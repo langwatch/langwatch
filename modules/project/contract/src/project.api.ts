@@ -99,6 +99,21 @@ export interface ProjectApi {
     by: Readonly<{ id: string }>,
   ): Promise<Project>;
   /**
+   * Provisions a project for a management credential, which may be a service
+   * key acting as nobody: the actor is nullable here, unlike `create`'s.
+   */
+  createInOrganization(
+    input: Readonly<{
+      organizationId: string;
+      userId: string | null;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+    }>,
+  ): Promise<Project>;
+  /**
    * Stored-object credentials (`s3Endpoint`, `s3AccessKeyId`, `s3SecretAccessKey`)
    * arrive as plaintext and are sealed on write; reads answer them as stored.
    */

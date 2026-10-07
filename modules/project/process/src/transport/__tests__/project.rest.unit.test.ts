@@ -4,23 +4,19 @@
  * a domain refusal becomes, and the wire body — not what the domain decides.
  * Spec: specs/projects/projects-management-door.feature
  */
-import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import type { DataPrivacyPiiRedactionLevel } from "@langwatch/data-privacy-contract";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
-  ProjectSlugConflictError,
-  TeamNotInOrganizationError,
-  type PaginatedProjects,
   type ArchivedProject,
   type Project,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { API_KEY_ID, mountProjectRest, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
+import { mountProjectRest, ORGANIZATION_ID } from "./project.rest.harness.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -77,309 +73,26 @@ function projectWithTeam(overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
   };
 }
 
-function page(data: Project[], total = data.length): PaginatedProjects {
-  return { data, pagination: { page: 1, limit: 50, total } };
-}
-
-/** The service key the door mints alongside a new project. */
-function mintedServiceKey(): { token: string; apiKeyId: string } {
-  return { token: "sk-lw-service-token", apiKeyId: "api-key-service" };
-}
-
-/** The visibility answer a credential whose reach is the whole organization gets. */
-const SEES_EVERYTHING: ApiKeyVisibleProjects = { kind: "all" };
-
-/** Every listing route resolves the credential's reach before it queries. */
-const REACHES_EVERYTHING = { resolveVisibleProjects: vi.fn(async () => SEES_EVERYTHING) };
-
 describe("the projects REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
-      const listByOrganization = vi.fn(async () => page([]));
-      const { hono } = mountProjectRest({ app: { listByOrganization } });
+      const findWithTeam = vi.fn(async () => projectWithTeam());
+      const { hono } = mountProjectRest({ app: { findWithTeam } });
 
-      const response = await hono.request("/api/projects");
+      const response = await hono.request("/api/projects/project_1");
 
       expect(response.status).toBe(401);
-      expect(listByOrganization).not.toHaveBeenCalled();
+      expect(findWithTeam).not.toHaveBeenCalled();
     });
 
     it("refuses a credential it does not recognise", async () => {
       const { send } = mountProjectRest();
 
-      const response = await send("/api/projects", { credential: "sk-lw-invalid_token" });
+      const response = await send("/api/projects/project_1", {
+        credential: "sk-lw-invalid_token",
+      });
 
       expect(response.status).toBe(401);
-    });
-  });
-
-  describe("when a project is provisioned", () => {
-    it("returns the project with a freshly minted service key and no base key", async () => {
-      const createInOrganization = vi.fn(async () => project());
-      const provisionServiceKey = vi.fn(async () => mintedServiceKey());
-      const { send } = mountProjectRest({ app: { createInOrganization, provisionServiceKey } });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "My Test Project",
-          teamId: "team-1",
-          language: "python",
-          framework: "langchain",
-        },
-      });
-
-      expect(response.status).toBe(201);
-      const body = (await response.json()) as Record<string, unknown>;
-      expect(body).toMatchObject({
-        id: "project_1",
-        name: "My Test Project",
-        slug: "my-test-project",
-        teamId: "team-1",
-        language: "python",
-        framework: "langchain",
-        serviceApiKey: "sk-lw-service-token",
-        serviceApiKeyId: "api-key-service",
-      });
-      expect(body).not.toHaveProperty("apiKey");
-      expect(createInOrganization).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
-      );
-      expect(provisionServiceKey).toHaveBeenCalledWith({
-        projectId: "project_1",
-        projectName: "My Test Project",
-        organizationId: ORGANIZATION_ID,
-        createdByUserId: USER_ID,
-      });
-    });
-
-    it("provisions into a new team when the request names one instead of an id", async () => {
-      const createInOrganization = vi.fn(async () => project({ teamId: "team-new" }));
-      const { send } = mountProjectRest({
-        app: { createInOrganization, provisionServiceKey: vi.fn(async () => mintedServiceKey()) },
-      });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "New Team Project",
-          newTeamName: "API Team",
-          language: "typescript",
-          framework: "vercel-ai",
-        },
-      });
-
-      expect(response.status).toBe(201);
-      expect(createInOrganization).toHaveBeenCalledWith(
-        expect.objectContaining({ newTeamName: "API Team", teamId: undefined }),
-      );
-    });
-
-    it("refuses a body with no name", async () => {
-      const createInOrganization = vi.fn(async () => project());
-      const { send } = mountProjectRest({ app: { createInOrganization } });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: { teamId: "team-1", language: "python", framework: "langchain" },
-      });
-
-      expect(response.status).toBe(422);
-      expect(createInOrganization).not.toHaveBeenCalled();
-    });
-
-    it("refuses a body that names neither an existing team nor a new one", async () => {
-      const createInOrganization = vi.fn(async () => project());
-      const { send } = mountProjectRest({ app: { createInOrganization } });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: { name: "No Team", language: "python", framework: "langchain" },
-      });
-
-      expect(response.status).toBe(422);
-      expect(createInOrganization).not.toHaveBeenCalled();
-    });
-
-    it("reads a team outside the organization as a bad request", async () => {
-      const { send } = mountProjectRest({
-        app: {
-          createInOrganization: vi.fn(async (): Promise<Project> => {
-            throw new TeamNotInOrganizationError("Team does not belong to this organization");
-          }),
-        },
-      });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "Wrong Team",
-          teamId: "nonexistent-team-id",
-          language: "python",
-          framework: "langchain",
-        },
-      });
-
-      expect(response.status).toBe(400);
-    });
-
-    it("refuses a personal-workspace boundary and reports a slug clash", async () => {
-      const boundary = mountProjectRest({
-        app: {
-          createInOrganization: vi.fn(async (): Promise<Project> => {
-            throw new PersonalWorkspaceBoundaryError("Not managed here");
-          }),
-        },
-      });
-      const clash = mountProjectRest({
-        app: {
-          createInOrganization: vi.fn(async (): Promise<Project> => {
-            throw new ProjectSlugConflictError("Slug already taken");
-          }),
-        },
-      });
-      const body = {
-        name: "Clashing",
-        teamId: "team-1",
-        language: "python",
-        framework: "langchain",
-      };
-
-      expect((await boundary.send("/api/projects", { method: "POST", body })).status).toBe(403);
-
-      const conflict = await clash.send("/api/projects", { method: "POST", body });
-      expect(conflict.status).toBe(409);
-      await expect(conflict.json()).resolves.toMatchObject({ code: "conflict" });
-    });
-
-    it("refuses a caller without project:create", async () => {
-      const createInOrganization = vi.fn(async () => project());
-      const { send } = mountProjectRest({
-        app: { createInOrganization },
-        granted: ["project:view"],
-      });
-
-      const response = await send("/api/projects", {
-        method: "POST",
-        body: {
-          name: "Nope",
-          teamId: "team-1",
-          language: "python",
-          framework: "langchain",
-        },
-      });
-
-      expect(response.status).toBe(403);
-      expect(createInOrganization).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the collection is listed", () => {
-    /** @scenario Listing projects never discloses base keys */
-    it("answers with the page and never discloses a base key", async () => {
-      const listByOrganization = vi.fn(async () => page([project(), project({ id: "project_2" })]));
-      const { send } = mountProjectRest({
-        app: { listByOrganization, ...REACHES_EVERYTHING },
-      });
-
-      const response = await send("/api/projects");
-
-      expect(response.status).toBe(200);
-      const body = (await response.json()) as {
-        data: Record<string, unknown>[];
-        pagination: { page: number; limit: number; total: number };
-      };
-      expect(body.pagination).toEqual({ page: 1, limit: 50, total: 2 });
-      for (const row of body.data) {
-        expect(row).not.toHaveProperty("apiKey");
-        expect(row).not.toHaveProperty("lwqlKey");
-      }
-      expect(JSON.stringify(body)).not.toContain(project().apiKey);
-    });
-
-    it("passes the requested page and limit through", async () => {
-      const listByOrganization = vi.fn(async () => page([], 0));
-      const { send } = mountProjectRest({
-        app: { listByOrganization, ...REACHES_EVERYTHING },
-      });
-
-      await send("/api/projects?page=2&limit=2");
-
-      expect(listByOrganization).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: ORGANIZATION_ID, page: 2, limit: 2 }),
-      );
-    });
-
-    /**
-     * The listing is `anyAuthenticated`, not a `project:view` demand: a
-     * credential whose reach is narrower than the organization gets exactly
-     * the projects it can see, with a 200.
-     */
-    describe("given a credential bound to some of the organization's projects", () => {
-      /** @scenario "project-scoped key gets a filtered list, not a refusal" */
-      it("narrows the query to those projects and answers 200", async () => {
-        const listByOrganization = vi.fn(async () => page([project()], 1));
-        const resolveVisibleProjects = vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
-          kind: "some",
-          ids: ["project_1", "project_9"],
-        }));
-        const { send } = mountProjectRest({
-          app: { listByOrganization, resolveVisibleProjects },
-        });
-
-        const response = await send("/api/projects?limit=100");
-
-        expect(response.status).toBe(200);
-        expect(resolveVisibleProjects).toHaveBeenCalledWith({
-          apiKeyId: API_KEY_ID,
-          organizationId: ORGANIZATION_ID,
-        });
-        expect(listByOrganization).toHaveBeenCalledWith({
-          organizationId: ORGANIZATION_ID,
-          page: 1,
-          limit: 100,
-          projectIds: ["project_1", "project_9"],
-        });
-      });
-
-      /** @scenario "a key without project:view gets an empty list, not a refusal" */
-      it("answers 200 with an empty list when the credential reaches nothing", async () => {
-        const listByOrganization = vi.fn(async () => page([], 0));
-        const { send } = mountProjectRest({
-          app: {
-            listByOrganization,
-            resolveVisibleProjects: vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
-              kind: "some",
-              ids: [],
-            })),
-          },
-          granted: [],
-        });
-
-        const response = await send("/api/projects");
-
-        expect(response.status).toBe(200);
-        await expect(response.json()).resolves.toEqual({
-          data: [],
-          pagination: { page: 1, limit: 50, total: 0 },
-        });
-      });
-    });
-
-    /** @scenario "org-scoped key lists every project in the organization" */
-    it("leaves the query unfiltered for a credential that reaches the organization", async () => {
-      const listByOrganization = vi.fn(async () => page([project()]));
-      const { send } = mountProjectRest({
-        app: { listByOrganization, ...REACHES_EVERYTHING },
-      });
-
-      await send("/api/projects");
-
-      expect(listByOrganization).toHaveBeenCalledWith({
-        organizationId: ORGANIZATION_ID,
-        page: 1,
-        limit: 50,
-      });
     });
   });
 

@@ -1,4 +1,3 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { SessionReader } from "@langwatch/api/hosting";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
@@ -69,7 +68,6 @@ function installed(peers: Peers) {
           updatedAt: CREATED_AT,
         }),
       }),
-      "api-key": createApiFixture<ApiKeyApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       trace: peers.trace,
       "audit-log": peers.auditLog,

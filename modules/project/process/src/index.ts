@@ -1,9 +1,5 @@
 export { projectProcessModule } from "./project.module.ts";
-export {
-  type ProjectManagementApi,
-  projectRest,
-  projectRestCredential,
-} from "./transport/project.rest.ts";
+export { type ProjectManagementApi, projectRest } from "./transport/project.rest.ts";
 export {
   type ProjectBrowserApi,
   projectTrpcTransport,

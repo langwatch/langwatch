@@ -1,16 +1,12 @@
-import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 /**
- * `/api/projects` — the organization's own projects and each one's ingestion
- * credential. The door resolves the ORGANIZATION; the five by-id routes ask
- * permission at the project the path names. Spec: specs/api-keys/project-key-read-access.feature
+ * `/api/projects/:id` — one of the organization's projects and its base key.
+ * The door resolves the ORGANIZATION; each route asks at the project the path
+ * names. The collection is api-key's (api-key-projects.rest.ts).
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
-  BadRequestError,
-  defineRestMiddleware,
   defineRestRouter,
   ForbiddenError,
-  HttpError,
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
@@ -22,21 +18,13 @@ import { moduleApi } from "@langwatch/module";
 import {
   isGovernanceProject,
   PersonalProjectProtectedError,
-  PersonalWorkspaceBoundaryError,
   projectApiKeyRotationSchema,
   ProjectNotFoundError,
-  projectRestCreateSchema,
   projectRestArchivedSchema,
-  projectRestCreatedSchema,
-  projectRestCredentialSchema,
-  projectRestPaginationQuerySchema,
   projectRestParamsSchema,
   projectRestRegenerateApiKeyInputSchema,
-  projectRestPageSchema,
   projectRestDetailSchema,
   projectRestUpdateSchema,
-  ProjectSlugConflictError,
-  TeamNotInOrganizationError,
   type ArchivedProject,
   type Project,
   type ProjectApi,
@@ -60,28 +48,12 @@ const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
 /**
  * What the management door reaches: flat operations `ProjectModule` serves via
  * `implements ProjectManagementApi`, so an unsupplied member fails the build.
- * Reads mirror {@link ProjectApi} and {@link DataPrivacyApi}; five are its own.
+ * Reads mirror {@link ProjectApi} and {@link DataPrivacyApi}; two are its own.
  */
 export interface ProjectManagementApi
   extends
-    Pick<ProjectApi, "listByOrganization" | "findWithTeam">,
+    Pick<ProjectApi, "findWithTeam">,
     Pick<DataPrivacyApi, "getPiiRedactionLevel" | "setPiiRedactionLevel"> {
-  /**
-   * Provisions a project in this organization. Distinct from
-   * `ProjectApi.create` because a management credential may be a service key
-   * (acts as nobody) — the actor here is nullable; that one's is not.
-   */
-  createInOrganization(
-    input: Readonly<{
-      organizationId: string;
-      userId: string | null;
-      teamId?: string | undefined;
-      newTeamName?: string | undefined;
-      name: string;
-      language: string;
-      framework: string;
-    }>,
-  ): Promise<Project>;
   /**
    * Writes exactly the fields the request carried, scoped to the organization
    * the credential resolved — never to the project's own organization, which
@@ -98,39 +70,9 @@ export interface ProjectManagementApi
   archiveInOrganization(
     input: Readonly<{ projectId: string; organizationId: string }>,
   ): Promise<ArchivedProject>;
-  /** Which of the organization's projects the presented credential reaches. */
-  resolveVisibleProjects(
-    input: Readonly<{ apiKeyId: string; organizationId: string }>,
-  ): Promise<ApiKeyVisibleProjects>;
-  /** The service key minted alongside a newly provisioned project. */
-  provisionServiceKey(
-    input: Readonly<{
-      projectId: string;
-      projectName: string;
-      organizationId: string;
-      createdByUserId: string | null;
-    }>,
-  ): Promise<{ token: string; apiKeyId: string }>;
 }
 
 export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project");
-
-/**
- * The organization credential this door resolved: the key, and the member it
- * acts as — null for a service key, which acts as nobody.
- */
-export const projectRestCredential = defineRestMiddleware(
-  "projectRestCredential",
-  projectRestCredentialSchema,
-);
-
-/**
- * The listing is not gated on organization-wide `project:view`: a credential
- * whose view does not reach organization scope gets a 200 with exactly the
- * projects it holds `project:view` on instead of a 403.
- */
-const LISTING_ANSWERS_WHAT_THE_KEY_REACHES =
-  "the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused";
 
 /**
  * The two base-key routes answer nothing rather than check a permission —
@@ -152,73 +94,6 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   // No derived twin: `/api/v1/projects` belongs to the LangWatch-QL family.
   .withAddressing("dated", { v1Twin: false })
   .withCredential("organization")
-
-  .get("/", "listProjects")
-  .withQuery(projectRestPaginationQuerySchema)
-  .withAccess(anyAuthenticated({ reason: LISTING_ANSWERS_WHAT_THE_KEY_REACHES }))
-  .withOutput(projectRestPageSchema)
-  .withDocs({
-    summary: "List projects",
-    description:
-      "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
-    errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS],
-  })
-  .withMiddleware(projectRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const visible = await app.resolveVisibleProjects({
-      apiKeyId: credential.apiKeyId,
-      organizationId: scope.id,
-    });
-
-    const result = await app.listByOrganization({
-      organizationId: scope.id,
-      page: input.page,
-      limit: input.limit,
-      ...(visible.kind === "some" ? { projectIds: visible.ids } : {}),
-    });
-
-    return { data: result.data.map(projectResponse), pagination: result.pagination };
-  })
-
-  .post("/", "createProject")
-  .withInput(projectRestCreateSchema)
-  .withPermission("project:create")
-  .withOutput(projectRestCreatedSchema)
-  .withStatus(201)
-  .withDocs({
-    summary: "Create a project",
-    description:
-      "Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
-    errors: [
-      { status: 400, description: "Team does not belong to this organization" },
-      PROJECT_INVALID_TOKEN,
-      { status: 403, description: "Insufficient permissions (requires project:create)" },
-      { status: 409, description: "A project with this name already exists in the team" },
-      { status: 422, description: "Validation error (missing required fields)" },
-    ],
-  })
-  .withMiddleware(projectRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const project = await provisionProject({
-      app,
-      input,
-      organizationId: scope.id,
-      userId: credential.userId,
-    });
-
-    const serviceKey = await app.provisionServiceKey({
-      projectId: project.id,
-      projectName: project.name,
-      organizationId: scope.id,
-      createdByUserId: credential.userId,
-    });
-
-    return {
-      ...projectResponse(project),
-      serviceApiKey: serviceKey.token,
-      serviceApiKeyId: serviceKey.apiKeyId,
-    };
-  })
 
   .get("/:id", "getProject")
   .withParams(projectRestParamsSchema)
@@ -366,43 +241,6 @@ async function projectInOrganization({
   return project;
 }
 
-/** The provisioning refusals, as the status codes this family answers with. */
-async function provisionProject({
-  app,
-  input,
-  organizationId,
-  userId,
-}: {
-  app: ProjectManagementApi;
-  input: Readonly<{
-    name: string;
-    language: string;
-    framework: string;
-    teamId?: string | undefined;
-    newTeamName?: string | undefined;
-  }>;
-  organizationId: string;
-  userId: string | null;
-}): Promise<Project> {
-  try {
-    return await app.createInOrganization({
-      organizationId,
-      userId,
-      teamId: input.teamId,
-      newTeamName: input.newTeamName,
-      name: input.name,
-      language: input.language,
-      framework: input.framework,
-    });
-  } catch (error) {
-    if (error instanceof TeamNotInOrganizationError) throw new BadRequestError(error.message);
-    if (error instanceof PersonalWorkspaceBoundaryError) throw new ForbiddenError(error.message);
-    if (error instanceof ProjectSlugConflictError) throw new ProjectSlugConflict(error.message);
-
-    throw error;
-  }
-}
-
 /** The update, then the PII level if one was sent, answering the level read back. */
 async function updateProject({
   app,
@@ -457,19 +295,5 @@ async function archiveProject({
     if (error instanceof PersonalProjectProtectedError) throw new ForbiddenError(error.message);
 
     throw error;
-  }
-}
-
-/**
- * The slug clash, in the flat body this family has always answered. A plain
- * {@link HttpError} would publish the sentence as the `error` field; this door
- * publishes the class of refusal there and the sentence beside it.
- */
-class ProjectSlugConflict extends HttpError {
-  readonly status = 409;
-
-  constructor(message: string) {
-    super(message);
-    this.error = "Conflict";
   }
 }

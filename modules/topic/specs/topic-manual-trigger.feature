@@ -30,3 +30,10 @@ Feature: A member triggers topic clustering by hand
     When the scheduler fails for a reason no caller can act on
     Then the process records the failure
     And the caller is told only that the request failed, with a trace id to quote
+
+  @unit
+  Scenario: A clustering request whose scheduler cannot be reached is reported, not raised
+    Given a deployment whose clustering scheduler cannot be reached
+    When a member asks topics.triggerTopicClustering for a manual run
+    Then the failure is reported for the project it happened on
+    And the member is answered with an unknown failure rather than a named one

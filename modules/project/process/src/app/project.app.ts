@@ -1,4 +1,3 @@
-import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -55,7 +54,6 @@ import type {
 
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
-  apiKeys: typeof ApiKeyApi;
   /**
    * Asked about a scope the door's declared check did not resolve. Every
    * process that installs this module installs AuthZ, which is what makes it
@@ -100,7 +98,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   static readonly contract = ProjectApi;
   static readonly dependencies: ProjectDependencies = {
     organizations: OrganizationApi,
-    apiKeys: ApiKeyApi,
     authorization: AuthzApi,
     trace: TraceApi,
     auditLog: AuditLogApi,
@@ -110,7 +107,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
-  readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
@@ -122,7 +118,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     projectService,
     operations,
     lifecycle,
-    apiKeys,
     authorization,
     trace,
     dataPrivacy,
@@ -130,7 +125,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
-    apiKeys: ApiKeyApi;
     authorization: AuthzApi;
     trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
@@ -138,7 +132,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
-    this.#apiKeys = apiKeys;
     this.#authorization = authorization;
     this.#trace = trace;
     this.#dataPrivacy = dataPrivacy;
@@ -170,7 +163,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       projectService: projects,
       operations,
       lifecycle,
-      apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
       trace: dependencies.trace,
       dataPrivacy: dependencies.dataPrivacy,
@@ -273,9 +265,9 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   }
 
   /**
-   * The `/api/projects` management operations, each scoped to the
-   * organization the door's credential resolved — never the project itself —
-   * so a token issued for one organization cannot reach another's project.
+   * The management operations, each scoped to the organization the door's
+   * credential resolved — never the project itself — so a token issued for one
+   * organization cannot reach another's project.
    */
   createInOrganization(
     input: Readonly<{
@@ -318,12 +310,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
   }
 
-  resolveVisibleProjects(
-    input: Readonly<{ apiKeyId: string; organizationId: string }>,
-  ): Promise<ApiKeyVisibleProjects> {
-    return this.#apiKeys.resolveVisibleProjects(input);
-  }
-
   getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
     return this.#dataPrivacy.getPiiRedactionLevel(input);
   }
@@ -333,31 +319,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     level: DataPrivacyPiiRedactionLevel;
   }): Promise<void> {
     return this.#dataPrivacy.setPiiRedactionLevel(input);
-  }
-
-  /**
-   * The service key a newly provisioned project is handed back with: an
-   * organization key bound as ADMIN on that project alone, belonging to no
-   * member. Lives here because it is what a project's credential IS, not how one door spells it.
-   */
-  async provisionServiceKey(
-    input: Readonly<{
-      projectId: string;
-      projectName: string;
-      organizationId: string;
-      createdByUserId: string | null;
-    }>,
-  ): Promise<{ token: string; apiKeyId: string }> {
-    const created = await this.#apiKeys.create({
-      name: `${input.projectName} Service Key`,
-      userId: null,
-      createdByUserId: input.createdByUserId,
-      organizationId: input.organizationId,
-      permissionMode: "all",
-      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: input.projectId }],
-    });
-
-    return { token: created.token, apiKeyId: created.apiKey.id };
   }
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {

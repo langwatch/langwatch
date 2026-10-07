@@ -102,12 +102,6 @@ Feature: The project.* browser namespace is served by the application the compos
     Then their standing is asked about the project being archived
     And the project is archived only when that answer permits it
 
-  Scenario: a clustering request that fails is reported, not raised
-    Given a deployment whose clustering scheduler cannot be reached
-    When somebody asks for topic clustering
-    Then the failure is reported for the project it happened on
-    And the caller is answered with an unknown failure rather than a named one
-
   Scenario: A project manager revokes the legacy project key and is shown no key
     Given a project with a legacy project key
     And somebody who is an administrator of the project

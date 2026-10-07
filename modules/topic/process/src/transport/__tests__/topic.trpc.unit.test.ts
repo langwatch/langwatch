@@ -133,4 +133,21 @@ describe("topics.triggerTopicClustering", () => {
       expect(reportFailure).toHaveBeenCalledWith(expect.any(Error), { projectId: "project_123" });
     });
   });
+
+  describe("when the clustering scheduler cannot be reached", () => {
+    /** @scenario "A clustering request whose scheduler cannot be reached is reported, not raised" */
+    it("reports the failure for the project and answers an unknown failure", async () => {
+      const { caller, reportFailure } = mount({
+        requestClustering: async () => {
+          throw new Error("connect ECONNREFUSED clustering-scheduler:443");
+        },
+      });
+
+      const refusal = caller.triggerTopicClustering({ projectId: "project_123" });
+
+      await expect(refusal).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+      await expect(refusal).rejects.not.toHaveProperty("cause.code");
+      expect(reportFailure).toHaveBeenCalledWith(expect.any(Error), { projectId: "project_123" });
+    });
+  });
 });

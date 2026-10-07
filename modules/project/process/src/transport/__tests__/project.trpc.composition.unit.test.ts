@@ -25,7 +25,6 @@ import { MemoryProjectRepository } from "../../repositories/memory/memory.projec
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const reported = vi.hoisted(() => ({
   entries: [] as { payload: Readonly<Record<string, unknown>>; message: string }[],
@@ -141,7 +140,6 @@ function application(
   const app = ProjectModule.create({
     logger,
     dependencies: {
-      apiKeys: new TestApiKeyService(),
       authorization,
       organizations: createApiFixture<OrganizationApi>({}, "organizations"),
       trace: createApiFixture<TraceApi>({}, "trace"),

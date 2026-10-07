@@ -12648,9 +12648,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../api-key/contract
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
