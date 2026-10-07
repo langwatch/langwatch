@@ -7,10 +7,13 @@ import {
   adminWorkspaceKindSchema,
   recordWorkspaceViewResultSchema,
 } from "./admin-workspace-view-audit.ts";
+import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
 import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
 import { governanceSetupStateSchema } from "./governance.ts";
 import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
 import { personaResolutionSchema } from "./persona-home.ts";
+import { governanceBudgetOverviewForUserSchema } from "./personal-budget-overview.ts";
+import { personalUsageRollupSchema } from "./personal-usage.ts";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
@@ -69,4 +72,25 @@ export const governanceTrpc = defineTrpcContract("governance")
     }),
   )
   .withOutput(recordWorkspaceViewResultSchema)
+
+  /** The caller's own /me rollup; the window applies only when both ends are given. */
+  .query("personalUsage")
+  .withInput(
+    z.object({
+      ...organizationScope.shape,
+      windowStartMs: z.number().optional(),
+      windowEndMs: z.number().optional(),
+    }),
+  )
+  .withOutput(personalUsageRollupSchema)
+
+  /** Every budget binding the caller's own keys, most binding first. */
+  .query("budgetOverview")
+  .withInput(z.object({ ...organizationScope.shape, includeTopModels: z.boolean().optional() }))
+  .withOutput(governanceBudgetOverviewForUserSchema)
+
+  /** What the CLI's login ceremony renders: the caller's providers and monthly budget. */
+  .query("cliBootstrap")
+  .withInput(organizationScope)
+  .withOutput(cliBootstrapResultSchema)
   .build();

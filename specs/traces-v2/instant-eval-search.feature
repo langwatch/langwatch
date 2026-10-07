@@ -100,6 +100,18 @@ Feature: Instant Evals inside the Trace Explorer
       When the chips are drawn
       Then each is drawn as an eval chip, apart from the blue filter chips
 
+    @unit
+    Scenario: An eval question still being typed is green from its opening quote
+      Given the reader is typing `eval:"the assistant refused to help"` one character at a time
+      When the chips are drawn after each character from the opening quote on
+      Then each time one eval chip covers the field, the quote and the whole question so far
+
+    @integration
+    Scenario: The editor draws an eval question still being typed as one eval chip
+      Given the search bar editor holds `eval:"the assistant refused to` with the quote not closed
+      When the chips are drawn
+      Then the editor shows one eval chip holding the whole text
+
     @integration
     Scenario: An eval chip sweeps while its run is under way
       Given an eval chip in the search bar

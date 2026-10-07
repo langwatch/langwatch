@@ -9,7 +9,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
@@ -90,18 +90,9 @@ function userService(): ScimUserProvisioning {
   } satisfies ScimUserProvisioning;
 }
 
-function governance(): ScimDepartmentAssignment {
+function costCenterFacts(): ScimCostCenterFacts {
   return {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: "org-1",
-      name: "Engineering",
-      // A Department carries its timestamps; the stub used to omit them and a
-      // cast onto the whole service hid it.
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
 }
 
@@ -144,7 +135,7 @@ describe("SCIM PATCH operation casing parity", () => {
       prisma: repo,
       writer: new GrantsFake(),
       users: userService(),
-      governance: governance(),
+      costCenterFacts: costCenterFacts(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),

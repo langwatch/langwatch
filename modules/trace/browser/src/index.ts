@@ -1,6 +1,5 @@
 export * from "./model/attribute-format.ts";
 export * from "./model/attribute-value-equality.ts";
-export * from "./model/cost-attribution.ts";
 export * from "./model/dedupe-by-value.ts";
 
 export * from "./behavior/time-range-presets.ts";

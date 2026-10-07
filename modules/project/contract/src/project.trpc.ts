@@ -20,7 +20,6 @@ import {
   projectLegacyKeyStatusSchema,
   projectProvisionedSchema,
   projectSettingsSavedSchema,
-  topicClusteringRequestSchema,
 } from "./project.responses.ts";
 
 export const projectTrpc = defineTrpcContract("project")
@@ -60,8 +59,4 @@ export const projectTrpc = defineTrpcContract("project")
   .mutation("archiveById")
   .withInput(projectArchiveByIdInputSchema)
   .withOutput(projectArchivedSchema)
-
-  .mutation("triggerTopicClustering")
-  .withInput(projectScopeSchema)
-  .withOutput(topicClusteringRequestSchema)
   .build();

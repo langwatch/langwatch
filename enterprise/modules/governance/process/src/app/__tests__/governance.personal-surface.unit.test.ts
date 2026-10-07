@@ -48,7 +48,7 @@ const noGatewayAccess: GatewayBudgetOverviewForUser = {
   budgets: [],
 };
 
-async function buildApp(options: { workspace: PersonalWorkspace | null }) {
+async function buildApp(options: { workspace: PersonalWorkspace | null; member?: boolean }) {
   const traceSpend = vi.fn(async (_input: { projectId: string }) => ({
     totalCost: 0,
     billedCost: 0,
@@ -73,6 +73,7 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>({
+        isMember: async () => options.member ?? true,
         getPersonalWorkspace: async () => {
           if (!options.workspace) throw new TeamNotFoundError();
           return options.workspace;
@@ -104,6 +105,18 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
 }
 
 describe("GovernanceModule personal surface", () => {
+  describe("given a caller outside the organization", () => {
+    /** @scenario "A caller outside the organization cannot read a personal usage rollup" */
+    it("refuses the usage dashboard as user_not_in_organization before reading", async () => {
+      const { app, traceSpend } = await buildApp({ workspace: null, member: false });
+
+      await expect(
+        app.personalUsageDashboard({ organizationId: ORGANIZATION_ID }, CALLER),
+      ).rejects.toMatchObject({ code: "user_not_in_organization", httpStatus: 403 });
+      expect(traceSpend).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a member with no personal workspace yet", () => {
     it("answers the usage dashboard with zeros", async () => {
       const { app } = await buildApp({ workspace: null });

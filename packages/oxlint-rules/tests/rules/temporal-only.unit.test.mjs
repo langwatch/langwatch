@@ -143,6 +143,28 @@ describe("given a file outside the governed source", () => {
     });
   });
 
+  describe("when it is auth's memory row file", () => {
+    /** @scenario "Auth's memory rows keep their Date" */
+    it("reports nothing, because Better Auth's memory adapter holds a Date", () => {
+      expect(
+        ids(
+          "type Row = { lastSeenAt?: Date };",
+          "modules/auth/process/src/repositories/memory/memory.auth.database.ts",
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Another memory repository is not a seam" */
+    it("reports the Date in a memory repository beside it", () => {
+      expect(
+        ids(
+          "const at = new Date();",
+          "modules/auth/process/src/repositories/memory/memory.better-auth-hooks.repository.ts",
+        ),
+      ).not.toEqual([]);
+    });
+  });
+
   describe("when it is eventing's Prisma store", () => {
     /** @scenario "Eventing's Prisma stores keep their Date" */
     it("reports nothing", () => {

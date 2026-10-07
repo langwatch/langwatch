@@ -1,25 +1,14 @@
 import { EvaluatorWorkflowVersionRequiredError } from "@langwatch/evaluator-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 type WorkflowReference = Readonly<{ workflowId: string; projectId: string }>;
-type EvaluatorReference = Readonly<{ evaluatorId: string; projectId: string }>;
 
-/** The workflow and monitor rows an evaluator is entangled with, through their owners. */
+/** The workflow rows an evaluator is entangled with, through their owner. */
 export class EvaluatorLinkedRowsService {
-  private constructor(
-    private readonly workflows: WorkflowApi,
-    private readonly monitors: Pick<MonitorApi, "findByEvaluator" | "delete">,
-  ) {}
+  private constructor(private readonly workflows: WorkflowApi) {}
 
-  static create({
-    workflows,
-    monitors,
-  }: {
-    workflows: WorkflowApi;
-    monitors: Pick<MonitorApi, "findByEvaluator" | "delete">;
-  }): EvaluatorLinkedRowsService {
-    return new EvaluatorLinkedRowsService(workflows, monitors);
+  static create({ workflows }: { workflows: WorkflowApi }): EvaluatorLinkedRowsService {
+    return new EvaluatorLinkedRowsService(workflows);
   }
 
   async findLinkedWorkflow({
@@ -29,20 +18,6 @@ export class EvaluatorLinkedRowsService {
     const [linked] = await this.workflows.listSummaries({ projectId, workflowIds: [workflowId] });
 
     return linked ?? null;
-  }
-
-  findMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ id: string; name: string }[]> {
-    return this.monitors.findByEvaluator(input);
-  }
-
-  /** Monitors are configuration: the cascade removes each one, through monitor. */
-  async deleteMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ count: number }> {
-    const monitors = await this.monitors.findByEvaluator(input);
-    for (const monitor of monitors) {
-      await this.monitors.delete({ id: monitor.id, projectId: input.projectId });
-    }
-
-    return { count: monitors.length };
   }
 
   archiveLinkedWorkflow(input: WorkflowReference): Promise<{ id: string }> {

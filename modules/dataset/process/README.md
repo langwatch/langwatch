@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport, batchRecordTrpcTransport).withEventing(datasetNormalizationEventing).withTasks(…)`, `src/dataset.module.ts:13`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withTasks(…)`, `src/dataset.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -19,7 +19,7 @@ Peers call these through the token, declared at `../contract/src/dataset.api.ts:
 #### `upsertDataset`
 
 ```typescript
-upsertDataset(input: { projectId: string; datasetId?: string; slugOrId?: string; experimentId?: string; name?: string; columnTypes?: DatasetColumns; datasetRecords?: UpsertDatasetInput["datasetRecords"]; }): Promise<Dataset>;
+upsertDataset(input: { projectId: string; datasetId?: string; slugOrId?: string; name?: string; columnTypes?: DatasetColumns; datasetRecords?: UpsertDatasetInput["datasetRecords"]; }): Promise<Dataset>;
 ```
 
 #### `validateDatasetName`
@@ -252,10 +252,10 @@ createBatchEvaluation(input: BatchEvaluationEntry): Promise<void>;
 
 #### `listBatchEvaluations`
 
-Every batch-evaluation record of the experiment the slug names.
+Every batch-evaluation record of one experiment; experiment resolves the slug.
 
 ```typescript
-listBatchEvaluations(input: { projectId: string; experimentSlug: string; }): Promise<BatchEvaluationRecord[]>;
+listBatchEvaluations(input: { projectId: string; experimentId: string; }): Promise<BatchEvaluationRecord[]>;
 ```
 
 #### `platformUrl`
@@ -517,15 +517,6 @@ type Response = z.infer<typeof datasetRestRecordsDeletedSchema>; // ../contract/
 ```
 
 ## tRPC transport
-
-### `batchRecord`
-
-Contract `../contract/src/batch-record.trpc.ts:54`, router `src/transport/batch-record.trpc.ts:10`.
-
-| Procedure                               | Kind  | Gate                        | Input                                     | Output |
-| --------------------------------------- | ----- | --------------------------- | ----------------------------------------- | ------ |
-| `batchRecord.getAllByexperimentIdGroup` | query | Permission `workflows:view` | `datasetApiProjectInputSchema`            | inline |
-| `batchRecord.getAllByexperimentSlug`    | query | Permission `workflows:view` | `batchRecordApiExperimentSlugInputSchema` | inline |
 
 ### `datasetRecord`
 

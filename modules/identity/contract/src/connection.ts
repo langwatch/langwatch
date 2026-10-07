@@ -31,8 +31,8 @@ export const SSO_CONNECTION_STATES = [
   "TEARDOWN_PENDING",
   "TORN_DOWN",
 ] as const;
-export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
-export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
+export const ssoConnectionLifecycleStateSchema = z.enum(SSO_CONNECTION_STATES);
+export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionLifecycleStateSchema>;
 
 /**
  * Where a connection's identity provider settings may be replaced: every setup
@@ -648,66 +648,79 @@ export const ssoDomainClaimSchema = z.object({
 });
 export type SsoDomainClaim = z.infer<typeof ssoDomainClaimSchema>;
 
+/** The dialing information as the fold holds it: the fact's shape, blank before registration. */
+const ssoIdpMetadataStateSchema = z.object({
+  issuer: z.string().nullable(),
+  providerId: z.string(),
+  clientIdRef: z.string().nullable(),
+  secretRef: z.string().nullable(),
+  certRefs: z.array(z.string()),
+}) satisfies z.ZodType<SsoIdpMetadata>;
+
 /**
- * One connection as the projection knows it — one row of `SsoConnection`,
- * and the state every guard is evaluated against.
+ * One connection as the projection knows it: one row of `SsoConnection`, the
+ * state every guard is evaluated against, and what a peer fold stores and
+ * parses back (`ssoConnectionStateSchema`).
  */
-export interface SsoConnectionState {
-  connectionId: string;
-  organizationId: string;
-  type: SsoConnectionType;
-  state: SsoConnectionLifecycleState;
+export const ssoConnectionStateSchema = z.object({
+  connectionId: z.string(),
+  organizationId: z.string(),
+  type: ssoConnectionTypeSchema,
+  state: ssoConnectionLifecycleStateSchema,
   /** Claimed but not yet approved. */
-  claimedDomains: string[];
+  claimedDomains: z.array(z.string()),
   /** Every claim this connection has made, in order: where each stands,
    *  when it was made and how long it waited. */
-  domainClaims: SsoDomainClaim[];
+  domainClaims: z.array(ssoDomainClaimSchema),
   /** Approved by ops, not yet proved. */
-  approvedDomains: string[];
+  approvedDomains: z.array(z.string()),
   /** Proved, and the only ones that ever route. */
-  verifiedDomains: string[];
+  verifiedDomains: z.array(z.string()),
   /** What proved each of them, and who. One entry per verified domain. */
-  domainVerifications: SsoDomainVerification[];
+  domainVerifications: z.array(ssoDomainVerificationSchema),
   /** The ceremony in flight, if any. The token's hash, never the token. */
-  pendingVerification: {
-    domain: string;
-    method: SsoVerificationMethod;
-    tokenHash: string;
-    /** When the published record stops proving anything; null when the
-     *  ceremony does not expire. */
-    expiresAtMs: number | null;
-  } | null;
-  idpMetadata: SsoIdpMetadata;
+  pendingVerification: z
+    .object({
+      domain: z.string(),
+      method: ssoVerificationMethodSchema,
+      tokenHash: z.string(),
+      /** When the published record stops proving anything; null when the
+       *  ceremony does not expire. */
+      expiresAtMs: z.number().nullable(),
+    })
+    .nullable(),
+  idpMetadata: ssoIdpMetadataStateSchema,
   /** Who this connection admits (ADR-117 §3). Stated at registration and
    *  changed by the setup journey; never absent, so no reader has to decide
    *  what absence means. */
-  arrivalPolicy: SsoArrivalPolicy;
+  arrivalPolicy: ssoArrivalPolicySchema,
   /** When somebody CHOSE it, or null while the registration default stands.
    *  A different fact from the policy: going live waits for the deciding,
    *  and "turn everybody away" is a decision too. */
-  arrivalPolicyDecidedAtMs: number | null;
-  source: SsoConnectionSource;
-  testLoginAccountId: string | null;
+  arrivalPolicyDecidedAtMs: z.number().nullable(),
+  source: ssoConnectionSourceSchema,
+  testLoginAccountId: z.string().nullable(),
   /** Why ops last rejected a claim, with the domain it was about. Kept so a
    *  re-claim starts from what a human already said. */
-  rejection: { domain: string; note: string } | null;
-  createdBy: string | null;
-  createdAtMs: number;
-  updatedAtMs: number;
+  rejection: z.object({ domain: z.string(), note: z.string() }).nullable(),
+  createdBy: z.string().nullable(),
+  createdAtMs: z.number(),
+  updatedAtMs: z.number(),
   /** When the grace elapses, while TEARDOWN_PENDING. */
-  tearDownAfterMs: number | null;
+  tearDownAfterMs: z.number().nullable(),
   /** The grandfathered connection this direct one replaces. Null for an
    *  ordinary connection, and for the grandfathered predecessor itself. */
-  replacesConnectionId: string | null;
+  replacesConnectionId: z.string().nullable(),
   /** Where the cutover stands. Null outside a migration pair. */
-  migrationPhase: SsoMigrationPhase | null;
-  graceStartedAtMs: number | null;
+  migrationPhase: ssoMigrationPhaseSchema.nullable(),
+  graceStartedAtMs: z.number().nullable(),
   /** When an administrator last chose the route. Audit evidence only: the
    *  route is derived from the phase, never from recency. */
-  routeChangedAtMs: number | null;
-  finalizationRequestedAtMs: number | null;
-  finalizedAtMs: number | null;
-}
+  routeChangedAtMs: z.number().nullable(),
+  finalizationRequestedAtMs: z.number().nullable(),
+  finalizedAtMs: z.number().nullable(),
+});
+export type SsoConnectionState = z.infer<typeof ssoConnectionStateSchema>;
 
 const EMPTY_IDP: SsoIdpMetadata = {
   issuer: null,

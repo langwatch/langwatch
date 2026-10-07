@@ -30,6 +30,13 @@ import type {
   MapProjectionOptions,
 } from "../projections/mapProjection.types.ts";
 import {
+  type PeerEventSchema,
+  type PeerFoldProjectionDeclaration,
+  type PeerMapProjectionDeclaration,
+  peerFoldProjection,
+  peerMapProjection,
+} from "../projections/peerProjection.ts";
+import {
   type SealedFoldProjection,
   type SealedMapProjection,
   type SealedStateProjection,
@@ -213,6 +220,46 @@ export class PipelineBuilder<
         }),
     });
     return this;
+  }
+
+  /**
+   * This module's fold over a peer pipeline's events (§9), on the global registry: lane
+   * `<this pipeline>.<fold name>`, ordered per source aggregate, deduped by event id, re-folded
+   * and replayed from the owner's event log. Spec: packages/eventing/specs/peer-projection.feature.
+   */
+  withPeerFoldProjection<State, const Events extends readonly PeerEventSchema[]>(
+    declaration: PeerFoldProjectionDeclaration<State, Events>,
+  ): this {
+    const lane = `${this.name}.${declaration.fold.name}`;
+    this.assertGlobalLaneFree(lane);
+    const fold = peerFoldProjection({ lane, declaration });
+    this.globalProjections.push({
+      name: lane,
+      register: (registry) => registry.registerPeerFoldProjection(fold),
+      peer: { kind: "fold", projection: sealFoldProjection(fold) },
+    });
+    return this;
+  }
+
+  /** This module's map over a peer pipeline's events (§9), as `withPeerFoldProjection`. */
+  withPeerMapProjection<MapRecord, const Events extends readonly PeerEventSchema[]>(
+    declaration: PeerMapProjectionDeclaration<MapRecord, Events>,
+  ): this {
+    const lane = `${this.name}.${declaration.map.name}`;
+    this.assertGlobalLaneFree(lane);
+    const map = peerMapProjection({ lane, declaration });
+    this.globalProjections.push({
+      name: lane,
+      register: (registry) => registry.registerPeerMapProjection(map),
+      peer: { kind: "map", projection: sealMapProjection<MapRecord, Event, Event>(map) },
+    });
+    return this;
+  }
+
+  private assertGlobalLaneFree(lane: string): void {
+    if (this.globalProjections.some((declared) => declared.name === lane)) {
+      this.throwDuplicateProjectionName(lane);
+    }
   }
 
   /** Register a ClickHouse fold. The app must bind its store through the Redis

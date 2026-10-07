@@ -8,21 +8,18 @@ import {
   canonicalErrorResponse,
   ForbiddenError,
   UnauthorizedError,
-  bindRestMiddleware,
 } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/process";
 
-import { projectRest, projectRestCredential, ProjectManagementApi } from "../project.rest.ts";
+import { projectRest, ProjectManagementApi } from "../project.rest.ts";
 import { TestProjectManagementApi } from "./support/test-project-management-api.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 export const USER_ID = "user-1";
-export const API_KEY_ID = "api-key-1";
 export const CREDENTIAL = "organization-credential";
 
 /** Every permission an organization credential holds unless a test narrows it. */
 const EVERY_PERMISSION = [
-  "project:create",
   "project:view",
   "project:update",
   "project:delete",
@@ -99,12 +96,6 @@ export function mountProjectRestApplication(
   const hono = runtime.mount(projectRest.router(), {
     app: () => apis.reference(ProjectManagementApi),
     onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestCredential, () => ({
-        apiKeyId: API_KEY_ID,
-        userId: USER_ID,
-      })),
-    ],
   });
 
   const send = (

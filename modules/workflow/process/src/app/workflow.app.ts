@@ -703,6 +703,7 @@ export class WorkflowModule implements WorkflowApi {
       studioDsl: infrastructure.studioDsl,
       httpSecrets: infrastructure.httpSecrets,
       agentMappings: infrastructure.agentMappings,
+      recordVersionSaved: (input) => this.#recordVersionSaved(input),
     });
     this.#studioCopies = WorkflowStudioCopyService.create({
       datasets: infrastructure.datasets,
@@ -850,6 +851,29 @@ export class WorkflowModule implements WorkflowApi {
         });
       })
       .catch((error: unknown) => this.#infrastructure.signals.failed(error, { projectId }));
+  }
+
+  /** Records a saved Studio version, never failing or delaying the save. */
+  #recordVersionSaved(input: {
+    projectId: string;
+    workflowId: string;
+    versionId: string;
+    authorId: string;
+  }): void {
+    void Promise.resolve()
+      .then(() => {
+        if (!this.#lifecycleCommands) {
+          throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordWorkflowVersionSaved.send({
+          tenantId: input.projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          ...input,
+        });
+      })
+      .catch((error: unknown) =>
+        this.#infrastructure.signals.failed(error, { projectId: input.projectId }),
+      );
   }
 
   /** The workflow lifecycle pipeline this module registers, built once by {@link create}. */

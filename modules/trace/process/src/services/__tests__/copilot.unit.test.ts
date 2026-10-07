@@ -1,6 +1,6 @@
+import { CopilotCanonicaliserService } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
-import { CopilotCanonicaliserService } from "../copilot-canonicaliser.service.ts";
 import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import { createExtractorContext } from "./test-helpers.ts";
 

@@ -70,7 +70,8 @@ For a module with a `client/` package read `modules/dataset/client`.
 3. Write the contract (`contract` skill), then the process half
    (`process-module` skill).
 4. Add the catalogue entry, run `pnpm generate:modules`, and
-   `pnpm sync:references` (new workspace packages).
+   `pnpm sync:references` (new workspace packages). Run `pnpm generate:readmes` and write the
+   one-paragraph description above each new page's generated block (`readmes` skill).
 5. Prove it with an installation test that boots the installed list over
    memory twins (record §13; `apps/api/src/__tests__/api-installation.fixture.ts`).
    `monitor-installation.unit.test.ts` still uses the deleted `createApp`
@@ -97,6 +98,9 @@ For a module with a `client/` package read `modules/dataset/client`.
   first (§5, 2026-10-05). The `module-dependencies` skill walks it.
 
 ## Not here
+
+What each module owns today, its peers and its doors: `modules/README.md` and the module's own
+`README.md`, generated from the code (`ownership` skill). Read them before the module's files.
 
 What a module may demand of its process (peers, config, secrets, availability,
 entitlements; §3.3): `module-dependencies`. Composing a process (`main.ts`,

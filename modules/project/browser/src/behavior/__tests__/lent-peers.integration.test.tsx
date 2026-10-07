@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { CustomGraphToken, type CustomGraphInput } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { InlineCommandPaletteToken } from "@langwatch/navigation-client";
 import {
@@ -22,12 +23,29 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
 
 import {
   AgentActionsMenu,
+  CustomGraph,
   InlineCommandPalette,
   PendingJoinRequests,
   ProjectDepartmentField,
 } from "../lent-peers.tsx";
 
 const peerLends = uiDeclarations([
+  {
+    name: "analytics",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: CustomGraphToken,
+          load: async () => ({
+            default: ({ input }: { input: CustomGraphInput }) => (
+              <span>{input.graphType} graph</span>
+            ),
+          }),
+        },
+      ],
+    },
+  },
   {
     name: "navigation",
     installation: {
@@ -81,6 +99,14 @@ const peerLends = uiDeclarations([
     },
   },
 ]);
+
+const graphInput: CustomGraphInput = {
+  graphId: "custom",
+  graphType: "line",
+  series: [],
+  includePrevious: false,
+  timeScale: 1,
+};
 
 const agentActions = {
   triggerLabel: "Set up with your agent",
@@ -157,6 +183,22 @@ describe("what navigation and organization lend project", () => {
     it("draws nothing in the menu's place", () => {
       declarations.current = uiDeclarations([]);
       const { container } = render(<AgentActionsMenu {...agentActions} />);
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe("given analytics lends its custom graph", () => {
+    it("draws analytics' graph with the input it is handed", async () => {
+      declarations.current = peerLends;
+      render(<CustomGraph input={graphInput} />);
+      expect(await screen.findByText("line graph")).toBeInTheDocument();
+    });
+  });
+
+  describe("given no installed module lends the custom graph token", () => {
+    it("draws nothing in the graph's place", () => {
+      declarations.current = uiDeclarations([]);
+      const { container } = render(<CustomGraph input={graphInput} />);
       expect(container).toBeEmptyDOMElement();
     });
   });

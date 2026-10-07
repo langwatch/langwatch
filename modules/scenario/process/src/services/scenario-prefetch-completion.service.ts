@@ -13,10 +13,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { resolveExecuteSyncRoute } from "../rules/execute-sync-route.rules.ts";
-import type {
-  RunSuite,
-  ScenarioExecutionLookupService,
-} from "./scenario-execution-lookup.service.ts";
+import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import {
   type ScenarioModelParametersService,
@@ -31,7 +28,6 @@ export type ScenarioPrefetchLookups = {
   scenario: ReturnType<ScenarioExecutionLookupService["getScenarioExecution"]>;
   project: ReturnType<ScenarioExecutionLookupService["fetchProject"]>;
   adapter: ReturnType<ScenarioTargetPrefetchService["getTargetAdapter"]>;
-  suite: ReturnType<ScenarioExecutionLookupService["getRunSuite"]>;
 };
 
 type ScenarioResult = Awaited<ReturnType<ScenarioExecutionLookupService["getScenarioExecution"]>>;
@@ -68,7 +64,6 @@ type ValidatedLookups =
       scenario: ScenarioResult;
       project: { id: string };
       adapter: TargetAdapterData;
-      suite: RunSuite;
     }
   | { success: false; result: ScenarioExecutionPrefetchResult };
 
@@ -108,6 +103,7 @@ export class ScenarioPrefetchCompletionService {
   async complete(input: {
     context: ScenarioExecutionPrefetchInput["context"];
     target: TargetConfig;
+    plan?: ScenarioExecutionPrefetchInput["plan"];
     lookups: ScenarioPrefetchLookups;
     /** The run's key, minted once by the prefetcher and shared with the child's environment. */
     runKey: Promise<string | undefined>;
@@ -115,17 +111,15 @@ export class ScenarioPrefetchCompletionService {
     startedByUserId?: string | undefined;
     startedByApiKeyId?: string | undefined;
   }): Promise<ScenarioExecutionPrefetchResult> {
-    const [scenario, project, adapter, suite] = await Promise.allSettled([
+    const [scenario, project, adapter] = await Promise.allSettled([
       input.lookups.scenario,
       input.lookups.project,
       input.lookups.adapter,
-      input.lookups.suite,
     ]);
     const validated = this.validateLookups(input.context, input.target, {
       scenario,
       project,
       adapter,
-      suite,
     });
     if (!validated.success) {
       return validated.result;
@@ -142,14 +136,14 @@ export class ScenarioPrefetchCompletionService {
     }
     if (runKey === undefined) throw new Error("A scenario run key was not minted");
 
-    this.applyPromptMappings(validated.adapter, input.target, validated.suite);
+    this.applyPromptMappings(validated.adapter, input.target);
     await this.applySandboxKey({
       adapter: validated.adapter,
       projectId: input.context.projectId,
       startedByUserId: input.startedByUserId,
       startedByApiKeyId: input.startedByApiKeyId,
     });
-    const models = await this.resolveModels(input.context, validated);
+    const models = await this.resolveModels(input.context, validated, input.plan);
     if (!models.success) {
       return models.result;
     }
@@ -194,13 +188,11 @@ export class ScenarioPrefetchCompletionService {
       scenario: PromiseSettledResult<ScenarioResult>;
       project: PromiseSettledResult<ProjectResult>;
       adapter: PromiseSettledResult<AdapterResult>;
-      suite: PromiseSettledResult<RunSuite>;
     },
   ): ValidatedLookups {
     const scenario = extractSettledOrMiss(lookups.scenario, "scenario_not_found");
     const project = extractSettled(lookups.project);
     const adapter = extractSettledOrMiss(lookups.adapter, "scenario_target_not_found");
-    const suite = extractSettled(lookups.suite);
 
     if (!scenario.found) {
       logger.warn(
@@ -270,7 +262,6 @@ export class ScenarioPrefetchCompletionService {
       scenario: scenario.value,
       project: project.data,
       adapter: adapter.value,
-      suite,
     };
   }
 
@@ -291,21 +282,13 @@ export class ScenarioPrefetchCompletionService {
     }
   }
 
-  private applyPromptMappings(
-    adapter: TargetAdapterData,
-    target: TargetConfig,
-    suite: RunSuite,
-  ): void {
+  /** A suite pins its prompt target's mappings on the run it queues; any other run has none. */
+  private applyPromptMappings(adapter: TargetAdapterData, target: TargetConfig): void {
     if (adapter.type !== "prompt") {
       return;
     }
 
-    adapter.scenarioMappings = suite.found
-      ? suite.suite.targets.find(
-          (candidate) =>
-            candidate.type === "prompt" && candidate.referenceId === target.referenceId,
-        )?.scenarioMappings
-      : undefined;
+    adapter.scenarioMappings = target.type === "prompt" ? target.scenarioMappings : undefined;
   }
 
   /**
@@ -332,6 +315,7 @@ export class ScenarioPrefetchCompletionService {
   private async resolveModels(
     context: ScenarioExecutionPrefetchInput["context"],
     lookups: Extract<ValidatedLookups, { success: true }>,
+    plan: ScenarioExecutionPrefetchInput["plan"],
   ): Promise<ResolvedModels> {
     try {
       let adapter: string | undefined;
@@ -347,10 +331,7 @@ export class ScenarioPrefetchCompletionService {
       // answer expanded, because a `latest` alias is stored verbatim and no
       // provider understands it as a model id.
       const { simulatorModel, judgeModel } = await resolveRunModels({
-        plan: {
-          simulatorModel: lookups.suite.found ? lookups.suite.suite.simulatorModel : undefined,
-          judgeModel: lookups.suite.found ? lookups.suite.suite.judgeModel : undefined,
-        },
+        plan: { simulatorModel: plan?.simulatorModel, judgeModel: plan?.judgeModel },
         scenario: {
           simulatorModel: lookups.scenario.simulatorModel,
           judgeModel: lookups.scenario.judgeModel,

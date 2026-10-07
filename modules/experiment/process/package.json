@@ -67,7 +67,8 @@
     "ioredis": "catalog:",
     "nanoid": "catalog:",
     "slugify": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zod-validation-error": "catalog:"
   },
   "devDependencies": {
     "@langwatch/authorization": "workspace:*",

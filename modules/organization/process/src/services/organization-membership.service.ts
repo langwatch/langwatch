@@ -546,6 +546,18 @@ export class OrganizationMembershipService {
     return { ...membership, teams };
   }
 
+  /** The plain MEMBER row an SSO domain auto-join writes (ADR-116); the caller grants it. */
+  createSsoDomainMembership(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    return this.repo.createSsoDomainMembership(input);
+  }
+
+  countMembershipsForUser(input: { userId: string }): Promise<number> {
+    return this.repo.countMembershipsForUser(input);
+  }
+
   /**
    * Removes a user from an organization and all its teams.
    */

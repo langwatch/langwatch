@@ -5,13 +5,19 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
+import {
+  DatasetApi,
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  type Dataset,
+} from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
   ExperimentApi,
+  ExperimentNotFoundError,
   type ExperimentCaller,
   type ExperimentRunLookupInput,
   type ExperimentUpdateFrame,
@@ -20,6 +26,7 @@ import {
   type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
+  type LogBatchEvaluationInput,
   type ComputeExperimentRunMetricsCommandData,
   type ExperimentIdLookupResult,
   type CreateEvaluationsV3Input,
@@ -111,6 +118,7 @@ import {
   slugifyExperimentName,
 } from "../rules/experiment-slug.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { ExperimentBatchLogService } from "../services/experiment-batch-log.service.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
@@ -178,6 +186,8 @@ export interface ExperimentAppDependencies {
   }>;
   /** The run pipeline, its senders and run lookup; absent where a suite builds none. */
   runProcessing?: ExperimentRunProcessing;
+  /** The SDK's batch result log; absent where a suite builds none. */
+  batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -250,10 +260,11 @@ export class ExperimentModule implements ExperimentApi {
     });
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
     const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
+    const runLookup = ExperimentFindOrCreateService.create(experiments);
 
     return new ExperimentModule({
       experiments,
-      runLookup: ExperimentFindOrCreateService.create(experiments),
+      runLookup,
       slugify: slugifyExperimentName,
       workbenchTargetNames: (input) => targetNames.resolve({ ...input, prompts, entities }),
       workflows,
@@ -268,6 +279,12 @@ export class ExperimentModule implements ExperimentApi {
       workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
       runProcessing: runs.processing,
+      batchLog: ExperimentBatchLogService.create({
+        runLookup,
+        runs: experiments,
+        report: dependencies.evaluation,
+        limits: dataset,
+      }),
     });
   }
 
@@ -530,6 +547,21 @@ export class ExperimentModule implements ExperimentApi {
     return this.#dependencies.experiments.completeExperimentRun(input);
   }
 
+  assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void> {
+    return this.#batchLog().assertWithinLimit(input);
+  }
+
+  logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void> {
+    return this.#batchLog().log(input);
+  }
+
+  #batchLog(): NonNullable<ExperimentAppDependencies["batchLog"]> {
+    const batchLog = this.#dependencies.batchLog;
+    if (!batchLog) throw new Error("this experiment process composes no batch result log");
+
+    return batchLog;
+  }
+
   /** One trace's cost, folded into its run by the run pipeline. */
   computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {
     return this.#runProcessing().commands.computeRunMetrics(input);
@@ -765,6 +797,28 @@ export class ExperimentModule implements ExperimentApi {
     input: Readonly<{ datasetId: string; projectId: string; name: string }>,
   ): Promise<Dataset> {
     return this.#dependencies.dataset.renameDataset(input);
+  }
+
+  /** One row per experiment and dataset: how many batch evaluations ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]> {
+    return this.#dependencies.dataset.summariseBatchEvaluations(input);
+  }
+
+  /** Every batch-evaluation record of the experiment a URL slug names; dataset holds the rows. */
+  async listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]> {
+    const experiment = await this.#dependencies.experiments.findBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
+    if (!experiment) throw new ExperimentNotFoundError(input.experimentSlug);
+
+    return this.#dependencies.dataset.listBatchEvaluations({
+      projectId: input.projectId,
+      experimentId: experiment.id,
+    });
   }
 
   /** Copies a dataset into another project. */

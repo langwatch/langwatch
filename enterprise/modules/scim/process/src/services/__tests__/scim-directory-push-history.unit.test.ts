@@ -101,9 +101,8 @@ function directoryOver({ ledger }: { ledger: ScimSyncLedgerWriterService }) {
     prisma: store,
     writer: new GrantsFake(),
     users,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),

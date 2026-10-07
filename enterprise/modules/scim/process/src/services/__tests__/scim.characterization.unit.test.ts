@@ -106,17 +106,8 @@ function service(
       findById: vi.fn(async () => null),
       create: vi.fn(),
     } satisfies ScimUserProvisioning,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(async () => ({
-        id: "department_1",
-        organizationId: "org_1",
-        name: "Engineering",
-        // A Department carries its timestamps; the stub used to omit them and a
-        // cast onto the whole service hid it.
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-      })),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: new FixedEntitlementService(enterprise),
@@ -303,17 +294,8 @@ describe("SCIM characterization: provisioning invariants", () => {
       prisma: repo,
       users,
       writer,
-      governance: {
-        departmentResolveByNameOrCreate: vi.fn(async () => ({
-          id: "department_1",
-          organizationId: "org_1",
-          name: "Engineering",
-          // A Department carries its timestamps; the stub used to omit them and a
-          // cast onto the whole service hid it.
-          createdAt: new Date(0),
-          updatedAt: new Date(0),
-        })),
-        departmentAssignUser: vi.fn(async () => undefined),
+      costCenterFacts: {
+        recordCostCenterChanged: vi.fn(async () => undefined),
       },
       organization: new OrganizationAdministrationFake(),
       entitlements: new FixedEntitlementService(true),
@@ -398,17 +380,8 @@ describe("SCIM characterization: provisioning invariants", () => {
       prisma: repo,
       users,
       writer,
-      governance: {
-        departmentResolveByNameOrCreate: vi.fn(async () => ({
-          id: "department_1",
-          organizationId: "org_1",
-          name: "Engineering",
-          // A Department carries its timestamps; the stub used to omit them and a
-          // cast onto the whole service hid it.
-          createdAt: new Date(0),
-          updatedAt: new Date(0),
-        })),
-        departmentAssignUser: vi.fn(async () => undefined),
+      costCenterFacts: {
+        recordCostCenterChanged: vi.fn(async () => undefined),
       },
       organization: new OrganizationAdministrationFake(),
       entitlements: new FixedEntitlementService(true),
@@ -471,15 +444,8 @@ describe("SCIM characterization: provisioning invariants", () => {
           prisma: repository({ addMembership: vi.fn(async () => undefined) }),
           writer,
           users,
-          governance: {
-            departmentResolveByNameOrCreate: vi.fn(async () => ({
-              id: "department_1",
-              organizationId: "org_1",
-              name: "Engineering",
-              createdAt: new Date(0),
-              updatedAt: new Date(0),
-            })),
-            departmentAssignUser: vi.fn(async () => undefined),
+          costCenterFacts: {
+            recordCostCenterChanged: vi.fn(async () => undefined),
           },
           organization: new OrganizationAdministrationFake(),
           entitlements: new FixedEntitlementService(true),

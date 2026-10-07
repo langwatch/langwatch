@@ -1,4 +1,6 @@
-import { Temporal } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
+import type { BetterAuthOptions } from "better-auth";
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthSessionRepository } from "../memory.auth-session.repository.ts";
@@ -8,14 +10,16 @@ import { MemoryCliDeviceSessionRepository } from "../memory.cli-device-session.r
 import { MemorySignUpVerificationTokenRepository } from "../memory.signup-verification-token.repository.ts";
 
 const NOW = Temporal.Instant.from("2026-08-28T00:00:00.000Z");
-const SESSION = { sessionToken: "token", impersonation: null };
+const SESSION = { sessionToken: "token" };
 
 function sessions() {
   const memory = MemoryAuthDatabase.create();
 
-  memory.sessions.set("s1", { id: "s1", userId: "u1", sessionToken: "t1", impersonation: null });
-  memory.sessions.set("s2", { id: "s2", userId: "u1", sessionToken: "t2", impersonation: null });
-  memory.sessions.set("s3", { id: "s3", userId: "u2", sessionToken: "t3", impersonation: null });
+  memory.db.Session.push(
+    { id: "s1", userId: "u1", sessionToken: "t1" },
+    { id: "s2", userId: "u1", sessionToken: "t2" },
+    { id: "s3", userId: "u2", sessionToken: "t3" },
+  );
 
   return MemoryAuthSessionRepository.create({ memory });
 }
@@ -54,16 +58,13 @@ describe("MemoryAuthSessionRepository", () => {
       /** @scenario "An organization's signed-in count holds its own members only" */
       it("counts each of those people with a live session once, and nobody else", async () => {
         const memory = MemoryAuthDatabase.create();
-        const live = NOW.add({ hours: 1 });
-        memory.sessions.set("s1", { ...SESSION, id: "s1", userId: "u1", expires: live });
-        memory.sessions.set("s2", { ...SESSION, id: "s2", userId: "u1", expires: live });
-        memory.sessions.set("s3", {
-          ...SESSION,
-          id: "s3",
-          userId: "u2",
-          expires: NOW.subtract({ hours: 1 }),
-        });
-        memory.sessions.set("s4", { ...SESSION, id: "s4", userId: "outsider", expires: live });
+        const live = toDate(NOW.add({ hours: 1 }));
+        memory.db.Session.push(
+          { ...SESSION, id: "s1", userId: "u1", expires: live },
+          { ...SESSION, id: "s2", userId: "u1", expires: live },
+          { ...SESSION, id: "s3", userId: "u2", expires: toDate(NOW.subtract({ hours: 1 })) },
+          { ...SESSION, id: "s4", userId: "outsider", expires: live },
+        );
         const repository = MemoryAuthSessionRepository.create({ memory });
 
         await expect(
@@ -82,6 +83,105 @@ describe("MemoryAuthSessionRepository", () => {
       it("counts zero rather than raising, as deleteMany does", async () => {
         await expect(sessions().deleteById({ id: "absent" })).resolves.toBe(0);
       });
+    });
+  });
+});
+
+/** Better Auth's model and field names, as the channel maps them onto the tables. */
+const BETTER_AUTH_TABLES = {
+  user: { modelName: "User" },
+  account: { modelName: "Account" },
+  session: {
+    modelName: "Session",
+    fields: { token: "sessionToken", expiresAt: "expires" },
+    additionalFields: {
+      amr: { type: "string[]", required: false, input: false },
+      identifierId: { type: "string", required: false, input: false },
+    },
+  },
+  verification: {
+    modelName: "VerificationToken",
+    fields: { identifier: "identifier", value: "token", expiresAt: "expires" },
+  },
+} satisfies BetterAuthOptions;
+
+describe("given Better Auth's memory adapter over the twins' database", () => {
+  async function mint({
+    memory,
+    token,
+    expiresAt,
+  }: {
+    memory: MemoryAuthDatabase;
+    token: string;
+    expiresAt: Instant;
+  }) {
+    const adapter = memoryAdapter(memory.db)(BETTER_AUTH_TABLES);
+
+    await adapter.transaction(async (transaction) => {
+      await transaction.create({
+        model: "session",
+        data: {
+          userId: "u1",
+          token,
+          expiresAt: toDate(expiresAt),
+          createdAt: toDate(NOW),
+          updatedAt: toDate(NOW),
+        },
+      });
+    });
+  }
+
+  describe("when a session is written inside a transaction and committed", () => {
+    it("is read back by the session twin after the commit replaced the table", async () => {
+      const memory = MemoryAuthDatabase.create();
+      const repository = MemoryAuthSessionRepository.create({ memory });
+      const before = memory.db.Session;
+
+      await mint({ memory, token: "minted", expiresAt: NOW.add({ hours: 1 }) });
+
+      expect(memory.db.Session).not.toBe(before);
+      await expect(repository.findTokensForUser({ userId: "u1" })).resolves.toEqual(["minted"]);
+      const [stored] = await repository.findStoredForUser({ userId: "u1" });
+      await expect(repository.findById({ id: stored!.id })).resolves.toMatchObject({
+        userId: "u1",
+        sessionToken: "minted",
+        impersonation: null,
+        createdAt: NOW,
+      });
+      await expect(repository.findExpiryByToken({ token: "minted" })).resolves.toEqual([
+        { expires: NOW.add({ hours: 1 }), userId: "u1" },
+      ]);
+      await expect(repository.countSignedInUsers({ at: NOW.epochMilliseconds })).resolves.toBe(1);
+    });
+  });
+
+  describe("when the committed session has already expired", () => {
+    it("does not count its owner as signed in", async () => {
+      const memory = MemoryAuthDatabase.create();
+      const repository = MemoryAuthSessionRepository.create({ memory });
+
+      await mint({ memory, token: "stale", expiresAt: NOW.subtract({ hours: 1 }) });
+
+      await expect(repository.findTokensForUser({ userId: "u1" })).resolves.toEqual(["stale"]);
+      await expect(repository.countSignedInUsers({ at: NOW.epochMilliseconds })).resolves.toBe(0);
+    });
+  });
+
+  describe("when a token is issued by the twin and a transaction commits beside it", () => {
+    it("keeps the twin's row, so the token is still claimable", async () => {
+      const memory = MemoryAuthDatabase.create();
+      const tokens = MemorySignUpVerificationTokenRepository.create({ memory });
+      await tokens.issue({
+        identifier: "signup:someone@example.com",
+        token: "live",
+        expires: NOW.add({ hours: 1 }),
+      });
+
+      await mint({ memory, token: "minted", expiresAt: NOW.add({ hours: 1 }) });
+
+      await expect(
+        tokens.claim({ token: "live", now: NOW, keepSpentUntil: NOW.add({ hours: 24 }) }),
+      ).resolves.toEqual({ claimed: true, identifier: "signup:someone@example.com" });
     });
   });
 });

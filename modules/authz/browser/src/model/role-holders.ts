@@ -1,4 +1,6 @@
-// Who holds a custom role and where, folded out of the assignments (main's roleHolders.ts).
+// Who holds what, folded out of the assignments (main's roleHolders.ts): onto the
+// holder, then onto the role with the scopes it was granted on. Every kind of holder
+// gets its own key and its own word, so no row is ever nameless.
 
 import type { GrantScopeTier } from "@langwatch/authz-contract";
 
@@ -11,16 +13,35 @@ export type GrantScope = {
   scopeName: string | null;
 };
 
+/** One role, and everywhere this holder was granted it. */
+export type CollapsedGrant = {
+  key: string;
+  roleName: string;
+  /** Which tier's colour the role badge takes; a custom role is its own tier. */
+  tier: string;
+  customRoleId: string | null;
+  scopes: GrantScope[];
+};
+
 /** A person, group or API key holding a role, however many assignments that took. */
 export type Holder = {
   key: string;
   kind: "person" | "group" | "apiKey";
   userId: string | null;
+  /** Never empty: a holder we cannot name is named as such. */
   name: string;
+  address: string | null;
   image: string | null;
   /** The directory a group is managed by, when it is. */
   directory: string | null;
+  grants: CollapsedGrant[];
+  /** The grants themselves, widest scope first: the expanded row lists each one. */
+  assignments: ManagedGrant[];
+  assignmentCount: number;
 };
+
+/** The filter above the Access list: every assignment, then each scope tier. */
+export type ScopeCounts = Record<"ALL" | GrantScopeTier, number>;
 
 const SCOPE_ORDER: Record<GrantScopeTier, number> = {
   ORGANIZATION: 0,
@@ -30,39 +51,134 @@ const SCOPE_ORDER: Record<GrantScopeTier, number> = {
 
 const KIND_ORDER: Record<Holder["kind"], number> = { person: 0, group: 1, apiKey: 2 };
 
-function holderOf(binding: ManagedGrant): Holder {
-  const shared = { userId: binding.userId, image: binding.userImage, directory: null };
+type HolderIdentity = Pick<Holder, "key" | "kind" | "name" | "address">;
+
+function holderIdentity(binding: ManagedGrant): HolderIdentity {
   if (binding.userId) {
     return {
-      ...shared,
       key: `person:${binding.userId}`,
       kind: "person",
       name: binding.userName ?? binding.userEmail ?? "A member with no name yet",
+      address: binding.userEmail,
     };
   }
   if (binding.groupId) {
     return {
-      ...shared,
       key: `group:${binding.groupId}`,
       kind: "group",
       name: binding.groupName ?? "A group with no name yet",
-      directory: binding.groupScimSource,
+      address: null,
     };
   }
   if (binding.apiKeyId) {
     return {
-      ...shared,
       key: `apiKey:${binding.apiKeyId}`,
       kind: "apiKey",
       name: binding.apiKeyName ?? "An API key with no name yet",
+      address: null,
     };
   }
+  // One row per unattributed assignment, so it stays countable rather than pooled.
   return {
-    ...shared,
     key: `unattributed:${binding.id}`,
-    kind: "apiKey",
+    kind: "person",
     name: "An assignment with no holder",
+    address: null,
   };
+}
+
+function byScope(a: GrantScope, b: GrantScope): number {
+  return (
+    SCOPE_ORDER[a.scopeType] - SCOPE_ORDER[b.scopeType] ||
+    (a.scopeName ?? "").localeCompare(b.scopeName ?? "")
+  );
+}
+
+function collapseGrants(bindings: readonly ManagedGrant[]): CollapsedGrant[] {
+  const byRole = new Map<string, CollapsedGrant>();
+  for (const binding of bindings) {
+    const key = binding.customRoleId ?? binding.role;
+    let grant = byRole.get(key);
+    if (!grant) {
+      grant = {
+        key,
+        roleName: binding.customRoleName ?? binding.role,
+        tier: binding.customRoleId ? "CUSTOM" : binding.role,
+        customRoleId: binding.customRoleId,
+        scopes: [],
+      };
+      byRole.set(key, grant);
+    }
+    if (!grant.scopes.some((scope) => scope.scopeId === binding.scopeId)) {
+      grant.scopes.push({
+        scopeType: binding.scopeType,
+        scopeId: binding.scopeId,
+        scopeName: binding.scopeName,
+      });
+    }
+  }
+  return [...byRole.values()]
+    .map((grant) => ({ ...grant, scopes: grant.scopes.toSorted(byScope) }))
+    .toSorted((a, b) => a.roleName.localeCompare(b.roleName));
+}
+
+/** One holder per person, group or key: people first, then groups, then keys. */
+export function holdersOf(assignments: readonly ManagedGrant[]): Holder[] {
+  const byHolder = new Map<string, { first: ManagedGrant; rows: ManagedGrant[] }>();
+  for (const binding of assignments) {
+    const { key } = holderIdentity(binding);
+    const entry = byHolder.get(key);
+    if (entry) entry.rows.push(binding);
+    else byHolder.set(key, { first: binding, rows: [binding] });
+  }
+
+  const holders = [...byHolder.values()].map(({ first, rows }) => ({
+    ...holderIdentity(first),
+    userId: first.userId,
+    image: first.userImage,
+    directory: first.groupScimSource,
+    grants: collapseGrants(rows),
+    assignments: rows.toSorted(byScope),
+    assignmentCount: rows.length,
+  }));
+  return holders.toSorted(
+    (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name),
+  );
+}
+
+/** "Team Platform", never an abbreviation; an unresolved name says its kind and stops. */
+export function scopeLabel({ scopeType, scopeName }: Omit<GrantScope, "scopeId">): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  const kind = scopeType === "TEAM" ? "Team" : "Project";
+  return scopeName ? `${kind} ${scopeName}` : kind;
+}
+
+/** The one colour on a holder row: how much the role can do. */
+export function roleTone(tier: string): string {
+  if (tier === "ADMIN") return "red";
+  if (tier === "MEMBER") return "blue";
+  if (tier === "VIEWER") return "gray";
+  return "purple";
+}
+
+function plural({ count, word }: { count: number; word: string }): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+/** "Organization, and 3 teams": where a grant applies, when its scopes outgrow a row. */
+export function summariseScopes(scopes: readonly GrantScope[]): string {
+  const teams = scopes.filter((scope) => scope.scopeType === "TEAM").length;
+  const projects = scopes.filter((scope) => scope.scopeType === "PROJECT").length;
+  const organization = scopes.some((scope) => scope.scopeType === "ORGANIZATION");
+
+  const parts: string[] = [];
+  if (organization) parts.push("Organization");
+  if (teams > 0) parts.push(plural({ count: teams, word: "team" }));
+  if (projects > 0) parts.push(plural({ count: projects, word: "project" }));
+
+  if (parts.length === 0) return "Nowhere";
+  if (parts.length === 1) return parts[0]!;
+  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
 }
 
 /** Everyone holding the role, each once: people first, then groups, then keys. */
@@ -73,15 +189,7 @@ export function holdersOfCustomRole({
   assignments: readonly ManagedGrant[];
   customRoleId: string;
 }): Holder[] {
-  const holders = new Map<string, Holder>();
-  for (const binding of assignments) {
-    if (binding.customRoleId !== customRoleId) continue;
-    const holder = holderOf(binding);
-    if (!holders.has(holder.key)) holders.set(holder.key, holder);
-  }
-  return [...holders.values()].toSorted(
-    (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name),
-  );
+  return holdersOf(assignments.filter((binding) => binding.customRoleId === customRoleId));
 }
 
 /** The people holding the role, directly or through a group, each counted once. */
@@ -118,9 +226,17 @@ export function scopesOfCustomRole({
       scopeName: binding.scopeName,
     });
   }
-  return [...scopes.values()].toSorted(
-    (a, b) =>
-      SCOPE_ORDER[a.scopeType] - SCOPE_ORDER[b.scopeType] ||
-      (a.scopeName ?? "").localeCompare(b.scopeName ?? ""),
-  );
+  return [...scopes.values()].toSorted(byScope);
+}
+
+/** How many assignments sit at each scope, counted across all of them, not the filter. */
+export function scopeCounts(assignments: readonly ManagedGrant[]): ScopeCounts {
+  const count = (tier: GrantScopeTier) =>
+    assignments.filter((binding) => binding.scopeType === tier).length;
+  return {
+    ALL: assignments.length,
+    ORGANIZATION: count("ORGANIZATION"),
+    TEAM: count("TEAM"),
+    PROJECT: count("PROJECT"),
+  };
 }

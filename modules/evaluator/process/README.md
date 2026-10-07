@@ -6,7 +6,7 @@ The server half of [evaluator](../README.md). Evaluators: their definitions, and
 
 ## Installation
 
-`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport)`, `src/evaluator.module.ts:8`.
+`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing)`, `src/evaluator.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -136,7 +136,7 @@ getWorkflowFields(input: EvaluatorScope): Promise<EvaluatorWorkflowFields>;
 
 #### `getRelatedEntities`
 
-The workflow and monitors a cascade archive would take with the evaluator.
+The workflow a cascade archive would take with the evaluator.
 
 ```typescript
 getRelatedEntities(input: EvaluatorScope): Promise<EvaluatorRelatedEntities>;
@@ -208,7 +208,7 @@ archive(input: EvaluatorScope): Promise<Evaluator>;
 
 #### `cascadeArchive`
 
-Archives the evaluator, archives its workflow and deletes its monitors.
+Archives the evaluator and its workflow, and records `lw.evaluator.deleted`.
 
 ```typescript
 cascadeArchive(input: EvaluatorScope): Promise<EvaluatorCascadeArchive>;
@@ -360,7 +360,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: evaluator declares no pipeline, process manager, subscriber or task.
+### Pipeline `evaluator_lifecycle` (aggregate `evaluator`)
+
+Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:22`. Events: `evaluatorDeletedEventSchema`.
+
+| Kind    | Name                     | Handles | Declared at                                       |
+| ------- | ------------------------ | ------- | ------------------------------------------------- |
+| command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:27` |
 
 ## Configuration
 

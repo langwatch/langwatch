@@ -56,10 +56,3 @@ export const evaluatorSettingsSourceSchema = z.enum([
   "monitor-parameters",
 ]);
 export type EvaluatorSettingsSource = z.infer<typeof evaluatorSettingsSourceSchema>;
-
-/** The settings a run hands the judge, and where they came from. */
-export const evaluatorEffectiveSettingsSchema = z.object({
-  settings: z.record(z.string(), z.unknown()).nullable().optional(),
-  source: evaluatorSettingsSourceSchema,
-});
-export type EvaluatorEffectiveSettings = z.infer<typeof evaluatorEffectiveSettingsSchema>;

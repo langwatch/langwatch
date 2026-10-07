@@ -6,12 +6,8 @@
 
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import type {
-  NavigationAccountMenu,
-  NavigationCommandBar,
   NavigationDeployment,
   NavigationFlagReading,
-  NavigationHost,
-  NavigationLangy,
   NavigationOpsAccess,
   NavigationOrganization,
   NavigationPlanReading,
@@ -20,10 +16,18 @@ import type {
   NavigationSupportChat,
   NavigationTeam,
   NavigationUser,
-} from "@langwatch/navigation-browser/navigation";
+} from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
 import { joinOffer, organizationMfaGate, teamAccessWaiting } from "./navigation-host-capabilities";
+import type { UiRootCapabilities } from "./ui-root-capabilities";
+
+/** Navigation's node-bearing shapes, read off the lent port rather than its package. */
+type NavigationHostClass = UiRootCapabilities["navigationHost"]["NavigationHost"];
+type NavigationHost = InstanceType<NavigationHostClass>;
+export type NavigationCommandBar = NonNullable<ReturnType<NavigationHost["commandBar"]>>;
+export type NavigationLangy = NonNullable<ReturnType<NavigationHost["langy"]>>;
+export type NavigationAccountMenu = NonNullable<ReturnType<NavigationHost["accountMenu"]>>;
 
 /** Everything the shell has already read by the time the chrome draws. */
 export type BrowserNavigationReading = {
@@ -73,7 +77,7 @@ export type BrowserNavigationHosts = {
 };
 
 /** The shell's host class, over the navigation port class it is handed. */
-export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavigationHosts {
+export function browserNavigationHosts(port: NavigationHostClass): BrowserNavigationHosts {
   class BrowserNavigationHost extends port {
     static create(
       reading: BrowserNavigationReading,

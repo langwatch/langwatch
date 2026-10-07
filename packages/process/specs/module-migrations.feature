@@ -85,3 +85,23 @@ Feature: A module declares its migration steps beside its tasks
     When the tree is linted
     Then the lint rule `langwatch/frozen-blocking-step` refuses a run that imports a service, a repository or another module's contract
     And it accepts a run that executes only SQL text held in the step's own file
+
+  @unit
+  Scenario: A module's migration binder receives the process's projection replayer
+    Given a process composed with a projection replayer
+    When it installs a module that declares its migration steps
+    Then the module's migration binder is handed that replayer
+    And the module wires nothing itself to replay a projection lane
+
+  @unit
+  Scenario: The process's projection replayer replays over its eventing member's engine and closes it
+    Given an eventing member that opens a replay engine for one run
+    When a migration step replays a projection lane through the process's replayer
+    Then the lane replays over the pipelines registered by then
+    And the engine is closed when the run ends
+
+  @unit
+  Scenario: A projection replay in a process whose eventing opens no replay engine is refused by code
+    Given a process whose eventing member opens no replay engine, or that composed no replayer
+    When a migration step replays a projection lane
+    Then the replay is refused with the code "projection_replay_unavailable", naming the lane

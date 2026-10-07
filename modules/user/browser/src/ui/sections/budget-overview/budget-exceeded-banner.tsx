@@ -69,7 +69,7 @@ const PERIOD_LABEL: Record<string, string> = {
 const SCOPE_LABEL: Record<string, string> = {
   user: "personal",
   virtual_key: "personal",
-  // Scope classes from `api.user.budgetOverview`, already user-relative.
+  // Scope classes from `api.governance.budgetOverview`, already user-relative.
   personal: "personal",
   key: "personal",
   department: "department",

@@ -140,4 +140,6 @@ you do not own. Current list (brought current 2026-10-05, after Alex's evening a
 
 `dev/docs/ARCHITECTURE.md` (all), `dev/docs/adr/147-compiler-checked-process-supply.md`,
 `dev/docs/adr/148-declared-browser-supply.md`, `dev/docs/CODING_STANDARDS.md`,
-`.claude/skills/core/repository-rules.md`.
+`.claude/skills/core/repository-rules.md`. For what a given module owns and exposes today, read its
+generated page (`modules/README.md`, then `modules/<id>/README.md`; the `ownership` skill), not the
+record.

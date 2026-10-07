@@ -138,6 +138,9 @@
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {

@@ -4,11 +4,11 @@ import {
   type ModelCost,
 } from "@langwatch/model-provider-contract";
 import {
-  type OtlpSpan,
   ATTR_KEYS,
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
   CODEX_TURN_SPAN_NAME,
-} from "@langwatch/trace-contract";
+} from "@langwatch/span-normalisation";
+import { type OtlpSpan } from "@langwatch/trace-contract";
 
 import { SpanModelNameService } from "./span-model-name.service.ts";
 

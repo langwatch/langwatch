@@ -32,7 +32,7 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -42,14 +42,12 @@ import type { BetterAuthFederation } from "../../channels/better-auth.channel.ts
 import {
   afterAccountCreate,
   afterUserCreate,
+  type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import { MemorySignupAnnouncementChannel } from "../../channels/memory/memory.signup-announcement.channel.ts";
 import { RecordSignedUpCommand } from "../../eventing/auth-lifecycle.commands.ts";
 import type { SignedUpEvent } from "../../eventing/auth-lifecycle.events.ts";
-import type {
-  BetterAuthHookOrganization,
-  BetterAuthHooksRepository,
-} from "../../repositories/better-auth-hooks.repository.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import { AuthLifecycleNoticeService } from "../../services/auth-lifecycle-notice.service.ts";
 import { SignupAnnouncementService } from "../../services/signup-announcement.service.ts";
 
@@ -167,32 +165,30 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
   };
   return {
     getUserForHooks: unused,
-    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
     deleteAccounts: unused,
     flagPendingSsoSetup: unused,
-    createOrganizationMembership: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
-    countOrgMembershipsForUser: unused,
     ...members,
   };
 }
 
-function organizationRepo(
-  organization: BetterAuthHookOrganization | null,
-): BetterAuthHooksRepository {
-  return hooksRepo({
-    getOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
-      .mockImplementation(async () => {
-        if (organization === null) throw new OrganizationNotFoundError();
-        return organization;
-      }),
-    createOrganizationMembership: vi
-      .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
+type SsoDomainOrganization = { id: string; name: string; ssoProvider: string | null };
+
+function organizationsOver(mocks: Partial<SsoDomainOrganizations>): SsoDomainOrganizations {
+  return createApiFixture<SsoDomainOrganizations>(mocks);
+}
+
+function domainOrganizations(organization: SsoDomainOrganization | null): SsoDomainOrganizations {
+  return organizationsOver({
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    createSsoDomainMembership: vi
+      .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
       .mockResolvedValue("created"),
   });
 }
@@ -201,11 +197,14 @@ describe("afterUserCreate", () => {
   function collaborators({
     announcements,
     admit = async () => undefined,
+    organizations = domainOrganizations(null),
   }: {
     announcements: LoggedBetterAuthAnnouncements;
     admit?: SsoArrivalApi["admit"];
+    organizations?: SsoDomainOrganizations;
   }) {
     return {
+      organizations,
       federation: new StubFederation(true),
       invites: new StubInvites(),
       announcements,
@@ -226,7 +225,6 @@ describe("afterUserCreate", () => {
       const { announcements, facts, reportError } = composedAnnouncements();
 
       await afterUserCreate({
-        repo: organizationRepo(null),
         user: { id: "user_1", email: "u@other.com", name: "User", emailVerified: true },
         collaborators: collaborators({ announcements }),
       });
@@ -241,9 +239,6 @@ describe("afterUserCreate", () => {
       const admit = vi.fn<SsoArrivalApi["admit"]>().mockResolvedValue(undefined);
       const user = { id: "user_2", email: "new@acme.com", name: "New User" };
       const repo = hooksRepo({
-        getOrganizationBySsoDomain: async () => {
-          throw new OrganizationNotFoundError();
-        },
         getUserForHooks: async () => ({
           ...user,
           deactivatedAt: null,
@@ -254,7 +249,6 @@ describe("afterUserCreate", () => {
       });
 
       await afterUserCreate({
-        repo,
         user: { ...user, emailVerified: true },
         collaborators: collaborators({ announcements, admit }),
       });
@@ -273,7 +267,6 @@ describe("afterUserCreate", () => {
       const { announcements, facts } = composedAnnouncements();
 
       await afterUserCreate({
-        repo: organizationRepo(null),
         user: { id: "user_3", email: "", name: "User", emailVerified: true },
         collaborators: collaborators({ announcements }),
       });
@@ -284,22 +277,21 @@ describe("afterUserCreate", () => {
     /** @scenario PostHog signed_up still fires when the signup is unverified */
     it("records the sign-up fact even when the verified-email gate skips org admission", async () => {
       const { announcements, facts } = composedAnnouncements();
-      const createOrganizationMembership = vi
-        .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
+      const createSsoDomainMembership = vi
+        .fn<SsoDomainOrganizations["createSsoDomainMembership"]>()
         .mockResolvedValue("created");
-      const repo = hooksRepo({
-        getOrganizationBySsoDomain: async () => ({ id: "org_1", name: "Acme", ssoProvider: null }),
-        createOrganizationMembership,
+      const organizations = organizationsOver({
+        findBySsoDomain: async () => ({ id: "org_1", name: "Acme", ssoProvider: null }),
+        createSsoDomainMembership,
       });
 
       await afterUserCreate({
-        repo,
         user: { id: "user_4", email: "new@acme.com", name: "New User", emailVerified: false },
-        collaborators: collaborators({ announcements }),
+        collaborators: collaborators({ announcements, organizations }),
       });
 
       expectSignUpOf(await onlySignUpFact(facts), "user_4");
-      expect(createOrganizationMembership).not.toHaveBeenCalled();
+      expect(createSsoDomainMembership).not.toHaveBeenCalled();
     });
   });
 });

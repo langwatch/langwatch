@@ -167,3 +167,11 @@ export {
   type ScimSyncCommandType,
 } from "./scim-sync-commands.ts";
 export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events.ts";
+export {
+  SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
+  SCIM_COST_CENTER_CHANGED_EVENT_VERSION,
+  SCIM_COST_CENTER_PIPELINE_NAME,
+  SCIM_MEMBER_AGGREGATE_TYPE,
+  type ScimCostCenterChangedEventData,
+  scimCostCenterChangedEventDataSchema,
+} from "./scim-cost-center.events.ts";

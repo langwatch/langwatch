@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 696" width="1280" height="696" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="The path of one trace through a self-hosted install">
+<title>The path of one trace through a self-hosted install</title>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker><marker id="head-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#94a3b8"/></marker><marker id="head-out-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#e17100"/></marker></defs>
+<rect width="1280" height="696" fill="#ffffff"/>
+<text x="24" y="42" font-size="22" font-weight="700" fill="#1d293d" text-anchor="start">The path of one trace through a self-hosted install</text>
+<rect x="16" y="62" width="1248" height="446" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="32" y="86" font-size="14.5" font-weight="600" fill="#52637a" text-anchor="start">Your environment</text>
+<rect x="40" y="142" width="160" height="104" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="120" y="181.5" font-size="16" font-weight="650" fill="#1d293d" text-anchor="middle">Your agent</text>
+<text x="120" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">sends spans over</text>
+<text x="120" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">OpenTelemetry</text>
+<rect x="246" y="142" width="160" height="104" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="326" y="181.5" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">App</text>
+<text x="326" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">checks the API key,</text>
+<text x="326" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">accepts the spans</text>
+<rect x="452" y="142" width="160" height="104" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="532" y="181.5" font-size="16" font-weight="650" fill="#1e4b8f" text-anchor="middle">Redis</text>
+<text x="532" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">queue between</text>
+<text x="532" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">App and Workers</text>
+<rect x="658" y="142" width="160" height="104" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="738" y="181.5" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">Workers</text>
+<text x="738" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">redact PII, add cost,</text>
+<text x="738" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">summarise the trace</text>
+<rect x="864" y="142" width="160" height="104" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="944" y="181.5" font-size="16" font-weight="650" fill="#1e4b8f" text-anchor="middle">ClickHouse</text>
+<text x="944" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">events and the</text>
+<text x="944" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">tables the UI reads</text>
+<rect x="1070" y="142" width="160" height="104" rx="10" fill="#eff6ff" stroke="#7ea6e0" stroke-width="1.5"/>
+<text x="1150" y="181.5" font-size="16" font-weight="650" fill="#1e4b8f" text-anchor="middle">Object storage</text>
+<text x="1150" y="202" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">older data,</text>
+<text x="1150" y="220.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">backups</text>
+<path d="M200 194 L244 194" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="223" cy="194" r="13" fill="#e17100"/>
+<text x="223" y="199" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+<path d="M406 194 L450 194" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="429" cy="194" r="13" fill="#e17100"/>
+<text x="429" y="199" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+<path d="M612 194 L656 194" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="635" cy="194" r="13" fill="#e17100"/>
+<text x="635" y="199" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+<path d="M818 194 L862 194" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="841" cy="194" r="13" fill="#e17100"/>
+<text x="841" y="199" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+<path d="M1024 194 L1068 194" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="1047" cy="194" r="13" fill="#e17100"/>
+<text x="1047" y="199" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">7</text>
+<rect x="246" y="372" width="160" height="104" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="326" y="411.5" font-size="16" font-weight="650" fill="#1d293d" text-anchor="middle">Your team</text>
+<text x="326" y="432" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">sees the trace</text>
+<text x="326" y="450.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">in the browser</text>
+<rect x="658" y="372" width="160" height="104" rx="10" fill="#fff7ed" stroke="#f0a04b" stroke-width="1.5"/>
+<text x="738" y="411.5" font-size="16" font-weight="650" fill="#9a4a00" text-anchor="middle">LangEvals</text>
+<text x="738" y="432" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">runs the evaluators</text>
+<text x="738" y="450.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">you set up</text>
+<rect x="864" y="372" width="160" height="104" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="944" y="401.5" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">Your model</text>
+<text x="944" y="420.5" font-size="15" font-weight="650" fill="#1d293d" text-anchor="middle">provider</text>
+<text x="944" y="441" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">only for model-</text>
+<text x="944" y="459.5" font-size="13.5" font-weight="400" fill="#52637a" text-anchor="middle">based evaluators</text>
+<path d="M738 249 L738 370" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)" marker-start="url(#head-start)"/>
+<circle cx="738" cy="309" r="13" fill="#e17100"/>
+<text x="738" y="314" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+<path d="M818 424 L862 424" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<path d="M944 142 L944 118 Q944 108 934 108 L336 108 Q326 108 326 118 L326 140" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="532" cy="108" r="13" fill="#e17100"/>
+<text x="532" y="113" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+<path d="M296 246 L296 370" fill="none" stroke="#94a3b8" stroke-width="2" marker-end="url(#head)"/>
+<circle cx="296" cy="309" r="13" fill="#e17100"/>
+<text x="296" y="314" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+<circle cx="40" cy="548" r="13" fill="#e17100"/>
+<text x="40" y="553" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+<text x="64" y="553" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">The agent sends spans to the App over OpenTelemetry (OTLP over HTTP).</text>
+<circle cx="40" cy="584" r="13" fill="#e17100"/>
+<text x="40" y="589" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+<text x="64" y="589" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">The App puts an ingestion job on the Redis queue.</text>
+<circle cx="40" cy="620" r="13" fill="#e17100"/>
+<text x="40" y="625" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+<text x="64" y="625" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">A Worker picks the job up. Workers are stateless and scale by replica.</text>
+<circle cx="40" cy="656" r="13" fill="#e17100"/>
+<text x="40" y="661" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+<text x="64" y="661" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">The Worker redacts PII, adds cost and metrics, and writes to ClickHouse.</text>
+<circle cx="664" cy="548" r="13" fill="#e17100"/>
+<text x="664" y="553" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+<text x="688" y="553" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">Evaluators you configured run in LangEvals. Scores go to ClickHouse.</text>
+<circle cx="664" cy="584" r="13" fill="#e17100"/>
+<text x="664" y="589" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+<text x="688" y="589" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">The App reads ClickHouse and pushes the trace to the open browser.</text>
+<circle cx="664" cy="620" r="13" fill="#e17100"/>
+<text x="664" y="625" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">7</text>
+<text x="688" y="625" font-size="14.5" font-weight="400" fill="#52637a" text-anchor="start">Older data moves from ClickHouse to object storage.</text>
+</svg>

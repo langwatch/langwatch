@@ -11,7 +11,7 @@ Monitors: the checks that run an evaluator over incoming traces, their definitio
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | monitor                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                              |
-| Api token      | `MonitorApi` = `moduleApi<MonitorApi>()("monitor")`, `contract/src/monitor.api.ts:75` (22 operations) |
+| Api token      | `MonitorApi` = `moduleApi<MonitorApi>()("monitor")`, `contract/src/monitor.api.ts:71` (21 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What monitor owns
@@ -25,15 +25,15 @@ Anything else monitor needs belongs to another module and is reached through its
 
 ## Peers (static dependencies)
 
-| Name          | Token           | Module                                |
-| ------------- | --------------- | ------------------------------------- |
-| `evaluation`  | `EvaluationApi` | [evaluation](../evaluation/README.md) |
-| `evaluators`  | `EvaluatorApi`  | [evaluator](../evaluator/README.md)   |
-| `permissions` | `AuthzApi`      | [authz](../authz/README.md)           |
-| `workflows`   | `WorkflowApi`   | [workflow](../workflow/README.md)     |
+| Name           | Token            | Module                                    |
+| -------------- | ---------------- | ----------------------------------------- |
+| `evaluators`   | `EvaluatorApi`   | [evaluator](../evaluator/README.md)       |
+| `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
+| `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
+| `workflows`    | `WorkflowApi`    | [workflow](../workflow/README.md)         |
 
 ## Who depends on monitor
 
-[audit-log](../audit-log/README.md), [automation](../automation/README.md), [evaluation](../evaluation/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
+[audit-log](../audit-log/README.md), [automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -1,6 +1,6 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal } from "@langwatch/time";
+import { fromDate, Temporal, toDate, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
   UserApi,
@@ -126,6 +126,18 @@ function makeService({
   };
 }
 
+/** A token row's stored expiry, read back as the Instant the service wrote. */
+function storedExpiry({
+  memory,
+  token,
+}: {
+  memory: MemoryAuthDatabase;
+  token: string;
+}): Instant | undefined {
+  const row = memory.db.VerificationToken.find((candidate) => candidate.token === token);
+  return row && fromDate(row.expires);
+}
+
 describe("given a sign-up address to confirm", () => {
   describe("when the address is submitted", () => {
     it("emails a normalized link that expires in an hour", async () => {
@@ -136,7 +148,7 @@ describe("given a sign-up address to confirm", () => {
       expect(harness.mail.sent).toEqual([
         { email: "sam@acme.com", verificationUrl: "https://app.test/auth/signup?verify=token-1" },
       ]);
-      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-1" })).toEqual(
         NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       );
     });
@@ -174,8 +186,8 @@ describe("given a sign-up address to confirm", () => {
         "mailer down",
       );
 
-      expect(sent.memory.sessions.size).toBe(0);
-      expect(down.memory.sessions.size).toBe(0);
+      expect(sent.memory.db.Session.length).toBe(0);
+      expect(down.memory.db.Session.length).toBe(0);
     });
   });
 
@@ -191,7 +203,7 @@ describe("given a sign-up address to confirm", () => {
         addressProof: "token-2",
         freshClaim: true,
       });
-      expect(harness.memory.verificationTokens.get("token-2")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-2" })).toEqual(
         NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
       );
     });
@@ -241,7 +253,7 @@ describe("given a sign-up address to confirm", () => {
       expect(answers.filter((answer) => answer.freshClaim)).toHaveLength(1);
       expect(answers.filter((answer) => answer.addressProof !== null)).toHaveLength(1);
       expect(answers.every((answer) => !answer.accountCreated)).toBe(true);
-      expect(harness.memory.sessions.size).toBe(0);
+      expect(harness.memory.db.Session.length).toBe(0);
     });
   });
 
@@ -275,7 +287,9 @@ describe("given a sign-up address to confirm", () => {
         await expect(
           harness.service.completeVerification({ token: "token-1" }),
         ).rejects.toMatchObject({ code: "identity_verification_expired" });
-        expect(harness.memory.verificationTokens.has("token-2")).toBe(false);
+        expect(harness.memory.db.VerificationToken.some((row) => row.token === "token-2")).toBe(
+          false,
+        );
       });
     },
   );
@@ -298,10 +312,11 @@ describe("given a sign-up address to confirm", () => {
     /** @scenario "A link nobody ever issued is refused the way an expired one is" */
     it("refuses both the same way", async () => {
       const harness = makeService();
-      harness.memory.verificationTokens.set("borrowed", {
+      harness.memory.db.VerificationToken.push({
+        id: "borrowed",
         identifier: "password-reset:sam@acme.com",
         token: "borrowed",
-        expires: NOW.add({ hours: 1 }),
+        expires: toDate(NOW.add({ hours: 1 })),
       });
 
       await expect(
@@ -316,13 +331,14 @@ describe("given a sign-up address to confirm", () => {
   describe("when a link minted before the doors converged carries a credential", () => {
     it("treats the credential as untrusted and hands back the proof instead", async () => {
       const harness = makeService();
-      harness.memory.verificationTokens.set("in-flight", {
+      harness.memory.db.VerificationToken.push({
+        id: "in-flight",
         identifier: `identity-signup-verification:${JSON.stringify({
           email: "sam@acme.com",
           passwordHash: "$2b$10$notthepassword",
         })}`,
         token: "in-flight",
-        expires: NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
+        expires: toDate(NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS })),
       });
 
       await expect(harness.service.completeVerification({ token: "in-flight" })).resolves.toEqual({
@@ -513,7 +529,7 @@ describe("given an installation that cannot send email", () => {
 
       expect(answer).toEqual({ sent: false, addressProof: "token-1" });
       expect(harness.mail.sent).toEqual([]);
-      expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
+      expect(storedExpiry({ memory: harness.memory, token: "token-1" })).toEqual(
         NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
       );
       await expect(
@@ -619,7 +635,7 @@ describe("given an installation that cannot send email", () => {
       await expect(
         harness.service.claimUnconfirmedAddressProof({ token: proof, email: "sam@acme.com" }),
       ).resolves.toBe(false);
-      expect(harness.memory.verificationTokens.has(proof)).toBe(true);
+      expect(harness.memory.db.VerificationToken.some((row) => row.token === proof)).toBe(true);
     });
   });
 });

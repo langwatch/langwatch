@@ -3,6 +3,7 @@
  * doesn't include MainMenu column (deleted with DashboardLayout).
  */
 
+import type { NavigationProject } from "@langwatch/navigation-contract";
 import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
@@ -14,7 +15,7 @@ import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
 } from "../../model/navigation-active-state.ts";
-import { useNavigationHost, type NavigationProject } from "../../model/navigation-host.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-items.ts";
 import { projectScopedDestination } from "../../model/project-scoped-nav.ts";
 import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group.tsx";

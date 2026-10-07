@@ -75,3 +75,10 @@ export const topicClusteringRunHistoryEntrySchema = z
   .strict();
 
 export type TopicClusteringRunHistoryEntry = z.infer<typeof topicClusteringRunHistoryEntrySchema>;
+
+/** What a manual clustering trigger did, which is not always "started a run". */
+export const topicClusteringTriggerResultSchema = z.union([
+  z.object({ started: z.literal(true) }).strict(),
+  z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
+]);
+export type TopicClusteringTriggerResult = z.infer<typeof topicClusteringTriggerResultSchema>;

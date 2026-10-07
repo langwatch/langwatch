@@ -559,6 +559,31 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { outcome: "created", seat };
   }
 
+  async createSsoDomainMembership({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<"created" | "already-present"> {
+    if (this.membershipRow({ organizationId, userId })) return "already-present";
+    const now = nowInstant();
+    this.memory.organizationUsers.push({
+      userId,
+      organizationId,
+      role: OrganizationUserRole.MEMBER,
+      disabledAt: null,
+      createdAt: now,
+      updatedAt: now,
+      pendingSsoGrantId: null,
+    });
+    return "created";
+  }
+
+  async countMembershipsForUser({ userId }: { userId: string }): Promise<number> {
+    return this.memory.organizationUsers.filter((row) => row.userId === userId).length;
+  }
+
   async deleteMember(input: DeleteMemberInput): Promise<void> {
     const { organizationId, userId } = input;
     const row = this.membershipRow({ organizationId, userId });

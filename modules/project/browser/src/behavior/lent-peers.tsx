@@ -1,7 +1,6 @@
 /** What analytics, navigation, onboarding, organization and trace lend this module (§10.1). */
 
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type { UiCustomGraphProps } from "@langwatch/browser-host/declarations";
+import { CustomGraphToken, type CustomGraphProps } from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
 import {
   InlineCommandPaletteToken,
@@ -16,7 +15,6 @@ import {
   type ProjectDepartmentFieldProps,
 } from "@langwatch/organization-client";
 import { AgentActionsMenuToken, type AgentActionsMenuProps } from "@langwatch/trace-client";
-import { lazy, Suspense, useMemo } from "react";
 
 /** Navigation's command palette, drawn inline as navigation lends it. */
 export function InlineCommandPalette(props: InlineCommandPaletteProps) {
@@ -39,21 +37,8 @@ export function PendingJoinRequests(props: PendingJoinRequestsProps) {
 }
 
 /** Analytics' custom graph, drawn as analytics lends it. */
-export function CustomGraph(props: UiCustomGraphProps) {
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so it is not remounted.
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("customGraph")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function CustomGraph(props: CustomGraphProps) {
+  return <Lent of={CustomGraphToken} props={props} />;
 }
 
 /** Trace's agent actions menu, drawn as trace lends it. */

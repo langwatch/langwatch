@@ -12,7 +12,7 @@ export * from "./dataset-rest.schemas.ts";
 export * from "./dataset.api.ts";
 export * from "./dataset.trpc.ts";
 export * from "./dataset-record.trpc.ts";
-export * from "./batch-record.trpc.ts";
+export * from "./batch-evaluation.schemas.ts";
 export * from "./trace-mapping.ts";
 export * from "./evaluator-mappings.ts";
 export * from "./dataset.config.ts";

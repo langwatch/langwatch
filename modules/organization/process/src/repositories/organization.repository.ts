@@ -10,6 +10,7 @@ import type {
   PersonalWorkspaceInput,
   OrganizationUsageCount,
   PricingModel,
+  SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -101,6 +102,10 @@ export abstract class OrganizationRepository {
     organizationId: string;
     setting: JoinRequestJoining;
   }): Promise<void>;
+  /** The organization claiming this SSO domain, or null. */
+  abstract findBySsoDomain(input: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
   /** Main's `?? 0`: an unknown organization reads as unbounded. */
   abstract getSessionPolicy(input: {
     organizationId: string;
@@ -109,6 +114,23 @@ export abstract class OrganizationRepository {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void>;
+  /** The four sign-in security columns (GAC-09, GAC-10); throws OrganizationNotFoundError. */
+  abstract getSignInSecurityPolicy(input: {
+    organizationId: string;
+  }): Promise<SignInSecurityPolicy>;
+  abstract updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void>;
+  /**
+   * Through Organization filtered by an enabled membership, never
+   * OrganizationUser keyed by userId alone (ADR-021).
+   */
+  abstract findSignInSecurityPoliciesForUser(input: {
+    userId: string;
+  }): Promise<SignInSecurityPolicy[]>;
+  /** Every organization that set any rule. */
+  abstract findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
   /** An unknown organization has no pricing model and the schema's default currency (EUR). */
   abstract getPricing(input: {
     organizationId: string;
@@ -131,6 +153,12 @@ export abstract class OrganizationRepository {
   abstract updateSentPlanLimitAlert(input: {
     organizationId: string;
     sentAt: Instant;
+  }): Promise<void>;
+  /** Throws OrganizationNotFoundError. */
+  abstract setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
   }): Promise<void>;
   abstract claimBillingCustomerId(input: {
     organizationId: string;

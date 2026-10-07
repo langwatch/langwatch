@@ -184,6 +184,7 @@ describe("WorkflowNlpExecutionService with a migrated legacy version", () => {
       studioDsl: { prepare: async ({ dsl }) => dsl },
       httpSecrets: { store: async ({ dsl }) => dsl },
       agentMappings: { recompute: async () => void 0 },
+      recordVersionSaved: () => void 0,
     });
     const dispatchNlp = vi.fn().mockResolvedValue({
       ok: true,

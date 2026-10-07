@@ -20,7 +20,7 @@ import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import {
   ScimDirectoryIdentityService,
@@ -38,14 +38,8 @@ import { ScimTokenService } from "./scim-token.service.ts";
  * All operations are scoped to an organization for multi-tenancy.
  */
 /**
- * SCIM takes the dependencies it passes down, not the whole services they
- * came from: `ScimDepartmentAssignment` is Governance's two department calls,
- * declared beside the leaf service that makes them.
- *
- * Asking for a whole `GovernanceRestApi` to use two methods is what forced
- * every test here to build a one-method object and cast it at a service it
- * shares nothing else with. The cast is the signal: a dependency that can only
- * be satisfied by lying about it is asking for more than it needs.
+ * SCIM takes the dependencies it passes down, not the whole services they came from:
+ * `ScimCostCenterFacts` is the one recorder the leaf cost-center service writes through.
  */
 export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepository;
@@ -60,7 +54,7 @@ export class ScimService extends ScimServiceContract {
     prisma,
     writer,
     users,
-    governance,
+    costCenterFacts,
     organization,
     entitlements,
     lifecycle,
@@ -72,7 +66,7 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepository;
     writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
@@ -92,7 +86,7 @@ export class ScimService extends ScimServiceContract {
       writer,
       grants,
       users,
-      governance,
+      costCenterFacts,
       organization,
       lifecycle,
       provenOffboarding,
@@ -117,7 +111,7 @@ export class ScimService extends ScimServiceContract {
     prisma: ScimRepository;
     writer: ScimGrantAuthority;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;

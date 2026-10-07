@@ -205,6 +205,7 @@ describe("given organization records a newly created personal workspace", () => 
       recordProjectMoved: lifecycle.commands.recordProjectMoved,
       recordProjectArchived: lifecycle.commands.recordProjectArchived,
       recordProjectDepartmentAssigned: lifecycle.commands.recordProjectDepartmentAssigned,
+      recordProjectTraceSharingDisabled: lifecycle.commands.recordProjectTraceSharingDisabled,
     });
     eventing.register(createdListener(heard));
 

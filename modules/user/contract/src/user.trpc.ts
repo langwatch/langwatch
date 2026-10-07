@@ -1,12 +1,6 @@
-import {
-  cliBootstrapResultSchema,
-  governanceBudgetOverviewForUserSchema,
-  personalUsageRollupSchema,
-} from "@langwatch/enterprise-governance-contract";
 /**
  * Every `user.*` procedure and the one `identity.*` procedure this module owns.
- * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
- * `cliBootstrap` read through Enterprise governance, which is always installed.
+ * The names are the browser's cache keys. The /me governance reads are `governance.*`.
  */
 import { defineTrpcContract } from "@langwatch/module";
 
@@ -26,13 +20,11 @@ import {
   userApiSuccessSchema,
 } from "./user.responses.ts";
 import {
-  userApiBudgetOverviewInputSchema,
   userApiChangePasswordInputSchema,
   userApiEmptyInputSchema,
   userApiEndBrowserSessionInputSchema,
   userApiNotificationTopicInputSchema,
   userApiOrganizationInputSchema,
-  userApiPersonalUsageInputSchema,
   userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
   userApiSetAvatarInputSchema,
@@ -180,16 +172,4 @@ export const userTrpc = defineTrpcContract("user")
   .query("homePagePickerState")
   .withInput(userApiOrganizationInputSchema)
   .withOutput(userApiHomePagePickerStateSchema)
-
-  .query("personalUsage")
-  .withInput(userApiPersonalUsageInputSchema)
-  .withOutput(personalUsageRollupSchema)
-
-  .query("budgetOverview")
-  .withInput(userApiBudgetOverviewInputSchema)
-  .withOutput(governanceBudgetOverviewForUserSchema)
-
-  .query("cliBootstrap")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(cliBootstrapResultSchema)
   .build();

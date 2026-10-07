@@ -47,12 +47,12 @@ export const evaluatorTrpc = defineTrpcContract("evaluators")
   .withInput(evaluatorApiUpdateInputSchema)
   .withOutput(evaluatorSchema)
 
-  /** The workflow and monitors the archive confirmation names. */
+  /** The workflow the archive confirmation names; the monitors are read from monitor. */
   .query("getRelatedEntities")
   .withInput(evaluatorApiEvaluatorIdInputSchema)
   .withOutput(evaluatorRelatedEntitiesSchema)
 
-  /** Archives the evaluator, its workflow, and the monitors running it. */
+  /** Archives the evaluator and its workflow; monitor removes its rows on the fact. */
   .mutation("cascadeArchive")
   .withInput(evaluatorApiEvaluatorIdInputSchema)
   .withOutput(evaluatorCascadeArchiveSchema)

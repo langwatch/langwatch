@@ -4,14 +4,13 @@
  */
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EvaluationApi, type OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
   EvaluatorApi,
   evaluatorsSchema,
-  findEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   MonitorApi,
@@ -28,7 +27,6 @@ import {
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
   type MonitorPatchInput,
-  type MonitorPerformanceInput,
   type MonitorReplicationInput,
   type MonitorRunnableCheckInput,
   type MonitorServerConfig,
@@ -40,18 +38,17 @@ import {
   type MonitorSummary,
 } from "@langwatch/monitor-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildMonitorEvaluatorCleanupPipeline,
+  type MonitorEvaluatorCleanupPipeline,
+} from "../eventing/monitor-evaluator-cleanup.pipeline.ts";
 import type { MonitorRepositories } from "../repositories/monitor.repositories.ts";
-import { previousPeriodStartMs } from "../rules/monitor-performance-window.rules.ts";
 import { monitorPlatformUrl } from "../rules/monitor-platform-url.rules.ts";
 import { MonitorCatalogService } from "../services/monitor-catalog.service.ts";
 import { MonitorReplicationService } from "../services/monitor-replication.service.ts";
 import { MonitorService } from "../services/monitor.service.ts";
-
-/** The window the performance strip reports, and compares to the one before it. */
-const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** The app's KSUID resource for a monitor row (`KSUID_RESOURCES.MONITOR`). */
 const MONITOR_KSUID_RESOURCE = "monitor";
@@ -69,8 +66,8 @@ export class MonitorModule implements MonitorApi {
     permissions: AuthzApi,
     /** Evaluator service for the port and copy replication. */
     evaluators: EvaluatorApi,
-    /** Seven-day trend, read through the evaluation application. */
-    evaluation: EvaluationApi,
+    /** The settings-recovery rollback switch a monitor's parameters are checked under. */
+    featureFlags: FeatureFlagApi,
     /** Removes the workflow a monitor copy replicated when the replica is refused. */
     workflows: WorkflowApi,
   };
@@ -81,7 +78,6 @@ export class MonitorModule implements MonitorApi {
   #usage: MonitorRepositories["monitors"];
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
-  #evaluation: EvaluationApi;
   #replication: MonitorReplicationService;
   readonly #publicBaseUrl: string | undefined;
 
@@ -93,13 +89,12 @@ export class MonitorModule implements MonitorApi {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
       evaluators: dependencies.evaluators,
-      evaluation: dependencies.evaluation,
+      featureFlags: dependencies.featureFlags,
       generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
     this.#usage = repositories.monitors;
     this.#permissions = dependencies.permissions;
-    this.#evaluation = dependencies.evaluation;
     this.#replication = MonitorReplicationService.create({
       evaluators: dependencies.evaluators,
       workflows: dependencies.workflows,
@@ -109,6 +104,11 @@ export class MonitorModule implements MonitorApi {
 
   static create(setup: MonitorSetup): MonitorModule {
     return new MonitorModule(setup.repositories, setup.dependencies, setup.config.publicBaseUrl);
+  }
+
+  /** Removes the monitors that ran an evaluator once evaluator records it deleted. */
+  evaluatorCleanupPipeline(): MonitorEvaluatorCleanupPipeline {
+    return buildMonitorEvaluatorCleanupPipeline({ monitors: this.#monitors });
   }
 
   list(input: Readonly<{ projectId: string }>): Promise<MonitorWithEvaluator[]> {
@@ -224,33 +224,6 @@ export class MonitorModule implements MonitorApi {
     await this.#monitors.getById(input);
 
     return this.#monitors.delete(input);
-  }
-
-  /**
-   * The last seven days of score and pass-rate for each of the project's
-   * monitors, against the window before it. The window, each monitor's
-   * guardrail flag, and the answer for a project with no monitors live here.
-   */
-  async performanceForProject(
-    input: MonitorPerformanceInput,
-  ): Promise<OnlineEvaluationPerformance[]> {
-    const monitors = await this.list({ projectId: input.projectId });
-    if (monitors.length === 0) return [];
-
-    const endMs = nowInstant().epochMilliseconds;
-    const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
-
-    return this.#evaluation.getMonitorPerformance({
-      tenantId: input.projectId,
-      monitors: monitors.map((monitor) => ({
-        id: monitor.id,
-        isGuardrail: findEvaluatorDefinitions(monitor.checkType)[0]?.isGuardrail ?? false,
-      })),
-      previousStartMs: previousPeriodStartMs({ startMs: currentStartMs, endMs }),
-      currentStartMs,
-      endMs,
-      timeZone: input.timeZone ?? "UTC",
-    });
   }
 
   /**

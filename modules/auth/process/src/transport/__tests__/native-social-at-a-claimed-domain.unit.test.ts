@@ -3,7 +3,6 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 /**
  * A native social button pressed by somebody whose organization's connection governs their
  * address, on both account seams: the refusal carries the connection so the error route can
@@ -21,11 +20,9 @@ import {
   type BetterAuthHookCollaborators,
   createBeforeAccountCreateHook,
   type FindGoverningConnections,
+  type SsoDomainOrganizations,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import type {
-  BetterAuthHookOrganization,
-  BetterAuthHooksRepository,
-} from "../../repositories/better-auth-hooks.repository.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 
 const CONNECTION = "local_ssoc_acme";
 
@@ -41,12 +38,14 @@ const acmeGoverned: FindGoverningConnections = async ({ email }) =>
 const acmeBrokered: FindGoverningConnections = async ({ email }) =>
   email.endsWith("@acme.com") ? [{ connectionId: CONNECTION, methodId: "auth0" }] : [];
 
+type SsoDomainOrganization = { id: string; name: string; ssoProvider: string | null };
+
 function repoFor({
   email = "sam@acme.com",
   organization = null,
 }: {
   email?: string;
-  organization?: BetterAuthHookOrganization | null;
+  organization?: SsoDomainOrganization | null;
 } = {}) {
   const flagPendingSsoSetup = vi.fn(async () => undefined);
   const repo = createApiFixture<BetterAuthHooksRepository>({
@@ -58,15 +57,14 @@ function repoFor({
       pendingSsoSetup: false,
       signupConfirmationPending: false,
     }),
-    getOrganizationBySsoDomain: async () => {
-      if (organization === null) throw new OrganizationNotFoundError();
-      return organization;
-    },
     countAccountsForUser: async () => 1,
     findFederatedAccountsForUser: async () => [],
     flagPendingSsoSetup,
   });
-  return { repo, flagPendingSsoSetup };
+  const organizations = createApiFixture<SsoDomainOrganizations>({
+    findBySsoDomain: async () => organization,
+  });
+  return { repo, organizations, flagPendingSsoSetup };
 }
 
 function accountFor(providerId: string, accountId = `${providerId}|123`) {
@@ -82,8 +80,15 @@ function accountFor(providerId: string, accountId = `${providerId}|123`) {
   };
 }
 
-function collaborators(admit = vi.fn(async () => undefined)): BetterAuthHookCollaborators {
+function collaborators({
+  admit = vi.fn(async () => undefined),
+  organizations = repoFor().organizations,
+}: {
+  admit?: SsoArrivalApi["admit"];
+  organizations?: SsoDomainOrganizations;
+} = {}): BetterAuthHookCollaborators {
   return {
+    organizations,
     federation: licensed,
     invites: createApiFixture<BetterAuthHookCollaborators["invites"]>(),
     announcements: createApiFixture<BetterAuthHookCollaborators["announcements"]>(),
@@ -107,6 +112,7 @@ function signUp({
 }) {
   return createBeforeAccountCreateHook({
     repo,
+    organizations: repoFor().organizations,
     federation: licensed,
     findGoverningConnections: acmeGoverned,
   })(accountFor(providerId, accountId), null);
@@ -154,7 +160,7 @@ describe("a native social sign-in on an already-linked account", () => {
       afterAccountUpdate({
         repo: repoFor().repo,
         account: accountFor("google"),
-        collaborators: collaborators(admit),
+        collaborators: collaborators({ admit }),
         findGoverningConnections: acmeGoverned,
       }),
     ).rejects.toMatchObject({
@@ -168,7 +174,7 @@ describe("a native social sign-in on an already-linked account", () => {
     await afterAccountUpdate({
       repo: repoFor().repo,
       account: accountFor(CONNECTION),
-      collaborators: collaborators(admit),
+      collaborators: collaborators({ admit }),
       findGoverningConnections: acmeGoverned,
     });
     expect(admit).toHaveBeenCalledWith(expect.objectContaining({ connectionId: CONNECTION }));
@@ -181,10 +187,11 @@ describe("the legacy ssoDomain columns", () => {
 
   /** @scenario "A native social sign-in at an SSO-enforced domain is refused" */
   it("refuses a native provider for an existing member and leaves pendingSsoSetup alone", async () => {
-    const { repo, flagPendingSsoSetup } = repoFor({ organization: LEGACY });
+    const { repo, organizations, flagPendingSsoSetup } = repoFor({ organization: LEGACY });
     await expect(
       createBeforeAccountCreateHook({
         repo,
+        organizations,
         federation: licensed,
         findGoverningConnections: nobodyGoverns,
       })(accountFor("google"), null),
@@ -194,10 +201,11 @@ describe("the legacy ssoDomain columns", () => {
 
   /** @scenario A connection reached through the broker refuses without bouncing */
   it("leaves a brokered connection to the legacy guard instead of bouncing to it", async () => {
-    const { repo } = repoFor({ organization: LEGACY });
+    const { repo, organizations } = repoFor({ organization: LEGACY });
     await expect(
       createBeforeAccountCreateHook({
         repo,
+        organizations,
         federation: licensed,
         findGoverningConnections: acmeBrokered,
       })(accountFor("google"), null),
@@ -206,11 +214,12 @@ describe("the legacy ssoDomain columns", () => {
 
   /** @scenario "A native social sign-in on an already-linked account is refused too" */
   it("refuses a native provider on the update seam", async () => {
+    const { repo, organizations } = repoFor({ organization: LEGACY });
     await expect(
       afterAccountUpdate({
-        repo: repoFor({ organization: LEGACY }).repo,
+        repo,
         account: accountFor("google"),
-        collaborators: collaborators(),
+        collaborators: collaborators({ organizations }),
         findGoverningConnections: nobodyGoverns,
       }),
     ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
@@ -218,18 +227,19 @@ describe("the legacy ssoDomain columns", () => {
 
   /** @scenario "An organization pinned to Google still signs in with Google" */
   it("lets an organization pinned to Google sign in with Google on both seams", async () => {
-    const { repo, flagPendingSsoSetup } = repoFor({
+    const { repo, organizations, flagPendingSsoSetup } = repoFor({
       organization: { ...LEGACY, ssoProvider: "google" },
     });
     await createBeforeAccountCreateHook({
       repo,
+      organizations,
       federation: licensed,
       findGoverningConnections: nobodyGoverns,
     })(accountFor("google"), null);
     await afterAccountUpdate({
       repo,
       account: accountFor("google"),
-      collaborators: collaborators(),
+      collaborators: collaborators({ organizations }),
       findGoverningConnections: nobodyGoverns,
     });
     expect(flagPendingSsoSetup).not.toHaveBeenCalled();

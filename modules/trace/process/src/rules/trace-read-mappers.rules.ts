@@ -9,6 +9,7 @@ import {
   CONTENT_CATEGORIES,
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
+import { resolveNonBilledCost } from "@langwatch/span-normalisation";
 import type {
   CategoryVisibility,
   Protections,
@@ -29,7 +30,6 @@ import {
   deriveTraceTimestamp,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-  resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";

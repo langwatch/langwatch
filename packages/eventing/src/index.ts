@@ -103,6 +103,12 @@ export type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "./projections/mapProjection.types.ts";
+export type {
+  PeerEvent,
+  PeerEventSchema,
+  PeerFoldProjectionDeclaration,
+  PeerMapProjectionDeclaration,
+} from "./projections/peerProjection.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
 export type {
   SealedCommand,
@@ -210,6 +216,7 @@ export * from "./replay/replayLog.ts";
 export * from "./replay/replayStatePath.ts";
 export * from "./replay/replayMarkers.ts";
 export * from "./replay/replayProjections.ts";
+export * from "./replay/projectionLaneReplay.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
 export * from "./stores/eventStoreUtils.ts";

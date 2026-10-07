@@ -40,6 +40,10 @@ import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.s
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  async findBySsoDomain(): Promise<null> {
+    return null;
+  }
+
   async findAllIds(): Promise<string[]> {
     return [];
   }
@@ -66,6 +70,20 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getSignInSecurityPolicy(): Promise<never> {
+    throw new Error("not used");
+  }
+
+  async updateSignInSecurityPolicy(): Promise<void> {}
+
+  async findSignInSecurityPoliciesForUser(): Promise<[]> {
+    return [];
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<[]> {
+    return [];
+  }
 
   async getPricing(): Promise<{ pricingModel: PricingModel | null; currency: "USD" | "EUR" }> {
     return { pricingModel: null, currency: "EUR" };
@@ -138,6 +156,10 @@ class StubRepository extends OrganizationRepository {
   }
 
   async updateSentPlanLimitAlert(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async setLicense(): Promise<void> {
     throw new OrganizationNotFoundError();
   }
 

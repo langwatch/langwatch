@@ -23,4 +23,17 @@ export const evaluationTrpcTransport: TrpcRouterDeclaration<EvaluationApi, typeo
     .procedure("warmupLambda")
     .withPermission("evaluations:view")
     .handle(({ app, input }) => app.warmupEvaluators(input))
+
+    /**
+     * `evaluations:view` for the monitors, and `analytics:view` on top because
+     * the trend is the analytics page's own comparison window.
+     */
+    .procedure("getMonitorPerformanceForProject")
+    .withPermission(["evaluations:view", "analytics:view"])
+    .handle(({ app, input }) =>
+      app.findMonitorPerformance({
+        projectId: input.projectId,
+        ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
+      }),
+    )
     .build();

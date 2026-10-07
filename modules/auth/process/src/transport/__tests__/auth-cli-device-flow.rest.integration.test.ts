@@ -16,8 +16,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
-import type { AuthDirectoryRepository } from "../../repositories/auth-directory.repository.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
+import type { CliDeviceDirectory } from "../../services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
   type CliDeviceFlowCollaborators,
@@ -1476,7 +1476,7 @@ function deviceFlowWorld(
     validatedSelections: [],
   };
 
-  const directory: AuthDirectoryRepository = {
+  const directory: CliDeviceDirectory = {
     getOrganizationIdBySsoDomain: () => Promise.reject(new OrganizationNotFoundError()),
     getPerson: (userId) =>
       world.personExists

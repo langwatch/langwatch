@@ -87,20 +87,6 @@ Feature: Shared project service
     And it does not construct Prisma or a Project repository per request
 
   @unit
-  Scenario: A deployment without a clustering scheduler refuses by name
-    Given a process composes the project surface with no topic-clustering scheduler
-    When a caller asks for a manual clustering run
-    Then the caller is told this deployment does not offer that service
-    And the refusal reaches the caller by name rather than as an unknown failure
-
-  @unit
-  Scenario: A clustering run that fails inside the platform degrades to an unknown failure
-    Given a process composes the project surface with a clustering scheduler
-    When the scheduler fails for a reason no caller can act on
-    Then the process records the failure
-    And the caller is told only that the request failed, with a trace id to quote
-
-  @unit
   Scenario: A project is born with packaged credentials
     Given a process composes the project service
     When the service creates a project
@@ -142,6 +128,19 @@ Feature: Shared project service
     Then project records a presence-setting-changed fact with presence off and the project's organization
     And the fact carries the id of the member who changed it
     And it is not marked as backfilled
+
+  @unit
+  Scenario: Switching trace sharing off is recorded as project's fact
+    Given a project whose trace sharing is on
+    When a member saves the project settings with trace sharing off
+    Then project records a trace-sharing-disabled fact with the project's organization
+    And the fact carries the id of the member who switched it off
+
+  @unit
+  Scenario: Saving project settings with trace sharing already off records no sharing fact
+    Given a project whose trace sharing is off
+    When a member saves the project settings with trace sharing off
+    Then no trace-sharing-disabled fact is recorded
 
   @unit
   Scenario: Saving project settings without changing presence records no presence fact

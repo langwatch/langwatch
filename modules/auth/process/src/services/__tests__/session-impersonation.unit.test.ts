@@ -4,7 +4,7 @@
  * @see specs/identity/mfa-and-session-shape.feature
  */
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -47,15 +47,14 @@ function harness() {
     sessionBound: signInSecurityFixture({ now }).sessionBound,
     now,
   });
-  memory.sessions.set("session-operator", {
+  memory.db.Session.push({
     id: "session-operator",
     userId: "operator",
     sessionToken: "token-operator",
-    impersonation: null,
     amr: ["pwd", "otp"],
-    createdAt: NOW,
-    updatedAt: NOW,
-    lastSeenAt: NOW,
+    createdAt: toDate(NOW),
+    updatedAt: toDate(NOW),
+    lastSeenAt: toDate(NOW),
   });
   const verified: VerifiedBrowserSession = {
     session: { id: "session-operator", expiresAt: new Date("2030-01-01T00:00:00.000Z") },
@@ -73,6 +72,11 @@ const start = {
   expiresAt: IN_AN_HOUR,
 };
 
+/** The row as the session twin reads it, impersonation claims and all. */
+function storedSession({ memory, id }: { memory: MemoryAuthDatabase; id: string }) {
+  return MemoryAuthSessionRepository.create({ memory }).findById({ id });
+}
+
 describe("BrowserSessionService impersonation", () => {
   describe("when an operator starts impersonating somebody", () => {
     /** @scenario "An impersonated session records both people" */
@@ -81,8 +85,9 @@ describe("BrowserSessionService impersonation", () => {
 
       await service.startImpersonation(start);
 
-      const row = memory.sessions.get("session-operator");
-      expect(row?.impersonation).toEqual({
+      const row = memory.db.Session.find((candidate) => candidate.id === "session-operator");
+      const stored = await storedSession({ memory, id: "session-operator" });
+      expect(stored?.impersonation).toEqual({
         actorUserId: "operator",
         subjectUserId: "sam",
         reason: "Debugging trace 42",
@@ -136,7 +141,7 @@ describe("BrowserSessionService impersonation", () => {
       await service.stopImpersonation({ sessionId: "session-operator" });
       await service.stopImpersonation({ sessionId: "session-operator" });
 
-      expect(memory.sessions.get("session-operator")?.impersonation).toBeNull();
+      expect((await storedSession({ memory, id: "session-operator" }))?.impersonation).toBeNull();
       await expect(service.resolveBrowserSession({ verified })).resolves.toMatchObject({
         kind: "signed_in",
         session: { user: { id: "operator" } },

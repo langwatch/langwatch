@@ -18,6 +18,13 @@ export class MemorySuiteRunRepository extends BaseMemoryProjectionStore<
     return `${tenantId}:${aggregateId}`;
   }
 
+  /** One tenant's held run projections, in batch-run order. */
+  async findForTenant(tenantId: string): Promise<Projection<SuiteRunStateData>[]> {
+    return [...this.store.values()]
+      .filter((projection) => String(projection.tenantId) === tenantId)
+      .toSorted((left, right) => left.aggregateId.localeCompare(right.aggregateId));
+  }
+
   async storeProjectionBatch(
     projections: Projection<SuiteRunStateData>[],
     context: ProjectionStoreWriteContext,

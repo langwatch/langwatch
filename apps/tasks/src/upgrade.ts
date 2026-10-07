@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { hostname } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
@@ -8,13 +9,19 @@ import {
   reconcileTTL,
   resolveClickHouseMigrationTaskConfig,
   runMigrations,
+  type GooseOptions,
 } from "@langwatch/clickhouse-migrations";
 import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { imageSteps, type UpgradeClickHouse } from "@langwatch/upgrade";
-import { readImageTree } from "@langwatch/upgrade/gate";
-import { loadReleases, type ManifestStep } from "@langwatch/upgrade/manifest";
+import { IMAGE_MIGRATION_DIRECTORIES, readImageTree } from "@langwatch/upgrade/gate";
+import {
+  compareReleases,
+  loadReleases,
+  type ManifestStep,
+  type ReleaseManifest,
+} from "@langwatch/upgrade/manifest";
 import { formatStatus } from "@langwatch/upgrade/reader";
 import {
   createUpgradeRunner,
@@ -32,6 +39,7 @@ import {
   upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
 import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
+import { applyRelease, SteppingError } from "@langwatch/upgrade/stepping";
 
 import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
@@ -104,6 +112,12 @@ function clickhouseTargets({ environment }: TaskInput) {
   return { config, targets };
 }
 
+/** Postgres left alone: SKIP_PRISMA_MIGRATE set (ok), or no DATABASE_URL (failed). */
+function prismaSkipped({ url }: { url: string | undefined }): SchemaTargetReport {
+  const error = url ? null : "DATABASE_URL is required to apply the Postgres schema";
+  return { engine: "postgres", target: "postgres", ok: !!url, error };
+}
+
 function deployPrisma({
   input,
   lockTimeoutMs,
@@ -114,10 +128,7 @@ function deployPrisma({
   signal: AbortSignal;
 }): Promise<SchemaTargetReport> {
   const url = input.environment.DATABASE_URL;
-  if (input.config.skipPrismaMigrate || !url) {
-    const error = url ? null : "DATABASE_URL is required to apply the Postgres schema";
-    return Promise.resolve({ engine: "postgres", target: "postgres", ok: !!url, error });
-  }
+  if (input.config.skipPrismaMigrate || !url) return Promise.resolve(prismaSkipped({ url }));
   const configPath = fileURLToPath(new URL("../prisma.config.ts", import.meta.url));
   return new Promise((resolve) => {
     const child = spawn("pnpm", ["exec", "prisma", "migrate", "deploy", "--config", configPath], {
@@ -177,20 +188,40 @@ function resolvePrismaRolledBack({
   });
 }
 
-async function migrateClickHouse({ input }: { input: TaskInput }): Promise<SchemaTargetReport[]> {
+/** What goose is run with for one target; `upTo` is set only when stepping a release. */
+export function clickHouseRunOptions({
+  url,
+  settings,
+  upTo,
+}: {
+  url: string;
+  settings: Pick<GooseOptions, "clusterName" | "childEnvironment" | "waitSeconds"> | undefined;
+  upTo: number | undefined;
+}): GooseOptions {
+  return {
+    connectionUrl: url,
+    clusterName: settings?.clusterName,
+    childEnvironment: settings?.childEnvironment,
+    waitSeconds: settings?.waitSeconds,
+    verbose: true,
+    ...(upTo === undefined ? {} : { upTo }),
+  };
+}
+
+async function migrateClickHouse({
+  input,
+  upTo,
+}: {
+  input: TaskInput;
+  upTo?: number;
+}): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
   const reports: SchemaTargetReport[] = [];
   for (const target of targets) {
     let error: string | null = null;
     try {
-      await runMigrations({
-        connectionUrl: target.url,
-        clusterName: settings?.clusterName,
-        childEnvironment: settings?.childEnvironment,
-        waitSeconds: settings?.waitSeconds,
-        verbose: true,
-      });
+      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo }));
     } catch (failure) {
       error = String(failure instanceof Error ? failure.message : failure)
         .split(target.url)
@@ -221,6 +252,199 @@ function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplie
     },
     resolveRolledBack: ({ migration, signal }) =>
       resolvePrismaRolledBack({ input, migration, signal }),
+  };
+}
+
+/** What stepping to a release applies: every Prisma folder and the last goose version up to it. */
+export function releaseSchemaUpTo({
+  release,
+  manifests,
+}: {
+  release: string;
+  manifests: readonly ReleaseManifest[];
+}): { prismaFolders: string[]; gooseUpTo: number | null } {
+  const ids = manifests
+    .filter((manifest) => compareReleases({ left: manifest.release, right: release }) <= 0)
+    .flatMap((manifest) => manifest.steps.map((step) => step.id));
+  const named = (prefix: string) =>
+    ids.filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
+  const versions = named("clickhouse:").map(Number);
+  return {
+    prismaFolders: named("prisma:"),
+    gooseUpTo: versions.length > 0 ? Math.max(...versions) : null,
+  };
+}
+
+/** What one stepped release did: its target reports and the Prisma folders it applied. */
+export type SteppedSchema = Readonly<{
+  reports: readonly SchemaTargetReport[];
+  applied: readonly string[];
+}>;
+
+/** Applies the schema up to one release; the stepping applier calls it once per release. */
+export type StepSchemaTo = (args: {
+  release: string;
+  prismaFolders: readonly string[];
+  gooseUpTo: number | null;
+  lockTimeoutMs: number;
+  signal: AbortSignal;
+}) => Promise<SteppedSchema>;
+
+/** Said once, when the first schema to apply is older than the image's release. */
+export function steppingStartsLine({
+  imageRelease,
+}: {
+  imageRelease: string | null;
+}): UpgradeTaskLine {
+  return {
+    level: "info",
+    message: `the upgrade crosses several releases: the schema steps one release at a time up to ${imageRelease ?? "this image"}, each release's blocking steps after its schema`,
+    fields: { phase: "schema", waitingOn: "nothing", next: "nothing to do: wait for the run" },
+  };
+}
+
+/** Said before one release's schema is applied. */
+export function stepToLine({
+  release,
+  prismaFolders,
+  gooseUpTo,
+}: {
+  release: string;
+  prismaFolders: readonly string[];
+  gooseUpTo: number | null;
+}): UpgradeTaskLine {
+  const clickhouse =
+    gooseUpTo === null ? "no ClickHouse version up to it" : `ClickHouse up to version ${gooseUpTo}`;
+  return {
+    level: "info",
+    message: `stepping the schema to ${release}: ${prismaFolders.length} Prisma folder(s) up to it, ${clickhouse}`,
+    fields: {
+      phase: "schema",
+      release,
+      waitingOn: "prisma migrate deploy, then goose",
+      next: "nothing to do: wait for the run",
+    },
+  };
+}
+
+/** Said after one release's schema: what it applied, or which targets failed. */
+export function steppedLine({
+  release,
+  stepped,
+}: {
+  release: string;
+  stepped: SteppedSchema;
+}): UpgradeTaskLine {
+  const failed = stepped.reports.filter((report) => !report.ok).map((report) => report.target);
+  const fields = { phase: "schema", release, applied: stepped.applied };
+  if (failed.length === 0)
+    return {
+      level: "info",
+      message: `schema stepped to ${release}: ${stepped.applied.length} Prisma migration(s) applied; its blocking steps run next`,
+      fields: { ...fields, waitingOn: "nothing" },
+    };
+  return {
+    level: "warn",
+    message: `schema step to ${release} failed on ${failed.join(", ")}`,
+    fields: { ...fields, failed, waitingOn: "the runner's retry or its failure report" },
+  };
+}
+
+/**
+ * One release, a fresh install or only the unreleased tail: the one-pass applier, unchanged. A
+ * first schema older than the image steps each release in turn, the unreleased tail in one pass
+ * (specs/upgrade/stepping.feature).
+ */
+export function releaseSteppingApplier({
+  imageRelease,
+  manifests,
+  onePass,
+  stepTo,
+  say,
+}: {
+  imageRelease: string | null;
+  manifests: readonly ReleaseManifest[];
+  onePass: UpgradeSchemaApplier;
+  stepTo: StepSchemaTo;
+  say: (line: UpgradeTaskLine) => void;
+}): UpgradeSchemaApplier {
+  let stepping: boolean | undefined;
+  return {
+    ...onePass,
+    async apply(args) {
+      const { release, lockTimeoutMs, signal } = args;
+      if (stepping === undefined) {
+        stepping = release !== null && release !== imageRelease;
+        if (stepping) say(steppingStartsLine({ imageRelease }));
+      }
+      if (!stepping || release === null) return onePass.apply(args);
+      const schema = releaseSchemaUpTo({ release, manifests });
+      say(stepToLine({ release, ...schema }));
+      const stepped = await stepTo({ release, ...schema, lockTimeoutMs, signal });
+      say(steppedLine({ release, stepped }));
+      return stepped.reports;
+    },
+  };
+}
+
+/** One release's Postgres schema through the stepping applier's release directory. */
+async function stepPrisma({
+  input,
+  release,
+  prismaFolders,
+  lockTimeoutMs,
+  signal,
+}: {
+  input: TaskInput;
+  release: string;
+  prismaFolders: readonly string[];
+  lockTimeoutMs: number;
+  signal: AbortSignal;
+}): Promise<SteppedSchema> {
+  const url = input.environment.DATABASE_URL;
+  if (input.config.skipPrismaMigrate || !url)
+    return { reports: [prismaSkipped({ url })], applied: [] };
+  const failed = (error: string): SteppedSchema => ({
+    reports: [{ engine: "postgres", target: "postgres", ok: false, error }],
+    applied: [],
+  });
+  try {
+    const { targets } = await applyRelease({
+      release,
+      prismaFolders: prismaFolders.map((name) => join(IMAGE_MIGRATION_DIRECTORIES.prisma, name)),
+      gooseUpTo: null,
+      postgresUrl: withLockTimeout({ url, lockTimeoutMs }),
+      clickhouseTargets: [],
+      environment: input.environment,
+      signal,
+    });
+    const postgres = targets[0];
+    if (postgres?.status === "applied")
+      return {
+        reports: [{ engine: "postgres", target: "postgres", ok: true, error: null }],
+        applied: postgres.applied,
+      };
+    if (postgres?.status === "failed") {
+      const code = postgres.code ? ` (${postgres.code})` : "";
+      return {
+        ...failed(`prisma migrate deploy to ${release} failed${code}: ${postgres.message}`),
+        applied: postgres.applied,
+      };
+    }
+    return failed(`prisma migrate deploy to ${release} did not run: the upgrade was aborted`);
+  } catch (error) {
+    if (!(error instanceof SteppingError)) throw error;
+    return failed(`${error.code}: ${error.message}`);
+  }
+}
+
+/** Postgres up to the release, then ClickHouse once a release up to it carries a goose version. */
+function stepSchemaTo({ input }: { input: TaskInput }): StepSchemaTo {
+  return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal }) => {
+    const postgres = await stepPrisma({ input, release, prismaFolders, lockTimeoutMs, signal });
+    if (!postgres.reports.every((report) => report.ok) || gooseUpTo === null) return postgres;
+    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo });
+    return { ...postgres, reports: [...postgres.reports, ...clickhouse] };
   };
 }
 
@@ -398,7 +622,13 @@ async function runWithCodeSteps({
       },
       codeSteps: steps,
       releases,
-      applier: oneReleaseApplier({ input }),
+      applier: releaseSteppingApplier({
+        imageRelease: newest,
+        manifests: releases.manifests,
+        onePass: oneReleaseApplier({ input }),
+        stepTo: stepSchemaTo({ input }),
+        say: (line) => writeLine({ logger, line }),
+      }),
       reconcilers: reconcilers({ input }),
       identity: { image: newest ?? "unreleased", host: hostname() },
       log: runnerLog(),

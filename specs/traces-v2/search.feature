@@ -1436,6 +1436,35 @@ Rule: Enter routes a sentence
     And contractions, possessives and a trailing plural possessive stay words too
     And a value in single quotes is still a quoted value
 
+  # A quoted value still missing its closing quote does not parse, so its chip
+  # is drawn without the parser. An open quote reads as it will once closed:
+  # everything after it is the value.
+  @unit
+  Scenario: A quoted value still being typed is drawn as one chip
+    When the user has typed `errorMessage:"rate limit exc` and not closed the quote
+    Then one chip covers the field, the quote and every word typed after it
+    And it is one chip after every character typed on the way there, a space included
+    And the U+00A0 the editor writes for a space is part of the chip like a space
+    And an escaped quote inside the value does not close it
+    And a value opened with a single quote is drawn the same way
+
+  @unit
+  Scenario: An apostrophe inside an open quoted value stays in the chip
+    When the user has typed `errorMessage:"the model didn't answ` and not closed the quote
+    Then one chip covers the text up to the last character typed
+
+  @unit
+  Scenario: A term after a closed quote is its own chip while its quote is open
+    When the user has typed `errorMessage:"rate limit" model:"gpt 5` and not closed the second quote
+    Then the closed term is one chip and the open term is a second chip
+    And an operator word inside the open value is not drawn as an operator
+
+  @integration
+  Scenario: The editor draws an open quoted value as one chip wherever the caret sits
+    Given the search bar editor holds `errorMessage:"rate limit exceeded` with the quote not closed
+    When the caret is moved back between two words of the value
+    Then the editor shows one chip holding the whole text
+
   @unit
   Scenario: A lowercase "not" inside a sentence is a word of the sentence
     When the user types "where did a member ask about cover that is not in their plan?"

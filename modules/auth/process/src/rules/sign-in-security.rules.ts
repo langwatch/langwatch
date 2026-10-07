@@ -1,4 +1,9 @@
-import { SessionMaxLifetimeTooShortError } from "@langwatch/auth-contract";
+import {
+  SessionMaxLifetimeTooShortError,
+  type LockoutPolicy,
+  type SessionBound,
+} from "@langwatch/auth-contract";
+import type { SignInSecurityPolicy } from "@langwatch/organization-contract";
 
 type RuleNumbers = {
   lockoutAfterFailedAttempts: number;
@@ -39,4 +44,20 @@ export function assertSessionWindowSensible({
       `maximum session length of ${sessionMaxLifetimeMinutes} minutes is shorter than the idle timeout of ${sessionIdleTimeoutMinutes} minutes, which would make the idle timeout unreachable`,
     );
   }
+}
+
+/** The lockout half of the four columns an organization stores. */
+export function toLockoutPolicy(policy: SignInSecurityPolicy): LockoutPolicy {
+  return {
+    afterFailedAttempts: policy.lockoutAfterFailedAttempts,
+    lockMinutes: policy.lockoutMinutes,
+  };
+}
+
+/** The session-window half of the four columns an organization stores. */
+export function toSessionBound(policy: SignInSecurityPolicy): SessionBound {
+  return {
+    idleTimeoutMinutes: policy.sessionIdleTimeoutMinutes,
+    maxLifetimeMinutes: policy.sessionMaxLifetimeMinutes,
+  };
 }

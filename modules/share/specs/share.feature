@@ -260,6 +260,20 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Then none of the existing links resolve
       And no new share links can be created
 
+    @unit
+    Scenario: project's trace sharing disabled fact revokes that project's trace links
+      Given the share_trace_sharing_revocation pipeline over two projects with trace share links
+      When project records trace sharing disabled for one of them
+      Then share revokes every trace link of that project from its own side
+      And the other project's links stay
+
+    @unit
+    Scenario: a redelivered trace sharing disabled fact is harmless
+      Given the share_trace_sharing_revocation pipeline
+      When the same trace sharing disabled fact is delivered twice
+      Then both deliveries share one deduplication identity
+      And the second delivery revokes nothing and does not fail
+
     @integration
     Scenario: Disabling trace sharing for the organization disables it everywhere
       Given an organization with trace sharing enabled

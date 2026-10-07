@@ -7,6 +7,7 @@
 
 import type { Event } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
@@ -17,8 +18,6 @@ import {
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "#rules/trace-payload-cap.rules";
 
 import {
   buildStructuredIoPreview,

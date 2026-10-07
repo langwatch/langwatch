@@ -16,11 +16,9 @@ import {
   createMonitorTestApp,
   createMonitorTestRepositories,
   FakeMonitorEvaluators,
-  FakeMonitorPerformance,
   FakeMonitorReplication,
 } from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
-import { previousPeriodStartMs } from "../../rules/monitor-performance-window.rules.ts";
 import { monitorTrpcTransport } from "../monitor.trpc.ts";
 import type { MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
 
@@ -52,7 +50,6 @@ function mount(
   options: {
     permits?: (permission: string) => boolean;
     seed?: readonly MonitorWithEvaluator[];
-    performance?: FakeMonitorPerformance;
     replication?: FakeMonitorReplication;
     evaluators?: FakeMonitorEvaluators;
     hasProjectPermission?: (input: { permission: string }) => Promise<boolean>;
@@ -60,7 +57,6 @@ function mount(
 ) {
   const repository = MemoryMonitorRepository.create({ seed: options.seed ?? [] });
 
-  const performance = options.performance ?? new FakeMonitorPerformance();
   const replication =
     options.replication ?? new FakeMonitorReplication({ id: "evaluator-2", workflowId: null });
   const evaluators = options.evaluators ?? new FakeMonitorEvaluators(["evaluator-1"]);
@@ -68,7 +64,6 @@ function mount(
   const app = createMonitorTestApp({
     repositories: createMonitorTestRepositories(repository),
     evaluators,
-    performance,
     replication,
     permissions: createApiFixture<AuthzApi>({
       hasProjectPermission: options.hasProjectPermission ?? (async () => true),
@@ -86,7 +81,6 @@ function mount(
     router,
     caller: router.createCaller({ actor: { id: "user-1" } }),
     repository,
-    performance,
     replication,
     evaluators,
   };
@@ -114,7 +108,6 @@ describe("the monitors tRPC namespace", () => {
         "delete",
         "getAllForProject",
         "getById",
-        "getPerformanceForProject",
         "isNameAvailable",
         "toggle",
         "update",
@@ -204,42 +197,6 @@ describe("the monitors tRPC namespace", () => {
       expect(replication.deletedWorkflows).toEqual([
         { workflowId: "workflow-2", projectId: "target" },
       ]);
-    });
-  });
-
-  describe("when the trend is read", () => {
-    it("answers with no rows rather than querying evaluations for an empty project", async () => {
-      const { caller, performance } = mount();
-
-      await expect(caller.getPerformanceForProject({ projectId: PROJECT_ID })).resolves.toEqual([]);
-      expect(performance.queries).toEqual([]);
-    });
-
-    it("compares against the window the process resolves", async () => {
-      const { caller, performance } = mount({ seed: [seeded] });
-
-      await caller.getPerformanceForProject({ projectId: PROJECT_ID, timeZone: "Europe/Berlin" });
-
-      expect(performance.queries[0]).toMatchObject({
-        tenantId: PROJECT_ID,
-        monitors: [{ id: "monitor-1" }],
-        timeZone: "Europe/Berlin",
-      });
-      const query = performance.queries[0]!;
-      expect(query.previousStartMs).toBe(
-        previousPeriodStartMs({ startMs: query.currentStartMs, endMs: query.endMs }),
-      );
-    });
-
-    it("refuses a reader who may see evaluations but not analytics", async () => {
-      const { caller } = mount({
-        seed: [seeded],
-        permits: (permission) => permission !== "analytics:view",
-      });
-
-      await expect(
-        caller.getPerformanceForProject({ projectId: PROJECT_ID }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 });

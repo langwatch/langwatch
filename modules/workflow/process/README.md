@@ -646,11 +646,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `workflow_lifecycle` (aggregate `workflow`)
 
-Declared at `src/eventing/workflow-lifecycle.pipeline.ts:29`. Events: `workflowCreatedEventSchema`.
+Declared at `src/eventing/workflow-lifecycle.pipeline.ts:33`. Events: `workflowCreatedEventSchema`, `workflowVersionSavedEventSchema`.
 
-| Kind    | Name                    | Handles | Declared at                                      |
-| ------- | ----------------------- | ------- | ------------------------------------------------ |
-| command | `recordWorkflowCreated` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:34` |
+| Kind    | Name                         | Handles | Declared at                                      |
+| ------- | ---------------------------- | ------- | ------------------------------------------------ |
+| command | `recordWorkflowCreated`      | –       | `src/eventing/workflow-lifecycle.pipeline.ts:38` |
+| command | `recordWorkflowVersionSaved` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:39` |
 
 ### Pipeline `workflow_nlp_lambda_cleanup` (aggregate `global`)
 

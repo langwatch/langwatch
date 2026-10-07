@@ -1,3 +1,36 @@
+import { CODEX_EXEC_SCOPE, isCodexScope } from "@langwatch/coding-agent-contract";
+import {
+  type AttributeCanonicaliser,
+  canonicalLogRecordStore,
+  canonicalSpanStore,
+  claudeCacheWritesLongLived,
+  ClaudeCodeCanonicaliserService,
+  ClaudeCodeRequestService,
+  ClaudeCodeResponseService,
+  CodexCanonicaliserService,
+  CopilotCanonicaliserService,
+  extractLastUserMessageText,
+  extractMessageContentText,
+  type ExtractorContext,
+  FallbackCanonicaliserService,
+  GenAICanonicaliserService,
+  HaystackCanonicaliserService,
+  isConversationalQuerySource,
+  LangWatchCanonicaliserService,
+  LegacyOtelCanonicaliserService,
+  type LogExtractorContext,
+  LogfireCanonicaliserService,
+  MastraCanonicaliserService,
+  OpenInferenceCanonicaliserService,
+  parseJsonStringValues,
+  remainingAttributes,
+  remainingEvents,
+  SpringAICanonicaliserService,
+  StrandsCanonicaliserService,
+  TraceloopCanonicaliserService,
+  VercelCanonicaliserService,
+  VertexAdkCanonicaliserService,
+} from "@langwatch/span-normalisation";
 import {
   classifyClaudeCallInputSchema,
   classifyClaudeCallResultSchema,
@@ -25,62 +58,6 @@ import {
   TraceCanonicalisationService as TraceCanonicalisationServiceContract,
 } from "@langwatch/trace-contract";
 
-import {
-  type AttributeCanonicaliser,
-  canonicalLogRecordStore,
-  canonicalSpanStore,
-  type ExtractorContext,
-  type LogExtractorContext,
-  remainingAttributes,
-  remainingEvents,
-} from "../rules/canonical-attributes.rules.ts";
-import { parseJsonStringValues } from "../rules/canonical-json.rules.ts";
-import {
-  extractLastUserMessageText,
-  extractMessageContentText,
-} from "../rules/canonical-message.rules.ts";
-import {
-  claudeCacheWritesLongLived,
-  isConversationalQuerySource,
-} from "../rules/claude-code-call-policy.rules.ts";
-import { canonicaliseVercelCore } from "../rules/vercel-core.rules.ts";
-import { canonicaliseVercelIO } from "../rules/vercel-io.rules.ts";
-import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
-import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
-import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";
-import { CodexCanonicaliserService } from "./codex-canonicaliser.service.ts";
-import { CopilotCanonicaliserService } from "./copilot-canonicaliser.service.ts";
-import { FallbackCanonicaliserService } from "./fallback-canonicaliser.service.ts";
-import { GenAICanonicaliserService } from "./gen-ai-canonicaliser.service.ts";
-import { HaystackCanonicaliserService } from "./haystack-canonicaliser.service.ts";
-import { LangWatchCanonicaliserService } from "./langwatch-canonicaliser.service.ts";
-import { LegacyOtelCanonicaliserService } from "./legacy-otel-canonicaliser.service.ts";
-import { LogfireCanonicaliserService } from "./logfire-canonicaliser.service.ts";
-import { MastraCanonicaliserService } from "./mastra-canonicaliser.service.ts";
-import { OpenInferenceCanonicaliserService } from "./openinference-canonicaliser.service.ts";
-import { SpringAICanonicaliserService } from "./spring-ai-canonicaliser.service.ts";
-import { StrandsCanonicaliserService } from "./strands-canonicaliser.service.ts";
-import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service.ts";
-import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
-
-export class VercelCanonicaliserService implements AttributeCanonicaliser {
-  static create(): VercelCanonicaliserService {
-    return new VercelCanonicaliserService();
-  }
-
-  private constructor() {}
-
-  readonly id = "vercel";
-
-  apply(ctx: ExtractorContext): void {
-    if (!canonicaliseVercelCore(ctx)) {
-      return;
-    }
-
-    canonicaliseVercelIO(ctx);
-  }
-}
-
 const claudeCodeResponseService = ClaudeCodeResponseService.create();
 
 const claudeCodeRequestService = ClaudeCodeRequestService.create();
@@ -96,7 +73,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     VercelCanonicaliserService.create(),
     // Native CLI emitters can arrive as spans as well as log records.
     ClaudeCodeCanonicaliserService.create(),
-    CodexCanonicaliserService.create(),
+    CodexCanonicaliserService.create({ scopes: { isCodexScope, execScope: CODEX_EXEC_SCOPE } }),
     // Copilot adds its extras after GenAI establishes the standard attributes.
     CopilotCanonicaliserService.create(),
     SpringAICanonicaliserService.create(),

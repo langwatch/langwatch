@@ -56,9 +56,8 @@ function service(
       findById: vi.fn(async () => null),
       create: vi.fn(),
     } satisfies ScimUserProvisioning,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements,

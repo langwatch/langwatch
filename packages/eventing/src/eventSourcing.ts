@@ -7,6 +7,7 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
+import { peerOwnerOf } from "./pipeline/peerOwner.ts";
 import {
   type SealedPipelineDefinition,
   sealPipelineDefinition,
@@ -23,6 +24,7 @@ import type {
 } from "./process-manager/outbox/outboxDispatcherService.ts";
 import { ProcessRuntime } from "./process-manager/processRuntime.ts";
 import type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
+import type { AggregateEventLog } from "./projections/eventLogLoaders.ts";
 import { ProjectionRegistry } from "./projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck.ts";
 import { DispatchError } from "./queues/dispatchError.ts";
@@ -32,6 +34,7 @@ import type {
   JobDelivery,
 } from "./queues/index.ts";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
+import type { ReplayService } from "./replay/replayService.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.ts";
 import { EventSourcingPipeline } from "./runtimePipeline.ts";
 import {
@@ -96,6 +99,11 @@ export interface EventSourcingOptions {
     hinted: ReadHintMap;
     declaredEventTypes: ReadonlySet<string>;
   }) => StaticPipelineDefinition<never>;
+  /** Opens one replay run's engine over the event log; absent where the role holds no log. */
+  replayEngine?: (input: {
+    definitions: readonly SealedPipelineDefinition[];
+    retentionPolicyResolver?: RetentionPolicyResolver;
+  }) => { service: ReplayService; close: () => Promise<void> };
 }
 
 /**
@@ -158,6 +166,7 @@ export class EventSourcing {
   private readonly _participation?: EventingParticipation;
   private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
   private readonly _readHints?: EventSourcingOptions["readHints"];
+  private readonly _replayEngine?: EventSourcingOptions["replayEngine"];
   private _processRuntimeInstance?: ProcessRuntime;
   /** Each registered pipeline's re-drive of its recorded hand-offs, by pipeline name. */
   private readonly handoffRedrives = new Map<
@@ -183,10 +192,13 @@ export class EventSourcing {
     this._participation = options.participation;
     this._maintenance = options.maintenance;
     this._readHints = options.readHints;
+    this._replayEngine = options.replayEngine;
 
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
       start: () => this.startGlobalRegistry(),
+      peerEventLog: (peer) => this.peerEventLog(peer),
+      replayMarkerChecker: this._replayMarkerChecker,
     });
     options.configureGlobalProjections?.(this.projectionRegistry);
   }
@@ -332,6 +344,27 @@ export class EventSourcing {
     return this._readHints({ hinted, declaredEventTypes });
   }
 
+  /** A peer lane's owner log (§9): the pipeline declaring its types, read as that one reads. */
+  private peerEventLog(peer: { lane: string; eventTypes: readonly string[] }): AggregateEventLog {
+    const owner = peerOwnerOf({ definitions: this.definitions, ...peer });
+    const store = this._eventStore;
+    if (!store) {
+      throw new ConfigurationError(
+        "EventSourcing",
+        `Peer projection "${peer.lane}" has no event log to re-fold from: this runtime holds no EventStore.`,
+        { projection: peer.lane },
+      );
+    }
+    return owner.open((definition) => ({
+      aggregateType: definition.metadata.aggregateType,
+      eventStore: upcastEventStore({
+        store,
+        upcaster: EventUpcaster.of(definition.upcasts),
+        parseEvent: definition.parseEvent,
+      }),
+    }));
+  }
+
   /** A queued event parsed with the schema of whichever registered pipeline declares its type. */
   private parseRegisteredEvent(value: unknown): Event {
     const type =
@@ -358,6 +391,16 @@ export class EventSourcing {
     if (this._described.size === 0) return this._definitions;
     const kept = this._definitions.filter(({ metadata }) => !this._described.has(metadata.name));
     return [...kept, ...this._described.values()];
+  }
+
+  /** One replay run's engine over the registered pipelines; undefined where none is wired. */
+  replayEngine(): { service: ReplayService; close: () => Promise<void> } | undefined {
+    return this._replayEngine?.({
+      definitions: this.definitions,
+      ...(this._retentionPolicyResolver === undefined
+        ? {}
+        : { retentionPolicyResolver: this._retentionPolicyResolver }),
+    });
   }
 
   /** Lists a pipeline's consume side without starting it: no queue, consumer, timer or sender. */
@@ -1022,10 +1065,12 @@ export class EventSourcing {
     retentionPolicyResolver?: RetentionPolicyResolver;
     warnWhenProjectionsRunInline?: boolean;
     processStore?: ProcessStore;
+    configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   }): EventSourcing {
     const es = new EventSourcing({
       enabled: true,
       eventStore: options.eventStore,
+      configureGlobalProjections: options.configureGlobalProjections,
       executionTarget: options.executionTarget,
       retentionPolicyResolver: options.retentionPolicyResolver,
       warnWhenProjectionsRunInline: options.warnWhenProjectionsRunInline,

@@ -12,9 +12,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../analytics/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -28,6 +25,12 @@
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"

@@ -2,12 +2,14 @@
  * The pinned experiment wire: twenty tRPC procedures and sixteen REST routes
  * with their origin/main names, kinds and permissions.
  * Spec: modules/experiment/specs/experiment-service.feature.
+ * @see modules/experiment/specs/experiment-batch-records.feature
  */
 import type { TrpcAccess, TrpcProcedureFactory } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
-import { experimentsTrpc } from "@langwatch/experiment-contract";
+import { batchRecordTrpc, experimentsTrpc } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
+import { batchRecordTrpcTransport } from "../batch-record.trpc.ts";
 import { experimentDspyStepsRest } from "../experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "../experiment-init.rest.ts";
 import { experimentV3Rest } from "../experiment-v3.rest.ts";
@@ -89,6 +91,27 @@ describe("given the experiments tRPC namespace", () => {
           accessDeclaredBy(experimentTrpcTransport)[index],
         ]),
       ).toEqual(MAIN_PROCEDURES.map(([name, , permission]) => [name, permission]));
+    });
+  });
+});
+
+describe("given the batchRecord tRPC namespace experiment now serves", () => {
+  describe("when the declaration and its server half are read", () => {
+    /** @scenario "The batchRecord procedures keep their wire after the move" */
+    it("keeps main's namespace, names, kinds and permissions", () => {
+      const access = accessDeclaredBy(batchRecordTrpcTransport);
+
+      expect(batchRecordTrpc.namespace).toBe("batchRecord");
+      expect(
+        Object.entries(batchRecordTrpc.members).map(([name, member], index) => [
+          name,
+          member.kind,
+          access[index],
+        ]),
+      ).toEqual([
+        ["getAllByexperimentIdGroup", "query", "workflows:view"],
+        ["getAllByexperimentSlug", "query", "workflows:view"],
+      ]);
     });
   });
 });

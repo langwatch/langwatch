@@ -12,6 +12,8 @@ import {
   type OwnEventLog,
   type ReadHintTarget,
   type ReadHintMap,
+  type ReplayService,
+  type SealedPipelineDefinition,
 } from "@langwatch/eventing";
 import type { TrpcContract, TrpcContractMember } from "@langwatch/module";
 
@@ -140,6 +142,16 @@ export interface EventingHost {
   resumeConsumers?(): void | Promise<void>;
   /** Wakes one process manager's outbox in this process; absent where none runs. */
   notifyOutbox?(processName: string): void;
+  /** Every pipeline registered so far, read at call time; absent where none can be listed. */
+  readonly definitions?: readonly SealedPipelineDefinition[] | undefined;
+  /** Opens one replay run's engine over the event log; absent where the role holds no log. */
+  replayEngine?(): ProjectionReplayEngine | undefined;
+}
+
+/** One replay run's engine, opened by the eventing member and closed when the run ends. */
+export interface ProjectionReplayEngine {
+  readonly service: ReplayService;
+  close(): Promise<void>;
 }
 
 /**
@@ -320,6 +332,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     get eventStore() {
       return host.eventStore;
     },
+    get definitions() {
+      return host.definitions;
+    },
     register: registerPipelines(host.register.bind(candidate)),
     ...(typeof host.describe === "function"
       ? { describe: describePipelines(host.describe.bind(candidate)) }
@@ -335,6 +350,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.notifyOutbox === "function"
       ? { notifyOutbox: host.notifyOutbox.bind(candidate) }
+      : {}),
+    ...(typeof host.replayEngine === "function"
+      ? { replayEngine: host.replayEngine.bind(candidate) }
       : {}),
     ...consumerControls(host, candidate),
   };

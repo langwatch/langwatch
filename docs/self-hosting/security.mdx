@@ -5,6 +5,11 @@ description: "Security model, encryption, secrets management, and hardening for 
 
 Self-hosted LangWatch authenticates users, encrypts stored credentials, isolates tenants at the query layer, and hardens every pod it authors by default. Three bundled components cannot meet [strict admission control](#strict-admission-control) and must be disabled or replaced there.
 
+<Frame caption="Identity, keys, secrets and network exposure of a self-hosted install.">
+  <img src="/images/self-hosting/self-hosting-security-light.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="block dark:hidden" />
+  <img src="/images/self-hosting/self-hosting-security-dark.svg" alt="Security view of a self-hosted install: sign-in through your identity provider, API keys for agents, TLS at the ingress with only the App exposed, internal services and data stores, and Kubernetes Secrets synced from your secret manager" className="hidden dark:block" />
+</Frame>
+
 ## Authentication & Authorization
 
 LangWatch handles user authentication with support for:

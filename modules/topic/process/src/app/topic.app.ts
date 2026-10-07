@@ -1,14 +1,16 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   Topic,
   TopicApi,
   TopicClusteringRunHistoryEntry,
   TopicClusteringRequestInput,
   TopicClusteringStatus,
+  TopicClusteringTriggerResult,
   TopicNamesInput,
   TopicProjectInput,
 } from "@langwatch/topic-contract";
@@ -32,12 +34,16 @@ import { TopicClusteringManualRunService } from "../services/topic-clustering-ma
 import { OtelTopicClusteringMetricsService } from "../services/topic-clustering-metrics.service.ts";
 import { ModelProviderTopicClusteringModelsService } from "../services/topic-clustering-models.service.ts";
 import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
+import { TopicClusteringTriggerService } from "../services/topic-clustering-trigger.service.ts";
 import { TopicService } from "../services/topic.service.ts";
+import type { TopicBrowserApi } from "../transport/topic.trpc.ts";
 
 /** Eventing-owned schedule read needed by the Topic status projection. */
 export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
+
+const triggerLogger = createLogger("langwatch:topic:clustering-trigger");
 
 type TopicSetup = FeatureSetup<
   typeof TopicModule.dependencies,
@@ -46,7 +52,7 @@ type TopicSetup = FeatureSetup<
   TopicRepositories
 >;
 
-export class TopicModule implements TopicApi {
+export class TopicModule implements TopicApi, TopicBrowserApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {
     evaluations: EvaluationApi,
@@ -59,6 +65,7 @@ export class TopicModule implements TopicApi {
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
   readonly #bootstrap: TopicClusteringBootstrapService;
   readonly #manualRun: TopicClusteringManualRunService;
+  readonly #trigger: TopicClusteringTriggerService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
 
   private constructor(parts: {
@@ -69,6 +76,12 @@ export class TopicModule implements TopicApi {
     manualRun: TopicClusteringManualRunService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
   }) {
+    this.#trigger = TopicClusteringTriggerService.create({
+      clustering: this,
+      reportFailure: (error, { projectId }) =>
+        triggerLogger.error({ error, projectId }, "Topic clustering request failed."),
+      now: () => nowInstant().epochMilliseconds,
+    });
     this.#topics = parts.topics;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
@@ -128,6 +141,18 @@ export class TopicModule implements TopicApi {
         seeds: migration,
       }),
     });
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  topics(): TopicApi {
+    return this;
+  }
+
+  triggerTopicClustering(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<TopicClusteringTriggerResult> {
+    return this.#trigger.trigger(input);
   }
 
   /** The pipeline `topic_clustering_processing` registers, built once by {@link create}. */

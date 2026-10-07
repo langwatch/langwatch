@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:84`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:77`; nothing else in this package is public.
 
 #### `findById`
 
@@ -392,30 +392,6 @@ requestBudgetIncrease(input: UserApiRequestBudgetIncreaseInput & { userId: strin
 getHomePagePickerState(input: { userId: string; organizationId: string; }): Promise<UserHomePagePickerState>;
 ```
 
-#### `getPersonalUsageRollup`
-
-The caller's own usage rollup; refuses a caller outside the organization.
-
-```typescript
-getPersonalUsageRollup(input: UserApiPersonalUsageInput & { userId: string }): Promise<PersonalUsageRollup>;
-```
-
-#### `getBudgetOverview`
-
-Every budget binding the caller's own keys, most binding first.
-
-```typescript
-getBudgetOverview(input: UserApiBudgetOverviewInput & { userId: string }): Promise<GovernanceBudgetOverviewForUser>;
-```
-
-#### `getCliBootstrap`
-
-What the CLI's login ceremony renders: the caller's providers and monthly budget.
-
-```typescript
-getCliBootstrap(input: { userId: string; organizationId: string }): Promise<CliBootstrapResult>;
-```
-
 #### `getPersonalUsage`
 
 One person's own AI usage, rolled up over a window, for `/api/me/usage`.
@@ -525,42 +501,39 @@ type Params = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/use
 
 ### `user`
 
-Contract `../contract/src/user.trpc.ts:57`, router `src/transport/user.trpc.ts:46`.
+Contract `../contract/src/user.trpc.ts:49`, router `src/transport/user.trpc.ts:46`.
 
-| Procedure                             | Kind     | Gate                                                                                                                                                         | Input                                         | Output                                  |
-| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------- |
-| `user.register`                       | mutation | Public: the signup form's own backend: it mints the account a caller would otherwise need to already hold                                                    | `userApiRegisterInputSchema`                  | `createdUserSchema`                     |
-| `user.getAvatarUrl`                   | query    | No permission: a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it                                   | `userAvatarRestParamsSchema`                  | `userAvatarUrlSchema`                   |
-| `user.getTraceExplorerTourPreference` | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`              |
-| `user.dismissTraceExplorerTour`       | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`              |
-| `user.getNotificationPreference`      | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiNotificationTopicInputSchema`         | `userNotificationPreferenceSchema`      |
-| `user.setNotificationPreference`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetNotificationPreferenceInputSchema` | `userNotificationPreferenceSchema`      |
-| `user.isAdmin`                        | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiIsAdminSchema`                  |
-| `user.updateLastLogin`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | –                                       |
-| `user.getSsoStatus`                   | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userSsoStatusSchema`                   |
-| `user.getAccountInfo`                 | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userAccountInfoSchema`                 |
-| `user.getLinkedAccounts`              | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiLinkedAccountsSchema`           |
-| `user.unlinkAccount`                  | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiUnlinkAccountInputSchema`             | `userApiSuccessSchema`                  |
-| `user.secureAccountNudge`             | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userSecureAccountOfferSchema`          |
-| `user.dismissSecureAccountNudge`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                  |
-| `user.updateName`                     | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiUpdateNameInputSchema`                | `userApiUpdatedNameSchema`              |
-| `user.browserSessions`                | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | inline                                  |
-| `user.endBrowserSession`              | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEndBrowserSessionInputSchema`         | `userApiBrowserSessionEndedSchema`      |
-| `user.hasPassword`                    | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiHasPasswordSchema`              |
-| `user.setPassword`                    | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetPasswordInputSchema`               | `userApiSuccessSchema`                  |
-| `user.changePassword`                 | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiChangePasswordInputSchema`            | `userApiSuccessSchema`                  |
-| `user.deactivate`                     | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                  |
-| `user.reactivate`                     | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                  |
-| `user.setAvatar`                      | mutation | Permission `organization:view`                                                                                                                               | `userApiSetAvatarInputSchema`                 | `userAvatarResultSchema`                |
-| `user.removeAvatar`                   | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                  |
-| `user.personalContext`                | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiPersonalContextSchema`          |
-| `user.personalBudget`                 | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiPersonalBudgetSchema`           |
-| `user.requestBudgetIncrease`          | mutation | Permission `organization:view`                                                                                                                               | `userApiRequestBudgetIncreaseInputSchema`     | `userApiBudgetIncreaseRequestedSchema`  |
-| `user.setLastHomePath`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetLastHomePathInputSchema`           | `userApiOkSchema`                       |
-| `user.homePagePickerState`            | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiHomePagePickerStateSchema`      |
-| `user.personalUsage`                  | query    | Permission `organization:view`                                                                                                                               | `userApiPersonalUsageInputSchema`             | `personalUsageRollupSchema`             |
-| `user.budgetOverview`                 | query    | Permission `organization:view`                                                                                                                               | `userApiBudgetOverviewInputSchema`            | `governanceBudgetOverviewForUserSchema` |
-| `user.cliBootstrap`                   | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `cliBootstrapResultSchema`              |
+| Procedure                             | Kind     | Gate                                                                                                                                                         | Input                                         | Output                                 |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------- |
+| `user.register`                       | mutation | Public: the signup form's own backend: it mints the account a caller would otherwise need to already hold                                                    | `userApiRegisterInputSchema`                  | `createdUserSchema`                    |
+| `user.getAvatarUrl`                   | query    | No permission: a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it                                   | `userAvatarRestParamsSchema`                  | `userAvatarUrlSchema`                  |
+| `user.getTraceExplorerTourPreference` | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`             |
+| `user.dismissTraceExplorerTour`       | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userTourPreferenceSchema`             |
+| `user.getNotificationPreference`      | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiNotificationTopicInputSchema`         | `userNotificationPreferenceSchema`     |
+| `user.setNotificationPreference`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetNotificationPreferenceInputSchema` | `userNotificationPreferenceSchema`     |
+| `user.isAdmin`                        | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiIsAdminSchema`                 |
+| `user.updateLastLogin`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | –                                      |
+| `user.getSsoStatus`                   | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userSsoStatusSchema`                  |
+| `user.getAccountInfo`                 | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userAccountInfoSchema`                |
+| `user.getLinkedAccounts`              | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiLinkedAccountsSchema`          |
+| `user.unlinkAccount`                  | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiUnlinkAccountInputSchema`             | `userApiSuccessSchema`                 |
+| `user.secureAccountNudge`             | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userSecureAccountOfferSchema`         |
+| `user.dismissSecureAccountNudge`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
+| `user.updateName`                     | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiUpdateNameInputSchema`                | `userApiUpdatedNameSchema`             |
+| `user.browserSessions`                | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | inline                                 |
+| `user.endBrowserSession`              | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEndBrowserSessionInputSchema`         | `userApiBrowserSessionEndedSchema`     |
+| `user.hasPassword`                    | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiHasPasswordSchema`             |
+| `user.setPassword`                    | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetPasswordInputSchema`               | `userApiSuccessSchema`                 |
+| `user.changePassword`                 | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiChangePasswordInputSchema`            | `userApiSuccessSchema`                 |
+| `user.deactivate`                     | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                 |
+| `user.reactivate`                     | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                 |
+| `user.setAvatar`                      | mutation | Permission `organization:view`                                                                                                                               | `userApiSetAvatarInputSchema`                 | `userAvatarResultSchema`               |
+| `user.removeAvatar`                   | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
+| `user.personalContext`                | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiPersonalContextSchema`         |
+| `user.personalBudget`                 | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiPersonalBudgetSchema`          |
+| `user.requestBudgetIncrease`          | mutation | Permission `organization:view`                                                                                                                               | `userApiRequestBudgetIncreaseInputSchema`     | `userApiBudgetIncreaseRequestedSchema` |
+| `user.setLastHomePath`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetLastHomePathInputSchema`           | `userApiOkSchema`                      |
+| `user.homePagePickerState`            | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiHomePagePickerStateSchema`     |
 
 ## Sockets
 

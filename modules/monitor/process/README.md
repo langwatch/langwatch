@@ -6,13 +6,13 @@ The server half of [monitor](../README.md). Monitors: the checks that run an eva
 
 ## Installation
 
-`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport)`, `src/monitor.module.ts:8`.
+`defineProcessModule("monitor").withRepositories(monitorRepositories).withApi(MonitorModule).withTransports(…, monitorTrpcTransport).withEventing(monitorEvaluatorCleanupEventing)`, `src/monitor.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`MonitorApi`)
 
-Peers call these through the token, declared at `../contract/src/monitor.api.ts:33`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/monitor.api.ts:31`; nothing else in this package is public.
 
 #### `list`
 
@@ -146,14 +146,6 @@ The copy itself, once the evaluator (if any) already exists in the target.
 replicate(input: MonitorReplicationInput): Promise<Monitor>;
 ```
 
-#### `performanceForProject`
-
-The last seven days of score and pass rate for each of the project's monitors.
-
-```typescript
-performanceForProject(input: MonitorPerformanceInput): Promise<OnlineEvaluationPerformance[]>;
-```
-
 #### `platformUrl`
 
 The platform address for a monitor resource.
@@ -265,19 +257,18 @@ type Response = z.infer<typeof monitorRestDeletedSchema>; // ../contract/src/mon
 
 ### `monitors`
 
-Contract `../contract/src/monitor.trpc.ts:22`, router `src/transport/monitor.trpc.ts:8`.
+Contract `../contract/src/monitor.trpc.ts:20`, router `src/transport/monitor.trpc.ts:8`.
 
-| Procedure                           | Kind     | Gate                                            | Input                                   | Output                           |
-| ----------------------------------- | -------- | ----------------------------------------------- | --------------------------------------- | -------------------------------- |
-| `monitors.getAllForProject`         | query    | Permission `evaluations:view`                   | `monitorApiProjectInputSchema`          | inline                           |
-| `monitors.getPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorApiPerformanceInputSchema`      | inline                           |
-| `monitors.getById`                  | query    | Permission `evaluations:view`                   | `monitorApiMonitorInputSchema`          | `monitorWithEvaluatorSchema`     |
-| `monitors.isNameAvailable`          | mutation | Permission `evaluations:view`                   | `monitorApiNameAvailabilityInputSchema` | `monitorNameAvailabilitySchema`  |
-| `monitors.create`                   | mutation | Permission `evaluations:create`                 | `monitorApiCreateInputSchema`           | `monitorSchema`                  |
-| `monitors.update`                   | mutation | Permission `evaluations:update`                 | `monitorApiUpdateInputSchema`           | `monitorSchema`                  |
-| `monitors.toggle`                   | mutation | Permission `evaluations:update`                 | `monitorApiToggleInputSchema`           | `monitorWriteAcknowledgedSchema` |
-| `monitors.delete`                   | mutation | Permission `evaluations:delete`                 | `monitorApiMonitorInputSchema`          | `monitorWriteAcknowledgedSchema` |
-| `monitors.copy`                     | mutation | Permission `evaluations:manage`                 | `monitorApiCopyInputSchema`             | `monitorSchema`                  |
+| Procedure                   | Kind     | Gate                            | Input                                   | Output                           |
+| --------------------------- | -------- | ------------------------------- | --------------------------------------- | -------------------------------- |
+| `monitors.getAllForProject` | query    | Permission `evaluations:view`   | `monitorApiProjectInputSchema`          | inline                           |
+| `monitors.getById`          | query    | Permission `evaluations:view`   | `monitorApiMonitorInputSchema`          | `monitorWithEvaluatorSchema`     |
+| `monitors.isNameAvailable`  | mutation | Permission `evaluations:view`   | `monitorApiNameAvailabilityInputSchema` | `monitorNameAvailabilitySchema`  |
+| `monitors.create`           | mutation | Permission `evaluations:create` | `monitorApiCreateInputSchema`           | `monitorSchema`                  |
+| `monitors.update`           | mutation | Permission `evaluations:update` | `monitorApiUpdateInputSchema`           | `monitorSchema`                  |
+| `monitors.toggle`           | mutation | Permission `evaluations:update` | `monitorApiToggleInputSchema`           | `monitorWriteAcknowledgedSchema` |
+| `monitors.delete`           | mutation | Permission `evaluations:delete` | `monitorApiMonitorInputSchema`          | `monitorWriteAcknowledgedSchema` |
+| `monitors.copy`             | mutation | Permission `evaluations:manage` | `monitorApiCopyInputSchema`             | `monitorSchema`                  |
 
 ## Sockets
 
@@ -285,7 +276,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: monitor declares no pipeline, process manager, subscriber or task.
+### Pipeline `monitor_evaluator_cleanup` (aggregate `global`)
+
+Declared at `src/eventing/monitor-evaluator-cleanup.pipeline.ts:33`.
+
+| Kind            | Name                      | Handles                                                            | Declared at                                             |
+| --------------- | ------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------- |
+| peer subscriber | `monitorEvaluatorDeleted` | `lw.evaluator.deleted` from [evaluator](../../evaluator/README.md) | `src/eventing/monitor-evaluator-cleanup.pipeline.ts:40` |
 
 ## Configuration
 

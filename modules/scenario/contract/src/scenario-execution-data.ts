@@ -359,8 +359,17 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 export const TargetConfigSchema = z.object({
   type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
+  /** A suite prompt target's field mappings, pinned when the suite queued the run. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
+
+/** A suite plan's model picks for a run it queued, which win over the scenario's own. */
+export const runPlanModelsSchema = z.object({
+  simulatorModel: z.string().optional(),
+  judgeModel: z.string().optional(),
+});
+export type RunPlanModels = z.infer<typeof runPlanModelsSchema>;
 
 // ============================================================================
 // Result Types

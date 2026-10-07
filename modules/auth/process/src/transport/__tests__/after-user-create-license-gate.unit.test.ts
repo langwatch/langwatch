@@ -8,7 +8,7 @@ import type {
  * federation, and it rides the same platform SSO license gate as every other provider — a
  * domain-matched organization must not gain a member off a licensing store answer of "no
  */
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,11 +16,11 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
 } from "../../channels/better-auth.channel.ts";
-import { afterUserCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import type {
-  BetterAuthHookOrganization,
-  BetterAuthHooksRepository,
-} from "../../repositories/better-auth-hooks.repository.ts";
+import {
+  afterUserCreate,
+  type SsoDomainOrganizations,
+} from "../../channels/http/http.better-auth-hooks.channel.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}
@@ -61,46 +61,44 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
   };
   return {
     getUserForHooks: unused,
-    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
     deleteAccounts: unused,
     flagPendingSsoSetup: unused,
-    createOrganizationMembership: unused,
     reconcileSsoAccounts: unused,
     recordLastLogin: unused,
-    countOrgMembershipsForUser: unused,
     ...members,
   };
 }
 
-function organizationRepo(organization: BetterAuthHookOrganization | null) {
+type SsoDomainOrganization = { id: string; name: string; ssoProvider: string | null };
+
+function organizationRepo(organization: SsoDomainOrganization | null) {
   const mocks = {
-    getOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
-      .mockImplementation(async () => {
-        if (organization === null) throw new OrganizationNotFoundError();
-        return organization;
-      }),
-    createOrganizationMembership:
-      vi.fn<BetterAuthHooksRepository["createOrganizationMembership"]>(),
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
+      .mockResolvedValue(organization),
+    createSsoDomainMembership: vi.fn<SsoDomainOrganizations["createSsoDomainMembership"]>(),
   };
-  return { double: hooksRepo(mocks), mocks };
+  return {
+    double: hooksRepo({}),
+    mocks,
+    organizations: createApiFixture<SsoDomainOrganizations>(mocks),
+  };
 }
 
 describe("the ssoDomain auto-join on an unlicensed deployment", () => {
   /** @scenario "Unlicensed-mode signup does not auto-join a domain-matched organization" */
   it("creates the account and skips the domain-matched organization entirely", async () => {
     const federation = new StubFederation(false);
-    const { double: repo, mocks } = organizationRepo({
+    const { mocks, organizations } = organizationRepo({
       id: "org_1",
       name: "Acme",
       ssoProvider: null,
     });
 
     await afterUserCreate({
-      repo,
       user: {
         id: "user_1",
         email: "new@acme.com",
@@ -108,6 +106,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
         emailVerified: true,
       },
       collaborators: {
+        organizations,
         federation,
         invites: new StubInvites(),
         announcements: new StubAnnouncements(),
@@ -122,7 +121,7 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
       },
     });
 
-    expect(mocks.getOrganizationBySsoDomain).not.toHaveBeenCalled();
-    expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
+    expect(mocks.findBySsoDomain).not.toHaveBeenCalled();
+    expect(mocks.createSsoDomainMembership).not.toHaveBeenCalled();
   });
 });

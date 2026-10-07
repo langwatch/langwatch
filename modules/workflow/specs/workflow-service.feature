@@ -36,6 +36,13 @@ Feature: Workflow service boundary
     And callers receive portable Workflow contract values
 
   @unit
+  Scenario: Saving a Studio graph records the version as a fact agents react to
+    Given a Studio graph saved as a version of a workflow
+    When the save completes
+    Then one version_saved fact is recorded on the workflow's own pipeline, keyed by the version
+    And recording it never fails or delays the save
+
+  @unit
   Scenario: A workflow created as an autosave keeps one version across later autosaves
     Given a workflow created with its first version marked autosaved
     When a second autosave is written into it

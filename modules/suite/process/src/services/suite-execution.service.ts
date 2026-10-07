@@ -287,7 +287,13 @@ export class SuiteExecutionService implements SuiteExecution {
           batchRunId,
           setId,
           name: input.scenarioNames.get(item.scenarioId),
-          target: { type: item.target.type, referenceId: item.target.referenceId },
+          target: {
+            type: item.target.type,
+            referenceId: item.target.referenceId,
+            ...(item.target.type === "prompt" && item.target.scenarioMappings
+              ? { scenarioMappings: item.target.scenarioMappings }
+              : {}),
+          },
           targetKey,
           ...SuiteExecutionService.withTargetParameters(item.target.runParameters),
           parameters: parameters.get(targetKey)?.get(item.scenarioId) ?? {},

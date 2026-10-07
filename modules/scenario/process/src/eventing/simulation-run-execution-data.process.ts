@@ -1,5 +1,10 @@
 import type { IntentSpec } from "@langwatch/eventing";
-import { runParameterValuesSchema, runSecretCiphertextSchema } from "@langwatch/scenario-contract";
+import {
+  FieldMappingSchema,
+  runParameterValuesSchema,
+  runPlanModelsSchema,
+  runSecretCiphertextSchema,
+} from "@langwatch/scenario-contract";
 import { z } from "zod";
 
 export const SIMULATION_RUN_EXECUTION_PROCESS_NAME = "simulation_run_execution" as const;
@@ -130,7 +135,10 @@ export const executeRunIntentSchema = z.object({
   target: z.object({
     type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
     referenceId: z.string(),
+    scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   }),
+  /** The models the queuing suite's plan picked; absent for a run no suite queued. */
+  plan: runPlanModelsSchema.optional(),
   parameters: runParameterValuesSchema.optional(),
   /**
    * The run's secret parameter values, still encrypted. The pool job carries
@@ -187,8 +195,11 @@ export const simulationRunProcessEventViewSchema = z.object({
     .object({
       type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
       referenceId: z.string(),
+      scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
     })
     .nullable(),
+  /** The suite plan's models from the queued event's reserved namespace; empty when none. */
+  plan: runPlanModelsSchema.default({}),
   /**
    * The evaluators the finished event says the run is graded with, ids and
    * required flags only, or null when the event carries none. Defaulted so

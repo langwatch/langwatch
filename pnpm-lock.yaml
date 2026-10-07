@@ -2140,6 +2140,9 @@ importers:
       '@langwatch/navigation-browser':
         specifier: workspace:*
         version: link:../../modules/navigation/browser
+      '@langwatch/navigation-contract':
+        specifier: workspace:*
+        version: link:../../modules/navigation/contract
       '@langwatch/notification-browser':
         specifier: workspace:*
         version: link:../../modules/notification/browser
@@ -3456,6 +3459,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-governance-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
@@ -3553,6 +3559,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  enterprise/modules/governance/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   enterprise/modules/governance/contract:
     dependencies:
@@ -3944,6 +3960,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -4448,9 +4467,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../governance/contract
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4493,6 +4509,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
@@ -4509,9 +4528,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/enterprise-governance-process':
+      '@langwatch/secrets':
         specifier: workspace:*
-        version: link:../../governance/process
+        version: link:../../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -4991,6 +5010,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -5254,6 +5276,9 @@ importers:
 
   modules/analytics/client:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -6160,6 +6185,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6914,6 +6942,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7292,6 +7323,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7710,9 +7744,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../experiment/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8327,6 +8358,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -8339,9 +8373,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8796,6 +8827,9 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.5
+      zod-validation-error:
+        specifier: 'catalog:'
+        version: 5.0.0(zod@4.6.5)
     devDependencies:
       '@langwatch/authorization':
         specifier: workspace:*
@@ -9213,6 +9247,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -10458,6 +10495,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -10617,9 +10657,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/enterprise-managed-provider-contract':
+      '@langwatch/enterprise-managed-provider-client':
         specifier: workspace:*
-        version: link:../../../enterprise/modules/managed-provider/contract
+        version: link:../../../enterprise/modules/managed-provider/client
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
@@ -10962,9 +11002,6 @@ importers:
 
   modules/monitor/process:
     dependencies:
-      '@langwatch/analytics-contract':
-        specifier: workspace:*
-        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -10980,6 +11017,12 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -11077,6 +11120,9 @@ importers:
       '@langwatch/navigation-client':
         specifier: workspace:*
         version: link:../client
+      '@langwatch/navigation-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../ops/contract
@@ -11159,6 +11205,12 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  modules/navigation/contract:
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -11352,6 +11404,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-governance-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -12517,6 +12572,9 @@ importers:
 
   modules/project/browser:
     dependencies:
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../../analytics/client
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
@@ -12706,9 +12764,6 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../api-key/contract
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
@@ -12751,18 +12806,12 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/share-contract':
-        specifier: workspace:*
-        version: link:../../share/contract
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/topic-contract':
-        specifier: workspace:*
-        version: link:../../topic/contract
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -13798,9 +13847,6 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
-      '@langwatch/suite-process':
-        specifier: workspace:*
-        version: link:../../suite/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14067,6 +14113,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14579,6 +14628,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -14696,6 +14748,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14859,6 +14914,9 @@ importers:
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
@@ -15080,6 +15138,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -15234,6 +15295,9 @@ importers:
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
@@ -16392,9 +16456,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../modules/dashboard/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../modules/dataset/contract
@@ -17519,6 +17580,25 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/span-normalisation:
+    dependencies:
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../redaction
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

@@ -1,6 +1,6 @@
 import { createTenantId } from "@langwatch/eventing";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import {
-  ATTR_KEYS,
   type TraceNameChangedEvent,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,

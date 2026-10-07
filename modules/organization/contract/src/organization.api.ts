@@ -87,6 +87,7 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type { SignInSecurityPolicy } from "./sign-in-security-policy.ts";
 import type { SignUpVerdict } from "./sign-up-policy.ts";
 import type { TeamWithProjects } from "./team.responses.ts";
 import type {
@@ -293,6 +294,25 @@ export interface OrganizationApi {
     maxSessionDurationDays: number;
   }): Promise<void>;
   /**
+   * This organization's sign-in security rules (GAC-09, GAC-10).
+   * Throws OrganizationNotFoundError.
+   */
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy>;
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void>;
+  /**
+   * The rules of the organizations this person belongs to and is not
+   * disabled in; read on every session.
+   */
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]>;
+  /**
+   * Cross-tenant by design: every organization that set any rule, for an
+   * address resolving to nobody and the session path's early-out.
+   */
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
+  /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system
    * read: no caller. An unknown organization has no model and the schema's default currency.
    */
@@ -418,6 +438,19 @@ export interface OrganizationApi {
    * rather than about a listed organization.
    */
   organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
+  /** The organization an email domain is claimed by for SSO, or null when none claims it. */
+  findBySsoDomain(
+    input: Readonly<{ domain: string }>,
+  ): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
+  /**
+   * Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants
+   * the seat itself. A row already there is `"already-present"`: a concurrent callback.
+   */
+  createSsoDomainMembership(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<"created" | "already-present">;
+  /** How many organizations this person has a membership row in, disabled ones included. */
+  countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
   /** Throws `organization_not_found_for_team` when no organization owns the team. */
@@ -533,6 +566,10 @@ export interface OrganizationApi {
   /** Main's `updateSentPlanLimitAlert`. */
   updateSentPlanLimitAlert(
     input: Readonly<{ organizationId: string; sentAt: Instant }>,
+  ): Promise<void>;
+  /** Main's mint script write: the licence and its expiry, the validated stamp cleared. */
+  setLicense(
+    input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant }>,
   ): Promise<void>;
   claimBillingCustomerId(
     input: Readonly<{ organizationId: string; billingCustomerId: string }>,

@@ -114,7 +114,6 @@ export function createCanonicalAutomationApp(): {
     create: vi.fn(),
     updateSettings: vi.fn(),
     archive: vi.fn(),
-    requestTopicClustering: vi.fn(),
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),
     touchCodingAgentPullRequestSeen: vi.fn(),
@@ -152,7 +151,6 @@ export function createCanonicalAutomationApp(): {
     assertCheckRunnable: vi.fn(),
     copy: vi.fn(),
     replicate: vi.fn(),
-    performanceForProject: vi.fn(),
   });
   const infrastructure: AutomationInfrastructure = {
     verifier,

@@ -12,6 +12,13 @@ export type {
   ReplayEventSource,
 } from "./replayEventSource.ts";
 export type { ReplayLogWriter } from "./replayLog.ts";
+export {
+  ProjectionLaneNotFoundError,
+  ProjectionLaneReplayFailedError,
+  type ProjectionLaneReplayer,
+  type ProjectionLaneReplayResult,
+  projectionLaneReplayer,
+} from "./projectionLaneReplay.ts";
 export { ReplayService } from "./replayService.ts";
 export type {
   BatchCompleteInfo,

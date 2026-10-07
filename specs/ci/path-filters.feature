@@ -157,16 +157,32 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     And no file content has to be downloaded to list them
 
   @unit
-  Scenario: A pull_request_target run past the files API's cap runs everything
-    Given a pull_request_target run, which must not fetch the pull request's commits
-    When the pull request changes 3,000 files or more, or its file count is missing
+  Scenario: A pull_request_target run diffs the head commit by SHA with git
+    Given a pull_request_target run of the change detector in a lean checkout of the base branch
+    When it chooses where to read the changed paths from
+    Then it fetches the base and head commits by SHA as objects only, deepening until they share a merge base
+    And it diffs the merge base against the head commit with git, past 3,000 files as below them
+    And nothing from the pull request is checked out, built or run
+    And every untrusted value reaches the step through its environment, never inlined into the script
+
+  @unit
+  Scenario: A pull_request_target run that cannot diff by SHA runs everything
+    Given a pull_request_target run of the change detector
+    When the head cannot be fetched, no merge base appears within the depth cap, or a commit id is malformed
     Then every filter is forced true
 
   @unit
-  Scenario: A pull_request_target run under the files API's cap reads the files API
-    Given a pull_request_target run
-    When the pull request changes fewer than 3,000 files
-    Then the change detector reads the files API, which lists all of them
+  Scenario: Git pathspecs select the same changed paths as dorny's picomatch
+    Given the filters of every pull_request_target caller of the change detector
+    When every tracked path, look-alikes of the patterns and paths beneath literal patterns are matched
+    Then the git pathspecs select exactly the paths dorny's picomatch selects with dot files included
+
+  @unit
+  Scenario: A pull_request_target filter may use neither braces nor negation
+    Given a workflow triggered by pull_request_target declares a change-detector filter
+    When an entry uses braces or starts with "!"
+    Then the path-filter guard fails and names the entry
+    And the change detector refuses the filter at run time by forcing every filter true
 
   @unit
   Scenario: A push in diff mode is diffed with git and every other event runs everything

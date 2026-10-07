@@ -1,5 +1,5 @@
 /**
- * The procedures this package calls: dataset, datasetRecord and batchRecord
+ * The procedures this package calls: dataset and datasetRecord
  * derive from the contract, storedObjects from its owner's (ADR-158), the
  * borrowed three belong to features not yet split. Segment names are the cache key.
  */

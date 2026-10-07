@@ -8,16 +8,6 @@ export {
   type NavigationAccountMenu,
   type NavigationCommandBar,
   type NavigationLangy,
-  type NavigationDeployment,
-  type NavigationFlagReading,
-  type NavigationOpsAccess,
-  type NavigationOrganization,
-  type NavigationPlanReading,
-  type NavigationProject,
-  type NavigationScopeWrite,
-  type NavigationSupportChat,
-  type NavigationTeam,
-  type NavigationUser,
 } from "./model/navigation-host.ts";
 export {
   PRODUCTS,

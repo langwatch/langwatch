@@ -4,8 +4,8 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import {
-  ATTR_KEYS,
   type AnnotationAddedEvent,
   type AnnotationRemovedEvent,
   type AnnotationsBulkSyncedEvent,
@@ -13,7 +13,6 @@ import {
   type LogRecordReceivedEvent,
   type MetricDataPointCorrelatedEvent,
   type NormalizedSpan,
-  NON_BILLABLE_ATTR,
   type OriginResolvedEvent,
   type SpanReceivedEvent,
   spanReceivedEventSchema,

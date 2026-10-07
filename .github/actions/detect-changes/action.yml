@@ -8,15 +8,17 @@
 # diffed against its before-commit instead of force-run, for workflows
 # whose real jobs spend money on live LLM calls.
 #
-# Never the files API on `pull_request`: it stops at 3,000 files and, past
-# that, gave each workflow a different subset (#7536). `pull_request_target`
-# must not fetch the PR's commits, so it keeps the API under the cap and
-# forces every filter at or past it. .github/scripts/detect-changes-source.sh
-# makes that choice; specs/ci/path-filters.feature pins it.
+# Never the files API: it stops at 3,000 files and, past that, gave each
+# workflow a different subset (#7536). On `pull_request_target` the base and
+# head commits are fetched by SHA as objects only, never checked out, and
+# diffed with git pathspecs (.github/scripts/detect-changes-by-sha.sh); any
+# failure there forces every filter. .github/scripts/detect-changes-source.sh
+# makes the choice; specs/ci/path-filters.feature pins it.
 #
 # The caller MUST check out the repo first so this composite action is
-# accessible. A sparse `.github` checkout is enough: dorny fetches the base
-# commit at depth one and lists paths from trees, never file content.
+# accessible. A sparse `.github` checkout with `persist-credentials: false`
+# is enough: both paths list changed paths from trees, never file content.
+# A `pull_request_target` caller's filters may not use braces or `!`.
 #
 # IMPORTANT: every filter key the caller wants to consume must be
 # declared as an `outputs.<key>` entry below AND echoed into the force
@@ -47,7 +49,7 @@ name: detect-changes
 description: Decide whether a path-filtered workflow should run real work.
 inputs:
   filters:
-    description: YAML filter block for dorny/paths-filter (must define `relevant` + `feature-parity` filters).
+    description: YAML filter block for dorny/paths-filter (must define `relevant` + `feature-parity` filters). On pull_request_target, no braces and no `!` negation.
     required: true
   push-strategy:
     description: >-
@@ -61,22 +63,22 @@ inputs:
 outputs:
   relevant:
     description: "'true' if relevant paths changed, or if the event is neither a PR nor a diff-mode push."
-    value: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+    value: ${{ steps.filter.outputs.relevant || steps.sha.outputs.relevant || steps.force.outputs.relevant }}
   feature-parity:
     description: "'true' if feature-parity-relevant paths changed, or if the event is neither a PR nor a diff-mode push."
-    value: ${{ steps.filter.outputs.feature-parity || steps.force.outputs.feature-parity }}
+    value: ${{ steps.filter.outputs.feature-parity || steps.sha.outputs.feature-parity || steps.force.outputs.feature-parity }}
   lambda-image:
     description: "'true' if Lambda-image-relevant paths changed, or if the event is neither a PR nor a diff-mode push. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
-    value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
+    value: ${{ steps.filter.outputs.lambda-image || steps.sha.outputs.lambda-image || steps.force.outputs.lambda-image }}
   ingest:
     description: "'true' if the app's HTTP ingest spine changed, or if the event is neither a PR nor a diff-mode push. Used by sdk-javascript-ci's e2e job, which drives real SDK telemetry at a running server and is therefore the only check that sees those routes answer over a socket. Separate from `relevant` because the sibling `ci` job shares that filter and spends LLM budget."
-    value: ${{ steps.filter.outputs.ingest || steps.force.outputs.ingest }}
+    value: ${{ steps.filter.outputs.ingest || steps.sha.outputs.ingest || steps.force.outputs.ingest }}
   codeql-javascript:
     description: "'true' if code CodeQL analyses as javascript-typescript changed. Used by codeql.yml to build its language matrix: the single `relevant` filter fires on any of six trees and then runs every analyser, so a TypeScript-only change was paying for the Python one."
-    value: ${{ steps.filter.outputs.codeql-javascript || steps.force.outputs.codeql-javascript }}
+    value: ${{ steps.filter.outputs.codeql-javascript || steps.sha.outputs.codeql-javascript || steps.force.outputs.codeql-javascript }}
   codeql-python:
     description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
-    value: ${{ steps.filter.outputs.codeql-python || steps.force.outputs.codeql-python }}
+    value: ${{ steps.filter.outputs.codeql-python || steps.sha.outputs.codeql-python || steps.force.outputs.codeql-python }}
   heavy:
     description: >-
       "'true' unless this is a draft pull request. Gate expensive jobs on
@@ -131,20 +133,39 @@ runs:
       env:
         EVENT_NAME: ${{ github.event_name }}
         PUSH_STRATEGY: ${{ inputs.push-strategy }}
-        CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
       run: bash "$GITHUB_ACTION_PATH/../../scripts/detect-changes-source.sh" >> "$GITHUB_OUTPUT"
 
     - name: Detect relevant changes
-      if: steps.source.outputs.source == 'git' || steps.source.outputs.source == 'api'
+      if: steps.source.outputs.source == 'git'
       id: filter
       uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
       with:
         filters: ${{ inputs.filters }}
         # An empty token is what makes dorny diff with git instead of the API.
-        token: ${{ steps.source.outputs.source == 'api' && github.token || '' }}
+        token: ""
+
+    # dorny refuses an empty token on pull_request_target, so git matches here.
+    # Untrusted values arrive through env only; the head is fetched as objects
+    # and diffed, never checked out or run. Outputs are written only on success.
+    - name: Diff the pull request's head commit by SHA
+      if: steps.source.outputs.source == 'git-sha'
+      id: sha
+      shell: bash
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        FILTERS: ${{ inputs.filters }}
+      run: |
+        result="$RUNNER_TEMP/detect-changes-by-sha"
+        if bash "$GITHUB_ACTION_PATH/../../scripts/detect-changes-by-sha.sh" > "$result"; then
+          cat "$result" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::Could not diff the head commit by SHA; forcing every filter true."
+          echo "sha-diff-failed=true" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Force every filter true
-      if: steps.source.outputs.source == 'force'
+      if: steps.source.outputs.source == 'force' || steps.sha.outputs.sha-diff-failed == 'true'
       id: force
       shell: bash
       run: |

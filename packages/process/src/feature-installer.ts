@@ -1,6 +1,6 @@
 import type { TransportFactBinding } from "@langwatch/api";
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
-import { type FeatureEventing } from "@langwatch/eventing";
+import { type FeatureEventing, type ProjectionLaneReplayer } from "@langwatch/eventing";
 import {
   type DependencyIdentity,
   type DependencyToken,
@@ -20,6 +20,7 @@ import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import { buildsMigrationSteps } from "./migration-steps.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
+import { processProjectionReplayer } from "./projection-replayer.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 import {
   instantiateRepositories,
@@ -174,6 +175,18 @@ export type ModuleTaskBinder<
   setup: ModuleTaskSetup<Dependencies, Members, Repositories, App, Config>,
 ) => readonly unknown[] | Promise<readonly unknown[]>;
 
+/** What a migration binder is handed: the task setup plus the process's projection replayer. */
+export interface ModuleMigrationSetup<
+  Dependencies extends TokenMap,
+  Members,
+  Repositories,
+  App,
+  Config = unknown,
+> extends ModuleTaskSetup<Dependencies, Members, Repositories, App, Config> {
+  /** Replays one named lane from its owner's log, for `defineProjectionReplayStep` (round 12). */
+  readonly replayer: ProjectionLaneReplayer;
+}
+
 /** Builds a module's migration steps over its booted App, at install in tasks and worker. */
 export type ModuleMigrationBinder<
   Dependencies extends TokenMap,
@@ -181,7 +194,9 @@ export type ModuleMigrationBinder<
   Repositories,
   App,
   Config = unknown,
-> = ModuleTaskBinder<Dependencies, Members, Repositories, App, Config>;
+> = (
+  setup: ModuleMigrationSetup<Dependencies, Members, Repositories, App, Config>,
+) => readonly unknown[] | Promise<readonly unknown[]>;
 
 /** The parsed slice a declaration's phantom `configType` names; nothing where it declared none. */
 type DeclaredConfigOf<Declaration> = Declaration extends { readonly configType?: infer Config }
@@ -305,6 +320,8 @@ export interface FeatureInstallArguments<Members> {
    * resolves one refuses by name rather than reading an undeclared secret.
    */
   readonly secrets?: ScopedSecrets;
+  /** The process's projection replayer; absent where none was composed, which then refuses. */
+  readonly replayer?: ProjectionLaneReplayer;
   /** The instance the graph resolved for one token. */
   resolve: (token: TokenIdentity) => unknown;
 }
@@ -1896,6 +1913,7 @@ function bindingMigrations<Declaration extends object>(
         members: args.members,
         config: declaredConfig(args.config),
         secrets: args.secrets ?? undeclaredSecrets(installable.name),
+        replayer: args.replayer ?? processProjectionReplayer({ eventing: undefined }),
       });
       return { ...state, migrationSteps: [...(state.migrationSteps ?? []), ...built] };
     },

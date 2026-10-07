@@ -3,6 +3,7 @@ import type { RunSecretCiphertext } from "./run-parameters.ts";
 import type {
   ChildProcessJobData,
   ExecutionContext,
+  RunPlanModels,
   ScenarioAgentInstance,
   TargetConfig,
 } from "./scenario-execution-data.ts";
@@ -18,7 +19,10 @@ export interface ScenarioExecutionJob {
   target: {
     type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
     referenceId: string;
+    scenarioMappings?: TargetConfig["scenarioMappings"];
   };
+  /** The models the queuing suite's plan picked; absent for a run no suite queued. */
+  plan?: RunPlanModels;
   parameters?: RunParameterValues;
   secretParameters?: RunSecretCiphertext;
   /** The member who started the run; absent when nobody did, and the run acts as the system. */
@@ -61,6 +65,7 @@ export type ScenarioExecutionPrefetchInput = {
     parameters?: RunParameterValues;
     secretParameters?: RunSecretCiphertext;
   };
+  plan?: RunPlanModels;
   target: TargetConfig;
   /** Whose run this is: its key acts as them and holds no more than they do. */
   startedByUserId?: string | undefined;

@@ -5,12 +5,9 @@ import {
   ProjectNotFoundError,
   ProjectS3SecretRequiredError,
   type Project,
-  type TopicClusteringRequest,
   type UpdateProjectInput,
   type ProjectLegacyKeyStatus,
 } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
 
 import type {
   ProjectStorageSettings,
@@ -36,15 +33,12 @@ type ProjectOperationsDependencies = Readonly<{
   readonly auditLog: AuditLogApi;
   readonly lifecycle: Pick<
     ProjectCreatedNoticeService,
-    "legacyKeyRevoked" | "presenceSettingChanged"
+    "legacyKeyRevoked" | "presenceSettingChanged" | "traceSharingDisabled"
   >;
   /** Where a best-effort failure is reported when nothing can be done about it. */
   readonly logger: Readonly<{
     error(payload: Readonly<Record<string, unknown>>, message: string): void;
   }>;
-  readonly share: ShareApi;
-  readonly topics: Pick<TopicApi, "getClusteringStatus" | "requestClustering">;
-  readonly now: () => number;
 }>;
 
 const REVOKED_KEY_KSUID_RESOURCE = "project";
@@ -123,7 +117,11 @@ export class ProjectOperationsService {
     const updated: Project = { ...written, ...stored };
 
     if (input.traceSharingEnabled === false && project.traceSharingEnabled === true) {
-      await this.dependencies.share.revokeAllTraceShares(input.projectId);
+      await this.dependencies.lifecycle.traceSharingDisabled({
+        projectId: input.projectId,
+        organizationId,
+        disabledByUserId: by.id,
+      });
     }
     if (input.presenceEnabled !== undefined && input.presenceEnabled !== project.presenceEnabled) {
       await this.dependencies.lifecycle.presenceSettingChanged({
@@ -208,24 +206,5 @@ export class ProjectOperationsService {
         "Recording the project API key revocation in the audit log failed.",
       );
     }
-  }
-
-  async requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: ProjectCaller,
-  ): Promise<TopicClusteringRequest> {
-    const status = await this.dependencies.topics.getClusteringStatus(input);
-    if (status.isRunInFlight) {
-      return { started: false, reason: "already_running" };
-    }
-
-    await this.dependencies.topics.requestClustering({
-      projectId: input.projectId,
-      occurredAt: this.dependencies.now(),
-      trigger: "manual",
-      requestedByUserId: by.id,
-    });
-
-    return { started: true };
   }
 }

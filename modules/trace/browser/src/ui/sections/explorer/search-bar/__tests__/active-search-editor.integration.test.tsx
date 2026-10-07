@@ -5,7 +5,7 @@
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -229,6 +229,40 @@ describe("ActiveSearchEditor applied query", () => {
 });
 
 describe("ActiveSearchEditor rendered DOM", () => {
+  describe("given a quoted value still missing its closing quote", () => {
+    /** @scenario "The editor draws an eval question still being typed as one eval chip" */
+    it("renders the whole eval question so far as one eval chip", async () => {
+      renderEditor('eval:"the assistant refused to');
+      const editor = await waitForEditor();
+
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens).toHaveLength(1);
+      expect(tokens[0]).toHaveClass("filter-token-eval");
+      expect(tokens[0]?.textContent).toBe('eval:"the assistant refused to');
+    });
+
+    describe("when the caret is moved back between two words of the value", () => {
+      /** @scenario "The editor draws an open quoted value as one chip wherever the caret sits" */
+      it("still renders one chip holding the whole text", async () => {
+        const typed = 'errorMessage:"rate limit exceeded';
+        renderEditor(typed);
+        const editor = await waitForEditor();
+
+        const textNode = editor.querySelector(".filter-token")?.firstChild;
+        if (!textNode) throw new Error("the editor rendered no chip");
+        const caret = 'errorMessage:"rate'.length;
+        act(() => {
+          document.getSelection()?.setBaseAndExtent(textNode, caret, textNode, caret);
+          document.dispatchEvent(new Event("selectionchange"));
+        });
+
+        const tokens = editor.querySelectorAll(".filter-token");
+        expect(tokens).toHaveLength(1);
+        expect(tokens[0]?.textContent).toBe(typed);
+      });
+    });
+  });
+
   describe("given a single wildcard query", () => {
     it("renders one filter-token span containing the full field:value run", async () => {
       renderEditor("model:gpt-*");

@@ -52,6 +52,7 @@
     "@langwatch/scenario-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
+    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",

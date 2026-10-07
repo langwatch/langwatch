@@ -12,10 +12,8 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,7 +25,6 @@ import { MemoryProjectRepository } from "../../repositories/memory/memory.projec
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const reported = vi.hoisted(() => ({
   entries: [] as { payload: Readonly<Record<string, unknown>>; message: string }[],
@@ -98,24 +95,6 @@ function project(overrides: Partial<Project> = {}): Project {
   };
 }
 
-/** A project whose topics have never been clustered: nothing is in flight. */
-const IDLE_CLUSTERING: TopicClusteringStatus = {
-  lastRequestedAt: null,
-  lastRequestTrigger: null,
-  lastRunAt: null,
-  lastRunOutcome: null,
-  lastRunMode: null,
-  lastRunSkippedReason: null,
-  lastRunErrorCode: null,
-  isLastRunErrorUserActionable: false,
-  lastRunTracesProcessed: 0,
-  lastRunTopicsCount: 0,
-  lastRunSubtopicsCount: 0,
-  isInProgress: false,
-  isRunInFlight: false,
-  nextRunAt: null,
-};
-
 /** One permission question, as this application asked AuthZ. */
 type PermissionQuestion = {
   userId: string;
@@ -133,7 +112,6 @@ type PermissionQuestion = {
 function application(
   options: {
     permits?: (question: PermissionQuestion) => boolean;
-    clustering?: () => Promise<void>;
     record?: AuditLogApi["record"];
     revoked?: (payload: unknown) => Promise<void>;
   } = {},
@@ -162,14 +140,8 @@ function application(
   const app = ProjectModule.create({
     logger,
     dependencies: {
-      apiKeys: new TestApiKeyService(),
       authorization,
       organizations: createApiFixture<OrganizationApi>({}, "organizations"),
-      share: createApiFixture<ShareApi>({}, "share"),
-      topics: createApiFixture<TopicApi>({
-        getClusteringStatus: async () => IDLE_CLUSTERING,
-        requestClustering: options.clustering ?? (async () => undefined),
-      }),
       trace: createApiFixture<TraceApi>({}, "trace"),
       auditLog: createApiFixture<AuditLogApi>(
         { record: options.record ?? (async () => ({ id: "audit", occurredAt: 0 })) },
@@ -193,6 +165,7 @@ function application(
     recordProjectMoved: { send: async () => undefined },
     recordProjectArchived: { send: async () => undefined },
     recordProjectDepartmentAssigned: { send: async () => undefined },
+    recordProjectTraceSharingDisabled: { send: async () => undefined },
   });
 
   return { app, database, asked, logged: reported.entries };
@@ -215,7 +188,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
-    triggerTopicClustering: (input) => app.triggerTopicClustering(input),
     getFieldProtections,
   };
 
@@ -412,22 +384,6 @@ describe("the project tRPC namespace over the application the composition builds
       ).rejects.toMatchObject({ cause: { code: "forbidden", httpStatus: 403 } });
 
       expect(database.findProject(GOVERNANCE_ID)?.name).toBe("Governance (internal)");
-    });
-  });
-
-  describe("when a clustering request does not land", () => {
-    /** @scenario "a clustering request that fails is reported, not raised" */
-    it("reports it through the process's logger and answers with an unknown failure", async () => {
-      const { caller, logged } = mount({
-        clustering: async () => {
-          throw new Error("the scheduler is not reachable");
-        },
-      });
-
-      await expect(caller.triggerTopicClustering({ projectId: "project_1" })).rejects.toBeDefined();
-
-      expect(logged).toHaveLength(1);
-      expect(logged[0]).toMatchObject({ payload: { projectId: "project_1" } });
     });
   });
 });

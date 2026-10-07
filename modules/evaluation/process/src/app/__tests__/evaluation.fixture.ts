@@ -145,19 +145,10 @@ function unreachable(what: string): () => never {
 
 export function createEvaluationTestDoorInfrastructure(): Pick<
   EvaluationInfrastructure,
-  "experiments" | "experimentRuns" | "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
+  "experiments" | "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
 > {
   return {
-    experiments: {
-      findOrCreate: unreachable("experiment directory"),
-      findBySlug: unreachable("experiment directory"),
-    },
-    experimentRuns: {
-      startRun: unreachable("experiment run writer"),
-      recordTargetResult: unreachable("experiment run writer"),
-      recordEvaluatorResult: unreachable("experiment run writer"),
-      completeRun: unreachable("experiment run writer"),
-    },
+    experiments: { findBySlug: unreachable("experiment directory") },
     slugs: {
       findMonitorBySlug: unreachable("monitor directory"),
       findDatasetBySlug: unreachable("dataset directory"),

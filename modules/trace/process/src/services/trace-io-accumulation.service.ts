@@ -1,21 +1,18 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import {
-  ATTR_KEYS,
+  OUTPUT_SOURCE,
+  TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
+  TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
   type TraceCanonicalisationService,
   type TraceSummaryData,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 
 import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
-import {
-  TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
-  TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
-  type TraceMediaReferenceResolver,
-} from "./trace-media-reference.service.ts";
+import type { TraceMediaReferenceResolver } from "./trace-media-reference.service.ts";
 
-export const OUTPUT_SOURCE = {
-  EXPLICIT: "explicit",
-  INFERRED: "inferred",
-} as const;
+// Transitional: the summary projection still imports it from here.
+export { OUTPUT_SOURCE } from "@langwatch/trace-contract";
 
 /**
  * Media attributes: read both sources (langwatch.* and gen_ai.*.messages) since they

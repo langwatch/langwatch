@@ -2,7 +2,7 @@
   "name": "@langwatch/analytics-client",
   "version": "0.1.0",
   "private": true,
-  "description": "The tokens analytics lends other modules' screens (ARCHITECTURE.md §10.1).",
+  "description": "The tokens analytics lends other modules' screens (ARCHITECTURE.md \u00a710.1).",
   "files": [
     "src"
   ],
@@ -19,6 +19,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/module": "workspace:*"
   },
   "devDependencies": {

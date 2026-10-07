@@ -71,6 +71,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/share-contract": "workspace:*",
+    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",

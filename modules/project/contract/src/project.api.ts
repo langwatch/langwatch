@@ -1,7 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
-import type { TopicClusteringRequest } from "./project.responses.ts";
 import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
@@ -100,6 +99,21 @@ export interface ProjectApi {
     by: Readonly<{ id: string }>,
   ): Promise<Project>;
   /**
+   * Provisions a project for a management credential, which may be a service
+   * key acting as nobody: the actor is nullable here, unlike `create`'s.
+   */
+  createInOrganization(
+    input: Readonly<{
+      organizationId: string;
+      userId: string | null;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+    }>,
+  ): Promise<Project>;
+  /**
    * Stored-object credentials (`s3Endpoint`, `s3AccessKeyId`, `s3SecretAccessKey`)
    * arrive as plaintext and are sealed on write; reads answer them as stored.
    */
@@ -124,10 +138,6 @@ export interface ProjectApi {
   findPersonalWorkspaceOwner(
     input: Readonly<{ organizationId: string; scopeId: string }>,
   ): Promise<{ ownerUserId: string | null } | null>;
-  requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<TopicClusteringRequest>;
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;

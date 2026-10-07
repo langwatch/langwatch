@@ -11,7 +11,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | user, user-avatar                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:224` (64 operations) |
+| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:207` (61 operations) |
 | Other token    | `UserAvatarFileApi`, `process/src/transport/user-avatar.rest.ts:23`                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 

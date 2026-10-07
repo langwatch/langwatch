@@ -299,14 +299,4 @@ describe("MonitorModule", () => {
       ]);
     });
   });
-
-  describe("when the seven-day trend is read", () => {
-    it("answers nothing at all for a project with no monitors", async () => {
-      const app = createMonitorTestApp();
-
-      await expect(
-        app.performanceForProject({ projectId: "empty-project", actor: { id: "user-1" } }),
-      ).resolves.toEqual([]);
-    });
-  });
 });

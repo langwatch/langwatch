@@ -29,13 +29,12 @@ Anything else evaluator needs belongs to another module and is reached through i
 | ---------------- | ------------------ | --------------------------------------------- |
 | `auditLog`       | `AuditLogApi`      | [audit-log](../audit-log/README.md)           |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
-| `monitors`       | `MonitorApi`       | [monitor](../monitor/README.md)               |
 | `permissions`    | `AuthzApi`         | [authz](../authz/README.md)                   |
 | `users`          | `UserApi`          | [user](../user/README.md)                     |
 | `workflows`      | `WorkflowApi`      | [workflow](../workflow/README.md)             |
 
 ## Who depends on evaluator
 
-[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [suite](../suite/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
+[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

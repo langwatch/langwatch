@@ -680,6 +680,8 @@ personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
 
 #### `personalUsageDashboard`
 
+The caller's own /me rollup; `user_not_in_organization` (403) outside the organization.
+
 ```typescript
 personalUsageDashboard(input: { organizationId: string; window?: PersonalUsageWindow }, by: GovernanceCaller): Promise<PersonalUsageRollup>;
 ```
@@ -1078,16 +1080,19 @@ Contract `../contract/src/governance-people.ts:55`, router `src/transport/govern
 
 ### `governance`
 
-Contract `../contract/src/governance.trpc.ts:22`, router `src/transport/governance.trpc.ts:12`.
+Contract `../contract/src/governance.trpc.ts:25`, router `src/transport/governance.trpc.ts:13`.
 
-| Procedure                                | Kind     | Gate                               | Input               | Output                            |
-| ---------------------------------------- | -------- | ---------------------------------- | ------------------- | --------------------------------- |
-| `governance.resolveActorPersonalProject` | query    | Permission `governance:view`       | inline              | inline                            |
-| `governance.resolveHome`                 | query    | Permission `organization:view`     | `organizationScope` | `personaResolutionSchema`         |
-| `governance.setupState`                  | query    | Permission `governance:view`       | `organizationScope` | `governanceSetupStateSchema`      |
-| `governance.ocsfExport`                  | query    | Permission `complianceExport:view` | inline              | `governanceOcsfExportPageSchema`  |
-| `governance.quarantineFillStats`         | query    | Permission `governance:view`       | inline              | `quarantineFillStatsSchema`       |
-| `governance.recordWorkspaceView`         | mutation | Permission `governance:view`       | inline              | `recordWorkspaceViewResultSchema` |
+| Procedure                                | Kind     | Gate                               | Input               | Output                                  |
+| ---------------------------------------- | -------- | ---------------------------------- | ------------------- | --------------------------------------- |
+| `governance.resolveActorPersonalProject` | query    | Permission `governance:view`       | inline              | inline                                  |
+| `governance.resolveHome`                 | query    | Permission `organization:view`     | `organizationScope` | `personaResolutionSchema`               |
+| `governance.setupState`                  | query    | Permission `governance:view`       | `organizationScope` | `governanceSetupStateSchema`            |
+| `governance.ocsfExport`                  | query    | Permission `complianceExport:view` | inline              | `governanceOcsfExportPageSchema`        |
+| `governance.quarantineFillStats`         | query    | Permission `governance:view`       | inline              | `quarantineFillStatsSchema`             |
+| `governance.recordWorkspaceView`         | mutation | Permission `governance:view`       | inline              | `recordWorkspaceViewResultSchema`       |
+| `governance.personalUsage`               | query    | Permission `organization:view`     | inline              | `personalUsageRollupSchema`             |
+| `governance.budgetOverview`              | query    | Permission `organization:view`     | inline              | `governanceBudgetOverviewForUserSchema` |
+| `governance.cliBootstrap`                | query    | Permission `organization:view`     | `organizationScope` | `cliBootstrapResultSchema`              |
 
 ### `ingestionKey`
 
@@ -1167,13 +1172,14 @@ Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `cod
 
 ### Pipeline `governance_activity_monitor` (aggregate `global`)
 
-Declared at `src/eventing/governance-activity-monitor.pipeline.ts:54`.
+Declared at `src/eventing/governance-activity-monitor.pipeline.ts:64`.
 
-| Kind            | Name                       | Handles                                                                                     | Declared at                                               |
-| --------------- | -------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| process manager | `spendSpikeEvaluation`     | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:67` |
-| process manager | `governanceTraceFacts`     | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)     | `src/eventing/governance-activity-monitor.pipeline.ts:84` |
-| peer subscriber | `seedDefaultAiToolCatalog` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/governance-activity-monitor.pipeline.ts:60` |
+| Kind            | Name                             | Handles                                                                                     | Declared at                                               |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| process manager | `spendSpikeEvaluation`           | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:82` |
+| process manager | `governanceTraceFacts`           | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)     | `src/eventing/governance-activity-monitor.pipeline.ts:99` |
+| peer subscriber | `seedDefaultAiToolCatalog`       | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/governance-activity-monitor.pipeline.ts:70` |
+| peer subscriber | `assignScimCostCenterDepartment` | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                             | `src/eventing/governance-activity-monitor.pipeline.ts:77` |
 
 ### Pipeline `ingestion_pull_reconcile` (aggregate `global`)
 

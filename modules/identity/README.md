@@ -43,6 +43,6 @@ Anything else identity needs belongs to another module and is reached through it
 
 ## Who depends on identity
 
-[auth](../auth/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [scim](../../enterprise/modules/scim/README.md), [sso](../../enterprise/modules/sso/README.md) (as a peer).
+[auth](../auth/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [sso](../../enterprise/modules/sso/README.md) (as a peer).
 
 <!-- readme:generated:end -->

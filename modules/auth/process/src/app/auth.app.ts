@@ -65,6 +65,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   internalSlackSignupsWebhook,
   Secret,
@@ -88,8 +89,6 @@ import {
 } from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
-import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
-import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
@@ -107,6 +106,7 @@ import {
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import type { CliDeviceApprovalFrame } from "../services/cli-device-approval.service.ts";
+import { CliDeviceDirectoryService } from "../services/cli-device-directory.service.ts";
 import {
   CliDeviceFlowService,
   type CliBrowserSession,
@@ -230,6 +230,8 @@ export class AuthModule implements AuthApiContract {
     sso: SsoApi,
     /** Whether a CLI person may bind a session to a project (`project:view`). */
     authz: AuthzApi,
+    /** The live project a CLI device grant binds a session to. */
+    projects: ProjectApi,
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
@@ -434,7 +436,7 @@ export class AuthModule implements AuthApiContract {
     /** Every mail auth sends goes out through notification, which owns the gateway. */
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = members.now ?? nowInstant;
-    const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
+    const accountRows = repositories.betterAuthHooks;
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
@@ -444,7 +446,7 @@ export class AuthModule implements AuthApiContract {
       identityEmails: members.identityEmails,
       users: dependencies.users,
       sessionBound: SessionBoundService.create({
-        settings: repositories.signInSecurity,
+        organizations: dependencies.organizations,
         activity: repositories.sessions,
         now,
       }),
@@ -458,12 +460,18 @@ export class AuthModule implements AuthApiContract {
         : cliDeviceSettlementChannels.memory.create(),
     });
 
+    const cliDeviceDirectory = CliDeviceDirectoryService.create({
+      people: repositories.directory,
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+    });
+
     const app = new AuthModule({
       sessions,
       cliSessions,
       cliDeviceFlow: {
         sessions: () => cliSessions,
-        directory: () => PrismaAuthDirectoryRepository.create(members.prisma),
+        directory: () => cliDeviceDirectory,
         apiKeys: () => dependencies.apiKeys,
         ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
         canViewProject: ({ userId, projectId }) =>
@@ -501,9 +509,12 @@ export class AuthModule implements AuthApiContract {
         memberships: legacyAccessMemberships(dependencies.organizations),
         connections: legacyAccessConnections(dependencies.identity),
       }),
-      federatedAccounts: FederatedAccountReadsService.create({ accounts: accountRows }),
+      federatedAccounts: FederatedAccountReadsService.create({
+        accounts: accountRows,
+        organizations: dependencies.organizations,
+      }),
       signInSecurity: SignInSecuritySettingsService.create({
-        settings: repositories.signInSecurity,
+        organizations: dependencies.organizations,
         locks: repositories.signInLocks,
         members: signInSecurityMembers(dependencies.organizations),
         entitlements: dependencies.entitlements,
@@ -625,7 +636,7 @@ export class AuthModule implements AuthApiContract {
             lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({
               locks: repositories.signInLocks,
-              settings: repositories.signInSecurity,
+              organizations: dependencies.organizations,
               directory: {
                 findUserIdFor: async ({ identifier }) =>
                   (await dependencies.users.findByEmail({ email: identifier }))?.id ?? null,
@@ -636,8 +647,7 @@ export class AuthModule implements AuthApiContract {
             }),
             signUpProofs: app.#signUp,
             passkeySignUpEligibility: app.#signUpEnrollment,
-            prisma: members.prisma,
-            encryption: members.encryption,
+            repositories,
             redis: members.redis,
             auth: app,
             grants: dependencies.authz,

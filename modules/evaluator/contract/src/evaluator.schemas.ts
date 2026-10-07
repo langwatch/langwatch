@@ -134,17 +134,15 @@ export const evaluatorWorkflowFieldsSchema = z.object({
   outputFields: z.array(evaluatorFieldSchema),
 });
 
-/** The workflow and monitors an archive would take with the evaluator. */
+/** The workflow an archive would take with the evaluator; monitor answers for its own rows. */
 export const evaluatorRelatedEntitiesSchema = z.object({
   workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
-  monitors: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 
 /** What a cascade archive took with it. */
 export const evaluatorCascadeArchiveSchema = z.object({
   evaluator: evaluatorSchema,
   archivedWorkflow: z.object({ id: z.string() }).nullable(),
-  deletedMonitorsCount: z.number(),
 });
 
 /** How far a push to the replicas reached. */

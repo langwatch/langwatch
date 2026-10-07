@@ -5,7 +5,7 @@
  */
 
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
-import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
+import type { NavigationDeployment } from "@langwatch/navigation-contract";
 
 import { parseUiFeatureConfig } from "../ui-feature-config";
 

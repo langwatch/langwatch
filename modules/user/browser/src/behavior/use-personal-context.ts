@@ -17,7 +17,7 @@ export type PersonalSummary = {
 };
 
 /**
- * Mirror of `api.user.budgetOverview`: every budget binding the user's own
+ * Mirror of `api.governance.budgetOverview`: every budget binding the user's own
  * keys, most binding first. `gatewayAccess: false` means the org gives no
  * member-facing gateway path, so budget UI renders nothing, not an empty state.
  */
@@ -116,7 +116,7 @@ export function usePersonalContext(): PersonalContext {
     },
   );
 
-  const personalUsageQuery = api.user.personalUsage.useQuery(
+  const personalUsageQuery = api.governance.personalUsage.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
@@ -126,7 +126,7 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  const budgetOverviewQuery = api.user.budgetOverview.useQuery(
+  const budgetOverviewQuery = api.governance.budgetOverview.useQuery(
     { organizationId: orgId, includeTopModels: true },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );

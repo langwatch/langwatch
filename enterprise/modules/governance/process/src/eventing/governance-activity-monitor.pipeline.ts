@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
+  scimCostCenterChangedEventDataSchema,
+} from "@langwatch/enterprise-scim-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -24,6 +28,7 @@ import {
   governanceTraceFactsStateSchema,
   governanceTraceFactsWake,
 } from "./governance-trace-facts.process.ts";
+import { assignScimCostCenterDepartment } from "./scim-cost-center.subscriber.ts";
 import { runSpendSpikeEvaluation } from "./spend-spike-evaluation.intent.ts";
 import {
   SPEND_SPIKE_EVALUATION_INITIAL_STATE,
@@ -38,7 +43,8 @@ export const GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME = "governance_activity_mo
 
 /**
  * `global`: one pass evaluates every spend_spike rule; one pulls every tenant's governance traces.
- * A signed-up organization gets the standard AI-tool catalogue from governance's own side (§9).
+ * A signed-up organization gets the standard AI-tool catalogue, and a SCIM cost center its
+ * department, from governance's own side (§9).
  */
 function buildGovernanceActivityMonitor({
   app,
@@ -47,7 +53,11 @@ function buildGovernanceActivityMonitor({
   unknown,
   Pick<
     GovernanceModule,
-    "evaluateSpendSpikes" | "pullGovernanceTraceFacts" | "aiToolEnsureDefaultCatalog"
+    | "evaluateSpendSpikes"
+    | "pullGovernanceTraceFacts"
+    | "aiToolEnsureDefaultCatalog"
+    | "departmentResolveByNameOrCreate"
+    | "departmentAssignUser"
   >
 >): StaticPipelineDefinition<never> {
   return (
@@ -63,6 +73,11 @@ function buildGovernanceActivityMonitor({
         handle: async ({ organizationId }) => {
           await app.aiToolEnsureDefaultCatalog({ organizationId });
         },
+      })
+      .withPeerSubscriber("assignScimCostCenterDepartment", {
+        eventType: SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
+        data: scimCostCenterChangedEventDataSchema,
+        handle: assignScimCostCenterDepartment({ departments: app }),
       })
       .withProcessManager(SPEND_SPIKE_EVALUATION_PROCESS_NAME, (pm) =>
         pm

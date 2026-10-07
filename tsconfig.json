@@ -241,6 +241,9 @@
       "path": "enterprise/modules/governance/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/governance/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/governance/contract/tsconfig.json"
     },
     {
@@ -502,6 +505,9 @@
       "path": "modules/navigation/client/tsconfig.json"
     },
     {
+      "path": "modules/navigation/contract/tsconfig.json"
+    },
+    {
       "path": "modules/notification/browser/tsconfig.json"
     },
     {
@@ -686,6 +692,9 @@
     },
     {
       "path": "modules/slack/process/tsconfig.json"
+    },
+    {
+      "path": "packages/span-normalisation/tsconfig.json"
     },
     {
       "path": "apps/storagesim-web/tsconfig.json"

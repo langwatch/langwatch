@@ -15,6 +15,7 @@ from openai.types import Completion
 from openai.types.chat import ChatCompletionChunk
 from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.trace import StatusCode
 from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
     SpanExporter,
@@ -109,9 +110,43 @@ def test_chat_completion_without_choices_returns_the_callers_response_untouched(
     assert "langwatch.output" not in (llm_spans[0].attributes or {})
 
 
+# @scenario "a chat completion carrying the error envelope marks the span as an error"
+def test_chat_completion_with_error_envelope_marks_the_span_as_an_error():
+    exporter = _InMemoryExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    client = OpenAI(
+        api_key="test",
+        base_url="http://gateway.test/v1",
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(_heartbeat_committed_error)
+        ),
+        max_retries=0,
+    )
+
+    with langwatch.trace(name="caller", tracer_provider=provider) as trace:
+        trace.autotrack_openai_calls(client)
+        response = client.chat.completions.create(
+            model="gpt-5-mini", messages=[{"role": "user", "content": "hi"}]
+        )
+
+    assert response.choices is None
+    llm_span = next(
+        s
+        for s in exporter.spans
+        if (s.attributes or {}).get("langwatch.span.type") == "llm"
+    )
+    assert llm_span.status.status_code == StatusCode.ERROR
+    exception_events = [e for e in llm_span.events if e.name == "exception"]
+    assert len(exception_events) == 1
+    event_attributes = exception_events[0].attributes or {}
+    assert event_attributes["exception.message"] == "provider timeout"
+    assert (llm_span.attributes or {})["error.type"] == "provider_timeout"
+
+
 # @scenario "a legacy completion with no choices records no output"
 def test_legacy_completion_without_choices_records_no_output():
-    response = Completion.construct(choices=None, **ERROR_ENVELOPE)
+    response = Completion.construct(choices=None)
 
     captured = _capture_end_span(
         OpenAICompletionTracer,
@@ -124,6 +159,69 @@ def test_legacy_completion_without_choices_records_no_output():
     )
 
     assert captured == [[]]
+
+
+# @scenario "a response with no choices and no error body is not an error"
+def test_completion_without_choices_or_error_body_is_not_an_error():
+    exporter = _InMemoryExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    client = OpenAI(
+        api_key="test",
+        base_url="http://gateway.test/v1",
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200, json={"id": "x", "object": "chat.completion", "model": "m"}
+                )
+            )
+        ),
+        max_retries=0,
+    )
+
+    with langwatch.trace(name="caller", tracer_provider=provider) as trace:
+        trace.autotrack_openai_calls(client)
+        client.chat.completions.create(
+            model="gpt-5-mini", messages=[{"role": "user", "content": "hi"}]
+        )
+
+    llm_span = next(
+        s
+        for s in exporter.spans
+        if (s.attributes or {}).get("langwatch.span.type") == "llm"
+    )
+    assert llm_span.status.status_code != StatusCode.ERROR
+
+
+# @scenario "a legacy completion carrying the error envelope marks the span as an error"
+def test_legacy_completion_with_error_envelope_marks_the_span_as_an_error():
+    response = Completion.construct(choices=None, **ERROR_ENVELOPE)
+    errors: List[Any] = []
+    original = OpenAICompletionTracer.end_span
+
+    def capture(cls, client, span, outputs, metrics, timestamps, error=None, **kw):
+        errors.append(error)
+
+    class _Span:
+        attributes: Dict[str, Any] = {}
+
+        def set_attributes(self, attributes: Dict[str, Any]):
+            self.attributes.update(attributes)
+
+    span = _Span()
+    OpenAICompletionTracer.end_span = classmethod(capture)  # type: ignore[method-assign]
+    try:
+        OpenAICompletionTracer.handle_completion(
+            client=None,  # type: ignore[arg-type]
+            span=span,  # type: ignore[arg-type]
+            response=response,
+            timestamps=SpanTimestamps(started_at=0, finished_at=1),
+        )
+    finally:
+        OpenAICompletionTracer.end_span = original  # type: ignore[method-assign]
+
+    assert [str(e) for e in errors] == ["provider timeout"]
+    assert span.attributes == {"error.type": "provider_timeout"}
 
 
 # @scenario "a streamed chunk with no choices is skipped"

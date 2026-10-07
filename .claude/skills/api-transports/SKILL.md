@@ -170,4 +170,6 @@ code slug. Register the code in `packages/handled-error/src/app-codes.ts` and it
 Mount the real router on a real runtime and assert status, body and `code`:
 `modules/automation/process/src/transport/__tests__/automation.rest.integration.test.ts` and
 `automation.trpc.unit.test.ts`. See the `testing` skill. A changed route, name, status or permission is a
-wire change: diff the served surface against `origin/main` and record every difference.
+wire change: diff the served surface against `origin/main` and record every difference. After adding
+or changing a route, procedure or socket, run `pnpm generate:readmes`: the module's `process/README.md`
+is the review artefact (`readmes` skill).

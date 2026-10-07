@@ -148,13 +148,7 @@ const OKTA: OrganizationSsoConnection = {
 
 function orgViewOver({ row }: { row: ScimSyncState }) {
   const reads: ScimReconciliationReads = {
-    identity: {
-      ssoConnectionReads: () => ({
-        findForOrganization: async () => [OKTA],
-        getProvider: async () => ({ connectionId: CONNECTION, providerId: "okta" }),
-        getOrganization: () => Promise.reject(new Error("reconciliation never asks")),
-      }),
-    },
+    connections: { findHeldConnections: async () => [OKTA] },
     syncs: {
       findForOrganization: async () => [row],
       findByConnection: async () => row,

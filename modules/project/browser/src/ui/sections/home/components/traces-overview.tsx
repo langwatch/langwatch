@@ -1,4 +1,4 @@
-import type { UiCustomGraphProps } from "@langwatch/browser-host/declarations";
+import type { CustomGraphProps } from "@langwatch/analytics-client";
 import {
   Box,
   chakra,
@@ -139,7 +139,7 @@ export function TracesOverview({
   const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;
   const showTrend = trendIsMeaningful && variant === "strip" && chartOpen;
 
-  const tracesOverviewGraph: UiCustomGraphProps["input"] = {
+  const tracesOverviewGraph: CustomGraphProps["input"] = {
     graphId: "tracesOverview",
     graphType: "summary",
     // Langy's own turns trace into the project (ADR-061) but the customer never

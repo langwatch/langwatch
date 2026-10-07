@@ -56,13 +56,6 @@ export const projectArchivedSchema = z
   .strict();
 export type ProjectArchived = z.infer<typeof projectArchivedSchema>;
 
-/** What a manual clustering request did, which is not always "started a run". */
-export const topicClusteringRequestSchema = z.union([
-  z.object({ started: z.literal(true) }).strict(),
-  z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
-]);
-export type TopicClusteringRequest = z.infer<typeof topicClusteringRequestSchema>;
-
 /**
  * One project as `/api/projects` answers it: identity, setup fields, team —
  * no credential (its own gated route) or archive stamp (never listed).
@@ -86,40 +79,6 @@ export const projectRestDetailSchema = projectRestSchema.safeExtend({
   piiRedactionLevel: dataPrivacyPiiRedactionLevelSchema,
 });
 export type ProjectRestDetail = z.infer<typeof projectRestDetailSchema>;
-
-/**
- * The `Project` component the generated clients name their type after: the listing's shape, and
- * the PII level a single project's own GET and PATCH add.
- */
-const projectRestComponentSchema = projectRestSchema
-  .safeExtend({ piiRedactionLevel: dataPrivacyPiiRedactionLevelSchema.optional() })
-  .meta({ id: "Project" });
-
-/** A page of them, with the count the caller pages through. */
-export const projectRestPageSchema = z
-  .object({
-    data: z.array(projectRestComponentSchema),
-    pagination: z
-      .object({
-        page: z.number().int().positive(),
-        limit: z.number().int().positive(),
-        total: z.number().int().nonnegative(),
-      })
-      .strict()
-      .meta({ id: "Pagination" }),
-  })
-  .strict();
-export type ProjectRestPage = z.infer<typeof projectRestPageSchema>;
-
-/**
- * A freshly created project, with the service key minted alongside it. The
- * token is shown once, on this response only.
- */
-export const projectRestCreatedSchema = projectRestSchema.safeExtend({
-  serviceApiKey: z.string().min(1),
-  serviceApiKeyId: z.string().min(1),
-});
-export type ProjectRestCreated = z.infer<typeof projectRestCreatedSchema>;
 
 /** What an archive answers: the project it archived, and when. */
 export const projectRestArchivedSchema = z

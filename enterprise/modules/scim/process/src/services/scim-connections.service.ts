@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { ScimDirectoryConnection } from "@langwatch/enterprise-scim-contract";
-import type { IdentityApi, OrganizationSsoConnection } from "@langwatch/identity-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 
-/**
- * The one thing SCIM asks Identity about connections: which ones this
- * organization holds. Identity owns those rows, so this is a peer's answer
- * rather than a query of its tables.
- */
-export type ScimConnectionReads = Pick<IdentityApi, "ssoConnectionReads">;
+import type { ScimSsoConnectionReadRepository } from "../repositories/scim-sso-connection.repository.ts";
+import { toOrganizationSsoConnection } from "../rules/scim-sso-connection.rules.ts";
+
+/** SCIM's own fold of identity's connection facts: the one place it learns which connections exist. */
+export type ScimConnectionReads = Pick<ScimSsoConnectionReadRepository, "findForOrganization">;
 
 /** The directory connections a token can be minted against. */
 export class ScimConnectionsService {
-  private constructor(private readonly identity: ScimConnectionReads) {}
+  private constructor(private readonly connections: ScimConnectionReads) {}
 
-  static create(identity: ScimConnectionReads): ScimConnectionsService {
-    return new ScimConnectionsService(identity);
+  static create(connections: ScimConnectionReads): ScimConnectionsService {
+    return new ScimConnectionsService(connections);
   }
 
   async findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]> {
@@ -28,10 +27,13 @@ export class ScimConnectionsService {
     }));
   }
 
-  /** Every connection the organization holds, as identity answers it, whatever its state. */
-  findHeldConnections(input: { organizationId: string }): Promise<OrganizationSsoConnection[]> {
-    return this.identity
-      .ssoConnectionReads()
-      .findForOrganization({ organizationId: input.organizationId });
+  /** Every connection the organization holds, newest first, as SCIM folded identity's facts. */
+  async findHeldConnections(input: {
+    organizationId: string;
+  }): Promise<OrganizationSsoConnection[]> {
+    const folded = await this.connections.findForOrganization({
+      organizationId: input.organizationId,
+    });
+    return folded.map(toOrganizationSsoConnection);
   }
 }

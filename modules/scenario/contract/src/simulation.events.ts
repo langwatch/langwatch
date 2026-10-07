@@ -13,7 +13,7 @@ import {
   simulationEventMessageSchema,
   simulationEventResultsSchema,
 } from "./simulation-event.values.ts";
-import { simulationTargetSchema } from "./simulation.ts";
+import { simulationQueuedTargetSchema, simulationTargetSchema } from "./simulation.ts";
 
 const runSecretCiphertextSchema = z.record(z.string(), z.string());
 
@@ -50,7 +50,7 @@ export const simulationRunQueuedEventDataSchema = z.object({
    */
   secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
-  target: simulationTargetSchema.optional(),
+  target: simulationQueuedTargetSchema.optional(),
   /**
    * The evaluators the run is graded with, resolved from its suite and plan
    * when queued. Absent before this was recorded, and on a code-driven run,

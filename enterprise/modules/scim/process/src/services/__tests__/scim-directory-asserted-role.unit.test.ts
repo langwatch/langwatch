@@ -70,15 +70,8 @@ function serviceOver({
     prisma: repository,
     writer,
     users,
-    governance: {
-      departmentResolveByNameOrCreate: vi.fn(async () => ({
-        id: "department-1",
-        organizationId: "org-1",
-        name: "Engineering",
-        createdAt: new Date(0),
-        updatedAt: new Date(0),
-      })),
-      departmentAssignUser: vi.fn(async () => undefined),
+    costCenterFacts: {
+      recordCostCenterChanged: vi.fn(async () => undefined),
     },
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),

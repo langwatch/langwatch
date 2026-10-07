@@ -14,6 +14,13 @@ import type { Instant } from "@langwatch/time";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
+  /** The email domain the organization claims for SSO auto-join (ADR-116). */
+  ssoDomain?: string | null;
+  ssoProvider?: string | null;
+  /** The licence a mint or an upload wrote; absent reads as unlicensed. */
+  license?: string | null;
+  licenseExpiresAt?: Instant | null;
+  licenseLastValidatedAt?: Instant | null;
   id: string;
   name: string;
   slug: string;
@@ -40,6 +47,11 @@ export interface MemoryOrganizationRow {
   joinerRole?: "MEMBER" | "DEVELOPER";
   /** The CLI/device session ceiling in days; absent reads as unbounded. */
   maxSessionDurationDays?: number;
+  /** The sign-in security columns (GAC-09, GAC-10); absent reads as no rule. */
+  lockoutAfterFailedAttempts?: number;
+  lockoutMinutes?: number;
+  sessionIdleTimeoutMinutes?: number;
+  sessionMaxLifetimeMinutes?: number;
   /** The per-file dataset limit an operator set, in mebibytes. */
   datasetAttachmentMaxMb?: number | null;
   /** The organization's own Instant Evals consent; absent reads as not given. */
@@ -211,9 +223,9 @@ export function organizationOfRow(row: MemoryOrganizationRow): Organization {
     stripeCustomerId: row.stripeCustomerId,
     currency: "USD",
     pricingModel: "SEAT_EVENT",
-    license: null,
-    licenseExpiresAt: null,
-    licenseLastValidatedAt: null,
+    license: row.license ?? null,
+    licenseExpiresAt: row.licenseExpiresAt ?? null,
+    licenseLastValidatedAt: row.licenseLastValidatedAt ?? null,
   };
 }
 

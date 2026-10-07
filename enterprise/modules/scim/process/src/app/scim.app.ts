@@ -21,7 +21,6 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import {
   SCIM_REQUEST_FEED_LIMIT,
   ScimApi,
@@ -70,7 +69,6 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
-import { IdentityApi } from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -97,6 +95,10 @@ import {
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
+import {
+  ScimCostCenterFactsService,
+  type ScimCostCenterSenders,
+} from "../services/scim-cost-center-facts.service.ts";
 import { ScimDeprovisionService } from "../services/scim-deprovision.service.ts";
 import { ScimDirectoryExternalIdsService } from "../services/scim-directory-external-ids.service.ts";
 import { ScimDirectoryMoveService } from "../services/scim-directory-move.service.ts";
@@ -238,10 +240,8 @@ export class ScimModule implements ScimApiContract {
   static readonly dependencies = {
     authorization: AuthzApi,
     users: UserApi,
-    governance: GovernanceRestApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
-    identity: IdentityApi,
     organization: OrganizationApi,
   };
   static readonly config = scimConfig;
@@ -262,6 +262,7 @@ export class ScimModule implements ScimApiContract {
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
+  #costCenterFacts: ScimCostCenterFactsService | undefined;
   #syncReads: ScimSyncReadsService | undefined;
 
   private constructor(options: ScimAppOptions) {
@@ -303,12 +304,13 @@ export class ScimModule implements ScimApiContract {
     });
     // The activity log arrives when scim_sync is built over its own store; see readScimSyncFrom.
     const syncs = ScimSyncReadsService.create({ syncs: repositories.scimSyncs, activity: null });
-    const connections = ScimConnectionsService.create(dependencies.identity);
+    const connections = ScimConnectionsService.create(repositories.scimSsoConnections);
+    const costCenterFacts = ScimCostCenterFactsService.create();
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
       users: dependencies.users,
-      governance: dependencies.governance,
+      costCenterFacts,
       organization: dependencies.organization,
       entitlements: dependencies.entitlements,
       lifecycle,
@@ -326,7 +328,7 @@ export class ScimModule implements ScimApiContract {
         identities: repositories.scim,
       }),
       reconciliation: ScimReconciliationService.create({
-        identity: dependencies.identity,
+        connections,
         syncs,
         grants: dependencies.authorization,
         people: dependencies.users,
@@ -354,6 +356,7 @@ export class ScimModule implements ScimApiContract {
       lifecycle,
     });
     app.#scimSyncLedger = scimSyncLedger;
+    app.#costCenterFacts = costCenterFacts;
     app.#syncReads = syncs;
     return app;
   }
@@ -370,6 +373,11 @@ export class ScimModule implements ScimApiContract {
 
   connectDirectory(commands: Readonly<{ requestDirectoryMove: ScimDirectoryMoveSender }>): void {
     this.#requestDirectoryMove = commands.requestDirectoryMove;
+  }
+
+  /** scim_cost_center's senders: each member's cost center is recorded through them. */
+  connectCostCenter(commands: ScimCostCenterSenders): void {
+    this.#costCenterFacts?.connect(commands);
   }
 
   /** scim-sync's senders: the directory-sync history stages each fact through them. */

@@ -177,6 +177,9 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("experiment_run_processing");
       expect(pipelines).toContain("coding_agent_processing");
       expect(pipelines).toContain("github_lifecycle");
+      expect(pipelines).toContain("evaluator_lifecycle");
+      expect(pipelines).toContain("monitor_evaluator_cleanup");
+      expect(pipelines).toContain("scim_sso_connections");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");
@@ -271,6 +274,34 @@ describe("the worker process installation", () => {
           "coding_agent_processing.codingAgentLogFactsDispatch",
           "coding_agent_processing.codingAgentMetricFactsDispatch",
           "coding_agent_processing.codingAgentInstallationBackfill",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("hosts suite's peer lanes on scenario's run facts, and no suite sync on scenario", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect([
+        ...(byName
+          .get("simulation_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).not.toContain("suiteRunSync");
+      expect(
+        byName
+          .get("suite_run_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "suite_run_processing.scenarioRunStarted",
+          "suite_run_processing.scenarioRunFinished",
+          "suite_run_processing.scenarioRunEvaluated",
         ]),
       );
     } finally {

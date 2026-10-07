@@ -1,4 +1,3 @@
-import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -23,7 +22,6 @@ import {
   type ProjectIdentity,
   type ProjectWithTeam,
   type PaginatedProjects,
-  type TopicClusteringRequest,
   type TraceDestinationDecision,
   type TraceDestinationInput,
   type TraceDestinationProject,
@@ -35,9 +33,7 @@ import {
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
 import type * as projectContractModule from "@langwatch/project-contract";
-import { ShareApi } from "@langwatch/share-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
-import { TopicApi } from "@langwatch/topic-contract";
+import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
@@ -58,9 +54,6 @@ import type {
 
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
-  apiKeys: typeof ApiKeyApi;
-  share: typeof ShareApi;
-  topics: typeof TopicApi;
   /**
    * Asked about a scope the door's declared check did not resolve. Every
    * process that installs this module installs AuthZ, which is what makes it
@@ -105,9 +98,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   static readonly contract = ProjectApi;
   static readonly dependencies: ProjectDependencies = {
     organizations: OrganizationApi,
-    apiKeys: ApiKeyApi,
-    share: ShareApi,
-    topics: TopicApi,
     authorization: AuthzApi,
     trace: TraceApi,
     auditLog: AuditLogApi,
@@ -117,44 +107,34 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
-  readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
-  readonly #logger: ProjectLogger;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
-    reportTopicClusteringFailure: (error, context) =>
-      this.#reportTopicClusteringFailure(error, context),
   });
   private constructor({
     projectService,
     operations,
     lifecycle,
-    apiKeys,
     authorization,
     trace,
     dataPrivacy,
-    logger,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
-    apiKeys: ApiKeyApi;
     authorization: AuthzApi;
     trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
-    logger: ProjectLogger;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
-    this.#apiKeys = apiKeys;
     this.#authorization = authorization;
     this.#trace = trace;
     this.#dataPrivacy = dataPrivacy;
-    this.#logger = logger;
   }
 
   static create({
@@ -178,19 +158,14 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       auditLog: dependencies.auditLog,
       lifecycle,
       logger,
-      share: dependencies.share,
-      topics: dependencies.topics,
-      now: () => nowInstant().epochMilliseconds,
     });
     return new ProjectModule({
       projectService: projects,
       operations,
       lifecycle,
-      apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
       trace: dependencies.trace,
       dataPrivacy: dependencies.dataPrivacy,
-      logger,
     });
   }
 
@@ -275,15 +250,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
   }
 
-  /**
-   * A clustering request that did not land. Reported rather than raised: the
-   * door has already decided this is best effort, and the topic module
-   * re-schedules on its own.
-   */
-  #reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void {
-    this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
-  }
-
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
@@ -300,17 +266,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#operations.revokeLegacyProjectKey({ projectId: input.projectId }, input.by);
   }
 
-  triggerTopicClustering(input: {
-    projectId: string;
-    by: Readonly<{ id: string }>;
-  }): Promise<TopicClusteringRequest> {
-    return this.#requests.triggerTopicClustering(input);
-  }
-
   /**
-   * The `/api/projects` management operations, each scoped to the
-   * organization the door's credential resolved — never the project itself —
-   * so a token issued for one organization cannot reach another's project.
+   * The management operations, each scoped to the organization the door's
+   * credential resolved — never the project itself — so a token issued for one
+   * organization cannot reach another's project.
    */
   createInOrganization(
     input: Readonly<{
@@ -353,12 +312,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
   }
 
-  resolveVisibleProjects(
-    input: Readonly<{ apiKeyId: string; organizationId: string }>,
-  ): Promise<ApiKeyVisibleProjects> {
-    return this.#apiKeys.resolveVisibleProjects(input);
-  }
-
   getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
     return this.#dataPrivacy.getPiiRedactionLevel(input);
   }
@@ -368,31 +321,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     level: DataPrivacyPiiRedactionLevel;
   }): Promise<void> {
     return this.#dataPrivacy.setPiiRedactionLevel(input);
-  }
-
-  /**
-   * The service key a newly provisioned project is handed back with: an
-   * organization key bound as ADMIN on that project alone, belonging to no
-   * member. Lives here because it is what a project's credential IS, not how one door spells it.
-   */
-  async provisionServiceKey(
-    input: Readonly<{
-      projectId: string;
-      projectName: string;
-      organizationId: string;
-      createdByUserId: string | null;
-    }>,
-  ): Promise<{ token: string; apiKeyId: string }> {
-    const created = await this.#apiKeys.create({
-      name: `${input.projectName} Service Key`,
-      userId: null,
-      createdByUserId: input.createdByUserId,
-      organizationId: input.organizationId,
-      permissionMode: "all",
-      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: input.projectId }],
-    });
-
-    return { token: created.token, apiKeyId: created.apiKey.id };
   }
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {
@@ -536,13 +464,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     input: Readonly<{ organizationId: string; scopeId: string }>,
   ): Promise<{ ownerUserId: string | null } | null> {
     return this.#projectService.findPersonalWorkspaceOwner(input);
-  }
-
-  requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<TopicClusteringRequest> {
-    return this.#operations.requestTopicClustering(input, by);
   }
 
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {

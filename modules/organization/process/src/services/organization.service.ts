@@ -60,6 +60,7 @@ import {
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
   type PricingModel,
+  type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -240,8 +241,33 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.repository.saveJoinSetting(input);
   }
 
+  findBySsoDomain(input: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    return this.repository.findBySsoDomain(input);
+  }
+
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
     return this.repository.getSessionPolicy(input);
+  }
+
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {
+    return this.repository.getSignInSecurityPolicy(input);
+  }
+
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    return this.repository.updateSignInSecurityPolicy(input);
+  }
+
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]> {
+    return this.repository.findSignInSecurityPoliciesForUser(input);
+  }
+
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return this.repository.findConfiguredSignInSecurityPolicies();
   }
 
   saveSessionPolicy(input: {
@@ -371,6 +397,14 @@ export class OrganizationService extends OrganizationServiceContract {
 
   updateSentPlanLimitAlert(input: { organizationId: string; sentAt: Instant }): Promise<void> {
     return this.repository.updateSentPlanLimitAlert(input);
+  }
+
+  setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    return this.repository.setLicense(input);
   }
 
   getBillingProfile(

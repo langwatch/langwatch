@@ -11,6 +11,7 @@ import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "./topic-clustering.cons
 import {
   topicClusteringRunHistoryEntrySchema,
   topicClusteringStatusSchema,
+  topicClusteringTriggerResultSchema,
   topicSchema,
 } from "./topic.ts";
 
@@ -29,4 +30,8 @@ export const topicTrpc = defineTrpcContract("topics")
   .query("getClusteringRunHistory", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringRunHistoryEntrySchema.array())
+
+  .mutation("triggerTopicClustering")
+  .withInput(topicProjectScopeSchema)
+  .withOutput(topicClusteringTriggerResultSchema)
   .build();

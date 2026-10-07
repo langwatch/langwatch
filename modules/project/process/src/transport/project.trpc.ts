@@ -12,7 +12,6 @@ import {
   TraceSharingDeniedError,
   projectTrpc,
   type ProjectApi,
-  type TopicClusteringRequest,
 } from "@langwatch/project-contract";
 
 /** A scope a probe is asked at, when the declaration resolved a different one. */
@@ -35,7 +34,7 @@ export type ProjectFieldProtections = Readonly<{
 
 /**
  * What the project's own browser door reaches: the project application, and
- * the six deployment answers the surface needs beside it. Each is asked of the
+ * the five deployment answers the surface needs beside it. Each is asked of the
  * request the mount built this for, so the caller is the mount's to resolve.
  */
 export interface ProjectBrowserApi {
@@ -66,11 +65,6 @@ export interface ProjectBrowserApi {
   getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
   /** Revokes the legacy project key for good, audited; no key is returned. */
   revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
-  /** Requests a clustering run, reporting a request that did not land. */
-  triggerTopicClustering(input: {
-    projectId: string;
-    by: Readonly<{ id: string }>;
-  }): Promise<TopicClusteringRequest>;
 }
 
 export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
@@ -202,12 +196,6 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
 
       return { success: true as const, alreadyArchived };
     })
-
-    .procedure("triggerTopicClustering")
-    .withPermission("project:update")
-    .handle(({ app, input, actor }) =>
-      app.triggerTopicClustering({ projectId: input.projectId, by: actor }),
-    )
     .build();
 
 /**

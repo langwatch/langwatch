@@ -14,6 +14,8 @@ import {
   PROJECT_ARCHIVED_EVENT_VERSION,
   PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE,
   PROJECT_DEPARTMENT_ASSIGNED_EVENT_VERSION,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 
 import {
@@ -23,6 +25,10 @@ import {
   RECORD_PROJECT_MOVED_COMMAND_TYPE,
   RECORD_PROJECT_ARCHIVED_COMMAND_TYPE,
   RECORD_PROJECT_DEPARTMENT_ASSIGNED_COMMAND_TYPE,
+  RECORD_PROJECT_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+  type ProjectTraceSharingDisabledEvent,
+  type RecordProjectTraceSharingDisabledCommandData,
+  recordProjectTraceSharingDisabledCommandDataSchema,
   type ProjectDepartmentAssignedEvent,
   type RecordProjectDepartmentAssignedCommandData,
   recordProjectDepartmentAssignedCommandDataSchema,
@@ -307,6 +313,50 @@ export class RecordProjectDepartmentAssignedCommand implements CommandHandler<
 
   static getSpanAttributes(
     payload: RecordProjectDepartmentAssignedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records that a project's trace sharing was switched off; a change is keyed on its moment. */
+export class RecordProjectTraceSharingDisabledCommand implements CommandHandler<
+  Command<RecordProjectTraceSharingDisabledCommandData>,
+  ProjectTraceSharingDisabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+    recordProjectTraceSharingDisabledCommandDataSchema,
+    "Record that a project's trace sharing was disabled",
+  );
+
+  async handle(
+    command: Command<RecordProjectTraceSharingDisabledCommandData>,
+  ): Promise<ProjectTraceSharingDisabledEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectTraceSharingDisabledEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
+        version: PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:trace-sharing-disabled:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectTraceSharingDisabledCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectTraceSharingDisabledCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.project.id": payload.projectId,

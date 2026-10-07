@@ -15,6 +15,7 @@ import {
   type PersonalWorkspace,
   type OrganizationUsageCount,
   type PricingModel,
+  type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -32,6 +33,14 @@ import type {
 
 /** In-memory `OrganizationRepository`, for tests and a memory-backed boot. */
 const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
+/** An absent column reads as no rule, so a row seeded without one asks nothing of anybody. */
+const signInSecurityPolicyOf = (organization: MemoryOrganizationRow): SignInSecurityPolicy => ({
+  lockoutAfterFailedAttempts: organization.lockoutAfterFailedAttempts ?? 0,
+  lockoutMinutes: organization.lockoutMinutes ?? 30,
+  sessionIdleTimeoutMinutes: organization.sessionIdleTimeoutMinutes ?? 0,
+  sessionMaxLifetimeMinutes: organization.sessionMaxLifetimeMinutes ?? 0,
+});
 
 export class MemoryOrganizationRepository extends OrganizationRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {
@@ -106,6 +115,22 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
   }
 
+  async findBySsoDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    const organization = [...this.memory.organizations.values()].find(
+      (candidate) => candidate.ssoDomain === domain,
+    );
+    if (!organization) return null;
+    return {
+      id: organization.id,
+      name: organization.name,
+      ssoProvider: organization.ssoProvider ?? null,
+    };
+  }
+
   async getSessionPolicy({
     organizationId,
   }: {
@@ -123,6 +148,48 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     maxSessionDurationDays: number;
   }): Promise<void> {
     this.requireOrganization(organizationId).maxSessionDurationDays = maxSessionDurationDays;
+  }
+
+  async getSignInSecurityPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SignInSecurityPolicy> {
+    return signInSecurityPolicyOf(this.requireOrganization(organizationId));
+  }
+
+  async updateSignInSecurityPolicy({
+    organizationId,
+    policy,
+  }: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    Object.assign(this.requireOrganization(organizationId), policy);
+  }
+
+  async findSignInSecurityPoliciesForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<SignInSecurityPolicy[]> {
+    return this.memory.organizationUsers
+      .filter((member) => member.userId === userId && member.disabledAt === null)
+      .flatMap((member) => {
+        const organization = this.memory.organizations.get(member.organizationId);
+        return organization ? [signInSecurityPolicyOf(organization)] : [];
+      });
+  }
+
+  async findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return [...this.memory.organizations.values()]
+      .map(signInSecurityPolicyOf)
+      .filter(
+        (policy) =>
+          policy.lockoutAfterFailedAttempts > 0 ||
+          policy.sessionIdleTimeoutMinutes > 0 ||
+          policy.sessionMaxLifetimeMinutes > 0,
+      );
   }
 
   async getPricing({ organizationId }: { organizationId: string }): Promise<{
@@ -272,6 +339,18 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const organization = this.memory.organizations.get(input.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
     organization.sentPlanLimitAlert = input.sentAt;
+  }
+
+  async setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.license = input.licenseKey;
+    organization.licenseExpiresAt = input.expiresAt;
+    organization.licenseLastValidatedAt = null;
   }
 
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {

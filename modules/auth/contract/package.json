@@ -23,6 +23,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

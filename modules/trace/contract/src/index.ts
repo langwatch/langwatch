@@ -1,4 +1,13 @@
-export * from "./cost-attribution.ts";
+export * from "./span-cost-metrics.ts";
+export * from "./span-rollup-contribution.ts";
+export * from "./span-status-fold.ts";
+export * from "./span-timing-fold.ts";
+export * from "./trace-analytics-fold.ts";
+export * from "./trace-attribute-accumulation.ts";
+export * from "./trace-attribute-extraction.ts";
+export * from "./trace-name-resolution.ts";
+export * from "./trace-origin-hoisting.ts";
+export * from "./trace-summary-attribute-values.ts";
 export * from "./derive-trace-origin.ts";
 export * from "./derive-trace-status.ts";
 export * from "./trace.ts";
@@ -6,7 +15,6 @@ export * from "./trace-view.contract.ts";
 export * from "./trace-explorer.contract.ts";
 export * from "./trace-canonicalisation.ts";
 export * from "./trace-ingress.events.ts";
-export * from "./trace-content-part.ts";
 export type {
   AsyncContentPartVisitor,
   BinaryPart,
@@ -20,7 +28,6 @@ export {
 } from "./trace-content-part.provider-source.ts";
 export { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 export { visitContentPart, visitContentPartAsync } from "./trace-content-part.dispatcher.ts";
-export * from "./trace-attributes.ts";
 export { trimAttributesForAnalytics } from "./trace-analytics-attribute-trim.ts";
 export * from "./trace-time-range-presets.ts";
 export * from "./trace-token-budget.ts";

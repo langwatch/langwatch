@@ -95,6 +95,9 @@
       "path": "modules/monitor/contract/tsconfig.build.json"
     },
     {
+      "path": "modules/navigation/contract/tsconfig.build.json"
+    },
+    {
       "path": "modules/notification/contract/tsconfig.build.json"
     },
     {

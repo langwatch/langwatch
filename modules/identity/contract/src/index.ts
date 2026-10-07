@@ -113,6 +113,7 @@ export {
   ssoConnectionFactInputSchema,
   ssoConnectionSourceSchema,
   ssoConnectionStateSchema,
+  ssoConnectionLifecycleStateSchema,
   ssoConnectionTypeSchema,
   ssoDomainProofStateSchema,
   ssoIdpMetadataSchema,

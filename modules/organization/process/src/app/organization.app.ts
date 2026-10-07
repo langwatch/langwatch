@@ -123,6 +123,7 @@ import {
   type PendingInvitationForCaller,
   type PendingInvitationsForCaller,
   type SignUpVerdict,
+  type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -701,6 +702,25 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.getSessionPolicy(input);
   }
 
+  getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {
+    return this.#dependencies.organizations.getSignInSecurityPolicy(input);
+  }
+
+  updateSignInSecurityPolicy(input: {
+    organizationId: string;
+    policy: SignInSecurityPolicy;
+  }): Promise<void> {
+    return this.#dependencies.organizations.updateSignInSecurityPolicy(input);
+  }
+
+  findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]> {
+    return this.#dependencies.organizations.findSignInSecurityPoliciesForUser(input);
+  }
+
+  findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
+    return this.#dependencies.organizations.findConfiguredSignInSecurityPolicies();
+  }
+
   saveSessionPolicy(input: {
     organizationId: string;
     maxSessionDurationDays: number;
@@ -971,6 +991,22 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.memberOrganizationIds(input);
   }
 
+  findBySsoDomain(
+    input: Readonly<{ domain: string }>,
+  ): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
+    return this.#dependencies.organizations.findBySsoDomain(input);
+  }
+
+  createSsoDomainMembership(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<"created" | "already-present"> {
+    return this.#dependencies.membership.createSsoDomainMembership(input);
+  }
+
+  countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number> {
+    return this.#dependencies.membership.countMembershipsForUser(input);
+  }
+
   organizationIdsForMember(input: { userId: string }): Promise<string[]> {
     return this.#dependencies.organizations.organizationIdsForMember(input);
   }
@@ -1195,6 +1231,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   updateSentPlanLimitAlert(input: { organizationId: string; sentAt: Instant }): Promise<void> {
     return this.#dependencies.organizations.updateSentPlanLimitAlert(input);
+  }
+
+  setLicense(input: {
+    organizationId: string;
+    licenseKey: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    return this.#dependencies.organizations.setLicense(input);
   }
 
   /** The billing-facing profile, which is also where the display name lives. */

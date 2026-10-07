@@ -18,7 +18,7 @@ SCIM provisioning: directory connections, their tokens, and syncing users from a
 
 | Kind            | Name                                                                                                                                                                               | Declared at                                                      |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Stores required | prisma, operatorReads                                                                                                                                                              | `process/src/repositories/prisma/prisma.scim.repositories.ts:13` |
+| Stores required | prisma, operatorReads                                                                                                                                                              | `process/src/repositories/prisma/prisma.scim.repositories.ts:14` |
 | Secrets         | `auth0WebhookSecret` (AUTH0_SCIM_WEBHOOK_SECRET), `tokenPepper` (CREDENTIALS_SECRET), `tokenPepperFallback` (NEXTAUTH_SECRET), `tokenPepperPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `contract/src/scim.config.ts:13`                                 |
 | Config          | `provenOffboarding` (SCIM_V2_GRANTS)                                                                                                                                               | `contract/src/scim.config.ts:6`                                  |
 
@@ -26,15 +26,13 @@ Anything else scim needs belongs to another module and is reached through its `*
 
 ## Peers (static dependencies)
 
-| Name            | Token               | Module                                                  |
-| --------------- | ------------------- | ------------------------------------------------------- |
-| `auditLog`      | `AuditLogApi`       | [audit-log](../../../modules/audit-log/README.md)       |
-| `authorization` | `AuthzApi`          | [authz](../../../modules/authz/README.md)               |
-| `entitlements`  | `EntitlementApi`    | [entitlement](../../../modules/entitlement/README.md)   |
-| `governance`    | `GovernanceRestApi` | [governance](../governance/README.md)                   |
-| `identity`      | `IdentityApi`       | [identity](../../../modules/identity/README.md)         |
-| `organization`  | `OrganizationApi`   | [organization](../../../modules/organization/README.md) |
-| `users`         | `UserApi`           | [user](../../../modules/user/README.md)                 |
+| Name            | Token             | Module                                                  |
+| --------------- | ----------------- | ------------------------------------------------------- |
+| `auditLog`      | `AuditLogApi`     | [audit-log](../../../modules/audit-log/README.md)       |
+| `authorization` | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
+| `entitlements`  | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
+| `organization`  | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
+| `users`         | `UserApi`         | [user](../../../modules/user/README.md)                 |
 
 ## Who depends on scim
 

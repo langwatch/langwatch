@@ -61,10 +61,11 @@ Feature: License registry
     Then the registry holds a row for that license
 
   @unit
-  Scenario: The minted license and its registry row are written together
-    Given the mint script applied a license to an organization
+  Scenario: A minted license whose organization write fails leaves no registry row
+    Given the mint script recorded a license in the registry for an organization
     When writing the license onto the organization fails
-    Then the registry row is rolled back with it
+    Then the registry row is deleted again
+    And the mint fails
 
   @unit
   Scenario: The registry stores a hash of the token, not the token

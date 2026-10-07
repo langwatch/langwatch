@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:60`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:58`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -108,20 +108,12 @@ findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null
 getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
 ```
 
-#### `assertBatchLogWithinLimit`
+#### `findMonitorPerformance`
 
-Refuses an SDK batch body larger than the project's organization accepts in one request.
-
-```typescript
-assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
-```
-
-#### `logBatchEvaluation`
-
-Records one SDK batch evaluation: its run, its rows and its verdicts.
+The seven-day trend of every monitor the project has; none when it has no monitors.
 
 ```typescript
-logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
+findMonitorPerformance(input: MonitorPerformanceForProjectInput): Promise<OnlineEvaluationPerformance[]>;
 ```
 
 #### `runEvaluator`
@@ -146,14 +138,6 @@ One saved evaluator, ready to run; throws when no evaluator answers to it.
 
 ```typescript
 resolveSavedEvaluator(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
-```
-
-#### `getEvaluatorEffectiveSettings`
-
-The settings a run would use for an evaluator and a monitor's parameters, flag included.
-
-```typescript
-getEvaluatorEffectiveSettings(input: EvaluatorEffectiveSettingsQuery): Promise<EvaluatorEffectiveSettings>;
 ```
 
 #### `findMonitorBySlug`
@@ -258,7 +242,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:210` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:188` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -267,94 +251,82 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:218`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:196`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:225)
-```
-
-#### `POST /api/evaluations/batch/log_results` · `postApiEvaluationsBatchLogResults`
-
-Report batch evaluation results
-
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:246`.
-
-Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_results`.
-
-```typescript
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:248)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:251)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:203)
 ```
 
 #### `POST /api/evaluations/:evaluator/evaluate` · `postApiEvaluationsByEvaluatorEvaluate`
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:292`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:224`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:295)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:298)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:227)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:230)
 ```
 
 #### `POST /api/evaluations/:evaluator/:subpath/evaluate` · `postApiEvaluationsByEvaluatorBySubpathEvaluate`
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:323`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:255`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof namespacedEvaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:16
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:329)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:332)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:261)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:264)
 ```
 
 #### `POST /api/guardrails/:evaluator/evaluate` · `postApiGuardrailsByEvaluatorEvaluate`
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:357`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:289`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:359)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:362)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:291)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:294)
 ```
 
 #### `POST /api/dataset/evaluate` · `postApiDatasetEvaluate`
 
 Evaluate a dataset
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:387`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:319`.
 
 Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:389)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:392)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:321)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:324)
 ```
 
 ## tRPC transport
 
 ### `evaluations`
 
-Contract `../contract/src/evaluation.trpc.ts:20`, router `src/transport/evaluation.trpc.ts:10`.
+Contract `../contract/src/evaluation.trpc.ts:24`, router `src/transport/evaluation.trpc.ts:10`.
 
-| Procedure                               | Kind     | Gate                            | Input                           | Output                       |
-| --------------------------------------- | -------- | ------------------------------- | ------------------------------- | ---------------------------- |
-| `evaluations.availableEvaluators`       | query    | Permission `evaluations:view`   | `evaluationProjectScopeSchema`  | `evaluatorCatalogueSchema`   |
-| `evaluations.availableCustomEvaluators` | query    | Permission `evaluations:view`   | `evaluationProjectScopeSchema`  | inline                       |
-| `evaluations.runEvaluation`             | mutation | Permission `evaluations:manage` | `runTraceEvaluationInputSchema` | `evaluationRunOutcomeSchema` |
-| `evaluations.warmupLambda`              | mutation | Permission `evaluations:view`   | `warmupEvaluatorsInputSchema`   | `evaluationWarmupSchema`     |
+| Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
+| --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
+| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
+| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | inline                       |
+| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
+| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
+| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
 
 ## Sockets
 
@@ -391,8 +363,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:82`. Even
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:291`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:292`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:278`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:279`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:26` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:28` |

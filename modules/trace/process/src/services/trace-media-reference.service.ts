@@ -14,10 +14,6 @@ export type TraceMediaReference = {
   role?: string;
 };
 
-export const TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.input";
-
-export const TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE = "langwatch.reserved.media_refs.output";
-
 export interface TraceMediaReferenceResolver {
   collect(value: unknown): TraceMediaReference[];
 

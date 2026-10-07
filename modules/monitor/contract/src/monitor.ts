@@ -240,16 +240,6 @@ export const monitorPatchInputSchema = z
   .strict();
 export type MonitorPatchInput = z.infer<typeof monitorPatchInputSchema>;
 
-/** The seven-day trend window, in the reader's own time zone. */
-export const monitorPerformanceInputSchema = z
-  .object({
-    projectId: z.string().min(1),
-    timeZone: z.string().min(1).max(100).optional(),
-    actor: z.object({ id: z.string().min(1) }).strict(),
-  })
-  .strict();
-export type MonitorPerformanceInput = z.infer<typeof monitorPerformanceInputSchema>;
-
 /** A check as a caller proposed it, before the monitor holding it is written. */
 export const monitorRunnableCheckInputSchema = z
   .object({ checkType: z.string().min(1), parameters: z.unknown() })

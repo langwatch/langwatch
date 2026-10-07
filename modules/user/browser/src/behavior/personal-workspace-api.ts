@@ -9,6 +9,7 @@ import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
 import type { personalVirtualKeysTrpc } from "@langwatch/enterprise-gateway-contract";
 import type {
   AiToolEntry,
+  governanceTrpc,
   ingestionKeyTrpc,
   personalSessionsTrpc,
 } from "@langwatch/enterprise-governance-contract";
@@ -155,11 +156,6 @@ type BorrowedProcedures = {
       query: { input: { organizationId: string }; output: IngestionTemplateView[] };
     };
   };
-  governance: {
-    resolveHome: {
-      query: { input: { organizationId: string }; output: PersonaResolutionView };
-    };
-  };
   codingAgents: {
     usageTotals: {
       query: {
@@ -188,6 +184,7 @@ export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
   ContractApiMap<typeof identityTrpc> &
   ContractApiMap<typeof personalVirtualKeysTrpc> &
   ContractApiMap<typeof personalSessionsTrpc> &
+  ContractApiMap<typeof governanceTrpc> &
   ContractApiMap<typeof ingestionKeyTrpc> &
   BorrowedProcedures;
 

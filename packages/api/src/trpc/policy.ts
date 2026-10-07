@@ -13,7 +13,7 @@ import {
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import { createLogger, type RequestContext } from "@langwatch/observability";
+import { createLogger, type Logger, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -41,6 +41,7 @@ import {
   type EnforcedScopeFields,
 } from "../access/declared-middleware.ts";
 import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
+import type { RateLimiter } from "../ports.ts";
 import {
   auditScopeIds,
   callerTraceContext,
@@ -769,6 +770,8 @@ export type TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext extends obj
   audit: TrpcAudit;
   errorReporting: TrpcErrorReporting;
   causes: TrpcCauseTranslation;
+  /** The counter refused calls spend their audit budget on; absent, every refusal is recorded. */
+  refusalAudit?: Readonly<{ limiter: RateLimiter; logger: Pick<Logger, "warn"> }> | undefined;
 }>;
 
 function spanAttributes(path: string, type: string) {
@@ -996,6 +999,55 @@ function failuresToAudit<TActor extends { id?: string }>({
   return [{ error, actor: { ...actor, id: actor.id } }];
 }
 
+// Main's refusal budget (spec: audit-log.feature, "One caller cannot fill the audit trail"):
+// a refusal is free to provoke, so one caller records at most 200 an hour. Spending it never
+// changes what the caller is told, and a limiter that cannot answer records the row (fail open).
+const REFUSAL_AUDIT_BUDGET = { requests: 200, seconds: 60 * 60 } as const;
+
+/** Whether this refusal still fits the caller's budget; warns once a window when it does not. */
+async function refusalFitsBudget({
+  userId,
+  budget,
+}: {
+  userId: string;
+  budget: TrpcRuntimePolicyMembers<unknown, object>["refusalAudit"];
+}): Promise<boolean> {
+  if (!budget) return true;
+  try {
+    const { allowed } = await budget.limiter.check(
+      `trpc-refusal-audit:${userId}`,
+      REFUSAL_AUDIT_BUDGET,
+    );
+    if (allowed) return true;
+    await warnBudgetSpent({ userId, budget });
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/** Said once per window rather than per dropped row: the flood stays visible in the logs. */
+async function warnBudgetSpent({
+  userId,
+  budget,
+}: {
+  userId: string;
+  budget: NonNullable<TrpcRuntimePolicyMembers<unknown, object>["refusalAudit"]>;
+}): Promise<void> {
+  const firstThisWindow = await budget.limiter
+    .check(`trpc-refusal-audit-warned:${userId}`, {
+      requests: 1,
+      seconds: REFUSAL_AUDIT_BUDGET.seconds,
+    })
+    .then(({ allowed }) => allowed)
+    .catch(() => true);
+  if (!firstThisWindow) return;
+  budget.logger.warn(
+    { userId },
+    "refusal audit budget spent; further refused calls by this caller are logged but not recorded in the audit trail",
+  );
+}
+
 /** Called once per root; a process composes one and hands its middlewares to every mount. */
 export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
@@ -1057,6 +1109,9 @@ export function createTrpcRuntimePolicy<
       actor,
     });
     if (!failure) return result;
+    if (!(await refusalFitsBudget({ userId: failure.actor.id, budget: ports.refusalAudit }))) {
+      return result;
+    }
     const auditedInput = input ?? (await getRawInput());
     const scopeIds = auditScopeIds(auditedInput);
 

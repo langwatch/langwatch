@@ -36,6 +36,6 @@ Anything else share needs belongs to another module and is reached through its `
 
 ## Who depends on share
 
-[organization](../organization/README.md), [project](../project/README.md), [trace](../trace/README.md) (as a peer).
+[organization](../organization/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->

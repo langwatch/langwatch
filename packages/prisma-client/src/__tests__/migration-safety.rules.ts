@@ -4,8 +4,9 @@
  * its own fix, the way a lint message does. ADR-155.
  */
 
-/** The rules added with S9, which the test holds only the migrations written after them to. */
+/** S9's floor and lock rules and W-01's foreign-key rule, held only above the rules marker. */
 export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
+  "new-foreign-key",
   "retirement-note-above-floor",
   "set-not-null-on-populated-column",
   "enum-recreated",
@@ -262,7 +263,7 @@ const ENUM_FIX =
   "and column and retire the old under the removal rule).";
 
 const CONSTRAINT_FIX =
-  "building a UNIQUE or PRIMARY KEY constraint, or validating a CHECK or FOREIGN KEY, scans " +
+  "building a UNIQUE or PRIMARY KEY constraint, or validating a CHECK, scans " +
   "the table under a lock and fails on a row the old image can still write. Pre-build the " +
   "index CONCURRENTLY and attach it with `ADD CONSTRAINT ... USING INDEX`, or add the " +
   "constraint `NOT VALID` and `VALIDATE CONSTRAINT` it as its own later step.";
@@ -303,12 +304,11 @@ function indexAndConstraintFindings({ sql, live, created }: Scoped & { sql: stri
     }
     const table = alteredTable(text);
     if (!table || created.has(table)) return [];
-    const pattern =
-      /\bADD\s+(?:CONSTRAINT\s+"?\w+"?\s+)?(UNIQUE|PRIMARY\s+KEY|EXCLUDE|CHECK|FOREIGN\s+KEY)\b/i;
+    const pattern = /\bADD\s+(?:CONSTRAINT\s+"?\w+"?\s+)?(UNIQUE|PRIMARY\s+KEY|EXCLUDE|CHECK)\b/i;
     const match = pattern.exec(text);
     if (!match) return [];
     const kind = match[1]!.toUpperCase().replace(/\s+/g, " ");
-    const safe = /^(CHECK|FOREIGN KEY)$/.test(kind)
+    const safe = /^CHECK$/.test(kind)
       ? /\bNOT\s+VALID\b/i.test(text)
       : /\bUSING\s+INDEX\b/i.test(text);
     if (safe) return [];
@@ -320,6 +320,24 @@ function indexAndConstraintFindings({ sql, live, created }: Scoped & { sql: stri
       },
     ];
   });
+}
+
+const FOREIGN_KEY_FIX =
+  "no new foreign key: keep the reference a plain column with an index. " +
+  "The owning service deletes its dependents; another module's go by a fact and that " +
+  "module's purge subscriber. The postgres-migration skill shows the shape.";
+
+function foreignKeyFindings(live: string): Finding[] {
+  return statementsOf(live)
+    .filter(({ text }) => /\bFOREIGN\s+KEY\b|\bREFERENCES\s+[\w".]+\s*\(/i.test(text))
+    .map(({ text }) => {
+      const table = alteredTable(text) ?? [...createdTables(text)][0] ?? "a table";
+      return {
+        rule: "new-foreign-key",
+        problem: `adds a foreign key on ${table}`,
+        fix: FOREIGN_KEY_FIX,
+      };
+    });
 }
 
 function renameFindings(live: string): Finding[] {
@@ -360,6 +378,7 @@ export function scanPostgresMigration({
     ...alterTypeFindings({ live, created }),
     ...enumFindings(live),
     ...indexAndConstraintFindings({ sql, live, created }),
+    ...foreignKeyFindings(live),
     ...renameFindings(live),
   ].map((finding) => ({ migration: name, ...finding }));
 }

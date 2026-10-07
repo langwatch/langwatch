@@ -1,5 +1,4 @@
-import type { CanonicalEvent } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { ATTR_KEYS, type CanonicalEvent } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
 import { canonicalisation, makeStubSpan } from "./test-helpers.ts";

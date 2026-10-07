@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 
 import type { GatewayRealtimeSessionRecord, SpendUsage } from "@langwatch/gateway-contract";
-import { ATTR_KEYS as ATTR } from "@langwatch/trace-contract";
+import { ATTR_KEYS as ATTR } from "@langwatch/span-normalisation";
 
 type SettlementSpanAttribute =
   | { key: string; value: { doubleValue: number } }

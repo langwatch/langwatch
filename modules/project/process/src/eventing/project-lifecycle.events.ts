@@ -18,6 +18,9 @@ import {
   projectCreatedEventDataSchema,
   projectLegacyKeyRevokedEventDataSchema,
   projectPresenceSettingChangedEventDataSchema,
+  projectTraceSharingDisabledEventDataSchema,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 import { z } from "zod";
 
@@ -114,3 +117,22 @@ export const projectDepartmentAssignedEventSchema = z.object({
   data: projectDepartmentAssignedEventDataSchema,
 });
 export type ProjectDepartmentAssignedEvent = z.infer<typeof projectDepartmentAssignedEventSchema>;
+
+export const RECORD_PROJECT_TRACE_SHARING_DISABLED_COMMAND_TYPE =
+  "lw.project.record_trace_sharing_disabled" as const;
+
+export const recordProjectTraceSharingDisabledCommandDataSchema =
+  projectTraceSharingDisabledEventDataSchema;
+export type RecordProjectTraceSharingDisabledCommandData = z.infer<
+  typeof recordProjectTraceSharingDisabledCommandDataSchema
+>;
+
+export const projectTraceSharingDisabledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE),
+  version: z.literal(PROJECT_TRACE_SHARING_DISABLED_EVENT_VERSION),
+  data: projectTraceSharingDisabledEventDataSchema,
+});
+export type ProjectTraceSharingDisabledEvent = z.infer<
+  typeof projectTraceSharingDisabledEventSchema
+>;

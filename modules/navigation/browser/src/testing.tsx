@@ -1,6 +1,18 @@
 /** Stub host for tests; built from partial reading with fail-closed defaults */
 
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import type {
+  NavigationDeployment,
+  NavigationFlagReading,
+  NavigationOpsAccess,
+  NavigationOrganization,
+  NavigationPlanReading,
+  NavigationProject,
+  NavigationScopeWrite,
+  NavigationSupportChat,
+  NavigationTeam,
+  NavigationUser,
+} from "@langwatch/navigation-contract";
 import type { ReactNode } from "react";
 
 import {
@@ -8,17 +20,7 @@ import {
   NavigationHostProvider,
   type NavigationAccountMenu,
   type NavigationCommandBar,
-  type NavigationDeployment,
-  type NavigationFlagReading,
   type NavigationLangy,
-  type NavigationOpsAccess,
-  type NavigationOrganization,
-  type NavigationPlanReading,
-  type NavigationProject,
-  type NavigationScopeWrite,
-  type NavigationSupportChat,
-  type NavigationTeam,
-  type NavigationUser,
 } from "./model/navigation-host.ts";
 
 export type StubNavigationReadings = {

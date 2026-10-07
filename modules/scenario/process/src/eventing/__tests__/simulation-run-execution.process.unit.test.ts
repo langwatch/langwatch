@@ -1103,6 +1103,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         scenarioSetId: null,
         name: null,
         target: null,
+        plan: {},
         parameters: null,
         secretParameters: null,
         secretParameterNames: null,

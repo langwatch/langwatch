@@ -34,7 +34,8 @@ disagree, the linter wins (§17).
    subject (trace, monitor, invite), it is a module.
 3. **One subject, one owning module.** `modules/catalogue.json` maps every
    subject to exactly one module. Another module reaches the subject through the
-   owner's `*Api` and contract only (§3).
+   owner's `*Api` and contract only (§3). `modules/README.md` prints that map with each
+   module's tables and peers, and every module has its own `README.md` (`ownership` skill).
 4. **The prefix tells you the graph.** Nothing `browser-*` in a server graph;
    no `process*` package in a web graph (§2). A contract imports no framework
    beyond `@langwatch/module`.
@@ -115,6 +116,8 @@ module has that kind of thing.
 
 - `dev/docs/ARCHITECTURE.md` §1 (the product), §2 (package family), §3 (a module),
   §3.4 (browser half, no kits), §16 (names in flight), §18 (Nx runs the tasks).
+- The generated pages: `modules/README.md`, `packages/README.md`, `apps/README.md`, the
+  `enterprise/` indexes and one per module; `ownership` reads them, `readmes` maintains them.
 - The module skills: `module` for anatomy, `module-client` for clients,
   `browser-module` for the browser half.
 - Process composition and what a module may demand (peers, config, stores,

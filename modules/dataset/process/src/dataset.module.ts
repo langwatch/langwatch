@@ -5,7 +5,6 @@ import { datasetNormalizationEventing } from "#eventing/dataset-normalization.pi
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
 import { DatasetMigrationService } from "#services/dataset-migration.service";
 import { DatasetContentBackfillTask } from "#tasks/dataset-content-backfill.task";
-import { batchRecordTrpcTransport } from "#transport/batch-record.trpc";
 import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
 import { createDatasetRest } from "#transport/dataset.rest";
 import { datasetTrpcTransport } from "#transport/dataset.trpc";
@@ -13,12 +12,7 @@ import { datasetTrpcTransport } from "#transport/dataset.trpc";
 export const datasetProcessModule = defineProcessModule("dataset")
   .withRepositories(datasetRepositories)
   .withApi(DatasetModule)
-  .withTransports(
-    createDatasetRest(),
-    datasetTrpcTransport,
-    datasetRecordTrpcTransport,
-    batchRecordTrpcTransport,
-  )
+  .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
   .withEventing(datasetNormalizationEventing)
   .withTasks(({ repositories }) => [
     DatasetContentBackfillTask.create({

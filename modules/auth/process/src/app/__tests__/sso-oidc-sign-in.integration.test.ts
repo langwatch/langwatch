@@ -20,6 +20,7 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type ServedOidcProvider, startOidcProvider } from "@langwatch/test-harness/oidc-provider";
@@ -27,7 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { BetterAuthTransport } from "../../channels/http/http.better-auth.channel.ts";
-import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
+import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
@@ -96,8 +97,14 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
       publicBaseUrl: undefined,
       nodeEnvironment: undefined,
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories: LiveAuthRepositories.create({
+      prisma,
+      redis: null as never,
+      rateLimiter: {} as never,
+      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+    }),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,

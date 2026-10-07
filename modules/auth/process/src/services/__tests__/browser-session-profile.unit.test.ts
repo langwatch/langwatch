@@ -4,7 +4,7 @@
  * @see specs/settings/profile.feature
  */
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -46,14 +46,13 @@ function harness() {
     sessionBound: signInSecurityFixture({ now }).sessionBound,
     now,
   });
-  memory.sessions.set("session-sam", {
+  memory.db.Session.push({
     id: "session-sam",
     userId: "sam",
     sessionToken: "token-sam",
-    impersonation: null,
-    createdAt: clock,
-    updatedAt: clock,
-    lastSeenAt: clock,
+    createdAt: toDate(clock),
+    updatedAt: toDate(clock),
+    lastSeenAt: toDate(clock),
   });
   const verified: VerifiedBrowserSession = {
     session: { id: "session-sam", expiresAt: new Date("2030-01-01T00:00:00.000Z") },

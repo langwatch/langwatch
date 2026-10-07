@@ -166,7 +166,7 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
-import { UserApi } from "@langwatch/user-contract";
+import { UserApi, UserNotOrganizationMemberError } from "@langwatch/user-contract";
 
 import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
@@ -1985,12 +1985,18 @@ export class GovernanceModule implements GovernanceRestApi {
   /**
    * The same rollup for the caller's own /me screen, over the tenants their
    * traffic actually lands in. Zeros before their first request, so the page
-   * renders rather than refusing.
+   * renders rather than refusing; a caller outside the organization is refused.
    */
-  personalUsageDashboard(
+  async personalUsageDashboard(
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,
   ): Promise<PersonalUsageRollup> {
+    const member = await this.isOrganizationMember({
+      organizationId: input.organizationId,
+      userId: by.id,
+    });
+    if (!member) throw new UserNotOrganizationMemberError(input.organizationId);
+
     return this.personalUsageDashboards.read({
       userId: by.id,
       organizationId: input.organizationId,

@@ -40,7 +40,6 @@ describe("the project tRPC declarations", () => {
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
-        "triggerTopicClustering",
         "update",
       ]);
     });
@@ -70,7 +69,6 @@ describe("the project tRPC declarations", () => {
         update: "mutation",
         getFieldRedactionStatus: "query",
         archiveById: "mutation",
-        triggerTopicClustering: "mutation",
       });
     });
 
@@ -98,7 +96,6 @@ describe("the project tRPC declarations", () => {
         "project.update": { kind: "permission", permission: "project:update" },
         "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
-        "project.triggerTopicClustering": { kind: "permission", permission: "project:update" },
       });
     });
   });

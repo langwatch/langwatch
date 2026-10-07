@@ -1,28 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
   type ScimPatchOperation,
 } from "@langwatch/enterprise-scim-contract";
 
-/**
- * The two things SCIM asks of Governance: find or create the department a
- * cost-center attribute names, and put the user in it. Named here, where the
- * calls are, so the chain that carries it down from `ScimService` states the
- * same narrow dependency at every step.
- */
-export type ScimDepartmentAssignment = Pick<
-  GovernanceRestApi,
-  "departmentAssignUser" | "departmentResolveByNameOrCreate"
->;
+import type { ScimCostCenterFactsService } from "./scim-cost-center-facts.service.ts";
 
-/** Applies SCIM cost-center attributes through Governance's department owner. */
+/** Where SCIM records a member's cost center; governance assigns the department from its side. */
+export type ScimCostCenterFacts = Pick<ScimCostCenterFactsService, "recordCostCenterChanged">;
+
+/** Records SCIM cost-center attributes as facts; a blank one clears the department. */
 export class ScimCostCenterService {
-  private constructor(private readonly governance: ScimDepartmentAssignment) {}
+  private constructor(private readonly facts: ScimCostCenterFacts) {}
 
-  static create(governance: ScimDepartmentAssignment): ScimCostCenterService {
-    return new ScimCostCenterService(governance);
+  static create(facts: ScimCostCenterFacts): ScimCostCenterService {
+    return new ScimCostCenterService(facts);
   }
 
   async sync(input: {
@@ -35,20 +28,10 @@ export class ScimCostCenterService {
     }
 
     const trimmed = typeof input.costCenter === "string" ? input.costCenter.trim() : "";
-    const departmentId =
-      trimmed === ""
-        ? null
-        : (
-            await this.governance.departmentResolveByNameOrCreate({
-              organizationId: input.organizationId,
-              name: trimmed,
-            })
-          ).id;
-
-    await this.governance.departmentAssignUser({
+    await this.facts.recordCostCenterChanged({
       organizationId: input.organizationId,
       userId: input.userId,
-      departmentId,
+      costCenter: trimmed === "" ? null : trimmed,
     });
   }
 

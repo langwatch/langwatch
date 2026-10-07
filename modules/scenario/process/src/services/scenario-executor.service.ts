@@ -10,7 +10,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioServerConfig, SimulationService } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -38,7 +37,6 @@ type ScenarioExecutorPeers = Readonly<{
   agents: AgentApi;
   prompts: PromptApi;
   secrets: SecretApi;
-  suites: SuiteApi;
   traces: TraceApi;
   workflows: WorkflowApi;
   projects: ProjectApi;
@@ -129,7 +127,6 @@ export class ScenarioExecutorService {
         legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
       },
       scenarios: this.input.scenarios,
-      suites: peers.suites,
       prompts: peers.prompts,
       agents: peers.agents,
       workflows: peers.workflows,

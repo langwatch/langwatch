@@ -112,3 +112,76 @@ Feature: Stepping the schema one release at a time
     Given a signal that is already aborted
     When the release is applied
     Then every target reports skipped because the upgrade was aborted
+
+  # `pnpm task upgrade` wires the applier: a one-release upgrade keeps the one-pass applier
+  # (`prisma migrate deploy` and goose `up`); a jump whose first schema is older than the image
+  # steps each release's Postgres folders through the applier above.
+
+  @integration
+  Scenario: A jump across two releases applies each release's schema, then its blocking steps, release by release
+    Given an installation on the oldest of three releases
+    And the two newer releases each carry a Prisma folder and a blocking data step
+    When the upgrade runs with the newest image
+    Then the older release's schema is applied, then its blocking step
+    And then the newer release's schema, then its blocking step
+
+  @unit
+  Scenario: A one-release upgrade applies the whole schema in one pass, as before
+    Given an upgrade whose first schema to apply is the image's own release
+    When the schema is applied
+    Then every call goes to the one-pass applier
+    And nothing is said about stepping
+
+  @unit
+  Scenario: A jump across several releases steps Postgres through each release's folders in turn
+    Given an upgrade whose first schema to apply is older than the image's release
+    When each release's schema is applied
+    Then each release is applied over every Prisma folder up to it
+    And it names the last goose version up to it
+
+  @unit
+  Scenario: The unreleased steps after a stepped jump are applied in one pass
+    Given a stepped jump that also has unreleased schema
+    When the unreleased schema is applied
+    Then it goes to the one-pass applier
+
+  @unit
+  Scenario: Each stepped release is named on the console before and after its schema
+    Given a stepped jump across two releases
+    When each release's schema is applied
+    Then the console says the schema steps one release at a time
+    And it names each release before its schema and again after it
+
+  @unit
+  Scenario: A stepped release whose schema fails is named with the failing target
+    Given a stepped release whose Prisma migration fails
+    When its schema is applied
+    Then the console warns naming the release and the failing target
+    And the failed report goes back to the runner
+
+  @unit
+  Scenario: A release with no goose version up to it steps no ClickHouse version
+    Given release manifests that carry no goose version up to a release
+    When the schema up to that release is worked out
+    Then it names every Prisma folder up to it and no goose version
+
+  @unit
+  Scenario: A stepped release migrates ClickHouse up to its own last goose version
+    Given a stepped release whose manifests up to it list goose version 2
+    When its ClickHouse migrations run
+    Then goose is asked to stop at version 2
+    And a one-pass upgrade asks goose for no stopping version
+
+  @unit
+  Scenario: Without a stopping version goose runs exactly as before
+    Given a ClickHouse migration run with no stopping version
+    When the goose passes are worked out
+    Then a server that needs the dimension compatibility replays up to 86 and then runs up
+    And any other server runs up alone
+
+  @unit
+  Scenario: With a stopping version neither goose pass goes past it
+    Given a ClickHouse migration run that stops at a version
+    When the goose passes are worked out
+    Then the compatibility replay stops at the lower of 86 and that version
+    And the final pass runs up to that version

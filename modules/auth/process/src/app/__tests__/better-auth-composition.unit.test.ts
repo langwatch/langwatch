@@ -15,12 +15,15 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
+import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS, type SignInProvidersConfig } from "./support/sign-in-providers.ts";
@@ -58,6 +61,7 @@ async function appFor(
     askedFor?: MountsRequest[];
     identity?: IdentityApi;
     logger?: Logger;
+    repositories?: AuthRepositories;
   } = {},
 ): Promise<AuthModule> {
   return AuthModule.create({
@@ -76,8 +80,9 @@ async function appFor(
       publicBaseUrl: undefined,
       nodeEnvironment: undefined,
     },
-    repositories: MemoryAuthRepositories.create(),
+    repositories: providers.repositories ?? MemoryAuthRepositories.create(),
     dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       users: new TestUserApi({}) as never,
       apiKeys: { findResolvedToken: async () => null } as never,
       featureFlags: {} as never,
@@ -156,7 +161,16 @@ describe("given a deployment that named one", () => {
     /** @scenario "The API composes the stock engine and reports the absent pipeline once" */
     it("composes the stock Prisma engine and reports the absent identity pipeline once", async () => {
       const { logger, lines } = createTestLogger();
-      const app = await appFor(true, { logger: logger as Logger });
+      const app = await appFor(true, {
+        logger: logger as Logger,
+        // The API composes the live tier; its storage queries nothing until a request reaches it.
+        repositories: LiveAuthRepositories.create({
+          prisma: {} as never,
+          redis: null as never,
+          rateLimiter: {} as never,
+          encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
+        }),
+      });
 
       await Promise.all([app.betterAuth(), app.betterAuth()]);
       const context = await (await app.betterAuth()).$context;

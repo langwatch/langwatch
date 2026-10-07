@@ -14,6 +14,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { suiteRunStateDataSchema, type SuiteRunStateData } from "@langwatch/suite-contract";
 
+import { OPEN_SUITE_RUN_STATUSES } from "#rules/suite-run-open.rules";
+
 type SuiteRunClickHouseRepositoryOptions = {
   /**
    * The process's one ClickHouse client. It routes each statement to the
@@ -70,6 +72,18 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
         error,
       });
     }
+  }
+
+  /** One tenant's suite runs still open, the latest row of each batch run. */
+  async findOpenRuns({ tenantId }: { tenantId: string }): Promise<SuiteRunStateData[]> {
+    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
+      tenantId,
+      sql: ClickHouseSuiteRunRepository.openRunsQuery(),
+      params: { tenantId, statuses: [...OPEN_SUITE_RUN_STATUSES] },
+      table: TABLE_NAME,
+      kind: "read",
+    });
+    return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
   }
 
   async storeProjection(
@@ -233,6 +247,34 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
           GROUP BY TenantId, BatchRunId
         )
       LIMIT 1
+    `;
+  }
+
+  private static openRunsQuery(): string {
+    return `
+      SELECT
+        t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+        t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId, t.Status AS Status,
+        t.Total AS Total, t.StartedCount AS StartedCount,
+        t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
+        t.Progress AS Progress, t.PassRateBps AS PassRateBps,
+        t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
+        toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+        toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+        toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
+        toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+        toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
+      FROM suite_runs AS t
+      WHERE t.TenantId = {tenantId:String}
+        AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
+          SELECT TenantId, BatchRunId, max(UpdatedAt)
+          FROM suite_runs
+          WHERE TenantId = {tenantId:String}
+          GROUP BY TenantId, BatchRunId
+        )
+        AND t.Status IN {statuses:Array(String)}
+      ORDER BY t.BatchRunId
+      LIMIT 1 BY t.BatchRunId
     `;
   }
 

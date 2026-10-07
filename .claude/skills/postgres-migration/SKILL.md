@@ -59,17 +59,18 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
 Every finding prints its own fix. Source: `packages/prisma-client/src/__tests__/migration-safety.rules.ts`.
 A table created in the same migration is empty, so the locking rules leave it alone.
 
-| Rule                                               | Refuses                                                                           | Write instead                                                                                                   |
-| -------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `drop-without-retirement-note`                     | `DROP TABLE`, `DROP COLUMN` with no note                                          | the note, once the floor allows                                                                                 |
-| `retirement-note-above-floor`                      | a note naming a release above the floor                                           | wait for the floor, or leave the drop out                                                                       |
-| `add-not-null-column-without-default`              | `ADD COLUMN ... NOT NULL` with no `DEFAULT`                                       | a `DEFAULT`, or nullable now                                                                                    |
-| `set-not-null-on-populated-column`                 | `ALTER COLUMN ... SET NOT NULL` on an existing table                              | app-level enforcement, or `CHECK (col IS NOT NULL) NOT VALID` then `VALIDATE` later; no escape hatch (round 22) |
-| `alter-column-type`                                | `ALTER COLUMN ... TYPE`                                                           | new column, backfill, switch, retire the old                                                                    |
-| `enum-recreated`                                   | `ALTER TYPE ... RENAME TO`, drop-and-recreate an enum                             | `ALTER TYPE ... ADD VALUE`; never remove a value                                                                |
-| `unique-or-validated-constraint-on-existing-table` | `ADD UNIQUE`/`PRIMARY KEY` built at once, `CHECK`/`FOREIGN KEY` validated at once | pre-build the index and `ADD CONSTRAINT ... USING INDEX`, or `NOT VALID` + a later `VALIDATE`                   |
-| `plain-index-on-existing-table`                    | `CREATE INDEX` on an existing table with no pre-build note                        | the ops pre-build note (below)                                                                                  |
-| `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                      | add, backfill, dual-write, switch, retire                                                                       |
+| Rule                                               | Refuses                                                                            | Write instead                                                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `drop-without-retirement-note`                     | `DROP TABLE`, `DROP COLUMN` with no note                                           | the note, once the floor allows                                                                                 |
+| `retirement-note-above-floor`                      | a note naming a release above the floor                                            | wait for the floor, or leave the drop out                                                                       |
+| `add-not-null-column-without-default`              | `ADD COLUMN ... NOT NULL` with no `DEFAULT`                                        | a `DEFAULT`, or nullable now                                                                                    |
+| `set-not-null-on-populated-column`                 | `ALTER COLUMN ... SET NOT NULL` on an existing table                               | app-level enforcement, or `CHECK (col IS NOT NULL) NOT VALID` then `VALIDATE` later; no escape hatch (round 22) |
+| `alter-column-type`                                | `ALTER COLUMN ... TYPE`                                                            | new column, backfill, switch, retire the old                                                                    |
+| `enum-recreated`                                   | `ALTER TYPE ... RENAME TO`, drop-and-recreate an enum                              | `ALTER TYPE ... ADD VALUE`; never remove a value                                                                |
+| `unique-or-validated-constraint-on-existing-table` | `ADD UNIQUE`/`PRIMARY KEY` built at once, `CHECK` validated at once                | pre-build the index and `ADD CONSTRAINT ... USING INDEX`, or `NOT VALID` + a later `VALIDATE`                   |
+| `plain-index-on-existing-table`                    | `CREATE INDEX` on an existing table with no pre-build note                         | the ops pre-build note (below)                                                                                  |
+| `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                       | add, backfill, dual-write, switch, retire                                                                       |
+| `new-foreign-key`                                  | `FOREIGN KEY` or a `REFERENCES <table>(...)` clause, on a new or an existing table | a plain column with an index (below); new `@relation` lines are held by the enforcer's `prisma-relations` list  |
 
 **The ops pre-build note.** `CONCURRENTLY` cannot run inside Prisma's transaction, so an index on an
 existing table carries a comment naming the statement an operator runs ahead; the migration's own
@@ -86,9 +87,34 @@ say in the note to check `pg_index.indisvalid` and `DROP INDEX CONCURRENTLY` bef
 Sessions run with `lock_timeout` 10 s; a statement that waits longer fails the run, the old image
 keeps serving, and the operator re-runs `upgrade`.
 
+**A re-runnable migration, worked.** The shape the `rerunnable-migrations` policy accepts
+(`packages/architecture-enforcer/src/policies/persistence/rerunnable-migrations.ts`, cases in
+`packages/architecture-enforcer/tests/rerunnable-migrations.unit.test.ts`; the in-tree index
+exemplar is the `20261006120000_process_outbox_lease_by_process_index` folder above). Every
+statement is a no-op on its second run, in the order Prisma would apply them:
+
+```sql
+CREATE TABLE IF NOT EXISTS "ProjectWidget" ("id" TEXT NOT NULL, "projectId" TEXT NOT NULL,
+  CONSTRAINT "ProjectWidget_pkey" PRIMARY KEY ("id"));
+ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "slug" TEXT;
+CREATE INDEX IF NOT EXISTS "ProjectWidget_projectId_idx" ON "ProjectWidget" ("projectId");
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Project_slug_present') THEN
+    ALTER TABLE "Project" ADD CONSTRAINT "Project_slug_present"
+      CHECK ("slug" IS NOT NULL) NOT VALID;
+  END IF;
+END $$;
+```
+
+The policy names the fix for each bare form (`a second CREATE TABLE fails: write CREATE TABLE IF NOT
+EXISTS`, `a second INSERT duplicates its rows ...: add ON CONFLICT DO NOTHING`, `a cancelled concurrent
+build leaves an INVALID index ...`); a statement it does not recognise is refused with the `DO $$`
+guard as the fix. Prisma's generated SQL has none of these guards: edit it after `--create-only`.
+
 ## No foreign keys, no new `@relation`
 
-A reference is a plain scalar column with an index. Joins happen in the owning repository by a second
+The W-01 guard (`new-foreign-key`, merged in 0dece53e) refuses a new `FOREIGN KEY` or `REFERENCES` clause in
+a migration and a new `@relation` in `schema.prisma`; existing ones stay. A reference is a plain scalar column with an index. Joins happen in the owning repository by a second
 query; a table another module owns is never joined (ask its `*Api`). Deleting dependents is a
 service's behaviour; children in another module go by a fact and that module's purge subscriber (§9.1).
 
@@ -141,14 +167,15 @@ runs at its own release against its own schema. Keep it small and copy, never mo
 ## When it failed on deploy
 
 A folder newer than the marker is re-runnable, so `upgrade` clears it itself: it marks the failed
-row rolled back (`prisma migrate resolve --rolled-back`), waits the retry backoff and applies it
-again, logging each by name ("failed on attempt 1 of 3 and is re-runnable: marked it rolled back").
-A failed row an earlier run left is cleared the same way at preflight. Still failing after the last
-attempt, the run exits `rerunnable_migration_failed`: fix the cause (often a lock another session
-holds) and run `upgrade` again; no resolve command is needed.
+row rolled back (`prisma migrate resolve --rolled-back`), waits the retry backoff (2 s, then 4 s) and
+applies it again, up to 3 attempts, logging each by name (`Prisma migration <name> failed on attempt 1
+of 3 and is re-runnable: marked it rolled back`). A failed row an earlier run left is cleared the same
+way at preflight. Still failing after the last attempt, the run exits 1 with code
+`rerunnable_migration_failed`: fix the cause (often a lock another session holds, `lock_timeout` 10 s)
+and run `upgrade` again; no resolve command is needed.
 
 A folder at or below the marker, or one the image does not ship, keeps the conservative path:
-`upgrade` names it with the command to clear it. Check what it left, then
+`upgrade` exits 1 with code `failed_prisma_migration` and names the command to clear it. Check what it left, then
 `prisma migrate resolve --rolled-back <name>` if nothing remains, or `--applied <name>` if you
 completed it by hand, then run `upgrade` again. Nothing has rolled; the old image still serves.
 specs/upgrade/rerunnable-migrations.feature.

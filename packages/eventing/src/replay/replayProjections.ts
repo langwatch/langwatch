@@ -1,7 +1,9 @@
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import { peerOwnerOf } from "../pipeline/peerOwner.ts";
 import type { SealedPipelineDefinition } from "../pipeline/sealedPipeline.ts";
 import type {
+  PeerLane,
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "../pipeline/staticBuilder.types.ts";
@@ -51,8 +53,75 @@ export function replayProjectionsOf(
     replayable.projections.push(...own.projections);
     replayable.mapProjections.push(...own.mapProjections);
     replayable.stateProjections.push(...own.stateProjections);
+    for (const peer of sealed.open((definition) => peerLanesOf(definition))) {
+      if (peer.kind === "fold") replayable.projections.push(replayPeerFold({ definitions, peer }));
+      else replayable.mapProjections.push(replayPeerMap({ definitions, peer }));
+    }
   }
   return replayable;
+}
+
+/**
+ * A peer lane (§9) rebuilt from its owner's events: it runs on the global registry, so its pause
+ * entry names the `global` pipeline, and it reads under the aggregate type of the one owner.
+ */
+function peerIdentity({
+  definitions,
+  lane,
+  eventTypes,
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  lane: string;
+  eventTypes: readonly string[];
+}) {
+  const owner = peerOwnerOf({ definitions, lane, eventTypes });
+  return {
+    pipelineName: "global",
+    aggregateType: owner.metadata.aggregateType,
+    source: "global" as const,
+    projectionName: lane,
+  };
+}
+
+function replayPeerFold({
+  definitions,
+  peer: { projection },
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  peer: Extract<PeerLane, { kind: "fold" }>;
+}): RegisteredFoldProjection {
+  const { name, eventTypes } = projection.definition;
+  return {
+    ...peerIdentity({ definitions, lane: name, eventTypes }),
+    ...replayFold(projection),
+    pauseKey: `global/projection/${name}`,
+    kind: "fold",
+  };
+}
+
+function replayPeerMap({
+  definitions,
+  peer: { projection },
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  peer: Extract<PeerLane, { kind: "map" }>;
+}): RegisteredMapProjection {
+  const { name, eventTypes, targetTable } = projection.definition;
+  return {
+    ...peerIdentity({ definitions, lane: name, eventTypes }),
+    ...projection.open((own) => sealMapProjection(own)),
+    pauseKey: `global/handler/${name}`,
+    kind: "map",
+    ...(targetTable === undefined ? {} : { targetTable }),
+  };
+}
+
+function peerLanesOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): PeerLane[] {
+  return (definition.globalProjections ?? []).flatMap(({ peer }) => (peer ? [peer] : []));
 }
 
 /**

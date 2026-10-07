@@ -13,11 +13,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { NavigationTeam } from "@langwatch/navigation-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { navigationApi } from "../../behavior/navigation-api.ts";
-import { type NavigationTeam, useNavigationHost } from "../../model/navigation-host.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
 import { isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";

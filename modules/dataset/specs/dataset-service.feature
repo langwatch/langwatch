@@ -71,7 +71,7 @@ Feature: Shared Dataset service
 
   @unit
   Scenario: The dataset transports move without changing who may call them
-    Given the dataset, dataset record and batch record tRPC surfaces
+    Given the dataset and dataset record tRPC surfaces
     When the process mounts them
     Then every procedure keeps the name its callers already use
     And every procedure keeps the access decision it declared before the move
@@ -192,3 +192,9 @@ Feature: Shared Dataset service
     When its size is checked
     Then it is refused as dataset_attachment_too_large
     And the refusal names the largest size accepted
+
+  @unit
+  Scenario: A dataset upsert names its dataset outright
+    Given a dataset upsert that names an experiment and no dataset name
+    When the input is validated
+    Then it is refused before the application is asked

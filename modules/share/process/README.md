@@ -6,7 +6,7 @@ The server half of [share](../README.md). Share links: creating, resolving and r
 
 ## Installation
 
-`defineProcessModule("share").withRepositories(shareRepositories).withApi(ShareModule).withTransports(shareTrpcTransport, pinnedTraceTrpcTransport)`, `src/share.module.ts:8`.
+`defineProcessModule("share").withRepositories(shareRepositories).withApi(ShareModule).withTransports(shareTrpcTransport, pinnedTraceTrpcTransport).withEventing(shareTraceSharingRevocationEventing)`, `src/share.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -122,7 +122,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: share declares no pipeline, process manager, subscriber or task.
+### Pipeline `share_trace_sharing_revocation` (aggregate `global`)
+
+Declared at `src/eventing/share-trace-sharing-revocation.pipeline.ts:33`.
+
+| Kind            | Name                               | Handles                                                                     | Declared at                                                  |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| peer subscriber | `shareProjectTraceSharingDisabled` | `lw.project.trace_sharing_disabled` from [project](../../project/README.md) | `src/eventing/share-trace-sharing-revocation.pipeline.ts:40` |
 
 ## Configuration
 

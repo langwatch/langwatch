@@ -604,7 +604,7 @@ function invalidateMonitorQueries({
   monitorId: string | undefined;
 }) {
   void utils.monitors.getAllForProject.invalidate({ projectId });
-  void utils.monitors.getPerformanceForProject.invalidate({ projectId, timeZone });
+  void utils.evaluations.getMonitorPerformanceForProject.invalidate({ projectId, timeZone });
   if (monitorId) void utils.monitors.getById.invalidate({ id: monitorId, projectId });
 }
 

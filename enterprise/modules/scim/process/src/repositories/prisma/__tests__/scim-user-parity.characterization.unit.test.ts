@@ -68,17 +68,8 @@ function harness(
     findById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
   } satisfies ScimUserProvisioning;
-  const governance = {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: "org-1",
-      name: "Engineering",
-      // A Department carries its timestamps; the stub used to omit them and a
-      // cast onto the whole service hid it.
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+  const costCenterFacts = {
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
   const writer = new GrantsFake();
   const service = ScimService.create({
@@ -86,7 +77,7 @@ function harness(
     prisma: repo,
     writer,
     users,
-    governance,
+    costCenterFacts,
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
@@ -96,7 +87,7 @@ function harness(
   if (options.membership !== void 0) {
     vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);
   }
-  return { repo, users, governance, writer, service };
+  return { repo, users, costCenterFacts, writer, service };
 }
 
 describe("SCIM user parity", () => {
@@ -574,42 +565,29 @@ describe("SCIM enterprise cost-center parity", () => {
     ...(costCenter === undefined ? {} : { [SCIM_ENTERPRISE_USER_SCHEMA]: { costCenter } }),
   });
 
-  it("assigns a named department on create", async () => {
-    const { governance, service } = harness({ currentUser: user() });
+  /** @scenario "A pushed cost center is recorded trimmed for governance to assign" */
+  it("records the named cost center on create, for governance to assign", async () => {
+    const { costCenterFacts, service } = harness({ currentUser: user() });
     await service.createUser({
       organizationId: "org-1",
-      request: request("Engineering"),
+      request: request("  Engineering "),
     });
-    expect(governance.departmentResolveByNameOrCreate).toHaveBeenCalledWith({
-      organizationId: "org-1",
-      name: "Engineering",
-    });
-    expect(governance.departmentAssignUser).toHaveBeenCalledWith({
+    expect(costCenterFacts.recordCostCenterChanged).toHaveBeenCalledWith({
       organizationId: "org-1",
       userId: "user-1",
-      departmentId: "department-1",
+      costCenter: "Engineering",
     });
   });
 
-  it("resolves an unrecognised department through Governance before assigning it", async () => {
-    const { governance, service } = harness({ currentUser: user() });
-    vi.mocked(governance.departmentResolveByNameOrCreate).mockResolvedValue({
-      id: "department-research",
-      organizationId: "org-1",
-      name: "Research",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    });
-    await service.createUser({ organizationId: "org-1", request: request("Research") });
-    expect(governance.departmentAssignUser).toHaveBeenCalledWith({
-      organizationId: "org-1",
-      userId: "user-1",
-      departmentId: "department-research",
-    });
+  /** @scenario "A push that names no cost center records nothing" */
+  it("records nothing when the request names no cost center", async () => {
+    const { costCenterFacts, service } = harness({ currentUser: user() });
+    await service.createUser({ organizationId: "org-1", request: request(undefined) });
+    expect(costCenterFacts.recordCostCenterChanged).not.toHaveBeenCalled();
   });
 
-  it("reassigns a member when a PATCH changes costCenter", async () => {
-    const { governance, service } = harness({ membership: { user: user() } });
+  it("records the new cost center when a PATCH changes costCenter", async () => {
+    const { costCenterFacts, service } = harness({ membership: { user: user() } });
     await service.updateUser({
       id: "user-1",
       organizationId: "org-1",
@@ -624,14 +602,16 @@ describe("SCIM enterprise cost-center parity", () => {
         ],
       },
     });
-    expect(governance.departmentResolveByNameOrCreate).toHaveBeenCalledWith({
+    expect(costCenterFacts.recordCostCenterChanged).toHaveBeenCalledWith({
       organizationId: "org-1",
-      name: "Marketing",
+      userId: "user-1",
+      costCenter: "Marketing",
     });
   });
 
-  it("clears a member's department when costCenter is removed", async () => {
-    const { governance, service } = harness({ membership: { user: user() } });
+  /** @scenario "A removed cost center is recorded as cleared" */
+  it("records a cleared cost center when costCenter is removed", async () => {
+    const { costCenterFacts, service } = harness({ membership: { user: user() } });
     await service.updateUser({
       id: "user-1",
       organizationId: "org-1",
@@ -640,10 +620,10 @@ describe("SCIM enterprise cost-center parity", () => {
         Operations: [{ op: "remove", path: `${SCIM_ENTERPRISE_USER_SCHEMA}:costCenter` }],
       },
     });
-    expect(governance.departmentAssignUser).toHaveBeenCalledWith({
+    expect(costCenterFacts.recordCostCenterChanged).toHaveBeenCalledWith({
       organizationId: "org-1",
       userId: "user-1",
-      departmentId: null,
+      costCenter: null,
     });
   });
 });

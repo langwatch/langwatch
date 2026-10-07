@@ -6,9 +6,9 @@ import {
 } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
-  ATTR_KEYS,
   type DerivedTraceEvent,
   type NormalizedAttributes,
   type NormalizedSpan,

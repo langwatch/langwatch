@@ -1,5 +1,5 @@
 import type { SessionImpersonation } from "@langwatch/auth-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { fromDate, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import type {
   AuthSessionRepository,
@@ -7,11 +7,39 @@ import type {
   SessionExpiry,
   StoredBrowserSession,
 } from "../auth-session.repository.ts";
-import type { MemoryAuthDatabase, MemoryStoredSession } from "./memory.auth.database.ts";
+import type { MemoryAuthDatabase, MemorySessionRow } from "./memory.auth.database.ts";
 
 const EPOCH: Instant = Temporal.Instant.fromEpochMilliseconds(0);
 
-/** The `Session` rows in memory, with the Prisma twin's delete semantics. */
+function instantOf(date: MemorySessionRow["createdAt"]): Instant {
+  return date === undefined ? EPOCH : fromDate(date);
+}
+
+function storedOf(row: MemorySessionRow): StoredBrowserSession {
+  return {
+    id: row.id,
+    userId: row.userId,
+    sessionToken: row.sessionToken,
+    impersonation:
+      row.actorUserId || row.subjectUserId || row.impersonationExpiresAt
+        ? {
+            actorUserId: row.actorUserId ?? null,
+            subjectUserId: row.subjectUserId ?? null,
+            reason: row.impersonationReason ?? null,
+            expiresAt: row.impersonationExpiresAt ? fromDate(row.impersonationExpiresAt) : null,
+          }
+        : null,
+    createdAt: instantOf(row.createdAt),
+    lastSeenAt: row.lastSeenAt === undefined ? null : fromDate(row.lastSeenAt),
+    updatedAt: instantOf(row.updatedAt),
+  };
+}
+
+/**
+ * The `Session` rows of the shared memory-adapter database, with the Prisma
+ * twin's delete semantics. Every method reads `db.Session` afresh, because a
+ * committed transaction or a delete replaces the array.
+ */
 export class MemoryAuthSessionRepository implements AuthSessionRepository {
   private constructor(private readonly memory: MemoryAuthDatabase) {}
 
@@ -20,8 +48,8 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
   }
 
   async countSignedInUsers({ at }: { at: number }): Promise<number> {
-    const signedIn = [...this.memory.sessions.values()].filter(
-      (session) => session.expires !== undefined && session.expires.epochMilliseconds >= at,
+    const signedIn = this.memory.db.Session.filter(
+      (session) => session.expires !== undefined && session.expires.getTime() >= at,
     );
     return new Set(signedIn.map((session) => session.userId)).size;
   }
@@ -34,28 +62,19 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     at: number;
   }): Promise<number> {
     const among = new Set(userIds);
-    const signedIn = [...this.memory.sessions.values()].filter(
+    const signedIn = this.memory.db.Session.filter(
       (session) =>
         among.has(session.userId) &&
         session.expires !== undefined &&
-        session.expires.epochMilliseconds >= at,
+        session.expires.getTime() >= at,
     );
     return new Set(signedIn.map((session) => session.userId)).size;
   }
 
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
-    const session = this.memory.sessions.get(id);
-    if (!session) return null;
+    const session = this.memory.db.Session.find((row) => row.id === id);
 
-    return {
-      id: session.id,
-      userId: session.userId,
-      sessionToken: session.sessionToken,
-      impersonation: session.impersonation,
-      createdAt: session.createdAt ?? EPOCH,
-      lastSeenAt: session.lastSeenAt ?? null,
-      updatedAt: session.updatedAt ?? EPOCH,
-    };
+    return session ? storedOf(session) : null;
   }
 
   async writeImpersonation({
@@ -65,24 +84,31 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     sessionId: string;
     claims: SessionImpersonation;
   }): Promise<void> {
-    const session = this.memory.sessions.get(sessionId);
-    if (!session) return;
-
-    this.memory.sessions.set(sessionId, { ...session, impersonation: { ...claims } });
+    this.replace({
+      sessionId,
+      change: {
+        actorUserId: claims.actorUserId,
+        subjectUserId: claims.subjectUserId,
+        impersonationReason: claims.reason,
+        impersonationExpiresAt: toDate(claims.expiresAt),
+      },
+    });
   }
 
   async clearImpersonation({ sessionId }: { sessionId: string }): Promise<void> {
-    const session = this.memory.sessions.get(sessionId);
-    if (!session) return;
-
-    this.memory.sessions.set(sessionId, { ...session, impersonation: null });
+    this.replace({
+      sessionId,
+      change: {
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      },
+    });
   }
 
   async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {
-    const session = this.memory.sessions.get(sessionId);
-    if (!session) return;
-
-    this.memory.sessions.set(sessionId, { ...session, lastSeenAt: at });
+    this.replace({ sessionId, change: { lastSeenAt: toDate(at) } });
   }
 
   async findStoredForUser({
@@ -90,39 +116,28 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
   }: {
     userId: string;
   }): Promise<readonly StoredBrowserSession[]> {
-    return [...this.memory.sessions.values()]
-      .filter((session) => session.userId === userId)
-      .map((session) => ({
-        id: session.id,
-        userId: session.userId,
-        sessionToken: session.sessionToken,
-        impersonation: session.impersonation,
-        createdAt: session.createdAt ?? EPOCH,
-        lastSeenAt: session.lastSeenAt ?? null,
-        updatedAt: session.updatedAt ?? EPOCH,
-      }));
+    return this.memory.db.Session.filter((session) => session.userId === userId).map(storedOf);
   }
 
   async findForUser({ userId }: { userId: string }): Promise<readonly BrowserSessionRecord[]> {
-    return [...this.memory.sessions.values()]
-      .filter((session) => session.userId === userId)
+    return this.memory.db.Session.filter((session) => session.userId === userId)
       .map((session) => ({
         id: session.id,
         identifierId: session.identifierId ?? null,
-        amr: session.amr ?? [],
+        amr: [...(session.amr ?? [])],
         ipAddress: session.ipAddress ?? null,
         userAgent: session.userAgent ?? null,
-        createdAt: session.createdAt ?? EPOCH,
-        updatedAt: session.updatedAt ?? EPOCH,
-        expires: session.expires ?? EPOCH,
+        createdAt: instantOf(session.createdAt),
+        updatedAt: instantOf(session.updatedAt),
+        expires: instantOf(session.expires),
       }))
       .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt));
   }
 
   async findTokensForUser({ userId }: { userId: string }): Promise<string[]> {
-    return [...this.memory.sessions.values()]
-      .filter((session) => session.userId === userId)
-      .map((session) => session.sessionToken);
+    return this.memory.db.Session.filter((session) => session.userId === userId).map(
+      (session) => session.sessionToken,
+    );
   }
 
   async deleteAllForUser({ userId }: { userId: string }): Promise<number> {
@@ -144,13 +159,13 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
   }
 
   async findExpiryByToken({ token }: { token: string }): Promise<SessionExpiry[]> {
-    return [...this.memory.sessions.values()]
-      .filter((session) => session.sessionToken === token)
-      .map((session) => ({ expires: session.expires ?? EPOCH, userId: session.userId }));
+    return this.memory.db.Session.filter((session) => session.sessionToken === token).map(
+      (session) => ({ expires: instantOf(session.expires), userId: session.userId }),
+    );
   }
 
   async findAmrForSession({ sessionId }: { sessionId: string }): Promise<string[]> {
-    return [...(this.memory.sessions.get(sessionId)?.amr ?? [])];
+    return [...(this.memory.db.Session.find((row) => row.id === sessionId)?.amr ?? [])];
   }
 
   async findAmrForIdentifiers({
@@ -162,25 +177,39 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     identifierIds: readonly string[];
     at: Instant;
   }): Promise<string[]> {
-    const asserted = [...this.memory.sessions.values()].filter(
+    const asserted = this.memory.db.Session.filter(
       (session) =>
         userIds.includes(session.userId) &&
         session.identifierId !== undefined &&
         session.identifierId !== null &&
         identifierIds.includes(session.identifierId) &&
         session.expires !== undefined &&
-        Temporal.Instant.compare(session.expires, at) > 0,
+        session.expires.getTime() > at.epochMilliseconds,
     );
 
     return [...new Set(asserted.flatMap((session) => session.amr ?? []))];
   }
 
+  /** Copy-on-write, so a row a caller already read never changes under it. */
+  private replace({
+    sessionId,
+    change,
+  }: {
+    sessionId: string;
+    change: Partial<MemorySessionRow>;
+  }): void {
+    this.memory.db.Session = this.memory.db.Session.map((row) =>
+      row.id === sessionId ? { ...row, ...change } : row,
+    );
+  }
+
   /** Deleting an absent row counts zero rather than raising, as `deleteMany` does. */
-  private remove(matches: (session: MemoryStoredSession) => boolean): number {
-    const doomed = [...this.memory.sessions.values()].filter(matches);
+  private remove(matches: (session: MemorySessionRow) => boolean): number {
+    const before = this.memory.db.Session;
+    const kept = before.filter((session) => !matches(session));
 
-    for (const session of doomed) this.memory.sessions.delete(session.id);
+    this.memory.db.Session = kept;
 
-    return doomed.length;
+    return before.length - kept.length;
   }
 }

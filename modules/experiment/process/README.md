@@ -6,13 +6,13 @@ The server half of [experiment](../README.md). Experiments: saved definitions, t
 
 ## Installation
 
-`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:25`.
+`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ExperimentApi`)
 
-Peers call these through the token, declared at `../contract/src/experiment.api.ts:141`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/experiment.api.ts:145`; nothing else in this package is public.
 
 #### `getById`
 
@@ -48,6 +48,22 @@ findBySlug(input: ExperimentSlugLookup): Promise<Experiment | null>;
 
 ```typescript
 findBySlugAndType(input: ExperimentSlugLookup & { type: ExperimentType }): Promise<Experiment | null>;
+```
+
+#### `summariseBatchEvaluations`
+
+One row per experiment and dataset: how many batch evaluations ran, cost, mean score.
+
+```typescript
+summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
+```
+
+#### `listBatchEvaluations`
+
+Every batch-evaluation record of the experiment the slug names.
+
+```typescript
+listBatchEvaluations(input: { projectId: string; experimentSlug: string; }): Promise<BatchEvaluationRecord[]>;
 ```
 
 #### `list`
@@ -174,6 +190,22 @@ recordEvaluatorResult(input: RecordEvaluatorResultInput): Promise<void>;
 
 ```typescript
 completeExperimentRun(input: CompleteExperimentRunInput): Promise<void>;
+```
+
+#### `assertBatchLogWithinLimit`
+
+Refuses an SDK batch body larger than the project's organization accepts in one request.
+
+```typescript
+assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
+```
+
+#### `logBatchEvaluation`
+
+Records one SDK batch evaluation: its run, its rows and its verdicts.
+
+```typescript
+logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
 ```
 
 #### `computeRunMetrics`
@@ -431,6 +463,28 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<E
 ```
 
 ## REST transport
+
+### `experimentBatchLogRest`
+
+|             |                                                 |
+| ----------- | ----------------------------------------------- |
+| Declared at | `src/transport/experiment-batch-log.rest.ts:85` |
+| Base URL    | none: each route's path is its address          |
+| Addressing  | literal                                         |
+| Credential  | project                                         |
+
+#### `POST /api/evaluations/batch/log_results` · `postApiEvaluationsBatchLogResults`
+
+Report batch evaluation results
+
+Permission `evaluations:manage`. Declared at `src/transport/experiment-batch-log.rest.ts:91`.
+
+Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_results`.
+
+```typescript
+// Rawbody: "text" (inline, src/transport/experiment-batch-log.rest.ts:92)
+// Response: "protocol" (inline, src/transport/experiment-batch-log.rest.ts:95)
+```
 
 ### `experimentDspyStepsRest`
 
@@ -812,6 +866,15 @@ type Response = z.infer<typeof createExperimentResponseSchema>; // ../contract/s
 ```
 
 ## tRPC transport
+
+### `batchRecord`
+
+Contract `../contract/src/batch-record.trpc.ts:20`, router `src/transport/batch-record.trpc.ts:11`.
+
+| Procedure                               | Kind  | Gate                        | Input                                     | Output |
+| --------------------------------------- | ----- | --------------------------- | ----------------------------------------- | ------ |
+| `batchRecord.getAllByexperimentIdGroup` | query | Permission `workflows:view` | `datasetApiProjectInputSchema`            | inline |
+| `batchRecord.getAllByexperimentSlug`    | query | Permission `workflows:view` | `batchRecordApiExperimentSlugInputSchema` | inline |
 
 ### `experiments`
 

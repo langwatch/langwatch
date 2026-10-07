@@ -107,6 +107,7 @@ function noticeOver() {
         departments.push(payload);
       },
     },
+    recordProjectTraceSharingDisabled: { send: async () => undefined },
   });
   return { notice, sent, presence, departments, logger };
 }
@@ -126,6 +127,7 @@ describe("ProjectCreatedNoticeService", () => {
       recordProjectMoved: { send: async () => undefined },
       recordProjectArchived: { send: async () => undefined },
       recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectTraceSharingDisabled: { send: async () => undefined },
     });
 
     await notice.created({

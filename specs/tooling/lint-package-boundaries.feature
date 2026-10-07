@@ -7,7 +7,7 @@ Feature: The package-boundaries lint rule
 
   Background:
     Given a workspace whose agent and project modules each have a contract, process and browser package
-    And an enterprise governance module with a contract and a process package
+    And an enterprise governance module with a contract, process, browser and client package
 
   @unit
   Scenario: A browser package importing another module's browser package is reported as crossModuleBrowser
@@ -95,6 +95,20 @@ Feature: The package-boundaries lint rule
     Given a core module's service that imports an enterprise module's peer Api from its contract
     When the package-boundaries rule runs over it
     Then it does not report coreImportsEnterprise
+
+  @unit
+  Scenario: A core browser may read an enterprise module's client, and no other enterprise package
+    Given a core module's browser package
+    When it imports an enterprise module's client package
+    Then the package-boundaries rule reports nothing
+    And an import of that module's browser or process package still reports coreImportsEnterprise
+    And an import of that module's contract is still let through
+
+  @unit
+  Scenario: Core code other than a browser reading an enterprise client is still reported
+    Given a core module's service that imports an enterprise module's client package
+    When the package-boundaries rule runs over it
+    Then it reports clientConsumer and coreImportsEnterprise
 
   @unit
   Scenario: An undeclared export subpath is reported as sealedExports

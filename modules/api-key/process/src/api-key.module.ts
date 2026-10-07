@@ -9,6 +9,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { ApiKeyModule } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
+import { apiKeyProjectsRest } from "./transport/api-key-projects.rest.ts";
 import {
   apiKeyIngestionCaller,
   apiKeyRest,
@@ -24,7 +25,7 @@ import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
 export const apiKeyProcessModule = defineProcessModule("api-key")
   .withRepositories(apiKeyRepositories)
   .withApi(ApiKeyModule)
-  .withTransports(apiKeyRest, apiKeyTrpcTransport)
+  .withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyTrpcTransport)
   // The credential itself, not just its holder: two of these routes ask whether
   // the KEY may act organization-wide as well as whether the member may, so a
   // narrowed key cannot borrow the reach of whoever created it.

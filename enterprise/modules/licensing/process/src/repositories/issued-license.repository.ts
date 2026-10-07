@@ -71,6 +71,8 @@ export interface IssuedLicenseRepository {
     search?: string;
   }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
   update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord>;
+  /** Removes a row a failed flow wrote; a row already gone is not an error. */
+  delete(id: string): Promise<void>;
   /**
    * Binds the license to an install only while it has none, and answers whether
    * this call was the one that bound it.
