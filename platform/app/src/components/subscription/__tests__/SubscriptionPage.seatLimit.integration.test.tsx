@@ -170,10 +170,11 @@ const givenMembers = (
   });
 };
 
-const givenSeatLimitExceeded = (message: string) => {
+const givenSeatLimitExceeded = (message: string, membersCount?: number) => {
   mockGetUsage.mockReturnValue({
-    data: { seatLimitInfo: { status: "exceeded", message } },
+    data: { seatLimitInfo: { status: "exceeded", message }, membersCount },
     isLoading: false,
+    refetch: vi.fn(),
   });
 };
 
@@ -357,6 +358,84 @@ describe("<SubscriptionPage/> seat limit", () => {
         );
       });
       expect(screen.getByText("Upgrade required")).toBeInTheDocument();
+    });
+  });
+
+  describe("when an Enterprise organization uses more seats than it bought", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "subscription",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 2,
+          maxMembersLite: 9999,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      givenMembers([{ id: "user-3", role: "MEMBER" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+      );
+    });
+
+    it("offers to contact sales instead of an upgrade", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("seat-limit-callout")).toHaveTextContent(
+          "Contact sales to add seats.",
+        );
+      });
+      expect(
+        screen.getByRole("link", { name: "Contact sales" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Upgrade required")).toBeNull();
+      expect(screen.queryByTestId("upgrade-plan-block")).toBeNull();
+    });
+  });
+
+  describe("when the server counts a seat the page cannot classify", () => {
+    beforeEach(() => {
+      // An EXTERNAL member with a custom role that can write holds a full
+      // seat; only the server sees the custom role's permissions.
+      givenMembers([{ id: "editor-1", role: "EXTERNAL" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+        3,
+      );
+    });
+
+    it("shows the server's seat count", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/2");
+      });
+    });
+
+    it("checks out for at least the seats the server counts", async () => {
+      const user = userEvent.setup();
+      const mutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      await user.click(
+        await screen.findByRole("button", { name: /Upgrade now/i }),
+      );
+
+      await waitFor(() => {
+        expect(mutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ membersToAdd: 3 }),
+        );
+      });
     });
   });
 });

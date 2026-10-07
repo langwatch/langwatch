@@ -151,8 +151,10 @@ export type MockSeatLimitInfo = {
 export const mockGetUsage = vi.fn(() => ({
   data: {
     seatLimitInfo: { status: "ok", message: "" } as MockSeatLimitInfo,
+    membersCount: undefined as number | undefined,
   },
   isLoading: false,
+  refetch: vi.fn(),
 }));
 
 export const mockDetectCurrency = vi.fn(() => ({
@@ -206,8 +208,12 @@ export function resetMocks() {
     isLoading: false,
   });
   mockGetUsage.mockReturnValue({
-    data: { seatLimitInfo: { status: "ok", message: "" } },
+    data: {
+      seatLimitInfo: { status: "ok", message: "" },
+      membersCount: undefined,
+    },
     isLoading: false,
+    refetch: vi.fn(),
   });
   mockDetectCurrency.mockReturnValue({
     data: { currency: "EUR" },

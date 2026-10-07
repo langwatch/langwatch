@@ -203,7 +203,13 @@ export function SubscriptionPage() {
 
   const existingCoreMembers = countFullMembers(users);
   const plannedCoreSeatCount = countFullMembers(allPlannedUsers);
-  const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
+  // Members and open invites as enforcement counts them (custom roles
+  // included) when the server has answered, plus rows planned in the drawer.
+  const serverMembersCount = usage.data?.membersCount;
+  const seatUsageN =
+    serverMembersCount !== undefined
+      ? serverMembersCount + countFullMembers(plannedUsers)
+      : existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
   // Above the plan's seats, the organization is offered the upgrade (or more
@@ -235,6 +241,7 @@ export function SubscriptionPage() {
     isDeveloperPlan || isLicenseOverride
       ? Math.max(
           totalFullMembers,
+          seatUsageN,
           (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount,
         )
       : Math.max(
@@ -288,6 +295,7 @@ export function SubscriptionPage() {
               type: "success",
             });
             void pendingInvites.refetch();
+            void usage.refetch();
             void organizationWithMembers.refetch();
           },
           onError: (error) =>
@@ -331,6 +339,7 @@ export function SubscriptionPage() {
       setDeletedSeatCount(0);
       void activePlan.refetch();
       void pendingInvites.refetch();
+      void usage.refetch();
     },
     organizationWithMembers,
     activePlanType: plan?.type,
