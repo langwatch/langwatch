@@ -246,12 +246,12 @@ describe("TraceListClickHouseRepository through the proof", () => {
         });
         expect(count).toBe(4);
 
-        const traceIds = await repo.findTraceIds({
+        const traceRefs = await repo.findTraceRefs({
           authorization,
           timeRange: WINDOW,
           limit: 100,
         });
-        expect(traceIds.sort()).toEqual([
+        expect(traceRefs.map((ref) => ref.traceId).sort()).toEqual([
           "a-1",
           "a-yesterday",
           "agg-1",
@@ -340,6 +340,38 @@ describe("TraceListClickHouseRepository through the proof", () => {
           `${TWIN_B}:${TWIN_TRACE_ID}`,
         ]);
         expect(page.totalHits).toBe(4);
+      });
+    });
+
+    describe("when a filter's trace selection is read", () => {
+      it("names each trace by its tenant, once, even when two versions tie", async () => {
+        const tieA = `proof-tie-a-${nanoid()}`;
+        const tieB = `proof-tie-b-${nanoid()}`;
+        const tied = summaryRow({ tenantId: tieA, traceId: "tie", occurredAt: TODAY });
+        // Two inserts, so the tied versions land in two parts no merge has
+        // folded yet.
+        await insert([
+          tied,
+          summaryRow({ tenantId: tieB, traceId: "tie", occurredAt: TODAY }),
+        ]);
+        await insert([{ ...tied, ProjectionId: `proj-${nanoid()}` }]);
+
+        const refs = await repo.findTraceRefs({
+          authorization: aggregateProof({
+            projectId: TWIN_AGGREGATE,
+            members: [
+              { projectId: tieA, from: 0 },
+              { projectId: tieB, from: 0 },
+            ],
+            now: NOW,
+          }),
+          timeRange: WINDOW,
+          limit: 10,
+        });
+
+        expect(refs.map(rowKey).sort()).toEqual(
+          [`${tieA}:tie`, `${tieB}:tie`].sort(),
+        );
       });
     });
   });

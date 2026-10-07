@@ -36,6 +36,9 @@ export interface TraceListCursor {
 /** A listed trace with the tenant it was read from, which names it on an aggregate. */
 export type TraceListRow = TraceSummaryData & { tenantId: string };
 
+/** One trace, named by the tenant that holds it and its id. */
+export type TraceRef = { tenantId: string; traceId: string };
+
 export interface TraceListQuery {
   /** The proof the read is fenced by; the reader applies its tenant set. */
   authorization: Authorization;
@@ -133,16 +136,19 @@ export interface TraceListRepository {
   }): Promise<number>;
 
   /**
-   * The ids of the traces a filter selects in the window, newest first, at
-   * most `limit` of them. What an Instant Eval run judges when its filter
-   * names a field only this repository's compiler can answer.
+   * The traces a filter selects in the window, newest first, at most
+   * `limit` of them, each named by its tenant and trace id together: on an
+   * aggregate two members may hold the same id (ADR-144 v4.1), and the id
+   * alone would not say which trace was meant. What an Instant Eval run
+   * judges when its filter names a field only this repository's compiler
+   * can answer.
    */
-  findTraceIds(params: {
+  findTraceRefs(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
-  }): Promise<string[]>;
+  }): Promise<TraceRef[]>;
 
   findDistinctValues(params: {
     authorization: Authorization;
@@ -265,7 +271,7 @@ export class NullTraceListRepository implements TraceListRepository {
   async findCount(): Promise<number> {
     return 0;
   }
-  async findTraceIds(): Promise<string[]> {
+  async findTraceRefs(): Promise<TraceRef[]> {
     return [];
   }
   async findDistinctValues(): Promise<string[]> {

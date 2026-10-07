@@ -19,6 +19,7 @@ import type {
   TraceListQuery,
   TraceListRepository,
   TraceListRow,
+  TraceRef,
 } from "./trace-list.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -470,12 +471,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return Number(rows[0]?.cnt ?? 0);
   }
 
-  async findTraceIds(params: {
+  async findTraceRefs(params: {
     authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
-  }): Promise<string[]> {
+  }): Promise<TraceRef[]> {
     const {
       sql: whereClause,
       baseSql: baseWhereClause,
@@ -488,9 +489,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const client = this.clickhouse.as(params.authorization, {
       reads: "traces",
     });
+    // Two unmerged versions can tie on max(UpdatedAt), so the dedup tuple
+    // can pass a trace twice; LIMIT 1 BY keeps one per trace. It reads only
+    // the two key columns, so none of the heavy-column cost LIMIT BY carries
+    // on a wide select applies here.
     const result = await client.query({
       query: `
-        SELECT TraceId
+        SELECT TenantId, TraceId
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
           AND (TenantId, TraceId, UpdatedAt) IN (
@@ -499,13 +504,16 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             WHERE ${baseWhereClause}
             GROUP BY TenantId, TraceId
           )
-        ORDER BY OccurredAt DESC, TraceId
+        ORDER BY OccurredAt DESC, TenantId, TraceId
+        LIMIT 1 BY TenantId, TraceId
         LIMIT {limit:UInt32}
       `,
       query_params: { ...queryParams, limit: params.limit },
       format: "JSONEachRow",
     });
-    return (await result.json<{ TraceId: string }>()).map((row) => row.TraceId);
+    return (await result.json<{ TenantId: string; TraceId: string }>()).map(
+      (row) => ({ tenantId: row.TenantId, traceId: row.TraceId }),
+    );
   }
 
   async findDistinctValues(params: {

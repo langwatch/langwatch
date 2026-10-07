@@ -176,13 +176,15 @@ async function selectExplorerTraceIds({
     permission: "traces:view",
     purpose: { kind: "operator", entry: "InstantEvalRunService.accept" },
   });
-  return await app.traces.list.getTraceIds({
+  const refs = await app.traces.list.getTraceRefs({
     authorization,
     timeRange: window,
     filterWhere: translateFilterToClickHouse(filter, window) ?? undefined,
     hiddenOrigins: explorerHiddenOrigins(filter),
     limit,
   });
+  // The proof is the run's own project alone, so each id names one trace.
+  return [...new Set(refs.map((ref) => ref.traceId))];
 }
 
 /**

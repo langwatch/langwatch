@@ -44,6 +44,7 @@ import type {
   TraceListRow,
   TraceListSort,
   TraceListSortColumn,
+  TraceRef,
 } from "./repositories/trace-list.repository";
 import { scopeTraceFilterToTable } from "./trace-filter-scope";
 import { teaserOf } from "./visibility-window.service";
@@ -713,12 +714,12 @@ export class TraceListService {
   }
 
   /**
-   * The trace ids a filter selects, newest first, capped. What an Instant
-   * Eval run started from the Explorer judges when its filter names a field
-   * the shorthand dialect cannot answer.
+   * The traces a filter selects, newest first, capped, each named by its
+   * tenant and trace id. What an Instant Eval run started from the Explorer
+   * judges when its filter names a field the shorthand dialect cannot answer.
    */
-  async getTraceIds(params: TraceIdsParams): Promise<string[]> {
-    return this.repository.findTraceIds({
+  async getTraceRefs(params: TraceIdsParams): Promise<TraceRef[]> {
+    return this.repository.findTraceRefs({
       authorization: params.authorization,
       timeRange: params.timeRange,
       filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
