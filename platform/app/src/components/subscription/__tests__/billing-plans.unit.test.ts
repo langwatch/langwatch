@@ -2,7 +2,8 @@
  * Unit tests for currency-aware pricing strings in billing-plans.
  *
  * Verifies that getGrowthFeatures() and getGrowthPlanFeatures() produce
- * the correct per-100K events pricing line for each supported currency.
+ * the correct per-100K events and per-GB retention pricing lines for each
+ * supported currency.
  */
 
 import { describe, expect, it } from "vitest";
@@ -40,6 +41,12 @@ describe("getGrowthPlanFeatures()", () => {
 
       expect(features).toContain("\u20AC5 per additional 100,000 events");
     });
+
+    it("contains the EUR retention pricing string", () => {
+      const features = getGrowthPlanFeatures(Currency.EUR);
+
+      expect(features).toContain("30 days retention (+ custom at \u20AC3/GB)");
+    });
   });
 
   describe("when currency is USD", () => {
@@ -47,6 +54,12 @@ describe("getGrowthPlanFeatures()", () => {
       const features = getGrowthPlanFeatures(Currency.USD);
 
       expect(features).toContain("$6 per additional 100,000 events");
+    });
+
+    it("contains the USD retention pricing string", () => {
+      const features = getGrowthPlanFeatures(Currency.USD);
+
+      expect(features).toContain("30 days retention (+ custom at $4/GB)");
     });
   });
 });
