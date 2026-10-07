@@ -253,9 +253,9 @@ describe("Feature: an aggregate read applies the strictest member policy", () =>
       it("hides the attribute", async () => {
         const protections = await protectionsOf(restricter.id);
 
-        expect(protections.hiddenAttributes?.map((rule) => rule.pattern)).toEqual(
-          ["secret.key"],
-        );
+        expect(
+          protections.hiddenAttributes?.map((rule) => rule.pattern),
+        ).toEqual(["secret.key"]);
       });
     });
 
@@ -264,9 +264,9 @@ describe("Feature: an aggregate read applies the strictest member policy", () =>
       it("still hides the attribute the restricting member stored", async () => {
         const protections = await protectionsOf(attributeAggregate.id);
 
-        expect(protections.hiddenAttributes?.map((rule) => rule.pattern)).toEqual(
-          ["secret.key"],
-        );
+        expect(
+          protections.hiddenAttributes?.map((rule) => rule.pattern),
+        ).toEqual(["secret.key"]);
       });
     });
   });

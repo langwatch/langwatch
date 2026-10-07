@@ -9,11 +9,11 @@ import {
   type ResolvedDataPrivacy,
 } from "./dataPrivacy.types";
 import { DataPrivacyPolicyCache } from "./dataPrivacyPolicy.cache";
-import type { PrivacyPolicyRequestMemo } from "./privacyPolicyRequestMemo";
 import {
   DataPrivacyPolicyRepository,
   type DataPrivacyScope,
 } from "./dataPrivacyPolicy.repository";
+import type { PrivacyPolicyRequestMemo } from "./privacyPolicyRequestMemo";
 import { strictestDataPrivacy } from "./strictestDataPrivacy";
 
 export class ScopeTargetNotFoundError extends Error {

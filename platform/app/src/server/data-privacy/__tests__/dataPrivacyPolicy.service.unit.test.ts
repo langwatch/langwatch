@@ -61,8 +61,14 @@ describe("DataPrivacyPolicyService.getResolvedForProjects", () => {
         const { cache, service } = serviceWith(async () => null);
         const memo = newPrivacyPolicyRequestMemo();
 
-        await service.getResolvedForProjects({ projectIds: ["p1", "p2"], memo });
-        await service.getResolvedForProjects({ projectIds: ["p1", "p3"], memo });
+        await service.getResolvedForProjects({
+          projectIds: ["p1", "p2"],
+          memo,
+        });
+        await service.getResolvedForProjects({
+          projectIds: ["p1", "p3"],
+          memo,
+        });
 
         expect(cache.resolve.mock.calls.map(([id]) => id)).toEqual([
           "p1",

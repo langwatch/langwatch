@@ -800,9 +800,10 @@ describe("ADR-144: a write under an aggregate is refused at the door", () => {
       Object.assign(params.ctx, {
         app: {
           permissions: {
-            getProjectAnyDecision: vi
-              .fn()
-              .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+            getProjectAnyDecision: vi.fn().mockResolvedValue({
+              permitted: true,
+              organizationRole: "ADMIN",
+            }),
           },
         },
         projectKinds: {

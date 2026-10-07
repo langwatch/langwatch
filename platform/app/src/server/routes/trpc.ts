@@ -18,8 +18,8 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { newPrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import { getServerAuthSession } from "~/server/auth";
+import { newPrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import type { NextApiRequest } from "~/types/next-stubs";
 
 type NodeServerEnv = {

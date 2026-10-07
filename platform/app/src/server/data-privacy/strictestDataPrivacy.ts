@@ -1,9 +1,9 @@
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,
-  EMPTY_AUDIENCE,
   type CustomAttributeDisposition,
   type Disposition,
+  EMPTY_AUDIENCE,
   type PiiLevel,
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedAudience,

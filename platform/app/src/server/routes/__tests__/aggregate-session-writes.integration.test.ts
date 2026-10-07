@@ -11,14 +11,22 @@
  *
  * Spec: specs/governance/aggregate-project.feature
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { Project } from "~/generated/prisma/client";
-import { prisma } from "~/server/db";
-import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import {
   type AggregateFixture,
   seedAggregateOrganization,
 } from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
+import { prisma } from "~/server/db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
 

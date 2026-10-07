@@ -153,7 +153,10 @@ describe("DataPrivacyPolicyCache", () => {
       cacheGet.mockResolvedValue(undefined);
       const cache = buildCache();
 
-      await Promise.all([cache.resolve("project_1"), cache.resolve("project_2")]);
+      await Promise.all([
+        cache.resolve("project_1"),
+        cache.resolve("project_2"),
+      ]);
 
       expect(repository.getProjectScopeFacts).toHaveBeenCalledTimes(2);
     });

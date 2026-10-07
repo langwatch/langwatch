@@ -125,8 +125,7 @@ describe("the aggregate write guard's exemptions", () => {
       const letThrough = mutations
         .filter(
           ({ path, permission }) =>
-            !writesUnderProject(permission) &&
-            acceptsProjectId(inputsOf(path)),
+            !writesUnderProject(permission) && acceptsProjectId(inputsOf(path)),
         )
         .map(({ path }) => path)
         .sort();
