@@ -67,11 +67,6 @@ function acceptsProjectId(inputs: unknown[]): boolean {
   return inputs.some((input) => carries(input, 0));
 }
 
-const isWriteAction = (permission: AuthzPermission) => {
-  const action = permission.split(":")[1];
-  return action !== "view" && action !== "viewOtherPersonal";
-};
-
 describe("the aggregate write guard's exemptions", () => {
   const mutations = declaredMutations();
   const permissionOf = (path: string) =>
@@ -113,69 +108,101 @@ describe("the aggregate write guard's exemptions", () => {
     });
   });
 
-  describe("when every write mutation is listed", () => {
-    it("exempts exactly the permissions of the organisation, project and team resources", () => {
-      const exempt = [
+  describe("when every mutation is listed", () => {
+    it("lets through exactly these permissions", () => {
+      const letThrough = [
         ...new Set(
           mutations
-            .filter(
-              ({ permission }) =>
-                isWriteAction(permission) && !writesUnderProject(permission),
-            )
+            .filter(({ permission }) => !writesUnderProject(permission))
             .map(({ permission }) => permission),
         ),
       ].sort();
 
-      expect(exempt).toEqual(EXEMPT_PERMISSIONS);
+      expect(letThrough).toEqual(LET_THROUGH_PERMISSIONS);
     });
 
     it("lets through exactly these mutations that name a project", () => {
-      const exempt = mutations
+      const letThrough = mutations
         .filter(
           ({ path, permission }) =>
-            isWriteAction(permission) &&
             !writesUnderProject(permission) &&
             acceptsProjectId(inputsOf(path)),
         )
         .map(({ path }) => path)
         .sort();
 
-      expect(exempt).toEqual(EXEMPT_MUTATIONS_NAMING_A_PROJECT);
+      expect(letThrough).toEqual(LET_THROUGH_MUTATIONS_NAMING_A_PROJECT);
     });
   });
 });
 
 /**
- * The mutations the exemption lets through on an aggregate, among those whose
- * input names a project. They are declared under the organisation or project
- * resource, so they stay open: the project's name, rule, key and archive, and
- * the settings-shaped writes that ride the same permission (retention, topic
+ * Every mutation the guard lets through on an aggregate, among those whose
+ * input names a project, written out by hand rather than derived. Two kinds
+ * are here. Those declared under the organisation, project or team resource
+ * stay open by design: the project's name, rule, key and archive, and the
+ * settings-shaped writes that ride the same permission (retention, topic
  * clustering, model providers, pinned traces, share revocation, instant
- * evaluations). Narrowing any of these is a decision for the ADR, not a quiet
- * edit here.
+ * evaluations). Those declared under a view permission are reads shaped as
+ * mutations, plus a few writes the ADR lists as not reached (saved views,
+ * the Slack integration). Narrowing any of these is a decision for the ADR,
+ * not a quiet edit here.
  */
-const EXEMPT_MUTATIONS_NAMING_A_PROJECT: string[] = [
+const LET_THROUGH_MUTATIONS_NAMING_A_PROJECT: string[] = [
+  "analytics.lwql.query",
+  "analytics.savedWorkbenchCharts.run",
   "dataRetention.killMutation",
   "dataRetention.triggerRetroactiveUpdate",
+  "datasetRecord.download",
+  "evaluations.warmupLambda",
+  "langy.claimUiAction",
+  "langy.completeUiAction",
   "modelProvider.codexApplyCodingDefaults",
   "modelProvider.codexSignInPoll",
   "modelProvider.codexSignInStart",
+  "monitors.isNameAvailable",
+  "optimization.chat",
   "pinnedTrace.pin",
   "pinnedTrace.unpin",
+  "presence.cursor",
+  "presence.leave",
+  "presence.update",
   "project.archiveById",
   "project.regenerateApiKey",
   "project.triggerTopicClustering",
   "project.update",
   "project.updateAggregateRule",
+  "savedViews.create",
+  "savedViews.delete",
+  "savedViews.rename",
+  "savedViews.reorder",
   "share.revokeAllTraceShares",
+  "slackIntegration.create",
+  "slackIntegration.delete",
+  "slackIntegration.update",
+  "traces.getAllForDownload",
+  "tracesV2.aiAction",
+  "tracesV2.aiQuery",
   "tracesV2.instantEval.enable",
+  "tracesV2.routeSearch",
+  "translate.translate",
 ];
 
-/** The write permissions the guard lets through, as the router declares them. */
-const EXEMPT_PERMISSIONS: AuthzPermission[] = [
+/** The permissions the guard lets through, as the router declares them. */
+const LET_THROUGH_PERMISSIONS: AuthzPermission[] = [
+  "analytics:view",
+  "datasets:view",
+  "evaluations:view",
+  "governance:view",
+  "langy:view",
   "organization:manage",
+  "organization:view",
   "project:delete",
   "project:manage",
   "project:update",
+  "project:view",
   "team:manage",
+  "traces:view",
+  "virtualKeys:view",
+  "workflows:view",
 ];

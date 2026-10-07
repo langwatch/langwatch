@@ -1,4 +1,9 @@
-import type { AUTHZ_RESOURCES, AuthzPermission } from "@langwatch/authz";
+import {
+  type AUTHZ_RESOURCES,
+  type AuthzPermission,
+  permissionResource,
+} from "@langwatch/authz";
+import { isViewOnlyPermission } from "~/server/license-enforcement/member-classification";
 import { AggregateProjectIsReadOnlyError } from "./errors";
 import { isAggregateProjectKind } from "./project-kinds";
 
@@ -15,13 +20,20 @@ export const AGGREGATE_WRITE_EXEMPT_RESOURCES = [
   "team",
 ] as const satisfies readonly (keyof typeof AUTHZ_RESOURCES)[];
 
-/** The actions that only read. Every other action writes. */
-const READ_ACTIONS: ReadonlySet<string> = new Set([
-  "view",
-  "viewOtherPersonal",
-]);
-
 const EXEMPT: ReadonlySet<string> = new Set(AGGREGATE_WRITE_EXEMPT_RESOURCES);
+
+/**
+ * Whether a permission only reads. A view, as the seat classifier counts it,
+ * plus `viewOtherPersonal`: it reads other members' personal resources, which
+ * the seat classifier counts as more than a view because it widens whose data
+ * a seat sees, but it writes nothing under any tenant.
+ */
+function onlyReads(permission: AuthzPermission): boolean {
+  return (
+    isViewOnlyPermission(permission) ||
+    permission === `${permissionResource(permission)}:viewOtherPersonal`
+  );
+}
 
 /**
  * Whether a mutation declared under this permission writes data under the
@@ -29,8 +41,7 @@ const EXEMPT: ReadonlySet<string> = new Set(AGGREGATE_WRITE_EXEMPT_RESOURCES);
  * decision 8).
  */
 export function writesUnderProject(permission: AuthzPermission): boolean {
-  const [resource = "", action = ""] = permission.split(":");
-  return !READ_ACTIONS.has(action) && !EXEMPT.has(resource);
+  return !onlyReads(permission) && !EXEMPT.has(permissionResource(permission));
 }
 
 /**
