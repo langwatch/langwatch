@@ -25,7 +25,7 @@ design `dev/docs/plans/migrations-rethink-2026-10-06.md`, cited "plan 6.x".
 Default to background. `defineMigrationStep` refuses `blocking` on any kind but `data`
 (`blocking_not_data`). Set `needsOldWritersGone: true` when an old image still serving would undo
 or miss the work (a backfill the old build overwrites, a dual write it skips): the worker then waits
-until presence says every live api and worker declares this step (ADR-173 §3).
+until the serving roster says every live api and worker declares this step (ADR-173 §3).
 
 ## 2. Declare it
 

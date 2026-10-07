@@ -2,7 +2,7 @@
   "name": "@langwatch/upgrade",
   "version": "0.1.0",
   "private": true,
-  "description": "The upgrade runner's own ledger: the runner-owned _langwatch_upgrade_run and _langwatch_upgrade_step tables beside _prisma_migrations and goose_db_version, and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
+  "description": "The upgrade runner's own ledger: the runner-owned ledger tables in their own Postgres schema (<schema>_upgrade_ledger), and their first seeding from those two records. Storage-engine-free: the caller hands in the Postgres and ClickHouse connections.",
   "files": [
     "src",
     "releases"

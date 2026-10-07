@@ -11,16 +11,16 @@
 ## Status
 
 The contract is fixed now; the pieces it names land in slices. All five have landed:
-the chart's pre-roll Job runs `upgrade`, and every admitted api and worker writes presence
+the chart's pre-roll Job runs `upgrade`, and every admitted api and worker writes its roster entry
 (15 s refresh, 60 s stale).
 
-| Piece                                         | Lands with                                             |
-| --------------------------------------------- | ------------------------------------------------------ |
-| `pnpm task upgrade` (the one command)         | `mig-s3-runner`                                        |
-| The chart Job running `upgrade`               | `mig-entry-points`                                     |
-| New pods refusing until current, and presence | `mig-serving-gate`                                     |
-| The presence table                            | `mig-ledger-widen`                                     |
-| The "old writers gone" predicate              | `mig-cloud-presence` (`packages/upgrade/src/presence`) |
+| Piece                                           | Lands with                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `pnpm task upgrade` (the one command)           | `mig-s3-runner`                                              |
+| The chart Job running `upgrade`                 | `mig-entry-points`                                           |
+| New pods refusing until current, and the roster | `mig-serving-gate`                                           |
+| The serving roster table                        | `mig-ledger-widen`                                           |
+| The "old writers gone" predicate                | `mig-cloud-presence` (`packages/upgrade/src/serving-roster`) |
 
 ## The contract
 
@@ -42,9 +42,13 @@ the chart's pre-roll Job runs `upgrade`, and every admitted api and worker write
 4. **Treat a failed run as a failed deploy.** Do not roll any Deployment. The
    old build keeps serving.
 5. **Let the serving processes shut down gracefully.** A graceful stop deletes
-   the process's presence row at once; a kill leaves it to lapse.
-6. **Never run DDL from a serving pod, and never edit the ledger or the presence
+   the process's roster entry at once; a kill leaves it to lapse.
+6. **Never run DDL from a serving pod, and never edit the ledger or the serving roster
    table by hand.** The ledger is the record `upgrade` and the serving gate read.
+7. **Let the `DATABASE_URL` role create the ledger schema.** `upgrade` keeps the ledger, its lease
+   and the serving roster in their own Postgres schema, `<installation schema>_upgrade_ledger`
+   (`public_upgrade_ledger` by default), created on its first run. A role without `CREATE` on the
+   database needs that schema created for it beforehand, owned by the role.
 
 If the deploy applies the chart, items 1 to 4 need nothing beyond the chart's
 Job, which `mig-entry-points` repoints to `upgrade`.
@@ -57,7 +61,7 @@ Job, which `mig-entry-points` repoints to `upgrade`.
   image declares is `done` or `not-needed`. Otherwise they refuse by name and stay
   not ready, which a rollout reads as a stuck rollout, not a crash loop.
 - **Background steps start on the first new worker.** A step that needs every
-  old writer gone waits until presence says so: every live api and worker row
+  old writer gone waits until the serving roster says so: every live api and worker row
   declares the step. That happens when the last old pod has stopped, however long
   the gradual release takes.
 - **Tenant steps keep their pacing on enrolment** (rethink 6.8). The deploy never
@@ -91,12 +95,12 @@ line names the UI's address from `BASE_HOST` and `pnpm task upgrade status`.
 Exit codes are unchanged.
 
 An api or worker logs that it is checking the ledger, then that it serves and how
-long the check took. If its presence lapses, it logs that readiness answers 503;
-a worker also takes no new jobs while in-flight ones finish. When a presence
+long the check took. If its roster entry lapses, it logs that readiness answers 503;
+a worker also takes no new jobs while in-flight ones finish. When a roster
 write succeeds again it logs how long serving stopped, and the worker takes jobs
 again.
 
-## How long presence takes to clear
+## How long a roster entry takes to clear
 
 - **Graceful stop**: the row is deleted as the process shuts down, so it stops
   counting at once.
@@ -104,11 +108,11 @@ again.
   for the stale bound, then never again. "Old writers gone" can therefore be late
   by at most that bound, never early.
 - **The bound itself** (and the refresh interval below it) is held for Alex; the
-  serving gate sets both when it records presence.
+  serving gate sets both when it records its roster entry.
 
 ## After a rollback
 
-The rolled-back image writes presence rows without the newer steps, so "old
+The rolled-back image writes roster entries without the newer steps, so "old
 writers gone" turns false again and any step waiting on it waits again. Blocking
 steps the newer build applied stay applied and are harmless to the older one.
 Contract steps wait for the LTS floor on cloud as on self-hosted (ADR-173,

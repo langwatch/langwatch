@@ -62,7 +62,8 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 
 ## How it runs
 
-- `pnpm task upgrade` (in `apps/tasks`, `apps/tasks/src/upgrade.ts`) takes the runner lease, seeds an
+- `pnpm task upgrade` (in `apps/tasks`, `apps/tasks/src/upgrade.ts`) first creates the ledger in its
+  own Postgres schema (`<schema>_upgrade_ledger`, round 21), takes the runner lease there, seeds an
   empty ledger, refuses an installation below the floor, then applies release by release: the
   release's Prisma folders, goose up to its last version on **every** ClickHouse target, its
   blocking steps, then the reconcilers. Postgres sessions carry `lock_timeout` (10 s).
@@ -73,9 +74,9 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 - api and worker **never migrate**. Their serving gate refuses to start, by name, while a blocking
   step of their image is not `done` or `not-needed`, or their release is below the floor. ClickHouse
   steps always count: an install without ClickHouse refuses (round 20). Admitted, each writes a
-  presence row, refreshed every 15 s, stale after 60 s; a process whose own row lapses stops serving.
+  roster entry, refreshed every 15 s, stale after 60 s; a process whose own row lapses stops serving.
 - Background steps run on the worker after the last release. A step with `needsOldWritersGone`
-  waits until presence says every live process declares it. A rollback is seen from presence and
+  waits until the serving roster says every live process declares it. A rollback is seen from the serving roster and
   reopens level-triggered background steps, so a re-upgrade re-runs them.
 - A fresh install applies all schema at once and plans code and upcast steps by mode, so **a data
   step is never the only way new rows become correct**: writers write the new shape from the release
@@ -86,7 +87,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Piece                                                                            | State                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, manifests, floor  | landed (`packages/upgrade`, `apps/tasks/src/upgrade.ts`)                                                |
-| Serving gate, first-install upgrade, presence 15 s / 60 s, rollback reopen       | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/presence`)                                   |
+| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen         | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/serving-roster`)                             |
 | Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals           | landed (`packages/*/src/__tests__/migration-safety.rules.ts`)                                           |
 | `migration-order` CI check, `migration-owners` policy                            | landed (`cmd/migrationorder`, `packages/architecture-enforcer`)                                         |
 | `defineMigrationStep` and `.withMigrations` collection (tasks, worker)           | landed (`packages/upgrade/src/step`, `packages/process/src/migration-steps.ts`)                         |
@@ -94,7 +95,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | `.withUpcasts` read-time upcast and drain                                        | landed (`packages/eventing/src/upcast`)                                                                 |
 | Upcast rewrite step, drain-age lint                                              | **not landed** (`@unimplemented` in `packages/eventing/specs/event-upcast.feature`)                     |
 | Re-runnable migration guard rule and the runner's auto-resolve                   | **ruled, not landed** (round 21); write re-runnable SQL now                                             |
-| Lapsed presence turning `/readyz` 503 and pausing the worker                     | landed for readiness and background steps; queue consumers pause once `packages/eventing` implements it |
+| A lapsed roster entry turning `/readyz` 503 and pausing the worker               | landed for readiness and background steps; queue consumers pause once `packages/eventing` implements it |
 
 ## Never
 
@@ -130,5 +131,5 @@ migrations it applies before the api and worker serve, and ends with "first run 
 phase logs its start and its end with its time; each blocking step is named before it runs and timed
 after. A runner waiting for the lease names the holder every 30 s. The task's last line names the UI's
 address from `BASE_HOST` and `pnpm task upgrade status`. A serving process logs its ledger check and
-the time it took; a lapsed presence says readiness answers 503 and, on a worker, that it takes no new
+the time it took; a lapsed roster entry says readiness answers 503 and, on a worker, that it takes no new
 jobs while in-flight ones finish; recovery says how long serving stopped.

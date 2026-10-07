@@ -201,6 +201,7 @@ That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one l
 ### What the upgrade does
 
 - **Release by release.** From the release the ledger records to the release of the image, each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner. An installation upgraded by an earlier build has its ledger copied there once, and the old tables are left in place.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
 - **Short locks.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails the upgrade instead of blocking your traffic; the previous version keeps serving, and running the upgrade again resumes where it stopped.
 - **Background steps.** Data copies that do not block the release run on the workers after the upgrade. A step that must not run while an older version still writes waits until every running app and worker is on a version that knows it.
@@ -211,7 +212,7 @@ The app and the workers refuse to start without ClickHouse. An installation with
 
 ### While it runs, and after
 
-Every running app and worker records itself in the upgrade ledger as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
+Every running app and worker records itself in the upgrade ledger's serving roster as it starts, refreshes that record every 15 seconds, and removes it on a graceful stop. A record not refreshed for 60 seconds counts as gone. The upgrade uses these records to tell when every older version has stopped. A process that cannot refresh its own record for 60 seconds stops serving until a refresh succeeds again, so it never keeps writing unseen.
 
 To follow an upgrade:
 
