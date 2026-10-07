@@ -50,7 +50,7 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/instant-eval/contract/tsconfig.build.json"
+      "path": "../../../../modules/instant-eval-judge/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/internal-slack/tsconfig.build.json"

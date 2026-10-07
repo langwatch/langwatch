@@ -6,7 +6,7 @@ The server half of [gateway](../README.md). The AI Gateway: virtual keys, gatewa
 
 ## Installation
 
-`defineProcessModule("gateway").withRepositories(gatewayRepositories).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:42`.
+`defineProcessModule("gateway").withRepositories(gatewayRepositories).withApi(GatewayModule).withTransports(agentCacheRest, elevenLabsWebhookRest, gatewayInternalRest, gatewayBudgetTrpcTransport, gatewayCacheRuleTrpcTransport, gatewayGuardrailTrpcTransport, gatewayPlatformRest, gatewaySpendRest, gatewaySpendEventTrpcTransport, gatewayUsageTrpcTransport, virtualKeyTrpcTransport).withEventing(gatewayGovernanceEventsEventing).withEventing(gatewaySpendEventing).withEventing(gatewayRealtimeSessionEventing).withEventing(gatewayPulledUsageLedgerEventing).withEventing(gatewayInstantEvalJudgeSpendEventing).withTasks(…).withTransportFacts(…)`, `src/gateway.module.ts:43`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1416,6 +1416,14 @@ Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `ga
 | command | `recordVkLifecycle`    | –       | `src/eventing/gateway-governance-events.pipeline.ts:39` |
 | command | `recordBudgetCrossing` | –       | `src/eventing/gateway-governance-events.pipeline.ts:40` |
 
+### Pipeline `gateway_instant_eval_judge_spend` (aggregate `global`)
+
+Declared at `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:33`.
+
+| Kind            | Name                              | Handles                                                                                            | Declared at                                                    |
+| --------------- | --------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| peer subscriber | `gatewayInstantEvalJudgeSpendRow` | `lw.instant_eval_judge.spend_priced` from [instant-eval-judge](../../instant-eval-judge/README.md) | `src/eventing/gateway-instant-eval-judge-spend.pipeline.ts:40` |
+
 ### Pipeline `gateway_pulled_usage_ledger` (aggregate `global`)
 
 Declared at `src/eventing/gateway-pulled-usage-ledger.pipeline.ts:32`.
@@ -1459,9 +1467,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1132`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1133`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1134`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1137`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1138`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1139`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |

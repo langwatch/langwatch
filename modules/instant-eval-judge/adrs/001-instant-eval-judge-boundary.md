@@ -24,8 +24,9 @@ its key, rate limits and settings, its own tables, the $1 check and the metered 
 ## Public surfaces and transports
 
 `@langwatch/instant-eval-judge-contract` exports the question, verdict and judgement types, the skip
-reasons, the classifier limits and wire format, the token estimates, the pricing rule, the $1 free
-budget, the two judge errors, the config slice and the priced event's schema. There is no transport.
+reasons, the classifier limits and wire format, the token estimates, the pricing rule, the Instant
+Evals request type the ledger rows carry, the $1 free budget, the two judge errors, the config
+slice and the priced event's schema. There is no transport.
 
 `InstantEvalJudgeApi` has three methods:
 
@@ -79,8 +80,10 @@ subscribers fold project's created fact and billing's usage-billing fact into th
 
 The pipeline `instant_eval_judge_spend` (aggregate per organization) has one command,
 `recordSpendPriced`, which appends `lw.instant_eval_judge.spend_priced` keyed by organization and
-request id. Its own subscriber writes the spend row from it. Gateway's ledger row will follow from
-the same fact (ADR-174 decision 13), so the two never disagree on a price.
+request id. Its own subscriber writes the spend row from it. Gateway's peer subscriber writes the
+ledger row from the same fact (ADR-174 decision 13), so the two never disagree on a price. Gateway
+reads only this contract, so the request type lives here rather than in Instant Evals' contract.
+A fact whose project has no team is logged and dropped; one gateway cannot write yet is retried.
 
 The cloud classifier is an HTTP channel built only when the key is set, wrapped in a Redis token
 bucket per project and one for the deployment. The module owns and closes it.

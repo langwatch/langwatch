@@ -18,7 +18,6 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  INSTANT_EVAL_REQUEST_TYPE,
   InstantEvalApi,
   type InstantEvalActor,
   InstantEvalMemoryJudgeInProductionError,
@@ -26,6 +25,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_REQUEST_TYPE,
   type InstantEvalJudgeApi,
 } from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";

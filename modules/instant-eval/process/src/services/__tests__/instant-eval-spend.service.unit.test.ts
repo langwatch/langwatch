@@ -1,4 +1,4 @@
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

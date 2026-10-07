@@ -44,9 +44,6 @@ export const INSTANT_EVAL_WINDOW_PARAMETERS = ["start_at", "end_at"] as const;
  */
 export const INSTANT_EVAL_SELECTION_PARAMETER = "instant_eval_selection_ids";
 
-/** The request type every Instant Eval spend row carries on `gateway_spend`. */
-export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
-
 /** The flag that releases Instant Evals to a project. */
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 

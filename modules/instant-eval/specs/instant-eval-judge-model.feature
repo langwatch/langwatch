@@ -515,7 +515,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | before |
         | after  |
 
-    @integration @unimplemented
+    @integration
     Scenario: Two priced events for one request add one row
       Given the judge recorded a $0.10 priced event for a request
       When a second priced event with a new event id carries the same request id

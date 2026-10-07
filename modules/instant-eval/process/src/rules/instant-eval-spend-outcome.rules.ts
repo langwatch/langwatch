@@ -5,8 +5,8 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import {
+  INSTANT_EVAL_REQUEST_TYPE,
   INSTANT_EVAL_PRICING,
   INSTANT_EVAL_SPEND_MODEL,
   instantEvalRateVersion,

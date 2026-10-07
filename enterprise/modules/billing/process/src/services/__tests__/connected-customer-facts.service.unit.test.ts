@@ -1,4 +1,4 @@
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";

@@ -5,8 +5,8 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import {
+  INSTANT_EVAL_REQUEST_TYPE,
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetExhaustedError,
 } from "@langwatch/instant-eval-judge-contract";

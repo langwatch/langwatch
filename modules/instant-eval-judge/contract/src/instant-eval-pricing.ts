@@ -15,6 +15,12 @@ export const INSTANT_EVAL_PRICING: InstantEvalPricing = {
 export const INSTANT_EVAL_SPEND_MODEL = "jev";
 
 /**
+ * The request type every Instant Eval spend row carries on `gateway_spend`, the one the meter
+ * and the run check sum. Gateway writes it on a judge call's ledger row, so the leaf owns it.
+ */
+export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
+
+/**
  * The rate identity stamped on an outcome. A judgement has no model registry,
  * so it stamps the two published numbers it was priced with: a price change
  * changes the stamp, which tells a replay from a re-rating.

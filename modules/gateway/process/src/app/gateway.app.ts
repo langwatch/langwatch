@@ -163,6 +163,10 @@ import {
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
 import {
+  buildGatewayInstantEvalJudgeSpendPipeline,
+  type GatewayInstantEvalJudgeSpendPipeline,
+} from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import {
   buildGatewayPulledUsageLedgerPipeline,
   type GatewayPulledUsageLedgerPipeline,
 } from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -214,6 +218,7 @@ import {
 } from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../services/gateway-instant-eval-judge-spend.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
@@ -1428,6 +1433,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   pulledUsageLedgerPipeline(): GatewayPulledUsageLedgerPipeline {
     return buildGatewayPulledUsageLedgerPipeline({
       ledger: this.#dependencies.budgetSpend ? this.#budgetLedgerService : void 0,
+    });
+  }
+
+  /** gateway_instant_eval_judge_spend: the ledger row for each judge call (ADR-174 dec. 13). */
+  instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
+    return buildGatewayInstantEvalJudgeSpendPipeline({
+      spend: GatewayInstantEvalJudgeSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
     });
   }
 
