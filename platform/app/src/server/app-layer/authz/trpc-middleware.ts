@@ -151,18 +151,22 @@ async function mintRouteAuthorization({
 async function refuseWriteUnderAggregate({
   ctx,
   type,
-  permission,
+  permissions,
   scope,
   organizationRole,
 }: {
   ctx: MiddlewareParams["ctx"];
   type: MiddlewareParams["type"];
-  permission: AuthzPermission;
+  /**
+   * The permissions the mutation is declared under. Under `.permissionAny`
+   * any one admits the caller, so the mutation writes if any of them does.
+   */
+  permissions: readonly AuthzPermission[];
   scope: { tier: string; id: string };
   organizationRole: OrganizationUserRole | null;
 }): Promise<void> {
   if (type !== "mutation" || scope.tier !== "project") return;
-  if (!writesUnderProject(permission)) return;
+  if (!permissions.some(writesUnderProject)) return;
   // Only an organisation admin is ever admitted to an aggregate: the
   // decision above already refused anyone else on one (decision 5), so a
   // permitted non-admin is on some other kind of project and costs no read.
@@ -319,7 +323,7 @@ export const checkDeclaredPermission = ({
       await refuseWriteUnderAggregate({
         ctx,
         type,
-        permission,
+        permissions: [permission],
         scope,
         organizationRole,
       });
@@ -356,7 +360,7 @@ export const checkDeclaredPermissionAny = (
 ): DeclaredMiddleware =>
   declareAuthzMiddleware(
     { kind: "permission-any", permissions },
-    async ({ ctx, input, next }: MiddlewareParams) => {
+    async ({ ctx, input, type, next }: MiddlewareParams) => {
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
@@ -413,6 +417,17 @@ export const checkDeclaredPermissionAny = (
         userId: ctx.session.user.id,
         sessionId: ctx.session.sessionId,
         scope,
+      });
+
+      // The same door as the single-permission seam: no mutation declared
+      // this way today writes, and one added later is refused on an
+      // aggregate without having to remember to ask.
+      await refuseWriteUnderAggregate({
+        ctx,
+        type,
+        permissions,
+        scope,
+        organizationRole,
       });
 
       ctx.organizationRole = organizationRole;

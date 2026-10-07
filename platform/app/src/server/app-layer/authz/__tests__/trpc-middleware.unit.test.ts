@@ -793,4 +793,60 @@ describe("ADR-144: a write under an aggregate is refused at the door", () => {
       expect(params.next).toHaveBeenCalled();
     });
   });
+
+  describe("when a mutation is declared with any of several permissions", () => {
+    const setupAny = ({ kind = "aggregate" }: { kind?: string } = {}) => {
+      const params = paramsFor({ projectId: "proj-1" });
+      Object.assign(params.ctx, {
+        app: {
+          permissions: {
+            getProjectAnyDecision: vi
+              .fn()
+              .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+          },
+        },
+        projectKinds: {
+          kindOf: vi.fn().mockResolvedValue(kind),
+          kindsOf: vi.fn(),
+        },
+      });
+      const run = (
+        permissions: Parameters<typeof checkDeclaredPermissionAny>[0],
+      ) =>
+        checkDeclaredPermissionAny(permissions)({
+          ...params,
+          type: "mutation",
+        } as any);
+      return { params, run };
+    };
+
+    it("refuses it on an aggregate when any of them writes", async () => {
+      const { params, run } = setupAny();
+
+      const refusal = await rejection(() =>
+        run(["traces:view", "workflows:create"]),
+      );
+
+      expect(HandledError.isHandled(refusal) && refusal.code).toBe(
+        "aggregate_project_is_read_only",
+      );
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("lets it through on an aggregate when every one of them reads", async () => {
+      const { params, run } = setupAny();
+
+      await run(["traces:view", "scenarios:view"]);
+
+      expect(params.next).toHaveBeenCalled();
+    });
+
+    it("lets it through on any other kind of project", async () => {
+      const { params, run } = setupAny({ kind: "application" });
+
+      await run(["traces:view", "workflows:create"]);
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
 });
