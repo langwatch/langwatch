@@ -116,8 +116,8 @@ module has that kind of thing.
 
 - `dev/docs/ARCHITECTURE.md` §1 (the product), §2 (package family), §3 (a module),
   §3.4 (browser half, no kits), §16 (names in flight), §18 (Nx runs the tasks).
-- The generated pages: `modules/README.md`, `packages/README.md`, `apps/README.md` and one
-  per module; `ownership` reads them, `readmes` maintains them.
+- The generated pages: `modules/README.md`, `packages/README.md`, `apps/README.md`, the
+  `enterprise/` indexes and one per module; `ownership` reads them, `readmes` maintains them.
 - The module skills: `module` for anatomy, `module-client` for clients,
   `browser-module` for the browser half.
 - Process composition and what a module may demand (peers, config, stores,

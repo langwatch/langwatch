@@ -17,7 +17,7 @@ and hands Go a manifest. For which page answers which question, load `ownership`
 | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `pnpm generate:readmes`                               | rewrites every stale generated block                                                         |
 | `pnpm check:readmes`                                  | exit 1 with a diff for each stale page, and for each page with no hand-written paragraph     |
-| `go run ./cmd/readmegen --write --only modules/slack` | settles only pages whose path starts with the prefix                                         |
+| `go run ./cmd/readmegen --write --only modules/slack` | from the repo root: settles only pages under the prefix                                      |
 | `go test ./tools/readmegen/`                          | the golden tests; add `-update` to rewrite `tools/readmegen/testdata/golden/` after a change |
 
 The extractor runs under `node` from `packages/architecture-enforcer`, so it needs an installed
@@ -36,17 +36,18 @@ markers and rewrites only what is between them.
 
 Pages today: the indexes (`modules/`, `enterprise/modules/`, `enterprise/`, `packages/`,
 `enterprise/packages/`, `apps/`), one page per module and one per process half. Contract and client
-halves get no page; the contract is printed on the process page (ruling Q2).
+halves get no page; the contract is printed on the process page (plan §9, Q2). Browser-half and
+per-app pages are planned (plan §2) but not generated yet.
 
 ## Fixing a wrong page
 
-| You see                                 | It means                                              | Do                                                                             |
-| --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
-| a stale diff in `check:readmes`         | the code changed and the page did not                 | run `pnpm generate:readmes`; commit the page with the code                     |
-| `≈` before a value                      | the extractor found the declaration but not its value | make the value static in the code, or teach the extractor the shape (below)    |
-| "unresolved values (shown with ≈): ..." | the run's count of `≈` values, by kind                | informational; it does not fail the check                                      |
-| `REST "<family>": mounted but not read` | a route the api serves that the syntactic read missed | teach the extractor the router shape; this one does fail the check             |
-| a fact that is wrong, not `≈`           | a bug in an extractor or a page renderer              | fix it in `tools/readmegen`, with a fixture row and a golden page that show it |
+| You see                                                                 | It means                                               | Do                                                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| a stale diff in `check:readmes`                                         | the code changed and the page did not                  | run `pnpm generate:readmes`; commit the page with the code                     |
+| `≈` before a value                                                      | the extractor found the declaration but not its value  | make the value static in the code, or teach the extractor the shape (below)    |
+| "unresolved values (shown with ≈): ..."                                 | the run's count of `≈` values, by kind                 | informational; it does not fail the check                                      |
+| `REST "<family>": mounted but not read: ...; read but not mounted: ...` | the routes read and the routes the api serves disagree | teach the extractor the router shape; this one does fail the check             |
+| a fact that is wrong, not `≈`                                           | a bug in an extractor or a page renderer               | fix it in `tools/readmegen`, with a fixture row and a golden page that show it |
 
 ## Adding a section or an extractor shape
 
@@ -64,9 +65,9 @@ halves get no page; the contract is printed on the process page (ruling Q2).
 
 ## Traps
 
-| Trap                                                                      | Do instead                                                                                      |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Editing a fact inside the markers so the page reads right                 | the next run puts it back; fix the code or the generator                                        |
-| Leaving a stale part of an old hand-written README above the block        | replace it with one paragraph; anything worth keeping moves to the module's `adrs/` (ruling Q4) |
-| Regenerating with `--update` on the golden tests without reading the diff | the golden diff is the proof the change did what it says                                        |
-| Running `check:readmes` with no install                                   | the extractor fails to start; run `pnpm install` first                                          |
+| Trap                                                                     | Do instead                                                                                        |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Editing a fact inside the markers so the page reads right                | the next run puts it back; fix the code or the generator                                          |
+| Leaving a stale part of an old hand-written README above the block       | replace it with one paragraph; anything worth keeping moves to the module's `adrs/` (plan §9, Q4) |
+| Regenerating with `-update` on the golden tests without reading the diff | the golden diff is the proof the change did what it says                                          |
+| Running `check:readmes` with no install                                  | the extractor fails to start; run `pnpm install` first                                            |

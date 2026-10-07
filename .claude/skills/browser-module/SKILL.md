@@ -100,5 +100,5 @@ Host wiring (host services, lending, `*HostApi` mounts, entitlement): §3.3,
 `dev/docs/design/guidelines.md` §4. Specs: `specs/ui/ui-page-composition.feature`,
 `specs/ui/browser-query-caching.feature`, `specs/ui/in-app-links.feature`.
 Tests sit in a colocated `__tests__/` beside the code (§13). The module
-anatomy: the `module` skill. After adding a screen or drawer, run `pnpm generate:readmes` and
-commit the regenerated pages with the change (`readmes` skill).
+anatomy: the `module` skill. The browser half has no generated page yet (plan
+`dev/docs/plans/module-readmes-2026-10-06.md` §2); who owns what is on the module's own `README.md`.

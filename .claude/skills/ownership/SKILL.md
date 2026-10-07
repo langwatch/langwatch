@@ -1,6 +1,6 @@
 ---
 name: ownership
-description: "Where a change belongs in LangWatch: find the owning module of a subject, table or route from the generated READMEs (modules/README.md and each module page), refuse an edit that reaches into another module, and name the *Api operation to call or the new operation to ask for. Use before any edit that touches two modules, and when someone says 'whose is this', 'who owns this table', 'which module owns', 'where does this change belong', 'can I edit this from here', 'call another module', 'reach into', 'cross-module', 'which Api do I call', or 'accessed not claimed'."
+description: "Where a change belongs in LangWatch: find the owning module of a subject, table or route from the generated READMEs (modules/README.md and each module page), refuse an edit that reaches into another module, and name the *Api operation to call or the new operation to ask for. Use before any edit that touches two modules, and when someone says 'whose is this', 'who owns this table', 'which module owns', 'where does this change belong', 'can I edit this from here', 'reach into', or 'cross-module'."
 user-invocable: true
 ---
 
@@ -29,14 +29,16 @@ the claim is its own change, and the pages show the gap so it gets one.
 2. **It is owned by another module.** Do not edit that module's tables, repositories or files from
    here. Call its `*Api` token: add the peer to `static dependencies` and call the operation listed
    under "Module API". Load `module-dependencies` for how a peer is declared.
-3. **The owner has no operation that does it.** Name the operation you need (its name, input and
-   result) and stop: a new `*Api` operation needs a ruling (`architecture-review`, check A). Do
-   not widen another module's contract inside a feature change.
+3. **The owner has no operation that does it.** An operation that moves an existing handler over
+   unchanged may be added (§8). One that adds behaviour or a new shape is asked for: name it (its
+   name, input and result) and stop until it is ruled (`architecture-review`, check A).
 4. **The change needs a new peer edge.** Read your page's "Peers" table and the target's "Who
    depends on" line first. If the target already depends on you, the edge closes a cycle; load
    `module-dependencies` (peer cycles, §5).
 
 ## Worked example: an automation posts to Slack
+
+The pages as of 2026-10-07; read the live ones, not this example.
 
 The automation needs a bot token. `modules/README.md` maps the `slack` subject to
 `modules/slack`. Its page owns `SlackIntegration` and lists `automation` under "Who depends on
