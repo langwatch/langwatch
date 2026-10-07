@@ -26,7 +26,7 @@ Prefixes are matched from the start of the key, so each one is the first segment
 - **Azure Blob** needs you to confirm the rules exist. Today the trace spool refuses oversized writes until you do, and the other kinds will follow. LangWatch holds a data-plane key and cannot read a management-plane lifecycle policy back, so the confirmation is your statement, not a check.
 - **The local filesystem** always refuses oversized writes. A filesystem cannot expire objects.
 
-A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. Nothing is lost, and nothing is left behind.
+A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. No data is lost, and no orphaned object is left behind.
 
 ## Confirming the rules on Azure
 

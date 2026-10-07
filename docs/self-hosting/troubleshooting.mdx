@@ -215,7 +215,7 @@ kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 
 ### The upgrade failed
 
-A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if nothing of it remains, and run the upgrade again. It resumes where it stopped.
+A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
 `SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
 

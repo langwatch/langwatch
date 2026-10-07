@@ -521,7 +521,9 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving. Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
+A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 

@@ -62975,7 +62975,7 @@ Prefixes are matched from the start of the key, so each one is the first segment
 - **Azure Blob** needs you to confirm the rules exist. Today the trace spool refuses oversized writes until you do, and the other kinds will follow. LangWatch holds a data-plane key and cannot read a management-plane lifecycle policy back, so the confirmation is your statement, not a check.
 - **The local filesystem** always refuses oversized writes. A filesystem cannot expire objects.
 
-A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. Nothing is lost, and nothing is left behind.
+A refused payload stays bounded: the trace keeps its payload inline and an evaluation keeps its preview. No data is lost, and no orphaned object is left behind.
 
 ## Confirming the rules on Azure
 
@@ -65102,7 +65102,9 @@ helm upgrade langwatch langwatch/langwatch \
   --wait --timeout 10m
 ```
 
-A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving. Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
+A pre-upgrade Job runs `pnpm task upgrade` on the new image before any pod rolls; on a first install the app runs it once on its first boot. If the upgrade fails, the Job fails the `helm upgrade` and the previous version keeps serving.
+
+Follow it on **Ops > Upgrades** or with `pnpm task upgrade status`. To run the upgrade from your own pipeline instead, set `app.migrations.preRoll: false` and run it before `helm upgrade`; until then the new pods refuse to start.
 
 See [Upgrade Guide](/self-hosting/upgrade) for version-specific instructions.
 
@@ -68499,7 +68501,7 @@ kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 
 ### The upgrade failed
 
-A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if nothing of it remains, and run the upgrade again. It resumes where it stopped.
+A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
 `SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
 
