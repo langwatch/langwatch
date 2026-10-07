@@ -1,3 +1,4 @@
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,7 +10,6 @@ import {
   extractSpanTokenCounts,
   extractSpanTokenTiming,
   isSpanCostNonBillable,
-  NON_BILLABLE_ATTR,
   NormalizedSpanKind,
   NormalizedStatusCode,
   type NormalizedSpan,

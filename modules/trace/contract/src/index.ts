@@ -1,4 +1,3 @@
-export * from "./cost-attribution.ts";
 export * from "./span-cost-metrics.ts";
 export * from "./span-rollup-contribution.ts";
 export * from "./span-status-fold.ts";
@@ -29,7 +28,6 @@ export {
 } from "./trace-content-part.provider-source.ts";
 export { parseBase64DataUri } from "./trace-content-part.file-decoder.ts";
 export { visitContentPart, visitContentPartAsync } from "./trace-content-part.dispatcher.ts";
-export * from "./trace-attributes.ts";
 export { trimAttributesForAnalytics } from "./trace-analytics-attribute-trim.ts";
 export * from "./trace-time-range-presets.ts";
 export * from "./trace-token-budget.ts";

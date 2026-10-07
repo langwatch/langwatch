@@ -1,9 +1,9 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import { describe, expect, it } from "vitest";
 
 import {
   accumulateSpanTiming,
   addReservedTokenSum,
-  ATTR_KEYS,
   extractSpanStatus,
   foldSpanIntoTraceAnalytics,
   mergeModelsMostRecentFirst,
