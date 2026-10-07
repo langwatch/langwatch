@@ -5,7 +5,7 @@
  * fresh), never staleness.
  *
  * Whether the cache is consulted at all is the composition root's decision:
- * runtime.ts wires the engine and checks.ts the door with the one rollout
+ * runtime.ts wires the engine and presets.ts the door with the one rollout
  * knob below, so the two caches turn on and off together.
  */
 import { createLogger } from "@langwatch/observability";

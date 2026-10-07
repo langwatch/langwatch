@@ -188,6 +188,7 @@ import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/reposito
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { authorizationServiceFor } from "./authz/checks";
 import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
+import { authzEpochCacheEnabled, getAuthzEpoch } from "./authz/epoch";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
@@ -502,7 +503,10 @@ export function initializeDefaultApp(options?: {
   const authorizedClickHouse = new AuthorizedClickHouse({
     resolveClient: resolveClickHouseClient,
   });
-  const authorizationService = authorizationServiceFor(prisma);
+  const authorizationService = authorizationServiceFor(prisma, {
+    epochReader: getAuthzEpoch,
+    cacheEnabled: authzEpochCacheEnabled,
+  });
 
   // ADR-137: one runs store and one judgements store, handed to the
   // pipeline's run port and to the App, so the run surface never resolves a
