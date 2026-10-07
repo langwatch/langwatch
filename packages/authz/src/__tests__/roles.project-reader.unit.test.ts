@@ -45,6 +45,7 @@ describe("project-reader role", () => {
   });
 
   describe("when a project-reader grant is asked for a permission", () => {
+    /** @scenario "A project-reader grant never escalates" */
     it("allows traces view and analytics view", () => {
       for (const permission of ["traces:view", "analytics:view"]) {
         expect(
@@ -53,6 +54,7 @@ describe("project-reader role", () => {
       }
     });
 
+    /** @scenario "A project-reader grant never escalates" */
     it("denies traces manage, project manage and prompts view", () => {
       for (const permission of [
         "traces:manage",

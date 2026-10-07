@@ -327,6 +327,7 @@ describe("the grants ledger's wire boundary", () => {
       expect(parse({}, withoutCondition).success).toBe(false);
     });
 
+    /** @scenario "A where clause is refused until the filter compiler exists" */
     it("refuses a condition with a non-empty where until the filter compiler exists", () => {
       expect(
         parse(
