@@ -24,6 +24,7 @@ import {
 import { type App, globalForApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { documentedDownPath } from "~/test-utils/migrationDownPath";
 import { getAuthzEpoch } from "../epoch";
 import { type AuthzGrantsCommandSenders, GrantsLedgerWriter } from "../ledger";
 import { PrismaAuthzGrantsWriteRepository } from "../repositories/authz-grants-write.prisma.repository";
@@ -40,6 +41,8 @@ const COMMAND_VERBS = [
 ] as const;
 
 const CONDITION = { type: "trace", from: "2026-10-01T00:00:00.000Z" } as const;
+
+const GRANT_CONDITION_MIGRATION = "20261006120001_grant_condition";
 
 describe("given a shared project read in the ledger", () => {
   const appended: Array<{ verb: string; data: unknown }> = [];
@@ -385,30 +388,36 @@ describe("given a shared project read in the ledger", () => {
   });
 
   /** ADR-144 gate: the migration's documented down path is a statement
-   *  that runs. Executed through psql inside one transaction that is rolled
-   *  back (the app's Prisma client refuses raw statements without tenancy),
-   *  so the column is there again before the next test. */
+   *  that runs. Read from the migration itself and executed through psql
+   *  inside one transaction that is rolled back (the app's Prisma client
+   *  refuses raw statements without tenancy), so the column is there again
+   *  before the next test. */
   it("can drop the condition column by the documented down path", async () => {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) throw new Error("DATABASE_URL is not set for this suite");
+    const columnCount =
+      "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'Grant' AND column_name = 'condition';";
     const output = execFileSync(
       "psql",
       [
         databaseUrl,
         "-v",
         "ON_ERROR_STOP=1",
-        "-tA",
-        "-c",
-        [
+        "-qtA",
+        ...[
           "BEGIN;",
-          'ALTER TABLE "Grant" DROP COLUMN "condition";',
-          "SELECT count(*) FROM information_schema.columns WHERE table_name = 'Grant' AND column_name = 'condition';",
-          "ROLLBACK;",
-        ].join(" "),
+          columnCount,
+          documentedDownPath({ migration: GRANT_CONDITION_MIGRATION }),
+          columnCount,
+        ].flatMap((statement) => ["-c", statement]),
+        "-c",
+        "ROLLBACK;",
       ],
       { encoding: "utf8" },
     );
-    expect(output.trim().split("\n")).toContain("0");
+    // Present before, gone after: a filter that matched nothing would read 0
+    // both times.
+    expect(output.trim().split("\n")).toEqual(["1", "0"]);
     const after = await prisma.grant.findUnique({
       where: { id: sharedGrantId },
       select: { condition: true },

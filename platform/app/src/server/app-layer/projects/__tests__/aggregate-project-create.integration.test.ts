@@ -9,8 +9,6 @@
  * @see specs/governance/aggregate-project.feature
  */
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
 import { roleFactToRow } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -25,6 +23,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { documentedDownPath } from "~/test-utils/migrationDownPath";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { AGGREGATE_DEFAULT_RULE, aggregateRuleSchema } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
@@ -41,33 +40,11 @@ const callerFor = (userId: string) =>
     createInnerTRPCContext({ session: { user: { id: userId }, expires: "1" } }),
   );
 
+const AGGREGATE_RULE_MIGRATION = "20261006120002_project_aggregate_rule";
+
 const rules = new AggregateRuleService(
   new PrismaAggregateRuleRepository(prisma),
 );
-
-/**
- * The down statement the aggregate rule migration documents, read from the
- * migration itself so the test runs what an operator would copy, not a
- * retyped copy of it.
- */
-function documentedDownPath(): string {
-  const migration = fs.readFileSync(
-    path.resolve(
-      import.meta.dirname,
-      "../../../../../prisma/migrations/20261006120002_project_aggregate_rule/migration.sql",
-    ),
-    "utf8",
-  );
-  const lines = migration.split("\n");
-  const heading = lines.findIndex((line) =>
-    line.startsWith("-- Down, to roll back by hand:"),
-  );
-  const statement = lines[heading + 1]?.replace(/^--\s+/, "").trim();
-  if (heading < 0 || !statement?.startsWith("ALTER TABLE")) {
-    throw new Error("the migration no longer documents its down path");
-  }
-  return statement;
-}
 
 describe("Feature: an admin creates an aggregate project", () => {
   let fixture: AggregateFixture;
@@ -451,9 +428,12 @@ describe("Feature: an admin creates an aggregate project", () => {
           "-v",
           "ON_ERROR_STOP=1",
           "-qtA",
-          ...["BEGIN;", columnCount, documentedDownPath(), columnCount].flatMap(
-            (statement) => ["-c", statement],
-          ),
+          ...[
+            "BEGIN;",
+            columnCount,
+            documentedDownPath({ migration: AGGREGATE_RULE_MIGRATION }),
+            columnCount,
+          ].flatMap((statement) => ["-c", statement]),
           "-c",
           "ROLLBACK;",
         ],
