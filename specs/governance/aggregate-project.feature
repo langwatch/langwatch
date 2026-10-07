@@ -393,6 +393,8 @@ Feature: An aggregate project reads its member projects
     When ana makes that change in the trace list
     Then she sees an error saying the lens change was not saved
     And the lens strip reloads from the server, so no unsaved lens lingers
+    And a refused new lens leaves the strip even when the project has no saved lens yet
+    And she is back on the lens she was on before, not sent to "All traces"
 
   # ── H. The aggregate in the app ──────────────────────────────────────────
   # The server refuses every write; these keep the app from inviting one, and

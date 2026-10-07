@@ -59,13 +59,20 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
  * The three lens writes the sync bridge mirrors to the server.
  *
  * Every lens write reloads the strip from the server once it settles. On
- * success that picks up the saved row; on a refusal it drops the lens the
- * store added locally, so nothing lingers that the server never kept. A
- * refusal also tells the user, since the store wrote first and showed it as
- * done.
+ * success that picks up the saved row; on a refused rename or delete it puts
+ * back what the server kept. A refusal also tells the user, since the store
+ * wrote first and showed it as done.
+ *
+ * A refused create is taken back explicitly, not left to the reload: the
+ * reload only re-runs the hydrate effect when the list changes reference, and
+ * an empty list reloaded as an empty list does not. So the new lens leaves the
+ * strip and the user returns to the lens they were on before creating it.
  */
 function useLensWriteMutations(projectId: string | undefined) {
   const utils = api.useUtils();
+  const discardRefusedLens = useExplorerStore((s) => s.discardRefusedLens);
+  // New lens id -> the lens to return to if the server refuses it.
+  const fallbackLensIdsRef = useRef(new Map<string, string>());
   const reloadLenses = () => {
     if (projectId) {
       void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
@@ -79,10 +86,29 @@ function useLensWriteMutations(projectId: string | undefined) {
     },
   });
 
+  const createMutation = api.savedViews.create.useMutation({
+    onSuccess: reloadLenses,
+    onError: (error, { id: lensId }) => {
+      const fallbackLensId = lensId && fallbackLensIdsRef.current.get(lensId);
+      if (lensId && fallbackLensId) {
+        discardRefusedLens({ lensId, fallbackLensId });
+      }
+      showErrorToast({ error, fallbackTitle: "Couldn't save the lens" });
+      reloadLenses();
+    },
+    onSettled: (_data, _error, { id: lensId }) => {
+      if (lensId) fallbackLensIdsRef.current.delete(lensId);
+    },
+  });
+
   return {
-    createMutation: api.savedViews.create.useMutation(
-      lensWriteOptions("Couldn't save the lens"),
-    ),
+    createLens: (
+      input: Parameters<typeof createMutation.mutate>[0] & { id: string },
+      fallbackLensId: string,
+    ) => {
+      fallbackLensIdsRef.current.set(input.id, fallbackLensId);
+      createMutation.mutate(input);
+    },
     renameMutation: api.savedViews.rename.useMutation(
       lensWriteOptions("Couldn't rename the lens"),
     ),
@@ -125,7 +151,7 @@ export function useLensSync(): void {
     },
   );
 
-  const { createMutation, renameMutation, deleteMutation } =
+  const { createLens, renameMutation, deleteMutation } =
     useLensWriteMutations(projectId);
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
@@ -136,8 +162,8 @@ export function useLensSync(): void {
   const canSaveLenses = useCanSaveLenses();
   const canSaveLensesRef = useRef(canSaveLenses);
   canSaveLensesRef.current = canSaveLenses;
-  const createRef = useRef(createMutation.mutate);
-  createRef.current = createMutation.mutate;
+  const createRef = useRef(createLens);
+  createRef.current = createLens;
   const renameRef = useRef(renameMutation.mutate);
   renameRef.current = renameMutation.mutate;
   const deleteRef = useRef(deleteMutation.mutate);
@@ -149,21 +175,24 @@ export function useLensSync(): void {
   useEffect(() => {
     setLensSyncBridge({
       acceptsWrites: () => canSaveLensesRef.current,
-      create: (lens) => {
+      create: (lens, { fallbackLensId }) => {
         const pid = projectIdRef.current;
         if (!pid) return;
-        createRef.current({
-          projectId: pid,
-          // Client-generated id keeps the locally-active lens valid
-          // through the server refetch — without it, the server would
-          // mint a new nanoid and `setUserLenses` would orphan the
-          // local active id.
-          id: lens.id,
-          name: lens.name,
-          filters: encode(lens) as unknown as Record<string, unknown>,
-          kind: KIND,
-          scope: "project",
-        });
+        createRef.current(
+          {
+            projectId: pid,
+            // Client-generated id keeps the locally-active lens valid
+            // through the server refetch — without it, the server would
+            // mint a new nanoid and `setUserLenses` would orphan the
+            // local active id.
+            id: lens.id,
+            name: lens.name,
+            filters: encode(lens) as unknown as Record<string, unknown>,
+            kind: KIND,
+            scope: "project",
+          },
+          fallbackLensId,
+        );
       },
       rename: (lensId, name) => {
         const pid = projectIdRef.current;

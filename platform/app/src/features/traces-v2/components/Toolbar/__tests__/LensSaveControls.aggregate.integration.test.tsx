@@ -139,6 +139,7 @@ describe("Lens save controls", () => {
 
         expect(create).toHaveBeenCalledWith(
           expect.objectContaining({ name: "Grouped answers" }),
+          { fallbackLensId: expect.any(String) },
         );
         expect(
           useExplorerStore

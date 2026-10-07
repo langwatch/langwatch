@@ -129,6 +129,15 @@ export interface ViewSlice {
    * keep the store in lockstep with the SavedView table.
    */
   setUserLenses: (lenses: LensConfig[]) => void;
+  /**
+   * Take back a new lens the server refused to save. The lens leaves the
+   * strip, and when it is still the active one the user returns to
+   * `fallbackLensId`, the lens they were on before creating it. Explicit,
+   * because the reload alone cannot be trusted to do it: an empty lens list
+   * reloaded as an empty list keeps its reference, so `setUserLenses` never
+   * runs on a project's first lens.
+   */
+  discardRefusedLens: (args: { lensId: string; fallbackLensId: string }) => void;
 }
 
 /**
@@ -147,8 +156,13 @@ export interface LensSyncBridge {
    * locally that the server will never keep.
    */
   acceptsWrites: () => boolean;
+  /**
+   * `fallbackLensId` is the lens the user was on before this one, so a
+   * refusal can return them to it (`discardRefusedLens`).
+   */
   create: (
     lens: LensConfig & { /** Optional client-suggested id. */ id: string },
+    rollback: { fallbackLensId: string },
   ) => void;
   rename: (lensId: string, name: string) => void;
   delete: (lensId: string) => void;
@@ -229,8 +243,8 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
 // the server (SavedView table, kind="v2-traces-lens") and `useLensSync`
 // pushes them into the store via `setUserLenses` whenever the tRPC
 // query resolves. Drift between tabs is handled by React Query's
-// `refetchOnWindowFocus`; failed mutations roll back via the same
-// invalidate-on-error path. Keeping a localStorage shadow would just
+// `refetchOnWindowFocus`; a refused rename or delete rolls back via the
+// invalidate-on-error path, and a refused create through `discardRefusedLens`. Keeping a localStorage shadow would just
 // be another source of inconsistency.
 
 function isSortConfig(value: unknown): value is SortConfig {
@@ -862,7 +876,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
       filterText: overrides?.filterText ?? get().queryText,
     };
     const allLenses = [...state.allLenses, newLens];
-    lensSyncBridge?.create(newLens);
+    lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
     // Adopt the new lens as the active one. When overrides are present we
     // also push the saved values into live state so the table immediately
     // reflects the configured shape (otherwise the user sees the old grouping
@@ -925,7 +939,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
       isBuiltIn: false,
     };
     const allLenses = [...state.allLenses, newLens];
-    lensSyncBridge?.create(newLens);
+    lensSyncBridge?.create(newLens, { fallbackLensId: state.activeLensId });
     get().setFilterFromLens(newLens.filterText);
     set({
       allLenses,
@@ -1024,6 +1038,31 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
         sort: next.sort,
         grouping: next.grouping,
         columnOrder: next.columns,
+      };
+    });
+  },
+
+  discardRefusedLens: ({ lensId, fallbackLensId }) => {
+    set((s) => {
+      const lens = s.allLenses.find((l) => l.id === lensId);
+      if (!lens || lens.isBuiltIn) return s;
+      const allLenses = s.allLenses.filter((l) => l.id !== lensId);
+      const draftState = clearDraftFor(s.draftState, lensId);
+      // The user moved on while the save was in flight: leave them there.
+      if (s.activeLensId !== lensId) return { allLenses, draftState };
+      const next =
+        allLenses.find((l) => l.id === fallbackLensId) ?? allLenses[0];
+      if (!next) return { allLenses, draftState };
+      // Back to the lens as the user left it, unsaved changes included.
+      const draft = draftState.get(next.id);
+      get().setFilterFromLens(draft?.filter ?? next.filterText);
+      return {
+        allLenses,
+        draftState,
+        activeLensId: next.id,
+        sort: draft?.sort ?? next.sort,
+        grouping: draft?.grouping ?? next.grouping,
+        columnOrder: draft?.columns ?? next.columns,
       };
     });
   },
