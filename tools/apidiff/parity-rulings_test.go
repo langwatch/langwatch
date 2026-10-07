@@ -240,3 +240,37 @@ func TestAMainAnyMethodRouteIsCoveredByAnyDeclaredMethod(t *testing.T) {
 		t.Fatal("an undeclared path was covered")
 	}
 }
+
+func TestRemovingARetiredRestOperationIsRuled(t *testing.T) {
+	cases := []struct {
+		method, path, kind string
+		ruled              bool
+	}{
+		{"GET", "/api/rpc.discover", "operation_removed", true},
+		{"POST", "/api/dataset/direct-upload/{datasetId}/finalize", "operation_removed", true},
+		{"GET", "/api/rpc.discover", "operation_added", false},
+		{"GET", "/api/gone", "operation_removed", false},
+	}
+	for _, testCase := range cases {
+		if got := ruledSpecChange(testCase.method, testCase.path, testCase.kind) != ""; got != testCase.ruled {
+			t.Errorf("%s %s %s: ruled = %v, want %v", testCase.method, testCase.path, testCase.kind, got, testCase.ruled)
+		}
+	}
+}
+
+func TestRuledProcedureMovesAndRetirementsAreNotMissing(t *testing.T) {
+	main := []Procedure{
+		{Path: "roleBinding.create", Kind: "mutation"},
+		{Path: "project.regenerateApiKey", Kind: "mutation"},
+		{Path: "roleBinding.getMyAccessBreakdown", Kind: "query"},
+		{Path: "project.other", Kind: "query"},
+	}
+	branch := []Procedure{{Path: "authz.createGrant", Kind: "mutation"}}
+	parity := DiffProcedures(main, branch, moduleFromSource)
+	if len(parity.Missing) != 1 || parity.Missing[0].Path != "project.other" {
+		t.Errorf("missing = %+v, want only project.other", parity.Missing)
+	}
+	if len(parity.Retired) != 2 || len(parity.Breaking) != 0 {
+		t.Errorf("retired = %+v, breaking = %+v", parity.Retired, parity.Breaking)
+	}
+}

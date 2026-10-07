@@ -11,6 +11,7 @@ const (
 	rulingPhantomField    = "phantom: main documents a field its handler never answers or accepts (r39 triage)"
 	rulingRootPrompts     = "documentation only: main's document published prompts at the root path"
 	rulingInstanceToken   = "documentation correction: the wire still uses the instance token, as on main"
+	rulingRetiredRoute    = "ruled retired: the operation's path is ruled out of the branch (RetiredRestOperation)"
 )
 
 // ruledSpecKindOnly rules one spec change kind on one operation, for a
@@ -67,6 +68,9 @@ func ruledSpecChange(method, path, kind string) string {
 	field, found := strings.CutPrefix(kind, "operation_")
 	if !found {
 		return ""
+	}
+	if field == "removed" && RetiredRestOperation(path) {
+		return rulingRetiredRoute
 	}
 	key := strings.ToUpper(method) + " " + path
 	pairing := strings.ToUpper(method) + " " + PairingPath(path)
