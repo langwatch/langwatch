@@ -37,6 +37,11 @@ export type CodingAgentBackfillProjects = {
   }): Promise<{ data: readonly { id: string }[] }>;
 };
 
+/** What the installation-connected peer lane calls; the feature service satisfies it. */
+export type CodingAgentPullRequestMappingBackfill = {
+  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
+};
+
 /** Private installation follow-up that discovers Coding Agent's own session branches. */
 export class CodingAgentPullRequestMappingBackfillService {
   static create(options: {

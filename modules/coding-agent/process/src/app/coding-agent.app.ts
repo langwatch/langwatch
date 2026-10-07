@@ -203,6 +203,7 @@ export class CodingAgentModule implements CodingAgentApi {
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,
       github: dependencies.github,
+      installationBackfill: service,
       receivedFacts: CodingAgentReceivedFactsService.create({
         traces: dependencies.traces,
         commands,

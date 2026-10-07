@@ -51,11 +51,13 @@ export interface GithubInstallApi {
   /** Where a connection command — and a blocked rebind — is recorded. */
   recordAudit(entry: GithubConnectionAuditEntry): Promise<void>;
   /**
-   * Relinks the coding-agent sessions whose pull requests this installation
-   * can now be read through. A deployment holding no coding agents binds a
-   * no-op: linkage then arrives on the branch recheck instead.
+   * Records the connect as GitHub's own fact; coding-agent reacts by relinking
+   * its sessions' pull requests. With no reactor, linkage arrives on the recheck.
    */
-  backfillPullRequestMappings(input: { organizationId: string }): Promise<void>;
+  recordInstallationConnected(input: {
+    organizationId: string;
+    installationId: string;
+  }): Promise<void>;
   /** The webhook door: verifies the HMAC before anything is parsed or applied. */
   receiveWebhook(delivery: GithubWebhookDelivery): Promise<GithubWebhookReceipt>;
 }
@@ -387,11 +389,11 @@ async function recordInstallation({
   }
 
   void app
-    .backfillPullRequestMappings({ organizationId: state.organizationId })
+    .recordInstallationConnected({ organizationId: state.organizationId, installationId })
     .catch((error: unknown) => {
       logger.warn(
         { error, organizationId: state.organizationId, installationId },
-        "GitHub installation pull-request backfill failed",
+        "GitHub installation connected fact was not recorded",
       );
     });
 

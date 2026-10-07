@@ -172,6 +172,7 @@ describe("the worker process installation", () => {
       const pipelines = eventing.definitions.map((definition) => definition.metadata.name);
       expect(pipelines).toContain("experiment_run_processing");
       expect(pipelines).toContain("coding_agent_processing");
+      expect(pipelines).toContain("github_lifecycle");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");
@@ -265,6 +266,7 @@ describe("the worker process installation", () => {
           "coding_agent_processing.codingAgentSpanFactsDispatch",
           "coding_agent_processing.codingAgentLogFactsDispatch",
           "coding_agent_processing.codingAgentMetricFactsDispatch",
+          "coding_agent_processing.codingAgentInstallationBackfill",
         ]),
       );
     } finally {

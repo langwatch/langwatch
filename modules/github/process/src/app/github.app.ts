@@ -1,7 +1,6 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   GithubApi,
   type GithubApi as GithubApiContract,
@@ -46,6 +45,10 @@ import { GithubBranchMappingService } from "../services/github-branch-mapping.se
 import { GithubHostService, type GithubHost } from "../services/github-host.service.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
+import {
+  GithubInstallationFactsService,
+  type GithubLifecycleSenders,
+} from "../services/github-installation-facts.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
@@ -211,7 +214,6 @@ export class GithubModule implements GithubApiContract {
     permissions: AuthzApi,
     auth: AuthApi,
     auditLog: AuditLogApi,
-    codingAgents: CodingAgentApi,
   };
   static readonly config = githubConfig;
   static readonly secrets = githubSecrets;
@@ -222,7 +224,7 @@ export class GithubModule implements GithubApiContract {
   readonly #permissions: AuthzApi;
   readonly #auth: AuthApi;
   readonly #auditLog: AuditLogApi;
-  readonly #codingAgents: CodingAgentApi;
+  readonly #installationFacts: GithubInstallationFactsService;
 
   private constructor(parts: {
     service: GithubFeatureService;
@@ -231,7 +233,7 @@ export class GithubModule implements GithubApiContract {
     permissions: AuthzApi;
     auth: AuthApi;
     auditLog: AuditLogApi;
-    codingAgents: CodingAgentApi;
+    installationFacts: GithubInstallationFactsService;
   }) {
     this.#service = parts.service;
     this.#branchMaintenance = parts.branchMaintenance;
@@ -239,7 +241,7 @@ export class GithubModule implements GithubApiContract {
     this.#permissions = parts.permissions;
     this.#auth = parts.auth;
     this.#auditLog = parts.auditLog;
-    this.#codingAgents = parts.codingAgents;
+    this.#installationFacts = parts.installationFacts;
   }
 
   /**
@@ -412,7 +414,7 @@ export class GithubModule implements GithubApiContract {
       permissions: dependencies.permissions,
       auth: dependencies.auth,
       auditLog: dependencies.auditLog,
-      codingAgents: dependencies.codingAgents,
+      installationFacts: GithubInstallationFactsService.create(),
     });
   }
 
@@ -450,8 +452,16 @@ export class GithubModule implements GithubApiContract {
   async recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
     await this.#auditLog.record(entry);
   }
-  async backfillPullRequestMappings(input: { organizationId: string }): Promise<void> {
-    await this.#codingAgents.backfillPullRequestMappings(input);
+  /** Peers react to the connect from their own side; coding-agent backfills its mappings. */
+  recordInstallationConnected(input: {
+    organizationId: string;
+    installationId: string;
+  }): Promise<void> {
+    return this.#installationFacts.recordInstallationConnected(input);
+  }
+  /** github_lifecycle's senders, once the pipeline registers in this process. */
+  connectLifecycle(senders: GithubLifecycleSenders): void {
+    this.#installationFacts.connect(senders);
   }
 
   /** The fleet-wide branch sweep `github_maintenance` schedules. */

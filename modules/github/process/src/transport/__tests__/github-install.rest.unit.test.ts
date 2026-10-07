@@ -140,7 +140,7 @@ function mount(
     recordAudit: async (entry) => {
       audits.push({ action: entry.action });
     },
-    backfillPullRequestMappings: async () => {},
+    recordInstallationConnected: async () => {},
     receiveWebhook: async ({ rawBody, signature, eventType, deliveryId }) => {
       const read = readGithubWebhook({ rawBody, signature, secret: WEBHOOK_SECRET });
       if ("refused" in read) return read;

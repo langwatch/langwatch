@@ -18,6 +18,10 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
+  GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
+  githubInstallationConnectedEventDataSchema,
+} from "@langwatch/github-contract";
+import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   canonicalLogRecordSchema,
 } from "@langwatch/log-contract";
@@ -44,6 +48,7 @@ import {
   EventingCodingAgentTraceSessionAppendService,
   EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
+import type { CodingAgentPullRequestMappingBackfill } from "../services/coding-agent-pull-request-mapping-backfill.service.ts";
 import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import type { CodingAgentProjectActivity } from "../services/coding-agent-session-seen.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
@@ -64,6 +69,7 @@ import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subsc
 import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
 
 const metricPointIdOf = canonicalMetricDataPointSchema.pick({ pointId: true });
+const connectedAtOf = githubInstallationConnectedEventDataSchema.pick({ occurredAt: true });
 const spanIdOf = z.object({ span: spanReceivedEventDataSchema.shape.span.pick({ spanId: true }) });
 
 /** Only spans a coding agent claims by name and scope mint a job (main's dispatch filter). */
@@ -89,6 +95,8 @@ export interface CodingAgentProcessingPipelineDeps {
   sessionFoldCache: CodingAgentSessionFoldCacheRepository;
   /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
   github?: CodingAgentPullRequestMapping;
+  /** Relinks an organization's sessions when GitHub records a connect; absent, no lane mounts. */
+  installationBackfill?: CodingAgentPullRequestMappingBackfill;
   /** Lifts what log and metric received into this pipeline's contribution commands. */
   receivedFacts: Pick<
     CodingAgentReceivedFactsService,
@@ -246,12 +254,28 @@ export class EventingCodingAgentProcessingAdapter {
         },
       });
 
-    const configured = github
+    const mapped = github
       ? builder.withProjectionSubscriber(
           "pullRequestMapping",
           createPullRequestMappingSubscriber(github),
         )
       : builder;
+    const backfill = deps.installationBackfill;
+    // The backfill re-asks idempotent branch mappings, so a redelivered connect is harmless.
+    const configured = backfill
+      ? mapped.withPeerSubscriber("codingAgentInstallationBackfill", {
+          eventType: GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
+          data: githubInstallationConnectedEventDataSchema,
+          options: {
+            deduplication: {
+              makeId: (event) =>
+                `coding-agent-installation-backfill:${event.tenantId}:${String(event.aggregateId)}:${connectedAtOf.parse(event.data).occurredAt}`,
+              ttlMs: 60_000,
+            },
+          },
+          handle: ({ organizationId }) => backfill.backfillPullRequestMappings({ organizationId }),
+        })
+      : mapped;
 
     return (deps.retention ? configured.withRetention(deps.retention) : configured).build();
   }

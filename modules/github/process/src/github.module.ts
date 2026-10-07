@@ -8,6 +8,7 @@ import {
   type GithubBranchDemandComposition,
   type GithubBranchDemand,
 } from "./app/github.app.ts";
+import { githubLifecycleEventing } from "./eventing/github-lifecycle.pipeline.ts";
 import {
   buildGithubMaintenancePipeline,
   githubMaintenanceEventing,
@@ -34,7 +35,8 @@ export const githubProcessModule = defineProcessModule("github")
   .withRepositories(githubRepositories)
   .withApi(GithubModule)
   .withTransports(githubInstallRest, githubTrpcTransport)
-  .withEventing(githubMaintenanceEventing);
+  .withEventing(githubMaintenanceEventing)
+  .withEventing(githubLifecycleEventing);
 
 /** The stores every ad-hoc GitHub composition below needs: a Prisma client and the Redis. */
 type GithubStoreConnections = {
