@@ -10,9 +10,9 @@ argument-hint: "<the schema change, or the migration name the scanner refused>"
 **The rule** (ADR-155, widened to the floor; ADR-173): every release from the LTS floor
 (`packages/upgrade/releases/lts-floor.json`, `3.20.1`) to head keeps running on every later schema.
 `upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
-the new schema. (Today's task runs goose `up` to the head on each target in one pass; the stepping
-applier, goose `up-to` each release's last version, is proven in `specs/upgrade/stepping.feature`
-and not wired, `oneReleaseApplier` in `apps/tasks/src/upgrade.ts`.) Every change is
+the new schema. (A one-release upgrade runs goose `up` on each target in one pass; a jump across
+several releases runs goose `up-to` each release's last version in turn, `releaseSteppingApplier`
+in `apps/tasks/src/upgrade.ts`, `specs/upgrade/stepping.feature`.) Every change is
 expand/contract, and a destructive step may only remove what **no release at or above the floor**
 reads. Which recipe applies at all: the `migration` skill.
 

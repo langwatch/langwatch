@@ -9,6 +9,7 @@ import {
   reconcileTTL,
   resolveClickHouseMigrationTaskConfig,
   runMigrations,
+  type GooseOptions,
 } from "@langwatch/clickhouse-migrations";
 import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
@@ -187,20 +188,40 @@ function resolvePrismaRolledBack({
   });
 }
 
-async function migrateClickHouse({ input }: { input: TaskInput }): Promise<SchemaTargetReport[]> {
+/** What goose is run with for one target; `upTo` is set only when stepping a release. */
+export function clickHouseRunOptions({
+  url,
+  settings,
+  upTo,
+}: {
+  url: string;
+  settings: Pick<GooseOptions, "clusterName" | "childEnvironment" | "waitSeconds"> | undefined;
+  upTo: number | undefined;
+}): GooseOptions {
+  return {
+    connectionUrl: url,
+    clusterName: settings?.clusterName,
+    childEnvironment: settings?.childEnvironment,
+    waitSeconds: settings?.waitSeconds,
+    verbose: true,
+    ...(upTo === undefined ? {} : { upTo }),
+  };
+}
+
+async function migrateClickHouse({
+  input,
+  upTo,
+}: {
+  input: TaskInput;
+  upTo?: number;
+}): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
   const reports: SchemaTargetReport[] = [];
   for (const target of targets) {
     let error: string | null = null;
     try {
-      await runMigrations({
-        connectionUrl: target.url,
-        clusterName: settings?.clusterName,
-        childEnvironment: settings?.childEnvironment,
-        waitSeconds: settings?.waitSeconds,
-        verbose: true,
-      });
+      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo }));
     } catch (failure) {
       error = String(failure instanceof Error ? failure.message : failure)
         .split(target.url)
@@ -422,8 +443,8 @@ function stepSchemaTo({ input }: { input: TaskInput }): StepSchemaTo {
   return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal }) => {
     const postgres = await stepPrisma({ input, release, prismaFolders, lockTimeoutMs, signal });
     if (!postgres.reports.every((report) => report.ok) || gooseUpTo === null) return postgres;
-    // goose runs `up` here: runMigrations takes no up-to version yet.
-    return { ...postgres, reports: [...postgres.reports, ...(await migrateClickHouse({ input }))] };
+    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo });
+    return { ...postgres, reports: [...postgres.reports, ...clickhouse] };
   };
 }
 

@@ -68,12 +68,11 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   run `schema_failed`), takes the runner lease there (ttl 60 s, renewed every 15 s, a second run
   waits 10 min), seeds an empty ledger, refuses an installation below the floor (exit 2), then walks
   the plan release by release: the release's schema, then its blocking steps; then the reconcilers.
-  **Today the schema applier is `oneReleaseApplier` (`apps/tasks/src/upgrade.ts`): Prisma deploy and
-  goose `up` on every ClickHouse target apply all releases' schema in the first pass, so a blocking
-  step sees head schema.** The stepping applier that applies one release's folders and goose `up-to`
-  at a time (`packages/upgrade/src/stepping/apply-release.ts`, `specs/upgrade/stepping.feature`) is
-  proven in tests and not wired. Write a blocking step as if stepped (frozen SQL, its own release's
-  columns). Postgres sessions carry `lock_timeout` (10 s) and a failed apply is attempted up to 3
+  **A one-release upgrade applies its schema in one pass (`oneReleaseApplier`); a jump across
+  several releases steps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`): each release's
+  Prisma folders and goose `up-to` its last version, then its blocking steps, so a blocking step sees
+  its own release's schema** (`specs/upgrade/stepping.feature`). Unreleased schema goes in one pass at
+  the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions carry `lock_timeout` (10 s) and a failed apply is attempted up to 3
   times (2 s, then 4 s). A Prisma migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a
   `lock_timeout` cancel) is marked rolled back and retried, logged by name; an older one stops the
   run `failed_prisma_migration` naming the `prisma migrate resolve` command
@@ -101,7 +100,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Piece                                                                            | State                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, manifests, floor  | landed (`packages/upgrade`, `apps/tasks/src/upgrade.ts`)                                                |
-| Stepping applier (one release's schema at a time) in the real task               | **not wired**: `oneReleaseApplier` applies all schema at once (`packages/upgrade/src/stepping`)         |
+| Stepping applier (one release's schema at a time) in the real task               | landed for multi-release jumps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                  |
 | Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen         | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/serving-roster`)                             |
 | Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals           | landed (`packages/*/src/__tests__/migration-safety.rules.ts`)                                           |
 | `migration-order` CI check, `migration-owners` policy                            | landed (`cmd/migrationorder`, `packages/architecture-enforcer`)                                         |

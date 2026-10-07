@@ -164,3 +164,24 @@ Feature: Stepping the schema one release at a time
     Given release manifests that carry no goose version up to a release
     When the schema up to that release is worked out
     Then it names every Prisma folder up to it and no goose version
+
+  @unit
+  Scenario: A stepped release migrates ClickHouse up to its own last goose version
+    Given a stepped release whose manifests up to it list goose version 2
+    When its ClickHouse migrations run
+    Then goose is asked to stop at version 2
+    And a one-pass upgrade asks goose for no stopping version
+
+  @unit
+  Scenario: Without a stopping version goose runs exactly as before
+    Given a ClickHouse migration run with no stopping version
+    When the goose passes are worked out
+    Then a server that needs the dimension compatibility replays up to 86 and then runs up
+    And any other server runs up alone
+
+  @unit
+  Scenario: With a stopping version neither goose pass goes past it
+    Given a ClickHouse migration run that stops at a version
+    When the goose passes are worked out
+    Then the compatibility replay stops at the lower of 86 and that version
+    And the final pass runs up to that version

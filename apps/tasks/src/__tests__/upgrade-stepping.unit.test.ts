@@ -6,6 +6,7 @@ import type { SchemaTargetReport, UpgradeSchemaApplier } from "@langwatch/upgrad
 import { describe, expect, it } from "vitest";
 
 import {
+  clickHouseRunOptions,
   releaseSchemaUpTo,
   releaseSteppingApplier,
   type StepSchemaTo,
@@ -177,5 +178,23 @@ describe("releaseSchemaUpTo()", () => {
       prismaFolders: ["20261001000000_base"],
       gooseUpTo: null,
     });
+  });
+});
+
+describe("clickHouseRunOptions()", () => {
+  const settings = { clusterName: undefined, childEnvironment: {}, waitSeconds: 5 };
+
+  /** @scenario "A stepped release migrates ClickHouse up to its own last goose version" */
+  it("carries the release's goose version when stepping and none in one pass", () => {
+    const url = "http://clickhouse:8123/langwatch";
+    expect(clickHouseRunOptions({ url, settings, upTo: 2 }).upTo).toBe(2);
+    expect(clickHouseRunOptions({ url, settings, upTo: undefined })).toEqual({
+      connectionUrl: url,
+      clusterName: undefined,
+      childEnvironment: {},
+      waitSeconds: 5,
+      verbose: true,
+    });
+    expect("upTo" in clickHouseRunOptions({ url, settings, upTo: undefined })).toBe(false);
   });
 });
