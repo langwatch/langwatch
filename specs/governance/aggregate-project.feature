@@ -273,7 +273,10 @@ Feature: An aggregate project reads its member projects
     # half it is. The proof is narrowed to one of its own tenants; a tenant
     # outside the proof is refused rather than read.
 
-  @integration
+  # Unimplemented: analytics read through raw clients and the rollup windows
+  # on BucketStart, a time column the fence does not admit yet; the fifth
+  # time column awaits a decision (ADR-144 open questions).
+  @integration @unimplemented
   Scenario: Analytics aggregate across members
     Given an aggregate project with two members each holding traces
     When ana opens the aggregate's analytics
@@ -304,28 +307,32 @@ Feature: An aggregate project reads its member projects
 
   # ── G. Privacy and audit ─────────────────────────────────────────────────
 
-  @integration
+  # Unimplemented: block G.
+  @integration @unimplemented
   Scenario: The strictest member privacy policy applies
     Given an aggregate project with one member on a loose privacy policy
     And another member on a strict privacy policy
     When ana reads the aggregate's trace list
     Then the strict policy's redaction applies to every row
 
-  @integration
+  # Unimplemented: block G.
+  @integration @unimplemented
   Scenario: Any read of the aggregate writes the admin view audit row
     Given an aggregate project with one member holding one trace
     When ana opens the aggregate's trace list and then that trace within five minutes
     Then one audit row of kind aggregate exists for ana and that project
     And no row names the trace or the member
 
-  @integration
+  # Unimplemented: block G.
+  @integration @unimplemented
   Scenario: The audit row repeats after the five-minute window
     Given an aggregate project
     When ana opens its trace list twice within five minutes
     Then one audit row of kind aggregate exists for ana and that project
     And a list read ten minutes later writes a second row
 
-  @integration
+  # Unimplemented: block G.
+  @integration @unimplemented
   Scenario: Audit rows for personal and team workspace views are unchanged
     Given ana opens sam's personal workspace
     Then one audit row of kind personal exists, as before
