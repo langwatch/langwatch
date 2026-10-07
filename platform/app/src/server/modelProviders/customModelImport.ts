@@ -17,7 +17,9 @@ import type { ListedModel } from "./modelListing";
  */
 export type ModelImportOutcome =
   | { status: "imported"; added: number; total: number }
-  | { status: "failed" };
+  | { status: "failed" }
+  /** The organization used up its provider check budget; nothing was asked. */
+  | { status: "skipped" };
 
 export type MergedModelLists = {
   customModels: CustomModelEntry[];

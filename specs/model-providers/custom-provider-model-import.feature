@@ -133,7 +133,7 @@ Feature: Import a custom provider's models on save
     Given my organization has used up its connection check budget
     When I save a custom provider
     Then the provider is saved with the models I sent
-    And the save reports the import as failed
+    And the save reports the import as skipped
     And the endpoint is not called
 
   @integration
@@ -154,6 +154,7 @@ Feature: Import a custom provider's models on save
     Given a save that imported 3 models from "My Endpoint"
     Then a success toast reads "Imported 3 models from My Endpoint"
     And when the import failed a warning toast says the models could not be listed and can be added by hand
+    And when the import was skipped by the check budget a toast asks the user to save again shortly
 
   @integration
   Scenario: See all models lists a custom provider's own models

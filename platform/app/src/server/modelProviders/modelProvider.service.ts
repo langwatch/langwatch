@@ -65,12 +65,6 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 const logger = createLogger("langwatch:modelProviders:service");
 
-/** Asks a provider to list its models with the credential the save stores. */
-export type ListProviderModels = (
-  provider: string,
-  customKeys: Record<string, string>,
-) => Promise<ValidationResult>;
-
 /** The import step's result, before the write folds it in. */
 type ModelListingImport = {
   outcome: ModelImportOutcome;
@@ -563,13 +557,11 @@ export class ModelProviderService {
   private readonly prisma: PrismaClient;
   private readonly repository: ModelProviderRepository;
   private readonly changeEvents: ChangeEventRepository;
-  private readonly listProviderModels: ListProviderModels;
 
   constructor({
     prisma,
     repository,
     changeEvents,
-    listProviderModels,
   }: {
     prisma: PrismaClient;
     repository: ModelProviderRepository;
@@ -581,13 +573,10 @@ export class ModelProviderService {
      * this provider id so the next request resolves the new key.
      */
     changeEvents?: ChangeEventRepository;
-    /** The model listing probe; the credential check by default. */
-    listProviderModels?: ListProviderModels;
   }) {
     this.prisma = prisma;
     this.repository = repository;
     this.changeEvents = changeEvents ?? new ChangeEventRepository(prisma);
-    this.listProviderModels = listProviderModels ?? validateProviderApiKey;
   }
 
   /**
@@ -1115,12 +1104,12 @@ export class ModelProviderService {
     // per-organization budget as a connection test. An exhausted budget
     // skips the import and keeps the save.
     if (!(await this.isModelListingWithinBudget(input))) {
-      return { outcome: { status: "failed" } };
+      return { outcome: { status: "skipped" } };
     }
 
-    let listed: Awaited<ReturnType<ListProviderModels>>;
+    let listed: ValidationResult;
     try {
-      listed = await this.listProviderModels(input.provider, keys);
+      listed = await validateProviderApiKey(input.provider, keys);
     } catch (error) {
       logger.warn(
         { provider: input.provider, error },

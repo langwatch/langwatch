@@ -86,6 +86,17 @@ describe("parseModelListing", () => {
       ]);
     });
 
+    it("reads reasoning from supported parameters", () => {
+      expect(
+        parseModelListing({
+          data: [
+            { id: "with", supported_parameters: ["temperature", "reasoning"] },
+            { id: "without", supported_parameters: ["temperature"] },
+          ],
+        }),
+      ).toEqual([{ id: "with", hasReasoning: true }, { id: "without" }]);
+    });
+
     it("does not read an empty reasoning efforts list as reasoning", () => {
       expect(
         parseModelListing({

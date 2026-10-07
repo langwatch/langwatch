@@ -761,6 +761,26 @@ describe("useProviderFormSubmit()", () => {
       );
     });
 
+    it("tells the user to save again when the import was skipped", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "skipped" },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Models were not imported this time",
+          type: "info",
+        }),
+      );
+    });
+
     it("shows no import toast when nothing new was imported", async () => {
       mockUpdateMutateAsync.mockResolvedValueOnce({
         modelImport: { status: "imported", added: 0, total: 3 },

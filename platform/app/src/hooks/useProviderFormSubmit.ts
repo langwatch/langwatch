@@ -105,7 +105,7 @@ export type AdvancedGatewayPayload = {
  * Tells the user what the save imported from the provider's model listing.
  * Nothing is shown when the provider does not import, or imported nothing new.
  */
-export function showModelImportToast({
+function showModelImportToast({
   modelImport,
   providerName,
 }: {
@@ -118,6 +118,16 @@ export function showModelImportToast({
       title: "Could not list models from this provider",
       description: "The provider was saved. Add its models by hand.",
       type: "warning",
+      duration: 6000,
+    });
+    return;
+  }
+  if (modelImport.status === "skipped") {
+    toaster.create({
+      title: "Models were not imported this time",
+      description:
+        "The provider was saved. Too many provider checks ran in the last minute. Save again in a minute to import its models.",
+      type: "info",
       duration: 6000,
     });
     return;

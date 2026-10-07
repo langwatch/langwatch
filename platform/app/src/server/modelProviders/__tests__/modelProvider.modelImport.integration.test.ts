@@ -376,7 +376,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     // Last in the file: it spends the organization's whole budget.
     describe("given the organization used up its connection check budget", () => {
       /** @scenario An exhausted listing budget skips the import and keeps the save */
-      it("saves the models sent without calling the endpoint", async () => {
+      it("saves the models sent and reports the import skipped without calling the endpoint", async () => {
         listing(["model-a"]);
         await expect(async () => {
           for (let i = 0; i < 100; i++) {
@@ -391,7 +391,7 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
 
         const saved = await save({ customModels: [manual] });
 
-        expect(saved.modelImport).toEqual({ status: "failed" });
+        expect(saved.modelImport).toEqual({ status: "skipped" });
         expect(await storedChat(saved.id)).toEqual([manual]);
         expect(endpoint.requests).toEqual([]);
       });
