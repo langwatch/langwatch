@@ -54,6 +54,38 @@ describe("the authorization proof", () => {
       ).not.toThrow();
       expect(Object.isFrozen(authorization)).toBe(true);
     });
+
+    it("freezes every nested object, so a holder cannot rewrite a grant", () => {
+      const authorization = sealAuthorization(proof());
+      const [own, member] = authorization.grants;
+      if (!own || !member) throw new Error("the fixture proof has two grants");
+
+      for (const nested of [
+        authorization.actor,
+        authorization.principal,
+        authorization.scope,
+        authorization.purpose,
+        authorization.grants,
+        own,
+        own.permissions,
+        own.via,
+        member,
+        member.condition,
+        member.permissions,
+        member.via,
+      ]) {
+        expect(Object.isFrozen(nested)).toBe(true);
+      }
+      expect(() => {
+        (member as { projectId?: string }).projectId = "proj_outsider";
+      }).toThrow(TypeError);
+      expect(() => {
+        (member.condition as { from: number }).from = 0;
+      }).toThrow(TypeError);
+      expect(member.projectId).toBe("proj_member");
+      expect(member.condition?.from).toBe(NOW - 1_000);
+      expect(isSealedAuthorization(authorization)).toBe(true);
+    });
   });
 
   describe("when a proof is assembled by hand", () => {

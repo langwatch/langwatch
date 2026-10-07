@@ -166,11 +166,21 @@ export type Authorization = z.infer<typeof authorizationSchema> & {
 
 const sealed = new WeakSet<object>();
 
+/** Freeze an object and every object and array it reaches, so no part of a
+ *  sealed proof can be rewritten after the seal is taken. */
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== "object" || value === null) return value;
+  for (const nested of Object.values(value)) deepFreeze(nested);
+  return Object.freeze(value);
+}
+
 /** Validate and seal a proof. Only `authz.authorize` and its equivalents
- *  for events and operators call this; a store client checks the seal. */
+ *  for events and operators call this; a store client checks the seal. The
+ *  proof is frozen all the way down before it is sealed, so the grants,
+ *  their windows and the principal stay as they were minted. */
 export function sealAuthorization(input: AuthorizationInput): Authorization {
   const parsed = authorizationSchema.parse(input);
-  const frozen = Object.freeze(parsed) as Authorization;
+  const frozen = deepFreeze(parsed) as Authorization;
   sealed.add(frozen);
   return frozen;
 }
