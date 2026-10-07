@@ -280,8 +280,10 @@ describe("Postgres migration safety", () => {
       expect(
         rules('ALTER TABLE "P" ADD CONSTRAINT "P_t" FOREIGN KEY ("t") REFERENCES "T"("id");'),
       ).toEqual(["new-foreign-key"]);
-      expect(rules('-- the old FOREIGN KEY went\nALTER TABLE "P" ADD COLUMN "p" TEXT;')).toEqual([]);
-      expect(rules("COMMENT ON COLUMN \"P\".\"t\" IS 'references the team';")).toEqual([]);
+      expect(rules('-- the old FOREIGN KEY went\nALTER TABLE "P" ADD COLUMN "p" TEXT;')).toEqual(
+        [],
+      );
+      expect(rules('COMMENT ON COLUMN "P"."t" IS \'references the team\';')).toEqual([]);
     });
 
     /** @scenario "Renaming a column or a table in place is refused by name" */

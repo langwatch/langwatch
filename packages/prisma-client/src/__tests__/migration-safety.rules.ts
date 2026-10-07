@@ -304,8 +304,7 @@ function indexAndConstraintFindings({ sql, live, created }: Scoped & { sql: stri
     }
     const table = alteredTable(text);
     if (!table || created.has(table)) return [];
-    const pattern =
-      /\bADD\s+(?:CONSTRAINT\s+"?\w+"?\s+)?(UNIQUE|PRIMARY\s+KEY|EXCLUDE|CHECK)\b/i;
+    const pattern = /\bADD\s+(?:CONSTRAINT\s+"?\w+"?\s+)?(UNIQUE|PRIMARY\s+KEY|EXCLUDE|CHECK)\b/i;
     const match = pattern.exec(text);
     if (!match) return [];
     const kind = match[1]!.toUpperCase().replace(/\s+/g, " ");
