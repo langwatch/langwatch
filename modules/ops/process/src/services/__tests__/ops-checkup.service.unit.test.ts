@@ -206,7 +206,7 @@ describe("OpsCheckupService", () => {
       });
       expect(clickhouse).toMatchObject({
         outcome: "refused",
-        code: "checkup_clickhouse_migrations_pending",
+        code: "checkup_clickhouse_migration_failed",
       });
       expect(clickhouse?.detail).toContain("clickhouse:00002");
     });

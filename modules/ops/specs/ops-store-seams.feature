@@ -27,3 +27,29 @@ Feature: Ops repositories hold only ops' own stores
     Given ops' memory registry
     When the checkup pings ClickHouse
     Then the ping answers without a raw ClickHouse client composed by the module
+
+  @unit
+  Scenario: A replay run's engine is built by ops' registry over the registered pipelines
+    Given ops' live registry over Redis, ClickHouse and the process's eventing member
+    When a replay run asks for its engine with the retention ops' service resolved
+    Then the engine rebuilds the projections the registered pipelines declare
+    And closing the run releases its own Redis connection
+
+  @unit
+  Scenario: A memory process refuses a replay run rather than invent an event log
+    Given ops' memory registry
+    When a replay run asks for its engine
+    Then the request is refused, as on a deployment that cannot serve a replay
+
+  @unit
+  Scenario: Introspection and the migration pass's private routes are read from ops' registry
+    Given ops' registries over the process's eventing member
+    When introspection lists the pipelines and the migration pass asks for private routes
+    Then the pipelines are the ones eventing registered
+    And the routes are the routed ClickHouse member's, or none in a memory process
+
+  @unit
+  Scenario: Ops boots over memory stores with only the eventing member beside them
+    Given a process composed over memory stores and an eventing member
+    When it boots ops in the api or the worker role
+    Then ops installs and answers without any raw Postgres, Redis or ClickHouse client

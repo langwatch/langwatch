@@ -1,11 +1,13 @@
-import { InMemoryProcessStore } from "@langwatch/eventing";
+import { type EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 
 import { NullBlobStoreRepository } from "../blob-store.repository.ts";
+import { EventingPipelineDefinitionsRepository } from "../eventing/eventing.pipeline-definitions.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
 import { NullQueueRepository } from "../queue.repository.ts";
 import { MemoryAnomalyRateTrackerRepository } from "./memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
+import { MemoryClickHouseRoutesRepository } from "./memory.clickhouse-routes.repository.ts";
 import { MemoryCredentialsResealRepository } from "./memory.credentials-reseal.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
@@ -25,6 +27,7 @@ import { MemoryProcessAuditRepository } from "./memory.process-audit.repository.
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
 import { MemoryProcessOpsRepository } from "./memory.process-ops.repository.ts";
 import { MemoryProjectTenantSourceRepository } from "./memory.project-tenant-source.repository.ts";
+import { MemoryReplayRuntimeRepository } from "./memory.replay-runtime.repository.ts";
 import { MemoryReplayRepository } from "./memory.replay.repository.ts";
 import { MemorySchedulerAuditRepository } from "./memory.scheduler-audit.repository.ts";
 import { MemoryStorageFootprintRepository } from "./memory.storage-footprint.repository.ts";
@@ -43,9 +46,12 @@ import {
 } from "./memory.user-tenant-source.repository.ts";
 
 export class MemoryOpsRepositories {
-  static readonly requires = [] as const;
+  /** Introspection reads the registered pipelines in memory too (Q212). */
+  static readonly requires = ["eventing"] as const;
 
-  static create(): OpsRepositories {
+  static create({
+    eventing,
+  }: Readonly<{ eventing: Pick<EventSourcing, "definitions"> }>): OpsRepositories {
     const store = MemoryOpsStore.create();
 
     return {
@@ -72,6 +78,9 @@ export class MemoryOpsRepositories {
       queues: NullQueueRepository.create(),
       blobStore: NullBlobStoreRepository.create(),
       replay: MemoryReplayRepository.create({ store }),
+      replayRuntimes: MemoryReplayRuntimeRepository.create(),
+      pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),
+      clickhouseRoutes: MemoryClickHouseRoutesRepository.create(),
       anomalyState: MemoryAnomalyStateRepository.create({ store }),
       rateTracker: MemoryAnomalyRateTrackerRepository.create({ store }),
       storageReadings: MemoryStorageStatsReadingsRepository.create({ store }),

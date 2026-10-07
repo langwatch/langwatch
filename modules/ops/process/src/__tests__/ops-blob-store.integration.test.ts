@@ -16,7 +16,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { OpsOperations } from "../app/ops-composition.build.ts";
+import { OpsOperations } from "../app/ops.app.ts";
 import type {
   OpsEventExplorer,
   OpsProcessExplorer,

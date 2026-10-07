@@ -125,7 +125,8 @@ export function createOpsTestInfrastructure(
 }
 
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
-  const repositories = options.repositories ?? MemoryOpsRepositories.create();
+  const repositories =
+    options.repositories ?? MemoryOpsRepositories.create({ eventing: { definitions: [] } });
 
   const app = OpsModule.fromInfrastructure({
     infrastructure: createOpsTestInfrastructure(options.members, options.capability),

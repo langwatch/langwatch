@@ -180,7 +180,7 @@ describe("given a named exception", () => {
   /** @scenario "A named exception names only the stores it lists, in its one file" */
   it("allows its listed stores in its file and reports any other store or file", () => {
     const auth = "modules/auth/process/src/app/auth-composition.build.ts";
-    const ops = "modules/ops/process/src/app/ops-composition.build.ts";
+    const ops = "modules/ops/process/src/repositories/live/live.replay-runtime.repository.ts";
 
     expect(report(auth, 'import { PrismaClient } from "@prisma/client";')).toEqual([]);
     expect(report(auth, 'import Redis from "ioredis";')).toEqual([]);

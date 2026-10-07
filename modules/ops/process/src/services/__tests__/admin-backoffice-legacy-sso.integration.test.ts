@@ -13,7 +13,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { OpsOperations } from "../../app/ops-composition.build.ts";
+import { OpsOperations } from "../../app/ops.app.ts";
 import type { OpsEventExplorer, OpsProcessExplorer, OpsReplayRunner } from "../../app/ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import { PrismaAdminBackofficeRepository } from "../../repositories/prisma/prisma.instance-admin.repository.ts";
@@ -41,7 +41,7 @@ const refuseEveryQuery = new Proxy(
 function backoffice(connectionDecides = true) {
   return OpsOperations.create({
     repositories: {
-      ...MemoryOpsRepositories.create(),
+      ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
       instanceAdmin: PrismaAdminBackofficeRepository.create(refuseEveryQuery as never),
     },
     audit: new AuditStub(),

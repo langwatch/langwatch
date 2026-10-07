@@ -4,6 +4,7 @@ import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
 import type { BugReportRepository } from "./bug-report.repository.ts";
+import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
 import type {
   ClickHouseHealthRepository,
@@ -18,10 +19,12 @@ import type { ProcessAuditRepository, SchedulerAuditRepository } from "./ops-aud
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { OrganizationTenantSourceRepository } from "./organization-tenant-source.repository.ts";
+import type { PipelineDefinitionsRepository } from "./pipeline-definitions.repository.ts";
 import type { ProcessManagerPurgeRepository } from "./process-manager-purge.repository.ts";
 import type { ProcessOpsRepository } from "./process-ops.repository.ts";
 import type { ProjectTenantSourceRepository } from "./project-tenant-source.repository.ts";
 import type { QueueRepository } from "./queue.repository.ts";
+import type { ReplayRuntimeRepository } from "./replay-runtime.repository.ts";
 import type { ReplayRepository } from "./replay.repository.ts";
 import type { StorageFootprintRepository } from "./storage-footprint.repository.ts";
 import type { StorageStatsReadingsRepository } from "./storage-stats-readings.repository.ts";
@@ -66,6 +69,10 @@ export interface OpsRepositories {
   readonly queues: QueueRepository;
   readonly blobStore: BlobStoreRepository;
   readonly replay: ReplayRepository;
+  /** One replay run's engine; the named raw-client exception (Q212) for ops' event replay. */
+  readonly replayRuntimes: ReplayRuntimeRepository;
+  readonly pipelineDefinitions: PipelineDefinitionsRepository;
+  readonly clickhouseRoutes: ClickHouseRoutesRepository;
   readonly anomalyState: AnomalyStateRepository;
   /** One per process: the queue-metrics writer records into it, the detector reads it. */
   readonly rateTracker: AnomalyRateTrackerRepository;

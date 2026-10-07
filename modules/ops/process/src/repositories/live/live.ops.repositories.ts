@@ -1,9 +1,12 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 
+import { ClickHouseClickHouseRoutesRepository } from "../clickhouse/clickhouse.clickhouse-routes.repository.ts";
 import { ClickHouseClickHouseHealthRepository } from "../clickhouse/clickhouse.datastore-health.repository.ts";
 import { EventExplorerClickHouseRepository } from "../clickhouse/clickhouse.event-explorer.repository.ts";
 import { ClickHouseStorageFootprintRepository } from "../clickhouse/clickhouse.storage-footprint.repository.ts";
+import { EventingPipelineDefinitionsRepository } from "../eventing/eventing.pipeline-definitions.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
 import { PostgresOpsRepositories } from "../prisma/prisma.ops.repositories.ts";
 import { QueueRedisRepository } from "../redis/queue.repository.ts";
@@ -16,22 +19,26 @@ import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
 import { ReplayRedisRepository } from "../redis/redis.replay.repository.ts";
 import { RedisStorageStatsReadingsRepository } from "../redis/redis.storage-stats-readings.repository.ts";
+import { LiveReplayRuntimeRepository } from "./live.replay-runtime.repository.ts";
 
 /**
  * Ops' live stores: its rows in Postgres, the migration lease, the dashboard's snapshots and
- * the queue readings in Redis, and the event log and table footprint in ClickHouse.
+ * the queue readings in Redis, the event log and table footprint in ClickHouse, and the pipeline
+ * definitions replay and introspection read off eventing.
  */
 export const LiveOpsRepositories = {
   ...PostgresOpsRepositories,
-  requires: ["prisma", "redis", "clickhouse"] as const,
+  requires: ["prisma", "redis", "clickhouse", "eventing"] as const,
   create: ({
     prisma,
     redis,
     clickhouse,
+    eventing,
   }: Readonly<{
     prisma: Parameters<typeof PostgresOpsRepositories.create>[0]["prisma"];
     redis: RedisConnection;
     clickhouse: ClickHouseQueryClient;
+    eventing: Pick<EventSourcing, "definitions">;
   }>): OpsRepositories => ({
     ...PostgresOpsRepositories.create({ prisma }),
     migrationLease: RedisMigrationLeaseRepository.create({ redis }),
@@ -40,6 +47,9 @@ export const LiveOpsRepositories = {
     queues: QueueRedisRepository.create({ redis }),
     blobStore: BlobStoreRedisRepository.create(redis),
     replay: ReplayRedisRepository.create({ redis }),
+    replayRuntimes: LiveReplayRuntimeRepository.create({ redis, clickhouse, eventing }),
+    pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),
+    clickhouseRoutes: ClickHouseClickHouseRoutesRepository.create({ clickhouse }),
     anomalyState: RedisAnomalyStateRepository.create(redis),
     rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
     storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),

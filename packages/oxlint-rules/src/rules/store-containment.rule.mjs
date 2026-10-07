@@ -42,7 +42,7 @@ const NAMED_EXCEPTIONS = [
       "Better Auth's storage adapter takes the raw Prisma client and a Redis secondary storage",
   },
   {
-    path: /^modules\/ops\/process\/src\/app\/ops-composition\.build\.ts$/,
+    path: /^modules\/ops\/process\/src\/repositories\/live\/live\.replay-runtime\.repository\.ts$/,
     stores: new Set(["ClickHouse", "Redis"]),
     reason: "ops' event replay reads the event log over ClickHouse and locks on a duplicated Redis",
   },

@@ -15,7 +15,9 @@ describe("given ops' ClickHouse health repository", () => {
   describe("when the memory registry built it", () => {
     /** @scenario "The checkup's ClickHouse ping is answered by ops' registry" */
     it("answers the ping with no ClickHouse client composed", async () => {
-      await expect(MemoryOpsRepositories.create().clickhouseHealth.ping()).resolves.toBeUndefined();
+      await expect(
+        MemoryOpsRepositories.create({ eventing: { definitions: [] } }).clickhouseHealth.ping(),
+      ).resolves.toBeUndefined();
     });
   });
 
