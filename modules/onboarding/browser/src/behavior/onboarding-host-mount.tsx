@@ -5,12 +5,9 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import {
-  useUiCapabilities,
-  useUiDeclarations,
-  useUiScope,
-} from "@langwatch/browser-host/capabilities";
+import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useLent, useLentHooks } from "@langwatch/browser-host/lent";
+import { SampleChoiceToken } from "@langwatch/enterprise-governance-client";
 import { GuidedOnboardingToken, type LangyGuidedOnboarding } from "@langwatch/langy-client";
 import { SidebarToken } from "@langwatch/navigation-client";
 import { JoinOfferToken } from "@langwatch/organization-client";
@@ -218,7 +215,6 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   });
   const sessionActor = session.currentUser();
   const reading = route.reading();
-  const declarations = useUiDeclarations();
   // `useLent` makes the component once per declaration set, so the offer is not remounted.
   const LentJoinOffer = useLent(JoinOfferToken);
   const joinOffers = useMemo(
@@ -231,10 +227,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
 
   const sidebar = useLentHooks(SidebarToken) ?? INERT_SIDEBAR;
 
-  const governance = useMemo(
-    () => declarations.declared("sampleChoice")[0]?.capability ?? INERT_GOVERNANCE,
-    [declarations],
-  );
+  const governance = useLentHooks(SampleChoiceToken) ?? INERT_GOVERNANCE;
 
   const scope: OnboardingScope = useMemo(
     () => ({

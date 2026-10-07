@@ -10859,9 +10859,6 @@ importers:
 
   modules/monitor/process:
     dependencies:
-      '@langwatch/analytics-contract':
-        specifier: workspace:*
-        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -16304,9 +16301,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../modules/dashboard/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../modules/dataset/contract

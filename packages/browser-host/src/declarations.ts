@@ -4,9 +4,7 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
-import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
-import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { UiTokenIdentity } from "@langwatch/module";
 import type {
   AvailableSource,
@@ -33,12 +31,7 @@ export type UiAuthenticationOverviewCardProps = {
 /** What organization's Directory hands the directory status band above its tabs. */
 export type UiDirectorySummaryProps = UiAuthenticationOverviewCardProps;
 
-/** What a screen hands analytics' lent graph: the graph to draw, and what to show when empty. */
-export type UiCustomGraphProps = {
-  input: CustomGraphInput;
-  titleProps?: SystemStyleObject;
-  emptyState?: ReactNode;
-};
+;
 
 /** A dataset column as a dataset surface names it: its name and its type's name. */
 export type UiDatasetColumn = DatasetColumn;
@@ -191,9 +184,6 @@ export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { limitType: "members" | "membersLite"; label?: never }
 );
 
-/** Governance's sample-data choice, written by onboarding's guided tour. */
-export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void };
-
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract.
@@ -205,7 +195,6 @@ export type UiDeclaredCapabilities = {
   };
   /** The directory's status band, drawn above the Directory's tabs; scim lends it. */
   directorySummary: UiDeclaredComponent<UiDirectorySummaryProps>;
-  customGraph: UiDeclaredComponent<UiCustomGraphProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
@@ -213,7 +202,6 @@ export type UiDeclaredCapabilities = {
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
-  sampleChoice: UiGovernanceSampleChoice;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
   studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
 };
