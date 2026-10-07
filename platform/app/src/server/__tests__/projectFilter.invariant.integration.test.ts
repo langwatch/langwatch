@@ -21,7 +21,7 @@
  * end: the same org, read without the safeguard, does contain the home.
  *
  * The same gate holds the aggregate project (ADR-144 decision 5) to a
- * narrower rule: it is listed to organization admins, and to nobody else
+ * narrower rule: it is listed to organisation admins, and to nobody else
  * whichever team it sits on. The aggregate cases at the bottom drive the
  * role-aware listings as a non-admin member and as a Developer seat.
  *
@@ -563,7 +563,7 @@ beforeAll(async () => {
     })),
   });
 
-  // Two people on the aggregate's own team who are not organization admins:
+  // Two people on the aggregate's own team who are not organisation admins:
   // an ordinary member and a Developer seat. Each holds an ADMIN binding on
   // the team, the strongest team-level grant there is, so whatever keeps the
   // aggregate from them is the admin-only rule and not a missing grant.
@@ -828,7 +828,7 @@ describe("the hidden governance project as a member sees it", () => {
 
 /**
  * The listings whose answer depends on who asks, driven as a given person.
- * The aggregate rule is per organization role, so these are the surfaces it
+ * The aggregate rule is per organisation role, so these are the surfaces it
  * can be wrong on; every other surface above is an admin-only screen or hands
  * back ids by permission, and the admin-only route guard covers those.
  */

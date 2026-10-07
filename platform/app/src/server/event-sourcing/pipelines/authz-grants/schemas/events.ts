@@ -126,15 +126,15 @@ export const resourceGrantTermsSchema = z.object({
  *
  * The `project` principal has exactly three legal placements: the resource
  * tier (a share link whose audience is "members who can see this project"),
- * its OWN project's PROJECT scope — the project-credential self-grant the
- * cutover imports, `Project.apiKey` acting as the project it belongs to — and
+ * its OWN project's PROJECT scope (the project-credential self-grant the
+ * cutover imports, `Project.apiKey` acting as the project it belongs to), and
  * the shared project read of ADR-144: a `project-reader` role on ANOTHER
  * project's PROJECT scope that carries a condition. The self-grant is the
  * contract the edge will resolve a project credential against once bare
  * column comparison retires; it is dormant until then (no collector returns
- * PROJECT-principal rows for a user or an api key). Any other placement — a
+ * PROJECT-principal rows for a user or an api key). Any other placement, a
  * project principal on a foreign project under any other role, on a team, or
- * on the organization — would be a standing cross-scope credential nobody
+ * on the organisation, would be a standing cross-scope credential nobody
  * holds, and is refused.
  *
  * The shared read is the only shape that carries a condition and the only

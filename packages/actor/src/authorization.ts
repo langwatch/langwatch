@@ -90,7 +90,7 @@ export type GrantCondition = z.infer<typeof grantConditionSchema>;
 
 export const authorizationGrantSchema = z
   .object({
-    /** Absent: the organization tier (members, keys, SSO). */
+    /** Absent: the organisation tier (members, keys, SSO). */
     projectId: z.string().min(1).optional(),
     /** Own: the caller's full effective set. Shared: the grant's own. */
     permissions: z.array(z.string().min(1)).readonly(),

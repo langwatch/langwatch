@@ -155,7 +155,7 @@ export interface ProjectRepository {
     aggregateRule: AggregateRule;
   }): Promise<Project | null>;
   /**
-   * The slug of the project the app lands a member of an organization on
+   * The slug of the project the app lands a member of an organisation on
    * when they chose none: their oldest unarchived project in it that is not
    * an aggregate (ADR-144 block F). Null when they have none.
    */
@@ -175,7 +175,7 @@ export interface ProjectRepository {
     projectIds?: string[];
     /**
      * Leaves out the governance project always, and aggregate projects unless
-     * the caller is an organization admin (ADR-144 decision 5).
+     * the caller is an organisation admin (ADR-144 decision 5).
      */
     callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>>;
@@ -193,9 +193,9 @@ export interface ProjectRepository {
     teamId: string;
   }): Promise<Project | null>;
   /**
-   * The unarchived projects of one team of the organization, with their
+   * The unarchived projects of one team of the organisation, with their
    * kind: what archiving the team takes out of every aggregate (ADR-144
-   * block E). Empty for a team of another organization.
+   * block E). Empty for a team of another organisation.
    */
   findLiveKindsByTeam(params: {
     teamId: string;

@@ -121,7 +121,7 @@ export async function resolveApiKeyPermissionProjectBatch({
   return new Map(
     cuts.map(([permission, projects]) => [
       permission,
-      closeProjects(projects, closed),
+      closeProjects({ projects, closed }),
     ]),
   );
 }

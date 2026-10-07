@@ -3,42 +3,20 @@
  * proof is what the read actually sees, so the policies come from its
  * grants, never from the aggregate's rule.
  */
-import {
-  type Authorization,
-  narrowAuthorization,
-  sealAuthorization,
-} from "@langwatch/actor";
+import { type Authorization, narrowAuthorization } from "@langwatch/actor";
 import { describe, expect, it } from "vitest";
+import { aggregateProof } from "~/test-utils/authorizationProofs";
 import { policyProjectIdsOf } from "../policyProjectIdsOf";
 
 const AGG = "proj_aggregate";
 const A = "proj_member_a";
 const B = "proj_member_b";
 
-function proof({ shared }: { shared: string[] }): Authorization {
-  return sealAuthorization({
-    actor: { type: "user", id: "ana" },
-    principal: { type: "user", id: "ana" },
-    scope: { organizationId: "org_acme" },
-    grants: [
-      {
-        projectId: AGG,
-        permissions: ["traces:view"],
-        via: [],
-        kind: "own",
-      },
-      ...shared.map((projectId) => ({
-        projectId,
-        permissions: ["traces:view"],
-        via: [`grant_${projectId}`],
-        kind: "shared" as const,
-        condition: { type: "trace" as const, from: 0, until: null },
-      })),
-    ],
-    expiresAt: Date.now() + 60_000,
-    purpose: { kind: "route", route: "tracesV2.list" },
+const proof = ({ shared }: { shared: string[] }): Authorization =>
+  aggregateProof({
+    projectId: AGG,
+    members: shared.map((projectId) => ({ projectId, from: 0 })),
   });
-}
 
 describe("policyProjectIdsOf", () => {
   describe("when the read carries no proof", () => {

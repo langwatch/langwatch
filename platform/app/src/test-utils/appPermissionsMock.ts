@@ -72,7 +72,7 @@ export function appPermissionsService(): PermissionsService {
 /** The stand-in proof the mocked door mints; never a sealed one. It holds
  *  no grants, so nothing reading them (the aggregate read audit) mistakes it
  *  for a proof that reads another project. */
-export const APP_MOCK_AUTHORIZATION = Object.freeze({
+const APP_MOCK_AUTHORIZATION = Object.freeze({
   mock: "authorization",
   grants: Object.freeze([]),
 });

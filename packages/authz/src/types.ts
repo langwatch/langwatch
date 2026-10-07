@@ -4,6 +4,7 @@
  * package (and the app's collector) can name them without importing the walk.
  */
 import type { ShareableResourceKind } from "./registry";
+import type { PROJECT_READER_ROLE_KEY } from "./roles";
 import type {
   CallerKind,
   PrincipalKind,
@@ -88,7 +89,7 @@ export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
 /** ADR-144: the role a SHARED grant carries - one project reading another.
  *  Never a legacy binding role, so it stays out of `BindingRoleKey` and the
  *  compat `RoleBinding` head never sees it. */
-export type SharedRoleKey = "project-reader";
+export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
 
 export type CollectedBinding = {
   roleKey: BindingRoleKey | SharedRoleKey;

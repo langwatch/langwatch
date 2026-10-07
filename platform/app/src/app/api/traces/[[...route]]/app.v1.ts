@@ -1,8 +1,9 @@
-import { type Authorization, internalActor } from "@langwatch/actor";
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import { ownOnlyTraceReadAuthorization } from "~/server/api/authorization";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { readCodingAgentTranscriptWithProtections } from "~/server/api/routers/tracesV2";
 import { requires, type SecuredApp } from "~/server/api/security";
@@ -945,11 +946,10 @@ function authorizeTraceRead({
   projectId: string;
   route: string;
 }): Promise<Authorization> {
-  return getApp().authorization.authorizeInternal({
-    actor: internalActor("app/api/traces/[[...route]]/app.v1.ts"),
+  return ownOnlyTraceReadAuthorization({
+    codePath: "app/api/traces/[[...route]]/app.v1",
     projectId,
-    permission: "traces:view",
-    purpose: { kind: "route", route },
+    route,
   });
 }
 

@@ -41,7 +41,7 @@ export interface TeamRepository {
     teamId: string;
     /**
      * Leaves out the governance project always, and aggregate projects unless
-     * the caller is an organization admin (ADR-144 decision 5).
+     * the caller is an organisation admin (ADR-144 decision 5).
      */
     callerOrganizationRole: string | null;
   }): Promise<TeamProjectListing[]>;

@@ -12,7 +12,7 @@ export type BuiltinRoleKey =
   | "demo-viewer"
   | "org-admin"
   | "org-member"
-  | "project-reader";
+  | typeof PROJECT_READER_ROLE_KEY;
 
 /** ADR-144: the role key a shared project-to-project grant carries. */
 export const PROJECT_READER_ROLE_KEY = "project-reader" as const;

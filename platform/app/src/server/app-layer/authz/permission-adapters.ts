@@ -394,7 +394,7 @@ export async function batchScopePermissions(
   });
   return {
     teams: decision.teams,
-    projects: closeProjects(decision.projects, closed),
+    projects: closeProjects({ projects: decision.projects, closed }),
   };
 }
 

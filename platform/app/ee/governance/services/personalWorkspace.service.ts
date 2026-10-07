@@ -71,7 +71,7 @@ export interface LwqlKeyMapSync {
 }
 
 /** Re-reads every aggregate of the organisation (ADR-144 block E). */
-export type AggregateMembersSync = Pick<
+type AggregateMembersSync = Pick<
   AggregateReconciler,
   "reconcileOrganizationOrLog"
 >;

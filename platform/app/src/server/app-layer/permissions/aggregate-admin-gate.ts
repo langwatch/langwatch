@@ -32,7 +32,7 @@ const MAX_CACHED_KINDS = 10_000;
  * remembered answer never goes stale and is safe to keep per process; the
  * bound only caps memory.
  */
-export class CachedProjectKindReader implements ProjectKindReader {
+class CachedProjectKindReader implements ProjectKindReader {
   private readonly kinds = new Map<string, string>();
 
   constructor(private readonly source: ProjectKindRepository) {}
@@ -74,9 +74,7 @@ export class CachedProjectKindReader implements ProjectKindReader {
 const readersByPrisma = new WeakMap<PrismaClient, CachedProjectKindReader>();
 
 /** One reader, and so one cache, per Prisma handle. */
-export function projectKindReaderFor(
-  prisma: PrismaClient,
-): CachedProjectKindReader {
+export function projectKindReaderFor(prisma: PrismaClient): ProjectKindReader {
   const existing = readersByPrisma.get(prisma);
   if (existing) return existing;
   const reader = new CachedProjectKindReader(
@@ -148,10 +146,13 @@ export async function aggregatesClosedTo({
 }
 
 /** The project answers with every closed aggregate turned to false. */
-export function closeProjects(
-  projects: ReadonlyMap<string, boolean>,
-  closed: ReadonlySet<string>,
-): Map<string, boolean> {
+export function closeProjects({
+  projects,
+  closed,
+}: {
+  projects: ReadonlyMap<string, boolean>;
+  closed: ReadonlySet<string>;
+}): Map<string, boolean> {
   return new Map(
     [...projects].map(([projectId, permitted]) => [
       projectId,

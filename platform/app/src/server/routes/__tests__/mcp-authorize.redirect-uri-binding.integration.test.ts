@@ -329,7 +329,7 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
  * authorization code carries the project's base key. So even an
  * organisation admin, who may open the aggregate, is refused a code for it.
  */
-describe("POST /api/mcp/authorize — a project that holds no credential", () => {
+describe("POST /api/mcp/authorize, given a project that holds no credential", () => {
   beforeEach(resetMocks);
 
   describe("when an organisation admin authorizes an aggregate project", () => {

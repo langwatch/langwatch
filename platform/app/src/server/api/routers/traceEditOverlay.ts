@@ -1,4 +1,4 @@
-import { type Authorization, internalActor } from "@langwatch/actor";
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
@@ -6,7 +6,10 @@ import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEd
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
 import type { Protections } from "~/server/traces/protections";
-import { requireRouteAuthorization } from "../authorization";
+import {
+  ownOnlyTraceReadAuthorization,
+  requireRouteAuthorization,
+} from "../authorization";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -65,11 +68,10 @@ function authorizeOverlaySummaryRead({
   projectId: string;
   route: string;
 }): Promise<Authorization> {
-  return getApp().authorization.authorizeInternal({
-    actor: internalActor("api/routers/traceEditOverlay"),
+  return ownOnlyTraceReadAuthorization({
+    codePath: "api/routers/traceEditOverlay",
     projectId,
-    permission: "traces:view",
-    purpose: { kind: "route", route },
+    route,
   });
 }
 

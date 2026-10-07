@@ -7,7 +7,6 @@
  * Framework-free on purpose, so the new-project form and the server agree on
  * the shapes through one schema.
  */
-import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 /** The discriminator of `Project.aggregateRule`. */
@@ -51,26 +50,3 @@ export function aggregateRuleFromDb(value: unknown): AggregateRule | null {
 export const AGGREGATE_DEFAULT_RULE = {
   kind: "all-personal",
 } as const satisfies AggregateRule;
-
-/**
- * A rule named a project or a department this organisation does not own, or
- * one an aggregate cannot read (the hidden governance project, another
- * aggregate). Raised before anything is written, so a refused rule leaves no
- * project and no grant behind.
- *
- * One code for every case on purpose: telling "belongs to another
- * organisation" apart from "does not exist" would confirm to the caller that
- * an id they guessed is real somewhere else.
- */
-export class AggregateRuleOutsideOrganizationError extends HandledError {
-  declare readonly code: "aggregate_rule_outside_organization";
-
-  constructor() {
-    super(
-      "aggregate_rule_outside_organization",
-      "The rule names a project or department outside this organization",
-      { httpStatus: 400 },
-    );
-    this.name = "AggregateRuleOutsideOrganizationError";
-  }
-}

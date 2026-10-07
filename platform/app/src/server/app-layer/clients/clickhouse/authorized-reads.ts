@@ -34,7 +34,7 @@ import type { AuthzPermission } from "@langwatch/authz";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 /** What a reader may be asked for, and the permission each one needs. */
-export const READ_RESOURCES = {
+const READ_RESOURCES = {
   traces: "traces:view",
   analytics: "analytics:view",
 } as const satisfies Record<string, AuthzPermission>;
@@ -57,7 +57,7 @@ export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set(
  * `ScheduledAt` on `evaluation_runs` (each is that table's partition key in
  * migration 00002), `Timestamp` on the log tables.
  */
-export const TENANT_SCOPE_TIME_COLUMNS = [
+const TENANT_SCOPE_TIME_COLUMNS = [
   "OccurredAt",
   "StartTime",
   "ScheduledAt",
@@ -66,7 +66,7 @@ export const TENANT_SCOPE_TIME_COLUMNS = [
 export type TenantScopeTimeColumn = (typeof TENANT_SCOPE_TIME_COLUMNS)[number];
 
 /** Every parameter the fence binds starts with this; callers may not. */
-export const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
+const TENANT_SCOPE_PARAM_PREFIX = "tenantScope";
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
@@ -160,7 +160,7 @@ function describe(violation: StatementScopeViolation): string {
 /** One shared project and the window its grant opens, as the fence binds it. */
 type SharedWindow = { projectId: string; from: number; until: number | null };
 
-export type TenantFence = {
+type TenantFence = {
   /**
    * The own projects, read outright. Empty only on a proof narrowed to one
    * of its shared projects, where the fence is that project's window alone.
@@ -243,7 +243,7 @@ export function fenceExpression({
 }
 
 /** The set-only form: every tenant in the fence, no window. */
-export function setExpression(fence: TenantFence): {
+function setExpression(fence: TenantFence): {
   sql: string;
   params: Record<string, unknown>;
 } {
@@ -351,7 +351,7 @@ export function singleTenantOf({
  * format kept as a literal so the result set types its rows the way the
  * client's own `query` does.
  */
-export type ScopedQueryParams<Format extends DataFormat = "JSON"> = Omit<
+type ScopedQueryParams<Format extends DataFormat = "JSON"> = Omit<
   QueryParams,
   "format"
 > & { format?: Format };

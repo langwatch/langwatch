@@ -272,7 +272,7 @@ const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
  * underlying ClickHouse scans are ~125MB+ on busy tenants, the result
  * turns over slowly (top values + key sets), and the SWR pattern means
  * users still get a background refresh every ~2 min of actual reads.
- * Cache keys are scoped to the proof's tenant set — see `discoverCacheKey`.
+ * Cache keys are scoped to the proof's tenant set; see `discoverCacheKey`.
  */
 const DISCOVER_TTL_MS = 30 * 60 * 1000;
 /**

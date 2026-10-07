@@ -10,10 +10,10 @@ import {
   AGGREGATE_DEFAULT_RULE,
   AGGREGATE_RULE_KINDS,
   type AggregateRule,
-  AggregateRuleOutsideOrganizationError,
   aggregateRuleSchema,
 } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
+import { AggregateRuleOutsideOrganizationError } from "../errors";
 import { ProjectService } from "../project.service";
 import { AGGREGATE_PROJECT_KIND } from "../project-kinds";
 import type { AggregateRuleRepository } from "../repositories/aggregate-rule.repository";

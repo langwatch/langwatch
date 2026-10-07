@@ -164,7 +164,7 @@ describe("each query-builder facet", () => {
     const idxTenant = sql.indexOf(TENANT_MARKER_PREFIX);
     expect(
       idxTenant,
-      "every facet query must carry the tenant marker the reader expands — multitenancy invariant",
+      "every facet query must carry the tenant marker the reader expands: multitenancy invariant",
     ).toBeGreaterThan(-1);
     expect(sql, "a facet never names the tenant itself").not.toMatch(
       /TenantId\s*=/,

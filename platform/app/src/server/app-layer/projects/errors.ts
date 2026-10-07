@@ -40,3 +40,26 @@ export class AggregateProjectAdminOnlyError extends HandledError {
     this.name = "AggregateProjectAdminOnlyError";
   }
 }
+
+/**
+ * A rule named a project or a department this organisation does not own, or
+ * one an aggregate cannot read (the hidden governance project, another
+ * aggregate). Raised before anything is written, so a refused rule leaves no
+ * project and no grant behind.
+ *
+ * One code for every case on purpose: telling "belongs to another
+ * organisation" apart from "does not exist" would confirm to the caller that
+ * an id they guessed is real somewhere else.
+ */
+export class AggregateRuleOutsideOrganizationError extends HandledError {
+  declare readonly code: "aggregate_rule_outside_organization";
+
+  constructor() {
+    super(
+      "aggregate_rule_outside_organization",
+      "The rule names a project or department outside this organization",
+      { httpStatus: 400 },
+    );
+    this.name = "AggregateRuleOutsideOrganizationError";
+  }
+}

@@ -247,13 +247,13 @@ secured
 /**
  * One project of this organization, addressed by id — and never the hidden
  * governance project, nor an aggregate unless the credential's owner is an
- * organization admin.
+ * organisation admin.
  *
  * The governance project is excluded from every listing surface, so answering a
  * read about it is the one thing left that would confirm it exists. It reads as
  * not found, which is what it is as far as this API is concerned: the id
  * belongs to an internal tenancy record, not to a workspace anybody can open
- * (ADR-128 §11). An aggregate is listed only to organization admins (ADR-144
+ * (ADR-128 §11). An aggregate is listed only to organisation admins (ADR-144
  * decision 5), so for anyone else it reads as not found for the same reason.
  */
 async function readableProject({
@@ -284,9 +284,9 @@ async function readableProject({
 
 /**
  * Refuses a write to an aggregate unless the credential's owner is an
- * organization admin, reading as not found like {@link readableProject}. The
- * write routes check their permission at the organization, so an
- * organization-tier custom role would otherwise rename or archive one. Every
+ * organisation admin, reading as not found like {@link readableProject}. The
+ * write routes check their permission at the organisation, so an
+ * organisation-tier custom role would otherwise rename or archive one. Every
  * other kind is left to the service, which owns its own refusals (the
  * governance project answers 403 there, naming what it is).
  */

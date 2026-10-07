@@ -1,7 +1,5 @@
-import {
-  type AggregateRule,
-  AggregateRuleOutsideOrganizationError,
-} from "./aggregate-rule";
+import type { AggregateRule } from "./aggregate-rule";
+import { AggregateRuleOutsideOrganizationError } from "./errors";
 import type { AggregateRuleRepository } from "./repositories/aggregate-rule.repository";
 
 /**

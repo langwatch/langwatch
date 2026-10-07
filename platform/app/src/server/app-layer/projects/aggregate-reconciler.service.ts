@@ -62,7 +62,7 @@ export type AggregateReconcileResult = {
   failed: string[];
 };
 
-export type OrganizationReconcileResult = {
+type OrganizationReconcileResult = {
   reconciled: Array<{
     aggregateProjectId: string;
     result: AggregateReconcileResult;
@@ -71,7 +71,7 @@ export type OrganizationReconcileResult = {
 };
 
 /** What woke the reconciler, for the log line only. */
-export type AggregateReconcileTrigger =
+type AggregateReconcileTrigger =
   | "aggregate-created"
   | "rule-edited"
   | "personal-workspace"

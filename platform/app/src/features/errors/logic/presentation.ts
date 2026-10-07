@@ -1456,7 +1456,7 @@ const presentations = {
   // ---- access, org & limits ----
   aggregate_project_admin_only: {
     // Reached from the new-project flow or the rule editor by someone whose
-    // role lets them manage projects but who is not an organization admin.
+    // role lets them manage projects but who is not an organisation admin.
     // Nothing was written, so the copy says who can do it.
     title: "Only organization admins can do this",
     describe: () =>
