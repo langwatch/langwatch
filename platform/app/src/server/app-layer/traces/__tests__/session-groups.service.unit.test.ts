@@ -29,6 +29,7 @@ const PROOF = ownProof({ projectId: TENANT });
 function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
   return {
     conversationId: "session-a",
+    tenantId: TENANT,
     traceCount: 3,
     totalCost: 1.25,
     totalTokens: 4200,
@@ -429,6 +430,7 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 200,
         conversationId: "s-2",
+        tenantId: TENANT,
         ...CURSOR_SORT,
       });
     });
@@ -459,6 +461,7 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 5,
         conversationId: "s-2",
+        tenantId: TENANT,
         sortColumn: "cost",
         sortDirection: "desc",
       });
