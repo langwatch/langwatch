@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { ChartsApiError, ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 import { handledErrorFrom } from "@/internal/api/errors";
@@ -76,14 +76,16 @@ const CHART = {
   rowSpan: 1,
 };
 
+type AsyncMock = Mock<(...args: never[]) => Promise<unknown>>;
+
 interface ServiceMocks {
   schema: ReturnType<typeof vi.fn>;
-  list: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
-  create: ReturnType<typeof vi.fn>;
+  list: AsyncMock;
+  get: AsyncMock;
+  create: AsyncMock;
   update: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
-  place: ReturnType<typeof vi.fn>;
+  place: AsyncMock;
   unplace: ReturnType<typeof vi.fn>;
   runQuery: ReturnType<typeof vi.fn>;
 }
@@ -445,21 +447,21 @@ describe("given the analytics schema comes back in an unexpected shape", () => {
 const keepWhatIsGiven = () => {
   const stored = new Map<string, typeof CHART>();
   mocks.create.mockImplementation(
-    async ({ name, definition }: { name: string; definition: (typeof CHART)["definition"] }) => {
+    ({ name, definition }: { name: string; definition: (typeof CHART)["definition"] }) => {
       const chart = { ...CHART, id: `chart-${stored.size + 1}`, name, definition };
       stored.set(chart.id, chart);
-      return chart;
+      return Promise.resolve(chart);
     },
   );
-  mocks.get.mockImplementation(async (id: string) => stored.get(id));
+  mocks.get.mockImplementation((id: string) => Promise.resolve(stored.get(id)));
   mocks.place.mockImplementation(
-    async (id: string, placement: { dashboardId: string; gridRow?: number }) => {
+    (id: string, placement: { dashboardId: string; gridRow?: number }) => {
       const placed = { ...stored.get(id)!, ...placement, gridRow: placement.gridRow ?? 3 };
       stored.set(id, placed as unknown as typeof CHART);
-      return placed;
+      return Promise.resolve(placed);
     },
   );
-  mocks.list.mockImplementation(async () => ({ data: [...stored.values()] }));
+  mocks.list.mockImplementation(() => Promise.resolve({ data: [...stored.values()] }));
 };
 
 describe("authoring a chart through the CLI", () => {
