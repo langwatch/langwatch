@@ -36,6 +36,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { Session } from "../../auth";
 import { prisma } from "../../db";
 import { type App, getApp } from "../app";
@@ -43,10 +44,15 @@ import { PROOF_BEARING_PERMISSIONS } from "../clients/clickhouse/authorized-read
 import { organizationMfa } from "../identity/runtime";
 import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
 import {
+  type ProjectKindReader,
+  projectKindReaderFor,
+} from "../permissions/aggregate-admin-gate";
+import {
   DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
+import { isAggregateProjectKind } from "../projects/project-kinds";
 import {
   permissionDecisionRecord,
   principalOfSession,
@@ -85,6 +91,9 @@ type MiddlewareParams = {
     mfaGate?: Partial<
       Pick<MfaGateDeps, "offered" | "scopes" | "organizationMfa">
     >;
+    /** How a project's kind is read (ADR-144); the process's cached reader
+     *  unless a test hands one in. */
+    projectKinds?: ProjectKindReader;
   };
   input: ScopeInput;
   /** The procedure path tRPC hands every middleware; the proof's purpose. */
@@ -129,6 +138,45 @@ async function mintRouteAuthorization({
 }
 
 /**
+ * ADR-144 decision 9: a read of an aggregate project is audited where its
+ * proof is minted, so a deep link, a prefetch or a direct call is audited
+ * as surely as a rendered page. Only a proof that reads shared grants on an
+ * aggregate qualifies; a plain project's proof never reaches the kind read.
+ * The row is deduplicated per actor and aggregate in process and in the
+ * database, so the cost is one cached kind read per request.
+ *
+ * Never fails the read: an audit failure is logged and reported, and the
+ * next read in the window retries it.
+ */
+async function auditAggregateRead({
+  ctx,
+  session,
+  projectId,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  session: Session;
+  projectId: string;
+}): Promise<void> {
+  const authorization = ctx.authorization;
+  if (!authorization?.grants.some((grant) => grant.kind === "shared")) return;
+  try {
+    const kind = await projectKindsOf(ctx).kindOf(projectId);
+    if (!isAggregateProjectKind(kind)) return;
+    await appOf(ctx).aggregateReadAudit.recordAggregateRead({
+      actorUserId: session.user.id,
+      organizationId: authorization.scope.organizationId,
+      aggregateProjectId: projectId,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "could not audit an aggregate read; the read goes on",
+    );
+    captureException(toError(error));
+  }
+}
+
+/**
  * The gate's dependencies for this request: the flag, the scope lookup, the
  * organization service — and the memo that makes the whole thing cost one
  * query per person per request.
@@ -142,6 +190,10 @@ const mfaGateDepsFor = (ctx: MiddlewareParams["ctx"]): MfaGateDeps => {
     cache: ctx.mfaGateCache,
   };
 };
+
+/** The kind reader this request asks: the injected one, or the cached one. */
+const projectKindsOf = (ctx: MiddlewareParams["ctx"]): ProjectKindReader =>
+  ctx.projectKinds ?? projectKindReaderFor(prisma);
 
 /**
  * The App this request decides through: the one its context factory injected,
@@ -239,6 +291,9 @@ export const checkDeclaredPermission = ({
         permission,
         scope,
       });
+      if (scope.tier === "project") {
+        await auditAggregateRead({ ctx, session, projectId: scope.id });
+      }
 
       ctx.permissionChecked = true;
       return next();

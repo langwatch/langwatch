@@ -10,6 +10,7 @@ import {
   IdentityMatchSuggestionRepository,
 } from "@ee/governance/repositories/governanceIdentity.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import { workspaceViewAggregateReadAudit } from "@ee/governance/services/aggregateReadAudit";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { CostRollupComparatorService } from "@ee/governance/services/costRollupComparator.service";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
@@ -354,6 +355,7 @@ import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { NULL_AGGREGATE_READ_AUDIT } from "./projects/aggregate-read-audit";
 import {
   AGGREGATE_RECONCILE_SWEEP,
   AggregateReconciler,
@@ -2274,6 +2276,10 @@ export function initializeDefaultApp(options?: {
     projects,
     permissions: permissionsServiceFor(prisma),
     authorization: authorizationService,
+    aggregateReadAudit: workspaceViewAggregateReadAudit({
+      prisma,
+      ocsfRepository: governanceOcsfEventsRepository,
+    }),
     tokenizer,
     usage,
     planProvider,
@@ -2726,6 +2732,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     projects: nullProjects,
     permissions: permissionsServiceFor(testPrisma),
     authorization: authorizationServiceFor(testPrisma),
+    aggregateReadAudit: NULL_AGGREGATE_READ_AUDIT,
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,

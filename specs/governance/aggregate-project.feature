@@ -314,24 +314,21 @@ Feature: An aggregate project reads its member projects
     When ana reads the aggregate's trace list
     Then the strict policy's redaction applies to every row
 
-  # Unimplemented: block G.
-  @integration @unimplemented
+  @integration
   Scenario: Any read of the aggregate writes the admin view audit row
     Given an aggregate project with one member holding one trace
     When ana opens the aggregate's trace list and then that trace within five minutes
     Then one audit row of kind aggregate exists for ana and that project
     And no row names the trace or the member
 
-  # Unimplemented: block G.
-  @integration @unimplemented
+  @integration
   Scenario: The audit row repeats after the five-minute window
     Given an aggregate project
     When ana opens its trace list twice within five minutes
     Then one audit row of kind aggregate exists for ana and that project
     And a list read ten minutes later writes a second row
 
-  # Unimplemented: block G.
-  @integration @unimplemented
+  @integration
   Scenario: Audit rows for personal and team workspace views are unchanged
     Given ana opens sam's personal workspace
     Then one audit row of kind personal exists, as before

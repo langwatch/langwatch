@@ -76,6 +76,7 @@ import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
+import type { AggregateReadAudit } from "./projects/aggregate-read-audit";
 import type { ProjectService } from "./projects/project.service";
 import type { ProjectRepository } from "./projects/repositories/project.repository";
 import type { ShareService } from "./share/share.service";
@@ -408,6 +409,13 @@ export interface AppDependencies {
    * to the route as `ctx.authorization`.
    */
   authorization: AuthorizationService;
+  /**
+   * ADR-144 decision 9: where a read of an aggregate project is audited.
+   * The permission middleware calls it when it mints a proof that reads
+   * shared grants on an aggregate. The governance module's adapter writes
+   * the admin workspace view row; the null port records nothing.
+   */
+  aggregateReadAudit: AggregateReadAudit;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;

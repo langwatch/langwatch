@@ -155,6 +155,7 @@ describe("AdminWorkspaceViewAuditService, aggregate kind", () => {
   });
 
   describe("when an admin opens another user's personal workspace", () => {
+    /** @scenario "Audit rows for personal and team workspace views are unchanged" */
     it("writes a row of kind personal and none of kind aggregate", async () => {
       const personalTeamId = fixture.personal.seller.teamId;
       const result = await service.recordView({

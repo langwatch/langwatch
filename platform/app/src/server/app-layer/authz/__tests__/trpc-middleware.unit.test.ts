@@ -194,7 +194,9 @@ describe("checkDeclaredPermission", () => {
       const params = paramsFor({ projectId: "proj-1" });
       (params.ctx as { app?: unknown }).app = {
         permissions: { getDecision },
-        authorization: { authorize: vi.fn().mockResolvedValue({}) },
+        authorization: {
+          authorize: vi.fn().mockResolvedValue({ grants: [] }),
+        },
       };
 
       await checkDeclaredPermission({ permission: "traces:view" })(
@@ -563,7 +565,7 @@ describe("declaredServiceAuthorization", () => {
 });
 
 describe("ADR-144: the proof a trace route carries", () => {
-  const SEALED = { sealed: "proof" };
+  const SEALED = { sealed: "proof", grants: [] };
   const appWith = (authorize = vi.fn().mockResolvedValue(SEALED)) => ({
     permissions: {
       getDecision: vi
@@ -629,6 +631,92 @@ describe("ADR-144: the proof a trace route carries", () => {
           (params.ctx as { authorization?: unknown }).authorization,
         ).toBeUndefined();
       });
+    });
+  });
+});
+
+describe("ADR-144: an aggregate read is audited at the door", () => {
+  const SHARED_PROOF = {
+    scope: { organizationId: "org-1" },
+    grants: [
+      { kind: "own", projectId: "proj-1" },
+      { kind: "shared", projectId: "proj-member" },
+    ],
+  };
+  const setup = ({
+    proof = SHARED_PROOF,
+    kind = "aggregate",
+    record = vi.fn().mockResolvedValue(undefined),
+  }: {
+    proof?: unknown;
+    kind?: string;
+    record?: ReturnType<typeof vi.fn>;
+  } = {}) => {
+    const kindOf = vi.fn().mockResolvedValue(kind);
+    const params = paramsFor({ projectId: "proj-1" });
+    Object.assign(params.ctx, {
+      app: {
+        permissions: {
+          getDecision: vi
+            .fn()
+            .mockResolvedValue({ permitted: true, organizationRole: "ADMIN" }),
+        },
+        authorization: { authorize: vi.fn().mockResolvedValue(proof) },
+        aggregateReadAudit: { recordAggregateRead: record },
+      },
+      projectKinds: { kindOf, kindsOf: vi.fn() },
+    });
+    const run = () =>
+      checkDeclaredPermission({ permission: "traces:view" })(params as any);
+    return { params, kindOf, record, run };
+  };
+
+  describe("when the proof reads shared grants on an aggregate", () => {
+    it("records the read for the caller and the aggregate", async () => {
+      const { record, run } = setup();
+
+      await run();
+
+      expect(record).toHaveBeenCalledWith({
+        actorUserId: "alice",
+        organizationId: "org-1",
+        aggregateProjectId: "proj-1",
+      });
+    });
+  });
+
+  describe("when recording the read fails", () => {
+    it("lets the read go on", async () => {
+      const { params, run } = setup({
+        record: vi.fn().mockRejectedValue(new Error("audit store down")),
+      });
+
+      await run();
+
+      expect(params.next).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the proof reads no shared grant", () => {
+    it("neither reads the kind nor records anything", async () => {
+      const { kindOf, record, run } = setup({
+        proof: { scope: { organizationId: "org-1" }, grants: [] },
+      });
+
+      await run();
+
+      expect(kindOf).not.toHaveBeenCalled();
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project reading shared grants is not an aggregate", () => {
+    it("records nothing", async () => {
+      const { record, run } = setup({ kind: "application" });
+
+      await run();
+
+      expect(record).not.toHaveBeenCalled();
     });
   });
 });
