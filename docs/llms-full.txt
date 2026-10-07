@@ -69395,7 +69395,9 @@ cd /app/apps/api && pnpm --silent run start:prepare:db
 
 That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one lease, so a second run waits for the first) and then the system-migrations pass. It is safe to run again: on a current installation it applies no step and leaves the schema as it is. To see what it would do first, run `cd /app/apps/tasks && pnpm task upgrade plan`; `pnpm task upgrade status` shows the ledger. Both take `--json`.
 
-`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed (a Prisma migration written after re-runnable migrations became the rule is marked rolled back and retried by `upgrade` itself, and exits `rerunnable_migration_failed` only when every attempt failed; an older one is named with the `prisma migrate resolve --rolled-back` command to clear it), `2` the installation is below this release's supported floor, `3` another upgrade holds the lease. A refused or failed run is recorded, so the Upgrades page and `upgrade status` show it.
+`upgrade` exits non-zero and names the cause when it cannot proceed: `1` a step failed, `2` the installation is below this release's supported floor, `3` another upgrade holds the lease. A refused or failed run is recorded, so the Upgrades page and `upgrade status` show it.
+
+When a Prisma migration fails, `upgrade` marks it rolled back and retries it itself if it was written after re-runnable migrations became the rule; it exits `rerunnable_migration_failed` only when every attempt failed. An older migration is named with the `prisma migrate resolve --rolled-back` command to clear it.
 
 ### What the upgrade does
 
