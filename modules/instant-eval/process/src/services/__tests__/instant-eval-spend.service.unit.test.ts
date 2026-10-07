@@ -26,8 +26,6 @@ function peers(overrides: Partial<InstantEvalSpendPeers> = {}): InstantEvalSpend
 }
 
 describe("InstantEvalSpendService", () => {
-  /** @scenario "A finished run is one confirmed spend record addressed by the run" */
-  /** @scenario "The record is billed against the project's organization and team" */
   it("records one priced outcome, attributed to the project's organization and team", async () => {
     const recorded: InstantEvalPricedSpend[] = [];
     const service = InstantEvalSpendService.create({
@@ -58,7 +56,6 @@ describe("InstantEvalSpendService", () => {
     });
   });
 
-  /** @scenario "A synchronous query is one confirmed spend record with a fresh id" */
   it("records a query under a fresh id that names no run", async () => {
     const recorded: InstantEvalPricedSpend[] = [];
     const service = InstantEvalSpendService.create({
@@ -78,7 +75,6 @@ describe("InstantEvalSpendService", () => {
     expect(JSON.parse(recorded[0]?.metadata ?? "{}").instant_eval).not.toHaveProperty("run_id");
   });
 
-  /** @scenario "A retried finish records the same request rather than a second one" */
   it("gives a finish delivered twice the same request id", async () => {
     const requestIds: string[] = [];
     const service = InstantEvalSpendService.create({
@@ -106,7 +102,6 @@ describe("InstantEvalSpendService", () => {
     expect(recordPricedSpend).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A record that cannot be dispatched is raised, not dropped" */
   it("raises a dispatch failure, so the finish intent's retry lands on the same request", async () => {
     const service = InstantEvalSpendService.create({
       peers: peers({

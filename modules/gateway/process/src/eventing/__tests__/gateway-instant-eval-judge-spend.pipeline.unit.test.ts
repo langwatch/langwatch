@@ -4,6 +4,7 @@
  * through its own peer subscriber (ADR-174 decision 13). A repeat under the same request id is
  * the same confirm, which the spend spine keeps once.
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 import {
   createTenantId,
@@ -154,6 +155,39 @@ describe("given gateway's Instant Evals judge spend pipeline beside the judge's 
         costNanoUsd: 100_000_000,
         metadata: JSON.stringify({ instant_eval: { cost_usd: 0.076923077, requests: 1 } }),
         occurredAt: OCCURRED_AT,
+      });
+      await eventing.close();
+    });
+  });
+
+  describe("when the judge records a run's priced spend", () => {
+    /** @scenario "A run's ledger row is written from the judge's priced record" */
+    /** @scenario "The record is billed against the project's organization and team" */
+    it("writes the run's row under the project's organization and team, naming the run", async () => {
+      const { eventing, append, recorded } = harness();
+      const runFact = {
+        ...pricedFact(),
+        requestId: "instanteval_run-1",
+        inputTokens: 2_000,
+        requests: 40,
+        runId: "run-1",
+      };
+
+      await append(runFact, "evt-run-priced");
+      await vi.waitFor(() => expect(recorded).toHaveLength(1));
+
+      expect(recorded[0]).toMatchObject({
+        requestId: "instanteval_run-1",
+        organizationId: ORGANIZATION_ID,
+        teamId: TEAM_ID,
+        requestType: INSTANT_EVAL_REQUEST_TYPE,
+        model: INSTANT_EVAL_SPEND_MODEL,
+        inputTokens: 2_000,
+        costNanoUsd: runFact.priceNanoUsd,
+      });
+      expect(recorded[0]).not.toHaveProperty("virtualKeyId");
+      expect(JSON.parse(recorded[0]?.metadata ?? "{}")).toEqual({
+        instant_eval: { cost_usd: 0.076923077, requests: 40, run_id: "run-1" },
       });
       await eventing.close();
     });

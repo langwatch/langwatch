@@ -19,8 +19,9 @@ export interface InstantEvalJudgeApi {
    */
   isClassifierConfigured(): Promise<boolean>;
   /**
-   * One classification with LangWatch's key, priced by nobody: runs, judged queries and the search
-   * bar record their own spend. Skips as `classifier_not_configured` where there is no key.
+   * One classification with LangWatch's key, priced by nobody: runs and judged queries record
+   * theirs through `recordSpend`, and the search bar records none (ADR-144). Skips as
+   * `classifier_not_configured` where there is no key.
    */
   classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
   /**
@@ -28,6 +29,12 @@ export interface InstantEvalJudgeApi {
    * A refusal is returned, never thrown, and calls no classifier.
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
+  /**
+   * Prices and records what an Instant Evals run or judged query spent, under the organization
+   * the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced
+   * fact cannot be stored, so a run's finish retries onto the same request id.
+   */
+  recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
 }
 
 export const InstantEvalJudgeApi = moduleApi<InstantEvalJudgeApi>()("instant-eval-judge");
@@ -49,6 +56,23 @@ export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
 export interface InstantEvalJudgeCall extends InstantEvalClassification {
   /** The evaluation's retry key: the same key gives the same spend id (ADR-174 decision 9). */
   readonly requestKey?: string;
+}
+
+/** What one Instant Evals run or judged query spent, as its caller records it. */
+export interface InstantEvalJudgeSpendRecord {
+  /** The organization the caller resolved; the judge never looks the project up for it. */
+  readonly organizationId: string;
+  readonly projectId: string;
+  /** The run's own id for every attempt of a run, a fresh id for a query (ADR-174 decision 17). */
+  readonly requestId: string;
+  /** Input tokens the classifier billed for. Zero records nothing. */
+  readonly inputTokens: number;
+  /** Classifications made, one per judged text. */
+  readonly requests: number;
+  /** The run the spend belongs to, when it belongs to one. */
+  readonly runId?: string;
+  /** Epoch milliseconds. */
+  readonly occurredAt: number;
 }
 
 /** Why a judge call was refused before the classifier was called (ADR-174 decision 7). */

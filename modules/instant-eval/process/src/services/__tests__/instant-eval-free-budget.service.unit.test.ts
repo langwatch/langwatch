@@ -27,6 +27,7 @@ function serviceWith({
 } = {}) {
   const clock = { now: 0 };
   const sumSpendNanoUsdByRequestType = vi.fn(async () => spentNanoUsd);
+  const isFreePlan = vi.fn(async () => isFree);
   const reservations = MemoryInstantEvalBudgetReservationsRepository.create({
     now: () => Temporal.Instant.fromEpochMilliseconds(clock.now),
   });
@@ -34,7 +35,7 @@ function serviceWith({
     peers: {
       findOrganizationId: async () => "org_1",
       listProjectIds: async () => projects,
-      isFreePlan: async () => isFree,
+      isFreePlan,
       sumSpendNanoUsdByRequestType,
     },
     reservations,
@@ -42,7 +43,7 @@ function serviceWith({
     now: () => Temporal.Instant.fromEpochMilliseconds(clock.now),
   });
 
-  return { service, sumSpendNanoUsdByRequestType, reservations, clock };
+  return { service, sumSpendNanoUsdByRequestType, isFreePlan, reservations, clock };
 }
 
 async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
@@ -159,6 +160,25 @@ describe("given an organization on a paid plan", () => {
       await service.reserve({ projectId: "proj_1", reservationId: "run_a", priceUsd: 50 });
       await service.release({ projectId: "proj_1", reservationId: "run_a" });
 
+      await expect(reservations.heldNanoUsd({ organizationId: "org_1" })).resolves.toBe(0);
+    });
+  });
+});
+
+describe("given a paid organization the meter does not bill, one dollar spent on Instant Evals", () => {
+  describe("when it starts a run in wave 1", () => {
+    /** @scenario "A paid organization on tiered pricing keeps today's run rules in wave 1" */
+    it("is accepted on the plan's free flag, the rule main had, with no judge to ask", async () => {
+      // The budget's peers hold no Instant Evals judge, so its usage-billing copy cannot be read.
+      const { service, isFreePlan, reservations } = serviceWith({
+        spentNanoUsd: 1 * NANO,
+        isFree: false,
+      });
+
+      await service.reserve({ projectId: "proj_1", reservationId: "run_a", priceUsd: 0.5 });
+      await expect(service.assertWithinBudget({ projectId: "proj_1" })).resolves.toBeUndefined();
+
+      expect(isFreePlan).toHaveBeenCalledWith({ organizationId: "org_1" });
       await expect(reservations.heldNanoUsd({ organizationId: "org_1" })).resolves.toBe(0);
     });
   });

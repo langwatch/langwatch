@@ -11,6 +11,8 @@ import {
   type InstantEvalJudgeCall,
   type InstantEvalJudgeRefusalCode,
   type InstantEvalJudgeSpendPricedEventData,
+  type InstantEvalJudgeSpendRecord,
+  type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
@@ -43,6 +45,8 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   recordSpendPriced: (fact: InstantEvalJudgeSpendPricedEventData) => Promise<void>;
   mintRequestId: () => string;
   now: () => Instant;
+  /** The published rates; a test names its own so a price comes out round. */
+  pricing?: InstantEvalPricing;
   logger?: InstantEvalJudgeLogger;
 }>;
 
@@ -104,9 +108,42 @@ export class InstantEvalJudgeService {
       }),
       inputTokens: judgement.inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
+      ...this.pricing(),
     });
     await this.record({ fact });
     return { outcome: "judged", judgement, priceUsd };
+  }
+
+  /**
+   * A run's or judged query's spend, under the organization its caller resolved: no project
+   * placement and no budget is read here, since runs keep their own $1 check (decision 12).
+   * A fact that cannot be stored throws, so a run's finish retries onto the same request id.
+   */
+  async recordSpend({
+    organizationId,
+    projectId,
+    requestId,
+    inputTokens,
+    requests,
+    runId,
+    occurredAt,
+  }: InstantEvalJudgeSpendRecord): Promise<void> {
+    if (inputTokens <= 0) return;
+    const { fact } = instantEvalJudgeSpendPricedOf({
+      organizationId,
+      projectId,
+      requestId,
+      inputTokens,
+      occurredAt,
+      requests,
+      runId,
+      ...this.pricing(),
+    });
+    await this.deps.recordSpendPriced(fact);
+  }
+
+  private pricing(): { pricing?: InstantEvalPricing } {
+    return this.deps.pricing ? { pricing: this.deps.pricing } : {};
   }
 
   /** Only the judge call reads the usage-billing copy; an organization never folded is capped. */

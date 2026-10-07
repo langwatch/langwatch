@@ -1,7 +1,7 @@
 /**
- * The ledger row one Instant Evals judge call writes, from the judge's priced fact (ADR-174
- * decision 13). The customer price is the row's cost, as for a run or a judged query, and our own
- * cost rides in the metadata. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * The ledger row one Instant Evals judge call, run or judged query writes, from the judge's priced
+ * fact (ADR-174 decision 13). The customer price is the row's cost, and our own cost rides in the
+ * metadata. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import type { GatewayPricedSpend } from "@langwatch/gateway-contract";
 import {
@@ -29,7 +29,12 @@ export function gatewayPricedSpendOfJudge({
     inputTokens: fact.inputTokens,
     costNanoUsd: fact.priceNanoUsd,
     metadata: JSON.stringify({
-      instant_eval: { cost_usd: fact.costNanoUsd / NANO_USD_PER_USD, requests: 1 },
+      instant_eval: {
+        cost_usd: fact.costNanoUsd / NANO_USD_PER_USD,
+        // A judge call is one classification; a run or query says how many it made.
+        requests: fact.requests ?? 1,
+        ...(fact.runId ? { run_id: fact.runId } : {}),
+      },
     }),
     occurredAt: fact.occurredAt,
   };

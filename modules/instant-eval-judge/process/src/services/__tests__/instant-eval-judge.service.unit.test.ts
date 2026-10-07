@@ -358,3 +358,67 @@ describe("given a judge call the classifier answers", () => {
     });
   });
 });
+
+describe("given an Instant Evals run's spend, for a project the judge has not learned", () => {
+  const record = {
+    organizationId: ORGANIZATION_ID,
+    projectId: PROJECT_ID,
+    requestId: "instanteval_run-1",
+    inputTokens: 2_000,
+    requests: 40,
+    runId: "run-1",
+    occurredAt: NOW,
+  };
+
+  describe("when it is recorded through the judge", () => {
+    it("appends one priced fact under the organization it was given, reading no project and no budget", async () => {
+      const { service, recorded, repositories, classifier, seed } = harness({
+        isProjectKnown: false,
+      });
+      await seed();
+      const placement = vi.spyOn(repositories.projects, "getPlacement");
+      const total = vi.spyOn(repositories.spend, "getTotal");
+
+      await service.recordSpend(record);
+
+      const { fact } = instantEvalJudgeSpendPricedOf({
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        requestId: "instanteval_run-1",
+        inputTokens: 2_000,
+        occurredAt: NOW,
+      });
+      expect(recorded).toEqual([{ ...fact, requests: 40, runId: "run-1" }]);
+      expect(placement).not.toHaveBeenCalled();
+      expect(total).not.toHaveBeenCalled();
+      expect(classifier.classify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when it judged no tokens", () => {
+    it("records nothing", async () => {
+      const { service, recorded } = harness();
+
+      await service.recordSpend({ ...record, inputTokens: 0 });
+
+      expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when the priced fact cannot be stored", () => {
+    it("throws, so the run's finish retries onto the same request id", async () => {
+      const service = InstantEvalJudgeService.create({
+        repositories: MemoryInstantEvalJudgeRepositories.create(),
+        classifier: undefined,
+        isCloud: true,
+        recordSpendPriced: async () => {
+          throw new Error("queue down");
+        },
+        mintRequestId: () => "minted",
+        now: () => Temporal.Instant.fromEpochMilliseconds(NOW),
+      });
+
+      await expect(service.recordSpend(record)).rejects.toThrow(/queue down/);
+    });
+  });
+});

@@ -313,7 +313,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When it is classified
       Then the judgement carries the input tokens of the answered attempt alone
 
-    @unit @unimplemented
+    @unit
     Scenario: The trace search bar stays unmetered
       Given a sentence routed by the trace search bar
       When it is classified
@@ -351,7 +351,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the classifier is not called
       And no priced event is appended
 
-    @integration @unimplemented
+    @integration
     Scenario: A run's and a judged query's spend reach the judge's total
       Given a free organization
       When a run records $0.50 and a judged query records $0.25 through the Instant Evals judge
@@ -365,7 +365,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the ledger rows carry the Instant Evals request type under the judged project
       And the run is refused with the free budget exhausted error
 
-    @unit @unimplemented
+    @unit
     Scenario Outline: Runs and judged queries record spend under the organization Instant Evals resolves
       Given a project the Instant Evals judge has not learned, in an organization Instant Evals resolves
       When an Instant Evals <work> records its spend through the judge
@@ -397,7 +397,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then it is refused with the free budget exhausted error
       And its message does not ask it to upgrade to a paid plan
 
-    @unit @unimplemented
+    @unit
     Scenario: A paid organization on tiered pricing keeps today's run rules in wave 1
       Given a paid organization the meter does not bill that has spent one dollar on Instant Evals
       And the judge holds no billing row for it
@@ -522,7 +522,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And the judge's spend is rebuilt from its events
       Then the judge's spend from that request is $0.10, both live and after the rebuild
 
-    @unit @unimplemented
+    @unit
     Scenario: A retried run records its spend under the same request
       Given an Instant Evals run whose finish failed after recording its spend
       When the finish is retried, under another finish reason or on another pod

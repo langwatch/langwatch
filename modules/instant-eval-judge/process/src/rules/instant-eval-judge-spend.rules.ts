@@ -40,6 +40,8 @@ export function instantEvalJudgeSpendPricedOf({
   requestId,
   inputTokens,
   occurredAt,
+  requests,
+  runId,
   pricing = INSTANT_EVAL_PRICING,
 }: {
   organizationId: string;
@@ -47,6 +49,9 @@ export function instantEvalJudgeSpendPricedOf({
   requestId: string;
   inputTokens: number;
   occurredAt: number;
+  /** A run's or query's classifications; a judge call is one and leaves it out. */
+  requests?: number | undefined;
+  runId?: string | undefined;
   pricing?: InstantEvalPricing;
 }): Readonly<{ priceUsd: number; fact: InstantEvalJudgeSpendPricedEventData }> {
   const costUsd = instantEvalCostUsd({ inputTokens, pricing });
@@ -64,6 +69,8 @@ export function instantEvalJudgeSpendPricedOf({
       inputTokens,
       priceNanoUsd: Math.round(priceUsd * NANO_USD_PER_USD),
       costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),
+      ...(requests === undefined ? {} : { requests }),
+      ...(runId === undefined ? {} : { runId }),
     },
   };
 }

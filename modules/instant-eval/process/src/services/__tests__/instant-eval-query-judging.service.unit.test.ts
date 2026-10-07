@@ -8,6 +8,7 @@ import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
+  type InstantEvalJudgeSpendRecord,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 import {
@@ -23,14 +24,13 @@ import type {
   InstantEvalJudgeChannel,
 } from "../../channels/instant-eval-judge.channel.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
-import type {
-  InstantEvalPricedSpend,
-  InstantEvalSpendRecord,
-} from "../../rules/instant-eval-spend-outcome.rules.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 import { InstantEvalJudgeRowsService } from "../instant-eval-judge-rows.service.ts";
+import {
+  type InstantEvalJudgedSpend,
+  InstantEvalJudgedSpendService,
+} from "../instant-eval-judged-spend.service.ts";
 import { InstantEvalQueryJudgingService } from "../instant-eval-query-judging.service.ts";
-import { InstantEvalSpendService } from "../instant-eval-spend.service.ts";
 
 const AT = Temporal.Instant.from("2026-10-06T10:00:00Z");
 const NANO = 1_000_000_000;
@@ -108,17 +108,18 @@ function harness({
   spentNanoUsd = 0,
   queryTokenBudget = 4_000_000,
   concurrency,
-  recordPricedSpend,
+  recordJudgeSpend,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
   queryTokenBudget?: number;
   concurrency?: number;
-  recordPricedSpend?: (input: InstantEvalPricedSpend) => Promise<void>;
+  /** The Instant Evals judge's record, which writes the ledger row from its priced fact. */
+  recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
 } = {}) {
   const events: string[] = [];
-  const priced: InstantEvalPricedSpend[] = [];
-  const records: InstantEvalSpendRecord[] = [];
+  const priced: InstantEvalJudgeSpendRecord[] = [];
+  const records: InstantEvalJudgedSpend[] = [];
   const reservations = MemoryInstantEvalBudgetReservationsRepository.create({ now: () => AT });
   const budget = InstantEvalFreeBudgetService.create({
     peers: {
@@ -131,14 +132,16 @@ function harness({
     isBounded: true,
     now: () => AT,
   });
-  const spend = InstantEvalSpendService.create({
+  const spend = InstantEvalJudgedSpendService.create({
     peers: {
-      findSpendAttribution: async () => ({ organizationId: "org-1", teamId: "team-1" }),
-      recordPricedSpend:
-        recordPricedSpend ??
-        (async (input) => {
-          priced.push(input);
-        }),
+      findOrganizationId: async () => "org-1",
+      judges: {
+        recordSpend:
+          recordJudgeSpend ??
+          (async (input) => {
+            priced.push(input);
+          }),
+      },
     },
   });
   const service = InstantEvalQueryJudgingService.create({
@@ -424,7 +427,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
   describe("given a query that judged three conversations", () => {
     /** @scenario "One spend record is reported per query" */
     /** @scenario "A synchronous query is one confirmed spend record with a fresh id" */
-    it("records one spend for the project, naming no run, at the classifier's cost", async () => {
+    it("records one spend for the project through the judge, under a fresh id naming no run", async () => {
       const { service, records, priced } = harness();
 
       await service.judgeQuery({
@@ -433,20 +436,22 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: [{ annoyed: "one" }, { annoyed: "two" }, { annoyed: "three" }],
       });
 
-      const costUsd = instantEvalCostUsd({ inputTokens: 3 * TOKENS_PER_TEXT });
       expect(records).toEqual([
         {
           projectId: "project-1",
           inputTokens: 3 * TOKENS_PER_TEXT,
           requests: 3,
-          costUsd,
-          priceUsd: instantEvalPriceUsd({ costUsd }),
           occurredAt: AT,
         },
       ]);
       expect(priced).toHaveLength(1);
+      expect(priced[0]).toMatchObject({
+        organizationId: "org-1",
+        inputTokens: 3 * TOKENS_PER_TEXT,
+        requests: 3,
+      });
       expect(priced[0]?.requestId.startsWith("instantevalquery")).toBe(true);
-      expect(JSON.parse(priced[0]?.metadata ?? "{}").instant_eval).not.toHaveProperty("run_id");
+      expect(priced[0]).not.toHaveProperty("runId");
     });
   });
 
@@ -485,7 +490,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
 
     it("keeps the hold when the spend could not be recorded, still answering", async () => {
       const { service, events } = harness({
-        recordPricedSpend: async () => {
+        recordJudgeSpend: async () => {
           throw new Error("spend spine down");
         },
       });

@@ -2,18 +2,22 @@
  * A classification asked for outside any run, which is how a peer routes a
  * sentence: the judge answers, or skips and the peer falls back.
  * @see modules/instant-eval/specs/classifier.feature
+ * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
 import type {
+  InstantEvalJudgeApi,
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-judge.channel.ts";
 import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
 import { InstantEvalClassifyService } from "../instant-eval-classify.service.ts";
+import { InstantEvalCloudJudgeService } from "../instant-eval-cloud-judge.service.ts";
 
 const question: InstantEvalQuestion = {
   id: "route",
@@ -58,6 +62,36 @@ describe("given a peer with text of its own to classify", () => {
         { projectId: "project-1", text: "annoyed users", questions: [question] },
       ]);
       expect(judgement.verdicts).toEqual([{ questionId: "route", label: "instant_eval" }]);
+    });
+  });
+
+  describe("when the trace search bar routes a sentence on LangWatch cloud", () => {
+    /** @scenario "The trace search bar stays unmetered" */
+    it("classifies through the judge's classify alone, recording no spend", async () => {
+      const asked: string[] = [];
+      // Answers classify only: a spend record or a metered judge call on it would throw.
+      const judges = createApiFixture<InstantEvalJudgeApi>({
+        classify: async ({ text }) => {
+          asked.push(text);
+          return {
+            verdicts: [{ questionId: "route", label: "instant_eval" }],
+            inputTokens: 120,
+            isTextTruncated: false,
+          };
+        },
+      });
+      const classifications = InstantEvalClassifyService.create({
+        judge: InstantEvalCloudJudgeService.create({ judges }),
+      });
+
+      const judgement = await classifications.classify({
+        projectId: "project-1",
+        text: "users who were annoyed",
+        questions: [question],
+      });
+
+      expect(asked).toEqual(["users who were annoyed"]);
+      expect(judgement.inputTokens).toBe(120);
     });
   });
 

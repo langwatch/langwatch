@@ -26,7 +26,7 @@ isClassifierConfigured(): Promise<boolean>;
 
 #### `classify`
 
-One classification with LangWatch's key, priced by nobody: runs, judged queries and the search bar record their own spend. Skips as `classifier_not_configured` where there is no key.
+One classification with LangWatch's key, priced by nobody: runs and judged queries record theirs through `recordSpend`, and the search bar records none (ADR-144). Skips as `classifier_not_configured` where there is no key.
 
 ```typescript
 classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
@@ -38,6 +38,14 @@ One metered judge call: unknown project, cloud only, budget, classify, price, pr
 
 ```typescript
 judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;
+```
+
+#### `recordSpend`
+
+Prices and records what an Instant Evals run or judged query spent, under the organization the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced fact cannot be stored, so a run's finish retries onto the same request id.
+
+```typescript
+recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void>;
 ```
 
 ## REST transport
@@ -76,7 +84,7 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:56`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:57`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |

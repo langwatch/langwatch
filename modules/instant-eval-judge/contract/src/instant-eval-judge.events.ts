@@ -27,6 +27,10 @@ export const instantEvalJudgeSpendPricedEventDataSchema = z.object({
   priceNanoUsd: z.number().int().nonnegative(),
   /** What the classifier charged us, in integer nano-USD, kept beside the price. */
   costNanoUsd: z.number().int().nonnegative(),
+  /** Classifications the tokens came from: one for a judge call, many for a run or query. */
+  requests: z.number().int().positive().optional(),
+  /** The run a run's spend belongs to, so the ledger row names it. */
+  runId: z.string().min(1).optional(),
 });
 export type InstantEvalJudgeSpendPricedEventData = z.infer<
   typeof instantEvalJudgeSpendPricedEventDataSchema

@@ -1,7 +1,7 @@
 /**
  * The judge a deployment with LangWatch's classifier key judges with: the Instant Evals judge's
- * own client, reached through its Api (ADR-174 decision 13). Runs, judged queries and the search
- * bar price their own spend, so this classification is never metered here.
+ * own client, reached through its Api (ADR-174 decision 13). Runs and judged queries record their
+ * spend through the judge afterwards, and the search bar records none, so this is never metered.
  * @see modules/instant-eval/specs/classifier.feature
  */
 

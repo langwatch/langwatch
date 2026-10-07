@@ -74,6 +74,7 @@ import { InstantEvalFreeBudgetService } from "../services/instant-eval-free-budg
 import { InstantEvalJudgeChoiceService } from "../services/instant-eval-judge-choice.service.ts";
 import { InstantEvalJudgePageService } from "../services/instant-eval-judge-page.service.ts";
 import { InstantEvalJudgeRowsService } from "../services/instant-eval-judge-rows.service.ts";
+import { InstantEvalJudgedSpendService } from "../services/instant-eval-judged-spend.service.ts";
 import { InstantEvalOptInService } from "../services/instant-eval-opt-in.service.ts";
 import { InstantEvalPlanService } from "../services/instant-eval-plan.service.ts";
 import { InstantEvalQueryJudgingService } from "../services/instant-eval-query-judging.service.ts";
@@ -108,7 +109,7 @@ type InstantEvalDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   /** The plan that decides a run's row cap and whether the budget binds it. */
   plans: typeof EntitlementApi;
-  /** The spend spine every judged token is filed on. */
+  /** The ledger a run's $1 check reads, and the spine a hosted call's spend is filed on. */
   gateway: typeof GatewayApi;
   /** The query door: a filtered shorthand target resolves its trace ids here. */
   traces: typeof TraceApi;
@@ -118,7 +119,7 @@ type InstantEvalDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   /** Asks whether a member may throw the organization's switch, as `enable` declares. */
   authz: typeof AuthzApi;
-  /** LangWatch's classifier client and its key, which the Instant Evals judge owns. */
+  /** LangWatch's classifier and its key, and where a run's or query's spend is recorded. */
   judges: typeof InstantEvalJudgeApi;
 }>;
 
@@ -248,18 +249,18 @@ export class InstantEvalModule implements InstantEvalApiContract {
       },
     });
 
-    // A query's spend lands on the same spine a run's finish records to.
+    // A query's and a run's spend go through the Instant Evals judge, whose priced fact writes
+    // the gateway ledger row (ADR-174 decision 13), under the organization resolved here.
+    const judgedSpend = InstantEvalJudgedSpendService.create({
+      peers: {
+        findOrganizationId: ({ projectId }) => projects.findOrganizationId(projectId),
+        judges: setup.dependencies.judges,
+      },
+    });
     const queries = InstantEvalQueryJudgingService.create({
       rows: InstantEvalJudgeRowsService.create({ judge }),
       budget,
-      spend: InstantEvalSpendService.create({
-        peers: {
-          findSpendAttribution: spendAttributionOf(projects),
-          recordPricedSpend: async (input) => {
-            await gateway.recordPricedSpend(input);
-          },
-        },
-      }),
+      spend: judgedSpend,
       pricing: judge.pricing,
       queryTokenBudget: setup.config.queryTokenBudget,
     });
@@ -323,8 +324,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
             cancellations,
             budget,
             analytics,
-            projects,
-            gateway,
+            judgedSpend,
           }),
           commands: () => dispatcher.outcomeCommands(),
         },
@@ -396,8 +396,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     cancellations,
     budget,
     analytics,
-    projects,
-    gateway,
+    judgedSpend,
   }: {
     context: InstantEvalRunContextService;
     rowSource: InstantEvalRowSourceService;
@@ -407,8 +406,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
     cancellations: InstantEvalCancellationRepository;
     budget: InstantEvalFreeBudgetService;
     analytics: AnalyticsApi;
-    projects: ProjectApi;
-    gateway: GatewayApi;
+    judgedSpend: InstantEvalJudgedSpendService;
   }): InstantEvalRunExecutor {
     const plans = InstantEvalPlanService.create({
       context,
@@ -426,14 +424,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
       budget,
     });
     const finishes = InstantEvalFinishService.create({
-      spend: InstantEvalSpendService.create({
-        peers: {
-          findSpendAttribution: spendAttributionOf(projects),
-          recordPricedSpend: async (input) => {
-            await gateway.recordPricedSpend(input);
-          },
-        },
-      }),
+      spend: judgedSpend,
       budget,
       pricing: judge.pricing,
     });

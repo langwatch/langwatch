@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
  * Two priced events for one request leave one spend row, live and after the judge's spend is
  * rebuilt from its events (ADR-174 decision 13). Subscribers are never replayed by the runtime,
  * so the rebuild here hands the stored events to the subscriber again, over memory and Postgres.
+ * A run's and a judged query's spend reach the same total through the judge's recordSpend.
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -26,12 +27,14 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { Temporal } from "@langwatch/time";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InstantEvalJudgeRepositories } from "../../repositories/instant-eval-judge.repositories.ts";
 import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { PostgresInstantEvalJudgeRepositories } from "../../repositories/prisma/prisma.instant-eval-judge.repositories.ts";
 import { InstantEvalJudgeFactsService } from "../../services/instant-eval-judge-facts.service.ts";
+import { InstantEvalJudgeService } from "../../services/instant-eval-judge.service.ts";
 import type { InstantEvalJudgeSpendPricedEvent } from "../instant-eval-judge-spend.commands.ts";
 import { buildInstantEvalJudgeSpendPipeline } from "../instant-eval-judge-spend.pipeline.ts";
 
@@ -45,6 +48,7 @@ type Backend = Readonly<{
 }>;
 
 const TEN_CENTS_NANO_USD = 100_000_000;
+const SEVENTY_FIVE_CENTS_NANO_USD = 750_000_000;
 const OCCURRED_AT = Date.UTC(2026, 9, 7);
 const SUBSCRIBER = "instantEvalJudgeSpendRow";
 
@@ -128,6 +132,47 @@ function spendCases(backend: Backend): void {
       await rebuilt.subscriber.handle(event, { ...tenant, aggregateId: event.aggregateId });
     }
     expect(await rebuilt.total()).toBe(BigInt(TEN_CENTS_NANO_USD));
+  });
+
+  /** @scenario "A run's and a judged query's spend reach the judge's total" */
+  it("counts a run's $0.50 and a judged query's $0.25 as $0.75, reading no project placement", async () => {
+    const repositories = backend.repositories();
+    const placement = vi.spyOn(repositories.projects, "getPlacement");
+    const live = subscriberOver(repositories);
+    const eventing = new EventSourcing({
+      eventStore: EventStoreMemory.createForTesting(),
+      processStore: InMemoryProcessStore.createForTesting(),
+    });
+    const registered = eventing.register(live.pipeline);
+    const judge = InstantEvalJudgeService.create({
+      repositories,
+      classifier: undefined,
+      isCloud: true,
+      recordSpendPriced: (fact) => registered.commands.recordSpendPriced.send(fact),
+      mintRequestId: () => "unused",
+      now: () => Temporal.Instant.fromEpochMilliseconds(OCCURRED_AT),
+      // A dollar per million tokens at no markup, so the prices come out round.
+      pricing: { usdPerMillionInputTokens: 1, markup: 1 },
+    });
+    const spendOf = ({ requestId, inputTokens }: { requestId: string; inputTokens: number }) => ({
+      organizationId: organizationId(),
+      projectId: `project_unlearned_${backend.namespace()}`,
+      requestId,
+      inputTokens,
+      requests: 10,
+      occurredAt: OCCURRED_AT,
+    });
+
+    await judge.recordSpend({
+      ...spendOf({ requestId: "instanteval_run-1", inputTokens: 500_000 }),
+      runId: "run-1",
+    });
+    await judge.recordSpend(spendOf({ requestId: "instantevalquery_q1", inputTokens: 250_000 }));
+    await vi.waitFor(() => expect(live.handled).toHaveLength(2));
+
+    expect(await live.total()).toBe(BigInt(SEVENTY_FIVE_CENTS_NANO_USD));
+    expect(placement).not.toHaveBeenCalled();
+    await eventing.close();
   });
 }
 

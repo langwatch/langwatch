@@ -6,6 +6,7 @@ import {
   InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
   type InstantEvalJudgeServerConfig,
+  type InstantEvalJudgeSpendRecord,
   type InstantEvalJudgement,
   instantEvalSkipped,
 } from "@langwatch/instant-eval-judge-contract";
@@ -138,6 +139,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
     return this.#judge.judge(input);
+  }
+
+  recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void> {
+    return this.#judge.recordSpend(input);
   }
 
   factsPipeline(): InstantEvalJudgeFactsPipeline {
