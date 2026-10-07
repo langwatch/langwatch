@@ -4,13 +4,13 @@
  */
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
   EvaluatorApi,
   evaluatorsSchema,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   MonitorApi,
@@ -66,8 +66,8 @@ export class MonitorModule implements MonitorApi {
     permissions: AuthzApi,
     /** Evaluator service for the port and copy replication. */
     evaluators: EvaluatorApi,
-    /** The effective-settings rule a monitor's parameters are checked against. */
-    evaluation: EvaluationApi,
+    /** The settings-recovery rollback switch a monitor's parameters are checked under. */
+    featureFlags: FeatureFlagApi,
     /** Removes the workflow a monitor copy replicated when the replica is refused. */
     workflows: WorkflowApi,
   };
@@ -89,7 +89,7 @@ export class MonitorModule implements MonitorApi {
     this.#monitors = MonitorService.create({
       repository: repositories.monitors,
       evaluators: dependencies.evaluators,
-      evaluation: dependencies.evaluation,
+      featureFlags: dependencies.featureFlags,
       generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });

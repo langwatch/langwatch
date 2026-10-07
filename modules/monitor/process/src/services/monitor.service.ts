@@ -1,7 +1,8 @@
 import { isDeepStrictEqual } from "node:util";
 
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import { resolveEvaluatorEffectiveSettings } from "@langwatch/evaluation-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   MonitorEvaluatorRequiredError,
   MonitorNotFoundError,
@@ -30,15 +31,18 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 
 import type { MonitorRepository } from "../repositories/monitor.repository.ts";
 
 type MonitorServiceOptions = {
   repository: MonitorRepository;
   evaluators: Pick<EvaluatorApi, "getById" | "findById">;
-  evaluation: Pick<EvaluationApi, "getEvaluatorEffectiveSettings">;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   generateId: () => string;
 };
+
+const logger = createLogger("langwatch:monitor:service");
 
 function slugify(value: string): string {
   return (
@@ -191,14 +195,33 @@ export class MonitorService {
     const { evaluator, parameters } = input;
     if (!parameters || Object.keys(parameters).length === 0) return;
 
-    const { settings, source } = await this.options.evaluation.getEvaluatorEffectiveSettings({
-      config: evaluator.config,
+    const { config } = evaluator;
+    const { settings, source } = resolveEvaluatorEffectiveSettings({
+      config:
+        config !== null && typeof config === "object" && !Array.isArray(config) ? config : null,
       parameters,
       evaluatorRecordType: evaluator.type,
+      recoveryDisabled: await this.readRecoveryDisabled(),
     });
     if (source === "monitor-parameters" || isDeepStrictEqual(settings, parameters)) return;
 
     throw new MonitorParametersUnusedError(evaluator.id);
+  }
+
+  /** The operator's rollback switch; unreadable leaves recovery active, as the runner does. */
+  private async readRecoveryDisabled(): Promise<boolean> {
+    try {
+      return await this.options.featureFlags.isEnabled("ops_evaluator_settings_recovery_disabled", {
+        kind: "system",
+      });
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Settings-recovery rollback flag could not be read, leaving recovery active",
+      );
+
+      return false;
+    }
   }
 
   async delete(input: MonitorIdInput): Promise<{ success: true }> {

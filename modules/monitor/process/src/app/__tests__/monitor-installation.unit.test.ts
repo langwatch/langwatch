@@ -3,8 +3,8 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -41,7 +41,7 @@ function process(role: "api" | "worker") {
       evaluator: createApiFixture<EvaluatorApi>({
         getById: async ({ id, projectId }) => evaluatorRow({ id, projectId }),
       }),
-      evaluation: createApiFixture<EvaluationApi>(),
+      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
       workflow: createApiFixture<WorkflowApi>(),
     });
 }
