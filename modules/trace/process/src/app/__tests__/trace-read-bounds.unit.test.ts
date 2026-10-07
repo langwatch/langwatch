@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The tier-effective request bounds: page sizes clamp to the plan's bound,
- * id arrays above the plan's bound refuse with the typed error.
+ * The tier-effective request bounds: page sizes clamp to the plan's bound unless
+ * the caller names a bound to refuse above; id arrays above it refuse.
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -129,6 +129,77 @@ describe("trace read bounds", () => {
       await app.readSampleTraces({ query: QUERY, protections: PROTECTIONS, pageSize: 5000 });
 
       expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 1000 });
+    });
+  });
+
+  describe("when the caller asks to refuse above a named bound", () => {
+    const refused = (meta: Record<string, unknown>) => ({
+      code: "trace_page_size_too_large",
+      meta: expect.objectContaining(meta),
+    });
+
+    /** @scenario "A trace list read above the caller's plan bound is refused by name" */
+    it("refuses a free-tier list page of 1001 naming the bound 1000, and reads 1000", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+      const list = (pageSize: number) =>
+        app.listTraces({
+          query: { ...QUERY, pageSize },
+          protections: PROTECTIONS,
+          options: { refuseAbove: "tracesPageSizeMax" },
+        });
+
+      await expect(list(1001)).rejects.toMatchObject(
+        refused({ maxPageSize: 1000, bound: "tracesPageSizeMax" }),
+      );
+      expect(getAllTracesForProject).not.toHaveBeenCalled();
+      await list(1000);
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 1000 });
+    });
+
+    /** @scenario "A paid plan keeps its larger trace list page" */
+    it("reads a paid-tier list page of 2000 unclamped and refuses 2001", async () => {
+      const { app, getAllTracesForProject } = harness("paid");
+      const list = (pageSize: number) =>
+        app.listTraces({
+          query: { ...QUERY, pageSize },
+          protections: PROTECTIONS,
+          options: { refuseAbove: "tracesPageSizeMax" },
+        });
+
+      await list(2000);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 2000 });
+      await expect(list(2001)).rejects.toMatchObject(refused({ maxPageSize: 2000 }));
+    });
+
+    /** @scenario "A trace download above the plan's download bound is refused by name" */
+    it("reads a free-tier download of 10 000 unclamped and refuses 10 001", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+      const download = (pageSize: number) =>
+        app.listTraces({
+          query: { ...QUERY, pageSize },
+          protections: PROTECTIONS,
+          options: { downloadMode: true, refuseAbove: "tracesDownloadPageSizeMax" },
+        });
+
+      await download(10_000);
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).toMatchObject({ pageSize: 10_000 });
+      await expect(download(10_001)).rejects.toMatchObject(
+        refused({ maxPageSize: 10_000, bound: "tracesDownloadPageSizeMax" }),
+      );
+    });
+
+    it("leaves an absent page size on the repository default", async () => {
+      const { app, getAllTracesForProject } = harness("free");
+
+      await app.listTraces({
+        query: { ...QUERY },
+        protections: PROTECTIONS,
+        options: { refuseAbove: "tracesPageSizeMax" },
+      });
+
+      expect(getAllTracesForProject.mock.calls[0]?.[0]).not.toHaveProperty("pageSize");
     });
   });
 

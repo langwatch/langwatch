@@ -1567,10 +1567,11 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   async listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult> {
-    const pageSize =
-      input.query.pageSize === undefined
-        ? undefined
-        : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+    const pageSize = await this.#boundedPageSize({
+      projectId: input.query.projectId,
+      pageSize: input.query.pageSize,
+      refuseAbove: input.options?.refuseAbove,
+    });
 
     return this.#contentReader.listTraces({
       ...input,
@@ -1579,6 +1580,22 @@ export class TraceModule implements TraceApi, CollectorApp {
         ...(pageSize === undefined ? {} : { pageSize }),
       },
     });
+  }
+  /** The tRPC reads refuse above their named plan bound; every other caller clamps. */
+  async #boundedPageSize({
+    projectId,
+    pageSize,
+    refuseAbove,
+  }: {
+    projectId: string;
+    pageSize: number | undefined;
+    refuseAbove: "tracesPageSizeMax" | "tracesDownloadPageSizeMax" | undefined;
+  }): Promise<number | undefined> {
+    if (pageSize === undefined) return undefined;
+    if (refuseAbove === undefined) return this.#readBounds.clampPageSize(projectId, pageSize);
+    await this.#readBounds.assertPageSizeWithinBound({ projectId, pageSize, bound: refuseAbove });
+
+    return pageSize;
   }
   async listTraceSummaries(input: {
     query: TraceSummaryListQuery;

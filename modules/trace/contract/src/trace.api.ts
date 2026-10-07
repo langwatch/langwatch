@@ -218,6 +218,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
       scrollId?: string | null;
       /** The v1 REST search's compiled query-language filter, ANDed into the read. */
       filterWhere?: { sql: string; params: Record<string, unknown> };
+      /** Refuse above this plan bound instead of clamping to the list bound. */
+      refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax";
     };
   }): Promise<TracesForProjectResult>;
   /**

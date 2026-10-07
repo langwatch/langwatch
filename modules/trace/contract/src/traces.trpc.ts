@@ -59,6 +59,10 @@ import { spanTreePageSchema } from "./trace.ts";
  */
 const TRACES_PAGE_SIZE_MAX = resolveRequestBound("tracesPageSizeMax", "ENTERPRISE");
 const TRACE_IDS_MAX = resolveRequestBound("traceIdsMax", "ENTERPRISE");
+const TRACES_DOWNLOAD_PAGE_SIZE_MAX = resolveRequestBound(
+  "tracesDownloadPageSizeMax",
+  "ENTERPRISE",
+);
 
 /**
  * Offset pagination was dropped for ClickHouse (deep OFFSET degrades badly;
@@ -244,7 +248,13 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(distinctFieldNamesResultSchema)
 
   .mutation("getAllForDownload")
-  .withInput(z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape }))
+  .withInput(
+    z.object({
+      ...traceListInputSchema.shape,
+      ...downloadExtrasSchema.shape,
+      pageSize: z.number().int().positive().max(TRACES_DOWNLOAD_PAGE_SIZE_MAX).optional(),
+    }),
+  )
   .withOutput(tracesForProjectResultSchema)
 
   /**

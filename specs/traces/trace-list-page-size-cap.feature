@@ -10,8 +10,9 @@ Feature: Trace list page size cap
   # ClickHouse, so an unbounded pageSize is a memory lever any caller can pull
   # (#8479).
   #
-  #   - UI list reads (getAllForProject) are capped at 1000, like tracesV2.list
-  #   - downloads are a deliberate bulk read: bounded at 10 000, their default
+  #   - UI list reads (getAllForProject) refuse above the caller's plan bound
+  #   - downloads are a deliberate bulk read: refused above the plan's download
+  #     bound (10 000 on every plan, also their default)
   #   - the public REST search routes clamp instead of rejecting, so existing
   #     API clients that ask for more keep working
   #   - the filtered annotations page needs more than one page of trace ids, so

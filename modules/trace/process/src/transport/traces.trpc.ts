@@ -56,7 +56,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       return app.listTraces({
         query: input,
         protections,
-        options: { scrollId: input.scrollId },
+        options: { scrollId: input.scrollId, refuseAbove: "tracesPageSizeMax" },
       });
     })
 
@@ -290,6 +290,7 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           includeSpans: input.includeSpans,
           resolveBlobs: true,
           scrollId: input.scrollId,
+          refuseAbove: "tracesDownloadPageSizeMax",
         },
       });
     })
