@@ -208,8 +208,10 @@ describe("explainLangyError", () => {
           }),
         );
 
+        expect(presentation.title).toBe("This provider rejected the API key");
+
         expect(presentation.kind).toBe("llm_upstream_error");
-        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.title).toBe("This provider rejected the API key");
         expect(presentation.description).toBe(
           "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
         );

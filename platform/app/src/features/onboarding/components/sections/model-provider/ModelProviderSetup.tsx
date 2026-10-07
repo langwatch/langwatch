@@ -500,7 +500,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 >
                   <option value="">Select default model...</option>
                   {chatModelOptions.map((model) => (
-                    <option key={model.value} value={model.value}>
+                    <option
+                      key={model.value}
+                      value={`${backendModelProviderKey}/${model.value}`}
+                    >
                       {model.label}
                     </option>
                   ))}
@@ -532,7 +535,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                   >
                     <option value="">Select default model...</option>
                     {state.customModels.map((model) => (
-                      <option key={model.modelId} value={model.modelId}>
+                      <option
+                        key={model.modelId}
+                        value={`${backendModelProviderKey}/${model.modelId}`}
+                      >
                         {model.displayName}
                       </option>
                     ))}

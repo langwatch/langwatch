@@ -3683,6 +3683,21 @@ function LangyPanel({
                             paddingX="18px"
                             paddingTop="18px"
                           >
+                            {pendingPrompt && !reconnectCodex ? (
+                              <VStack align="stretch" gap={1} paddingBottom={2}>
+                                <QueuedPrompt
+                                  prompt={pendingPrompt}
+                                  reduceMotion={reduceMotion}
+                                />
+                                <Text
+                                  alignSelf="flex-end"
+                                  textStyle="xs"
+                                  color="fg.muted"
+                                >
+                                  Langy sends this once a model is set up.
+                                </Text>
+                              </VStack>
+                            ) : null}
                             <Text fontSize="sm" fontWeight="semibold">
                               {reconnectCodex
                                 ? "Sign in to Codex again"
