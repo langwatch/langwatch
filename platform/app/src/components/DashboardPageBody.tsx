@@ -34,6 +34,7 @@ import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
 import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
+import { projectNavigation } from "./sidebar/projectKindNavigation";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -174,8 +175,13 @@ export const DashboardPageBody = ({
     organizationRole === OrganizationUserRole.ADMIN;
 
   // Analytics is the last surface on the v1 saved-views bar; the Trace
-  // Explorer carries its own view system.
-  const showSavedViews = router.pathname.startsWith("/[project]/analytics");
+  // Explorer carries its own view system. A project whose navigation has no
+  // Analytics (an aggregate, ADR-144) only shows the not-available notice
+  // there and takes no writes, so it gets no bar, no Edit menu and no
+  // saved-views read. Same rule as AggregateAnalyticsGate.
+  const showSavedViews =
+    router.pathname.startsWith("/[project]/analytics") &&
+    projectNavigation(project?.kind).analytics;
 
   return (
     <VStack width="full" gap={0} {...props}>

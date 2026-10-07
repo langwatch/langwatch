@@ -456,6 +456,8 @@ Feature: An aggregate project reads its member projects
     When ana opens a link to its analytics, LLM metrics, topics, users, online evaluations, reports or custom graph page
     Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
     And it draws no chart and runs no analytics query
+    And it shows no saved views bar, so no view can be edited, renamed or deleted from it, and reads no saved views
+    And an ordinary project's analytics still show the saved views bar
 
   @integration
   Scenario: The aggregate's reports offer no chart to add
