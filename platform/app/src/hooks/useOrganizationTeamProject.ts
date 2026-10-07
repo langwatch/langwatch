@@ -7,7 +7,10 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { resolveOrglessDestination } from "~/features/navigation/logic/resolveOrglessDestination";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
-import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
+import {
+  isAggregateProjectKind,
+  landingProjectOf,
+} from "~/server/app-layer/projects/project-kinds";
 import { useRouter } from "~/utils/compat/next-router";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
@@ -412,10 +415,16 @@ export const useOrganizationTeamProject = (
   // A slug named in the address bar keeps resolving exactly as before,
   // including into a team the caller cannot open: the refusal that follows is
   // the plain answer to typing someone else's project into the URL.
+  //
+  // An aggregate is a fourth (ADR-144 block F): an admin opens it on purpose,
+  // so a selection remembered from before this fix, or from another tab, never
+  // lands anyone on it. Dropped, the resolution falls back to the same landing
+  // rule the server uses, the first project that is not an aggregate.
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
     (isPersonalScopeRoute ||
+      isAggregateProjectKind(slugMatch.project.kind) ||
       !!slugMatch.team.isPersonal ||
       !userCanOpenTeam({
         team: slugMatch.team,
@@ -471,10 +480,16 @@ export const useOrganizationTeamProject = (
   // selection is written from whatever last resolved, so a bad pick outlives
   // the page that made it. An organization admin passes the test on their
   // role, so their remembered team stays remembered.
+  //
+  // A remembered team that holds projects but only aggregates has nothing to
+  // land on (ADR-144 block F), so it is forgotten and the ambient pick, which
+  // prefers a team with a landing project, chooses instead.
   const rememberedTeam = organization?.teams.find(
     (team) =>
       team.id == localStorageTeamId &&
       !team.isPersonal &&
+      (team.projects.length === 0 ||
+        landingProjectOf(team.projects) !== undefined) &&
       userCanOpenTeam({
         team,
         userId,
@@ -569,7 +584,12 @@ export const useOrganizationTeamProject = (
     // afterwards and the product switcher had no project to open LLM Ops
     // with. The private context is resolved from the /me address every time,
     // so it needs nothing remembered.
-    if (!team?.isPersonal) {
+    //
+    // An aggregate is not remembered either (ADR-144 block F): it is opened on
+    // purpose, by its address or from the switcher, and remembering it made
+    // the app root land on it for the rest of the session and after the next
+    // sign-in.
+    if (!team?.isPersonal && !isAggregateProjectKind(project?.kind)) {
       if (team && team.id !== localStorageTeamId) {
         setLocalStorageTeamId(team.id);
       }

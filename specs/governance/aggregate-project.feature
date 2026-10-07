@@ -362,3 +362,11 @@ Feature: An aggregate project reads its member projects
     And no key bound to the aggregate exists
     And the aggregate's setup page and onboarding say "Data can't be added to this project"
     And they show no key, no wait for a first trace and no button to mint one
+
+  @integration
+  Scenario: Landing never resolves to an aggregate from a remembered selection
+    Given ana opened the aggregate project earlier in the same browser
+    When she opens the app root, now or after signing in again
+    Then the app lands on her first project that is not an aggregate
+    And opening the aggregate by its address or from the switcher still opens it
+    And opening the aggregate never makes it the remembered selection
