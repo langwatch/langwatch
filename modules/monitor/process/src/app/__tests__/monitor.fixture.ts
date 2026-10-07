@@ -8,8 +8,6 @@ import type {
   EvaluationApi,
   EvaluatorEffectiveSettings,
   EvaluatorEffectiveSettingsQuery,
-  MonitorPerformanceQuery,
-  OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
 import {
   EvaluatorNotFoundError,
@@ -102,19 +100,6 @@ export class FakeEvaluatorSettings {
   }
 }
 
-/** The trend, answered from whatever the test seeded. */
-export class FakeMonitorPerformance {
-  readonly queries: MonitorPerformanceQuery[] = [];
-
-  constructor(private readonly rows: OnlineEvaluationPerformance[] = []) {}
-
-  async getMonitorPerformance(query: MonitorPerformanceQuery) {
-    this.queries.push(query);
-
-    return this.rows;
-  }
-}
-
 /** The evaluator copy and the workflow clean-up, recording what they were asked and answered. */
 export class FakeMonitorReplication {
   readonly copies: { evaluatorId: string; sourceProjectId: string; targetProjectId: string }[] = [];
@@ -157,14 +142,12 @@ export function createMonitorTestApp(
     permissions?: AuthzApi;
     evaluators?: FakeMonitorEvaluators;
     effectiveSettings?: FakeEvaluatorSettings;
-    performance?: FakeMonitorPerformance;
     replication?: FakeMonitorReplication;
     publicBaseUrl?: string;
   }> = {},
 ): MonitorModule {
   const evaluators = input.evaluators ?? new FakeMonitorEvaluators();
   const effectiveSettings = input.effectiveSettings ?? new FakeEvaluatorSettings();
-  const performance = input.performance ?? new FakeMonitorPerformance();
   const replication =
     input.replication ?? new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null });
 
@@ -181,7 +164,6 @@ export function createMonitorTestApp(
         copy: (copy) => replication.copy(copy),
       }),
       evaluation: createApiFixture<EvaluationApi>({
-        getMonitorPerformance: (query) => performance.getMonitorPerformance(query),
         getEvaluatorEffectiveSettings: (query) =>
           effectiveSettings.getEvaluatorEffectiveSettings(query),
       }),

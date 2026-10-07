@@ -30,6 +30,7 @@ import type {
   UpsertEvaluationRunCommand,
 } from "./evaluation.commands.ts";
 import type {
+  MonitorPerformanceForProjectInput,
   MonitorPerformanceQuery,
   OnlineEvaluationPerformance,
 } from "./evaluation.performance.ts";
@@ -83,6 +84,10 @@ export interface EvaluationApi {
   ): Promise<Record<string, TraceEvaluationData[]>>;
   findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
+  /** The seven-day trend of every monitor the project has; none when it has no monitors. */
+  findMonitorPerformance(
+    input: MonitorPerformanceForProjectInput,
+  ): Promise<OnlineEvaluationPerformance[]>;
 
   // The public evaluation doors: the SDK's batch result log and the four
   // evaluate paths reach the same capability every other caller does.

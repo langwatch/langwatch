@@ -1,4 +1,3 @@
-import { onlineEvaluationPerformanceSchema } from "@langwatch/evaluation-contract";
 /**
  * Every `monitors.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the surface has always called.
@@ -10,7 +9,6 @@ import {
   monitorApiCreateInputSchema,
   monitorApiMonitorInputSchema,
   monitorApiNameAvailabilityInputSchema,
-  monitorApiPerformanceInputSchema,
   monitorApiProjectInputSchema,
   monitorApiToggleInputSchema,
   monitorApiUpdateInputSchema,
@@ -23,14 +21,6 @@ export const monitorTrpc = defineTrpcContract("monitors")
   .query("getAllForProject")
   .withInput(monitorApiProjectInputSchema)
   .withOutput(monitorWithEvaluatorSchema.array())
-
-  /**
-   * The last seven days of score and pass rate for each monitor, against the
-   * same previous window the analytics page compares to.
-   */
-  .query("getPerformanceForProject")
-  .withInput(monitorApiPerformanceInputSchema)
-  .withOutput(onlineEvaluationPerformanceSchema.array())
 
   .query("getById")
   .withInput(monitorApiMonitorInputSchema)

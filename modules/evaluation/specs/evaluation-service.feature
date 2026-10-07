@@ -386,3 +386,10 @@ Feature: Evaluation service boundary
     Then it reads a body up to the largest limit an organization can be raised to
     And a body past that is refused as "evaluation_log_results_too_large"
 
+
+  @unit
+  Scenario: The monitors page's seven-day trend is read through evaluation
+    Given a project with one monitor
+    When a reader holding evaluations:view and analytics:view asks for the trend
+    Then evaluation lists the project's monitors itself and compares the last seven days with the window analytics resolves
+    And a project with no monitors answers no rows without querying evaluations

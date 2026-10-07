@@ -12,6 +12,10 @@ import {
   warmupEvaluatorsInputSchema,
 } from "./evaluation-trpc.schemas.ts";
 import {
+  monitorPerformanceForProjectInputSchema,
+  onlineEvaluationPerformanceSchema,
+} from "./evaluation.performance.ts";
+import {
   evaluationRunOutcomeSchema,
   evaluationWarmupSchema,
   evaluatorCatalogueSchema,
@@ -44,4 +48,12 @@ export const evaluationTrpc = defineTrpcContract("evaluations")
   .mutation("warmupLambda")
   .withInput(warmupEvaluatorsInputSchema)
   .withOutput(evaluationWarmupSchema)
+
+  /**
+   * The last seven days of score and pass rate for each of the project's
+   * monitors, against the same previous window the analytics page compares to.
+   */
+  .query("getMonitorPerformanceForProject")
+  .withInput(monitorPerformanceForProjectInputSchema)
+  .withOutput(onlineEvaluationPerformanceSchema.array())
   .build();

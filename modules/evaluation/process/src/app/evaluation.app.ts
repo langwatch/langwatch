@@ -98,6 +98,7 @@ import { EvaluatorSettingsService } from "../services/evaluator-settings.service
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
+import { MonitorTrendService } from "../services/monitor-trend.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 
 export type EvaluationInfrastructure = Readonly<{
@@ -275,7 +276,7 @@ export class EvaluationModule implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read per request (queued runs, slug lookups), not in construction: monitor needs us. */
+    /** Read per request: queued runs, slug lookups and the monitors page's trend. */
     monitors: MonitorApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
@@ -311,6 +312,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
   readonly #effectiveSettings: EvaluatorEffectiveSettingsService;
+  readonly #monitorTrend: MonitorTrendService;
   readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
@@ -337,6 +339,10 @@ export class EvaluationModule implements EvaluationApiContract {
     lifecycle: EvaluationLifecycleService | undefined;
   }) {
     this.#service = service;
+    this.#monitorTrend = MonitorTrendService.create({
+      monitors: dependencies.monitors,
+      performance: service,
+    });
     this.#lifecycle = lifecycle;
     this.#clustering = clustering;
     this.#piiDetection = piiDetection;
@@ -621,6 +627,8 @@ export class EvaluationModule implements EvaluationApiContract {
   findInputs: EvaluationApiContract["findInputs"] = (input) => this.#service.findInputs(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
+  findMonitorPerformance: EvaluationApiContract["findMonitorPerformance"] = (input) =>
+    this.#monitorTrend.findForProject(input);
 
   assertBatchLogWithinLimit: EvaluationApiContract["assertBatchLogWithinLimit"] = (input) =>
     this.#batchLog.assertWithinLimit(input);

@@ -152,7 +152,6 @@ export function createCanonicalAutomationApp(): {
     assertCheckRunnable: vi.fn(),
     copy: vi.fn(),
     replicate: vi.fn(),
-    performanceForProject: vi.fn(),
   });
   const infrastructure: AutomationInfrastructure = {
     verifier,

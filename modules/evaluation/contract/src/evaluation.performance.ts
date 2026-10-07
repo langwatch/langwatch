@@ -24,3 +24,12 @@ export const onlineEvaluationPerformanceSchema = z.object({
   previous: z.number().nullable(),
 });
 export type OnlineEvaluationPerformance = z.infer<typeof onlineEvaluationPerformanceSchema>;
+
+/** The seven-day trend of a project's monitors, in the reader's own time zone. */
+export const monitorPerformanceForProjectInputSchema = z.object({
+  projectId: z.string(),
+  timeZone: z.string().min(1).max(100).optional(),
+});
+export type MonitorPerformanceForProjectInput = z.infer<
+  typeof monitorPerformanceForProjectInputSchema
+>;

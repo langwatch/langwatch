@@ -10,20 +10,6 @@ export const monitorTrpcTransport: TrpcRouterDeclaration<MonitorApi, typeof moni
     .withPermission("evaluations:view")
     .handle(({ app, input }) => app.list({ projectId: input.projectId }))
 
-    /**
-     * `evaluations:view` for the monitors, and `analytics:view` on top because
-     * the trend is the analytics page's own comparison window.
-     */
-    .procedure("getPerformanceForProject")
-    .withPermission(["evaluations:view", "analytics:view"])
-    .handle(({ app, input, actor }) =>
-      app.performanceForProject({
-        projectId: input.projectId,
-        ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
-        actor: { id: actor.id },
-      }),
-    )
-
     .procedure("getById")
     .withPermission("evaluations:view")
     .handle(({ app, input }) => app.getById(input))
