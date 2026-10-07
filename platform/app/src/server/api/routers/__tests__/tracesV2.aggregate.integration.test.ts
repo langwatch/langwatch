@@ -12,51 +12,32 @@
  * Spec: specs/governance/aggregate-project.feature, section F.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Project } from "~/generated/prisma/client";
-import { NullLwqlKeyMapRepository } from "~/server/analytics/lwql/lwqlKeyMap.repository";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import {
-  GrantsLedgerWriter,
-  resetAuthzGrantsCommandsForTests,
-} from "~/server/app-layer/authz/ledger";
-import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
-import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
+import { resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { createTestApp } from "~/server/app-layer/presets";
 import {
   type AggregateFixture,
-  realOrganizationService,
   seedAggregateOrganization,
 } from "~/server/app-layer/projects/__tests__/aggregateProjectFixture";
-import { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
-import { AggregateRuleService } from "~/server/app-layer/projects/aggregate-rule.service";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { AGGREGATE_PROJECT_KIND } from "~/server/app-layer/projects/project-kinds";
-import { PrismaAggregateReconcileLock } from "~/server/app-layer/projects/repositories/aggregate-reconcile-lock.prisma.repository";
-import { PrismaAggregateRuleRepository } from "~/server/app-layer/projects/repositories/aggregate-rule.prisma.repository";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
-import { PrismaScheduledJobRepository } from "~/server/app-layer/scheduler/scheduled-job.repository";
-import { NullTopicRepository } from "~/server/app-layer/topic-clustering/repositories/null-topic.repository";
-import { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceListClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-list.clickhouse.repository";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceListService } from "~/server/app-layer/traces/trace-list.service";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
-import { traceSummaryRepositoryFor } from "~/test-utils/traceSummaryRepository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import {
+  handledCodeOf,
+  insertRows,
+  installAggregateTraceApp,
+  spanRow,
+  summaryRow,
+} from "./helpers/aggregateTraceRoutes";
 
 const run = nanoid(8);
 /** One trace per member, each named after the member that holds it. */
@@ -75,77 +56,6 @@ let occurredAt: number;
 let window: { from: number; to: number };
 /** The engineer's evaluation, which recorded the inputs it judged. */
 let engineerEvaluationId: string;
-
-const handledCodeOf = (error: unknown): string | undefined => {
-  const cause = (error as { cause?: unknown } | null)?.cause;
-  if (HandledError.isHandled(cause)) return cause.code;
-  return HandledError.isHandled(error) ? error.code : undefined;
-};
-
-function summaryRow({
-  tenantId,
-  traceId,
-}: {
-  tenantId: string;
-  traceId: string;
-}) {
-  return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    TraceId: traceId,
-    Version: "v1",
-    Attributes: { "service.name": `service-of-${tenantId}` },
-    OccurredAt: new Date(occurredAt),
-    CreatedAt: new Date(occurredAt),
-    UpdatedAt: new Date(occurredAt),
-    LastEventOccurredAt: new Date(occurredAt),
-    ComputedIOSchemaVersion: "v1",
-    ComputedInput: `input of ${tenantId}`,
-    ComputedOutput: `output of ${tenantId}`,
-    TotalDurationMs: 100,
-    SpanCount: 1,
-    ContainsErrorStatus: false,
-    ContainsOKStatus: true,
-    Models: [],
-    TraceName: `trace of ${tenantId}`,
-  };
-}
-
-function spanRow({ tenantId, traceId }: { tenantId: string; traceId: string }) {
-  return {
-    ProjectionId: `proj-${nanoid()}`,
-    TenantId: tenantId,
-    TraceId: traceId,
-    SpanId: `span-${nanoid(8)}`,
-    ParentSpanId: null,
-    ParentTraceId: null,
-    ParentIsRemote: null,
-    Sampled: 1,
-    StartTime: new Date(occurredAt),
-    EndTime: new Date(occurredAt + 50),
-    DurationMs: 50,
-    SpanName: `span of ${tenantId}`,
-    SpanKind: 1,
-    ServiceName: "test-service",
-    ResourceAttributes: { "service.name": `service-of-${tenantId}` },
-    SpanAttributes: {},
-    StatusCode: 1,
-    StatusMessage: null,
-    ScopeName: "test",
-    ScopeVersion: null,
-    "Events.Timestamp": [] as Date[],
-    "Events.Name": [] as string[],
-    "Events.Attributes": [] as Record<string, string>[],
-    "Links.TraceId": [] as string[],
-    "Links.SpanId": [] as string[],
-    "Links.Attributes": [] as Record<string, string>[],
-    DroppedAttributesCount: 0,
-    DroppedEventsCount: 0,
-    DroppedLinksCount: 0,
-    CreatedAt: new Date(occurredAt),
-    UpdatedAt: new Date(occurredAt),
-  };
-}
 
 function evaluationOf({
   traceId,
@@ -181,12 +91,7 @@ function evaluationOf({
 }
 
 async function insert(table: string, values: unknown[]) {
-  await ch.insert({
-    table,
-    values,
-    format: "JSONEachRow",
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
+  await insertRows({ ch, table, values });
 }
 
 const memberId = (handle: string): string => {
@@ -208,56 +113,7 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   const resolveClient = async () => ch;
-  const clickhouse = new AuthorizedClickHouse({ resolveClient });
-  const evaluationRuns = new EvaluationRunService(
-    evaluationRunRepositoryFor({ resolveClient }),
-  );
-  const ruleRepository = new PrismaAggregateRuleRepository(prisma);
-  const rules = new AggregateRuleService(ruleRepository);
-
-  resetAuthzGrantsCommandsForTests();
-  const defaults = createTestApp();
-  globalForApp.__langwatch_app = createTestApp({
-    organizations: realOrganizationService(prisma),
-    projects: new ProjectService(
-      new PrismaProjectRepository(prisma),
-      new NullLwqlKeyMapRepository(),
-      {
-        rules,
-        reconciler: new AggregateReconciler({
-          aggregates: ruleRepository,
-          lock: new PrismaAggregateReconcileLock(prisma),
-          rules,
-          ledger: () => new GrantsLedgerWriter(prisma),
-          schedule: new PrismaScheduledJobRepository(prisma),
-        }),
-      },
-    ),
-    _eventSourcing: createAuthzTestEventSourcing(prisma),
-    traces: {
-      ...defaults.traces,
-      summary: new TraceSummaryService(
-        traceSummaryRepositoryFor(resolveClient),
-      ),
-      list: new TraceListService(
-        new TraceListClickHouseRepository(clickhouse),
-        evaluationRuns,
-        new TopicService(new NullTopicRepository()),
-      ),
-      spans: new SpanStorageService(
-        new SpanStorageClickHouseRepository({ resolveClient, clickhouse }),
-      ),
-    },
-    evaluations: {
-      ...defaults.evaluations,
-      runs: evaluationRuns,
-      traceEvaluations: new TraceEvaluationsClickHouseRepository({
-        resolveClient,
-        clickhouse,
-      }),
-    },
-  });
-
+  installAggregateTraceApp({ ch });
   fixture = await seedAggregateOrganization(prisma, { label: "agg-route" });
   outsider = await fixture.makeTeamProject("outsider");
   members = [
@@ -304,8 +160,14 @@ beforeAll(async () => {
     { tenantId: memberId("seller"), traceId: TWIN_TRACE },
     { tenantId: outsider.id, traceId: traceIdOf("outsider") },
   ];
-  await insert("trace_summaries", holders.map(summaryRow));
-  await insert("stored_spans", holders.map(spanRow));
+  await insert(
+    "trace_summaries",
+    holders.map((holder) => summaryRow({ ...holder, occurredAt })),
+  );
+  await insert(
+    "stored_spans",
+    holders.map((holder) => spanRow({ ...holder, occurredAt })),
+  );
   const repository = evaluationRunRepositoryFor({ resolveClient });
   const engineerEvaluation = {
     ...evaluationOf({
