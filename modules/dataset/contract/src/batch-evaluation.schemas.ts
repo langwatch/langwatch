@@ -1,16 +1,9 @@
 /**
- * Every `batchRecord.*` procedure, declared once: the two rollups an
- * experiment's batch-evaluation runs are summarised by. Rows are
- * `BatchEvaluation`, owned beside the datasets they ran against.
+ * The batch-evaluation rows and rollups dataset owns as `BatchEvaluation`, beside the
+ * datasets they ran against. Experiment serves them as `batchRecord.*`.
  */
 
-import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
-
-import {
-  batchRecordApiExperimentSlugInputSchema,
-  datasetApiProjectInputSchema,
-} from "./dataset.schemas.ts";
 
 /**
  * One experiment-and-dataset rollup: how many batch evaluations ran, what they
@@ -50,15 +43,3 @@ export const batchEvaluationRecordSchema = z.looseObject({
   dataset: z.looseObject({ id: z.string(), name: z.string(), slug: z.string() }),
 });
 export type BatchEvaluationRecord = z.infer<typeof batchEvaluationRecordSchema>;
-
-export const batchRecordTrpc = defineTrpcContract("batchRecord")
-  /** One row per experiment and dataset, for the batch-evaluations index. */
-  .query("getAllByexperimentIdGroup")
-  .withInput(datasetApiProjectInputSchema)
-  .withOutput(z.array(batchEvaluationSummarySchema))
-
-  /** Every batch-evaluation record of one experiment, named by its slug. */
-  .query("getAllByexperimentSlug")
-  .withInput(batchRecordApiExperimentSlugInputSchema)
-  .withOutput(z.array(batchEvaluationRecordSchema))
-  .build();

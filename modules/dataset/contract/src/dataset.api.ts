@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import type { StoredObjectsCreateUploadOutput } from "@langwatch/stored-object-contract";
 
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-evaluation.schemas.ts";
 import type { DatasetLimits } from "./dataset-limits.ts";
 import type { DatasetApiDeleteInput } from "./dataset.schemas.ts";
 import type {
@@ -75,7 +75,6 @@ export interface DatasetApi {
     projectId: string;
     datasetId?: string;
     slugOrId?: string;
-    experimentId?: string;
     name?: string;
     columnTypes?: DatasetColumns;
     datasetRecords?: UpsertDatasetInput["datasetRecords"];
@@ -155,10 +154,10 @@ export interface DatasetApi {
   summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
   /** One batch-evaluation row, written as `POST /api/dataset/evaluate` records it. */
   createBatchEvaluation(input: BatchEvaluationEntry): Promise<void>;
-  /** Every batch-evaluation record of the experiment the slug names. */
+  /** Every batch-evaluation record of one experiment; experiment resolves the slug. */
   listBatchEvaluations(input: {
     projectId: string;
-    experimentSlug: string;
+    experimentId: string;
   }): Promise<BatchEvaluationRecord[]>;
   /**
    * The platform's own address for one dataset resource, built from the

@@ -5,13 +5,19 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
+import {
+  DatasetApi,
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  type Dataset,
+} from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import {
   ExperimentApi,
+  ExperimentNotFoundError,
   type ExperimentCaller,
   type ExperimentRunLookupInput,
   type ExperimentUpdateFrame,
@@ -765,6 +771,28 @@ export class ExperimentModule implements ExperimentApi {
     input: Readonly<{ datasetId: string; projectId: string; name: string }>,
   ): Promise<Dataset> {
     return this.#dependencies.dataset.renameDataset(input);
+  }
+
+  /** One row per experiment and dataset: how many batch evaluations ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]> {
+    return this.#dependencies.dataset.summariseBatchEvaluations(input);
+  }
+
+  /** Every batch-evaluation record of the experiment a URL slug names; dataset holds the rows. */
+  async listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]> {
+    const experiment = await this.#dependencies.experiments.findBySlug({
+      projectId: input.projectId,
+      slug: input.experimentSlug,
+    });
+    if (!experiment) throw new ExperimentNotFoundError(input.experimentSlug);
+
+    return this.#dependencies.dataset.listBatchEvaluations({
+      projectId: input.projectId,
+      experimentId: experiment.id,
+    });
   }
 
   /** Copies a dataset into another project. */

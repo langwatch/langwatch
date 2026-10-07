@@ -1,4 +1,8 @@
-import type { Dataset } from "@langwatch/dataset-contract";
+import type {
+  BatchEvaluationRecord,
+  BatchEvaluationSummary,
+  Dataset,
+} from "@langwatch/dataset-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
@@ -147,6 +151,13 @@ export interface ExperimentApi {
   findBySlugAndType(
     input: ExperimentSlugLookup & { type: ExperimentType },
   ): Promise<Experiment | null>;
+  /** One row per experiment and dataset: how many batch evaluations ran, cost, mean score. */
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
+  /** Every batch-evaluation record of the experiment the slug names. */
+  listBatchEvaluations(input: {
+    projectId: string;
+    experimentSlug: string;
+  }): Promise<BatchEvaluationRecord[]>;
   list(input: { projectId: string }): Promise<Experiment[]>;
   getPage(input: ExperimentPageInput): Promise<ExperimentPage>;
   findLatest(input: { projectId: string }): Promise<Experiment | null>;

@@ -49,7 +49,6 @@ import {
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
-import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -84,9 +83,8 @@ type DatasetSetup = FeatureSetup<
 >;
 
 /**
- * A create-or-replace: possibly named by slug rather than id, possibly
- * naming an experiment instead of a name, and possibly missing name and
- * columns when only patching what already exists.
+ * A create-or-replace: possibly named by slug rather than id, and possibly
+ * missing name and columns when only patching what already exists.
  */
 interface DatasetUpsertInput {
   projectId: string;
@@ -97,8 +95,6 @@ interface DatasetUpsertInput {
    * also what an unnamed `name` or `columnTypes` is taken from.
    */
   slugOrId?: string;
-  /** The experiment whose name the dataset borrows when none is given. */
-  experimentId?: string;
   name?: string;
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
@@ -107,7 +103,6 @@ interface DatasetUpsertInput {
 export class DatasetModule implements DatasetApi {
   static readonly contract = DatasetApi;
   static readonly dependencies = {
-    experiments: ExperimentApi,
     permissions: AuthzApi,
     /** The directory that answers which organization a project belongs to. */
     projects: ProjectApi,
@@ -125,7 +120,6 @@ export class DatasetModule implements DatasetApi {
   #normalization: DatasetNormalizeService;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
   #count: DatasetRepositories["count"];
-  #experiments: ExperimentApi;
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
 
@@ -184,7 +178,6 @@ export class DatasetModule implements DatasetApi {
 
     this.#batchEvaluations = repositories.batchEvaluations;
     this.#count = repositories.count;
-    this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
     this.#publicBaseUrl = config.publicBaseUrl;
   }
@@ -196,7 +189,7 @@ export class DatasetModule implements DatasetApi {
   // ── Datasets ─────────────────────────────────────────────────────────────
 
   /** Partial upsert completion (dataset fact, not transport-specific): patch
-   * backs up to existing row, borrow name from experimentId, or refuse.
+   * backs up to existing row, or refuse.
    */
   async upsertDataset(input: DatasetUpsertInput): Promise<Dataset> {
     const replacing = input.slugOrId
@@ -206,27 +199,8 @@ export class DatasetModule implements DatasetApi {
         })
       : undefined;
 
-    const borrowed =
-      input.name === undefined && input.experimentId !== undefined
-        ? (
-            await this.#experiments.getById({
-              projectId: input.projectId,
-              id: input.experimentId,
-            })
-          ).name
-        : undefined;
-
-    const name = input.name ?? borrowed ?? replacing?.name;
-    if (!name) {
-      // The experiment case keeps its own wording: the caller named a thing
-      // that exists, and the reason the write cannot proceed is that the thing
-      // has no name to lend.
-      throw new Error(
-        input.experimentId
-          ? `Experiment ${input.experimentId} has no name`
-          : "A dataset needs a name",
-      );
-    }
+    const name = input.name ?? replacing?.name;
+    if (!name) throw new Error("A dataset needs a name");
 
     return this.#datasets.upsertDataset({
       projectId: input.projectId,
@@ -477,26 +451,12 @@ export class DatasetModule implements DatasetApi {
     return this.#batchEvaluations.create(input);
   }
 
-  /**
-   * Every batch-evaluation record of the experiment a URL slug names. The
-   * slug-to-id read is the only thing this feature asks of Experiment, done
-   * here so no door reaches a second feature to answer a dataset question.
-   */
-  async listBatchEvaluations(input: {
+  /** Every batch-evaluation record of one experiment; experiment resolves its slug. */
+  listBatchEvaluations(input: {
     projectId: string;
-    experimentSlug: string;
+    experimentId: string;
   }): Promise<BatchEvaluationRecord[]> {
-    const experiment = await this.#experiments.findBySlug({
-      projectId: input.projectId,
-      slug: input.experimentSlug,
-    });
-
-    if (!experiment) throw new ExperimentNotFoundError(input.experimentSlug);
-
-    return this.#batchEvaluations.findAllByExperiment({
-      projectId: input.projectId,
-      experimentId: experiment.id,
-    });
+    return this.#batchEvaluations.findAllByExperiment(input);
   }
 
   // ── the platform's own links ──────────────────────────────────────────────

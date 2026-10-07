@@ -11,7 +11,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | dataset, dataset-record                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:173` (38 operations) |
+| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:172` (38 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What dataset owns
@@ -38,7 +38,6 @@ Anything else dataset needs belongs to another module and is reached through its
 | Name            | Token             | Module                                      |
 | --------------- | ----------------- | ------------------------------------------- |
 | `entitlement`   | `EntitlementApi`  | [entitlement](../entitlement/README.md)     |
-| `experiments`   | `ExperimentApi`   | [experiment](../experiment/README.md)       |
 | `permissions`   | `AuthzApi`        | [authz](../authz/README.md)                 |
 | `projects`      | `ProjectApi`      | [project](../project/README.md)             |
 | `storedObjects` | `StoredObjectApi` | [stored-object](../stored-object/README.md) |

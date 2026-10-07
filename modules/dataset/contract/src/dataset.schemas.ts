@@ -28,19 +28,13 @@ export const datasetApiUpsertBaseInputSchema = z.object({
 });
 
 /**
- * The half that names the dataset. The editor names it outright; the
- * experiment pages name an experiment and borrow its name.
+ * The half that names the dataset: every caller names it outright (Alex,
+ * 2026-10-07, round 9 D3; the experiment-name borrow is gone).
  */
-export const datasetApiUpsertTargetInputSchema = z.union([
-  z.object({
-    ...datasetRecordFormSchema.shape,
-    datasetId: z.string().optional(),
-  }),
-  z.object({
-    ...datasetRecordFormSchema.omit({ name: true }).shape,
-    experimentId: z.string(),
-  }),
-]);
+export const datasetApiUpsertTargetInputSchema = z.object({
+  ...datasetRecordFormSchema.shape,
+  datasetId: z.string().optional(),
+});
 
 export const datasetApiValidateNameInputSchema = z.object({
   projectId: z.string(),
@@ -125,12 +119,6 @@ export const datasetRecordApiDeleteManyInputSchema = z.object({
   projectId: z.string(),
   datasetId: z.string(),
   recordIds: z.array(z.string()).max(DATASET_RECORD_IDS_MAX),
-});
-
-/** `batchRecord.getAllByexperimentSlug`: one experiment, named by its URL slug. */
-export const batchRecordApiExperimentSlugInputSchema = z.object({
-  projectId: z.string(),
-  experimentSlug: z.string(),
 });
 
 export type DatasetApiUpsertBaseInput = z.infer<typeof datasetApiUpsertBaseInputSchema>;

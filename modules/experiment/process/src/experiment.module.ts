@@ -11,6 +11,7 @@ import { ExperimentModule } from "#app/experiment.app";
 import { experimentLifecycleEventing } from "./eventing/experiment-lifecycle.pipeline.ts";
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
 import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
+import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import {
@@ -38,6 +39,7 @@ export const experimentProcessModule = defineProcessModule("experiment")
     experimentV3LegacyRest,
     experimentWorkbenchRunLegacyRest,
     experimentTrpcTransport,
+    batchRecordTrpcTransport,
   )
   // This family answers behind the project door, so re-resolving the key here
   // would ask a second question that could answer differently from the door

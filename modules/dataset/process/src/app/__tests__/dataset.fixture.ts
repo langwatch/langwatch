@@ -1,7 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DATASET_LIMIT_BOUND_KEYS, type DatasetLimits } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import {
   deriveDatasetBounds,
   isDatasetDerivedBoundKey,
@@ -21,36 +20,6 @@ import { DatasetAttachmentUploadService } from "../../services/dataset-attachmen
 import { DatasetInlineAttachmentService } from "../../services/dataset-inline-attachment.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
 import { DatasetModule } from "../dataset.app.ts";
-
-/** One experiment, as this feature reads it: a name to borrow and an id. */
-export function datasetTestExperiment(
-  name: string | null,
-  id = "experiment-1",
-  slug = "nightly",
-): Experiment {
-  return {
-    id,
-    name,
-    type: "BATCH_EVALUATION",
-    slug,
-    projectId: "project-1",
-    workflowId: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    archivedAt: null,
-    workbenchState: null,
-    workbenchVersion: 0,
-  };
-}
-
-export function createDatasetTestExperiments(
-  experiment: Experiment | null = datasetTestExperiment("Nightly regression"),
-) {
-  return Object.assign(createApiFixture<ExperimentApi>(), {
-    getById: vi.fn(async () => experiment ?? datasetTestExperiment(null)),
-    findBySlug: vi.fn(async () => experiment),
-  });
-}
 
 export function createDatasetTestAuthz(permitted = true) {
   return Object.assign(createApiFixture<AuthzApi>(), {
@@ -166,7 +135,6 @@ export function createDatasetTestApp(
     repositories?: DatasetRepositories;
     publicBaseUrl?: string;
     dependencies?: Partial<{
-      experiments: ExperimentApi;
       permissions: AuthzApi;
       projects: ProjectApi;
       entitlement: EntitlementApi;
@@ -177,7 +145,6 @@ export function createDatasetTestApp(
   return DatasetModule.create({
     repositories: input.repositories ?? MemoryDatasetRepositories.create(),
     dependencies: {
-      experiments: input.dependencies?.experiments ?? createDatasetTestExperiments(),
       permissions: input.dependencies?.permissions ?? createDatasetTestAuthz(),
       projects: input.dependencies?.projects ?? createDatasetTestProjects(),
       entitlement: input.dependencies?.entitlement ?? createDatasetTestEntitlement(),

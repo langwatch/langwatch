@@ -89,7 +89,7 @@ describe("given a dataset evaluation scored one entry", () => {
     });
 
     await expect(
-      app.listBatchEvaluations({ projectId: "project-1", experimentSlug: "nightly" }),
+      app.listBatchEvaluations({ projectId: "project-1", experimentId: "experiment-1" }),
     ).resolves.toEqual([
       expect.objectContaining({
         id: "batch-1",
