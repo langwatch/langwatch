@@ -55,6 +55,13 @@ const outcomes = ({ window, from }: { window: Window; from: string }) => `SELECT
   )
   GROUP BY trace_id`;
 
+/**
+ * Trace cost plus evaluator cost, null only when neither side has a priced row: an unpriced
+ * trace has no cost (NULL), and `sum` skips it rather than counting it as $0.
+ */
+const costTotal = (traces: string, evaluations: string) =>
+  `coalesce((${traces}) + (${evaluations}), (${traces}), (${evaluations}))`;
+
 const PERIOD = { window: inPeriod, from: START };
 const BOTH_PERIODS = { window: inPeriodAndPrevious, from: PREVIOUS_START };
 const RECENT_START = `subtractDays(now(), ${PRESENCE_DAYS})`;
@@ -84,12 +91,16 @@ FROM (${outcomes(BOTH_PERIODS)})`;
 export const SPEND_COMPARISON_SQL = `SELECT
   uniqExactIf(${CONVERSATION}, OccurredAt >= ${START}) AS conversations,
   uniqExactIf(${CONVERSATION}, OccurredAt < ${START}) AS conversations_prev,
-  sumIf(ifNull(TotalCost, 0), OccurredAt >= ${START})
-    + (SELECT sumIf(ifNull(TotalCost, 0), OccurredAt >= ${START}) FROM evaluation_metrics
-      WHERE ${inPeriodAndPrevious("OccurredAt")}) AS cost,
-  sumIf(ifNull(TotalCost, 0), OccurredAt < ${START})
-    + (SELECT sumIf(ifNull(TotalCost, 0), OccurredAt < ${START}) FROM evaluation_metrics
-      WHERE ${inPeriodAndPrevious("OccurredAt")}) AS cost_prev
+  ${costTotal(
+    `sumIf(TotalCost, OccurredAt >= ${START})`,
+    `SELECT sumIf(TotalCost, OccurredAt >= ${START}) FROM evaluation_metrics
+      WHERE ${inPeriodAndPrevious("OccurredAt")}`,
+  )} AS cost,
+  ${costTotal(
+    `sumIf(TotalCost, OccurredAt < ${START})`,
+    `SELECT sumIf(TotalCost, OccurredAt < ${START}) FROM evaluation_metrics
+      WHERE ${inPeriodAndPrevious("OccurredAt")}`,
+  )} AS cost_prev
 FROM trace_metrics
 WHERE ${inPeriodAndPrevious("OccurredAt")}`;
 
@@ -268,26 +279,28 @@ ORDER BY bucket`;
 
 /** Month to date, the last 7 days' pace and the month's length, for the forecast. */
 export const MONTH_FORECAST_SQL = `SELECT
-  (SELECT sum(ifNull(TotalCost, 0)) FROM trace_metrics WHERE OccurredAt >= toStartOfMonth(now()))
-    + (SELECT sum(ifNull(TotalCost, 0)) FROM evaluation_metrics
-      WHERE OccurredAt >= toStartOfMonth(now())) AS month_to_date,
-  (SELECT sum(ifNull(TotalCost, 0)) FROM trace_metrics WHERE OccurredAt >= subtractDays(now(), 7))
-    + (SELECT sum(ifNull(TotalCost, 0)) FROM evaluation_metrics
-      WHERE OccurredAt >= subtractDays(now(), 7)) AS last_7_days,
+  ${costTotal(
+    "SELECT sum(TotalCost) FROM trace_metrics WHERE OccurredAt >= toStartOfMonth(now())",
+    "SELECT sum(TotalCost) FROM evaluation_metrics WHERE OccurredAt >= toStartOfMonth(now())",
+  )} AS month_to_date,
+  ${costTotal(
+    "SELECT sum(TotalCost) FROM trace_metrics WHERE OccurredAt >= subtractDays(now(), 7)",
+    "SELECT sum(TotalCost) FROM evaluation_metrics WHERE OccurredAt >= subtractDays(now(), 7)",
+  )} AS last_7_days,
   toDayOfMonth(now()) AS day_of_month,
   toDayOfMonth(subtractDays(toStartOfMonth(addMonths(now(), 1)), 1)) AS days_in_month`;
 
 /** Spend per bucket by where it came from; evaluator runs count as evaluations. */
 export const SPEND_BY_SOURCE_SQL = `SELECT bucket, source, sum(cost) AS cost
 FROM (
-  SELECT ${bucketOf("OccurredAt")} AS bucket, ifNull(TotalCost, 0) AS cost,
+  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost,
     multiIf(${PRODUCTION}, 'production', Origin = 'evaluation', 'evaluations',
       Origin = 'simulation', 'simulations', Origin IN ('playground', 'workflow'), 'experiments',
       'other') AS source
   FROM trace_metrics
   WHERE ${inPeriod("OccurredAt")}
   UNION ALL
-  SELECT ${bucketOf("OccurredAt")} AS bucket, ifNull(TotalCost, 0) AS cost, 'evaluations' AS source
+  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost, 'evaluations' AS source
   FROM evaluation_metrics
   WHERE ${inPeriod("OccurredAt")}
 )
@@ -299,7 +312,7 @@ const traceWaste = `SELECT ifNull(s.failed, 0) = 1 AS failed, t.cost AS cost,
     ifNull(s.spans, 0) AS spans, ifNull(s.retries, 0) AS retries,
     ifNull(s.repeats, 0) AS repeats, ifNull(s.llm_cost, 0) AS llm_cost, ifNull(s.llm_ok, 0) AS llm_ok
   FROM (
-    SELECT TraceId, ifNull(TotalCost, 0) AS cost
+    SELECT TraceId, TotalCost AS cost
     FROM trace_metrics
     WHERE ${inPeriod("OccurredAt")}
       AND ${PRODUCTION}
@@ -342,7 +355,7 @@ FROM (${traceWaste})`;
 
 /** Production cost and calls per bucket; a call is a conversation, else a trace. */
 export const COST_PER_CALL_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
-  sum(ifNull(TotalCost, 0)) AS cost,
+  sum(TotalCost) AS cost,
   uniqExact(${CONVERSATION}) AS calls
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
@@ -351,7 +364,7 @@ GROUP BY bucket
 ORDER BY bucket`;
 
 /** Production cost and calls over the whole period. */
-export const COST_PER_CALL_SQL = `SELECT sum(ifNull(TotalCost, 0)) AS cost, uniqExact(${CONVERSATION}) AS calls
+export const COST_PER_CALL_SQL = `SELECT sum(TotalCost) AS cost, uniqExact(${CONVERSATION}) AS calls
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
   AND ${PRODUCTION}`;
@@ -362,7 +375,7 @@ const DOCUMENT_MODEL = "if(length(Models) = 1, Models[1], 'several models')";
 /** Production cost and documents per bucket and model. */
 export const DOCUMENT_COST_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
   ${DOCUMENT_MODEL} AS model,
-  sum(ifNull(TotalCost, 0)) AS cost,
+  sum(TotalCost) AS cost,
   count() AS documents
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
@@ -373,9 +386,9 @@ ORDER BY bucket`;
 
 /** Cost and documents in the first and the second half of the period. */
 export const DOCUMENT_COST_HALVES_SQL = `SELECT
-  sumIf(ifNull(TotalCost, 0), OccurredAt < ${MIDPOINT}) AS first_cost,
+  sumIf(TotalCost, OccurredAt < ${MIDPOINT}) AS first_cost,
   countIf(OccurredAt < ${MIDPOINT}) AS first_documents,
-  sumIf(ifNull(TotalCost, 0), OccurredAt >= ${MIDPOINT}) AS second_cost,
+  sumIf(TotalCost, OccurredAt >= ${MIDPOINT}) AS second_cost,
   countIf(OccurredAt >= ${MIDPOINT}) AS second_documents
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}

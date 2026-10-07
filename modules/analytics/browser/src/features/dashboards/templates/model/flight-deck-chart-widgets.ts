@@ -23,7 +23,8 @@ export const statusCode = ({ source }: { source: WidgetSource }) =>
     components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
-  if (previous <= 0 && current > 0)
+  if (!known(current)) return null;
+  if (!known(previous) || (previous <= 0 && current > 0))
     return <div style={{ ...line, color: C.faint }}>No earlier data</div>;
   const delta = previous > 0 ? (current - previous) / previous : 0;
   const up = delta > 0.0005;
@@ -56,9 +57,9 @@ function Tile({ label, value, current, previous, rising }) {
     body: `  const row = main.data[0] || {};
   const requests = num(row.requests);
   const requestsPrev = num(row.requests_prev);
-  if (requests === 0) return <Panel><CallToAction /></Panel>;
+  if (!requests) return <Panel><CallToAction /></Panel>;
   const success = 1 - num(row.errors) / requests;
-  const successPrev = requestsPrev > 0 ? 1 - num(row.errors_prev) / requestsPrev : 0;
+  const successPrev = requestsPrev > 0 ? 1 - num(row.errors_prev) / requestsPrev : null;
   const columns = "repeat(auto-fit, minmax(140px, 1fr))";
   return (
     <Panel>
@@ -155,7 +156,7 @@ export const QUALITY_CODE = widgetCode({
   const points = passRate.data.map((row) => ({
     x: bucketLabel(row.bucket),
     passRate: num(row.pass_rate),
-    errorRate: errors.get(row.bucket) || 0,
+    errorRate: errors.get(row.bucket) ?? null,
   }));
   return (
     <Panel>
@@ -189,7 +190,7 @@ export const FEEDBACK_CODE = widgetCode({
   queries: ["summary", "rate"],
   body: `  const up = num(summary.data[0]?.thumbs_up);
   const down = num(summary.data[0]?.thumbs_down);
-  if (up + down === 0) return <Panel><CallToAction /></Panel>;
+  if (!add(up, down)) return <Panel><CallToAction /></Panel>;
   const points = rate.data.map((row) => ({
     x: bucketLabel(row.bucket),
     positive: num(row.positive_rate),

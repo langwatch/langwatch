@@ -54,6 +54,8 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 
   TotalCost: number | null;
   NonBilledCost: number | null;
+  UnpricedSpanCount: number;
+  UnpricedModels: string[];
   // Int64 column — stringified for JSON precision.
   TotalDurationMs: string;
   TimeToFirstTokenMs: number | null;
@@ -368,6 +370,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
       TotalCost: row.totalCost,
       NonBilledCost: row.nonBilledCost,
+      UnpricedSpanCount: Math.max(0, Math.round(row.unpricedSpanCount)),
+      UnpricedModels: row.unpricedModels,
       TotalDurationMs: String(Math.round(row.totalDurationMs)),
       TimeToFirstTokenMs:
         row.timeToFirstTokenMs !== null ? Math.round(row.timeToFirstTokenMs) : null,
@@ -433,6 +437,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
       totalCost: TraceAnalyticsClickHouseRepository.asNullableNumber(record.TotalCost),
       nonBilledCost: TraceAnalyticsClickHouseRepository.asNullableNumber(record.NonBilledCost),
+      unpricedSpanCount: TraceAnalyticsClickHouseRepository.asNumber(record.UnpricedSpanCount),
+      unpricedModels: TraceAnalyticsClickHouseRepository.asStringArray(record.UnpricedModels),
       totalDurationMs: TraceAnalyticsClickHouseRepository.asNumber(record.TotalDurationMs),
       timeToFirstTokenMs: TraceAnalyticsClickHouseRepository.asNullableNumber(
         record.TimeToFirstTokenMs,

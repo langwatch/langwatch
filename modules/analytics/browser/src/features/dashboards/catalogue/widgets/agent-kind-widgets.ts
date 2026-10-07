@@ -154,8 +154,7 @@ const ATT_TABLE_CODE = widgetCode({
     };
   };
   const shown = (side) => (side.judged >= MIN_JUDGED ? pct(rate(side.passed, side.judged), 0) : "-");
-  const perConversation = (row) =>
-    num(row.conversations) > 0 ? usd(num(row.cost) / num(row.conversations)) : "-";
+  const perConversation = (row) => usd(ratio(row.cost, row.conversations));
   const columns = [
     { header: cap(unit.one), cell: (row) => <b>{unitName(row.unit, key)}</b> },
     { header: cap(unit.things), align: "right", cell: (row) => count(num(row.conversations)) },
@@ -268,11 +267,11 @@ const COST_BY_SEGMENT_CODE = widgetCode({
   parts: [NUMBERS, BARS, UNITS],
   queries: ["units", "totals"],
   body: `  const total = num(totals.data[0]?.cost);
-  if (units.data.length === 0 || total === 0) return <Panel><CallToAction /></Panel>;
+  if (units.data.length === 0 || !total) return <Panel><CallToAction /></Panel>;
   const key = units.data[0].unit_key;
   if (!key) return <Panel><Note>{NO_UNIT}</Note></Panel>;
   const ranked = units.data.map((row) => ({ label: unitName(row.unit, key), value: num(row.cost) }));
-  const rest = Math.max(0, total - ranked.reduce((sum, row) => sum + row.value, 0));
+  const rest = Math.max(0, total - (add(...ranked.map((row) => row.value)) ?? 0));
   const more = num(totals.data[0]?.units) - ranked.length;
   return (
     <Panel>
@@ -301,7 +300,7 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
   parts: [...SERIES_PARTS, STAGES],
   queries: ["trend", "summary"],
   body: `  const totals = summary.data[0] || {};
-  if (num(totals.replies) === 0) return <Panel><CallToAction /></Panel>;
+  if (!num(totals.replies)) return <Panel><CallToAction /></Panel>;
   const reply = num(totals.reply_p95);
   const stages = STAGES.map((stage) => ({
     ...stage,
@@ -320,7 +319,9 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
         <Figure label="Reply time, slowest 5%" value={ms(reply)}
           sub={"over " + count(num(totals.replies)) + " replies"} />
         <Figure label="Largest stage" value={largest.label + " " + ms(largest.p95)}
-          sub={reply > 0 ? pct(largest.p95 / reply, 0) + " of the reply time" : undefined} />
+          sub={known(ratio(largest.p95, reply))
+            ? pct(ratio(largest.p95, reply), 0) + " of the reply time"
+            : undefined} />
         <Figure label="Grew most, second half" value={grew.label + " " + signed(grew.change)}
           tone={grew.change > 0.15 ? "act" : undefined} />
       </Figures>
@@ -336,12 +337,12 @@ const VOICE_CALL_HEALTH_CODE = widgetCode({
   recharts: SERIES_CHART_IMPORTS,
   parts: SERIES_PARTS,
   components: `const REPEAT_CHECK = "${sql.REPEAT_CHECK}";
-const perK = (part, whole) => (whole > 0 ? (part / whole) * 1000 : 0);
-const perKLabel = (value) => value.toFixed(1);`,
+const perK = (part, whole) => (known(ratio(part, whole)) ? ratio(part, whole) * 1000 : null);
+const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   queries: ["trend", "summary"],
   body: `  const totals = summary.data[0] || {};
   const calls = num(totals.calls);
-  if (calls === 0) return <Panel><CallToAction /></Panel>;
+  if (!calls) return <Panel><CallToAction /></Panel>;
   const checked = num(totals.repeat_checks) > 0;
   const first = perK(num(totals.dropped_first), num(totals.calls_first));
   const second = perK(num(totals.dropped_second), num(totals.calls_second));
@@ -446,9 +447,9 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
   parts: [...SERIES_PARTS, UNITS],
   queries: ["trend", "summary", "byUnit"],
   body: `  const totals = summary.data[0] || {};
-  if (num(totals.traces) === 0) return <Panel><CallToAction /></Panel>;
+  if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
   const documents = num(totals.documents);
-  if (documents === 0) {
+  if (!documents) {
     return (
       <Panel>
         <Note>No trace in this period reports sent_to_review or an outcome in its metadata.</Note>
@@ -456,13 +457,12 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
     );
   }
   const sent = num(totals.sent);
-  const firstShare = num(totals.documents_first) > 0
-    ? num(totals.sent_first) / num(totals.documents_first) : 0;
+  const firstShare = ratio(totals.sent_first, totals.documents_first);
   const top = byUnit.data[0];
   const unit = top ? unitOf(top.unit_key) : unitOf("");
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),
-    share: num(row.documents) > 0 ? num(row.sent) / num(row.documents) : 0,
+    share: ratio(row.sent, row.documents),
   }));
   return (
     <Panel>
@@ -507,9 +507,9 @@ const GEN_DROPOFF_CODE = widgetCode({
 }`,
   queries: ["main"],
   body: `  const totals = main.data[0] || {};
-  if (num(totals.traces) === 0) return <Panel><CallToAction /></Panel>;
+  if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
   const generated = num(totals.generated);
-  if (generated === 0) {
+  if (!generated) {
     return (
       <Panel>
         <Note>No trace in this period reports output_action in its metadata.</Note>
@@ -662,14 +662,14 @@ const SO_QUEUE_CODE = widgetCode({
   const cameIn = num(totals.came_in);
   const pending = num(totals.pending);
   const before = num(totals.pending_before);
-  if (cameIn + num(totals.reviewed) + pending === 0) return <Panel><CallToAction /></Panel>;
+  if (!add(cameIn, totals.reviewed, pending)) return <Panel><CallToAction /></Panel>;
   const grew = pending - before;
   let backlog = before;
   const points = flow.data.map((row) => {
     backlog += num(row.came_in) - num(row.reviewed);
     return { x: bucketLabel(row.bucket), pending: backlog };
   });
-  const wait = totals.wait_seconds === null ? "-" : Math.round(num(totals.wait_seconds) / 3600) + "h";
+  const wait = known(totals.wait_seconds) ? Math.round(num(totals.wait_seconds) / 3600) + "h" : GAP;
   let tone;
   if (grew > cameIn * 0.1) tone = "act";
   else if (grew > 0) tone = "watch";

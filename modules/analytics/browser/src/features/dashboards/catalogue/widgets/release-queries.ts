@@ -207,7 +207,7 @@ SELECT ${inAfter("OccurredAt")} AS after,
   count() AS traces,
   countIf(HasError) / count() AS error_rate,
   quantileExact(0.95)(TotalDurationMs) AS p95_ms,
-  sum(ifNull(TotalCost, 0)) / count() AS cost_per_trace
+  sum(TotalCost) / count() AS cost_per_trace
 FROM trace_metrics
 WHERE changed_at > toDateTime(0)
   AND (${inAfter("OccurredAt")} OR ${inBefore("OccurredAt")})

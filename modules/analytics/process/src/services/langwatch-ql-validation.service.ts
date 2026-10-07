@@ -82,6 +82,7 @@ export class LangWatchQLValidationService {
         joins: [...block.joins],
         filteredColumns: [...block.filteredColumns],
         groupByColumns: [...block.groupByColumns],
+        referencedColumns: [...block.referencedColumns],
         hasGroupBy: block.hasGroupBy,
         isAggregated: block.isAggregated,
       })),

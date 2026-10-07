@@ -18,7 +18,6 @@ import {
   MARKED_CHART,
   MARKED_CHART_IMPORTS,
   PIVOT,
-  RATIO,
   TRACES_LINK,
 } from "./flight-deck-costs-parts.ts";
 
@@ -29,17 +28,18 @@ export const SPEND_CODE = widgetCode({
   subtitle: "Production, evaluations and simulations together",
   source: "traces",
   compactCallToAction: true,
-  parts: [NUMBERS, RATIO, FIGURES],
+  parts: [NUMBERS, FIGURES],
   queries: ["spend", "outcomes", "month"],
   body: `  const s = spend.data[0] || {};
   const o = outcomes.data[0] || {};
   const m = month.data[0] || {};
   const cost = num(s.cost);
-  if (cost === 0 && num(s.conversations) === 0) return <Panel><CallToAction /></Panel>;
+  if (!cost && !num(s.conversations)) return <Panel><CallToAction /></Panel>;
   const resolved = num(o.resolved);
   const perSuccess = ratio(cost, resolved);
   const daysLeft = num(m.days_in_month) - num(m.day_of_month);
-  const forecast = num(m.month_to_date) + (num(m.last_7_days) / 7) * daysLeft;
+  const pace = ratio(m.last_7_days, 7);
+  const forecast = add(m.month_to_date, known(pace) ? pace * daysLeft : null);
   const monthName = new Date().toLocaleString("en-US", { month: "long", timeZone: "UTC" });
   return (
     <Panel>
@@ -71,7 +71,7 @@ export const SPEND_BY_SOURCE_CODE = widgetCode({
   subtitle: "Check that test traffic stays a small share",
   source: "traces",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [NUMBERS, RATIO, DATES, CHART_STYLE, HEADLINE, MARKED_CHART, PIVOT, TRACES_LINK],
+  parts: [NUMBERS, DATES, CHART_STYLE, HEADLINE, MARKED_CHART, PIVOT, TRACES_LINK],
   components: `// key, label, colour and the trace origin the row opens.
 const SOURCES = [
   ["production", "Production", C.teal, "application"],
@@ -101,15 +101,15 @@ function SourceRow({ label, colour, cost, total, origin }) {
 }`,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const costOf = (key) => main.data.filter((row) => row.source === key)
-    .reduce((sum, row) => sum + num(row.cost), 0);
-  const total = SOURCES.reduce((sum, [key]) => sum + costOf(key), 0);
-  if (total === 0) return <Panel><Note>No spend in this period.</Note></Panel>;
+  const costOf = (key) =>
+    add(...main.data.filter((row) => row.source === key).map((row) => row.cost));
+  const total = add(...SOURCES.map(([key]) => costOf(key)));
+  if (!total) return <Panel><Note>No priced spend in this period.</Note></Panel>;
   const shown = SOURCES.filter(([key]) => key !== "other" || costOf(key) > 0);
   const series = shown.filter(([key]) => costOf(key) > 0).map(([key, label, colour]) => ({
     key, label, colour, bars: true, stack: "spend",
   }));
-  const test = total - costOf("production");
+  const test = total - (costOf("production") ?? 0);
   return (
     <Panel>
       <Headline value={pct(test / total, 0)} label={"of " + usd(total) + " is test traffic"} />
@@ -131,19 +131,19 @@ export const WASTE_CODE = widgetCode({
   subtitle: "Fix the line with the biggest price first",
   source: "traces",
   compactCallToAction: true,
-  parts: [NUMBERS, RATIO, TABLE, HEADLINE, TRACES_LINK],
+  parts: [NUMBERS, TABLE, HEADLINE, TRACES_LINK],
   queries: ["main"],
   body: `  const w = main.data[0] || {};
   const spend = num(w.spend);
-  if (spend === 0) return <Panel><CallToAction /></Panel>;
+  if (!spend) return <Panel><CallToAction /></Panel>;
   const lines = [
     { label: "Failed, not recovered", traces: num(w.failed_traces), cost: num(w.failed_cost),
       filter: { status: "error" } },
     { label: "Retries that recovered", traces: num(w.retry_traces), cost: num(w.retry_cost) },
     { label: "Loops", traces: num(w.loop_traces), cost: num(w.loop_cost) },
   ].toSorted((a, b) => b.cost - a.cost);
-  const total = lines.reduce((sum, line) => sum + line.cost, 0);
-  if (total === 0) return <Panel><Note>No wasted spend in this period.</Note></Panel>;
+  const total = add(...lines.map((line) => line.cost));
+  if (!total) return <Panel><Note>No wasted spend in this period.</Note></Panel>;
   const columns = [
     {
       header: "Wasted on",
@@ -171,11 +171,11 @@ export const COST_PER_CALL_CODE = widgetCode({
   subtitle: "Check the share speech takes before cutting model cost",
   source: "traces",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [NUMBERS, RATIO, DATES, CHART_STYLE, FIGURES, MARKED_CHART],
+  parts: [NUMBERS, DATES, CHART_STYLE, FIGURES, MARKED_CHART],
   queries: ["total", "trend"],
   body: `  const t = total.data[0] || {};
   const calls = num(t.calls);
-  if (calls === 0) return <Panel><CallToAction /></Panel>;
+  if (!calls) return <Panel><CallToAction /></Panel>;
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),
     llm: ratio(num(row.cost), num(row.calls)),
@@ -203,19 +203,20 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
   subtitle: "Compare it with the accuracy per field before moving more traffic",
   source: "models",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [NUMBERS, RATIO, DATES, CHART_STYLE, BARS, FIGURES, MARKED_CHART],
+  parts: [NUMBERS, DATES, CHART_STYLE, BARS, FIGURES, MARKED_CHART],
   queries: ["trend", "halves", "changes"],
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
   const models = new Map();
   const buckets = new Map();
   for (const row of trend.data) {
-    const model = models.get(row.model) || { cost: 0, documents: 0 };
-    model.cost += num(row.cost);
+    const model = models.get(row.model) || { cost: null, documents: 0 };
+    model.cost = add(model.cost, row.cost);
     model.documents += num(row.documents);
     models.set(row.model, model);
-    const point = buckets.get(row.bucket) || { x: bucketLabel(row.bucket), cost: 0, documents: 0 };
-    point[row.model] = ratio(num(row.cost), num(row.documents));
-    point.cost += num(row.cost);
+    const point = buckets.get(row.bucket) ||
+      { x: bucketLabel(row.bucket), cost: null, documents: 0 };
+    point[row.model] = ratio(row.cost, row.documents);
+    point.cost = add(point.cost, row.cost);
     point.documents += num(row.documents);
     buckets.set(row.bucket, point);
   }
@@ -224,9 +225,11 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
     all: ratio(point.cost, point.documents),
   }));
   const rows = [...models.entries()].map(([model, value]) => ({ model, ...value }));
-  const cost = rows.reduce((sum, row) => sum + row.cost, 0);
+  const cost = add(...rows.map((row) => row.cost));
   const documents = rows.reduce((sum, row) => sum + row.documents, 0);
-  const cheapest = rows.toSorted((a, b) => ratio(a.cost, a.documents) - ratio(b.cost, b.documents))[0];
+  const perDocument = (row) => ratio(row.cost, row.documents);
+  const cheapest = rows.filter((row) => known(perDocument(row)))
+    .toSorted((a, b) => perDocument(a) - perDocument(b))[0];
   const h = halves.data[0] || {};
   const first = ratio(num(h.first_cost), num(h.first_documents));
   const second = ratio(num(h.second_cost), num(h.second_documents));
@@ -244,11 +247,11 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
           <Hint>{count(documents)} documents</Hint>
         </Figure>
         <Figure label="Second half against the first"
-          value={first > 0 ? signedPct(second / first - 1) : "No earlier data"}>
+          value={first > 0 && known(second) ? signedPct(second / first - 1) : "No earlier data"}>
           <Hint>{usd(first)} to {usd(second)}</Hint>
         </Figure>
-        <Figure label="Cheapest model" value={usd(ratio(cheapest.cost, cheapest.documents))}>
-          <Hint>{cheapest.model}</Hint>
+        <Figure label="Cheapest model" value={cheapest ? usd(perDocument(cheapest)) : GAP}>
+          <Hint>{cheapest ? cheapest.model : "No priced model"}</Hint>
         </Figure>
       </Figures>
       <div style={{ height: 8 }} />

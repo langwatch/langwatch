@@ -134,10 +134,10 @@ FROM (
     t.TraceName AS operation,
     if(t.HasError, 1, 0) AS has_error,
     t.TotalDurationMs AS latency_ms,
-    ifNull(t.TotalCost, 0) AS cost,
+    t.TotalCost AS cost,
     multiIf(a.thumbs_down > 0, 'down', a.thumbs_up > 0, 'up', '') AS feedback,
     quantileExact(0.95)(t.TotalDurationMs) OVER () AS p95_latency,
-    quantileExact(0.95)(ifNull(t.TotalCost, 0)) OVER () AS p95_cost
+    quantileExact(0.95)(t.TotalCost) OVER () AS p95_cost
   FROM trace_metrics AS t
   LEFT JOIN (
     SELECT TraceId, countIf(IsThumbsUp = true) AS thumbs_up, countIf(IsThumbsUp = false) AS thumbs_down

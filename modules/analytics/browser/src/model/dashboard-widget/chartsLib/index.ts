@@ -184,9 +184,102 @@ function numericColumns(data: Row[], exclude: string[]): string[] {
   return cols.filter((col) => !exclude.includes(col) && data.some((row) => isNumeric(row[col])));
 }
 
-function toNumber(value: unknown): number {
+/** A value as a number, or null when it is missing: a gap is never drawn as 0. */
+export function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const n = Number(value);
-  return isNaN(n) ? 0 : n;
+  return Number.isFinite(n) ? n : null;
+}
+
+// ---------------------------------------------------------------------------
+// Buckets: every bucket of the window, from the query's completeness report
+// ---------------------------------------------------------------------------
+
+/** A count may be a real 0; a measure (rate, average, percentile) with no data is a gap. */
+export type SeriesKind = "count" | "measure";
+
+/** A series key, or a key with its kind. A bare key is a measure, the safe default. */
+export type SeriesSpec = string | { key: string; kind?: SeriesKind };
+
+export interface CompletenessBucket {
+  start: string;
+  n: number;
+}
+
+/** `2026-10-07 00:00:00[.000]` as LangWatchQL returns it, read as UTC. */
+const CLICKHOUSE_INSTANT = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/;
+
+/** A bucket value as epoch milliseconds; rows and the report spell instants differently. */
+function bucketEpochMs(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const naive = CLICKHOUSE_INSTANT.exec(value.trim());
+  return parseInstantEpochMs(naive ? `${naive[1]}T${naive[2]}Z` : value.trim());
+}
+
+function clickHouseInstant(epochMs: number): string {
+  const utc = Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO("UTC");
+  const two = (part: number) => String(part).padStart(2, "0");
+  const date = `${utc.year}-${two(utc.month)}-${two(utc.day)}`;
+  return `${date} ${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)}`;
+}
+
+function seriesKey(spec: SeriesSpec): string {
+  return typeof spec === "string" ? spec : spec.key;
+}
+
+function emptyBucketRow({
+  x,
+  epochMs,
+  series,
+}: {
+  x: string;
+  epochMs: number;
+  series: readonly SeriesSpec[];
+}): Row {
+  const row: Row = { [x]: clickHouseInstant(epochMs) };
+  for (const spec of series) {
+    row[seriesKey(spec)] = typeof spec !== "string" && spec.kind === "count" ? 0 : null;
+  }
+  return row;
+}
+
+/**
+ * The rows with every bucket of the window present, in time order: a bucket with no row gets
+ * one, its count series 0 and its measure series null. Without buckets the rows come back as
+ * they are. A row whose x is not an instant is kept, after the others.
+ */
+export function mergeBuckets({
+  rows,
+  buckets,
+  x,
+  series = [],
+}: {
+  rows: readonly Row[];
+  buckets: readonly CompletenessBucket[] | null | undefined;
+  x: string;
+  series?: readonly SeriesSpec[];
+}): Row[] {
+  if (!buckets || buckets.length === 0) return [...rows];
+  const byBucket = new Map<number, Row[]>();
+  const unplaced: Row[] = [];
+  for (const row of rows) {
+    const epochMs = bucketEpochMs(row[x]);
+    if (epochMs === undefined) {
+      unplaced.push(row);
+      continue;
+    }
+    byBucket.set(epochMs, [...(byBucket.get(epochMs) ?? []), row]);
+  }
+  for (const bucket of buckets) {
+    const epochMs = bucketEpochMs(bucket.start);
+    if (epochMs === undefined || byBucket.has(epochMs)) continue;
+    byBucket.set(epochMs, [emptyBucketRow({ x, epochMs, series })]);
+  }
+  const placed = [...byBucket.entries()]
+    .toSorted(([left], [right]) => left - right)
+    .flatMap(([, bucketRows]) => bucketRows);
+  return [...placed, ...unplaced];
 }
 
 /** Index of the first row whose x value is at/after `projectionFrom`. -1 if none. */
@@ -281,14 +374,15 @@ export interface SparklineProps {
   height?: number;
 }
 
-function sparklinePoints(data: Row[] | number[], y?: string): { value: number }[] {
+// A null point breaks the line: the chart never invents a 0 for a missing value.
+function sparklinePoints(data: Row[] | number[], y?: string): { value: number | null }[] {
   if (data.length === 0) return [];
-  if (typeof data[0] === "number") {
-    return (data as number[]).map((value) => ({ value }));
+  if (!data.some((item) => typeof item === "object" && item !== null)) {
+    return (data as unknown[]).map((value) => ({ value: toNumber(value) }));
   }
   const rows = data as Row[];
   const key = y ?? numericColumns(rows, [])[0];
-  return rows.map((row) => ({ value: key ? toNumber(row[key]) : 0 }));
+  return rows.map((row) => ({ value: key ? toNumber(row[key]) : null }));
 }
 
 export function Sparkline({ data, y, color, height = 40 }: SparklineProps) {
@@ -309,6 +403,7 @@ export function Sparkline({ data, y, color, height = 40 }: SparklineProps) {
         fillOpacity: 0.15,
         strokeWidth: 1.5,
         dot: false,
+        connectNulls: false,
         isAnimationActive: false,
       }),
     ),
@@ -862,6 +957,13 @@ export function Donut({
 // Leaderboard
 // ---------------------------------------------------------------------------
 
+/** Larger first, a missing value after every known one. */
+function compareDescending(left: number | null, right: number | null): number {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return right - left;
+}
+
 export interface LeaderboardProps {
   data: Row[];
   labelKey: string;
@@ -883,8 +985,14 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
-  const ranked = [...data].toSorted((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
-  const scaleMax = max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
+  // Rows with no value sort last and draw no bar: a missing value is not a 0.
+  const ranked = [...data].toSorted((a, b) =>
+    compareDescending(toNumber(a[valueKey]), toNumber(b[valueKey])),
+  );
+  const known = ranked
+    .map((row) => toNumber(row[valueKey]))
+    .filter((value): value is number => value !== null);
+  const scaleMax = max ?? Math.max(1, ...known);
 
   return h(
     "div",
@@ -899,7 +1007,7 @@ export function Leaderboard({
     },
     ...ranked.map((row, index) => {
       const value = toNumber(row[valueKey]);
-      const widthPct = Math.max(2, Math.min(100, (value / scaleMax) * 100));
+      const widthPct = value === null ? 0 : Math.max(2, Math.min(100, (value / scaleMax) * 100));
       const clickable = typeof navigateTo?.params === "function";
       return h(
         "div",
@@ -972,6 +1080,8 @@ export interface HeatmapProps {
   xLabels?: string[];
   yLabels?: string[];
   colorScale?: [string, string];
+  /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
+  kind?: SeriesKind;
   height?: number;
 }
 
@@ -1011,17 +1121,22 @@ export function Heatmap({
   xLabels,
   yLabels,
   colorScale,
+  kind = "measure",
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
+  const c = chrome();
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
   const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
   const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
   const yValues = rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
   const scale = colorScale ?? ["#eef2ff", "#4338ca"];
-  const values = data.map((row) => toNumber(row[valueKey]));
+  const values = data
+    .map((row) => toNumber(row[valueKey]))
+    .filter((value): value is number => value !== null);
   const maxValue = Math.max(1, ...values);
+  const absent = kind === "count" ? 0 : null;
 
-  const lookup = new Map<string, number>();
+  const lookup = new Map<string, number | null>();
   data.forEach((row) => {
     lookup.set(`${String(row[xKey])}\u0000${String(row[yKey])}`, toNumber(row[valueKey]));
   });
@@ -1040,7 +1155,15 @@ export function Heatmap({
       },
       ...yValues.flatMap((yValue, yIndex) =>
         xValues.map((xValue, xIndex) => {
-          const raw = lookup.get(`${xValue}\u0000${yValue}`) ?? 0;
+          const cell = `${xValue}\u0000${yValue}`;
+          const raw = lookup.has(cell) ? (lookup.get(cell) ?? null) : absent;
+          if (raw === null) {
+            return h("div", {
+              key: `${yIndex}-${xIndex}`,
+              title: `${yValue} / ${xValue}: no data`,
+              style: { aspectRatio: "1", borderRadius: 2, border: `1px dashed ${c.grid}` },
+            });
+          }
           const t = maxValue > 0 ? raw / maxValue : 0;
           return h("div", {
             key: `${yIndex}-${xIndex}`,

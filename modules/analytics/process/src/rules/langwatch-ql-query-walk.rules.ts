@@ -985,6 +985,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
     joins: [],
     filteredColumns: [],
     groupByColumns: [],
+    referencedColumns: [],
     appFunctionAliases: aliases,
     hasGroupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) || node.group_by_all === true,
@@ -1366,16 +1367,17 @@ function visitIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 }
 
 /**
- * Records a column named in a filter or grouping position on the block it sits in. The leaf
- * segment only: what a diagnostic asks is "was this dataset's time column filtered", and
- * `t.OccurredAt`, `OccurredAt` and `analytics.traces.OccurredAt` are all the same answer to it.
+ * Records a column the block reads, and again when it sits in a filter or grouping position.
+ * The leaf segment only: what a diagnostic asks is "was this dataset's time column filtered",
+ * and `t.OccurredAt`, `OccurredAt` and `analytics.traces.OccurredAt` are all the same answer.
  */
 function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): void {
   const { block, clause } = frame;
   if (!block) return;
-  if (clause !== "filter" && clause !== "group") return;
   const leaf = name.split(".").at(-1)?.trim().toLowerCase();
   if (!leaf) return;
+  addOnce(block.referencedColumns, leaf);
+  if (clause !== "filter" && clause !== "group") return;
   if (clause === "filter") addOnce(block.filteredColumns, leaf);
   else addOnce(block.groupByColumns, leaf);
 }

@@ -5000,6 +5000,16 @@
           "comment": ""
         },
         {
+          "name": "UnpricedSpanCount",
+          "type": "UInt32",
+          "comment": ""
+        },
+        {
+          "name": "UnpricedModels",
+          "type": "Array(LowCardinality(String))",
+          "comment": ""
+        },
+        {
           "name": "TotalDurationMs",
           "type": "Int64",
           "comment": ""
@@ -5306,6 +5316,16 @@
         {
           "name": "NonBilledCost",
           "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "UnpricedSpanCount",
+          "type": "UInt32",
+          "comment": ""
+        },
+        {
+          "name": "UnpricedModels",
+          "type": "Array(LowCardinality(String))",
           "comment": ""
         },
         {

@@ -41,7 +41,7 @@ export const OUTCOMES_CODE = widgetCode({
   const points = trend.data.map((row) => {
     const point = { x: bucketLabel(row.bucket) };
     for (const [key] of FAILURES) {
-      point[key] = num(row.closed) > 0 ? num(row[key]) / num(row.closed) : 0;
+      point[key] = ratio(row[key], row.closed);
     }
     return point;
   });
@@ -92,8 +92,8 @@ export const UNANSWERED_CODE = widgetCode({
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
   const closed = trend.data.reduce((sum, row) => sum + num(row.closed), 0);
   const refused = trend.data.reduce((sum, row) => sum + num(row.refused), 0);
-  const average = closed > 0 ? refused / closed : 0;
-  const shareOf = (row) => (num(row.closed) > 0 ? num(row.refused) / num(row.closed) : 0);
+  const average = ratio(refused, closed);
+  const shareOf = (row) => ratio(row.refused, row.closed);
   const widest = Math.max(...topics.data.map(shareOf), Number.MIN_VALUE);
   const rows = topics.data.map((row) => ({
     label: topicName(row.topic),
@@ -102,8 +102,7 @@ export const UNANSWERED_CODE = widgetCode({
     colour: shareOf(row) > average * 1.3 ? C.red : C.orange,
     title: count(num(row.refused)) + " of " + count(num(row.closed)) + " got no answer",
   }));
-  const daily = trend.data.map((row) =>
-    num(row.closed) > 0 ? num(row.refused) / num(row.closed) : null);
+  const daily = trend.data.map(shareOf);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 14rem", gap: 20 }}>
@@ -133,7 +132,7 @@ export const JUDGE_AGREEMENT_CODE = widgetCode({
   parts: SERIES_PARTS,
   queries: ["weekly"],
   body: `  if (weekly.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const kappa = (value) => num(value).toFixed(2);
+  const kappa = (value) => (known(value) ? num(value).toFixed(2) : GAP);
   const reviewed = {};
   for (const row of weekly.data) {
     reviewed[row.evaluator] = (reviewed[row.evaluator] || 0) + num(row.reviewed);
@@ -223,7 +222,7 @@ export const FAILURE_SOURCE_CODE = widgetCode({
   const sum = (key) => trend.data.reduce((total, row) => total + num(row[key]), 0);
   const searched = sum("searched");
   const failures = sum("retrieval") + sum("generation") + sum("errors");
-  const ofFailed = (value) => count(value) + " · " + pct(failures > 0 ? value / failures : 0, 0);
+  const ofFailed = (value) => count(value) + " · " + pct(ratio(value, failures), 0);
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),
     retrieval: num(row.retrieval),
@@ -262,13 +261,13 @@ export const EMPTY_RETRIEVAL_CODE = widgetCode({
   const empty = sum("empty_searches");
   const points = trend.data.map((row) => ({
     x: bucketLabel(row.bucket),
-    rate: num(row.questions) > 0 ? num(row.empty_searches) / num(row.questions) : 0,
+    rate: ratio(row.empty_searches, row.questions),
   }));
   const label = "of " + count(questions) + " questions found nothing; " +
     count(sum("empty_errored")) + " of those ended in an error";
   return (
     <Panel>
-      <Headline value={pct(questions > 0 ? empty / questions : 0, 2)} label={label} />
+      <Headline value={pct(ratio(empty, questions), 2)} label={label} />
       <SeriesChart points={points} format={(value) => pct(value, 1)} domain={[0, "auto"]}
         series={[{ key: "rate", label: "empty retrieval", colour: C.teal }]} />
     </Panel>

@@ -8425,6 +8425,25 @@ export interface operations {
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
+                        completeness?: {
+                            /** @enum {string} */
+                            state: "complete" | "partial" | "missing" | "no_traffic";
+                            unit: string;
+                            total: number;
+                            fields: {
+                                field: string;
+                                label: string;
+                                present: number;
+                            }[];
+                            buckets?: {
+                                start: string;
+                                n: number;
+                            }[];
+                            unpriced?: {
+                                count: number;
+                                models: string[];
+                            };
+                        };
                     };
                 };
             };

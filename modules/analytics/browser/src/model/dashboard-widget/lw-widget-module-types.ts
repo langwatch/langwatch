@@ -156,7 +156,17 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     xLabels?: readonly string[];
     yLabels?: readonly string[];
     colorScale?: [string, string];
+    /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
+    kind?: SeriesKind;
     height?: number;
+  }
+  /** A count may be a real 0; a measure (rate, average, percentile) with no data is a gap. */
+  export type SeriesKind = "count" | "measure";
+  /** A series key, or a key with its kind. A bare key is a measure, the safe default. */
+  export type SeriesSpec = string | { key: string; kind?: SeriesKind };
+  export interface CompletenessBucket {
+    start: string;
+    n: number;
   }
   export type LwqlChartKind = "area" | "bars" | "donut" | "leaderboard" | "table";
   export interface LwqlChartProps {
@@ -181,6 +191,18 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
   export const LwqlChart: Chart<LwqlChartProps>;
   export function parseHexRgb(hex: string): [number, number, number] | null;
   export function interpolateColor(from: string, to: string, t: number): string;
+  /** A value as a number, or null when it is missing (null, undefined, NaN, ""). */
+  export function toNumber(value: unknown): number | null;
+  /**
+   * The rows with every bucket of \`completeness.buckets\` present, in time order: a bucket with
+   * no row gets one, its count series 0 and its measure series null (a gap in the line).
+   */
+  export function mergeBuckets(input: {
+    rows: readonly Row[];
+    buckets: readonly CompletenessBucket[] | null | undefined;
+    x: string;
+    series?: readonly SeriesSpec[];
+  }): Row[];
 }`;
 
 /**

@@ -15,8 +15,8 @@ import {
   widgetCode,
 } from "./widget-code-parts.ts";
 
-/** A share of a whole, "-" when the whole is zero. */
-const SHARE = `const share = (part, whole) => (whole > 0 ? pct(part / whole, 0) : "-");`;
+/** A share of a whole, a dash when the part is unknown or the whole is zero. */
+const SHARE = `const share = (part, whole) => pct(ratio(part, whole), 0);`;
 
 export const MODEL_SPEND_CODE = widgetCode({
   summary: "The five models that cost the most, with each one's share of all model spend.",
@@ -25,7 +25,7 @@ export const MODEL_SPEND_CODE = widgetCode({
   parts: [NUMBERS, TABLE, SHARE],
   queries: ["models", "spend"],
   body: `  const total = num(spend.data[0]?.cost);
-  if (models.data.length === 0 || total === 0) return <Panel><CallToAction /></Panel>;
+  if (models.data.length === 0 || !total) return <Panel><CallToAction /></Panel>;
   const columns = [
     { header: "Model", cell: (row) => mono(row.model) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(num(row.cost))}</b> },
@@ -51,7 +51,7 @@ export const TOP_MODELS_CODE = widgetCode({
     { header: "Model", cell: (row) => mono(row.model) },
     { header: "Traces", align: "right", cell: (row) => count(num(row.traces)) },
     { header: "Share", align: "right", cell: (row) => share(num(row.traces), traces) },
-    { header: "Cost", align: "right", cell: (row) => <b>{usd(costs.get(row.model) || 0)}</b> },
+    { header: "Cost", align: "right", cell: (row) => <b>{usd(costs.get(row.model) ?? null)}</b> },
   ];
   return (
     <Panel>
@@ -140,8 +140,8 @@ export const THUMBS_DOWN_CODE = widgetCode({
   queries: ["summary", "traces"],
   body: `  const up = num(summary.data[0]?.thumbs_up);
   const down = num(summary.data[0]?.thumbs_down);
-  if (up + down === 0) return <Panel><CallToAction /></Panel>;
-  const label = count(down) + " of " + count(up + down) + " reviewer votes were thumbs down";
+  if (!add(up, down)) return <Panel><CallToAction /></Panel>;
+  const label = count(down) + " of " + count(add(up, down)) + " reviewer votes were thumbs down";
   if (traces.data.length === 0) {
     return <Panel><Note color={C.green}>No reviewer thumbs down in this period</Note></Panel>;
   }
@@ -158,7 +158,7 @@ export const THUMBS_DOWN_CODE = widgetCode({
   ];
   return (
     <Panel>
-      <Headline value={pct(down / (up + down), 0)} label={label} />
+      <Headline value={pct(ratio(down, add(up, down)), 0)} label={label} />
       <Table columns={columns} rows={traces.data} rowPadding={3} />
     </Panel>
   );`,
@@ -181,7 +181,7 @@ export const LOWEST_SCORES_CODE = widgetCode({
   const columns = [
     { header: "Trace", cell: (row) => <TraceLink id={row.trace_id} /> },
     { header: "Evaluator", cell: (row) => row.evaluator || "Unnamed" },
-    { header: "Score", align: "right", cell: (row) => <b>{num(row.score).toFixed(2)}</b> },
+    { header: "Score", align: "right", cell: (row) => <b>{known(row.score) ? num(row.score).toFixed(2) : GAP}</b> },
     { header: "Verdict", align: "right", cell: verdict },
   ];
   return (
@@ -219,7 +219,7 @@ export const EVALUATION_COVERAGE_CODE = widgetCode({
   body: `  if (evaluators.data.length === 0) return <Panel><CallToAction /></Panel>;
   const traces = num(traffic.data[0]?.traces);
   const evaluatedTraces = num(evaluated.data[0]?.traces);
-  const passRate = (row) => (row.pass_rate === null ? "-" : pct(num(row.pass_rate), 0));
+  const passRate = (row) => pct(num(row.pass_rate), 0);
   const columns = [
     { header: "Evaluator", cell: (row) => row.evaluator || "Unnamed" },
     { header: "Runs", align: "right", cell: (row) => count(num(row.runs)) },

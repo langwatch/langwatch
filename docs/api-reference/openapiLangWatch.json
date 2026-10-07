@@ -14729,6 +14729,90 @@
                     },
                     "coarsenedFromSeconds": {
                       "type": "number"
+                    },
+                    "completeness": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "complete",
+                            "partial",
+                            "missing",
+                            "no_traffic"
+                          ]
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "total": {
+                          "type": "number"
+                        },
+                        "fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "field": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "present": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "field",
+                              "label",
+                              "present"
+                            ]
+                          }
+                        },
+                        "buckets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "start": {
+                                "type": "string"
+                              },
+                              "n": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "start",
+                              "n"
+                            ]
+                          }
+                        },
+                        "unpriced": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "number"
+                            },
+                            "models": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "count",
+                            "models"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "unit",
+                        "total",
+                        "fields"
+                      ]
                     }
                   },
                   "required": [

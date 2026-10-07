@@ -4,7 +4,11 @@
  * one `lw:init` over `postMessage` with a transferred `MessagePort`; the rest travels the port.
  */
 
-import type { LangWatchQLDiagnostic, LangWatchQLStatistics } from "./analytics.lwql.ts";
+import type {
+  LangWatchQLDiagnostic,
+  LangWatchQLStatistics,
+  QueryCompleteness,
+} from "./analytics.lwql.ts";
 
 export type ChartFrameTheme = "light" | "dark";
 
@@ -65,6 +69,8 @@ export interface ChartQueryResult {
   readonly followsGranularity: boolean;
   readonly granularitySeconds?: number;
   readonly coarsenedFromSeconds?: number;
+  /** What the rows are missing; absent when the server could not tell. */
+  readonly completeness?: QueryCompleteness;
 }
 
 /**
@@ -215,6 +221,7 @@ export function toChartQueryResult(result: {
   readonly followsGranularity: boolean;
   readonly granularitySeconds?: number;
   readonly coarsenedFromSeconds?: number;
+  readonly completeness?: QueryCompleteness;
 }): ChartQueryResult {
   return {
     columns: result.columns.map((column) => ({
@@ -232,5 +239,21 @@ export function toChartQueryResult(result: {
     ...(result.coarsenedFromSeconds !== undefined
       ? { coarsenedFromSeconds: result.coarsenedFromSeconds }
       : {}),
+    ...(result.completeness !== undefined
+      ? { completeness: cloneCompleteness(result.completeness) }
+      : {}),
+  };
+}
+
+/** A plain copy, so only the contract's fields cross the port. */
+function cloneCompleteness(completeness: QueryCompleteness): QueryCompleteness {
+  const { state, unit, total, fields, buckets, unpriced } = completeness;
+  return {
+    state,
+    unit,
+    total,
+    fields: fields.map(({ field, label, present }) => ({ field, label, present })),
+    ...(buckets ? { buckets: buckets.map(({ start, n }) => ({ start, n })) } : {}),
+    ...(unpriced ? { unpriced: { count: unpriced.count, models: [...unpriced.models] } } : {}),
   };
 }

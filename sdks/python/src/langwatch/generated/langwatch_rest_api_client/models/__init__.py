@@ -6643,6 +6643,11 @@ from .post_api_v1_query_body_parameters import PostApiV1QueryBodyParameters
 from .post_api_v1_query_body_time_window import PostApiV1QueryBodyTimeWindow
 from .post_api_v1_query_response_200 import PostApiV1QueryResponse200
 from .post_api_v1_query_response_200_columns_item import PostApiV1QueryResponse200ColumnsItem
+from .post_api_v1_query_response_200_completeness import PostApiV1QueryResponse200Completeness
+from .post_api_v1_query_response_200_completeness_buckets_item import PostApiV1QueryResponse200CompletenessBucketsItem
+from .post_api_v1_query_response_200_completeness_fields_item import PostApiV1QueryResponse200CompletenessFieldsItem
+from .post_api_v1_query_response_200_completeness_state import PostApiV1QueryResponse200CompletenessState
+from .post_api_v1_query_response_200_completeness_unpriced import PostApiV1QueryResponse200CompletenessUnpriced
 from .post_api_v1_query_response_200_diagnostics_item import PostApiV1QueryResponse200DiagnosticsItem
 from .post_api_v1_query_response_200_diagnostics_item_code import PostApiV1QueryResponse200DiagnosticsItemCode
 from .post_api_v1_query_response_200_diagnostics_item_meta import PostApiV1QueryResponse200DiagnosticsItemMeta
@@ -11326,6 +11331,11 @@ __all__ = (
     "PostApiV1QueryBodyTimeWindow",
     "PostApiV1QueryResponse200",
     "PostApiV1QueryResponse200ColumnsItem",
+    "PostApiV1QueryResponse200Completeness",
+    "PostApiV1QueryResponse200CompletenessBucketsItem",
+    "PostApiV1QueryResponse200CompletenessFieldsItem",
+    "PostApiV1QueryResponse200CompletenessState",
+    "PostApiV1QueryResponse200CompletenessUnpriced",
     "PostApiV1QueryResponse200DiagnosticsItem",
     "PostApiV1QueryResponse200DiagnosticsItemCode",
     "PostApiV1QueryResponse200DiagnosticsItemMeta",
