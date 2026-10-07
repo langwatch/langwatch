@@ -276,7 +276,18 @@ export function buildAutomationDispatchPorts({
     projects,
     baseHost,
     traceSummaryStore,
-    evaluationRuns: evaluations.runs,
+    findEvaluations: async ({ tenantId, traceId }) =>
+      evaluations.runs.findByTraceId({
+        authorization: await authorization.authorizeInternal({
+          actor: internalActor(
+            "app-layer/automations/dispatch/confirmSettledMatch",
+          ),
+          projectId: tenantId,
+          permission: "traces:view",
+          purpose: { kind: "operator", entry: "confirmSettledMatch" },
+        }),
+        traceId,
+      }),
     deriveEvents: async ({ tenantId, ...params }) =>
       traceReadDerivation.deriveEvents({
         authorization: await authorization.authorizeInternal({

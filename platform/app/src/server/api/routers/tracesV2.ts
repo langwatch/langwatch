@@ -2276,17 +2276,26 @@ export const tracesV2Router = createTRPCRouter({
       return applyDerivedTraceEventProtections(events, protections);
     }),
 
+  /**
+   * The evaluations already scored on one trace. Read through the detail
+   * proof, so on an aggregate an evaluation is matched to the member and the
+   * trace together (ADR-144 block F); the aggregate never runs one itself.
+   */
   evals: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...spanReadHintShape,
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
+      return app.evaluations.runs.findByTraceId({
+        authorization: await traceDetailAuthorization({ ctx, input }),
+        traceId: input.traceId,
+      });
     }),
 
   /**

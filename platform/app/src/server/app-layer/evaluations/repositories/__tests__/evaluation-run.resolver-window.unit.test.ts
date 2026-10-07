@@ -13,6 +13,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ResolvedRetention,
 } from "~/server/data-retention/retentionPolicy.schema";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 
 function createCapturingClient(
@@ -60,7 +61,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       });
 
       await repo.getByEvaluationId({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         evaluationId: "eval_recent",
       });
 
@@ -97,7 +98,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       });
 
       await repo.getByEvaluationId({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         evaluationId: "eval_old",
       });
 
@@ -137,7 +138,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       });
 
       await repo.getByEvaluationId({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         evaluationId: "eval_missing",
       });
 
@@ -156,7 +157,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       });
 
       await repo.getByEvaluationId({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         evaluationId: "eval_missing",
       });
 
@@ -187,7 +188,7 @@ describe("EvaluationRunClickHouseRepository ScheduledAt resolver", () => {
       });
 
       await repo.getByEvaluationId({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         evaluationId: "eval_old",
       });
 

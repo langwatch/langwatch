@@ -14,6 +14,7 @@ import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import type { TriggerSummary } from "../../repositories/trigger.repository";
 import {
@@ -147,7 +148,11 @@ beforeAll(async () => {
     resolveClient: async () => ch,
   });
   deps = {
-    evaluationRuns: new EvaluationRunService(repository),
+    findEvaluations: ({ tenantId, traceId }) =>
+      new EvaluationRunService(repository).findByTraceId({
+        authorization: ownProof({ projectId: tenantId }),
+        traceId,
+      }),
     deriveEvents: async () => [],
   };
   await repository.upsert(

@@ -74,29 +74,7 @@ const NOT_YET_CONVERTED: Array<{
   method: string;
   reason: string;
   owner: string;
-}> = [
-  {
-    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
-    method: "queryScheduledAtMs",
-    reason:
-      "the partition-window resolver behind getByEvaluationId reads by tenant id with it",
-    owner: "block F",
-  },
-  {
-    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
-    method: "getByEvaluationId",
-    reason:
-      "the per-evaluation read serves the evaluation worker, which holds no route proof yet",
-    owner: "block F",
-  },
-  {
-    file: "server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.ts",
-    method: "findByTraceId",
-    reason:
-      "the per-trace read serves the trace page's evaluations tab, converted with that route",
-    owner: "block F",
-  },
-];
+}> = [];
 
 function notYetConvertedMethodsOf(file: string): string[] {
   return NOT_YET_CONVERTED.filter((entry) => entry.file === file).map(
@@ -147,15 +125,7 @@ const ROUTE_CHUNKS_WITHOUT_PROOF: Array<{
   chunk: string;
   reason: string;
   owner: string;
-}> = [
-  {
-    file: "server/api/routers/tracesV2.ts",
-    chunk: "procedure evals",
-    reason:
-      "calls evaluations.runs.findByTraceId by tenant id, the per-trace read NOT_YET_CONVERTED lists",
-    owner: "block F",
-  },
-];
+}> = [];
 
 function read(relativeToSrc: string): string {
   return readFileSync(path.join(SRC, relativeToSrc), "utf8");

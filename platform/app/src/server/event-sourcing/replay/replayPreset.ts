@@ -105,12 +105,19 @@ export function createReplayRuntime(config: {
     ],
     [
       "evaluation_processing",
-      new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository({
+      new EvaluationRunStore({
+        repository: new EvaluationRunClickHouseRepository({
           resolveClient: clientResolver,
           clickhouse: authorizedClickHouse,
         }),
-      ),
+        authorize: ({ projectId, purpose }) =>
+          getApp().authorization.authorizeInternal({
+            actor: internalActor("event-sourcing/replay/replayPreset"),
+            projectId,
+            permission: "traces:view",
+            purpose,
+          }),
+      }),
     ],
     [
       "experiment_run_processing",

@@ -20,9 +20,25 @@ export interface GetByEvaluationIdHints {
 }
 
 export interface GetByEvaluationIdParams {
-  tenantId: string;
+  /**
+   * The proof the read is fenced by (ADR-144 block F). The evaluation worker
+   * and the fold store mint an own-only one for the evaluation's project.
+   */
+  authorization: Authorization;
   evaluationId: string;
   hints?: GetByEvaluationIdHints;
+}
+
+export interface FindByTraceIdParams {
+  /**
+   * The proof the read is fenced by (ADR-144 block F). A detail route
+   * narrows it to the tenant the trace was found in, so an evaluation is
+   * matched by tenant and trace together: on an aggregate two members may
+   * hold the same trace id, and neither member's evaluation decorates the
+   * other's trace.
+   */
+  authorization: Authorization;
+  traceId: string;
 }
 
 export interface EvaluationRunRepository {
@@ -41,10 +57,7 @@ export interface EvaluationRunRepository {
   getByEvaluationId(
     params: GetByEvaluationIdParams,
   ): Promise<EvaluationRunData | null>;
-  findByTraceId(
-    tenantId: string,
-    traceId: string,
-  ): Promise<EvaluationRunData[]>;
+  findByTraceId(params: FindByTraceIdParams): Promise<EvaluationRunData[]>;
   /**
    * The slim evaluations of a page of listed traces, read through the proof
    * (ADR-144 block C). Each row names the tenant it was read from: an
@@ -74,10 +87,7 @@ export class NullEvaluationRunRepository implements EvaluationRunRepository {
     return null;
   }
 
-  async findByTraceId(
-    _tenantId: string,
-    _traceId: string,
-  ): Promise<EvaluationRunData[]> {
+  async findByTraceId(_params: FindByTraceIdParams): Promise<EvaluationRunData[]> {
     return [];
   }
 

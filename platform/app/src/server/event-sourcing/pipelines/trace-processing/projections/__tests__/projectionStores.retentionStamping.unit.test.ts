@@ -107,8 +107,9 @@ describe("trace-pipeline projection stores retention stamping", () => {
     it("stamps evaluation_runs with the platform default", async () => {
       const upsert = vi.fn().mockResolvedValue(undefined);
       const store = new EvaluationRunStore({
-        upsert,
-      } as unknown as EvaluationRunRepository);
+        repository: { upsert } as unknown as EvaluationRunRepository,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(
         { evaluationId: "eval_1" } as EvaluationRunData,

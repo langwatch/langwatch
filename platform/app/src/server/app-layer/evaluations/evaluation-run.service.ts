@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/actor";
 import { EvaluationNotFoundError } from "./errors";
 import type {
   EvaluationRunRepository,
+  FindByTraceIdParams,
   GetByEvaluationIdParams,
   TenantEvalSummary,
 } from "./repositories/evaluation-run.repository";
@@ -23,10 +24,9 @@ export class EvaluationRunService {
   }
 
   async findByTraceId(
-    tenantId: string,
-    traceId: string,
+    params: FindByTraceIdParams,
   ): Promise<EvaluationRunData[]> {
-    return this.repository.findByTraceId(tenantId, traceId);
+    return this.repository.findByTraceId(params);
   }
 
   async findSummariesByTraceIds(params: {

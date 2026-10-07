@@ -1561,9 +1561,16 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(
-          this.deps.evaluations.runs.repository,
-        ),
+        evalRunStore: new EvaluationRunStore({
+          repository: this.deps.evaluations.runs.repository,
+          authorize: ({ projectId, purpose }) =>
+            this.authorizeTraceRead({
+              codePath:
+                "event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store",
+              projectId,
+              purpose,
+            }),
+        }),
         // Redis cache is the eval slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. Same wiring as
