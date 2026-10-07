@@ -4,8 +4,9 @@
  * its own fix, the way a lint message does. ADR-155.
  */
 
-/** The rules added with S9, which the test holds only the migrations written after them to. */
+/** The rules added with S9 and W-01; the test holds only migrations written after them to these. */
 export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
+  "new-foreign-key",
   "retirement-note-above-floor",
   "set-not-null-on-populated-column",
   "enum-recreated",
@@ -322,6 +323,24 @@ function indexAndConstraintFindings({ sql, live, created }: Scoped & { sql: stri
   });
 }
 
+const FOREIGN_KEY_FIX =
+  "no new foreign key (Alex, 2026-10-06): keep the reference a plain column with an index. " +
+  "The owning service deletes its dependents; another module's go by a fact and that " +
+  "module's purge subscriber. The postgres-migration skill shows the shape.";
+
+function foreignKeyFindings(live: string): Finding[] {
+  return statementsOf(live)
+    .filter(({ text }) => /\b(?:FOREIGN\s+KEY|REFERENCES)\b/i.test(text))
+    .map(({ text }) => {
+      const table = alteredTable(text) ?? [...createdTables(text)][0] ?? "a table";
+      return {
+        rule: "new-foreign-key",
+        problem: `adds a foreign key on ${table}`,
+        fix: FOREIGN_KEY_FIX,
+      };
+    });
+}
+
 function renameFindings(live: string): Finding[] {
   const columns = [...live.matchAll(/\bRENAME\s+COLUMN\s+"?(\w+)"?\s+TO\s+"?(\w+)"?/gi)].map(
     (match) => ({
@@ -360,6 +379,7 @@ export function scanPostgresMigration({
     ...alterTypeFindings({ live, created }),
     ...enumFindings(live),
     ...indexAndConstraintFindings({ sql, live, created }),
+    ...foreignKeyFindings(live),
     ...renameFindings(live),
   ].map((finding) => ({ migration: name, ...finding }));
 }

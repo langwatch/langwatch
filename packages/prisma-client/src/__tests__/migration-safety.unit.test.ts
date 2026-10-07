@@ -203,7 +203,7 @@ describe("Postgres migration safety", () => {
         'ALTER TABLE "P" ADD CONSTRAINT "P_ok" CHECK ("n" > 0);',
         'ALTER TABLE "P" ADD CONSTRAINT "P_t" FOREIGN KEY ("t") REFERENCES "T"("id");',
       ]) {
-        expect(rules(sql)).toEqual(["unique-or-validated-constraint-on-existing-table"]);
+        expect(rules(sql)).toContain("unique-or-validated-constraint-on-existing-table");
       }
     });
 
@@ -265,6 +265,22 @@ describe("Postgres migration safety", () => {
       ).toEqual([]);
       const privacy = readMigration("20261006170527_data_privacy_project_scope");
       expect(scanPostgresMigration({ ...privacy, floor: FIXTURE_FLOOR })).toEqual([]);
+    });
+
+    /** @scenario "A new foreign key is refused by name" */
+    it("refuses FOREIGN KEY and REFERENCES, on a new table or an existing one, naming the table", () => {
+      const findings = scan(
+        'ALTER TABLE "C" ADD CONSTRAINT "C_p_fkey" FOREIGN KEY ("p") REFERENCES "P"("id") NOT VALID;',
+      );
+      expect(findings.map((finding) => finding.rule)).toEqual(["new-foreign-key"]);
+      expect(findings[0]?.problem).toBe("adds a foreign key on c");
+      expect(findings[0]?.fix).toContain("plain column with an index");
+      expect(rules('CREATE TABLE "N" ("id" TEXT, "p" TEXT REFERENCES "P"("id"));')).toEqual([
+        "new-foreign-key",
+      ]);
+      expect(rules('-- the old FOREIGN KEY went\nALTER TABLE "P" ADD COLUMN "p" TEXT;')).toEqual(
+        [],
+      );
     });
 
     /** @scenario "Renaming a column or a table in place is refused by name" */

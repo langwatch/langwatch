@@ -70,6 +70,7 @@ A table created in the same migration is empty, so the locking rules leave it al
 | `unique-or-validated-constraint-on-existing-table` | `ADD UNIQUE`/`PRIMARY KEY` built at once, `CHECK`/`FOREIGN KEY` validated at once | pre-build the index and `ADD CONSTRAINT ... USING INDEX`, or `NOT VALID` + a later `VALIDATE`                   |
 | `plain-index-on-existing-table`                    | `CREATE INDEX` on an existing table with no pre-build note                        | the ops pre-build note (below)                                                                                  |
 | `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                      | add, backfill, dual-write, switch, retire                                                                       |
+| `new-foreign-key`                                  | `FOREIGN KEY` or `REFERENCES` anywhere, on a new or an existing table             | a plain column with an index (below); new `@relation` lines are held by the enforcer's `prisma-relations` list  |
 
 **The ops pre-build note.** `CONCURRENTLY` cannot run inside Prisma's transaction, so an index on an
 existing table carries a comment naming the statement an operator runs ahead; the migration's own

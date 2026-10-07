@@ -124,6 +124,13 @@ Feature: Migration safety
     # The data-privacy project scope migration is the live example.
 
   @unit
+  Scenario: A new foreign key is refused by name
+    When the migration adds a FOREIGN KEY or a REFERENCES clause, on a table it creates or one that exists
+    Then the scanner names the migration and the table
+    And the fix says to keep the reference a plain column with an index
+    # Existing keys stay; no new one (Alex, 2026-10-06). Comments are not read.
+
+  @unit
   Scenario: Renaming a column or a table in place is refused by name
     When the migration renames a column or renames a table
     Then the scanner names the migration and both names
