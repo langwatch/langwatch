@@ -9,8 +9,10 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
   The shape:
   - The evaluation module turns the judge's settings into one classifier question, and maps
     the verdict back to the result shape the judge returns today.
-  - Instant Evals answers one judge call: check the budget, classify, record one spend row
-    priced for the customer.
+  - The Instant Evals judge, a small shared module, answers one judge call: check the budget,
+    classify, record one spend row priced for the customer. The meter, the pricing rule and the
+    $1 check already exist and are reused. The spend row lands in the ledger the meter reads.
+  - The judge runs on LangWatch cloud only, with LangWatch's key.
   - An organization the meter does not bill may spend one dollar in total. Calls admitted
     together may run it slightly past, and every one of them is recorded.
 
@@ -152,6 +154,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given the classifier skips with <reason>
       When the result is mapped
       Then the result status is <status>
+      And its details name <reason>
 
       Examples:
         | reason                     | status  |
@@ -168,12 +171,75 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And Instant Evals is not called
 
     @unit @unimplemented
-    Scenario: A judge refused by the free budget is an error with the reason
-      Given an organization whose free budget is spent
+    Scenario Outline: A refused judge is an error with the reason
+      Given <refusal>
       When a trace is evaluated by a judge on Instant Evals
       Then the result status is error
-      And it carries the free budget exhausted error code
+      And it carries the <code> error code
       And the refusal is returned as a result, not thrown
+
+      Examples:
+        | refusal                                                 | code                  |
+        | an organization whose free budget is spent              | free budget exhausted |
+        | a project the Instant Evals judge has not learned yet   | project unknown       |
+
+    @unit @unimplemented
+    Scenario Outline: The refusal's error code is kept in the reported result
+      Given a judge result that is an error with the <code> code
+      When the evaluation's outcome is reported
+      Then the reported error text names the <code> code
+
+      Examples:
+        | code                  |
+        | free budget exhausted |
+        | project unknown       |
+
+    @integration @unimplemented
+    Scenario: A refused monitor evaluation is stored as an error naming its code
+      Given a monitor whose judge is on Instant Evals
+      And an organization whose free budget is spent
+      When the monitor evaluates a trace
+      Then the stored evaluation is an error
+      And its error text names the free budget exhausted code
+
+    @unit @unimplemented
+    Scenario: Off LangWatch cloud a judge call is not configured
+      Given an install that is not LangWatch cloud
+      And a classifier key is set
+      When a judge call arrives
+      Then it is answered as classifier not configured
+      And the classifier is not called
+
+    @unit @unimplemented
+    Scenario: The not configured copy never asks for a key of one's own
+      Given the copy shown when Instant Evals is not configured
+      Then neither the error tip nor the error message tells anyone to set a classifier key of their own
+
+    @unit @unimplemented
+    Scenario: A guardrail check on the stream chunk direction is skipped
+      Given a judge on Instant Evals
+      When a guardrail check evaluates it on the stream chunk direction
+      Then the result is skipped with the reason in its details
+      And Instant Evals is not called
+
+    @unit @unimplemented
+    Scenario: A guardrail passes its direction to the evaluation
+      Given a guardrail check from the gateway
+      When it is turned into an evaluation
+      Then the evaluation carries the check's direction
+
+    @unit @unimplemented
+    Scenario: The gateway allows a stream chunk an Instant Evals guardrail skipped
+      Given a guardrail whose judge is on Instant Evals
+      When the gateway checks a chunk of a streamed reply
+      Then the chunk is allowed
+      And Instant Evals is not called
+
+    @unit @unimplemented
+    Scenario: A guardrail still judges the response of a reply that is not streamed
+      Given a guardrail whose judge is on Instant Evals
+      When the gateway checks the response of a reply that is not streamed
+      Then Instant Evals answers it once
 
   Rule: One judge call is one spend row, once
 
@@ -269,10 +335,31 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then it is classified
 
     @unit @unimplemented
-    Scenario: A project with no organization is not capped
-      Given a project that belongs to no organization
+    Scenario: A project the judge does not know yet is refused, never judged free
+      Given a project the Instant Evals judge has not learned
       When a judge call arrives
-      Then it is classified
+      Then it is refused with the project unknown error, returned rather than thrown
+      And the classifier is not called
+      And no spend row is recorded
+
+    @unit @unimplemented
+    Scenario: Runs, judged queries and judges share one dollar
+      Given a free organization
+      And priced spend of $0.50 from a run, $0.25 from a judged query and $0.25 from a judge call is folded into the judge's total
+      When a judge call arrives
+      Then it is refused with the free budget exhausted error
+
+    @unit @unimplemented
+    Scenario Outline: Runs and judged queries on a project the judge does not know yet are refused
+      Given a project the Instant Evals judge has not learned
+      When an Instant Evals <work> starts
+      Then it is refused with the project unknown error at its budget hold
+      And the classifier is not called
+
+      Examples:
+        | work         |
+        | run          |
+        | judged query |
 
     @unit @unimplemented
     Scenario: A judge call that crosses one dollar is recorded in full
@@ -317,6 +404,47 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | on tiered pricing                                           | no     |
         | marked self-hosted with a connected billing account         | yes    |
         | that does not exist                                         | no     |
+
+  Rule: Catch-up jobs fill the judge's copies before the picker shows
+
+    @integration @unimplemented
+    Scenario: The project catch-up teaches the judge every existing project
+      Given projects created before the judge existed
+      When the project catch-up runs twice
+      Then the judge knows each project's organization
+      And each project appears once
+
+    @unit @unimplemented
+    Scenario: A repeated project created fact leaves one judge row
+      Given the judge already holds a project
+      When the same project created fact is folded again
+      Then the judge holds one row for that project
+
+    @integration @unimplemented
+    Scenario: The usage-billing catch-up marks every organization the meter bills today
+      Given an organization the meter bills today
+      When the usage-billing catch-up runs twice
+      Then the judge reads it as usage billed
+      And the second run adds no fact
+
+    @integration @unimplemented
+    Scenario: A billing change after the catch-up is kept
+      Given the usage-billing catch-up marked an organization usage billed
+      When billing later reports it is no longer usage billed
+      Then the judge reads it as not usage billed
+
+    @integration @unimplemented
+    Scenario: The spend catch-up seeds each organization's spend from the ledger
+      Given an organization with $0.40 of Instant Evals spend in the gateway ledger
+      When the spend catch-up runs twice
+      Then the judge's spend for it is $0.40
+
+    @integration @unimplemented
+    Scenario: The spend catch-up never counts spend twice
+      Given an organization with $0.40 of Instant Evals spend in the gateway ledger
+      And $0.10 judged after deploy, already folded into the judge's total and in the ledger
+      When the spend catch-up runs
+      Then the judge's spend for it is $0.50
 
   Rule: The picker offers Instant Evals behind the release flag
 

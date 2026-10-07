@@ -44,7 +44,7 @@
 
    An `error` reaches each caller the way any judge error does today, such as a missing provider key. A guardrail follows its own fail-open or fail-closed setting, so a fail-closed guardrail blocks once a free organization is past $1. This was the user's call. A monitor records the error, so its alerts fire.
    - The Instant Evals branch catches the refusal and returns the `error` result itself. A thrown refusal would reach the outcome handler as a customer fault and become `skipped`, which a guardrail allows.
-   - The error code survives into the stored result. Today `executionResultOf` (`evaluation-execution-result.rules.ts`) drops `error_type`, so wave 1 carries it through.
+   - The error code survives into the stored result, in its error text. The judge's error details name the code, and the outcome handler stores them as the error. Wave 1 adds no error-code column; a test pins that the text keeps the code.
 
 8. **One call is check, classify, record.**
    - Check the organization's spend against the free budget, with the existing $1 check. A spent budget refuses here, before the classifier is called.
@@ -78,12 +78,13 @@
     - The picker checks the opt-in. The judge call does not recheck it, since the $1 cap already guards spend.
 14. **The judge runs on LangWatch cloud only, with LangWatch's key.** Customers never supply a classifier key (the user's hard rule). The leaf answers `classifier_not_configured` on any install that is not cloud. The public self-hosting docs, `.env.example` and the error tip in `remediation.ts` stop telling customers to set `JEV_API_KEY` with their own key. Self-hosted judging waits for wave 3. Rejected: letting a self-hosted operator judge with their own key, which the hard rule forbids.
 15. **A project the leaf does not know is refused, never judged free.** The leaf learns each project's organization from project's created event. Until it holds a project, a call for it returns `error` with `instant_eval_project_unknown` and calls no classifier. Rejected: judging an unknown project uncapped, which would let it judge for free and drop its spend row.
-16. **Guardrails never judge a stream chunk.** A guardrail can run on every chunk of a streamed reply, which would charge one reply many times. The guardrail check returns `skipped` on the stream chunk direction, with the reason in details. It still judges the request and the full response.
+16. **Guardrails never judge a stream chunk.** A guardrail can run on every chunk of a streamed reply, which would charge one reply many times. The guardrail check passes its direction to the evaluation, and the Instant Evals branch returns `skipped` on the stream chunk direction, with the reason in details. The gateway reads a skip as allow. It still judges the request, and the response of a reply that is not streamed.
+    - A streamed reply's output is not judged by an Instant Evals guardrail in wave 1. The gateway checks only the request and each chunk of a streamed reply, never the full response (`services/aigateway/app/pipeline/guardrail.go`). A full-response check on the stream path is later work, tracked in the wave 1 issue.
 17. **Three catch-up jobs run before the flag shows the picker.** Subscribers never replay old events (ARCHITECTURE, eventing), so the leaf's tables start empty.
     - Projects: re-run project's existing `backfill-project-created` task. It is safe to re-run: the event keeps the key `${projectId}:created`, and duplicates are dropped when the store is read.
-    - Usage billing: a new billing task sends the usage-billed event once for every organization the meter bills today. Without it, those organizations read as capped.
-    - Spend: a new Instant Evals task reads each organization's Instant Evals spend from the gateway ledger and seeds the leaf's total. Instant Evals already depends on both gateway and the leaf, so the task adds no edge. Without it, every organization with spend on main would get a fresh $1.
-    - Instant Evals runs and judged queries record through the leaf too, so on existing projects they are refused (decision 15) from deploy until the project job finishes. The project job runs in the same deploy, right after the migration.
+    - Usage billing: a new billing task sends the usage-billed event once for every organization the meter bills today. Without it, those organizations read as capped. The task keys each fact `${organizationId}:usage-billed:catch-up`, so a re-run adds nothing, while a later real change carries its own key and is kept.
+    - Spend: a new Instant Evals task reads each organization's Instant Evals spend from the gateway ledger and sets the leaf's total to it. Setting, not adding, means a re-run never counts twice. Spend folded after deploy but not yet in the ledger when the task runs can be lost from the total, a small overshoot the user accepted. Instant Evals already depends on both gateway and the leaf, so the task adds no edge. Without it, every organization with spend on main would get a fresh $1.
+    - Instant Evals runs and judged queries check the leaf at their budget hold, before the classifier, so on existing projects they are refused (decision 15) from deploy until the project job finishes. A refusal when spend is recorded would come after the work was judged, and a judged query never fails on a spend write. The project job runs in the same deploy, right after the migration.
 
 ## Constants
 
@@ -115,7 +116,7 @@
 | Unknown project never judged free    | A project the leaf has not learned is refused                   | Unit test: the judge method returns `instant_eval_project_unknown` and the classifier is never called            |
 | Cloud only                           | No install judges with a customer's own key                     | Unit test: off cloud the judge answers `classifier_not_configured` with a key set                                |
 | Stream chunks never judged           | One streamed reply is charged once per direction, not per chunk | Unit test on the guardrail check for the `stream_chunk` direction                                                |
-| Catch-up jobs are safe to re-run     | A second run changes no total and sends no new fact             | Unit tests: seeding twice gives one total; the usage-billed task sends the same key twice                        |
+| Catch-up jobs are safe to re-run     | A second run changes no total and sends no new fact             | Integration tests: seeding twice gives one total; a re-run of the usage-billed task adds no fact                 |
 
 ## Assumptions
 
@@ -241,3 +242,8 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - `error_type` survives into the stored result (decision 7).
 - v9, 2026-10-07, wording only. Captain: Sergio Esteban.
   - Wording clarified: the meter, the pricing rule and the $1 budget check are reused. Wave 1 only connects the judge to them (summary, Context, decisions 8 and 13, Gates, Schema). No decision changed.
+- v10, 2026-10-07, after the spec was checked against the code. Captain: Sergio Esteban.
+  - A streamed reply's full response is never checked by the gateway, so an Instant Evals guardrail leaves streamed output unjudged in wave 1 (decision 16). The guardrail check now passes its direction to the evaluation.
+  - The error code already survives in the stored error text. No new column (decision 7).
+  - Runs and judged queries are refused at their budget hold, before the classifier (decision 17).
+  - The usage-billing catch-up uses its own key, and the spend catch-up sets the total rather than adding (decision 17).
