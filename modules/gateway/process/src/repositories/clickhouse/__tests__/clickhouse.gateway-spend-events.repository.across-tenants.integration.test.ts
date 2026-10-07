@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /** @vitest-environment node */
-/** Spec: specs/webhooks/webhook-endpoints.feature */
+/** Spec: specs/webhooks/webhook-endpoints.feature (webhook's listing, answered by gateway) */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  WebhookEventsClickHouseRepository,
-  type WebhookRoutedClickHouse,
-} from "../clickhouse.webhook-events.repository.ts";
+import type { GatewayClickHouseResolver } from "../clickhouse.gateway-session.store.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -86,20 +84,20 @@ function spendRow(input: {
 }
 
 /** The routed member's contract: one statement reads the one tenant it is routed by. */
-function tenantRoutedClickHouse(raw: () => ClickHouseClient): WebhookRoutedClickHouse {
-  return {
-    async query({ tenantId: routed, sql, params }) {
-      if (!/TenantId = \{tenantId:String\}/.test(sql) || params?.tenantId !== routed) {
+function tenantRoutedClickHouse(raw: () => ClickHouseClient): GatewayClickHouseResolver {
+  return async (routed) => ({
+    async query({ query, query_params }) {
+      if (!/TenantId = \{tenantId:String\}/.test(query) || query_params?.tenantId !== routed) {
         throw new Error(`statement is not scoped to its routed tenant ${routed}`);
       }
-      const result = await raw().query({ query: sql, query_params: params, format: "JSONEachRow" });
-      return { rows: await result.json() };
+      return raw().query({ query, query_params, format: "JSONEachRow" });
     },
-  };
+    insert: async () => undefined,
+  });
 }
 
 let client: ClickHouseClient;
-let eventsRepo: WebhookEventsClickHouseRepository;
+let eventsRepo: ClickHouseGatewaySpendEventsRepository;
 
 beforeAll(async () => {
   const [endpoint] = await startTestClickHouseEndpoints({
@@ -111,14 +109,14 @@ beforeAll(async () => {
   // The endpoint is reused across runs, so start from an empty table.
   await client.command({ query: "DROP TABLE IF EXISTS gateway_spend SYNC" });
   await client.command({ query: CREATE_TABLE });
-  eventsRepo = WebhookEventsClickHouseRepository.create(async () => client);
+  eventsRepo = ClickHouseGatewaySpendEventsRepository.create(async () => client as never);
 }, 120_000);
 
 afterAll(async () => {
   await client?.close();
 });
 
-describe("webhook emitted-events listing", () => {
+describe("spend events across tenants, as webhook's emitted-events listing reads them", () => {
   /** @scenario "The events listing serves settlements under their own type and hides in-flight rows" */
   it("serves settled rows as gateway.request.settled, filters by type, and never serves admitted rows", async () => {
     const settledId = `req-settled-${Math.random().toString(36).slice(2, 8)}`;
@@ -142,17 +140,18 @@ describe("webhook emitted-events listing", () => {
       ],
     });
 
-    const settledPage = await eventsRepo.readEmittedEventsPage({
+    const settledPage = await eventsRepo.readSpendEventsAcrossTenants({
       tenantIds: [tenantId],
       fromMs: baseTime - 1,
       toMs: baseTime + 500,
+      statuses: ["settled"],
       limit: 10,
-      types: ["gateway.request.settled"],
     });
     expect(settledPage.rows.map((r) => r.gatewayRequestId)).toEqual([settledId]);
     expect(settledPage.rows[0]!.settleReason).toBe("confirmation_deadline_expired");
 
-    const allPage = await eventsRepo.readEmittedEventsPage({
+    const allPage = await eventsRepo.readSpendEventsAcrossTenants({
+      statuses: ["confirmed", "failed", "settled"],
       tenantIds: [tenantId],
       fromMs: baseTime - 1,
       toMs: baseTime + 500,
@@ -162,12 +161,12 @@ describe("webhook emitted-events listing", () => {
     expect(served).toContain(settledId);
     expect(served).not.toContain(admittedId);
 
-    const unknown = await eventsRepo.readEmittedEventsPage({
+    const unknown = await eventsRepo.readSpendEventsAcrossTenants({
       tenantIds: [tenantId],
       fromMs: baseTime - 1,
       toMs: baseTime + 500,
+      statuses: [],
       limit: 10,
-      types: ["gateway.request.imagined"],
     });
     expect(unknown.rows).toEqual([]);
   });
@@ -191,7 +190,8 @@ describe("webhook emitted-events listing", () => {
       ),
     });
 
-    const first = await eventsRepo.readEmittedEventsPage({
+    const first = await eventsRepo.readSpendEventsAcrossTenants({
+      statuses: ["confirmed", "failed", "settled"],
       tenantIds: [tenantId],
       fromMs: windowStart - 1,
       toMs: windowStart + 60_000,
@@ -203,7 +203,8 @@ describe("webhook emitted-events listing", () => {
       first.rows[1]!.occurredAt.epochMilliseconds,
     );
 
-    const second = await eventsRepo.readEmittedEventsPage({
+    const second = await eventsRepo.readSpendEventsAcrossTenants({
+      statuses: ["confirmed", "failed", "settled"],
       tenantIds: [tenantId],
       fromMs: windowStart - 1,
       toMs: windowStart + 60_000,
@@ -248,12 +249,13 @@ describe("webhook emitted-events listing", () => {
         }),
       ],
     });
-    const routed = WebhookEventsClickHouseRepository.forRoutedClickHouse(
+    const routed = ClickHouseGatewaySpendEventsRepository.create(
       tenantRoutedClickHouse(() => client),
     );
     const window = { fromMs: windowStart - 1, toMs: windowStart + 60_000 };
 
-    const first = await routed.readEmittedEventsPage({
+    const first = await routed.readSpendEventsAcrossTenants({
+      statuses: ["confirmed", "failed", "settled"],
       tenantIds: [tenantId, otherTenant],
       ...window,
       limit: 2,
@@ -261,7 +263,8 @@ describe("webhook emitted-events listing", () => {
     expect(first.rows.map((row) => row.gatewayRequestId)).toEqual([newest, middle]);
     expect(first.rows.map((row) => row.tenantId)).toEqual([tenantId, otherTenant]);
 
-    const second = await routed.readEmittedEventsPage({
+    const second = await routed.readSpendEventsAcrossTenants({
+      statuses: ["confirmed", "failed", "settled"],
       tenantIds: [tenantId, otherTenant],
       ...window,
       cursor: first.nextCursor,
@@ -270,14 +273,16 @@ describe("webhook emitted-events listing", () => {
     expect(second.rows.map((row) => row.gatewayRequestId)).toEqual([older]);
     expect(second.nextCursor).toBeNull();
 
-    const found = await routed.findEmittedEventById({
+    const found = await routed.findSpendEventAcrossTenants({
       tenantIds: [tenantId, otherTenant],
-      id: `${middle}:completed`,
+      gatewayRequestId: middle,
+      statuses: ["confirmed", "failed"],
     });
     expect(found?.tenantId).toBe(otherTenant);
-    const outsider = await routed.findEmittedEventById({
+    const outsider = await routed.findSpendEventAcrossTenants({
       tenantIds: [tenantId],
-      id: `${middle}:completed`,
+      gatewayRequestId: middle,
+      statuses: ["confirmed", "failed"],
     });
     expect(outsider).toBeNull();
   });

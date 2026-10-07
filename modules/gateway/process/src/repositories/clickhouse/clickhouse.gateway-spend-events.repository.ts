@@ -77,6 +77,14 @@ const CHARGED_STATUSES = "('confirmed', 'failed')";
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
 const DAY_MS = 86_400_000;
 
+/** The order the per-tenant statements page in, applied again once their pages merge. */
+function newestFirst(left: SpendEventRow, right: SpendEventRow): number {
+  const byTime = right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds;
+  if (byTime !== 0) return byTime;
+  if (left.gatewayRequestId === right.gatewayRequestId) return 0;
+  return left.gatewayRequestId < right.gatewayRequestId ? 1 : -1;
+}
+
 /** The `TenantId IN (...)` list and its params: the guard wants one bound String per tenant. */
 function tenantSet({ tenantIds }: { tenantIds: readonly string[] }) {
   return {
@@ -407,6 +415,102 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
    * (EventTimestamp, GatewayRequestId) so late-restated rows sort after the
    * cursor, never skipped; from/to stay OccurredAt (request-time) bounds.
    */
+  async readSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    if (input.tenantIds.length === 0 || input.statuses.length === 0) {
+      return { rows: [], nextCursor: null };
+    }
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = { statuses: input.statuses, limit: input.limit };
+    if (input.fromMs !== undefined) {
+      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      params.fromMs = input.fromMs;
+    }
+    if (input.toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = input.toMs;
+    }
+    const cursor = input.cursor ? spendCursors.decodeSpendEventsCursor(input.cursor) : null;
+    if (cursor) {
+      clauses.push(
+        "AND (OccurredAt, GatewayRequestId) < (fromUnixTimestamp64Milli({cursorOccurredAtMs:Int64}), {cursorRequestId:String})",
+      );
+      params.cursorOccurredAtMs = cursor.eventTimestampMs;
+      params.cursorRequestId = cursor.gatewayRequestId;
+    }
+    const query = `SELECT ${SPEND_ROW_COLUMNS}
+        FROM ${TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND Status IN {statuses:Array(String)}
+          ${clauses.join("\n          ")}
+        ORDER BY OccurredAt DESC, GatewayRequestId DESC
+        LIMIT {limit:UInt32}`;
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) => this.readTenantSpendRows({ tenantId, query, params })),
+    );
+    const rows = perTenant.flat().toSorted(newestFirst).slice(0, input.limit);
+    const last = rows.at(-1);
+    return {
+      rows,
+      nextCursor:
+        rows.length === input.limit && last
+          ? spendCursors.encodeSpendEventsCursor({
+              eventTimestampMs: last.occurredAt.epochMilliseconds,
+              gatewayRequestId: last.gatewayRequestId,
+            })
+          : null,
+    };
+  }
+
+  async findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null> {
+    if (input.statuses.length === 0) return null;
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) =>
+        this.readTenantSpendRows({
+          tenantId,
+          query: `SELECT ${SPEND_ROW_COLUMNS}
+        FROM ${TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND GatewayRequestId = {gatewayRequestId:String}
+          AND Status IN {statuses:Array(String)}
+        LIMIT 1`,
+          params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+        }),
+      ),
+    );
+    return perTenant.flat()[0] ?? null;
+  }
+
+  /** One statement per project tenant: the tenant guard admits exactly one tenant per read. */
+  private async readTenantSpendRows({
+    tenantId,
+    query,
+    params,
+  }: {
+    tenantId: string;
+    query: string;
+    params: Record<string, unknown>;
+  }): Promise<SpendEventRow[]> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query,
+      query_params: { ...params, tenantId },
+      format: "JSONEachRow",
+    });
+    const raw = await result.json<Record<string, unknown>>();
+    return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
+  }
+
   async walkSpendEvents({
     tenantIds,
     fromMs,

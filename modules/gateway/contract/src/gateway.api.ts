@@ -38,6 +38,8 @@ import type {
 import type {
   GatewayPricedSpend,
   GatewayPricedSpendResult,
+  SpendEventRow,
+  SpendEventStatus,
   SpendFilters,
   SpendUsage,
 } from "./gateway-spend.schemas.ts";
@@ -461,6 +463,29 @@ export type GatewaySpendEventsPageQuery = {
   filters?: SpendFilters;
   cursor?: { occurredAtMs: number; gatewayRequestId: string };
   limit?: number;
+};
+
+/** One page of spend events across project tenants in the given statuses, newest first. */
+export type GatewaySpendEventsAcrossTenantsQuery = {
+  tenantIds: readonly string[];
+  statuses: readonly SpendEventStatus[];
+  fromMs?: number;
+  toMs?: number;
+  cursor?: string | null;
+  limit: number;
+};
+
+/** A page of spend rows and the opaque cursor of the next, null on the last. */
+export type GatewaySpendEventsAcrossTenantsPage = {
+  rows: SpendEventRow[];
+  nextCursor: string | null;
+};
+
+/** One request's spend row in any of these tenants, in one of these statuses. */
+export type GatewaySpendEventAcrossTenantsQuery = {
+  tenantIds: readonly string[];
+  gatewayRequestId: string;
+  statuses: readonly SpendEventStatus[];
 };
 
 export interface GatewayInternalProtocol {
@@ -917,6 +942,17 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * empty and `clickHouseDisabled`, so a door renders disabled rather than zero.
    */
   listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage>;
+  /**
+   * Spend events across these tenants in these statuses, newest first by occurrence
+   * then request id; an empty page where this deployment has no spend source.
+   */
+  listSpendEventsAcrossTenants(
+    input: GatewaySpendEventsAcrossTenantsQuery,
+  ): Promise<GatewaySpendEventsAcrossTenantsPage>;
+  /** One request's spend row across these tenants, null when none holds it. */
+  findSpendEventAcrossTenants(
+    input: GatewaySpendEventAcrossTenantsQuery,
+  ): Promise<SpendEventRow | null>;
   /**
    * The metered lane per UTC day across these tenants' ledgers, inclusive days,
    * oldest first; none for no tenants or no ledger. Main's governance

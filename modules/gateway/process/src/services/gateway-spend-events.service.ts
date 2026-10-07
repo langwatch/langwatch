@@ -45,6 +45,26 @@ export class GatewaySpendEventsService {
     return this.repository.readSpendSummaries(input);
   }
 
+  /** Newest first across tenants, one statement per tenant; webhook's events listing. */
+  getSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    return this.repository.readSpendEventsAcrossTenants(input);
+  }
+
+  findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null> {
+    return this.repository.findSpendEventAcrossTenants(input);
+  }
+
   walkSpendEvents(input: {
     tenantIds: string[];
     fromMs?: number;

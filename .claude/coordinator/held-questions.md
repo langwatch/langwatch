@@ -325,3 +325,13 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - clickhouse-table-ownership applies its declared records and named exceptions only when the workspace has a ClickHouse schema: on a fixture root every record and exception read as stale and broke `feature-package-boundaries.test.ts` and `cli.unit.test.ts`; the real tree is unaffected (13 findings before and after); default taken, held for Alex.
 - UpgradeReadError is a HandledError: `upgrade_not_found` 404 and `upgrade_invalid_cursor` 400, both fault `customer`, registered in app-codes with presentation copy and listed under PARAMETERIZED_CODES (the code is a constructor parameter the scanner cannot see); default taken, held for Alex.
+
+### r-lends-1
+
+- Dataset lends both a component token `addOrEditDatasetDrawer` (experiment renders it inline) and the routed drawer `addOrEditDataset`; the drawer token is `AddOrEditDatasetRoutedDrawerToken` in `@langwatch/dataset-client` beside `AddOrEditDatasetDrawerToken`: default taken, held for Alex.
+- `studioEvaluatorEditor` and prompt's `studioPromptEditor`, `llmConfigField`, `outputsSection`, `llmConfigPopover` and the `promptEditor` drawer name workflow's `AvailableSource`, `FieldMapping`, `Signature` (a whole DSL node) and experiment's `LocalPromptConfig`. Round 6 says "structural", but not whether the restatement widens (`type: string`, the owner then narrows into its own workflow-typed internals) or copies the literal unions (the compiler checks reader and owner both ways, drift caught at build). No recommendation on record: stopped, held for Alex.
+
+### r-gateway-spend-read
+
+- Q207 A gateway half: the by-id lookup needed a second read, so GatewayApi gained `findSpendEventAcrossTenants` beside the manifest's `listSpendEventsAcrossTenants` (both plain reads under the Q207 ruling); default taken, held for Alex.
+- Q208 D gateway half, not done: the one governance consumer (`pulled-usage-ledger.integration.test.ts`; the manifest said two) drives gateway's real `GatewayBudgetClickHouseRepository` and `PrismaGatewayAdapter.check`. Moving them into governance makes governance own gateway_budget queries (rule 2, ADR-134). Options: (a) split the test, the gateway debit/check half into gateway's own suite and governance keeps the pulled-ledger half; (b) boot gateway's installed module in the governance test and call `GatewayApi`; (c) copy the fixtures (violates ownership). No recommendation in the ruling; stopped, held for Alex.

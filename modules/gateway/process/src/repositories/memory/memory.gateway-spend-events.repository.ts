@@ -146,6 +146,62 @@ export class MemoryGatewaySpendEventsRepository extends GatewaySpendEventsReposi
     };
   }
 
+  async readSpendEventsAcrossTenants(input: {
+    tenantIds: string[];
+    statuses: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    const decoded = input.cursor ? spendCursors.decodeSpendEventsCursor(input.cursor) : null;
+    const rows = [...this.#rows.values()]
+      .filter((stored) => input.tenantIds.includes(stored.tenantId))
+      .map(toSpendEventRow)
+      .filter(
+        (row) =>
+          input.statuses.includes(row.status) &&
+          (input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs) &&
+          (input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs) &&
+          (!decoded ||
+            compareTuple(
+              [row.occurredAt.epochMilliseconds, row.gatewayRequestId],
+              [decoded.eventTimestampMs, decoded.gatewayRequestId],
+            ) < 0),
+      )
+      .toSorted((left, right) =>
+        compareTuple(
+          [right.occurredAt.epochMilliseconds, right.gatewayRequestId],
+          [left.occurredAt.epochMilliseconds, left.gatewayRequestId],
+        ),
+      )
+      .slice(0, input.limit);
+    const last = rows.at(-1);
+    return {
+      rows,
+      nextCursor:
+        rows.length === input.limit && last
+          ? spendCursors.encodeSpendEventsCursor({
+              eventTimestampMs: last.occurredAt.epochMilliseconds,
+              gatewayRequestId: last.gatewayRequestId,
+            })
+          : null,
+    };
+  }
+
+  async findSpendEventAcrossTenants(input: {
+    tenantIds: string[];
+    gatewayRequestId: string;
+    statuses: string[];
+  }): Promise<SpendEventRow | null> {
+    for (const tenantId of input.tenantIds) {
+      const stored = this.#rows.get(JSON.stringify([tenantId, input.gatewayRequestId]));
+      const row = stored ? toSpendEventRow(stored) : null;
+      if (row && input.statuses.includes(row.status)) return row;
+    }
+    return null;
+  }
+
   async walkSpendEvents(input: {
     tenantIds: string[];
     fromMs?: number;

@@ -4,6 +4,7 @@
  * repositories, with no repository class or tier named here.
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -52,6 +53,7 @@ function process(role: "api" | "worker", plan: Plan = entitledPlan) {
         getActivePlan: async () => plan,
         requestBound: async () => 10,
       }),
+      gateway: createApiFixture<GatewayApi>({}),
       project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
     });
 }
