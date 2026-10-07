@@ -300,6 +300,30 @@ Every organization this person belongs to. Asked by a peer deciding something ab
 organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
 ```
 
+#### `findBySsoDomain`
+
+The organization an email domain is claimed by for SSO, or null when none claims it.
+
+```typescript
+findBySsoDomain(input: Readonly<{ domain: string }>): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
+```
+
+#### `createSsoDomainMembership`
+
+Writes the plain MEMBER row an SSO domain auto-join admits (ADR-116); the caller grants the seat itself. A row already there is `"already-present"`: a concurrent callback.
+
+```typescript
+createSsoDomainMembership(input: Readonly<{ organizationId: string; userId: string }>): Promise<"created" | "already-present">;
+```
+
+#### `countMembershipsForUser`
+
+How many organizations this person has a membership row in, disabled ones included.
+
+```typescript
+countMembershipsForUser(input: Readonly<{ userId: string }>): Promise<number>;
+```
+
 #### `getOrganizationMembers`
 
 ```typescript

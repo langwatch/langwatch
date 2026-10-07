@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:60`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:61`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -106,6 +106,14 @@ findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null
 
 ```typescript
 getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
+```
+
+#### `findMonitorPerformance`
+
+The seven-day trend of every monitor the project has; none when it has no monitors.
+
+```typescript
+findMonitorPerformance(input: MonitorPerformanceForProjectInput): Promise<OnlineEvaluationPerformance[]>;
 ```
 
 #### `assertBatchLogWithinLimit`
@@ -347,14 +355,15 @@ Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
 
 ### `evaluations`
 
-Contract `../contract/src/evaluation.trpc.ts:20`, router `src/transport/evaluation.trpc.ts:10`.
+Contract `../contract/src/evaluation.trpc.ts:24`, router `src/transport/evaluation.trpc.ts:10`.
 
-| Procedure                               | Kind     | Gate                            | Input                           | Output                       |
-| --------------------------------------- | -------- | ------------------------------- | ------------------------------- | ---------------------------- |
-| `evaluations.availableEvaluators`       | query    | Permission `evaluations:view`   | `evaluationProjectScopeSchema`  | `evaluatorCatalogueSchema`   |
-| `evaluations.availableCustomEvaluators` | query    | Permission `evaluations:view`   | `evaluationProjectScopeSchema`  | inline                       |
-| `evaluations.runEvaluation`             | mutation | Permission `evaluations:manage` | `runTraceEvaluationInputSchema` | `evaluationRunOutcomeSchema` |
-| `evaluations.warmupLambda`              | mutation | Permission `evaluations:view`   | `warmupEvaluatorsInputSchema`   | `evaluationWarmupSchema`     |
+| Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
+| --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
+| `evaluations.availableEvaluators`             | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | `evaluatorCatalogueSchema`   |
+| `evaluations.availableCustomEvaluators`       | query    | Permission `evaluations:view`                   | `evaluationProjectScopeSchema`            | inline                       |
+| `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
+| `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
+| `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
 
 ## Sockets
 
@@ -391,8 +400,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:82`. Even
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:288`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:289`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:289`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:290`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:26` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:28` |
