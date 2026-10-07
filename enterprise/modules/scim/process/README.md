@@ -6,7 +6,7 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing)`, `src/scim.module.ts:30`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).withTransportFacts(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing)`, `src/scim.module.ts:28`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -567,14 +567,6 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `scim_cost_center` (aggregate `scim_member`)
-
-Declared at `src/eventing/scim-cost-center.pipeline.ts:20`. Events: `scimCostCenterChangedEventSchema`.
-
-| Kind    | Name                      | Handles | Declared at                                    |
-| ------- | ------------------------- | ------- | ---------------------------------------------- |
-| command | `recordCostCenterChanged` | –       | `src/eventing/scim-cost-center.pipeline.ts:25` |
-
 ### Pipeline `scim_directory` (aggregate `scim_directory_move`)
 
 Declared at `src/eventing/scim-directory.pipeline.ts:21`. Events: `scimDirectoryMoveRequestedEventSchema`.
@@ -582,14 +574,6 @@ Declared at `src/eventing/scim-directory.pipeline.ts:21`. Events: `scimDirectory
 | Kind    | Name                   | Handles | Declared at                                  |
 | ------- | ---------------------- | ------- | -------------------------------------------- |
 | command | `requestDirectoryMove` | –       | `src/eventing/scim-directory.pipeline.ts:26` |
-
-### Pipeline `scim_sso_connections` (aggregate `scim_sso_connection_view`)
-
-Declared at `src/eventing/scim-sso-connection.pipeline.ts:21`.
-
-| Kind                 | Name                                 | Handles | Declared at                                       |
-| -------------------- | ------------------------------------ | ------- | ------------------------------------------------- |
-| peer fold projection | `≈ scimSsoConnectionPeerFold(store)` | –       | `src/eventing/scim-sso-connection.pipeline.ts:26` |
 
 ### Pipeline `scim-sync` (aggregate `scim_sync`)
 

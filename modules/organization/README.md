@@ -11,7 +11,7 @@ Organisations and who is in them: membership, invites, teams, groups and persona
 | Classification | core (`modules/catalogue.json`)                                                                                             |
 | Subjects       | group, invite, membership, organization, personal-workspace, personal-workspace-features, team                              |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                                 |
-| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:864` (156 operations) |
+| Api token      | `OrganizationApi` = `moduleApi<OrganizationApi>()("organization")`, `contract/src/organization.api.ts:851` (153 operations) |
 | Other token    | `TeamManagementApi`, `process/src/transport/team.rest.ts:62`                                                                |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                                  |
 
