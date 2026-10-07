@@ -622,28 +622,11 @@ export class TraceListService {
       evaluations: evaluations.get(listedRowKey(row)) ?? [],
     }));
 
-    // Tease input/output/error previews and user-authored labels of items
-    // beyond the caller's visibility window — existence and counts stay
-    // untouched. Labels are user-authored metadata strings, so they're gated
-    // alongside the content fields to avoid leaking through on old traces.
-    const gatedItems =
-      params.visibilityCutoffMs === null ||
-      params.visibilityCutoffMs === undefined
-        ? items
-        : items.map((item) =>
-            item.timestamp < params.visibilityCutoffMs!
-              ? {
-                  ...item,
-                  input: item.input ? teaserOf(item.input) : item.input,
-                  output: item.output ? teaserOf(item.output) : item.output,
-                  error: item.error ? teaserOf(item.error) : item.error,
-                  labels: item.labels.map((label) => teaserOf(label)),
-                }
-              : item,
-          );
-
     return {
-      items: gatedItems,
+      items: teasedBeyondCutoff({
+        items,
+        cutoffMs: params.visibilityCutoffMs,
+      }),
       totalHits: result.totalHits,
       nextCursor:
         hasMore && visibleRows.length > 0
@@ -1444,6 +1427,33 @@ export function parseLabels(raw: string | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Tease input/output/error previews and user-authored labels of items beyond
+ * the caller's visibility window; existence and counts stay untouched. Labels
+ * are user-authored metadata strings, so they're gated alongside the content
+ * fields to avoid leaking through on old traces.
+ */
+function teasedBeyondCutoff({
+  items,
+  cutoffMs,
+}: {
+  items: TraceListItem[];
+  cutoffMs: number | null | undefined;
+}): TraceListItem[] {
+  if (cutoffMs === null || cutoffMs === undefined) return items;
+  return items.map((item) =>
+    item.timestamp < cutoffMs
+      ? {
+          ...item,
+          input: item.input ? teaserOf(item.input) : item.input,
+          output: item.output ? teaserOf(item.output) : item.output,
+          error: item.error ? teaserOf(item.error) : item.error,
+          labels: item.labels.map((label) => teaserOf(label)),
+        }
+      : item,
+  );
 }
 
 /** A listed row's identity: its tenant and trace id together. */

@@ -1461,6 +1461,56 @@ export class PipelineRegistry {
     );
   }
 
+  /**
+   * The span and event reads the evaluation command judges a trace from,
+   * each fenced by an own-only proof on the evaluated trace's project.
+   */
+  private executeEvaluationTraceReads(): Pick<
+    ConstructorParameters<typeof ExecuteEvaluationCommand>[0],
+    "spanStorage" | "traceEvents"
+  > {
+    const authorize = (projectId: string) =>
+      this.authorizeTraceRead({
+        codePath:
+          "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
+        projectId,
+        purpose: { kind: "operator", entry: "ExecuteEvaluationCommand.handle" },
+      });
+    return {
+      spanStorage: {
+        getSpansByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getSpansByTraceId({
+            authorization: await authorize(tenantId),
+            ...params,
+          }),
+      },
+      traceEvents: {
+        getEventsByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getEventsByTraceId({
+            authorization: await authorize(tenantId),
+            ...params,
+          }),
+      },
+    };
+  }
+
+  /**
+   * The evaluation fold's store. Its read-back is fenced by an own-only
+   * proof on the folded evaluation's project (ADR-144 block F).
+   */
+  private evaluationRunStore(): EvaluationRunStore {
+    return new EvaluationRunStore({
+      repository: this.deps.evaluations.runs.repository,
+      authorize: ({ projectId, purpose }) =>
+        this.authorizeTraceRead({
+          codePath:
+            "event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store",
+          projectId,
+          purpose,
+        }),
+    });
+  }
+
   private registerEvaluationPipeline({
     automations,
   }: {
@@ -1468,36 +1518,7 @@ export class PipelineRegistry {
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
-      spanStorage: {
-        getSpansByTraceId: async ({ tenantId, ...params }) =>
-          this.deps.traces.spans.getSpansByTraceId({
-            authorization: await this.authorizeTraceRead({
-              codePath:
-                "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
-              projectId: tenantId,
-              purpose: {
-                kind: "operator",
-                entry: "ExecuteEvaluationCommand.handle",
-              },
-            }),
-            ...params,
-          }),
-      },
-      traceEvents: {
-        getEventsByTraceId: async ({ tenantId, ...params }) =>
-          this.deps.traces.spans.getEventsByTraceId({
-            authorization: await this.authorizeTraceRead({
-              codePath:
-                "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
-              projectId: tenantId,
-              purpose: {
-                kind: "operator",
-                entry: "ExecuteEvaluationCommand.handle",
-              },
-            }),
-            ...params,
-          }),
-      },
+      ...this.executeEvaluationTraceReads(),
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
@@ -1561,16 +1582,7 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore({
-          repository: this.deps.evaluations.runs.repository,
-          authorize: ({ projectId, purpose }) =>
-            this.authorizeTraceRead({
-              codePath:
-                "event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store",
-              projectId,
-              purpose,
-            }),
-        }),
+        evalRunStore: this.evaluationRunStore(),
         // Redis cache is the eval slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. Same wiring as
