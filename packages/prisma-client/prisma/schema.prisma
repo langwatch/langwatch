@@ -2161,12 +2161,13 @@ model Dashboard {
   projectId String
   project   Project       @relation(fields: [projectId], references: [id])
   name      String
+  /// Legacy board sort position. The Dashboards v2 app orders boards by a
+  /// member's favourites and never writes this; kept because the legacy
+  /// Analytics reports section and the REST reorder endpoint still write it,
+  /// and a rolling deploy's older image still reads it.
   order     Int           @default(0)
   /// Free text under the board's name; null until a member writes one.
   description String?
-  /// Who may see the board: "only_me", "team" or "organisation" (the default,
-  /// which is what every board created before the column existed keeps).
-  visibility  String  @default("organisation")
   /// The member who created it; null for boards that predate the column.
   createdById String?
   createdAt DateTime      @default(now())
@@ -2176,6 +2177,25 @@ model Dashboard {
   @@index([projectId])
   @@index([projectId, order])
   @@map("Dashboard")
+}
+
+/// A member's starred dashboard, in their own order within a project. Personal:
+/// one member's stars never show to another. No foreign key (per the database
+/// rule): the dashboard service removes a board's favourites when it deletes
+/// the board, so a star never outlives its dashboard.
+model DashboardFavourite {
+  id          String   @id @default(nanoid())
+  userId      String
+  dashboardId String
+  projectId   String
+  /// The member's drag order among their own stars in the project.
+  position    Int
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, dashboardId])
+  @@index([userId, projectId, position])
+  @@index([dashboardId])
+  @@map("DashboardFavourite")
 }
 
 model SavedView {

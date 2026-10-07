@@ -14,10 +14,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  createDashboardTestAnalytics,
-  FixedDashboardAudience,
-} from "../../../app/__tests__/dashboard.fixture.ts";
+import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
 import type { WorkbenchAccess } from "../../../services/dashboard.service.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
@@ -60,7 +57,6 @@ function graphs(): DashboardService {
   return DashboardService.create({
     repository: PrismaDashboardRepository.create({ prisma: database() }),
     workbenchAccess: new WorkbenchOn(),
-    audience: new FixedDashboardAudience(),
   });
 }
 

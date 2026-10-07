@@ -1,7 +1,6 @@
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
-  DEFAULT_DASHBOARD_VISIBILITY,
   graphFiltersSchema,
   graphPayloadSchema,
   graphSchema,
@@ -9,7 +8,6 @@ import {
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
-  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -36,7 +34,6 @@ const dashboardRow = (row: {
   name: string;
   order: number;
   description: string | null;
-  visibility: string;
   createdById: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -47,7 +44,6 @@ const dashboardRow = (row: {
     name: row.name,
     order: row.order,
     description: row.description,
-    visibility: row.visibility,
     createdById: row.createdById,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -100,7 +96,7 @@ const savedWorkbenchChartRow = (row: StoredGraph): SavedWorkbenchChartRecord =>
   });
 
 export class PrismaDashboardRepository
-  extends PrismaRepository.transactionalFor("Dashboard", "CustomGraph")
+  extends PrismaRepository.transactionalFor("Dashboard", "CustomGraph", "DashboardFavourite")
   implements DashboardRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDashboardRepository(prisma));
@@ -191,15 +187,10 @@ export class PrismaDashboardRepository
     name: string;
     order: number;
     createdById?: string | null;
-    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
     return dashboardRow(
       await this.prisma.dashboard.create({
-        data: {
-          ...input,
-          createdById: input.createdById ?? null,
-          visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
-        },
+        data: { ...input, createdById: input.createdById ?? null },
       }),
     );
   }
@@ -221,11 +212,116 @@ export class PrismaDashboardRepository
     projectId: string;
     dashboardId: string;
   }): Promise<DashboardRecord> {
-    return dashboardRow(
-      await this.prisma.dashboard.delete({
-        where: { id: input.dashboardId, projectId: input.projectId },
-      }),
-    );
+    // Graphs cascade by foreign key; favourites have none, so remove them here.
+    return this.transaction(async (transaction) => {
+      await transaction.dashboardFavourite.deleteMany({
+        where: { dashboardId: input.dashboardId, projectId: input.projectId },
+      });
+      return dashboardRow(
+        await transaction.dashboard.delete({
+          where: { id: input.dashboardId, projectId: input.projectId },
+        }),
+      );
+    });
+  }
+
+  async findStarredDashboards(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<DashboardRecord[]> {
+    const favourites = await this.prisma.dashboardFavourite.findMany({
+      where: { projectId: input.projectId, userId: input.userId },
+      orderBy: { position: "asc" },
+      select: { dashboardId: true },
+    });
+    if (favourites.length === 0) return [];
+    const rows = await this.prisma.dashboard.findMany({
+      where: { projectId: input.projectId, id: { in: favourites.map((row) => row.dashboardId) } },
+    });
+    const byId = new Map(rows.map((row) => [row.id, dashboardRow(row)]));
+    return favourites
+      .map((favourite) => byId.get(favourite.dashboardId))
+      .filter((row): row is DashboardRecord => row !== undefined);
+  }
+
+  async findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]> {
+    const rows = await this.prisma.dashboardFavourite.findMany({
+      where: { projectId: input.projectId, userId: input.userId },
+      orderBy: { position: "asc" },
+      select: { dashboardId: true },
+    });
+    return rows.map((row) => row.dashboardId);
+  }
+
+  async starDashboard(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<void> {
+    await this.transaction(async (transaction) => {
+      const existing = await transaction.dashboardFavourite.findFirst({
+        where: {
+          projectId: input.projectId,
+          userId: input.userId,
+          dashboardId: input.dashboardId,
+        },
+        select: { id: true },
+      });
+      if (existing) return;
+      const last = await transaction.dashboardFavourite.findFirst({
+        where: { projectId: input.projectId, userId: input.userId },
+        orderBy: { position: "desc" },
+        select: { position: true },
+      });
+      await transaction.dashboardFavourite.create({
+        data: {
+          userId: input.userId,
+          dashboardId: input.dashboardId,
+          projectId: input.projectId,
+          position: (last?.position ?? -1) + 1,
+        },
+      });
+    });
+  }
+
+  async unstarDashboard(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<void> {
+    await this.prisma.dashboardFavourite.deleteMany({
+      where: { userId: input.userId, dashboardId: input.dashboardId, projectId: input.projectId },
+    });
+  }
+
+  async reorderStars(input: {
+    projectId: string;
+    userId: string;
+    dashboardIds: string[];
+  }): Promise<void> {
+    await this.transaction(async (transaction) => {
+      const current = await transaction.dashboardFavourite.findMany({
+        where: {
+          projectId: input.projectId,
+          userId: input.userId,
+          dashboardId: { in: input.dashboardIds },
+        },
+        select: { dashboardId: true, position: true },
+      });
+      const positionById = new Map(current.map((row) => [row.dashboardId, row.position]));
+      await Promise.all(
+        input.dashboardIds.flatMap((dashboardId, position) =>
+          !positionById.has(dashboardId) || positionById.get(dashboardId) === position
+            ? []
+            : [
+                transaction.dashboardFavourite.updateMany({
+                  where: { projectId: input.projectId, userId: input.userId, dashboardId },
+                  data: { position },
+                }),
+              ],
+        ),
+      );
+    });
   }
 
   async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {

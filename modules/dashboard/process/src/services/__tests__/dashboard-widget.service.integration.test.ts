@@ -27,17 +27,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
-import type { DashboardBoardAudience } from "../dashboard-widget.service.ts";
+import type { DashboardBoardExistence } from "../dashboard-widget.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
-/** Visibility is the dashboard service's; these cases are about grid rows and project scope. */
-class EveryBoardVisible implements DashboardBoardAudience {
-  async isVisibleTo(): Promise<boolean> {
-    return true;
-  }
-
-  async findVisibleDashboardIds(): Promise<string[]> {
-    throw new Error("these cases never list widgets");
+/** Answers from the real table, so a board of another project reads as absent. */
+class StoredBoards implements DashboardBoardExistence {
+  async boardExists(input: { projectId: string; dashboardId: string }): Promise<boolean> {
+    const count = await database().dashboard.count({
+      where: { id: input.dashboardId, projectId: input.projectId },
+    });
+    return count > 0;
   }
 }
 
@@ -122,7 +121,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     service = DashboardWidgetService.create({
       repository: PrismaDashboardWidgetRepository.create({ prisma: database() }),
       analytics: createDashboardTestAnalytics(),
-      boards: new EveryBoardVisible(),
+      boards: new StoredBoards(),
     });
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${randomUUID()}` },

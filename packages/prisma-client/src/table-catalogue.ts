@@ -49,6 +49,7 @@ export const prismaTableCatalogue = {
   "Dataset": "Dataset",
   "DatasetRecord": "DatasetRecord",
   "Dashboard": "Dashboard",
+  "DashboardFavourite": "DashboardFavourite",
   "SavedView": "SavedView",
   "CustomGraph": "CustomGraph",
   "BatchEvaluation": "BatchEvaluation",
@@ -1007,11 +1008,18 @@ export const prismaModelFieldCatalogue = {
     "name",
     "order",
     "description",
-    "visibility",
     "createdById",
     "createdAt",
     "updatedAt",
     "graphs"
+  ],
+  "DashboardFavourite": [
+    "id",
+    "userId",
+    "dashboardId",
+    "projectId",
+    "position",
+    "createdAt"
   ],
   "SavedView": [
     "id",
@@ -3001,6 +3009,7 @@ export const prismaRelationCatalogue = {
     "project": "Project",
     "graphs": "CustomGraph"
   },
+  "DashboardFavourite": {},
   "SavedView": {
     "project": "Project",
     "user": "User"

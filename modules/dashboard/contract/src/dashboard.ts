@@ -8,15 +8,6 @@ export const projectIdSchema = z.string().min(1);
 export const dashboardNameSchema = z.string().trim().min(1).max(255);
 export const dashboardDescriptionSchema = z.string().trim().max(2000);
 
-/**
- * Who may see a board: its creator only, the project's team, or the whole
- * organisation. Organisation is the default and what every older board keeps.
- */
-export const DASHBOARD_VISIBILITIES = ["only_me", "team", "organisation"] as const;
-export const dashboardVisibilitySchema = z.enum(DASHBOARD_VISIBILITIES);
-export type DashboardVisibility = z.infer<typeof dashboardVisibilitySchema>;
-export const DEFAULT_DASHBOARD_VISIBILITY: DashboardVisibility = "organisation";
-
 /** The signed-in member a read or write is for; absent for a project credential. */
 export type DashboardViewer = Readonly<{ userId: string }>;
 
@@ -24,8 +15,6 @@ export const dashboardCreateInputSchema = z
   .object({
     projectId: projectIdSchema,
     name: dashboardNameSchema,
-    /** Absent keeps today's behaviour: organisation-wide. */
-    visibility: dashboardVisibilitySchema.optional(),
   })
   .strict();
 
@@ -47,7 +36,6 @@ export const dashboardSchema = z
     name: dashboardNameSchema,
     order: z.number().int().nonnegative(),
     description: z.string().nullable(),
-    visibility: dashboardVisibilitySchema,
     createdById: z.string().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -56,7 +44,12 @@ export const dashboardSchema = z
 export type Dashboard = z.infer<typeof dashboardSchema>;
 
 export const dashboardSummarySchema = z
-  .object({ ...dashboardSchema.shape, graphCount: z.number().int().nonnegative() })
+  .object({
+    ...dashboardSchema.shape,
+    graphCount: z.number().int().nonnegative(),
+    /** Whether the member reading the list has starred this board. */
+    isStarred: z.boolean(),
+  })
   .strict();
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 

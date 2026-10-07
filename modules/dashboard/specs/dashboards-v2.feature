@@ -674,38 +674,100 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And each label is a button the keyboard reaches
 
   @integration
-  Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order
-    Given a member opens the "⋮" menu of a board they may manage
-    Then they see Set as default, Rename, Share, Duplicate, a separator and Delete, each with its icon
+  Scenario: AC107 Sidebar menu: each starred board offers its actions in order
+    Given a member opens the "⋮" menu of a starred board
+    Then they see Rename, Duplicate, Move up, Move down, a separator and Delete, each with its icon
     And Delete is in red
+    And there is no Share action anywhere
 
   @integration
-  Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use
-    Given a teammate's board the member may not manage
-    When the member opens its "⋮" menu
-    Then they see Set as default, Rename and Duplicate
-    And they do not see Share or Delete
-
-  @integration
-  Scenario: AC108 Sidebar menu: Share changes who sees the board
-    Given a member opens Share on a board they may manage
-    Then Only me, Team and Organisation are offered with the current one checked
-    And picking another one changes who sees the board
+  Scenario: AC107b Sidebar menu: reorder is bounded by the list's ends
+    Given a member opens the "⋮" menu of the first starred board
+    Then Move up is disabled
+    When they open the "⋮" menu of the last starred board
+    Then Move down is disabled
 
   @integration
   Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
     When the member picks Duplicate on a board
-    Then a new board named "<name> copy", visible only to them, is made
+    Then a new board named "<name> copy" is made, starred for them
     And every widget on the board is copied to it at the same place
     And the new board opens
     # Decision: no server procedure copies a board; the browser repeats the create and widget writes
 
-  @unit @integration
-  Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
-    When the member picks Set as default on a board
-    Then the row shows a quiet default marker and the menu item is checked
-    And /[project]/dashboards opens that board while it exists, else the member's first own board
-    # Decision: the choice is a per-reader preference in the browser, kept per project
+  # ---------------------------------------------------------------------------
+  # Dashboards page and favourites (langwatch/tasks#911)
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC150 The dashboards nav opens the All dashboards page with two tabs
+    Given a member with analytics:view opens /[project]/dashboards
+    Then the All dashboards page opens with a Dashboards tab and a Templates tab
+    And the Dashboards tab is active
+    And opening the Templates tab goes to /[project]/dashboards/templates with the library
+
+  @integration
+  Scenario: AC151 The Dashboards tab lists every board with a star, name, menu and link
+    Given a project with several boards
+    When the member opens the Dashboards tab
+    Then every board is listed with a star, its name as a link, its description and when it changed
+    And each row's "⋮" menu offers Rename, Duplicate and Delete
+
+  @unit
+  Scenario: AC151b Search narrows the list and sort orders it
+    Given a list of boards
+    When a search is typed
+    Then only boards whose name or description holds every word are kept
+    And sorting by recently updated orders by last change, newest first
+    And sorting by name orders alphabetically
+
+  @integration
+  Scenario: AC152 The Dashboards tab empty state offers a template or a blank board
+    Given a project with no boards
+    When the member opens the Dashboards tab
+    Then it says there are no dashboards yet
+    And it offers Start from a template and New blank dashboard
+
+  @integration
+  Scenario: AC153 A member stars and unstars a board from a row and from the board header
+    Given a board the member has not starred
+    When the member clicks its star on the Dashboards tab
+    Then the board is starred for them
+    When the member clicks the star in that board's header
+    Then the board is unstarred for them
+
+  @integration
+  Scenario: AC154 The sidebar shows my stars for this project, then All dashboards
+    Given the member has starred boards in this project in their own order
+    When the sidebar list renders
+    Then it lists the member's starred boards in that order
+    And an All dashboards link follows them
+    And a load failure shows a one-line error with Retry
+
+  @integration
+  Scenario: AC155 Move up and Move down reorder the member's stars
+    Given the member has several starred boards
+    When the member picks Move up on a board in the sidebar
+    Then that board swaps with the one above it and the new order is saved
+
+  @unit
+  Scenario: AC156 Creating, duplicating or adding from a template stars the board for its creator
+    Given a member creates a board, duplicates one, or adds one from a template
+    When the board is made
+    Then it is starred for that member
+    And a project credential that creates a board stars it for nobody
+
+  @unit
+  Scenario: AC157 Stars are per member
+    Given one member stars a board
+    When another member lists their starred boards
+    Then that board is not among them
+
+  @integration
+  Scenario: AC159 No sharing control appears anywhere
+    Given any board, row or board header
+    When the member looks for a visibility or share control
+    Then there is none, and every board is visible to the whole project
 
   # ---------------------------------------------------------------------------
   # Widget description and fit
@@ -964,7 +1026,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype, with labels that filter" → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board; Scenario: AC107e Templates library: a card's trunk and agent kind labels filter the library
-  # AC 107-109b: "Sidebar menu" → Scenario: AC107 Sidebar menu: each board offers its actions in the prototype's order; Scenario: AC107b Sidebar menu: a board the member cannot manage offers only what they may use; Scenario: AC108 Sidebar menu: Share changes who sees the board; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets; Scenario: AC109b Sidebar menu: Set as default picks the board the area opens on
+  # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each starred board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
+  # AC 150-159: "Dashboards page and favourites" (langwatch/tasks#911) → Scenario: AC150 The dashboards nav opens the All dashboards page with two tabs; Scenario: AC151 The Dashboards tab lists every board with a star, name, menu and link; Scenario: AC151b Search narrows the list and sort orders it; Scenario: AC152 The Dashboards tab empty state offers a template or a blank board; Scenario: AC153 A member stars and unstars a board from a row and from the board header; Scenario: AC154 The sidebar shows my stars for this project, then All dashboards; Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 Creating, duplicating or adding from a template stars the board for its creator; Scenario: AC157 Stars are per member; Scenario: AC159 No sharing control appears anywhere
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: the 'Add a block' picker narrows like the templates library" → Scenario: AC130 Picker filters: the picker offers the library's chips under the search; Scenario: AC131 Picker filters: chips narrow the widgets by trunk, agent kind and readiness; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in trunk order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row's trunk or agent kind label filters the picker
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board

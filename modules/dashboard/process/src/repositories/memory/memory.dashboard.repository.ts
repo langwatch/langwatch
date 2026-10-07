@@ -1,12 +1,10 @@
 import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
-  DEFAULT_DASHBOARD_VISIBILITY,
   dashboardSchema,
   graphSchema,
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
-  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -44,11 +42,22 @@ type StoredChart = Pick<GraphRecord, "createdAt" | "updatedAt"> & {
   rowSpan: number;
 };
 
-/** The same observable behaviour as the Prisma twin, over two arrays. */
+/** One member's star on one board, in their own order within a project. */
+type StoredFavourite = {
+  id: string;
+  userId: string;
+  dashboardId: string;
+  projectId: string;
+  position: number;
+};
+
+/** The same observable behaviour as the Prisma twin, over three arrays. */
 export class MemoryDashboardRepository implements DashboardRepository {
   #dashboards: DashboardRecord[] = [];
   #charts: StoredChart[] = [];
+  #favourites: StoredFavourite[] = [];
   #clock = 0;
+  #favouriteId = 0;
 
   private constructor() {}
 
@@ -125,12 +134,10 @@ export class MemoryDashboardRepository implements DashboardRepository {
     name: string;
     order: number;
     createdById?: string | null;
-    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
     const dashboard = dashboardSchema.parse({
       ...input,
       description: null,
-      visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
       createdById: input.createdById ?? null,
       createdAt: this.#now(),
       updatedAt: this.#now(),
@@ -162,7 +169,79 @@ export class MemoryDashboardRepository implements DashboardRepository {
     this.#dashboards = this.#dashboards.filter((row) => row.id !== dashboard.id);
     // The stored foreign key cascades, as the schema's does.
     this.#charts = this.#charts.filter((chart) => chart.dashboardId !== dashboard.id);
+    // Favourites have no foreign key, so the delete removes them itself.
+    this.#favourites = this.#favourites.filter((row) => row.dashboardId !== dashboard.id);
     return dashboard;
+  }
+
+  async findStarredDashboards(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<DashboardRecord[]> {
+    return this.#starred(input)
+      .map((favourite) => this.#dashboards.find((row) => row.id === favourite.dashboardId))
+      .filter((row): row is DashboardRecord => row !== undefined);
+  }
+
+  async findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]> {
+    return this.#starred(input).map((favourite) => favourite.dashboardId);
+  }
+
+  async starDashboard(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<void> {
+    if (this.#favourite(input)) return;
+    const position = this.#starred(input).length;
+    this.#favouriteId += 1;
+    this.#favourites.push({ id: `fav_${this.#favouriteId}`, ...input, position });
+  }
+
+  async unstarDashboard(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<void> {
+    this.#favourites = this.#favourites.filter(
+      (row) =>
+        !(
+          row.userId === input.userId &&
+          row.dashboardId === input.dashboardId &&
+          row.projectId === input.projectId
+        ),
+    );
+  }
+
+  async reorderStars(input: {
+    projectId: string;
+    userId: string;
+    dashboardIds: string[];
+  }): Promise<void> {
+    for (const [position, dashboardId] of input.dashboardIds.entries()) {
+      const favourite = this.#favourite({ ...input, dashboardId });
+      if (favourite) favourite.position = position;
+    }
+  }
+
+  /** The member's favourites in this project, in position order. */
+  #starred(input: { projectId: string; userId: string }): StoredFavourite[] {
+    return this.#favourites
+      .filter((row) => row.projectId === input.projectId && row.userId === input.userId)
+      .toSorted((left, right) => left.position - right.position);
+  }
+
+  #favourite(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): StoredFavourite | undefined {
+    return this.#favourites.find(
+      (row) =>
+        row.userId === input.userId &&
+        row.dashboardId === input.dashboardId &&
+        row.projectId === input.projectId,
+    );
   }
 
   async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {

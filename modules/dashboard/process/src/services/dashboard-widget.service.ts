@@ -23,33 +23,25 @@ import type {
 
 type Viewed = Readonly<{ viewer?: DashboardViewer }>;
 
-/** Which boards a viewer may see, for the blocks placed on them. */
-export interface DashboardBoardAudience {
-  isVisibleTo(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer?: DashboardViewer;
-  }): Promise<boolean>;
-  findVisibleDashboardIds(input: {
-    projectId: string;
-    viewer?: DashboardViewer;
-  }): Promise<string[]>;
+/** Whether a board the project may place a widget on exists. */
+export interface DashboardBoardExistence {
+  boardExists(input: { projectId: string; dashboardId: string }): Promise<boolean>;
 }
 
 /**
  * Every widget operation first asks analytics whether the project may use the
- * playground. A widget on a board outside the viewer's audience reads and
+ * playground. A widget placed on a board the project does not hold reads and
  * writes as not found, exactly like a widget that does not exist.
  */
 export class DashboardWidgetService {
   #repository: DashboardWidgetRepository;
   #analytics: AnalyticsApi;
-  #boards: DashboardBoardAudience;
+  #boards: DashboardBoardExistence;
 
   private constructor(
     repository: DashboardWidgetRepository,
     analytics: AnalyticsApi,
-    boards: DashboardBoardAudience,
+    boards: DashboardBoardExistence,
   ) {
     this.#repository = repository;
     this.#analytics = analytics;
@@ -59,29 +51,31 @@ export class DashboardWidgetService {
   static create(options: {
     repository: DashboardWidgetRepository;
     analytics: AnalyticsApi;
-    boards: DashboardBoardAudience;
+    boards: DashboardBoardExistence;
   }): DashboardWidgetService {
     return new DashboardWidgetService(options.repository, options.analytics, options.boards);
   }
 
   async getAll(input: { projectId: string } & Viewed): Promise<DashboardWidget[]> {
     await this.#assertEnabled(input);
-    const rows = await this.#visibleRows(input);
+    const rows = await this.#repository.findAll({ projectId: input.projectId });
     return rows.map((row) => this.#present(row));
   }
 
   async getById(input: DashboardWidgetScope & Viewed): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
-    return this.#present(await this.#visibleRow(input));
+    return this.#present(
+      await this.#repository.getById({ projectId: input.projectId, id: input.id }),
+    );
   }
 
   async createWidget(
     input: Omit<CreateDashboardWidgetInput, "id"> & Viewed,
   ): Promise<DashboardWidget> {
-    const { viewer, ...fields } = input;
+    const { viewer: _viewer, ...fields } = input;
     await this.#assertEnabled(fields);
     if (fields.dashboardId !== undefined) {
-      await this.#assertBoardVisible({ ...fields, dashboardId: fields.dashboardId, viewer });
+      await this.#assertBoardExists({ ...fields, dashboardId: fields.dashboardId });
     }
     return this.#present(
       await this.#repository.createWidget({
@@ -94,76 +88,38 @@ export class DashboardWidgetService {
   async updateWidget(input: UpdateDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
     const { viewer: _viewer, ...fields } = input;
     await this.#assertEnabled(fields);
-    await this.#visibleRow(input);
+    await this.#repository.getById({ projectId: input.projectId, id: input.id });
     return this.#present(await this.#repository.updateWidget(fields));
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput & Viewed): Promise<DashboardWidget> {
     const { viewer: _viewer, ...fields } = input;
     await this.#assertEnabled(fields);
-    await this.#visibleRow(input);
-    await this.#assertBoardVisible(input);
+    await this.#repository.getById({ projectId: input.projectId, id: input.id });
+    await this.#assertBoardExists(input);
     return this.#present(await this.#repository.assignToDashboard(fields));
   }
 
   async deleteWidget(input: DashboardWidgetScope & Viewed): Promise<void> {
     await this.#assertEnabled(input);
-    await this.#visibleRow(input);
+    await this.#repository.getById({ projectId: input.projectId, id: input.id });
     return this.#repository.deleteWidget({ projectId: input.projectId, id: input.id });
   }
 
-  /** A layout for a widget on a board outside the audience is skipped, like an unknown id. */
   async updateLayouts(input: DashboardWidgetLayoutsInput & Viewed): Promise<void> {
     await this.#assertEnabled(input);
-    const [rows, visible] = await Promise.all([
-      this.#repository.findAll({ projectId: input.projectId }),
-      this.#visibleIds(input),
-    ]);
-    const hidden = new Set(
-      rows.filter((row) => !isOnVisibleBoard(row, visible)).map((row) => row.id),
-    );
     await this.#repository.updateLayouts({
       projectId: input.projectId,
-      layouts: input.layouts.filter((layout) => !hidden.has(layout.graphId)),
+      layouts: input.layouts,
     });
   }
 
-  async #visibleRows(input: { projectId: string } & Viewed): Promise<DashboardWidgetRow[]> {
-    const [rows, visible] = await Promise.all([
-      this.#repository.findAll({ projectId: input.projectId }),
-      this.#visibleIds(input),
-    ]);
-    return rows.filter((row) => isOnVisibleBoard(row, visible));
-  }
-
-  async #visibleRow(input: DashboardWidgetScope & Viewed): Promise<DashboardWidgetRow> {
-    const row = await this.#repository.getById({ projectId: input.projectId, id: input.id });
-    if (row.dashboardId !== null) {
-      await this.#assertBoardVisible({ ...input, dashboardId: row.dashboardId });
-    }
-    return row;
-  }
-
-  async #assertBoardVisible(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer?: DashboardViewer;
-  }): Promise<void> {
-    const visible = await this.#boards.isVisibleTo({
+  async #assertBoardExists(input: { projectId: string; dashboardId: string }): Promise<void> {
+    const exists = await this.#boards.boardExists({
       projectId: input.projectId,
       dashboardId: input.dashboardId,
-      viewer: input.viewer,
     });
-    if (!visible) throw new DashboardWidgetNotFoundError();
-  }
-
-  async #visibleIds(input: { projectId: string } & Viewed): Promise<ReadonlySet<string>> {
-    return new Set(
-      await this.#boards.findVisibleDashboardIds({
-        projectId: input.projectId,
-        viewer: input.viewer,
-      }),
-    );
+    if (!exists) throw new DashboardWidgetNotFoundError();
   }
 
   #assertEnabled({ projectId }: { projectId: string }): Promise<void> {
@@ -178,9 +134,4 @@ export class DashboardWidgetService {
     const { graph: _graph, ...widget } = row;
     return { ...widget, definition: parsed.data };
   }
-}
-
-/** An unplaced widget belongs to no board, so no audience narrows it. */
-function isOnVisibleBoard(row: DashboardWidgetRow, visible: ReadonlySet<string>): boolean {
-  return row.dashboardId === null || visible.has(row.dashboardId);
 }

@@ -69,7 +69,6 @@ function dashboardRecord(): DashboardRecord & { graphs: GraphRecord[] } {
     name: "Reports",
     order: 0,
     description: null,
-    visibility: "organisation",
     createdById: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),

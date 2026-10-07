@@ -6,7 +6,6 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
@@ -15,7 +14,6 @@ import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import type { DashboardAudience } from "../../services/dashboard.service.ts";
 import { DashboardModule } from "../dashboard.app.ts";
 
 /** Everything visible: the caller the gates are measured against. */
@@ -71,25 +69,12 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
 export const TEST_TEAM_ID = "team-1";
 export const TEST_ORGANIZATION_ID = "organization-1";
 
-/** Team members are the listed ids; everyone else is outside the project's team. */
-export function createDashboardTestProjects(
-  input: Readonly<{ slug?: string; teamMemberIds?: readonly string[] }> = {},
-): ProjectApi {
+export function createDashboardTestProjects(input: Readonly<{ slug?: string }> = {}): ProjectApi {
   const slug = input.slug ?? "project-one";
-  const teamMemberIds = input.teamMemberIds ?? [];
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),
     findById: async (id: string) => ({ id, teamId: TEST_TEAM_ID }) as Project,
     getOrganizationId: async () => TEST_ORGANIZATION_ID,
-    isTeamMember: async ({ userId }) => teamMemberIds.includes(userId),
-  });
-}
-
-/** Admins hold `project:manage`; nobody else does. */
-export function createDashboardTestAuthz(adminIds: readonly string[] = []): AuthzApi {
-  return createApiFixture<AuthzApi>({
-    hasPermission: async (check) =>
-      check.permission === "project:manage" && adminIds.includes(check.userId),
   });
 }
 
@@ -101,7 +86,6 @@ export function createDashboardTestApp(
       analytics: AnalyticsApi;
       automation: AutomationApi;
       projects: ProjectApi;
-      authz: AuthzApi;
     }>;
   }> = {},
 ): DashboardModule {
@@ -111,7 +95,6 @@ export function createDashboardTestApp(
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
-      authz: input.dependencies?.authz ?? createDashboardTestAuthz(),
     },
     config: { publicBaseUrl: input.publicBaseUrl },
     resources: new ResourceScope(),
@@ -119,7 +102,7 @@ export function createDashboardTestApp(
   });
 }
 
-/** Memory repositories holding one organisation-wide board, for blocks placed on it. */
+/** Memory repositories holding one board, for blocks placed on it. */
 export async function createDashboardTestRepositoriesWithBoard(
   input: Readonly<{ projectId?: string; dashboardId?: string }> = {},
 ): Promise<DashboardRepositories> {
@@ -131,22 +114,4 @@ export async function createDashboardTestRepositoriesWithBoard(
     order: 0,
   });
   return repositories;
-}
-
-/** An audience answered from two fixed lists, for driving the service directly. */
-export class FixedDashboardAudience implements DashboardAudience {
-  constructor(
-    private readonly members: Readonly<{
-      teamMemberIds?: readonly string[];
-      adminIds?: readonly string[];
-    }> = {},
-  ) {}
-
-  async isTeamMember(input: { userId: string }): Promise<boolean> {
-    return (this.members.teamMemberIds ?? []).includes(input.userId);
-  }
-
-  async isAdmin(input: { userId: string }): Promise<boolean> {
-    return (this.members.adminIds ?? []).includes(input.userId);
-  }
 }

@@ -15,7 +15,6 @@ import type {
   DashboardSourcePresence,
   DashboardSummary,
   DashboardViewer,
-  DashboardVisibility,
 } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
 import type { SavedView, SavedViewPeriod } from "./saved-view.ts";
@@ -42,8 +41,8 @@ export interface DashboardUsageCount {
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   /**
-   * `viewer` is the signed-in member: boards outside their audience read as not
-   * found; without one only organisation-wide boards are reachable.
+   * Every board in the project; `viewer` is the member reading, so each row's
+   * `isStarred` is their own. Without a viewer no board is starred.
    */
   getAll(input: {
     projectId: string;
@@ -57,32 +56,48 @@ export interface DashboardApi {
   }): Promise<Dashboard & { graphs: Graph[] }>;
   /**
    * `createdById` is the member creating it; absent for a project credential.
-   * `visibility` defaults to organisation; `only_me`/`team` need `createdById`.
+   * A member-created board is starred for that member.
    */
-  create(input: {
-    projectId: string;
-    name: string;
-    createdById?: string;
-    visibility?: DashboardVisibility;
-  }): Promise<Dashboard>;
+  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard>;
   rename(input: {
     projectId: string;
     dashboardId: string;
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard>;
-  /** Only the creator or an admin (`dashboard_owner_only`), unless the board predates creators. */
+  /** Deletes the board and its graphs, and removes it from every member's stars. */
   delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard>;
+  /** The legacy board `order`; written only by the REST reorder endpoint. */
   reorder(input: {
     projectId: string;
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }>;
   getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard>;
+
+  /** The member's starred boards for this project, in their own order. */
+  listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]>;
+  /** Stars a board for the member; appends at the end, idempotent; unknown board is not found. */
+  star(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }>;
+  unstar(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }>;
+  /** Rewrites the member's star order from the ids given, in the order given. */
+  reorderStars(input: {
+    projectId: string;
+    userId: string;
+    dashboardIds: string[];
+  }): Promise<{ success: true }>;
   /** Where a reader opens each of these dashboards, keyed by dashboard id. */
   getDashboardLinks(input: {
     projectId: string;
@@ -97,20 +112,13 @@ export interface DashboardApi {
     name?: string;
     description?: string | null;
   }): Promise<Dashboard>;
-  /** Dashboards area. Same creator-or-admin rule as `delete`. */
-  setDashboardVisibility(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer: DashboardViewer;
-    visibility: DashboardVisibility;
-  }): Promise<Dashboard>;
   /** Dashboards area: whether each Flight Deck source ever recorded a row, as this member reads. */
   getSourcePresence(input: {
     projectId: string;
     viewer: DashboardViewer;
   }): Promise<DashboardSourcePresence>;
 
-  /** Graphs on a board outside the viewer's audience read and write as not found. */
+  /** Every builder graph in the project, optionally only those on one board. */
   listGraphs(input: {
     projectId: string;
     dashboardId?: string;
@@ -156,7 +164,7 @@ export interface DashboardApi {
    * definition analytics owns and whose placement this feature stores.
    */
   assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
-  /** Widgets follow their board's audience, as `getAll` does; unplaced ones reach everyone. */
+  /** Every custom chart widget in the project. */
   listDashboardWidgets(input: {
     projectId: string;
     viewer?: DashboardViewer;
@@ -220,7 +228,7 @@ export interface DashboardApi {
 
   /** The experimental gate over the whole workbench surface, asked per request. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
-  /** Charts placed on a board outside the viewer's audience are left out or read as not found. */
+  /** Every saved workbench chart in the project. */
   listSavedWorkbenchCharts(input: {
     projectId: string;
     viewer?: DashboardViewer;

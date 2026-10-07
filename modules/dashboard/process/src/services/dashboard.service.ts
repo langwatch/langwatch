@@ -9,11 +9,8 @@ import {
   dashboardRenameInputSchema,
   dashboardReorderInputSchema,
   DashboardNotFoundError,
-  DashboardOwnerOnlyError,
   DashboardReorderUnknownIdsError,
   dashboardDetailsUpdateSchema,
-  dashboardVisibilitySchema,
-  DEFAULT_DASHBOARD_VISIBILITY,
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
   graphIdSchema,
@@ -25,7 +22,6 @@ import {
   type DashboardGraphCountScope,
   type DashboardSummary,
   type DashboardViewer,
-  type DashboardVisibility,
   type Graph,
   type GraphLayout,
   type DashboardUsageCount,
@@ -36,11 +32,6 @@ import type {
   DashboardGraphKind,
   DashboardRepository,
 } from "../repositories/dashboard.repository.ts";
-import {
-  isDashboardManageable,
-  isDashboardVisible,
-  needsTeamMembership,
-} from "../rules/dashboard-visibility.rules.ts";
 
 const defaultLayout: GraphLayout = {
   gridColumn: 0,
@@ -58,39 +49,24 @@ export interface WorkbenchAccess {
 }
 
 /**
- * The two audience facts visibility needs about a member, asked of the peers
- * that own them: team membership (project, which owns the team) and admin
- * rights (authz).
+ * The project's dashboards, the chart-builder graphs placed on them, and each
+ * member's starred boards. Every board is visible to and editable by everyone
+ * in the project; the analytics permissions alone gate writes.
  */
-export interface DashboardAudience {
-  /** Whether the member belongs to the team that owns the project. */
-  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
-  /** Whether the member administers the project (`project:manage`). */
-  isAdmin(input: { projectId: string; userId: string }): Promise<boolean>;
-}
-
-/** The project's dashboards and the chart-builder graphs placed on them. */
 export class DashboardService {
   #repository: DashboardRepository;
   #workbenchAccess: WorkbenchAccess;
-  #audience: DashboardAudience;
 
-  private constructor(
-    repository: DashboardRepository,
-    workbenchAccess: WorkbenchAccess,
-    audience: DashboardAudience,
-  ) {
+  private constructor(repository: DashboardRepository, workbenchAccess: WorkbenchAccess) {
     this.#repository = repository;
     this.#workbenchAccess = workbenchAccess;
-    this.#audience = audience;
   }
 
   static create(options: {
     repository: DashboardRepository;
     workbenchAccess: WorkbenchAccess;
-    audience: DashboardAudience;
   }): DashboardService {
-    return new DashboardService(options.repository, options.workbenchAccess, options.audience);
+    return new DashboardService(options.repository, options.workbenchAccess);
   }
 
   countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount> {
@@ -109,12 +85,14 @@ export class DashboardService {
         ? (["builder"] as const)
         : await this.#placeableKinds(projectId);
 
-    const dashboards = await this.#repository.findAllDashboards({ projectId, graphKinds });
+    const [dashboards, starred] = await Promise.all([
+      this.#repository.findAllDashboards({ projectId, graphKinds }),
+      this.#starredIds({ projectId, viewer: input.viewer }),
+    ]);
 
-    return this.#visibleOnly({ projectId, viewer: input.viewer, dashboards });
+    return dashboards.map((dashboard) => ({ ...dashboard, isStarred: starred.has(dashboard.id) }));
   }
 
-  /** Refuses as not found when the board is outside the viewer's audience. */
   async getById(input: {
     projectId: string;
     dashboardId: string;
@@ -123,40 +101,40 @@ export class DashboardService {
     const parsed = dashboardRef(input);
 
     const dashboard = await this.#repository.findDashboard(parsed);
-    if (!dashboard || !(await this.#isVisible({ ...parsed, viewer: input.viewer, dashboard }))) {
-      throw new DashboardNotFoundError(parsed.projectId);
-    }
+    if (!dashboard) throw new DashboardNotFoundError(parsed.projectId);
 
     return dashboard;
   }
 
+  /** A member-created board is starred for that member; a project credential makes no star. */
   async create(input: {
     projectId: string;
     name: string;
     createdById?: string;
-    visibility?: DashboardVisibility;
   }): Promise<Dashboard> {
     const { createdById, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
-    const visibility = parsed.visibility ?? DEFAULT_DASHBOARD_VISIBILITY;
     const id = generate(DASHBOARD_KSUID_RESOURCE).toString();
-
-    // A private or team board needs someone to belong to; a project
-    // credential (API key, REST) has no member to claim it for.
-    if (visibility !== "organisation" && createdById === undefined) {
-      throw new DashboardOwnerOnlyError(id);
-    }
 
     const last = await this.#repository.findLastDashboard({ projectId: parsed.projectId });
 
-    return this.#repository.createDashboard({
+    const dashboard = await this.#repository.createDashboard({
       id,
       projectId: parsed.projectId,
       name: parsed.name,
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
-      visibility,
     });
+
+    if (createdById !== undefined) {
+      await this.#repository.starDashboard({
+        projectId: parsed.projectId,
+        userId: createdById,
+        dashboardId: dashboard.id,
+      });
+    }
+
+    return dashboard;
   }
 
   async rename(input: {
@@ -165,14 +143,13 @@ export class DashboardService {
     name: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
-    const { viewer, ...fields } = input;
+    const { viewer: _viewer, ...fields } = input;
     const parsed = dashboardRenameInputSchema.parse(fields);
 
     return this.updateDetails({
       projectId: parsed.projectId,
       dashboardId: parsed.dashboardId,
       name: parsed.name,
-      viewer,
     });
   }
 
@@ -185,7 +162,7 @@ export class DashboardService {
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#writable(input);
+    await this.#requireBoard(ref);
     const details = dashboardDetailsUpdateSchema.parse({
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.description === undefined ? {} : { description: input.description }),
@@ -201,56 +178,31 @@ export class DashboardService {
     });
   }
 
-  async setVisibility(input: {
-    projectId: string;
-    dashboardId: string;
-    visibility: DashboardVisibility;
-    viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
-    const visibility = dashboardVisibilitySchema.parse(input.visibility);
-    const ref = dashboardRef(input);
-    const dashboard = await this.#manageable(input);
-    const narrowsCreatorless = dashboard.createdById === null && visibility !== "organisation";
-    if (!narrowsCreatorless) {
-      return this.#repository.updateDashboard({ ...ref, data: { visibility } });
-    }
-
-    // Legacy boards have no creator; narrowing one claims it for the caller, so it stays
-    // visible to someone. A project credential has nobody to claim it for.
-    if (input.viewer === undefined) throw new DashboardOwnerOnlyError(dashboard.id);
-    return this.#repository.updateDashboard({
-      ...ref,
-      data: { visibility, createdById: input.viewer.userId },
-    });
-  }
-
   async delete(input: {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const ref = dashboardRef(input);
-    await this.#manageable(input);
+    await this.#requireBoard(ref);
 
     return this.#repository.deleteDashboard(ref);
   }
 
-  /** Boards outside the viewer's audience count as unknown ids. */
+  /** Writes the legacy `order` column; the REST reorder endpoint is the only caller. */
   async reorder(input: {
     projectId: string;
     dashboardIds: string[];
     viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
-    const { viewer, ...fields } = input;
+    const { viewer: _viewer, ...fields } = input;
     const parsed = dashboardReorderInputSchema.parse(fields);
 
-    const dashboards = await this.#repository.findAllDashboards({
+    const found = await this.#repository.findDashboardIds({
       projectId: parsed.projectId,
-      graphKinds: [],
+      dashboardIds: parsed.dashboardIds,
     });
-    const visible = await this.#visibleOnly({ projectId: parsed.projectId, viewer, dashboards });
-    const reachable = new Set(visible.map((dashboard) => dashboard.id));
-
+    const reachable = new Set(found);
     const missingIds = parsed.dashboardIds.filter((id) => !reachable.has(id));
     if (missingIds.length > 0) throw new DashboardReorderUnknownIdsError(missingIds);
 
@@ -259,81 +211,91 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The first board the viewer may see, or a new organisation-wide one after the last. */
+  /** The project's first board, or a new one after the last, starred for the viewer. */
   async getOrCreateFirst(input: {
     projectId: string;
     viewer?: DashboardViewer;
   }): Promise<Dashboard> {
     const projectId = projectIdSchema.parse(input.projectId);
 
-    const dashboards = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
-    const [first] = await this.#visibleOnly({ projectId, viewer: input.viewer, dashboards });
-    if (first) {
-      const { graphCount: _graphCount, ...dashboard } = first;
-      return dashboard;
-    }
+    const first = await this.#repository.findFirstDashboard({ projectId });
+    if (first) return first;
 
-    return this.#repository.createDashboard({
-      id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
+    return this.create({
       projectId,
       name: "Reports",
-      order: (dashboards.at(-1)?.order ?? -1) + 1,
-      createdById: input.viewer?.userId ?? null,
+      ...(input.viewer === undefined ? {} : { createdById: input.viewer.userId }),
     });
   }
 
-  /** Graphs on boards outside the viewer's audience are left out. */
+  // -- favourites ------------------------------------------------------------
+
+  /** The member's starred boards for this project, in their own order. */
+  async listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]> {
+    const projectId = projectIdSchema.parse(input.projectId);
+    return this.#repository.findStarredDashboards({ projectId, userId: input.userId });
+  }
+
+  async star(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }> {
+    const ref = dashboardRef(input);
+    await this.#requireBoard(ref);
+    await this.#repository.starDashboard({ ...ref, userId: input.userId });
+    return { success: true as const };
+  }
+
+  async unstar(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }> {
+    const ref = dashboardRef(input);
+    await this.#repository.unstarDashboard({ ...ref, userId: input.userId });
+    return { success: true as const };
+  }
+
+  async reorderStars(input: {
+    projectId: string;
+    userId: string;
+    dashboardIds: string[];
+  }): Promise<{ success: true }> {
+    const projectId = projectIdSchema.parse(input.projectId);
+    await this.#repository.reorderStars({
+      projectId,
+      userId: input.userId,
+      dashboardIds: input.dashboardIds.map((id) => dashboardIdSchema.parse(id)),
+    });
+    return { success: true as const };
+  }
+
+  /** Whether the project holds this board, for a peer placing a card on it. */
+  async boardExists(input: { projectId: string; dashboardId: string }): Promise<boolean> {
+    const ref = dashboardRef(input);
+    const [found] = await this.#repository.findDashboardIds({
+      projectId: ref.projectId,
+      dashboardIds: [ref.dashboardId],
+    });
+    return found !== undefined;
+  }
+
+  // -- graphs ----------------------------------------------------------------
+
   async listGraphs(input: {
     projectId: string;
     dashboardId?: string;
     viewer?: DashboardViewer;
   }): Promise<Graph[]> {
     const projectId = projectIdSchema.parse(input.projectId);
-
     if (input.dashboardId !== undefined) {
       const dashboardId = dashboardIdSchema.parse(input.dashboardId);
-      const dashboard = await this.#repository.findDashboard({ projectId, dashboardId });
-      if (dashboard && !(await this.#isVisible({ projectId, viewer: input.viewer, dashboard }))) {
-        return [];
-      }
       return this.#repository.findAllGraphs({ projectId, dashboardId });
     }
-
-    const [graphs, visibleIds] = await Promise.all([
-      this.#repository.findAllGraphs({ projectId }),
-      this.findVisibleDashboardIds({ projectId, viewer: input.viewer }),
-    ]);
-    const visible = new Set(visibleIds);
-
-    return graphs.filter((graph) => graph.dashboardId === null || visible.has(graph.dashboardId));
+    return this.#repository.findAllGraphs({ projectId });
   }
 
-  /** Whether the board exists and sits inside the viewer's audience. */
-  async isVisibleTo(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer?: DashboardViewer;
-  }): Promise<boolean> {
-    const ref = dashboardRef(input);
-    const dashboard = await this.#repository.findDashboard(ref);
-    if (dashboard === undefined) return false;
-
-    return this.#isVisible({ ...ref, viewer: input.viewer, dashboard });
-  }
-
-  /** The ids of every board inside the viewer's audience. */
-  async findVisibleDashboardIds(input: {
-    projectId: string;
-    viewer?: DashboardViewer;
-  }): Promise<string[]> {
-    const projectId = projectIdSchema.parse(input.projectId);
-    const dashboards = await this.#repository.findAllDashboards({ projectId, graphKinds: [] });
-    const visible = await this.#visibleOnly({ projectId, viewer: input.viewer, dashboards });
-
-    return visible.map((dashboard) => dashboard.id);
-  }
-
-  /** Refuses as not found when the graph sits on a board outside the viewer's audience. */
   async getGraph(input: {
     projectId: string;
     graphId: string;
@@ -343,16 +305,6 @@ export class DashboardService {
 
     const graph = await this.#repository.findGraph(parsed);
     if (!graph) throw new GraphNotFoundError(parsed.projectId);
-    if (graph.dashboardId !== null) {
-      const dashboard = await this.#repository.findDashboard({
-        projectId: parsed.projectId,
-        dashboardId: graph.dashboardId,
-      });
-      const reachable =
-        dashboard !== undefined &&
-        (await this.#isVisible({ ...parsed, viewer: input.viewer, dashboard }));
-      if (!reachable) throw new GraphNotFoundError(parsed.projectId);
-    }
 
     return graph;
   }
@@ -370,7 +322,7 @@ export class DashboardService {
     // schema is strict and flattens the grid onto the row, so spreading
     // `input` whole would offer it the `layout` key it refuses.
     // An empty `dashboardId` places the graph on no dashboard, as main's `&&` did.
-    const { layout: requestedLayout, viewer, dashboardId, ...withoutLayout } = input;
+    const { layout: requestedLayout, viewer: _viewer, dashboardId, ...withoutLayout } = input;
     const parsed = graphCreateInputSchema.parse({
       ...withoutLayout,
       ...requestedLayout,
@@ -378,11 +330,7 @@ export class DashboardService {
     });
 
     if (parsed.dashboardId !== undefined) {
-      await this.#writable({
-        projectId: parsed.projectId,
-        dashboardId: parsed.dashboardId,
-        viewer,
-      });
+      await this.#requireBoard({ projectId: parsed.projectId, dashboardId: parsed.dashboardId });
     }
 
     const nextGridRow =
@@ -418,14 +366,10 @@ export class DashboardService {
     filters?: Record<string, unknown>;
     viewer?: DashboardViewer;
   }): Promise<Graph> {
-    const { viewer, ...fields } = input;
+    const { viewer: _viewer, ...fields } = input;
     const parsed = graphUpdateInputSchema.parse(fields);
 
-    await this.getGraph({
-      projectId: parsed.projectId,
-      graphId: parsed.graphId,
-      viewer,
-    });
+    await this.getGraph({ projectId: parsed.projectId, graphId: parsed.graphId });
 
     return this.#repository.updateGraph({
       projectId: parsed.projectId,
@@ -443,7 +387,7 @@ export class DashboardService {
   }): Promise<Graph> {
     const parsed = graphRef(input);
 
-    await this.getGraph({ ...parsed, viewer: input.viewer });
+    await this.getGraph(parsed);
 
     return this.#repository.deleteGraph(parsed);
   }
@@ -458,7 +402,7 @@ export class DashboardService {
 
     const ref = graphRef(input);
 
-    await this.getGraph({ ...ref, viewer: input.viewer });
+    await this.getGraph(ref);
 
     return this.#repository.updateGraphLayout({ ...ref, layout });
   }
@@ -476,7 +420,7 @@ export class DashboardService {
     }));
 
     for (const item of layouts) {
-      await this.getGraph({ projectId, graphId: item.graphId, viewer: input.viewer });
+      await this.getGraph({ projectId, graphId: item.graphId });
     }
 
     await this.#repository.updateGraphLayouts({ projectId, layouts });
@@ -484,73 +428,25 @@ export class DashboardService {
     return { success: true as const };
   }
 
-  /** The board once it is known writable: visible to the viewer. */
-  async #writable(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
-    const ref = dashboardRef(input);
-    return this.getById({ ...ref, viewer: input.viewer });
-  }
-
-  /**
-   * Visible, and the viewer may change its visibility or
-   * delete it. An admin passes even when the board is outside their audience,
-   * so a departed member's private boards are never orphaned.
-   */
-  async #manageable(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
-    const ref = dashboardRef(input);
-    const { viewer } = input;
-
-    const dashboard = await this.#repository.findDashboard(ref);
-    if (!dashboard) throw new DashboardNotFoundError(ref.projectId);
-    const visible = await this.#isVisible({ ...ref, viewer, dashboard });
-
-    // The rule's null-creator branch is the legacy one (boards from before the
-    // column), not the general rule: see isDashboardManageable.
-    if (visible && isDashboardManageable({ dashboard, viewer, isAdmin: false })) return dashboard;
-    const isAdmin =
-      viewer !== undefined &&
-      (await this.#audience.isAdmin({ projectId: ref.projectId, userId: viewer.userId }));
-    if (isAdmin) return dashboard;
-    if (!visible) throw new DashboardNotFoundError(ref.projectId);
-
-    throw new DashboardOwnerOnlyError(dashboard.id);
-  }
-
-  async #isVisible(input: {
-    projectId: string;
-    viewer: DashboardViewer | undefined;
-    dashboard: Pick<Dashboard, "visibility" | "createdById">;
-  }): Promise<boolean> {
-    const [visible] = await this.#visibleOnly({
-      projectId: input.projectId,
-      viewer: input.viewer,
-      dashboards: [input.dashboard],
+  /** Raises the feature's own absence when the project holds no such board. */
+  async #requireBoard(ref: { projectId: string; dashboardId: string }): Promise<void> {
+    const [found] = await this.#repository.findDashboardIds({
+      projectId: ref.projectId,
+      dashboardIds: [ref.dashboardId],
     });
-    return visible !== undefined;
+    if (found === undefined) throw new DashboardNotFoundError(ref.projectId);
   }
 
-  /** Asks the team question at most once, and only when a team board depends on it. */
-  async #visibleOnly<T extends Pick<Dashboard, "visibility" | "createdById">>(input: {
+  async #starredIds(input: {
     projectId: string;
-    viewer: DashboardViewer | undefined;
-    dashboards: readonly T[];
-  }): Promise<T[]> {
-    const { projectId, viewer, dashboards } = input;
-    const asksTeam = dashboards.some((dashboard) => needsTeamMembership({ dashboard, viewer }));
-    const isTeamMember =
-      asksTeam && viewer !== undefined
-        ? await this.#audience.isTeamMember({ projectId, userId: viewer.userId })
-        : false;
-
-    return dashboards.filter((dashboard) =>
-      isDashboardVisible({ dashboard, viewer, isTeamMember }),
+    viewer?: DashboardViewer;
+  }): Promise<ReadonlySet<string>> {
+    if (input.viewer === undefined) return new Set();
+    return new Set(
+      await this.#repository.findStarredDashboardIds({
+        projectId: input.projectId,
+        userId: input.viewer.userId,
+      }),
     );
   }
 

@@ -15,7 +15,6 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import {
   AutomationApi,
   type AutomationApi as AutomationApiContract,
@@ -25,14 +24,12 @@ import {
   DashboardApi,
   DashboardsNotEnabledError,
   SavedWorkbenchChartDashboardNotFoundError,
-  SavedWorkbenchChartNotFoundError,
   dashboardConfig,
   type Dashboard,
   type DashboardGraphCountScope,
   type DashboardSourcePresence,
   type DashboardSummary,
   type DashboardViewer,
-  type DashboardVisibility,
   type Graph,
   type GraphLayout,
   type SavedView,
@@ -49,11 +46,7 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
 import { dashboardPlatformUrl } from "../rules/dashboard-platform-url.rules.ts";
 import { DashboardWidgetService } from "../services/dashboard-widget.service.ts";
-import {
-  type DashboardAudience,
-  DashboardService,
-  type WorkbenchAccess,
-} from "../services/dashboard.service.ts";
+import { DashboardService, type WorkbenchAccess } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
@@ -63,7 +56,6 @@ type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   automation: typeof AutomationApi;
   projects: typeof ProjectApi;
-  authz: typeof AuthzApi;
 }>;
 
 type DashboardSetup = FeatureSetup<
@@ -120,28 +112,6 @@ class AnalyticsWorkbenchCaller implements WorkbenchCaller {
   }
 }
 
-/** Team membership from the project peer, which owns the team, and admin rights from authz. */
-class PeerDashboardAudience implements DashboardAudience {
-  constructor(
-    private readonly peers: Readonly<{
-      projects: ProjectApiContract;
-      authz: AuthzApiContract;
-    }>,
-  ) {}
-
-  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
-    return this.peers.projects.isTeamMember(input);
-  }
-
-  isAdmin(input: { projectId: string; userId: string }): Promise<boolean> {
-    return this.peers.authz.hasPermission({
-      userId: input.userId,
-      permission: "project:manage",
-      projectId: input.projectId,
-    });
-  }
-}
-
 /**
  * `release_dashboards`, answered by Analytics, which owns the reporting area's
  * rollout flags — the same peer the Workbench gate is composed from.
@@ -160,7 +130,6 @@ export class DashboardModule implements DashboardApi {
     analytics: AnalyticsApi,
     automation: AutomationApi,
     projects: ProjectApi,
-    authz: AuthzApi,
   };
   /** The shared deployment origin, absent where the deployment named no `BASE_HOST`. */
   static readonly config = dashboardConfig;
@@ -219,11 +188,9 @@ export class DashboardModule implements DashboardApi {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
-    const { projects, authz } = setup.dependencies;
     const dashboards = DashboardService.create({
       repository: setup.repositories.dashboards,
       workbenchAccess,
-      audience: new PeerDashboardAudience({ projects, authz }),
     });
 
     return new DashboardModule({
@@ -278,13 +245,8 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.getById(input);
   }
 
-  /** A new dashboard, appended after the current last; organisation-wide by default. */
-  create(input: {
-    projectId: string;
-    name: string;
-    createdById?: string;
-    visibility?: DashboardVisibility;
-  }): Promise<Dashboard> {
+  /** A new dashboard, appended after the current last; starred for its creator. */
+  create(input: { projectId: string; name: string; createdById?: string }): Promise<Dashboard> {
     return this.#dashboards.create(input);
   }
 
@@ -298,7 +260,7 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.rename(input);
   }
 
-  /** Removes a dashboard, cascading to its graphs. */
+  /** Removes a dashboard, cascading to its graphs and every member's star of it. */
   delete(input: {
     projectId: string;
     dashboardId: string;
@@ -307,7 +269,7 @@ export class DashboardModule implements DashboardApi {
     return this.#dashboards.delete(input);
   }
 
-  /** The order the navigation lists them in. */
+  /** The legacy board `order`; written only by the REST reorder endpoint. */
   reorder(input: {
     projectId: string;
     dashboardIds: string[];
@@ -319,6 +281,37 @@ export class DashboardModule implements DashboardApi {
   /** The viewer's first dashboard, created on demand. */
   getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard> {
     return this.#dashboards.getOrCreateFirst(input);
+  }
+
+  /** The member's starred boards for this project, in their own order. */
+  listStarred(input: { projectId: string; userId: string }): Promise<Dashboard[]> {
+    return this.#dashboards.listStarred(input);
+  }
+
+  /** Stars a board for the member; appends at the end and is idempotent. */
+  star(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }> {
+    return this.#dashboards.star(input);
+  }
+
+  unstar(input: {
+    projectId: string;
+    userId: string;
+    dashboardId: string;
+  }): Promise<{ success: true }> {
+    return this.#dashboards.unstar(input);
+  }
+
+  /** Rewrites the member's star order from the ids given, in the order given. */
+  reorderStars(input: {
+    projectId: string;
+    userId: string;
+    dashboardIds: string[];
+  }): Promise<{ success: true }> {
+    return this.#dashboards.reorderStars(input);
   }
 
   /** Where a reader opens each of these dashboards. */
@@ -353,17 +346,6 @@ export class DashboardModule implements DashboardApi {
   }): Promise<Dashboard> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#dashboards.updateDetails(input);
-  }
-
-  /** Who may see a board. */
-  async setDashboardVisibility(input: {
-    projectId: string;
-    dashboardId: string;
-    viewer: DashboardViewer;
-    visibility: DashboardVisibility;
-  }): Promise<Dashboard> {
-    await this.#requireDashboardsEnabled(input.projectId);
-    return this.#dashboards.setVisibility(input);
   }
 
   /** Whether each Flight Deck source ever recorded a row, as this member reads the project. */
@@ -467,7 +449,7 @@ export class DashboardModule implements DashboardApi {
     return this.#analytics.assertCustomChartPlaygroundEnabled(input);
   }
 
-  /** The project's custom chart widgets, less those on boards outside the viewer's audience. */
+  /** The project's custom chart widgets. */
   listDashboardWidgets(input: {
     projectId: string;
     viewer?: DashboardViewer;
@@ -616,19 +598,14 @@ export class DashboardModule implements DashboardApi {
     return this.#workbenchAccess.isWorkbenchEnabled(input);
   }
 
-  /** The project's saved charts, less those on boards outside the viewer's audience. */
+  /** The project's saved charts. */
   async listSavedWorkbenchCharts(input: {
     projectId: string;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart[]> {
     await this.#requireWorkbench(input.projectId);
 
-    const [charts, visibleIds] = await Promise.all([
-      this.#charts.getAll({ projectId: input.projectId }),
-      this.#dashboards.findVisibleDashboardIds(input),
-    ]);
-    const visible = new Set(visibleIds);
-    return charts.filter((chart) => chart.dashboardId === null || visible.has(chart.dashboardId));
+    return this.#charts.getAll({ projectId: input.projectId });
   }
 
   /** One saved chart, with its query, parameters and specification. */
@@ -754,7 +731,7 @@ export class DashboardModule implements DashboardApi {
   }): Promise<SavedWorkbenchChart> {
     const { viewer, ...placement } = input;
     const { projectId, chartId, dashboardId } = placement;
-    if (!(await this.#dashboards.isVisibleTo({ projectId, dashboardId, viewer }))) {
+    if (!(await this.#dashboards.boardExists({ projectId, dashboardId }))) {
       throw new SavedWorkbenchChartDashboardNotFoundError();
     }
     await this.#getVisibleChart({ projectId, chartId, viewer });
@@ -774,24 +751,13 @@ export class DashboardModule implements DashboardApi {
     return this.#charts.unplace({ projectId: input.projectId, chartId: input.chartId });
   }
 
-  /** A chart on a board outside the viewer's audience reads as a chart that is not there. */
+  /** A chart the project does not hold reads as not there. */
   async #getVisibleChart(input: {
     projectId: string;
     chartId: string;
     viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    const chart = await this.#charts.getById({
-      projectId: input.projectId,
-      chartId: input.chartId,
-    });
-    if (chart.dashboardId === null) return chart;
-    const visible = await this.#dashboards.isVisibleTo({
-      projectId: input.projectId,
-      dashboardId: chart.dashboardId,
-      viewer: input.viewer,
-    });
-    if (!visible) throw new SavedWorkbenchChartNotFoundError();
-    return chart;
+    return this.#charts.getById({ projectId: input.projectId, chartId: input.chartId });
   }
 
   /** Runs one saved chart for a member, over the period the surface asks for. */

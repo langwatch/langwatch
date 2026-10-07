@@ -16,7 +16,6 @@ import {
   dashboardDescriptionSchema,
   dashboardNameSchema,
   dashboardSourcePresenceSchema,
-  dashboardVisibilitySchema,
 } from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
@@ -40,24 +39,22 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withOutput(dashboardTrpcDetailSchema)
 
   .mutation("create")
-  .withInput(
-    z.object({
-      ...projectScopeSchema.shape,
-      name: z.string(),
-      visibility: dashboardVisibilitySchema.optional(),
-    }),
-  )
+  .withInput(z.object({ ...projectScopeSchema.shape, name: z.string() }))
   .withOutput(dashboardTrpcRowSchema)
 
   .mutation("rename")
   .withInput(z.object({ ...dashboardScopeSchema.shape, name: z.string() }))
   .withOutput(dashboardTrpcRowSchema)
 
-  /** Cascades to the dashboard's graphs. */
+  /** Cascades to the dashboard's graphs, and removes it from everyone's stars. */
   .mutation("delete")
   .withInput(dashboardScopeSchema)
   .withOutput(dashboardTrpcRowSchema)
 
+  /**
+   * Legacy board ordering, kept for the Analytics reports section only; the
+   * Dashboards feature orders by a member's favourites. Remove with that section.
+   */
   .mutation("reorderDashboards")
   .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
   .withOutput(dashboardReorderResponseSchema)
@@ -81,10 +78,24 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   )
   .withOutput(dashboardTrpcRowSchema)
 
-  /** The creator or an admin; for a board older than creators, anyone who may edit. */
-  .mutation("setVisibility")
-  .withInput(z.object({ ...dashboardScopeSchema.shape, visibility: dashboardVisibilitySchema }))
-  .withOutput(dashboardTrpcRowSchema)
+  /** The member's starred boards for this project, in their own order. */
+  .query("listStarred")
+  .withInput(projectScopeSchema)
+  .withOutput(dashboardTrpcRowSchema.array())
+
+  /** Stars a board for the acting member; appends at the end and is idempotent. */
+  .mutation("star")
+  .withInput(dashboardScopeSchema)
+  .withOutput(dashboardReorderResponseSchema)
+
+  .mutation("unstar")
+  .withInput(dashboardScopeSchema)
+  .withOutput(dashboardReorderResponseSchema)
+
+  /** Rewrites the member's star order from the ids given, in the order given. */
+  .mutation("reorderStars")
+  .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
+  .withOutput(dashboardReorderResponseSchema)
 
   /** Per Flight Deck source, whether the project ever recorded a row. */
   .query("sourcePresence")

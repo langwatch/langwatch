@@ -19,29 +19,18 @@ Feature: Dashboards v1
     And the product switcher does not offer Dashboards
 
   @integration
-  Scenario: AC2 Landing on the member's first own board
+  Scenario: AC2 Opening the dashboards area shows the All dashboards page
     Given the release_dashboards flag is on for the project
-    And the member can see at least one board
     When they open /[project]/dashboards
-    Then they land on the first board they created
-    And when they created none, on the first board they can see
-    And no board is created
-
-  @integration
-  Scenario: AC2 A member with no board gets My dashboard
-    Given the release_dashboards flag is on for the project
-    And the member can see no board
-    When they open /[project]/dashboards
-    Then exactly one board named "My dashboard" is created, visible only to them
-    And it opens
+    Then the All dashboards page opens, listing every board in the project
+    And no board is created just by opening the area
 
   @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
-    Then they see "Saved dashboards" with a create button
-    And only stored boards are listed, with no built-in board and no "Default" tag
-    And each of their own boards is listed with a menu
+    Then they see their starred boards for this project in their own order, each with a menu
+    And an All dashboards link follows them
     And the sidebar shows nothing else besides Quick Search
 
   # ---------------------------------------------------------------------------
@@ -160,28 +149,25 @@ Feature: Dashboards v1
     And the current board is passed as context
 
   @integration
-  Scenario: AC18 Visibility hides a board from members outside its audience
-    Given a member sets a board to only me, team or organisation
-    When another member outside that audience lists dashboards
-    Then the board is not listed
-    And its URL is refused
+  Scenario: AC18 Every board in the project is visible to every member
+    Given a project with boards created by different members
+    When any member with analytics:view lists dashboards
+    Then every board is listed
+    And each board opens for them
 
   @integration
-  Scenario: AC18 Blocks on a board follow the board's visibility
-    Given a member sets a board holding blocks to only me or team
-    When another member outside that audience lists, adds, moves or deletes blocks on it
-    Then its blocks are not listed
-    And every read or write of those blocks is refused as not found
-    And a project credential reaches only the blocks on organisation-wide boards
+  Scenario: AC18 Blocks on any board are reachable to every member
+    Given a board holding blocks
+    When any member with analytics:view lists, adds, moves or deletes blocks on it
+    Then its blocks are listed and writable, subject only to the analytics permissions
+    And a project credential reaches the blocks on every board
 
   @unit
-  Scenario: AC18 Saved charts on a board follow the board's visibility
-    Given a member places a saved chart on a board set to only me or team
-    When another member outside that audience lists, opens, runs, edits or deletes saved charts
-    Then that chart is not listed
-    And every read, run or write of it is refused as not found
-    And a saved chart on no board stays reachable as before
-    And a project credential reaches only the charts on organisation-wide boards or on no board
+  Scenario: AC18 Saved charts on any board are reachable to every member
+    Given a saved chart placed on a board
+    When any member with analytics:view lists, opens, runs, edits or deletes saved charts
+    Then that chart is reachable, subject only to the analytics permissions
+    And a project credential reaches the charts on every board and on no board
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -244,12 +230,11 @@ Feature: Dashboards v1
 
   @integration
   Scenario: AC24 Boards created before this change keep working
-    Given a dashboard that existed before the visibility fields were added
+    Given a dashboard that existed before the description and creator fields were added
     When the migration has run
-    And a project member who could open it before lists dashboards
+    And a project member lists dashboards
     Then the board is listed
     And it opens for that member
-    And its visibility is organisation, the value that keeps the access it had before
     And its blocks render as before
     And its blocks render at the grain they had before day and week were added
 
@@ -299,54 +284,22 @@ Feature: Dashboards v1
     And once one row exists for Your coding agents the widget shows data
 
   @integration
-  Scenario: AC26 A member inside the audience with the edit permission can edit
-    Given a board set to team or organisation
-    And a member inside that audience with analytics:update
-    When that member opens the board
-    Then they can edit it
+  Scenario: AC26 Any member with the edit permission can edit any board
+    Given a board created by another member
+    And a member with analytics:update
+    When that member renames, edits or deletes the board
+    Then the server accepts each write
 
-  @integration
-  Scenario: AC26 A member inside the audience without the edit permission sees no edit controls
-    Given a board set to team or organisation
-    And a member inside that audience without analytics:update
-    When that member opens the board
-    Then they see no edit controls
-    And the server refuses their write
-
-  @integration
-  Scenario: AC26 Only the creator or an admin can change visibility or delete the board
-    Given a board set to team or organisation
-    And a member inside that audience who is neither its creator nor an admin
-    When that member tries to change its visibility or delete it
-    Then the server refuses the write
-    And the creator or an admin can perform that same write
-
-  @integration
-  Scenario: AC26 The server refuses every write from a member outside the audience
-    Given a board set to team or organisation
-    And a member outside that audience
-    When that member sends any write for the board
-    Then the server refuses every one of those writes
-
-  @integration
-  Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it
-    Given a board with no recorded creator
-    When a member sets it to only me or team
-    Then that member is recorded as its creator
-    And the board stays visible to them
-    And a project credential cannot set it to only me or team
-
-  @integration
-  Scenario: AC26 An admin can manage a board they cannot see
-    Given a board set to only me by another member
-    When an admin changes its visibility or deletes it
-    Then the server accepts the write
-    And the board is still not listed or opened for the admin
+  @unit
+  Scenario: AC26 Deleting a board removes it from every member's stars
+    Given a board starred by several members
+    When a member with analytics:delete deletes it
+    Then the board is gone from every member's starred list
 
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
-  # AC 2: "Landing" (changed: the member's own board, or a new "My dashboard"; no built-in board) → Scenario: AC2 Landing on the member's first own board; Scenario: AC2 A member with no board gets My dashboard
-  # AC 3: "Sidebar matches the reference" (changed: stored boards only, no "Default" row) → Scenario: AC3 Sidebar matches the reference
+  # AC 2: "Landing" (changed by langwatch/tasks#911: /dashboards opens the All dashboards page; no redirect, no auto-created board) -> Scenario: AC2 Opening the dashboards area shows the All dashboards page
+  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: the sidebar lists the member stars then an All dashboards link) -> Scenario: AC3 Sidebar matches the reference
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data
@@ -360,7 +313,7 @@ Feature: Dashboards v1
   # AC 15: "Widget menu" (changed: Edit, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload
   # AC 16: "Ask Langy from the board" → Scenario: AC16 Ask Langy from the board
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
-  # AC 18: "Visibility" → Scenario: AC18 Visibility hides a board from members outside its audience; Scenario: AC18 Blocks on a board follow the board's visibility; Scenario: AC18 Saved charts on a board follow the board's visibility
+  # AC 18: "Sharing removed: every board is visible to every project member" (changed by langwatch/tasks#911) -> Scenario: AC18 Every board in the project is visible to every member; Scenario: AC18 Blocks on any board are reachable to every member; Scenario: AC18 Saved charts on any board are reachable to every member
   # AC 19: "LWQL only" → Scenario: AC19 Every dashboard data request goes to LWQL and none to legacy analytics
   # AC 20: "Legacy analytics untouched" → Scenario: AC20 Legacy analytics files are untouched; Scenario: AC20 Legacy analytics pages behave exactly as before
   # AC 21: "Permissions" (sharpened) → Scenario: AC21 A member without analytics:view is refused; Scenario: AC21 A refused member sees the same not-found page
@@ -368,4 +321,4 @@ Feature: Dashboards v1
   # AC 23: "A failing query does not take the board down" → Scenario: AC23 A failing query does not take the board down
   # AC 24: "Boards created before this change keep working" (sharpened) → Scenario: AC24 Boards created before this change keep working
   # AC 25: "Every optional source has its own call to action" → Scenario: AC25 Scenario results shows its own call to action before any row exists; Scenario: AC25 Quality signal shows its own call to action before any row exists; Scenario: AC25 User feedback shows its own call to action before any row exists; Scenario: AC25 Gateway routing shows its own call to action before any row exists; Scenario: AC25 Your coding agents shows its own call to action before any row exists
-  # AC 26: "Visibility changes who can see a board, not who can edit it" → Scenario: AC26 A member inside the audience with the edit permission can edit; Scenario: AC26 A member inside the audience without the edit permission sees no edit controls; Scenario: AC26 Only the creator or an admin can change visibility or delete the board; Scenario: AC26 The server refuses every write from a member outside the audience; Scenario: AC26 Narrowing a board with no recorded creator records who narrowed it; Scenario: AC26 An admin can manage a board they cannot see
+  # AC 26: "Sharing removed: any member may edit any board, subject to the analytics permissions" (changed by langwatch/tasks#911) -> Scenario: AC26 Any member with the edit permission can edit any board; Scenario: AC26 Deleting a board removes it from every members stars

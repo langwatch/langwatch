@@ -4,13 +4,11 @@
  */
 import {
   DashboardNotFoundError,
-  DashboardOwnerOnlyError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import { FixedDashboardAudience } from "../../app/__tests__/dashboard.fixture.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import type { WorkbenchAccess } from "../dashboard.service.ts";
 import { DashboardService } from "../dashboard.service.ts";
@@ -31,7 +29,6 @@ function serviceWith(workbenchEnabled = true) {
     service: DashboardService.create({
       repository,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
-      audience: new FixedDashboardAudience(),
     }),
   };
 }
@@ -184,9 +181,9 @@ describe("DashboardService", () => {
     });
   });
 
-  describe("given a member creates a new dashboard", () => {
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("stays organisation-wide when visibility is not given", async () => {
+  describe("given a member creates a dashboard", () => {
+    /** @scenario "AC156 Creating, duplicating or adding from a template stars the board for its creator" */
+    it("stars it for the creator, and lists it starred for them", async () => {
       const { service } = serviceWith();
 
       const created = await service.create({
@@ -195,31 +192,94 @@ describe("DashboardService", () => {
         createdById: "member-1",
       });
 
-      expect(created.visibility).toBe("organisation");
-    });
-
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("stores an only_me board under its creator", async () => {
-      const { service } = serviceWith();
-
-      const created = await service.create({
-        projectId: PROJECT,
-        name: "Reports",
-        createdById: "member-1",
-        visibility: "only_me",
-      });
-
-      expect(created.visibility).toBe("only_me");
       expect(created.createdById).toBe("member-1");
+      await expect(
+        service.listStarred({ projectId: PROJECT, userId: "member-1" }),
+      ).resolves.toMatchObject([{ id: created.id }]);
     });
 
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("refuses only_me from a caller with no creator", async () => {
+    /** @scenario "AC156 Creating, duplicating or adding from a template stars the board for its creator" */
+    it("stars it for nobody when a project credential creates it", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.create({ projectId: PROJECT, name: "Reports" });
+
+      expect(created.createdById).toBeNull();
+      const [listed] = await service.getAll({ projectId: PROJECT, graphCountScope: "builder" });
+      expect(listed?.isStarred).toBe(false);
+    });
+  });
+
+  describe("given one member's stars", () => {
+    /** @scenario "AC157 Stars are per member" */
+    it("does not show them to another member", async () => {
+      const { service } = serviceWith();
+      const board = await service.create({ projectId: PROJECT, name: "Reports", createdById: "a" });
+
+      await expect(service.listStarred({ projectId: PROJECT, userId: "a" })).resolves.toMatchObject(
+        [{ id: board.id }],
+      );
+      await expect(service.listStarred({ projectId: PROJECT, userId: "b" })).resolves.toEqual([]);
+
+      const forB = await service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "builder",
+        viewer: { userId: "b" },
+      });
+      expect(forB.map((board) => board.isStarred)).toEqual([false]);
+    });
+
+    it("appends a star at the end and is idempotent", async () => {
+      const { service } = serviceWith();
+      const first = await service.create({ projectId: PROJECT, name: "One", createdById: "a" });
+      const second = await service.create({ projectId: PROJECT, name: "Two" });
+      const third = await service.create({ projectId: PROJECT, name: "Three" });
+
+      await service.star({ projectId: PROJECT, userId: "a", dashboardId: third.id });
+      await service.star({ projectId: PROJECT, userId: "a", dashboardId: second.id });
+      // Starring twice changes nothing.
+      await service.star({ projectId: PROJECT, userId: "a", dashboardId: third.id });
+
+      await expect(service.listStarred({ projectId: PROJECT, userId: "a" })).resolves.toMatchObject(
+        [{ id: first.id }, { id: third.id }, { id: second.id }],
+      );
+    });
+
+    it("unstars a board and reorders the rest", async () => {
+      const { service } = serviceWith();
+      const a = await service.create({ projectId: PROJECT, name: "A", createdById: "u" });
+      const b = await service.create({ projectId: PROJECT, name: "B", createdById: "u" });
+      const c = await service.create({ projectId: PROJECT, name: "C", createdById: "u" });
+
+      await service.unstar({ projectId: PROJECT, userId: "u", dashboardId: b.id });
+      await expect(service.listStarred({ projectId: PROJECT, userId: "u" })).resolves.toMatchObject(
+        [{ id: a.id }, { id: c.id }],
+      );
+
+      await service.reorderStars({ projectId: PROJECT, userId: "u", dashboardIds: [c.id, a.id] });
+      await expect(service.listStarred({ projectId: PROJECT, userId: "u" })).resolves.toMatchObject(
+        [{ id: c.id }, { id: a.id }],
+      );
+    });
+
+    /** @scenario "AC26 Deleting a board removes it from every member's stars" */
+    it("removes the board from every member's stars when it is deleted", async () => {
+      const { service } = serviceWith();
+      const board = await service.create({ projectId: PROJECT, name: "Shared", createdById: "a" });
+      await service.star({ projectId: PROJECT, userId: "b", dashboardId: board.id });
+
+      await service.delete({ projectId: PROJECT, dashboardId: board.id });
+
+      await expect(service.listStarred({ projectId: PROJECT, userId: "a" })).resolves.toEqual([]);
+      await expect(service.listStarred({ projectId: PROJECT, userId: "b" })).resolves.toEqual([]);
+    });
+
+    it("refuses a star on a board the project does not have", async () => {
       const { service } = serviceWith();
 
       await expect(
-        service.create({ projectId: PROJECT, name: "Reports", visibility: "only_me" }),
-      ).rejects.toBeInstanceOf(DashboardOwnerOnlyError);
+        service.star({ projectId: PROJECT, userId: "a", dashboardId: "missing" }),
+      ).rejects.toBeInstanceOf(DashboardNotFoundError);
     });
   });
 
@@ -253,29 +313,6 @@ describe("DashboardService", () => {
       await expect(
         service.getAll({ projectId: PROJECT, graphCountScope: "builder" }),
       ).resolves.toMatchObject([{ order: 0 }]);
-    });
-  });
-
-  describe("given a board with no recorded creator and a project credential", () => {
-    it("refuses only me and team, having nobody to record, and allows organisation", async () => {
-      const { service, repository } = serviceWith();
-      const board = await repository.createDashboard({
-        id: "creatorless",
-        projectId: PROJECT,
-        name: "Reports",
-        order: 0,
-      });
-      const ref = { projectId: PROJECT, dashboardId: board.id };
-
-      await expect(service.setVisibility({ ...ref, visibility: "only_me" })).rejects.toMatchObject({
-        code: "dashboard_owner_only",
-      });
-      await expect(service.setVisibility({ ...ref, visibility: "team" })).rejects.toMatchObject({
-        code: "dashboard_owner_only",
-      });
-      await expect(
-        service.setVisibility({ ...ref, visibility: "organisation" }),
-      ).resolves.toMatchObject({ visibility: "organisation", createdById: null });
     });
   });
 

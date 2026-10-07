@@ -57,7 +57,7 @@ const tableOf = (
 
 describe("the dashboard tRPC declarations", () => {
   describe("given the contract and the server it is bound to", () => {
-    /** @scenario "AC26 A member inside the audience without the edit permission sees no edit controls" */
+    /** @scenario "AC21 A member without analytics:view is refused" */
     it("keeps the dashboards wire names, kinds and permissions", () => {
       expect(tableOf(dashboardTrpc, mounted(dashboardTrpcTransport))).toEqual([
         ["getAll", "query", "analytics:view"],
@@ -68,7 +68,10 @@ describe("the dashboard tRPC declarations", () => {
         ["reorderDashboards", "mutation", "analytics:update"],
         ["getOrCreateFirst", "query", "analytics:view"],
         ["updateDetails", "mutation", "analytics:update"],
-        ["setVisibility", "mutation", "analytics:update"],
+        ["listStarred", "query", "analytics:view"],
+        ["star", "mutation", "analytics:view"],
+        ["unstar", "mutation", "analytics:view"],
+        ["reorderStars", "mutation", "analytics:view"],
         ["sourcePresence", "query", "analytics:view"],
       ]);
     });

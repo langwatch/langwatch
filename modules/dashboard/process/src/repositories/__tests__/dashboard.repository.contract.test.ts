@@ -285,6 +285,155 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when a member stars dashboards", () => {
+    const starred = (userId: string) =>
+      backend
+        .repository()
+        .findStarredDashboards({ projectId: backend.projectId(), userId })
+        .then((rows) => rows.map((row) => row.id));
+    const star = (userId: string, dashboardId: string) =>
+      backend.repository().starDashboard({ projectId: backend.projectId(), userId, dashboardId });
+
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("appends each star after the last and ignores a repeat", async () => {
+      const [a, b, c] = [await dashboard("A", 0), await dashboard("B", 1), await dashboard("C", 2)];
+
+      await star("u", c.id);
+      await star("u", a.id);
+      await star("u", c.id);
+      await star("u", b.id);
+
+      await expect(starred("u")).resolves.toEqual([c.id, a.id, b.id]);
+    });
+
+    it("keeps one member's stars apart from another's", async () => {
+      const a = await dashboard();
+
+      await star("u", a.id);
+
+      await expect(starred("u")).resolves.toEqual([a.id]);
+      await expect(starred("v")).resolves.toEqual([]);
+    });
+
+    it("answers the starred ids of the member in this project only", async () => {
+      const repository = backend.repository();
+      const a = await dashboard("A", 0);
+      await dashboard("B", 1);
+      await star("u", a.id);
+
+      await expect(
+        repository.findStarredDashboardIds({ projectId: backend.projectId(), userId: "u" }),
+      ).resolves.toEqual([a.id]);
+      await expect(
+        repository.findStarredDashboardIds({ projectId: backend.otherProjectId(), userId: "u" }),
+      ).resolves.toEqual([]);
+    });
+
+    it("removes a star and leaves the others in order", async () => {
+      const [a, b, c] = [await dashboard("A", 0), await dashboard("B", 1), await dashboard("C", 2)];
+      await star("u", a.id);
+      await star("u", b.id);
+      await star("u", c.id);
+
+      await backend
+        .repository()
+        .unstarDashboard({ projectId: backend.projectId(), userId: "u", dashboardId: b.id });
+
+      await expect(starred("u")).resolves.toEqual([a.id, c.id]);
+    });
+
+    it("rewrites the order of the starred boards from the ids given", async () => {
+      const [a, b, c] = [await dashboard("A", 0), await dashboard("B", 1), await dashboard("C", 2)];
+      await star("u", a.id);
+      await star("u", b.id);
+      await star("u", c.id);
+
+      await backend.repository().reorderStars({
+        projectId: backend.projectId(),
+        userId: "u",
+        dashboardIds: [c.id, a.id, b.id],
+      });
+
+      await expect(starred("u")).resolves.toEqual([c.id, a.id, b.id]);
+    });
+
+    it("removes the board from every member's stars when it is deleted", async () => {
+      const a = await dashboard();
+      await star("u", a.id);
+      await star("v", a.id);
+
+      await backend
+        .repository()
+        .deleteDashboard({ projectId: backend.projectId(), dashboardId: a.id });
+
+      await expect(starred("u")).resolves.toEqual([]);
+      await expect(starred("v")).resolves.toEqual([]);
+    });
+  });
+
+  describe("when favourites are written", () => {
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("appends stars in order and is idempotent", async () => {
+      const repository = backend.repository();
+      const one = await dashboard("One", 0);
+      const two = await dashboard("Two", 1);
+      const star = (dashboardId: string) =>
+        repository.starDashboard({ projectId: backend.projectId(), userId: "u", dashboardId });
+
+      await star(two.id);
+      await star(one.id);
+      await star(two.id);
+
+      await expect(
+        repository.findStarredDashboardIds({ projectId: backend.projectId(), userId: "u" }),
+      ).resolves.toEqual([two.id, one.id]);
+      const listed = await repository.findStarredDashboards({
+        projectId: backend.projectId(),
+        userId: "u",
+      });
+      expect(listed.map((row) => row.id)).toEqual([two.id, one.id]);
+    });
+
+    it("unstars and reorders a member's stars without touching another member's", async () => {
+      const repository = backend.repository();
+      const a = await dashboard("A", 0);
+      const b = await dashboard("B", 1);
+      const c = await dashboard("C", 2);
+      const projectId = backend.projectId();
+      for (const dashboardId of [a.id, b.id, c.id]) {
+        await repository.starDashboard({ projectId, userId: "u", dashboardId });
+      }
+      await repository.starDashboard({ projectId, userId: "other", dashboardId: a.id });
+
+      await repository.unstarDashboard({ projectId, userId: "u", dashboardId: b.id });
+      await repository.reorderStars({ projectId, userId: "u", dashboardIds: [c.id, a.id] });
+
+      await expect(repository.findStarredDashboardIds({ projectId, userId: "u" })).resolves.toEqual(
+        [c.id, a.id],
+      );
+      await expect(
+        repository.findStarredDashboardIds({ projectId, userId: "other" }),
+      ).resolves.toEqual([a.id]);
+    });
+
+    it("drops a board from every member's stars when it is deleted", async () => {
+      const repository = backend.repository();
+      const board = await dashboard();
+      const projectId = backend.projectId();
+      await repository.starDashboard({ projectId, userId: "u", dashboardId: board.id });
+      await repository.starDashboard({ projectId, userId: "other", dashboardId: board.id });
+
+      await repository.deleteDashboard({ projectId, dashboardId: board.id });
+
+      await expect(repository.findStarredDashboardIds({ projectId, userId: "u" })).resolves.toEqual(
+        [],
+      );
+      await expect(
+        repository.findStarredDashboardIds({ projectId, userId: "other" }),
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe("when builder graphs are written", () => {
     it("reads a created graph back with its payload and layout", async () => {
       const repository = backend.repository();
@@ -653,6 +802,8 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
 
   const clean = () =>
     cleanupTestRows(database(), [
+      ["dashboardFavourite", { projectId }],
+      ["dashboardFavourite", { projectId: otherProjectId }],
       ["customGraph", { projectId }],
       ["customGraph", { projectId: otherProjectId }],
       ["dashboard", { projectId }],

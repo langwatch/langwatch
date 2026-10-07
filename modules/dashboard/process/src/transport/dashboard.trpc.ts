@@ -1,7 +1,7 @@
 /**
  * The server half of `dashboards.*`. Reading takes `analytics:view`; creating
  * `analytics:create`, editing `analytics:update`, removing `analytics:delete`.
- * Every call names the member as viewer, so boards outside their audience stay hidden.
+ * Starring is personal, so it takes only `analytics:view` and names the actor.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, dashboardTrpc } from "@langwatch/dashboard-contract";
@@ -36,12 +36,7 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
     .procedure("create")
     .withPermission("analytics:create")
     .handle(async ({ app, input, actor }) =>
-      app.create({
-        projectId: input.projectId,
-        name: input.name,
-        createdById: actor.id,
-        ...(input.visibility === undefined ? {} : { visibility: input.visibility }),
-      }),
+      app.create({ projectId: input.projectId, name: input.name, createdById: actor.id }),
     )
 
     .procedure("rename")
@@ -93,14 +88,39 @@ export const dashboardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof 
       }),
     )
 
-    .procedure("setVisibility")
-    .withPermission("analytics:update")
+    .procedure("listStarred")
+    .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
-      app.setDashboardVisibility({
+      app.listStarred({ projectId: input.projectId, userId: actor.id }),
+    )
+
+    .procedure("star")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.star({
         projectId: input.projectId,
+        userId: actor.id,
         dashboardId: input.dashboardId,
-        viewer: { userId: actor.id },
-        visibility: input.visibility,
+      }),
+    )
+
+    .procedure("unstar")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.unstar({
+        projectId: input.projectId,
+        userId: actor.id,
+        dashboardId: input.dashboardId,
+      }),
+    )
+
+    .procedure("reorderStars")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.reorderStars({
+        projectId: input.projectId,
+        userId: actor.id,
+        dashboardIds: input.dashboardIds,
       }),
     )
 

@@ -1,7 +1,6 @@
 import type {
   Dashboard,
   DashboardSummary,
-  DashboardVisibility,
   Graph,
   GraphLayout,
   SavedWorkbenchChart,
@@ -18,7 +17,6 @@ export type DashboardRecord = Dashboard;
 export type DashboardUpdate = Readonly<{
   name?: string;
   description?: string | null;
-  visibility?: DashboardVisibility;
   createdById?: string;
 }>;
 export type DashboardSummaryRecord = DashboardSummary;
@@ -46,22 +44,32 @@ export interface DashboardRepository {
   findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]>;
-  /** No description; `createdById` null and `visibility` organisation-wide when absent. */
+  /** No description; `createdById` null when absent. */
   createDashboard(input: {
     id: string;
     projectId: string;
     name: string;
     order: number;
     createdById?: string | null;
-    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord>;
   updateDashboard(input: {
     projectId: string;
     dashboardId: string;
     data: DashboardUpdate;
   }): Promise<DashboardRecord>;
+  /** Removes the board, its graphs, and the row from every member's favourites. */
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;
+
+  /** The member's starred boards for this project, in their own position order. */
+  findStarredDashboards(input: { projectId: string; userId: string }): Promise<DashboardRecord[]>;
+  /** The ids the member has starred in this project, for marking a list. */
+  findStarredDashboardIds(input: { projectId: string; userId: string }): Promise<string[]>;
+  /** Appends a star at the end of the member's order; a no-op when already starred. */
+  starDashboard(input: { projectId: string; userId: string; dashboardId: string }): Promise<void>;
+  unstarDashboard(input: { projectId: string; userId: string; dashboardId: string }): Promise<void>;
+  /** Sets each starred board's position from the order of the ids; others untouched. */
+  reorderStars(input: { projectId: string; userId: string; dashboardIds: string[] }): Promise<void>;
 
   findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]>;
   findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined>;
