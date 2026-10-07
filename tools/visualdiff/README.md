@@ -468,22 +468,32 @@ push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
    modules, which refuse a deployment without one. The base
    then boots on the candidate's schema with its migrations skipped, the same
    as every rolling deploy's old release does.
-3. `visualdiff run -no-haven -no-publish -no-baseline` boots both refs on
-   plain ports from worktrees under the runner's temp directory, captures the
-   enterprise edition and writes the report. The Playwright browser is cached
-   by version.
-4. The run directory's report, screenshots and logs upload as the
-   `visualdiff-report` artifact (7 days): `report/<edition>/report.html`
-   addresses its screenshots relative to itself, so it opens from the
-   download. `summary.txt` becomes the job summary.
-5. `visualdiff publish -pr <n> -link <artifact>` edits the PR's one marked
-   comment. When no screen went up (the run broke, nothing was selected, or
-   gh could not attach images with the workflow's token) the workflow writes
-   the run's status into the same marked comment instead. A fork's PR has a
-   read-only token: it gets the job summary and the artifact, no comment.
+3. The `run` job is a matrix of eight shards. Each runs `visualdiff run
+   -no-haven -no-publish -no-baseline -shard i/8 -deadline 50m`: every eighth
+   route and flow from the i-th, booted on plain ports from worktrees under
+   the runner's temp directory, enterprise edition only. Shard 1 alone records
+   coverage. The Playwright browser is cached by version.
+4. A shard still capturing at `-deadline` stops, writes the report of what it
+   captured and marks it partial in `summary.txt` and `outcome.json`; a
+   `timeout` a few minutes later is the backstop. Either way the shard's run
+   directory (with its `exit_code`) uploads as `visualdiff-shard-<i>`.
+5. The `report` job downloads every shard to `<run-dir>/shards/<name>` and
+   `visualdiff merge -shards 8` writes one report per edition, `summary.txt`,
+   `findings.jsonl` and `outcome.json`. A shard that left no report, did not
+   finish, or is missing makes the merge partial; one that exited 2 or 3
+   makes it exit 2. The merged directory uploads as `visualdiff-report`
+   (7 days): `report/<edition>/report.html` addresses its screenshots inside
+   `shards/`, relative to itself, so it opens from the download.
+   `summary.txt` becomes the job summary.
+6. `visualdiff publish -pr <n> -link <artifact>` edits the PR's one marked
+   comment, which says when the run was partial. When no screen went up (the
+   run broke, nothing was selected, or gh could not attach images with the
+   workflow's token) the workflow writes the run's status into the same
+   marked comment instead. A fork's PR has a read-only token: it gets the job
+   summary and the artifact, no comment.
 
-Findings are for review and never fail the job; exit 2 does, and prints the
-end of every stack log into the step's output.
+Findings are for review and never fail the job; exit 2 does, and the shard's
+step prints the end of every stack log.
 
 ## Refusing a slow machine, and where the time goes
 
