@@ -14,7 +14,12 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import { canonicalV1Path, middlewareScopesOf, type MountableRestApp } from "./addressing.ts";
+import {
+  claimsNoPrefix,
+  middlewareScopesOf,
+  routeScopesOf,
+  type MountableRestApp,
+} from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
 import type {
   RestDoorCredential,
@@ -85,9 +90,9 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   /** Which module claims each prefixed namespace mounted so far. */
   private readonly claims = new Map<string, string>();
 
-  /** The prefixes claimed and the literal addresses served so far, each with its module. */
+  /** The prefixes claimed and the unprefixed addresses served so far, each with its module. */
   private readonly prefixes: ClaimedPrefix[] = [];
-  private readonly literals: LiteralAddress[] = [];
+  private readonly unclaimed: UnclaimedAddress[] = [];
 
   private constructor(private readonly options: Parameters<typeof RestHost.create>[0]) {}
 
@@ -154,18 +159,18 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /**
-   * A family that is not literal claims `/api/<namespace>` whole, so a second module's would
-   * run its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
+   * A family claiming a prefix claims `/api/<namespace>` whole, so a second module's would run
+   * its middleware ahead of the first's routes: it declares a shared path instead (§8, R10).
    */
   private claimNamespace(declaration: RestTransportDeclaration<unknown>): void {
     const serving = declaration.api.name;
 
-    if (declaration.addressing === "literal") {
-      const addresses = literalAddressesOf(declaration);
+    if (claimsNoPrefix(declaration)) {
+      const addresses = addressesOfFamilyClaimingNoPrefix(declaration);
       for (const address of addresses) {
         for (const claim of this.prefixes) assertSharedPathAdmitted({ address, claim });
       }
-      this.literals.push(...addresses);
+      this.unclaimed.push(...addresses);
       return;
     }
 
@@ -174,7 +179,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     if (claimant !== void 0 && claimant !== serving) {
       throw new Error(
         `REST "${declaration.namespace}" of ${serving} claims a namespace ${claimant} already claims; ` +
-          `serve its routes from a literal family with .withSharedPath({ owner: "${claimant}", reason, deprecate })`,
+          `declare .withSharedPath({ owner: "${claimant}", reason, deprecate }) on each of its routes`,
       );
     }
 
@@ -183,7 +188,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       module: serving,
     }));
     for (const claim of claims) {
-      for (const address of this.literals) assertSharedPathAdmitted({ address, claim });
+      for (const address of this.unclaimed) assertSharedPathAdmitted({ address, claim });
     }
     this.prefixes.push(...claims);
     this.claims.set(declaration.namespace, serving);
@@ -205,36 +210,36 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
 
 type ClaimedPrefix = { prefix: string; module: string };
 
-type LiteralAddress = {
+type UnclaimedAddress = {
   method: string;
   path: string;
   module: string;
   sharedPath: RestSharedPath | undefined;
 };
 
-/** Each address a literal family's routes answer at, its v1 twin included. */
-function literalAddressesOf(declaration: RestTransportDeclaration<unknown>): LiteralAddress[] {
-  return declaration.routes.flatMap((route) => {
-    const alias = declaration.v1Twin ? canonicalV1Path(route.path) : null;
-
-    return [route.path, ...(alias ? [alias] : [])].map((path) => ({
+/** Each address the routes of a family claiming no prefix answer at, v1 twins included. */
+function addressesOfFamilyClaimingNoPrefix(
+  declaration: RestTransportDeclaration<unknown>,
+): UnclaimedAddress[] {
+  return declaration.routes.flatMap((route) =>
+    routeScopesOf({ route, declaration }).map((path) => ({
       method: route.method.toUpperCase(),
       path,
       module: declaration.api.name,
       sharedPath: route.sharedPath,
-    }));
-  });
+    })),
+  );
 }
 
 /**
- * A literal route under a prefix another module's family claims runs that family's
+ * A route claiming no prefix, under a prefix another module's family claims, runs that family's
  * middleware: it says so with `.withSharedPath`, naming the claimant (§8, R10).
  */
 function assertSharedPathAdmitted({
   address,
   claim,
 }: {
-  address: LiteralAddress;
+  address: UnclaimedAddress;
   claim: ClaimedPrefix;
 }): void {
   const under = address.path === claim.prefix || address.path.startsWith(`${claim.prefix}/`);

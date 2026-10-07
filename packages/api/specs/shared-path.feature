@@ -27,10 +27,37 @@ Feature: A REST path served outside its owner's namespace says so on the route
       Then the mount is refused, naming the module and the path
 
     @unit
-    Scenario: A shared path lives only in a family that claims no prefix
-      Given a dated family whose route declares a shared path
+    Scenario: A shared path lives only in a literal or a dated family
+      Given a family addressed "v1-only" whose route declares a shared path
       When the family is mounted
-      Then the mount is refused, because the family's own middleware would run ahead of the owner's routes
+      Then the mount is refused, naming the addressings that may share a path
+
+  Rule: A dated family shares another module's namespace when every route says so
+
+    A dated family whose every route declares a shared path with one owner claims no prefix: its
+    own middleware runs on its own addresses only, so it never runs ahead of the owner's routes.
+
+    @integration
+    Scenario: Two modules serve one dated namespace, each at every address of its own routes
+      Given a host that mounted a dated family of one module claiming a namespace
+      And a dated family of another module on the same namespace whose every route declares a shared path with the first module
+      When both families are mounted, in either order
+      Then each route answers from its own handler at its bare, dated, latest and v1 addresses
+      And a date after a family's version answers from that family's route
+      And the registry lists the shared route with its owner and the module serving it
+      And the published document lists each route once, at an undated address
+
+    @integration
+    Scenario: A dated family sharing a namespace with the wrong owner is refused at mount
+      Given a host that mounted a dated family of one module claiming a namespace
+      When a dated family of another module on that namespace declares its shared path with a third module
+      Then the mount is refused, naming the module that claims the namespace
+
+    @unit
+    Scenario: A dated family that both owns and shares its namespace is refused at mount
+      Given a dated family where one route declares a shared path and another does not, or two routes name different owners
+      When the family is mounted
+      Then the mount is refused, naming the family and asking for the shared routes in a family of their own
 
   Rule: A namespace prefix is claimed by one module
 

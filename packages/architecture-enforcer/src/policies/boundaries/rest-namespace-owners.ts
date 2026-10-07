@@ -276,7 +276,7 @@ function finding({
       shared === undefined
         ? `${where} sits in the REST namespace "${route.namespace}", which ${owner} owns (modules/catalogue.json).`
         : `${where} declares a shared path with ${shared}, but ${owner} owns the REST namespace "${route.namespace}".`,
-    allowed: `Serve it from a literal family and declare .withSharedPath({ owner: "${owner}", reason, deprecate }) on the route, or move it under a namespace ${server} owns. ${RECORD}`,
+    allowed: `Declare .withSharedPath({ owner: "${owner}", reason, deprecate }) on the route (a literal family, or a dated family whose every route shares), or move it under a namespace ${server} owns. ${RECORD}`,
   };
 }
 

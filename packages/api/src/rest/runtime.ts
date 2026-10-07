@@ -51,9 +51,11 @@ import {
   addressesOf,
   basePathOf,
   canonicalV1Path,
+  claimsNoPrefix,
   isDateVersion,
   middlewareScopesOf,
   undescribedStack,
+  VERSION_NAMESPACE,
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
@@ -267,10 +269,12 @@ function mountFamilyRoutes<Api>({
 }
 
 /**
- * A shared path names an owner other than its server, and sits in a literal family:
- * a family claiming a prefix would run its middleware ahead of the owner's routes (§8, R10).
+ * A shared path names an owner other than its server, in a family claiming no prefix: a literal
+ * one, or a dated one whose every route shares one owner's namespace (§8, R10).
  */
 function assertSharedPaths<Api>(declaration: RestTransportDeclaration<Api>): void {
+  const owners = new Set<string>();
+
   for (const route of declaration.routes) {
     if (!route.sharedPath) continue;
 
@@ -280,12 +284,24 @@ function assertSharedPaths<Api>(declaration: RestTransportDeclaration<Api>): voi
       throw new Error(`${where} declares a shared path with its own module; drop withSharedPath`);
     }
 
-    if (declaration.addressing !== "literal") {
+    if (declaration.addressing !== "literal" && declaration.addressing !== "dated") {
       throw new Error(
         `${where} declares a shared path in the "${declaration.addressing}" family ` +
-          `"${declaration.namespace}"; serve it from a literal family, which claims no prefix`,
+          `"${declaration.namespace}"; serve it from a literal or a dated family`,
       );
     }
+
+    owners.add(route.sharedPath.owner);
+  }
+
+  if (declaration.addressing !== "dated" || owners.size === 0) return;
+
+  if (owners.size > 1 || !claimsNoPrefix(declaration)) {
+    throw new Error(
+      `REST dated family "${declaration.namespace}" of ${declaration.api.name} both owns and ` +
+        `shares a namespace (${[...owners].join(", ")}); serve the shared routes, all naming ` +
+        "one owner, from a dated family of their own",
+    );
   }
 }
 
@@ -2379,7 +2395,7 @@ function mountVersionGuards<Api>({
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): void {
-  const namespace = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
+  const namespace = VERSION_NAMESPACE;
   const fallback = dateFallback({ basePath, declaration, ports, options, facts });
   const notFound: MiddlewareHandler = async (context, next) =>
     anotherFamilyServesTheVersion(context) ? next() : context.notFound();

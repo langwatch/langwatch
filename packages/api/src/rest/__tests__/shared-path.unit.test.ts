@@ -14,8 +14,10 @@ import { defineRestRouter, type RestSharedPath } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
 
 const VERSION = "2026-10-06";
-const ApiKeyDoors = moduleApi<{ visible(): { ok: boolean } }>()("api-key");
-const app = { visible: () => ({ ok: true }) };
+const ApiKeyDoors = moduleApi<{ visible(): { ok: boolean }; other(): { ok: boolean } }>()(
+  "api-key",
+);
+const app = { visible: () => ({ ok: true }), other: () => ({ ok: true }) };
 const SHARED: RestSharedPath = {
   owner: "project",
   reason: "the visible-projects door moved to api-key with its path unchanged",
@@ -88,8 +90,25 @@ describe("a route declaring a shared path", () => {
     expect(registeredAt("/api/api-keys/self-shared")).toBeUndefined();
   });
 
-  /** @scenario "A shared path lives only in a family that claims no prefix" */
-  it("refuses at mount a shared path in a dated family", () => {
+  /** @scenario "A shared path lives only in a literal or a dated family" */
+  it("refuses at mount a shared path in a v1-only family", () => {
+    const declaration = defineRestRouter(ApiKeyDoors)
+      .withNamespace("projects")
+      .withVersion(VERSION)
+      .withAddressing("v1-only")
+      .get("/v1-shared", "visible")
+      .withSharedPath(SHARED)
+      .withAccess(anyAuthenticated({ reason: "the test door asks no permission" }))
+      .withOutput(z.object({ ok: z.boolean() }))
+      .handle(({ app }) => app.visible())
+      .build()
+      .router();
+
+    expect(() => mount(declaration)).toThrow(/"v1-only" family.*literal or a dated family/);
+  });
+
+  /** @scenario "A dated family that both owns and shares its namespace is refused at mount" */
+  it("refuses at mount a dated family where one route shares and another does not", () => {
     const declaration = defineRestRouter(ApiKeyDoors)
       .withNamespace("projects")
       .withVersion(VERSION)
@@ -98,9 +117,38 @@ describe("a route declaring a shared path", () => {
       .withAccess(anyAuthenticated({ reason: "the test door asks no permission" }))
       .withOutput(z.object({ ok: z.boolean() }))
       .handle(({ app }) => app.visible())
+      .get("/dated-owned", "other")
+      .withAccess(anyAuthenticated({ reason: "the test door asks no permission" }))
+      .withOutput(z.object({ ok: z.boolean() }))
+      .handle(({ app }) => app.other())
       .build()
       .router();
 
-    expect(() => mount(declaration)).toThrow(/literal family/);
+    expect(() => mount(declaration)).toThrow(
+      /dated family "projects" of api-key both owns and shares a namespace.*family of their own/,
+    );
+  });
+
+  /** @scenario "A dated family that both owns and shares its namespace is refused at mount" */
+  it("refuses at mount a dated family whose routes name different owners", () => {
+    const declaration = defineRestRouter(ApiKeyDoors)
+      .withNamespace("projects")
+      .withVersion(VERSION)
+      .get("/owner-one", "visible")
+      .withSharedPath(SHARED)
+      .withAccess(anyAuthenticated({ reason: "the test door asks no permission" }))
+      .withOutput(z.object({ ok: z.boolean() }))
+      .handle(({ app }) => app.visible())
+      .get("/owner-two", "other")
+      .withSharedPath({ ...SHARED, owner: "dataset" })
+      .withAccess(anyAuthenticated({ reason: "the test door asks no permission" }))
+      .withOutput(z.object({ ok: z.boolean() }))
+      .handle(({ app }) => app.other())
+      .build()
+      .router();
+
+    expect(() => mount(declaration)).toThrow(
+      /both owns and shares a namespace \(project, dataset\)/,
+    );
   });
 });

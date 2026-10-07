@@ -1567,7 +1567,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST namespace (the first segment after `/api/` or `/api/v1/`) has one owner, named in
   `modules/catalogue.json` `restNamespaces`; the category prefixes otel, internal, export, webhooks,
   connect, auth and scenario stay unowned. Another module serves a path in an owned namespace only by
-  declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family;
+  declaring it on the route, `.withSharedPath({ owner, reason, deprecate })`, in a literal family or in a dated family whose every route shares one owner's namespace (such a family claims no prefix; round 16, 2026-10-07);
   every such route is planned for deprecation except `/api/projects/:projectId/analytics/*`, declared
   `permanent: true`, and the route registry lists them (`RegisteredRoute.sharedPath`). A literal
   route under a prefix another module's family claims, undeclared or naming the wrong owner, is
