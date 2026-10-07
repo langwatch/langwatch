@@ -32,9 +32,6 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../governance/contract/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -78,9 +75,6 @@
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../governance/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

@@ -13,7 +13,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { ScimService } from "../scim.service.ts";
 import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
@@ -72,14 +72,13 @@ function world() {
     }),
   } satisfies ScimUserProvisioning;
   const departments = {
-    departmentResolveByNameOrCreate: vi.fn(),
-    departmentAssignUser: vi.fn(async () => undefined),
-  } satisfies ScimDepartmentAssignment;
+    recordCostCenterChanged: vi.fn(async () => undefined),
+  } satisfies ScimCostCenterFacts;
   const service = ScimService.create({
     prisma: store,
     writer,
     users,
-    governance: departments,
+    costCenterFacts: departments,
     organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),

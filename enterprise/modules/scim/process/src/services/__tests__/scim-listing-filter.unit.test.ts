@@ -11,7 +11,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { HeldConnectionsFake } from "../../__tests__/support/held-connections-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
-import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
+import type { ScimCostCenterFacts } from "../scim-cost-center.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
@@ -51,16 +51,9 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-function departments(): ScimDepartmentAssignment {
+function departments(): ScimCostCenterFacts {
   return {
-    departmentResolveByNameOrCreate: vi.fn(async () => ({
-      id: "department-1",
-      organizationId: ORGANIZATION,
-      name: "Engineering",
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    })),
-    departmentAssignUser: vi.fn(async () => undefined),
+    recordCostCenterChanged: vi.fn(async () => undefined),
   };
 }
 
@@ -97,7 +90,7 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
       prisma: repository,
       writer: new GrantsFake(),
       users,
-      governance: departments(),
+      costCenterFacts: departments(),
       organization: new OrganizationAdministrationFake(),
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),

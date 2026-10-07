@@ -14,10 +14,7 @@ import type {
   ScimUserRecord,
   ScimUserResourceRecord,
 } from "../repositories/scim.repository.ts";
-import {
-  ScimCostCenterService,
-  type ScimDepartmentAssignment,
-} from "./scim-cost-center.service.ts";
+import { ScimCostCenterService, type ScimCostCenterFacts } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import type { ScimGrantsService } from "./scim-grants.service.ts";
@@ -61,7 +58,7 @@ export class ScimProvisioningService {
     writer,
     grants,
     users,
-    governance,
+    costCenterFacts,
     organization,
     lifecycle,
     provenOffboarding,
@@ -71,7 +68,7 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -91,7 +88,7 @@ export class ScimProvisioningService {
     });
     this.listing = ScimUserListingService.create(prisma);
     this.provenOffboarding = provenOffboarding;
-    this.costCenters = ScimCostCenterService.create(governance);
+    this.costCenters = ScimCostCenterService.create(costCenterFacts);
     this.patches = ScimUserPatchService.create(this.costCenters);
   }
 
@@ -100,7 +97,7 @@ export class ScimProvisioningService {
     writer: AuthzGrantsService;
     grants: ScimGrantsService;
     users: ScimUserProvisioning;
-    governance: ScimDepartmentAssignment;
+    costCenterFacts: ScimCostCenterFacts;
     organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
