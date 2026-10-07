@@ -1,4 +1,5 @@
 import { Alert } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { explainHandledError } from "~/features/errors";
 
 /**
@@ -36,4 +37,20 @@ export function AggregateReadOnlyNotice() {
       </Alert.Content>
     </Alert.Root>
   );
+}
+
+/**
+ * Renders the read-only notice in place of `children` on an aggregate
+ * project, and `children` untouched everywhere else. A page whose body is
+ * already a chain of states (loading, empty, sections) wraps the chain in
+ * this rather than growing it by one more branch.
+ */
+export function AggregateReadOnlyGate({
+  isAggregate,
+  children,
+}: {
+  isAggregate: boolean;
+  children: ReactNode;
+}) {
+  return isAggregate ? <AggregateReadOnlyNotice /> : <>{children}</>;
 }
