@@ -103,7 +103,7 @@ export async function copyEvaluatorToProject({
   sourceProjectId,
   targetProjectId,
   newEvaluatorId = `evaluator_${nanoid()}`,
-  checkEvaluatorCap = true,
+  shouldCheckEvaluatorCap = true,
 }: {
   ctx: CopyEvaluatorCtx;
   evaluatorId: string;
@@ -115,9 +115,9 @@ export async function copyEvaluatorToProject({
    * Copying an online evaluation brings its evaluator along as part of the
    * monitor, and online evaluations are uncapped, so that caller passes false.
    */
-  checkEvaluatorCap?: boolean;
+  shouldCheckEvaluatorCap?: boolean;
 }) {
-  if (checkEvaluatorCap) {
+  if (shouldCheckEvaluatorCap) {
     await enforceCreationLimit({
       prisma: ctx.prisma,
       projectId: targetProjectId,
