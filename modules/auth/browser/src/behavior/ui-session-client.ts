@@ -4,6 +4,7 @@
  * `/get-session` — an impersonating admin must see the customer's screens.
  */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
@@ -15,20 +16,6 @@ export const UI_SESSION_PATH = "/session";
 
 /** The cache key the session read is kept under. Not a tRPC procedure. */
 export const UI_SESSION_QUERY_KEY: readonly string[] = ["langwatch-ui", "auth", "session"];
-
-/**
- * As much of the auth client as a session read uses — structural, so the
- * real client satisfies it without a cast and a test can fake it.
- */
-export type UiAuthClient = {
-  $fetch: (path: string) => Promise<{ data?: unknown; error?: unknown }>;
-  /**
-   * Ends the session. Declared here because this client is the ONE
-   * identity instance in the document — a governed web package may not
-   * construct its own (`frontend-ui-boundaries` names `better-auth`).
-   */
-  signOut: () => Promise<unknown>;
-};
 
 let sharedClient: UiAuthClient | undefined;
 

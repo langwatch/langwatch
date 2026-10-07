@@ -2,7 +2,9 @@
  * Deployment static config injected into HTML; reads from host port via useAuthHost
  */
 
-import { useAuthHost, type AuthPublicEnvironment } from "../model/auth-host.ts";
+import type { AuthPublicEnvironment } from "@langwatch/auth-contract";
+
+import { useAuthHost } from "../model/auth-host.ts";
 
 type StaticEnvironmentResult = {
   data: AuthPublicEnvironment;

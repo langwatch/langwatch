@@ -6,7 +6,7 @@
  */
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
-import type { UiAuthClient } from "@langwatch/auth-browser/session";
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { createUiFeatureShell } from "@langwatch/browser/feature-shell";

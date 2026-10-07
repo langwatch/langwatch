@@ -4,6 +4,7 @@
  * loading is a permission that leaked. Where they stand is scope's (§10.1).
  */
 
+import type { UiAuthClient } from "@langwatch/auth-contract";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import type { UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
@@ -23,7 +24,6 @@ import {
   readUiActor,
   uiAuthClient,
   UI_SESSION_QUERY_KEY,
-  type UiAuthClient,
   type UiSessionReading as UiSessionResponse,
 } from "./ui-session-client";
 import {
