@@ -1487,6 +1487,9 @@ jobs:
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh
 
+      - name: Test detect-changes-source.sh
+        run: bash .github/scripts/__tests__/detect-changes-source.test.sh
+
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which
       # .github/** is not — so it would never start for a change to its own
