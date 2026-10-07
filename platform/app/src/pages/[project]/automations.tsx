@@ -22,6 +22,7 @@ import {
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { HoverableBigText } from "~/components/HoverableBigText";
+import { AggregateReadOnlyNotice } from "~/components/projects/AggregateReadOnlyNotice";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { Link } from "~/components/ui/link";
@@ -63,6 +64,7 @@ import { automationContextChip } from "~/features/langy/logic/langyContextChips"
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -124,6 +126,7 @@ const sectionFromPath = (pathname: string): AutomationSection => {
 
 function AutomationsPage() {
   const { project } = useOrganizationTeamProject();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const { openDrawer } = useDrawer();
   const router = useRouter();
   const section = sectionFromPath(router.pathname);
@@ -609,7 +612,11 @@ function AutomationsPage() {
             {details.description}
           </Text>
 
-          {isLoading ? (
+          {projectIsAggregate ? (
+            // An aggregate (ADR-144) runs nothing of its own, and the server
+            // refuses an automation created under it.
+            <AggregateReadOnlyNotice />
+          ) : isLoading ? (
             <Text textStyle="sm" color="fg.muted">
               Loading...
             </Text>

@@ -14,6 +14,7 @@ import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -304,14 +305,17 @@ export function CustomDashboardsSection({
           </Box>
         );
       })}
-      <Button
-        size="sm"
-        width="full"
-        variant="ghost"
-        onClick={handleCreateDashboard}
-      >
-        <Plus size={14} /> Add Dashboard
-      </Button>
+      {/* An aggregate (ADR-144) keeps no dashboards of its own. */}
+      {!isAggregateProjectKind(project?.kind) && (
+        <Button
+          size="sm"
+          width="full"
+          variant="ghost"
+          onClick={handleCreateDashboard}
+        >
+          <Plus size={14} /> Add Dashboard
+        </Button>
+      )}
     </>
   );
 }

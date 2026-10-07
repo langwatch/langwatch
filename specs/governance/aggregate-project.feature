@@ -385,3 +385,12 @@ Feature: An aggregate project reads its member projects
     And the trace drawer names the member project of the open trace
     And a member whose name ana's project list lacks is shown by its id
     And a plain project's trace list has no Project column
+
+  @integration
+  Scenario: The app marks the aggregate and offers no way to add data to it
+    When ana opens the project switcher
+    Then the aggregate carries an "Aggregate" badge, in the list and on the current project
+    When ana opens the aggregate project
+    Then no control offers to comment, suggest an edit, edit a trace, automate or add a dashboard
+    And its datasets and automations pages say "Data can't be added to this project" instead of offering to create one
+    And managing the aggregate itself stays available

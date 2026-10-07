@@ -21,8 +21,10 @@ const {
   mockLocalStorage,
   idleQuery,
   USER_ID,
+  grantedPermissions,
 } = vi.hoisted(() => ({
   mockOrganizationsQuery: vi.fn(),
+  grantedPermissions: { current: [] as string[] },
   idleQuery: () => ({
     data: undefined,
     isLoading: false,
@@ -50,7 +52,7 @@ vi.mock("~/utils/api", () => ({
     authz: {
       effectivePermissions: {
         useQuery: () => ({
-          data: { permissions: [] },
+          data: { permissions: grantedPermissions.current },
           isLoading: false,
           isFetched: true,
         }),
@@ -170,6 +172,7 @@ function renderResolution() {
 describe("useOrganizationTeamProject with an aggregate project", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    grantedPermissions.current = [];
     mockRouter.query = {};
     for (const key of Object.keys(mockLocalStorage)) {
       mockLocalStorage[key] = "";
@@ -219,6 +222,53 @@ describe("useOrganizationTeamProject with an aggregate project", () => {
         expect(result.current.project?.id).toBe(AGGREGATE.id);
         expect(mockLocalStorage.selectedProjectSlug).toBe(ORDINARY.slug);
         expect(mockLocalStorage.selectedTeamId).toBe("team-support");
+      });
+    });
+  });
+
+  describe("given an admin holding every permission", () => {
+    const ADMIN_PERMISSIONS = [
+      "traces:view",
+      "annotations:manage",
+      "triggers:manage",
+      "datasets:manage",
+      "analytics:manage",
+      "project:manage",
+    ];
+
+    beforeEach(() => {
+      grantedPermissions.current = ADMIN_PERMISSIONS;
+      mockOrganizationsQuery.mockReturnValue(
+        organizationFor({ aggregateTeamHoldsOnlyIt: false }),
+      );
+    });
+
+    describe("when the open project is the aggregate", () => {
+      /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+      it("denies every write the server refuses and keeps reads and managing the project", () => {
+        mockRouter.query = { project: AGGREGATE.slug };
+
+        const { result } = renderResolution();
+
+        expect(result.current.project?.id).toBe(AGGREGATE.id);
+        expect(result.current.hasPermission("annotations:manage")).toBe(false);
+        expect(result.current.hasPermission("triggers:manage")).toBe(false);
+        expect(result.current.hasPermission("datasets:manage")).toBe(false);
+        expect(result.current.hasPermission("analytics:manage")).toBe(false);
+        expect(result.current.hasPermission("traces:view")).toBe(true);
+        expect(result.current.hasPermission("project:manage")).toBe(true);
+      });
+    });
+
+    describe("when the open project is an ordinary one", () => {
+      it("grants the same writes", () => {
+        mockRouter.query = { project: ORDINARY.slug };
+
+        const { result } = renderResolution();
+
+        expect(result.current.project?.id).toBe(ORDINARY.id);
+        expect(result.current.hasPermission("annotations:manage")).toBe(true);
+        expect(result.current.hasPermission("triggers:manage")).toBe(true);
       });
     });
   });

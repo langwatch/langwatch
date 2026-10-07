@@ -6,7 +6,9 @@ import { Menu } from "~/components/ui/menu";
 import { useWorkspaceData } from "~/components/useWorkspaceData";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import type { ProductId } from "../products";
+import { AggregateProjectBadge } from "./AggregateProjectBadge";
 import { ProjectSwitcherCombobox } from "./ProjectSwitcherCombobox";
 import type { ProjectPickGroup } from "./projectPickItems";
 
@@ -92,6 +94,7 @@ function ProjectScopeMenu() {
     0,
   );
   const showTeamHeaders = orgTeams.length > 1;
+  const currentProjectIsAggregate = isAggregateProjectKind(project.kind);
 
   return (
     <>
@@ -101,6 +104,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -109,6 +113,7 @@ function ProjectScopeMenu() {
           groups={groups}
           currentProjectId={project.id}
           currentProjectName={project.name}
+          currentProjectIsAggregate={currentProjectIsAggregate}
           showTeamHeaders={showTeamHeaders}
           onCreateProjectForTeam={onCreateProjectForTeam}
         />
@@ -122,12 +127,14 @@ function ProjectMenu({
   groups,
   currentProjectId,
   currentProjectName,
+  currentProjectIsAggregate,
   showTeamHeaders,
   onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
+  currentProjectIsAggregate: boolean;
   showTeamHeaders: boolean;
   onCreateProjectForTeam:
     | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
@@ -150,6 +157,7 @@ function ProjectMenu({
         >
           <ProjectAvatar name={currentProjectName} />
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          {currentProjectIsAggregate && <AggregateProjectBadge />}
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Menu.Trigger>
@@ -174,6 +182,7 @@ function ProjectMenu({
                     <HStack gap={2} width="full">
                       <ProjectAvatar name={candidate.label} />
                       <Text flex={1}>{candidate.label}</Text>
+                      {candidate.isAggregate && <AggregateProjectBadge />}
                       {candidate.projectId === currentProjectId && (
                         <Check size={13} aria-label="Current project" />
                       )}

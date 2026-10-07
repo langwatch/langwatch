@@ -3,6 +3,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import { ProjectAvatar } from "~/components/ProjectAvatar";
 import { useRouter } from "~/utils/compat/next-router";
+import { AggregateProjectBadge } from "./AggregateProjectBadge";
 import { ProjectComboboxPopup } from "./ProjectSwitcherComboboxPopup";
 import {
   type ProjectPickGroup,
@@ -23,12 +24,14 @@ export function ProjectSwitcherCombobox({
   groups,
   currentProjectId,
   currentProjectName,
+  currentProjectIsAggregate = false,
   showTeamHeaders,
   onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
+  currentProjectIsAggregate?: boolean;
   showTeamHeaders: boolean;
   onCreateProjectForTeam:
     | (({ teamId, orgId }: { teamId: string; orgId: string }) => void)
@@ -81,7 +84,10 @@ export function ProjectSwitcherCombobox({
       positioning={{ placement: "bottom-start", gutter: 4 }}
       width="auto"
     >
-      <ProjectComboboxTrigger currentProjectName={currentProjectName} />
+      <ProjectComboboxTrigger
+        currentProjectName={currentProjectName}
+        currentProjectIsAggregate={currentProjectIsAggregate}
+      />
       <ProjectComboboxPopup
         visibleGroups={visibleGroups}
         showTeamHeaders={showTeamHeaders}
@@ -94,8 +100,10 @@ export function ProjectSwitcherCombobox({
 /** The chip that opens the popup, styled the same as the plain menu's. */
 function ProjectComboboxTrigger({
   currentProjectName,
+  currentProjectIsAggregate,
 }: {
   currentProjectName: string;
+  currentProjectIsAggregate: boolean;
 }) {
   return (
     // Ark positions the listbox against the CONTROL, so the trigger
@@ -116,6 +124,7 @@ function ProjectComboboxTrigger({
         >
           <ProjectAvatar name={currentProjectName} />
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          {currentProjectIsAggregate && <AggregateProjectBadge />}
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Combobox.Trigger>

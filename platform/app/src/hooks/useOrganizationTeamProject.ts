@@ -11,6 +11,7 @@ import {
   isAggregateProjectKind,
   landingProjectOf,
 } from "~/server/app-layer/projects/project-kinds";
+import { writesUnderProject } from "~/server/app-layer/projects/project-write-guard";
 import { useRouter } from "~/utils/compat/next-router";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
@@ -548,15 +549,25 @@ export const useOrganizationTeamProject = (
     () => new Set(effectivePermissionsQuery.data?.permissions),
     [effectivePermissionsQuery.data?.permissions],
   );
+  // ADR-144 decision 8: the server refuses every write under an aggregate
+  // project, whatever the caller's role. The client asks the same question of
+  // the same predicate, so no control offers a write the server will refuse,
+  // while managing the aggregate itself (its name, rule, team) stays open.
+  const projectIsAggregate = isAggregateProjectKind(finalProject?.kind);
   const hasPermission = useCallback(
     (permission: AuthzPermission): boolean => {
       if (!effectivePermissionsQuery.data?.permissions) return false;
+      if (projectIsAggregate && writesUnderProject(permission)) return false;
       return permissionSatisfiedBy({
         granted: effectivePermissions,
         requested: permission,
       });
     },
-    [effectivePermissions, effectivePermissionsQuery.data?.permissions],
+    [
+      effectivePermissions,
+      effectivePermissionsQuery.data?.permissions,
+      projectIsAggregate,
+    ],
   );
   const hasOrgPermission = hasPermission;
   const hasAnyPermission = hasPermission;

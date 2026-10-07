@@ -1,6 +1,7 @@
 import { Box, Combobox, HStack, Portal } from "@chakra-ui/react";
 import { Check, Plus, Search } from "lucide-react";
 import { ProjectAvatar } from "~/components/ProjectAvatar";
+import { AggregateProjectBadge } from "./AggregateProjectBadge";
 import type { ProjectPickGroup, ProjectPickItem } from "./projectPickItems";
 
 /**
@@ -127,6 +128,7 @@ function ProjectItemRow({
         <Combobox.ItemText flex={1} truncate>
           {item.label}
         </Combobox.ItemText>
+        {item.isAggregate && <AggregateProjectBadge />}
         {isCurrent && <Check size={13} aria-label="Current project" />}
       </HStack>
     </Combobox.Item>
