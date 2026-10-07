@@ -1,6 +1,6 @@
 /**
  * A literal route under another module's claimed prefix says so (ARCHITECTURE.md §8, R10).
- * Spec: specs/api/rest-namespace-owners.feature.
+ * Spec: packages/architecture-enforcer/specs/rest-namespace-owners.feature.
  */
 import { moduleApi, type ModuleName } from "@langwatch/module";
 import { describe, expect, it } from "vitest";

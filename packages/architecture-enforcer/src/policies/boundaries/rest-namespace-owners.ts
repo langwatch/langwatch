@@ -18,7 +18,8 @@ const SCANNED = ["modules", "enterprise/modules"];
 const REST_TRANSPORT = /\/process\/src\/(?:.+\/)?[^/]+\.rest\.ts$/;
 const ROUTE_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 const VERSION_SEGMENT = /^v\d+$/;
-const RECORD = "See dev/docs/ARCHITECTURE.md §8 and specs/api/rest-namespace-owners.feature.";
+const RECORD =
+  "See dev/docs/ARCHITECTURE.md §8 and packages/architecture-enforcer/specs/rest-namespace-owners.feature.";
 
 /** One route a REST transport declares, with the namespace its path sits in. */
 export type DeclaredRestRoute = {

@@ -1570,7 +1570,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   `permanent: true`, and the route registry lists them (`RegisteredRoute.sharedPath`). A literal
   route under a prefix another module's family claims, undeclared or naming the wrong owner, is
   refused at mount; the `rest-namespace-owners` policy holds every route to the map (Alex,
-  2026-10-05 night and 2026-10-06, R10; `specs/api/rest-namespace-owners.feature`).
+  2026-10-05 night and 2026-10-06, R10; `packages/architecture-enforcer/specs/rest-namespace-owners.feature`).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an

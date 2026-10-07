@@ -199,7 +199,7 @@ export const POLICIES: readonly PolicyDefinition[] = [
   }),
   definePolicy({
     id: "rest-namespace-owners",
-    spec: "specs/api/rest-namespace-owners.feature",
+    spec: "specs/rest-namespace-owners.feature",
     run: lintRestNamespaceOwners,
   }),
   definePolicy({
