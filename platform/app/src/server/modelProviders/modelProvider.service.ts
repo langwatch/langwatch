@@ -1075,10 +1075,8 @@ export class ModelProviderService {
     });
     if (!imports) return undefined;
 
-    const envKey = process.env[definition.apiKey];
-    if (!keys[definition.apiKey]?.trim() && envKey) {
-      keys[definition.apiKey] = envKey;
-    }
+    // No environment fallback for the key: the base URL is the customer's
+    // choice, and a deployment-wide key must never be sent to it.
     return keys;
   }
 
