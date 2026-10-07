@@ -5,7 +5,6 @@ import {
   type ConversationTurn,
   useConversationContext,
 } from "../../../hooks/useConversationContext";
-import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import {
   type LoadedTurn,
   mergeSessionTurns,
@@ -215,16 +214,16 @@ async function loadTurnIntoLedger({
  */
 function useTurnLedger({
   projectId,
+  tenantId,
   traceId,
   conversationId,
 }: {
   projectId: string;
+  tenantId: string | null;
   traceId: string;
   conversationId: string | null | undefined;
 }): { current: Ledger; loadTurn: (target: TurnTarget) => void } {
   const utils = api.useUtils();
-  // On an aggregate the session's turns are the member's the drawer is on.
-  const { tenantId } = useTraceQueryArgs();
   const key = ledgerKeyOf({ projectId, traceId, conversationId, tenantId });
   const [ledger, setLedger] = useState<Ledger>(() => ({
     key,
@@ -305,6 +304,11 @@ function useMergedTurns({
 /** What the tab knows about the turn it opened on. */
 interface SessionScrollbackInput {
   projectId: string;
+  /**
+   * On an aggregate, the member the drawer is on: the session's earlier turns
+   * are that member's. Null on a plain project, whose reads are unchanged.
+   */
+  tenantId: string | null;
   traceId: string;
   occurredAtMs?: number;
   /** The agent's session id, which is the conversation these turns share. */
@@ -451,6 +455,7 @@ function ledgerKeyOf({
  */
 export function useSessionScrollback({
   projectId,
+  tenantId,
   traceId,
   occurredAtMs,
   conversationId,
@@ -461,7 +466,12 @@ export function useSessionScrollback({
     conversationId,
     traceId,
   );
-  const ledger = useTurnLedger({ projectId, traceId, conversationId });
+  const ledger = useTurnLedger({
+    projectId,
+    tenantId,
+    traceId,
+    conversationId,
+  });
   const { current, loadTurn } = ledger;
 
   const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({

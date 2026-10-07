@@ -53,8 +53,11 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
+  // On an aggregate, the member the drawer is on: the opened turn and the
+  // session's earlier turns are both read from it.
+  const { tenantId } = useTraceQueryArgs();
   const { transcriptQuery, spansQuery, eventsQuery, resourceQuery } =
-    useTurnReads({ projectId, traceId, occurredAtMs });
+    useTurnReads({ projectId, traceId, occurredAtMs, tenantId });
   const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
@@ -77,6 +80,7 @@ export function TerminalTab({
 
   const session = useSessionScrollback({
     projectId,
+    tenantId,
     traceId,
     occurredAtMs,
     conversationId,
@@ -150,8 +154,10 @@ function useTurnReads({
   projectId,
   traceId,
   occurredAtMs,
-}: Pick<TerminalTabProps, "projectId" | "traceId" | "occurredAtMs">) {
-  const { tenantId } = useTraceQueryArgs();
+  tenantId,
+}: Pick<TerminalTabProps, "projectId" | "traceId" | "occurredAtMs"> & {
+  tenantId: string | null;
+}) {
   const input = {
     projectId,
     traceId,
