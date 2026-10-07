@@ -166,6 +166,19 @@ describe("UsageStatsService", () => {
       });
     });
 
+    describe("when a Free organization is over both member and Lite Member seats", () => {
+      it("names both overages in the message", async () => {
+        givenPlanAndSeats({ plan: SAAS_FREE_PLAN, members: 3, lite: 1 });
+
+        const stats = await service.getUsageStats("org-123", testUser);
+
+        expect(stats.seatLimitInfo.status).toBe("exceeded");
+        expect(stats.seatLimitInfo.message).toBe(
+          "Your organization uses 3 member seats and your plan includes 2 member seats. Your organization uses 1 Lite Member seat and your plan includes no Lite Member seats.",
+        );
+      });
+    });
+
     describe("when the organization uses exactly the seats the plan includes", () => {
       /** @scenario "Seat usage within the plan's limits is not reported as exceeded" */
       it("reports the seat limit as ok", async () => {

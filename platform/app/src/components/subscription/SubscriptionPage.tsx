@@ -37,7 +37,6 @@ import {
   classifyMemberType,
   type MemberType,
 } from "~/server/license-enforcement/member-classification";
-import { buildSeatLimitInfo } from "~/server/license-enforcement/seat-limit";
 import { api } from "~/utils/api";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
@@ -58,7 +57,6 @@ import { InvoicesBlock } from "./InvoicesBlock";
 import { SeatLimitCallout } from "./SeatLimitCallout";
 import {
   countFullMembers,
-  countLiteMembers,
   type DrawerSaveResult,
   formatPlanTypeLabel,
   type PlannedUser,
@@ -116,6 +114,12 @@ export function SubscriptionPage() {
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
+  // Seat limit state as enforcement counts it (custom roles, open invites)
+  const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );
@@ -202,19 +206,9 @@ export function SubscriptionPage() {
   const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
-  // Seats in use before any change planned in the drawer: members plus open
-  // invites, the way enforcement counts them. Above the plan, the organization
-  // is offered the upgrade (or more seats) up front.
-  const seatLimitInfo = plan
-    ? buildSeatLimitInfo({
-        plan,
-        membersCount:
-          existingCoreMembers + countFullMembers(pendingInvitesWithMemberType),
-        membersLiteCount:
-          countLiteMembers(users) +
-          countLiteMembers(pendingInvitesWithMemberType),
-      })
-    : undefined;
+  // Above the plan's seats, the organization is offered the upgrade (or more
+  // seats) up front instead of waiting for an invite to be refused.
+  const seatLimitInfo = usage.data?.seatLimitInfo;
   const isOverPlanSeats = seatLimitInfo?.status === "exceeded";
 
   const {
@@ -408,8 +402,7 @@ export function SubscriptionPage() {
       isLicenseOverride) &&
     !isEnterprisePlan;
   const isUpgradePlanRequiredForFreePlan =
-    ((isDeveloperPlan &&
-      (plannedUsers.length > 0 || deletedSeatCount > 0 || isOverPlanSeats)) ||
+    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0)) ||
       isTieredLegacyPaidPlan) &&
     !isEnterprisePlan;
 

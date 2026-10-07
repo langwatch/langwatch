@@ -64,6 +64,11 @@ vi.mock("~/utils/api", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     api: {
+      limits: {
+        getUsage: {
+          useQuery: () => setup.mockGetUsage(),
+        },
+      },
       plan: {
         getActivePlan: {
           useQuery: () => setup.mockGetActivePlan(),

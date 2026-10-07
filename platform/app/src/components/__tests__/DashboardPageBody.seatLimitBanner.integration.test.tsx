@@ -23,6 +23,7 @@ const { membership, reload, usage, trackEvent } = vi.hoisted(() => ({
           maxMonthlyUsageLimit: number;
           messageLimitInfo: { status: "ok"; message: string };
           seatLimitInfo: { status: SeatLimitStatus; message: string };
+          activePlan: { type: string };
         }
       | undefined,
   },
@@ -32,15 +33,18 @@ const { membership, reload, usage, trackEvent } = vi.hoisted(() => ({
 const givenSeatLimit = ({
   status,
   message,
+  planType = "FREE",
 }: {
   status: SeatLimitStatus;
   message: string;
+  planType?: string;
 }) => {
   usage.data = {
     currentMonthCost: 0,
     maxMonthlyUsageLimit: 100,
     messageLimitInfo: { status: "ok", message: "" },
     seatLimitInfo: { status, message },
+    activePlan: { type: planType },
   };
 };
 
@@ -202,6 +206,25 @@ describe("<DashboardPageBody/> seat limit banner", () => {
         project_id: "proj_1",
         hook: "seats_limit_exceeded",
       });
+    });
+  });
+
+  describe("when an Enterprise organization uses more seats than it bought", () => {
+    it("offers to contact sales instead of an upgrade", () => {
+      givenSeatLimit({
+        status: "exceeded",
+        message: "Over the limit.",
+        planType: "ENTERPRISE",
+      });
+
+      renderPage();
+
+      expect(screen.getByTestId("seat-limit-banner")).toHaveTextContent(
+        "Over the limit. Contact sales to add seats.",
+      );
+      expect(
+        screen.queryByRole("link", { name: "Upgrade your plan" }),
+      ).toBeNull();
     });
   });
 

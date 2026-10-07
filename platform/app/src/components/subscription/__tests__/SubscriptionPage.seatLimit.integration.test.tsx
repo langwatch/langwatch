@@ -16,6 +16,7 @@ import {
   mockGetActivePlan,
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
+  mockGetUsage,
   mockOrganizationMembers,
   resetMocks,
 } from "./subscription-test-setup";
@@ -65,6 +66,11 @@ vi.mock("~/utils/api", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     api: {
+      limits: {
+        getUsage: {
+          useQuery: () => setup.mockGetUsage(),
+        },
+      },
       plan: {
         getActivePlan: {
           useQuery: () => setup.mockGetActivePlan(),
@@ -164,6 +170,13 @@ const givenMembers = (
   });
 };
 
+const givenSeatLimitExceeded = (message: string) => {
+  mockGetUsage.mockReturnValue({
+    data: { seatLimitInfo: { status: "exceeded", message } },
+    isLoading: false,
+  });
+};
+
 const invite = ({
   id,
   displayStatus,
@@ -195,6 +208,9 @@ describe("<SubscriptionPage/> seat limit", () => {
   describe("when a Free organization has more members than the plan includes", () => {
     beforeEach(() => {
       givenMembers([{ id: "user-3", role: "MEMBER" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+      );
     });
 
     /** @scenario "The billing page marks an upgrade as required when seats are over the plan" */
@@ -225,6 +241,9 @@ describe("<SubscriptionPage/> seat limit", () => {
         isLoading: false,
         refetch: vi.fn(),
       });
+      givenSeatLimitExceeded(
+        "Your organization uses 1 Lite Member seat and your plan includes no Lite Member seats.",
+      );
     });
 
     /** @scenario "The billing page counts Lite Members above the plan as over the limit" */
@@ -324,6 +343,9 @@ describe("<SubscriptionPage/> seat limit", () => {
         refetch: vi.fn(),
       });
       givenMembers([{ id: "user-3", role: "MEMBER" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+      );
     });
 
     it("offers to add seats", async () => {

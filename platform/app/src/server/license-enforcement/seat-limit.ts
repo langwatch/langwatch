@@ -1,6 +1,6 @@
 /**
- * Seat limit state shared by the server usage stats and the billing page.
- * Framework-free and server-free so the client can import it.
+ * Seat limit state reported with an organization's usage stats, read by the
+ * app-wide banner and the billing page.
  *
  * @see specs/licensing/subscription-page.feature
  */

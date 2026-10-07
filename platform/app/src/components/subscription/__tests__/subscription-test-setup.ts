@@ -143,6 +143,18 @@ export const mockGetPendingInvites = vi.fn(() => ({
   isLoading: false,
 }));
 
+export type MockSeatLimitInfo = {
+  status: "ok" | "exceeded";
+  message: string;
+};
+
+export const mockGetUsage = vi.fn(() => ({
+  data: {
+    seatLimitInfo: { status: "ok", message: "" } as MockSeatLimitInfo,
+  },
+  isLoading: false,
+}));
+
 export const mockDetectCurrency = vi.fn(() => ({
   data: { currency: "EUR" as "EUR" | "USD" },
   isLoading: false,
@@ -191,6 +203,10 @@ export function resetMocks() {
   });
   mockGetPendingInvites.mockReturnValue({
     data: [],
+    isLoading: false,
+  });
+  mockGetUsage.mockReturnValue({
+    data: { seatLimitInfo: { status: "ok", message: "" } },
     isLoading: false,
   });
   mockDetectCurrency.mockReturnValue({
