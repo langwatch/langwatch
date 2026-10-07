@@ -253,6 +253,7 @@ Feature: An aggregate project reads its member projects
     Given an aggregate project with three members
     When ana opens its trace list
     Then traces from all three members are listed as first-class rows
+    And each row names the member project that owns it
 
   @integration
   Scenario: A member trace opens in detail under the aggregate
@@ -261,6 +262,16 @@ Feature: An aggregate project reads its member projects
     Then the detail page shows the trace's spans
     And the owning project is shown as the member, not the aggregate
     And the detail read uses the proof, not the shown project id, to pick its tenants
+
+  @integration
+  Scenario: A trace id held by two members opens the member it was listed under
+    Given an aggregate project whose two members each hold a trace with the same id
+    When ana opens that trace from the first member's row
+    Then the header, the spans and the evaluations all come from the first member
+    And opening it with no member named picks the same member on every read
+    # One trace can cross project lines, so the id alone does not say whose
+    # half it is. The proof is narrowed to one of its own tenants; a tenant
+    # outside the proof is refused rather than read.
 
   @integration
   Scenario: Analytics aggregate across members
@@ -274,13 +285,22 @@ Feature: An aggregate project reads its member projects
     When ana opens that trace from the aggregate
     Then the evaluation result is shown
     And no evaluation runs from the aggregate
+    And an evaluation of another member's trace with the same id is not shown
 
   @unit
   Scenario: A trace route without a proof fails the build
     When a trace route reaches a trace service without minting a proof
     Then the lint gate fails
     # Twenty call sites in the trace router today pass the project id by
-    # hand. After this block none do, and the gate keeps it so.
+    # hand. After this block none do, and the gate keeps it so. A route left
+    # behind the baseline is listed by name with its owner and reason.
+
+  @integration
+  Scenario: An aggregate is never the project the app lands on
+    Given ana belongs to an aggregate project and an ordinary project
+    When the app picks a project for ana because none was chosen
+    Then it picks the ordinary project
+    # An admin opens the aggregate on purpose, from the project switcher.
 
   # ── G. Privacy and audit ─────────────────────────────────────────────────
 
