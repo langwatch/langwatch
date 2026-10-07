@@ -492,6 +492,54 @@ describe("Feature: the reconciler keeps members current", () => {
   });
 
   describe("given aggregate projects whose members no reconcile has attached yet", () => {
+    describe("when one reconcile attaches several members", () => {
+      it("waits for the projection once and lands every member", async () => {
+        const aggregate = await prisma.project.create({
+          data: {
+            name: `Batched view ${fixture.ns}`,
+            slug: `--test-batched-aggregate-${fixture.ns}`,
+            apiKey: `test-key-batched-aggregate-${fixture.ns}`,
+            teamId: fixture.team.id,
+            language: "other",
+            framework: "other",
+            kind: AGGREGATE_PROJECT_KIND,
+            aggregateRule: {
+              kind: "explicit",
+              projectIds: [
+                fixture.shared.id,
+                fixture.personal.engineer.id,
+                fixture.personal.seller.id,
+              ],
+            },
+          },
+        });
+        const waits = vi.spyOn(
+          GrantsLedgerWriter.prototype,
+          "awaitSharedProjectGrants",
+        );
+
+        try {
+          const result = await reconciler.reconcile({
+            aggregateProjectId: aggregate.id,
+          });
+
+          expect(result.attached).toHaveLength(3);
+          expect(result.failed).toEqual([]);
+          expect(waits).toHaveBeenCalledTimes(1);
+          expect(waits.mock.calls[0]?.[0].grantIds).toHaveLength(3);
+          expect(await liveMembersOf(aggregate.id)).toEqual(
+            [
+              fixture.shared.id,
+              fixture.personal.engineer.id,
+              fixture.personal.seller.id,
+            ].sort(),
+          );
+        } finally {
+          waits.mockRestore();
+        }
+      });
+    });
+
     describe("when two reconciles of the same aggregate run at once", () => {
       it("Two reconciles at once leave one live row per pair", async () => {
         // Three races in a row: one can be won cleanly by luck, three rarely

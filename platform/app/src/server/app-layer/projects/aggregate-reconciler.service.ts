@@ -38,6 +38,7 @@ export type SharedProjectGrantsLedger = Pick<
   GrantsLedgerWriter,
   | "findLiveSharedProjectGrants"
   | "attachSharedProjectGrant"
+  | "awaitSharedProjectGrants"
   | "revokeSharedProjectGrants"
 >;
 
@@ -47,11 +48,15 @@ export type AggregateSweepSchedule = Pick<
   "upsertForTarget" | "deactivateForTarget" | "findAllForProject"
 >;
 
-/** Member project ids, each in exactly one list. */
+/**
+ * Member project ids, each in exactly one list. `failed` are members the rule
+ * wants whose attach was refused; the next reconcile tries them again.
+ */
 export type AggregateReconcileResult = {
   attached: string[];
   revoked: string[];
   unchanged: string[];
+  failed: string[];
 };
 
 export type OrganizationReconcileResult = {
@@ -76,6 +81,7 @@ const NOTHING: AggregateReconcileResult = {
   attached: [],
   revoked: [],
   unchanged: [],
+  failed: [],
 };
 
 const ACTOR = {
@@ -180,25 +186,20 @@ export class AggregateReconciler {
     }
 
     const unchanged = [...held].filter((id) => desired.has(id));
-    const attached: string[] = [];
-    const from = this.now().toISOString();
-    for (const memberProjectId of [...desired].sort()) {
-      if (held.has(memberProjectId)) continue;
-      const outcome = await ledger.attachSharedProjectGrant({
-        organizationId,
-        readerProjectId: aggregateProjectId,
-        memberProjectId,
-        condition: { type: "trace", from },
-        actor: ACTOR,
-        source: "aggregate-reconciler",
-      });
-      // Someone else attached the pair since the read above (a direct
-      // ledger write, not another reconcile, which the lock keeps out); its
-      // row is the one that stands.
-      (outcome.attached ? attached : unchanged).push(memberProjectId);
-    }
+    const { attached, alreadyHeld, failed } = await this.attachMissing({
+      ledger,
+      organizationId,
+      aggregateProjectId,
+      missing: [...desired].filter((id) => !held.has(id)).sort(),
+    });
+    unchanged.push(...alreadyHeld);
 
-    const result = { attached, revoked, unchanged: unchanged.sort() };
+    const result: AggregateReconcileResult = {
+      attached,
+      revoked,
+      unchanged: unchanged.sort(),
+      failed,
+    };
     logger.info(
       {
         organizationId,
@@ -207,10 +208,81 @@ export class AggregateReconciler {
         attached: result.attached.length,
         revoked: result.revoked.length,
         unchanged: result.unchanged.length,
+        failed: result.failed.length,
       },
       "reconciled aggregate project members",
     );
     return result;
+  }
+
+  /**
+   * Attaches each missing member, then waits once for the whole batch: each
+   * attach appends without waiting for its row, so ten members cost one
+   * projection wait rather than ten. One refused attach is logged and listed,
+   * and the rest still go ahead.
+   */
+  private async attachMissing({
+    ledger,
+    organizationId,
+    aggregateProjectId,
+    missing,
+  }: {
+    ledger: SharedProjectGrantsLedger;
+    organizationId: string;
+    aggregateProjectId: string;
+    missing: string[];
+  }): Promise<{ attached: string[]; alreadyHeld: string[]; failed: string[] }> {
+    const attached: Array<{ memberProjectId: string; grantId: string }> = [];
+    const alreadyHeld: string[] = [];
+    const failed: Array<{ memberProjectId: string; error: Error }> = [];
+    const from = this.now().toISOString();
+    for (const memberProjectId of missing) {
+      try {
+        const outcome = await ledger.attachSharedProjectGrant({
+          organizationId,
+          readerProjectId: aggregateProjectId,
+          memberProjectId,
+          condition: { type: "trace", from },
+          actor: ACTOR,
+          source: "aggregate-reconciler",
+          awaitProjection: false,
+        });
+        // Someone else attached the pair since the live read (a direct
+        // ledger write, not another reconcile, which the lock keeps out);
+        // its row is the one that stands.
+        if (outcome.attached) {
+          attached.push({ memberProjectId, grantId: outcome.grantId });
+        } else {
+          alreadyHeld.push(memberProjectId);
+        }
+      } catch (error) {
+        failed.push({ memberProjectId, error: toError(error) });
+      }
+    }
+    const [firstFailure] = failed;
+    if (firstFailure) {
+      logger.error(
+        {
+          organizationId,
+          aggregateProjectId,
+          failed: failed.length,
+          error: firstFailure.error,
+        },
+        "some members of an aggregate project could not be attached; the next reconcile tries them again",
+      );
+      captureException(firstFailure.error, {
+        extra: { organizationId, aggregateProjectId, failed: failed.length },
+      });
+    }
+    await ledger.awaitSharedProjectGrants({
+      organizationId,
+      grantIds: attached.map((row) => row.grantId),
+    });
+    return {
+      attached: attached.map((row) => row.memberProjectId),
+      alreadyHeld,
+      failed: failed.map((row) => row.memberProjectId),
+    };
   }
 
   /**

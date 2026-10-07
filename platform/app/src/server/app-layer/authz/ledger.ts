@@ -773,6 +773,37 @@ export class GrantsLedgerWriter {
   }
 
   /**
+   * The one read-your-writes wait for a batch of shared reads attached with
+   * `awaitProjection: false`, so a reconciler attaching ten members waits
+   * once rather than ten times. Bumps the epoch after the rows land: each
+   * attach bumped it on append, before its row existed, and a snapshot cached
+   * in between would otherwise miss the read until the next bump. Throws
+   * {@link AuthzGrantNotConfirmedError} when the rows do not land in time;
+   * the appends are durable either way.
+   */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: async () => {
+        const present = await liveGrants(this.prisma).findMany({
+          where: { organizationId, id: { in: [...grantIds] } },
+          select: { id: true },
+        });
+        return present.length === grantIds.length;
+      },
+    });
+    await bumpAuthzEpoch({ organizationId });
+  }
+
+  /**
    * The live shared reads one reader project holds, one per member project.
    * The condition is not read: what the reconciler compares is which members
    * hold a row, and a row whose condition no longer parses is still a row it

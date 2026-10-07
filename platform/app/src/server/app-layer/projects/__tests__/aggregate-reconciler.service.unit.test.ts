@@ -52,8 +52,13 @@ function inMemoryLedger(
     condition: { type: "trace", from: "2026-01-01T00:00:00.000Z" },
   }));
   const revoked: LiveRow[] = [];
+  /** Each convergence wait, by the grant ids it waited for. */
+  const waits: string[][] = [];
   let minted = 0;
   const ledger: SharedProjectGrantsLedger = {
+    async awaitSharedProjectGrants({ grantIds }) {
+      waits.push([...grantIds]);
+    },
     async findLiveSharedProjectGrants({ readerProjectId }) {
       return rows
         .filter((row) => row.readerProjectId === readerProjectId)
@@ -100,7 +105,7 @@ function inMemoryLedger(
       return out.map((row) => row.grantId);
     },
   };
-  return { ledger, rows, revoked };
+  return { ledger, rows, revoked, waits };
 }
 
 function aggregatesOf(
@@ -199,6 +204,7 @@ describe("AggregateReconciler", () => {
           attached: ["p_a", "p_b"],
           revoked: [],
           unchanged: [],
+          failed: [],
         });
         expect(rows.map((row) => row.condition)).toEqual([
           { type: "trace", from: NOW.toISOString() },
@@ -232,6 +238,7 @@ describe("AggregateReconciler", () => {
           attached: [],
           revoked: ["p_gone"],
           unchanged: ["p_a"],
+          failed: [],
         });
         expect(revoked).toEqual([
           expect.objectContaining({
@@ -243,9 +250,53 @@ describe("AggregateReconciler", () => {
     });
   });
 
+  describe("given an aggregate whose rule wants three members it does not hold", () => {
+    describe("when it is reconciled", () => {
+      it("waits for the projection once, for all three", async () => {
+        const { ledger, waits } = inMemoryLedger();
+
+        await reconcilerFor({
+          ledger,
+          members: { "all-personal": ["p_a", "p_b", "p_c"] },
+        }).reconcile({ aggregateProjectId: "agg_1" });
+
+        expect(waits).toEqual([["grant_1", "grant_2", "grant_3"]]);
+      });
+    });
+
+    describe("when the second member's attach is refused", () => {
+      it("attaches the other two, waits once for them, and lists the refused one", async () => {
+        const { ledger, rows, waits } = inMemoryLedger();
+        const refusingOne: SharedProjectGrantsLedger = {
+          ...ledger,
+          async attachSharedProjectGrant(params) {
+            if (params.memberProjectId === "p_b") {
+              throw new Error("grant validation failed");
+            }
+            return ledger.attachSharedProjectGrant(params);
+          },
+        };
+
+        const result = await reconcilerFor({
+          ledger: refusingOne,
+          members: { "all-personal": ["p_a", "p_b", "p_c"] },
+        }).reconcile({ aggregateProjectId: "agg_1" });
+
+        expect(result).toEqual({
+          attached: ["p_a", "p_c"],
+          revoked: [],
+          unchanged: [],
+          failed: ["p_b"],
+        });
+        expect(rows.map((row) => row.memberProjectId)).toEqual(["p_a", "p_c"]);
+        expect(waits).toEqual([["grant_1", "grant_2"]]);
+      });
+    });
+  });
+
   describe("given a member to revoke and one to attach whose attach fails", () => {
     describe("when it is reconciled", () => {
-      it("has already revoked the member that stopped matching", async () => {
+      it("has still revoked the member that stopped matching, and lists the failure", async () => {
         const { ledger, revoked } = inMemoryLedger([
           { readerProjectId: "agg_1", memberProjectId: "p_gone" },
         ]);
@@ -256,12 +307,17 @@ describe("AggregateReconciler", () => {
           },
         };
 
-        await expect(
-          reconcilerFor({
-            ledger: failingAttach,
-            members: { "all-personal": ["p_new"] },
-          }).reconcile({ aggregateProjectId: "agg_1" }),
-        ).rejects.toThrow("ledger unavailable");
+        const result = await reconcilerFor({
+          ledger: failingAttach,
+          members: { "all-personal": ["p_new"] },
+        }).reconcile({ aggregateProjectId: "agg_1" });
+
+        expect(result).toEqual({
+          attached: [],
+          revoked: ["p_gone"],
+          unchanged: [],
+          failed: ["p_new"],
+        });
         expect(revoked.map((row) => row.memberProjectId)).toEqual(["p_gone"]);
       });
     });
@@ -283,6 +339,7 @@ describe("AggregateReconciler", () => {
           attached: [],
           revoked: [],
           unchanged: ["p_a", "p_b"],
+          failed: [],
         });
         expect(rows).toEqual(before);
       });
@@ -301,7 +358,7 @@ describe("AggregateReconciler", () => {
           stored: [aggregate({ rule: null })],
         }).reconcile({ aggregateProjectId: "agg_1" });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [] });
+        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
         expect(rows).toHaveLength(1);
         expect(revoked).toHaveLength(0);
       });
@@ -318,7 +375,7 @@ describe("AggregateReconciler", () => {
           stored: [aggregate({ archived: true })],
         }).reconcile({ aggregateProjectId: "agg_1" });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [] });
+        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
         expect(rows).toHaveLength(0);
       });
     });
@@ -333,7 +390,7 @@ describe("AggregateReconciler", () => {
           aggregateProjectId: "p_ordinary",
         });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [] });
+        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
         expect(rows).toHaveLength(0);
       });
     });
@@ -367,7 +424,12 @@ describe("AggregateReconciler", () => {
         expect(outcome.reconciled).toEqual([
           {
             aggregateProjectId: "agg_ok",
-            result: { attached: ["p_a", "p_b"], revoked: [], unchanged: [] },
+            result: {
+              attached: ["p_a", "p_b"],
+              revoked: [],
+              unchanged: [],
+              failed: [],
+            },
           },
         ]);
         expect(rows.every((row) => row.readerProjectId === "agg_ok")).toBe(
