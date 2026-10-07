@@ -188,4 +188,8 @@ export class PresenceModule implements PresenceApiContract, PresenceBroadcastFab
     const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
     return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
   }
+
+  upgradeReadHints({ signal }: { signal?: AbortSignal }): AsyncIterable<ReadHint> {
+    return this.#readHints.watchUpgrades(signal === undefined ? {} : { signal });
+  }
 }
