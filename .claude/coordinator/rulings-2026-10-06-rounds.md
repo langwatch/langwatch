@@ -187,3 +187,4 @@ Questions and options: `.claude/coordinator/ask-rounds-2026-10-06.json` (index i
 - Docs and env vars: operator docs and migration env vars updated to the new behaviour (lane upgrade-skills-docs).
 - The PR body and issue #8493 stay in sync with every batch.
 - At most 15 to 20 more questions tonight, prioritised to unblock nearly-ready lanes.
+- Refuse-above seam (P8484-R1 wiring, coordinator default under the ruling): TraceApi.listTraces gains `options.refuseAbove?: "tracesPageSizeMax" | "tracesDownloadPageSizeMax"`; the tRPC list and download set it, REST keeps clamping; no new *Api operation.
