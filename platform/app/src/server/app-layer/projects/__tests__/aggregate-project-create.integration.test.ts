@@ -11,12 +11,20 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { AGGREGATE_DEFAULT_RULE, aggregateRuleSchema } from "../aggregate-rule";
 import { AggregateRuleService } from "../aggregate-rule.service";
 import { AGGREGATE_PROJECT_KIND } from "../project-kinds";
@@ -136,6 +144,72 @@ describe("Feature: an admin creates an aggregate project", () => {
       expect(
         await prisma.project.count({ where: { teamId: fixture.team.id } }),
       ).toBe(before);
+    });
+  });
+
+  describe("when an admin of two organisations names the other one's team", () => {
+    it("is refused and writes no project and no grant", async () => {
+      const foreign = await seedAggregateOrganization(prisma, {
+        label: "agg-create-foreign-team",
+      });
+      try {
+        // Someone who manages both organisations passes every permission
+        // check, so only the team's own organisation can refuse this.
+        const dualAdmin = await fixture.makeUser({
+          handle: "dual-admin",
+          organizationRole: OrganizationUserRole.ADMIN,
+        });
+        await prisma.organizationUser.create({
+          data: {
+            userId: dualAdmin.id,
+            organizationId: foreign.organizationId,
+            role: OrganizationUserRole.ADMIN,
+          },
+        });
+        await seedRoleBinding(prisma, {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: foreign.organizationId,
+          userId: dualAdmin.id,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: foreign.organizationId,
+        });
+        const sharedReadsIn = (organizationId: string) =>
+          prisma.grant.count({
+            where: { organizationId, principalType: "PROJECT" },
+          });
+        const before = {
+          projects: await prisma.project.count({
+            where: { teamId: foreign.team.id },
+          }),
+          grants: await sharedReadsIn(foreign.organizationId),
+          ownGrants: await sharedReadsIn(fixture.organizationId),
+        };
+
+        await expect(
+          callerFor(dualAdmin.id).project.create({
+            organizationId: fixture.organizationId,
+            teamId: foreign.team.id,
+            name: "Outsider view",
+            language: "other",
+            framework: "other",
+            kind: AGGREGATE_PROJECT_KIND,
+          }),
+          // The scope lineage guard refuses ids from two organisations before
+          // any permission check, shaped as an ordinary denial so the refusal
+          // cannot tell a caller which organisation the team is in.
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        expect({
+          projects: await prisma.project.count({
+            where: { teamId: foreign.team.id },
+          }),
+          grants: await sharedReadsIn(foreign.organizationId),
+          ownGrants: await sharedReadsIn(fixture.organizationId),
+        }).toEqual(before);
+      } finally {
+        await foreign.cleanup();
+      }
     });
   });
 

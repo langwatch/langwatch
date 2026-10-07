@@ -38,6 +38,11 @@ import { getUserProtectionsForProject } from "../utils";
 /**
  * The owner is ADMIN of their own personal team, so `project:create` passes
  * there. A personal workspace holds only the project provisioned with it.
+ *
+ * A team outside the organisation is refused as not found. The scope lineage
+ * guard already refuses a request whose team and organisation disagree before
+ * this runs; this keeps the helper from reading "no team" as "not personal"
+ * should a caller ever reach it another way.
  */
 async function assertTeamCanHoldANewProject(
   prisma: PrismaClient,
@@ -49,8 +54,11 @@ async function assertTeamCanHoldANewProject(
     where: { id: teamId, organizationId },
     select: { isPersonal: true },
   });
+  if (!destinationTeam) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+  }
   const violation = personalWorkspaceCreateViolation(
-    destinationTeam?.isPersonal ?? false,
+    destinationTeam.isPersonal,
   );
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
