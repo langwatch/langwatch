@@ -166,7 +166,6 @@ describe("Feature: the aggregate project is no place to send traces", () => {
             bindings: [
               {
                 role: "MEMBER",
-                customRoleId: null,
                 scopeType: "PROJECT",
                 scopeId: projectId,
               },

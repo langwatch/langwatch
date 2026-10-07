@@ -55,7 +55,7 @@ function saveAndFailWith(error: unknown) {
   const { result } = renderHook(() =>
     useAnnotationMutations({
       traceId: "trace-1",
-      mode: "comment",
+      mode: "annotate",
       enabled: true,
       onDone: vi.fn(),
     }),
