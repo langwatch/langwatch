@@ -12,7 +12,7 @@ Feature: Live test fixtures run the upgrade before they boot
   Scenario: A live test boots against a test database whose upgrade has not run
     Given a test process whose live fixture has not yet upgraded the test database
     When two live boots ask for the upgraded test database
-    Then the upgrade runs once, in the tasks app, with only the test stores' URLs and NODE_ENV=test
+    Then the upgrade runs once, in the tasks app, with only the test stores' URLs, NODE_ENV=test and synthetic deployment facts
     And it names no env file
     And both boots go on once it has succeeded
 

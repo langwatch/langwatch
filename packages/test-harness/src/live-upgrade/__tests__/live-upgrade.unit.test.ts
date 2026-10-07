@@ -41,6 +41,9 @@ describe("the live fixtures' upgrade", () => {
         {
           PATH: "/usr/bin",
           NODE_ENV: "test",
+          BASE_HOST: "http://langwatch.test",
+          NEXTAUTH_URL: "http://langwatch.test",
+          API_KEY_PEPPER: "synthetic-api-key-pepper",
           DATABASE_URL: STORES.databaseUrl,
           REDIS_URL: STORES.redisUrl,
           CLICKHOUSE_URL: STORES.clickHouseUrl,

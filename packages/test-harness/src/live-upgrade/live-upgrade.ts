@@ -36,7 +36,20 @@ export class LiveUpgradeFailedError extends Error {
   }
 }
 
-/** The whole environment the upgrade sees: the test stores, NODE_ENV and PATH (for goose). */
+/**
+ * Throwaway deployment facts the upgrade's module tree refuses to boot without; never real
+ * secrets.
+ */
+const LIVE_UPGRADE_SYNTHETIC: Readonly<Record<string, string>> = {
+  BASE_HOST: "http://langwatch.test",
+  NEXTAUTH_URL: "http://langwatch.test",
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
+};
+
+/**
+ * The whole environment the upgrade sees: the test stores, NODE_ENV, PATH (for goose) and the
+ * synthetic facts.
+ */
 export function liveUpgradeEnvironment({
   stores,
   path,
@@ -47,6 +60,7 @@ export function liveUpgradeEnvironment({
   return {
     ...(path ? { PATH: path } : {}),
     NODE_ENV: "test",
+    ...LIVE_UPGRADE_SYNTHETIC,
     DATABASE_URL: stores.databaseUrl,
     REDIS_URL: stores.redisUrl,
     CLICKHOUSE_URL: stores.clickHouseUrl,
