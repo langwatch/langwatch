@@ -440,6 +440,8 @@ Feature: An aggregate project reads its member projects
     Given an aggregate project
     When ana opens a link to its reports or to the chart editor
     Then neither offers "Add chart" nor a Save button
+    And the reports title cannot be renamed
+    And no empty state invites ana to add a chart
 
   @integration
   Scenario: A chart save the server refuses says why

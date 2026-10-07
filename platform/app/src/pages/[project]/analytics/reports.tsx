@@ -30,8 +30,13 @@ import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
-function ReportsContent() {
-  const { project, organization } = useOrganizationTeamProject();
+/** Exported for the test that renders the body past the aggregate gate. */
+export function ReportsContent() {
+  const { project, organization, hasPermission } = useOrganizationTeamProject();
+  // The writes this page offers, each refused where the server refuses it:
+  // on an aggregate project (ADR-144) and for a member without the grant.
+  const canAddChart = hasPermission("analytics:create");
+  const canRenameDashboard = hasPermission("analytics:update");
   const { showFilters } = useFilterToggle();
   const router = useRouter();
   const projectId = project?.id ?? "";
@@ -195,7 +200,7 @@ function ReportsContent() {
     <GraphsLayout
       title={dashboardTitle}
       analyticsHeaderProps={{
-        isEditable: true,
+        isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
@@ -204,7 +209,7 @@ function ReportsContent() {
             option={autoRefresh.option}
             onChange={autoRefresh.setOption}
           />
-          {project ? (
+          {project && canAddChart ? (
             customChartPlaygroundEnabled ? (
               <Button
                 colorPalette="orange"
@@ -230,7 +235,7 @@ function ReportsContent() {
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && customChartPlaygroundEnabled && (
+      {project && canAddChart && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
@@ -241,7 +246,7 @@ function ReportsContent() {
       )}
 
       {/* Empty state */}
-      {hasNoGraphs && (
+      {hasNoGraphs && canAddChart && (
         <Alert.Root
           status="info"
           borderStartWidth="4px"
