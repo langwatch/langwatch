@@ -43,6 +43,18 @@ export function isOrgScopedPermission(permission: AuthzPermission): boolean {
 }
 
 /**
+ * Whether the client hides a control declared under this permission on an
+ * aggregate project (ADR-144 decision 8). The server refuses a mutation that
+ * writes under the aggregate it names; an organisation-level write names no
+ * project, so the server lets it through and the client does too.
+ *
+ * @internal Exported for testing only
+ */
+export function refusedOnAggregate(permission: AuthzPermission): boolean {
+  return !isOrgScopedPermission(permission) && writesUnderProject(permission);
+}
+
+/**
  * Whether the caller holds a membership on this team.
  *
  * `organization.getAll` returns every team in the organization but narrows
@@ -550,14 +562,15 @@ export const useOrganizationTeamProject = (
     [effectivePermissionsQuery.data?.permissions],
   );
   // ADR-144 decision 8: the server refuses every write under an aggregate
-  // project, whatever the caller's role. The client asks the same question of
-  // the same predicate, so no control offers a write the server will refuse,
-  // while managing the aggregate itself (its name, rule, team) stays open.
+  // project, whatever the caller's role. The client asks the same question,
+  // so no control offers a write the server will refuse, while managing the
+  // aggregate itself (its name, rule, team) and organisation-level writes
+  // stay open.
   const projectIsAggregate = isAggregateProjectKind(finalProject?.kind);
   const hasPermission = useCallback(
     (permission: AuthzPermission): boolean => {
       if (!effectivePermissionsQuery.data?.permissions) return false;
-      if (projectIsAggregate && writesUnderProject(permission)) return false;
+      if (projectIsAggregate && refusedOnAggregate(permission)) return false;
       return permissionSatisfiedBy({
         granted: effectivePermissions,
         requested: permission,
