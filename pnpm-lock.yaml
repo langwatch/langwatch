@@ -3456,6 +3456,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../../../modules/langy/contract
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../../../modules/model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
@@ -3957,6 +3960,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-managed-provider-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4799,6 +4805,9 @@ importers:
 
   modules/agent/browser:
     dependencies:
+      '@langwatch/agent-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5049,6 +5058,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: 'catalog:'
         version: 3.2.2(react@19.2.8)
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5426,6 +5438,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/annotation-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../contract
@@ -7999,6 +8014,9 @@ importers:
       '@hookform/resolvers':
         specifier: 'catalog:'
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
+      '@langwatch/analytics-client':
+        specifier: workspace:*
+        version: link:../../analytics/client
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
@@ -8032,12 +8050,18 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/experiment-client':
+        specifier: workspace:*
+        version: link:../../experiment/client
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -8062,6 +8086,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/workflow-client':
+        specifier: workspace:*
+        version: link:../../workflow/client
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -8351,6 +8378,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/experiment-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8381,6 +8411,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/workflow-client':
+        specifier: workspace:*
+        version: link:../../workflow/client
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -9859,6 +9892,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -10406,6 +10442,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-managed-provider-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/managed-provider/client
       '@langwatch/enterprise-managed-provider-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/managed-provider/contract
@@ -10418,6 +10457,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11128,6 +11170,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -12531,6 +12576,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -13099,6 +13147,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -15357,6 +15408,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/agent-client':
+        specifier: workspace:*
+        version: link:../../agent/client
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
@@ -15396,6 +15450,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/model-provider-client':
+        specifier: workspace:*
+        version: link:../../model-provider/client
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -15420,6 +15477,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@langwatch/workflow-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../contract
