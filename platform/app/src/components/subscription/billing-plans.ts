@@ -34,7 +34,6 @@ const growthEventsPricingString = (currency: Currency): string =>
     ? "\u20AC5 per additional 100,000 events"
     : "$6 per additional 100,000 events";
 
-/** Returns the Growth retention line, with the per-GB custom retention price for the given currency. */
 const growthRetentionPricingString = (currency: Currency): string =>
   currency === Currency.EUR
     ? "30 days retention (+ custom at \u20AC3/GB)"
