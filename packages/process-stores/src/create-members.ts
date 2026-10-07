@@ -238,7 +238,7 @@ function eventReadSeatMember({
   read,
 }: {
   config: ProcessConfig;
-  supplied: { readonly [Name in MemberName]?: ProcessMembers[Name] };
+  supplied: NonNullable<BuildProcessStoresOptions["members"]>;
   read: ReadMember;
 }): BuiltMember<EventReadSeat> {
   const eventingAvailable = config.eventing !== undefined || supplied.eventing !== undefined;
