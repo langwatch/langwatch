@@ -32,6 +32,7 @@
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/process": "workspace:*",
+    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",

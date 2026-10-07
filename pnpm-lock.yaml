@@ -7305,6 +7305,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9214,6 +9217,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -10373,6 +10379,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -14789,6 +14798,9 @@ importers:
       '@langwatch/share-contract':
         specifier: workspace:*
         version: link:../../share/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
