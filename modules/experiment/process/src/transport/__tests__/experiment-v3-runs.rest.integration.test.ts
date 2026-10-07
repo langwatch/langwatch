@@ -1074,7 +1074,12 @@ describe("POST /api/experiments/execute", () => {
 
     /** @scenario "The run id is not given out before the run API can answer for it" */
     it("holds the frame that names the run until the run API can answer for it", async () => {
-      const made = await harness({ redis: true, registers: false, worker });
+      const made = await harness({
+        experiments: { isActive: async () => true },
+        redis: true,
+        registers: false,
+        worker,
+      });
       let openTheRun = (): void => undefined;
       const recordRunStart = made.folds.recordRunStart.bind(made.folds);
       vi.spyOn(made.folds, "recordRunStart").mockImplementationOnce(
