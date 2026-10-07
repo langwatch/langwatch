@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { projectNavigation } from "../projectKindNavigation";
 
 describe("given the project navigation", () => {
-  /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
   describe("when the open project is an aggregate", () => {
+    /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
     it("shows Traces, and hides Analytics, Online Evals, Test and Build", () => {
       expect(projectNavigation("aggregate")).toEqual({
         home: false,
