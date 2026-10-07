@@ -4,21 +4,13 @@ import {
   eventPayloadSchema,
   findEventPayloadField,
 } from "../../rules/trace-event-log-payload.rules.ts";
-import { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+import {
+  TraceEventPayloadFieldNotFoundError,
+  TracePayloadReaderRepository,
+} from "../trace-payload-reader.repository.ts";
 
 /** Every offloaded trace field is recorded on the trace aggregate; no other is asked. */
 const TRACE_AGGREGATE_TYPE = "trace";
-
-/** The event was read, but it carries no such field: a corrupted event or a stale reference. */
-export class TraceEventPayloadFieldNotFoundError extends Error {
-  constructor(
-    readonly eventId: string,
-    readonly field: string,
-  ) {
-    super(`Field "${field}" not found in the payload of event ${eventId}`);
-    this.name = "TraceEventPayloadFieldNotFoundError";
-  }
-}
 
 /**
  * One offloaded field out of the trace event that recorded it, read through eventing's

@@ -171,7 +171,6 @@ function deployment(access: OtlpAccess = {}) {
         legacySpool: S3TraceLegacySpoolChannel.create({
           resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
         }),
-        resolveClickHouseClient: () => Promise.reject(new Error("no ClickHouse in this test")),
       }),
       dedup: MemoryTraceSpanDedupRepository.create(),
       commands,

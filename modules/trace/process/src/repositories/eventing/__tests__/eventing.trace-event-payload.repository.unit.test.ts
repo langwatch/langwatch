@@ -6,11 +6,9 @@ import { type Event, EventNotFoundError, type EventReadSeat } from "@langwatch/e
 import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
+import { TraceEventPayloadFieldNotFoundError } from "../../trace-payload-reader.repository.ts";
 import { traceRepositories } from "../../trace-repositories.registry.ts";
-import {
-  EventingTraceEventPayloadRepository,
-  TraceEventPayloadFieldNotFoundError,
-} from "../eventing.trace-event-payload.repository.ts";
+import { EventingTraceEventPayloadRepository } from "../eventing.trace-event-payload.repository.ts";
 
 type SeatRead = Parameters<EventReadSeat["getEvent"]>[0];
 

@@ -120,7 +120,6 @@ function compose({
     canonicalisation: TraceCanonicalisationService.create(),
     blobStore: TraceBlobStoreService.create({
       legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-      resolveClickHouseClient: refuse,
     }),
     dedup: MemoryTraceSpanDedupRepository.create(),
     commands: {

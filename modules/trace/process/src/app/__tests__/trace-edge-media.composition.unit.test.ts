@@ -46,7 +46,6 @@ function compose({
   const plans = createApiFixture<EntitlementApi>();
   const blobStore = TraceBlobStoreService.create({
     legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: refuse }),
-    resolveClickHouseClient: refuse,
   });
   const deps = TraceModule.composeDependencies({
     repositories: MemoryTraceRepositories.create(),

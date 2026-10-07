@@ -890,7 +890,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         resolveS3Client: () =>
           Promise.reject(new TraceCapabilityUnavailableError(role, "a v1 spool object read")),
       }),
-      resolveClickHouseClient,
+      payloads: repositories.eventPayloads,
       logger: createLogger("langwatch:trace:blob-store"),
     });
     const { publicBaseUrl } = setup.config;

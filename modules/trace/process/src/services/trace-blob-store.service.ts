@@ -1,14 +1,11 @@
 import type { Readable } from "node:stream";
 
 import type { Logger } from "@langwatch/observability";
+import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
+import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 
 import type { TraceLegacySpool } from "../channels/trace-legacy-spool.channel.ts";
-import {
-  eventLogOccurredAtWindow,
-  eventLogRowSchema,
-  eventPayloadSchema,
-  findEventPayloadField,
-} from "../rules/trace-event-log-payload.rules.ts";
+import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,
@@ -16,21 +13,6 @@ import {
   SPOOL_REF_V2,
 } from "../rules/trace-spool-location.rules.ts";
 import { TraceStreamBufferService } from "./trace-stream-buffer.service.ts";
-/**
- * The one read this store issues, in the default JSON format. Declared here rather than taken from
- * the package client, which pins JSONEachRow: this read consumes the envelope the default format
- * answers with, and switching would make every offloaded value read as not found.
- */
-interface BlobStoreClickHouseClient {
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-  }): Promise<{ json(): Promise<unknown> }>;
-}
-
-type ClickHouseClientResolver = (tenantId: string) => Promise<BlobStoreClickHouseClient>;
-import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
-import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 
 /**
  * Cap on a spool object read. The spool holds one over-threshold command and the attribute cap
@@ -96,10 +78,6 @@ export class BlobFieldNotFoundError extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Zod schemas for parsing untyped external data (event_log EventPayload)
-// ---------------------------------------------------------------------------
-
 /**
  * Raised when the project's storage destination cannot host the spool. Distinct
  * from a storage failure so the fail-open warn can say "this deployment has no
@@ -155,13 +133,13 @@ function assertDestinationCanHostSpool({
 
 /**
  * @see ADR-022
- * Transient spool operations on the write path and event_log reads on the read path; a spool object
- * is deleted after the INSERT. Event log reads select TenantId first, blocking a cross-tenant read.
+ * Transient spool operations on the write path and offloaded-field reads on the read path; a spool
+ * object is deleted after the INSERT. Reads go through trace's payload reader, tenant first.
  */
 export class TraceBlobStoreService {
   static create(options: {
     legacySpool: TraceLegacySpool;
-    resolveClickHouseClient?: ClickHouseClientResolver;
+    payloads?: TracePayloadReaderRepository;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
   }): TraceBlobStoreService {
@@ -170,27 +148,27 @@ export class TraceBlobStoreService {
 
   /**
    * `legacySpool` reads back v1 spool refs only, new writes going through the object store.
-   * `resolveClickHouseClient` is the per-tenant client event_log reads need; without it those
-   * reads throw. `spoolStorage` backs spool writes, and `logger` surfaces a refused delete.
+   * `payloads` reads an offloaded field back out of its trace event; without it those reads
+   * throw. `spoolStorage` backs spool writes, and `logger` surfaces a refused delete.
    */
   private readonly legacySpool: TraceLegacySpool;
-  private readonly resolveClickHouseClient?: ClickHouseClientResolver;
+  private readonly payloads?: TracePayloadReaderRepository;
   private readonly spoolStorage?: SpoolStorage;
   private readonly logger?: Logger;
 
   private constructor({
     legacySpool,
-    resolveClickHouseClient,
+    payloads,
     spoolStorage,
     logger,
   }: {
     legacySpool: TraceLegacySpool;
-    resolveClickHouseClient?: ClickHouseClientResolver;
+    payloads?: TracePayloadReaderRepository;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
   }) {
     this.legacySpool = legacySpool;
-    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.payloads = payloads;
     this.spoolStorage = spoolStorage;
     this.logger = logger;
   }
@@ -236,78 +214,28 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches a field value from event_log (ADR-022 read path), by (TenantId,
-   * AggregateType, AggregateId, EventId), TenantId first. Arrow property (not
-   * a prototype method) so a test mock can assert on it unbound-safely.
+   * Fetches an offloaded field from the trace event that recorded it (ADR-022 read path), through
+   * trace's payload reader, tenant first. Arrow property (not a prototype method) so a test mock
+   * can assert on it unbound-safely.
    */
   getFromEventLog = async ({
     eventId,
     field,
     tenantId,
-    aggregateType,
     aggregateId,
   }: {
     eventId: string;
     field: string;
     tenantId: string;
-    aggregateType: string;
     aggregateId: string;
   }): Promise<string> => {
-    if (!this.resolveClickHouseClient) {
-      throw new Error("ClickHouseClient not configured — cannot read from event_log (ADR-022)");
-    }
-
-    const clickHouseClient = await this.resolveClickHouseClient(tenantId);
-    const window = eventLogOccurredAtWindow(eventId);
-    // TenantId must be the first predicate in the WHERE clause (ADR-022 cross-tenant denial).
-    const result = await clickHouseClient.query({
-      query: `
-        SELECT EventPayload
-        FROM event_log
-        WHERE TenantId = {tenantId:String}
-          AND AggregateType = {aggregateType:String}
-          AND AggregateId = {aggregateId:String}
-          AND EventId = {eventId:String}
-          ${window.predicate}
-        LIMIT 1
-      `,
-      query_params: {
-        tenantId,
-        aggregateType,
-        aggregateId,
-        eventId,
-        ...window.params,
-      },
-    });
-
-    const response = await result.json();
-    const rawRows = (response as { data?: unknown[] } | null)?.data;
-    const rowParse = rawRows?.[0] ? eventLogRowSchema.safeParse(rawRows[0]) : null;
-    if (!rowParse?.success) {
-      throw new BlobNotFoundError(eventId, field, tenantId);
-    }
-
-    let parsedPayload: unknown;
-    try {
-      parsedPayload = JSON.parse(rowParse.data.EventPayload);
-    } catch (e) {
+    if (!this.payloads) {
       throw new Error(
-        `Failed to parse EventPayload for eventId=${eventId}: ${e instanceof Error ? e.message : String(e)}`,
+        "No trace payload reader configured: cannot read an offloaded field (ADR-022)",
       );
     }
 
-    // ADR-022: EventPayload is the event's own data, with the span or body at the top level.
-    const payloadParse = eventPayloadSchema.safeParse(parsedPayload);
-    if (!payloadParse.success) {
-      throw new BlobFieldNotFoundError(eventId, field);
-    }
-
-    const value = findEventPayloadField(payloadParse.data, field);
-    if (value === null) {
-      throw new BlobFieldNotFoundError(eventId, field);
-    }
-
-    return value;
+    return this.payloads.read({ tenantId, traceId: aggregateId, eventId, field });
   };
 
   /**
