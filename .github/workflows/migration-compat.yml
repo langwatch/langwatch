@@ -194,12 +194,19 @@ jobs:
 
       # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
       # gated base api reads before it serves (specs/upgrade/entry-points.feature).
+      # It boots the module tree for code steps, so it gets the Job's shared env.
       - name: Migrate with head's tasks
         working-directory: head
         env:
           CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/test_analytics_migrated_schema
+          BASE_HOST: http://localhost:5560
+          NEXTAUTH_URL: http://localhost:5560
         run: |
           set -euo pipefail
+          for name in NEXTAUTH_SECRET CREDENTIALS_SECRET API_TOKEN_JWT_SECRET LW_VIRTUAL_KEY_PEPPER \
+            LW_GATEWAY_INTERNAL_SECRET LW_GATEWAY_JWT_SECRET; do
+            export "${name}=$(openssl rand -hex 32)"
+          done
           pnpm --filter @langwatch/tasks task upgrade
 
       - name: Install and prepare base
