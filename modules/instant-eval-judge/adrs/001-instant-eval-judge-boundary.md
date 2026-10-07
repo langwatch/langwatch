@@ -52,7 +52,7 @@ contracts, never their Apis: project's `lw.project.created` and billing's
 
 ## Persistence
 
-Three Postgres tables, created in migration `20261007120000_instant_eval_judge_tables` (ADR-174
+Three Postgres tables, created in migration `20261007140001_instant_eval_judge_tables` (ADR-174
 Schema). Each is the leaf's own copy of a fact; none has a relation or foreign key.
 
 - `InstantEvalJudgeProject`, keyed by `projectId`: the project's organization and creation time.
