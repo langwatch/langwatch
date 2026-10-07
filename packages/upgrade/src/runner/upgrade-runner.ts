@@ -18,9 +18,10 @@ import {
   readPrismaMigrations,
 } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
+import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
 import { highestRecordedFloor, inferInstalledRelease } from "./installed-release.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
-import { redactSecrets, UpgradeRunLog } from "./run-log.ts";
+import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
 import { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
@@ -100,14 +101,55 @@ function targetStatus({
   return "pending";
 }
 
-function prismaFailure({ names }: { names: readonly string[] }): UpgradeRunFailure {
-  const command = `prisma migrate resolve --rolled-back ${names[0]}`;
+/** Why the runner did not resolve a failed migration itself; null when it was never asked to. */
+type NotResolvedReason = "below-marker" | "not-shipped" | "no-resolver" | { resolveError: string };
+
+const NOT_RESOLVED: Record<Exclude<NotResolvedReason, object>, string> = {
+  "below-marker":
+    "It is not newer than the re-runnable marker, so the upgrade does not re-run it. ",
+  "not-shipped": "This image does not ship it, so the upgrade cannot re-run it. ",
+  "no-resolver": "",
+};
+
+function prismaFailure({
+  names,
+  reason,
+}: {
+  names: readonly string[];
+  reason: NotResolvedReason;
+}): UpgradeRunFailure {
+  const command = resolveCommand(names[0]!);
+  const why =
+    typeof reason === "object"
+      ? `Marking it rolled back failed: ${redactSecrets(reason.resolveError)}. `
+      : NOT_RESOLVED[reason];
   return new UpgradeRunFailure(
     "failed_prisma_migration",
     `Prisma migration ${names.join(", ")} failed and is recorded as failed in _prisma_migrations. ` +
+      why +
       `Check what it left behind, then run "${command}" if nothing of it remains, or ` +
       `"prisma migrate resolve --applied ${names[0]}" if you completed it by hand; then upgrade again.`,
     { migrations: names, command },
+  );
+}
+
+/** A re-runnable migration that failed on every attempt; the next upgrade resolves it itself. */
+function rerunnableFailure({
+  names,
+  attempts,
+  error,
+}: {
+  names: readonly string[];
+  attempts: number;
+  error: string | null;
+}): UpgradeRunFailure {
+  const detail = redactSecrets(error ?? "no error given");
+  return new UpgradeRunFailure(
+    "rerunnable_migration_failed",
+    `Prisma migration ${names.join(", ")} failed on all ${attempts} attempts: ${detail}. It is ` +
+      `re-runnable, so the next upgrade marks it rolled back and applies it again; no ` +
+      `prisma migrate resolve is needed. Fix the cause first.`,
+    { migrations: names, attempts, error: detail },
   );
 }
 
@@ -123,6 +165,8 @@ export class UpgradeRunnerService {
   private readonly codeSteps: ReadonlyMap<string, MigrationStep>;
   private readonly shipped: RegisteredStep[];
   private readonly narrate: UpgradeRunLog;
+  private readonly shippedIds: ReadonlySet<string>;
+  private resolved: { migration: string; attempt: number }[] = [];
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
     this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
@@ -131,6 +175,7 @@ export class UpgradeRunnerService {
     this.codeSteps = new Map((options.codeSteps ?? []).map((step) => [step.id, step]));
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
     this.narrate = new UpgradeRunLog(options.log);
+    this.shippedIds = new Set(this.shipped.map((step) => step.id));
   }
 
   static create(options: UpgradeRunnerOptions): UpgradeRunnerService {
@@ -403,8 +448,8 @@ export class UpgradeRunnerService {
     phases: RunPhases;
   }): Promise<Record<string, unknown>> {
     await phases.start({ name: "preflight" });
-    const failedPrisma = await this.failedPrismaMigrations();
-    if (failedPrisma.length > 0) throw prismaFailure({ names: failedPrisma });
+    this.resolved = [];
+    await this.resolveLeftFailures({ signal });
     await this.runner.registerSteps({ steps: this.shipped });
     const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
@@ -425,7 +470,50 @@ export class UpgradeRunnerService {
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });
-    return { applied, notNeeded: plan.notNeeded, reopened };
+    return { applied, notNeeded: plan.notNeeded, reopened, resolved: this.resolved };
+  }
+
+  /** Round 21, S3-RETRY: the failed rows the runner may resolve, or why it may not. */
+  private resolvable({ names }: { names: readonly string[] }): NotResolvedReason | null {
+    if (!names.every((name) => isRerunnablePrismaMigration({ name }))) return "below-marker";
+    if (!names.every((name) => this.shippedIds.has(`prisma:${name}`))) return "not-shipped";
+    if (!this.options.applier.resolveRolledBack) return "no-resolver";
+    return null;
+  }
+
+  /** Marks each failed migration rolled back; refuses by name when one cannot be. */
+  private async resolveRolledBack({
+    names,
+    signal,
+  }: {
+    names: readonly string[];
+    signal: AbortSignal;
+  }): Promise<Map<string, number>> {
+    const reason = this.resolvable({ names });
+    if (reason !== null) throw prismaFailure({ names, reason });
+    const elapsed = new Map<string, number>();
+    for (const migration of names) {
+      const startedAt = performance.now();
+      const report = await this.options.applier.resolveRolledBack!({ migration, signal });
+      if (!report.ok)
+        throw prismaFailure({
+          names: [migration],
+          reason: { resolveError: report.error ?? "no error given" },
+        });
+      elapsed.set(migration, Math.round(performance.now() - startedAt));
+    }
+    return elapsed;
+  }
+
+  /** A failed row an earlier run left: resolved when re-runnable, else the run stops naming it. */
+  private async resolveLeftFailures({ signal }: { signal: AbortSignal }): Promise<void> {
+    const failed = await this.failedPrismaMigrations();
+    if (failed.length === 0) return;
+    const elapsed = await this.resolveRolledBack({ names: failed, signal });
+    for (const [migration, resolveMs] of elapsed) {
+      this.resolved.push({ migration, attempt: 0 });
+      this.narrate.resolvedBeforeApply({ migration, resolveMs });
+    }
   }
 
   private async failedPrismaMigrations(): Promise<string[]> {
@@ -453,7 +541,7 @@ export class UpgradeRunnerService {
     for (const { name, open } of engines) {
       if (open.length > 0) await phases.start({ name, release: release.release });
     }
-    const reports = await this.applyWithRetry({ release, signal });
+    const { reports, attempts } = await this.applyWithRetry({ release, signal });
     await this.recordPrisma({ open: engines[0].open, runId });
     await this.recordClickHouse({ open: engines[1].open, reports, runId });
     const failedPrisma = await this.failedPrismaMigrations();
@@ -463,7 +551,12 @@ export class UpgradeRunnerService {
     const outcome = (failed: boolean) => (failed ? "failed" : "succeeded");
     await phases.end({ name: "postgres-schema", outcome: outcome(postgresFailed) });
     await phases.end({ name: "clickhouse-schema", outcome: outcome(failedOn("clickhouse")) });
-    if (failedPrisma.length > 0) throw prismaFailure({ names: failedPrisma });
+    if (failedPrisma.length > 0) {
+      const reason = this.resolvable({ names: failedPrisma });
+      if (reason !== null) throw prismaFailure({ names: failedPrisma, reason });
+      const error = reports.find((report) => report.engine === "postgres" && !report.ok)?.error;
+      throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null });
+    }
     const failing = reports.filter((report) => !report.ok);
     if (failing.length === 0) return;
     const named = failing.map(
@@ -477,23 +570,41 @@ export class UpgradeRunnerService {
     });
   }
 
-  /** Retries with backoff only a failure that left no failed Prisma migration (handoff Risks). */
+  /**
+   * Retries with backoff a failure that left no failed Prisma migration, or one whose failed
+   * migrations are re-runnable, each marked rolled back first (round 21, S3-RETRY).
+   */
   private async applyWithRetry({
     release,
     signal,
   }: {
     release: PlannedRelease;
     signal: AbortSignal;
-  }): Promise<readonly SchemaTargetReport[]> {
+  }): Promise<{ reports: readonly SchemaTargetReport[]; attempts: number }> {
     const { applier } = this.options;
     const log = this.narrate;
     const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
     const retry = this.options.retry ?? DEFAULT_RETRY;
+    let resolvedLastAttempt: string[] = [];
     for (let attempt = 1; ; attempt++) {
       const reports = await applier.apply({ release: release.release, lockTimeoutMs, signal });
-      if (reports.every((report) => report.ok) || attempt >= retry.attempts) return reports;
-      if ((await this.failedPrismaMigrations()).length > 0) return reports;
+      if (reports.every((report) => report.ok)) {
+        if (resolvedLastAttempt.length > 0)
+          log.appliedAfterResolve({ migrations: resolvedLastAttempt, attempt });
+        return { reports, attempts: attempt };
+      }
+      if (attempt >= retry.attempts) return { reports, attempts: attempt };
+      const failed = await this.failedPrismaMigrations();
+      if (failed.length > 0 && this.resolvable({ names: failed }) !== null)
+        return { reports, attempts: attempt };
       const waitMs = retry.backoffMs * 2 ** (attempt - 1);
+      resolvedLastAttempt = failed;
+      if (failed.length > 0) {
+        const retrying = { attempt, attempts: retry.attempts, waitMs };
+        await this.resolveForRetry({ failed, reports, retrying, signal });
+        await sleep(waitMs, undefined, { signal });
+        continue;
+      }
       log.warn(`schema apply failed without a failed migration; retrying in ${waitMs} ms`, {
         phase: "schema",
         waitingOn: "the retry backoff",
@@ -502,6 +613,26 @@ export class UpgradeRunnerService {
         next: "nothing to do yet: a transient failure is retried",
       });
       await sleep(waitMs, undefined, { signal });
+    }
+  }
+
+  /** Marks this attempt's failed re-runnable migrations rolled back and logs each by name. */
+  private async resolveForRetry({
+    failed,
+    reports,
+    retrying,
+    signal,
+  }: {
+    failed: readonly string[];
+    reports: readonly SchemaTargetReport[];
+    retrying: { attempt: number; attempts: number; waitMs: number };
+    signal: AbortSignal;
+  }): Promise<void> {
+    const error = reports.find((report) => report.engine === "postgres" && !report.ok)?.error;
+    const elapsed = await this.resolveRolledBack({ names: failed, signal });
+    for (const [migration, resolveMs] of elapsed) {
+      this.resolved.push({ migration, attempt: retrying.attempt });
+      this.narrate.resolvedForRetry({ migration, ...retrying, resolveMs, error: error ?? null });
     }
   }
 

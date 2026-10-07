@@ -24,6 +24,15 @@ export interface UpgradeSchemaApplier {
     lockTimeoutMs: number;
     signal: AbortSignal;
   }): Promise<readonly SchemaTargetReport[]>;
+  /**
+   * `prisma migrate resolve --rolled-back` for one failed migration the image ships. Absent: the
+   * runner never resolves and names the command instead
+   * (specs/upgrade/rerunnable-migrations.feature).
+   */
+  resolveRolledBack?(args: {
+    migration: string;
+    signal: AbortSignal;
+  }): Promise<{ ok: boolean; error: string | null }>;
 }
 
 /** A level-triggered reconciler run as the last phase of every upgrade (TTL, LangWatchQL). */

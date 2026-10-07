@@ -1,10 +1,11 @@
-import { rm, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { rm } from "node:fs/promises";
 
+import { prismaErrorCode, redactOutput, runPrisma, type SteppingTools } from "./prisma-tool.ts";
 import { writeReleaseDirectory } from "./release-directory.ts";
 import { SteppingError } from "./stepping.errors.ts";
 import { runTool, type ToolRun } from "./tool-run.ts";
+
+export type { SteppingTools } from "./prisma-tool.ts";
 
 /** One ClickHouse database goose steps; `table` is `<db>.goose_db_version`. */
 export interface ClickHouseStepTarget {
@@ -13,12 +14,6 @@ export interface ClickHouseStepTarget {
   table: string;
   migrationsDir: string;
   environment?: Readonly<Record<string, string>>;
-}
-
-/** Where the two migration tools are; by default the package's `prisma` and `goose` on PATH. */
-export interface SteppingTools {
-  prisma?: { command: string; args: readonly string[] };
-  goose?: string;
 }
 
 export type StepTargetReport =
@@ -115,20 +110,12 @@ async function deployPrisma({
   tools: SteppingTools;
   signal?: AbortSignal;
 }): Promise<StepTargetReport> {
-  const schema = join(directory, "schema.prisma");
-  const config = join(directory, "prisma.config.mjs");
-  await writeFile(schema, 'datasource db {\n  provider = "postgresql"\n}\n');
-  const settings = { schema, migrations: { path: join(directory, "migrations") } };
-  await writeFile(
-    config,
-    `const settings = ${JSON.stringify(settings)};\nexport default { ...settings, datasource: { url: process.env.DATABASE_URL } };\n`,
-  );
-  const prisma = tools.prisma ?? defaultPrisma();
-  const run = await runTool({
-    command: prisma.command,
-    args: [...prisma.args, "migrate", "deploy", "--config", config],
-    cwd: directory,
-    environment: { ...environment, DATABASE_URL: postgresUrl, CHECKPOINT_DISABLE: "1" },
+  const run = await runPrisma({
+    directory,
+    args: ["migrate", "deploy"],
+    postgresUrl,
+    environment,
+    tools,
     signal,
   });
   const applied = [...run.output.matchAll(/^Applying migration `([^`]+)`/gm)].map((m) => m[1]!);
@@ -137,7 +124,7 @@ async function deployPrisma({
     target: POSTGRES_TARGET,
     applied,
     run,
-    code: /\bError: (P\d{4})\b/.exec(run.output)?.[1] ?? null,
+    code: prismaErrorCode({ run }),
     secrets: [postgresUrl],
   });
 }
@@ -189,10 +176,7 @@ function failed({
   code: string | null;
   secrets: readonly string[];
 }): StepTargetReport {
-  const message = secrets.reduce(
-    (text, secret) => text.split(secret).join("<redacted>"),
-    run.output.trim(),
-  );
+  const message = redactOutput({ run, secrets });
   return { target, status: "failed", applied, code: run.aborted ? "aborted" : code, message };
 }
 
@@ -214,9 +198,4 @@ function skipAll({
 }): ReleaseApplyReport {
   const names = [POSTGRES_TARGET, ...clickhouseTargets.map((target) => target.name)];
   return { release, ok: false, targets: names.map((name) => skipped(name, reason)) };
-}
-
-function defaultPrisma(): { command: string; args: readonly string[] } {
-  const manifest = createRequire(import.meta.url).resolve("prisma/package.json");
-  return { command: process.execPath, args: [join(dirname(manifest), "build/index.js")] };
 }

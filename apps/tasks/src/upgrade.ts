@@ -139,6 +139,44 @@ function deployPrisma({
   });
 }
 
+function resolvePrismaRolledBack({
+  input,
+  migration,
+  signal,
+}: {
+  input: TaskInput;
+  migration: string;
+  signal: AbortSignal;
+}): Promise<{ ok: boolean; error: string | null }> {
+  const url = input.environment.DATABASE_URL;
+  if (input.config.skipPrismaMigrate || !url)
+    return Promise.resolve({
+      ok: false,
+      error: "DATABASE_URL is required and SKIP_PRISMA_MIGRATE unset to resolve a migration",
+    });
+  const configPath = fileURLToPath(new URL("../prisma.config.ts", import.meta.url));
+  return new Promise((resolve) => {
+    const child = spawn(
+      "pnpm",
+      ["exec", "prisma", "migrate", "resolve", "--rolled-back", migration, "--config", configPath],
+      {
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        stdio: "inherit",
+        env: { ...input.environment, DATABASE_URL: url },
+        signal,
+      },
+    );
+    child.on("error", (error) => resolve({ ok: false, error: error.message }));
+    child.on("exit", (code) =>
+      resolve(
+        code === 0
+          ? { ok: true, error: null }
+          : { ok: false, error: `prisma migrate resolve exited with code ${code}` },
+      ),
+    );
+  });
+}
+
 async function migrateClickHouse({ input }: { input: TaskInput }): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
@@ -181,6 +219,8 @@ function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplie
       ];
       return applied;
     },
+    resolveRolledBack: ({ migration, signal }) =>
+      resolvePrismaRolledBack({ input, migration, signal }),
   };
 }
 

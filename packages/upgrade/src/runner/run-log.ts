@@ -19,6 +19,7 @@ export const UPGRADE_NEXT_ACTION: Readonly<Record<UpgradeOutcomeCode, string>> =
   lease_not_acquired: `wait for the holder's run to finish (${STATUS}), then run ${RUN} again; a dead holder's lease expires by itself`,
   lease_lost: `run ${RUN} again: it resumes from the ledger`,
   failed_prisma_migration: `run the \`prisma migrate resolve\` command the message names (DATABASE_URL), then ${RUN} again`,
+  rerunnable_migration_failed: `fix what the named migration's error names (a lock another session holds: lock_timeout), then run ${RUN} again: it marks the migration rolled back and re-runs it itself`,
   schema_failed: `check the named target is reachable (DATABASE_URL, CLICKHOUSE_URL), fix it, then run ${RUN} again`,
   step_failed: `read the step's error with ${STATUS}, fix its cause, then run ${RUN} again: the step resumes from its checkpoint`,
   reconciler_failed: `fix the store the named reconciler reaches (CLICKHOUSE_URL), then run ${RUN} again`,
@@ -50,6 +51,10 @@ function redactValue(value: unknown): unknown {
   }
   return value;
 }
+
+/** The command that marks a failed Prisma migration rolled back, as an operator would type it. */
+export const resolveCommand = (migration: string) =>
+  `prisma migrate resolve --rolled-back ${migration}`;
 
 const elapsedSince = (startedAt: number) => Math.round(performance.now() - startedAt);
 const countOf = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
@@ -221,6 +226,62 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
         ...fields,
         next: UPGRADE_NEXT_ACTION.step_failed,
       });
+  }
+
+  /** A failed row an earlier run left for a re-runnable migration, resolved at preflight. */
+  resolvedBeforeApply({ migration, resolveMs }: { migration: string; resolveMs: number }): void {
+    this.info(
+      `Prisma migration ${migration} failed in an earlier run and is re-runnable: marked it ` +
+        `rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; this run applies it again`,
+      {
+        phase: "preflight",
+        migration,
+        resolveElapsedMs: resolveMs,
+        waitingOn: "nothing",
+        next: WAIT,
+      },
+    );
+  }
+
+  /** A re-runnable migration that failed this attempt: resolved, retried after the backoff. */
+  resolvedForRetry({
+    migration,
+    attempt,
+    attempts,
+    waitMs,
+    resolveMs,
+    error,
+  }: {
+    migration: string;
+    attempt: number;
+    attempts: number;
+    waitMs: number;
+    resolveMs: number;
+    error: string | null;
+  }): void {
+    this.warn(
+      `Prisma migration ${migration} failed on attempt ${attempt} of ${attempts} and is ` +
+        `re-runnable: marked it rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; ` +
+        `applying it again in ${waitMs} ms. Error: ${error ?? "none given"}`,
+      {
+        phase: "postgres-schema",
+        migration,
+        attempt,
+        attempts,
+        waitMs,
+        resolveElapsedMs: resolveMs,
+        waitingOn: "the retry backoff",
+        next: "nothing to do yet: the upgrade re-runs the migration itself",
+      },
+    );
+  }
+
+  /** The attempt after a resolve applied every migration it had marked rolled back. */
+  appliedAfterResolve({ migrations, attempt }: { migrations: string[]; attempt: number }): void {
+    this.info(
+      `Prisma migration ${migrations.join(", ")} applied on attempt ${attempt} after it was marked rolled back`,
+      { phase: "postgres-schema", migrations, attempt, waitingOn: "nothing", next: WAIT },
+    );
   }
 
   finished({ outcome, fresh }: { outcome: UpgradeOutcome; fresh: boolean }): void {
