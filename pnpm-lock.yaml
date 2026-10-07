@@ -3945,6 +3945,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time

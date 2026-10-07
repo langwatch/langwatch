@@ -51,6 +51,7 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
