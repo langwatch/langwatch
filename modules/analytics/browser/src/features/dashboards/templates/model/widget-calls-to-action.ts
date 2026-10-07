@@ -1,7 +1,7 @@
 /**
- * The empty faces of every template widget, keyed by the source the widget reads:
- * when the source never sent data, what is missing, what turns up once it is there
- * and the button to the page that sets it up; when it did, one quiet-period line.
+ * The empty faces of the template widgets, keyed by the source a member connects or sets up:
+ * when it never sent data, what is missing and the button to its setup page; when it did, one
+ * quiet-period line. A trace field such as a conversation id is the completeness report's to name.
  */
 
 import type { NavigableTarget } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -13,9 +13,6 @@ export type WidgetSource =
   | "tokens"
   | "models"
   | "spans"
-  | "conversations"
-  | "satisfaction"
-  | "topics"
   | "scenarios"
   | "judges"
   | "evaluations"
@@ -81,32 +78,6 @@ export const CALLS_TO_ACTION: Readonly<Record<WidgetSource, CallToAction>> = {
     icon: `<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />`,
     button: "Connect traces",
     quiet: "No spans in this period.",
-    target: "traces",
-  },
-  conversations: {
-    title: "Group traces into conversations to continue",
-    line: "Send a conversation (thread) id with each trace to see how many turns a conversation takes.",
-    icon: CHAT_ICON,
-    button: "Connect traces",
-    quiet: "No conversations in this period.",
-    target: "traces",
-  },
-  satisfaction: {
-    title: "Score user satisfaction to continue",
-    line: "Add an evaluation that scores how satisfied users are, and watch the score move week by week.",
-    icon: `<circle cx="12" cy="12" r="10" />
-          <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" />`,
-    button: "Set up evaluations",
-    quiet: "No satisfaction scores in this period.",
-    target: "onlineEvaluations",
-  },
-  topics: {
-    title: "Topics appear once enough traces arrive",
-    line: "LangWatch groups your traces into topics by what users ask; send more traffic to see them.",
-    icon: `<circle cx="12" cy="12" r="10" />
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />`,
-    button: "Connect traces",
-    quiet: "No traces with a topic in this period.",
     target: "traces",
   },
   scenarios: {

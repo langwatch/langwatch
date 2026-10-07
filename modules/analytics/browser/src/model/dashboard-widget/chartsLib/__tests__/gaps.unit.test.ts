@@ -7,7 +7,15 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Heatmap, Leaderboard, mergeBuckets, toNumber } from "../index";
+import {
+  AreaTimeseries,
+  averageOf,
+  Heatmap,
+  isLowerBound,
+  Leaderboard,
+  mergeBuckets,
+  toNumber,
+} from "../index";
 
 interface Element {
   type: unknown;
@@ -141,5 +149,139 @@ describe("Heatmap", () => {
   /** @scenario "A heatmap cell with no data is a gap unless the series counts" */
   it("draws it as 0 when the series counts", () => {
     expect(cells("count").map((cell) => cell.props?.title)).toEqual(["Mon / 1: 4", "Mon / 2: 0"]);
+  });
+});
+
+/** The props of every element in a tree whose props carry `key` as a data key. */
+function elementsWithDataKey(tree: unknown, pattern: RegExp): Record<string, unknown>[] {
+  return descendants(tree)
+    .map((element) => element.props ?? {})
+    .filter((props) => typeof props.dataKey === "string" && pattern.test(props.dataKey));
+}
+
+describe("AreaTimeseries", () => {
+  const data = [
+    { day: "2026-10-06T00:00:00Z", p95: 400 },
+    { day: "2026-10-07T00:00:00Z", p95: null },
+    { day: "2026-10-08T00:00:00Z", p95: 300 },
+  ];
+
+  /** @scenario "A measure gap breaks the line with a faint dashed bridge" */
+  it("bridges a gap with a dashed line between the buckets either side", () => {
+    const tree = AreaTimeseries({ data, x: "day", series: "p95" });
+
+    const [bridge, ...others] = elementsWithDataKey(tree, /__gap/);
+    expect(others).toEqual([]);
+    expect(bridge).toMatchObject({ strokeDasharray: "3 3", connectNulls: true });
+    const rows = descendants(tree).find((element) => Array.isArray(element.props?.data))?.props
+      ?.data as Record<string, unknown>[];
+    expect(rows.map((row) => row[bridge?.dataKey as string])).toEqual([400, undefined, 300]);
+  });
+
+  /** @scenario "A measure gap breaks the line with a faint dashed bridge" */
+  it("draws no bridge on a stacked chart", () => {
+    const tree = AreaTimeseries({ data, x: "day", series: "p95", stacked: true });
+
+    expect(elementsWithDataKey(tree, /__gap/)).toEqual([]);
+  });
+
+  /** @scenario "The hover over a gap says there is no data" */
+  it("says there is no data on the bucket's date, or the widget's own words", () => {
+    const hover = (gapLabel?: (date: string) => string) => {
+      const tree = AreaTimeseries({
+        data,
+        x: "day",
+        series: "p95",
+        ...(gapLabel ? { gapLabel } : {}),
+      });
+      const tooltip = descendants(tree).find((element) => "content" in (element.props ?? {}));
+      const content = tooltip?.props?.content as (props: unknown) => unknown;
+      const shown = content({ active: true, label: data[1]?.day, payload: [{ payload: data[1] }] });
+      return descendants(shown).flatMap((element) =>
+        element.children.filter((child) => typeof child === "string"),
+      );
+    };
+
+    expect(hover()).toEqual(["No data on Oct 7"]);
+    expect(hover((date) => `No evals ran on ${date}`)).toEqual(["No evals ran on Oct 7"]);
+  });
+});
+
+describe("averageOf", () => {
+  /** @scenario "A big number never averages in empty buckets" */
+  it("leaves out buckets with no value and weighs the rest by their rows", () => {
+    const rows = [
+      { latency: 200, n: 1 },
+      { latency: null, n: 0 },
+      { latency: 400, n: 3 },
+    ];
+
+    expect(averageOf({ rows, key: "latency" })).toBe(300);
+    expect(averageOf({ rows, key: "latency", weight: "n" })).toBe(350);
+  });
+
+  /** @scenario "A big number never averages in empty buckets" */
+  it("is null when no bucket has a value", () => {
+    expect(averageOf({ rows: [{ latency: null }], key: "latency" })).toBeNull();
+  });
+});
+
+describe("isLowerBound", () => {
+  const partial = {
+    state: "partial" as const,
+    unit: "traces",
+    total: 10,
+    fields: [
+      { field: "TotalCost", label: "total cost", present: 10 },
+      { field: "TopicId", label: "topic", present: 6 },
+    ],
+    unpriced: { count: 3, models: ["my-finetune-v2"] },
+  };
+
+  /** @scenario "A sum is a lower bound when some rows lack its field or its price" */
+  it("is a lower bound for a cost with unpriced traces, or a field some rows lack", () => {
+    expect(isLowerBound({ completeness: partial, field: "TotalCost" })).toBe(true);
+    expect(isLowerBound({ completeness: partial, field: "TopicId" })).toBe(true);
+  });
+
+  /** @scenario "A sum is a lower bound when some rows lack its field or its price" */
+  it("is not for a field every row carries, nor on a complete or absent report", () => {
+    expect(
+      isLowerBound({ completeness: { ...partial, unpriced: undefined }, field: "TotalCost" }),
+    ).toBe(false);
+    expect(
+      isLowerBound({ completeness: { ...partial, state: "complete" }, field: "TopicId" }),
+    ).toBe(false);
+    expect(isLowerBound({ completeness: null, field: "TotalCost" })).toBe(false);
+  });
+});
+
+describe("Leaderboard with unpriced models", () => {
+  /** @scenario "A cost leaderboard lists an unpriced model with no price" */
+  it("lists each unpriced model with no price and a dash, last", () => {
+    const tree = Leaderboard({
+      data: [
+        { model: "my-finetune-v2", cost: 0 },
+        { model: "gpt-5", cost: 9 },
+      ],
+      labelKey: "model",
+      valueKey: "cost",
+      format: "currency",
+      unpriced: { models: ["my-finetune-v2", "llama-local"] },
+    });
+
+    const texts = descendants(tree).flatMap((element) =>
+      element.children.filter((child) => typeof child === "string"),
+    );
+    expect(texts).toEqual([
+      "gpt-5",
+      "$9",
+      "my-finetune-v2",
+      "no price",
+      "–",
+      "llama-local",
+      "no price",
+      "–",
+    ]);
   });
 });

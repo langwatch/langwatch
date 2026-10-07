@@ -1,6 +1,6 @@
 /**
- * The templates library's search, chips, counts, sections and address.
- * @see modules/dashboard/specs/dashboards-v2.feature
+ * The templates finder's pool, search, category chip, counts, sections and address.
+ * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
 import { existsSync } from "node:fs";
@@ -8,14 +8,20 @@ import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
-import { CATALOGUE_TEMPLATES, CATALOGUE_WIDGETS, TRUNKS } from "../catalogue/index.ts";
 import {
-  catalogueChipCounts,
+  CATALOGUE_TEMPLATES,
+  CATALOGUE_WIDGETS,
+  focusTemplateId,
+  TRUNKS,
+} from "../catalogue/index.ts";
+import {
   type CatalogueFilters,
   filterCatalogue,
   NO_CATALOGUE_FILTERS,
+  trunkCounts,
 } from "../model/catalogue-filter.ts";
 import {
+  finderPool,
   type LibraryTemplate,
   TEMPLATE_LIBRARY,
   TEMPLATE_PREVIEW_IDS,
@@ -25,53 +31,55 @@ import {
   templateSections,
 } from "../model/template-library.ts";
 
-const entry = ({
-  id,
-  trunk = "Growth",
-  agentKinds = [],
-  status = "ready",
-  searchText = id,
-}: Partial<Omit<LibraryTemplate, "board">> & { id: string }): LibraryTemplate => ({
-  board: { id, name: id, description: "", widgets: [] },
-  trunk,
-  agentKinds,
-  widgetCount: 1,
-  status,
-  searchText,
-  preview: { kind: "layout", widgets: [] },
-});
-
-const TEMPLATES = [
-  entry({ id: "costs", trunk: "Profit", agentKinds: ["voice"], status: "coming-soon" }),
-  entry({ id: "models", trunk: "Profit", status: "ready" }),
-  entry({ id: "calls", trunk: "Growth", agentKinds: ["voice"], status: "ready" }),
-  entry({ id: "fields", trunk: "Growth", agentKinds: ["extraction"], status: "coming-soon" }),
-  entry({ id: "safety", trunk: "Protect", agentKinds: ["regulated"], status: "coming-soon" }),
-];
+const catalogue = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
+const POOL = finderPool({});
+const poolIds = (templates: readonly LibraryTemplate[]) => templates.map(({ board }) => board.id);
 
 const shownIds = (filters: Partial<CatalogueFilters>) =>
-  filterCatalogue({ items: TEMPLATES, filters: { ...NO_CATALOGUE_FILTERS, ...filters } }).map(
-    ({ board }) => board.id,
-  );
+  poolIds(filterCatalogue({ items: POOL, filters: { ...NO_CATALOGUE_FILTERS, ...filters } }));
 
-describe("the templates library", () => {
-  describe("given every catalogue template", () => {
-    /** @scenario "AC101 Templates library: every template is listed by trunk, ready ones first" */
-    it("lists each one once, in trunk order, ready ones first in each section", () => {
-      const sections = templateSections({ templates: TEMPLATE_LIBRARY });
+describe("the templates finder", () => {
+  describe("given no agent type picked", () => {
+    /** @scenario "AC101 Templates library: every ready template is listed by trunk" */
+    it("lists every ready template once, in trunk order, each base before its focus templates", () => {
+      const sections = templateSections({ templates: POOL });
+      const listed = sections.flatMap(({ items }) => poolIds(items));
 
-      const listed = sections.flatMap(({ items }) => items.map(({ board }) => board.id));
-      expect(listed.toSorted()).toEqual(CATALOGUE_TEMPLATES.map(({ id }) => id).toSorted());
+      expect(listed.toSorted()).toEqual(poolIds(POOL).toSorted());
       expect(sections.map(({ key }) => key)).toEqual(
         TRUNKS.filter((trunk) => sections.some((section) => section.key === trunk)),
       );
-      for (const { items } of sections) {
-        const statuses = items.map(({ status }) => status);
-        const firstSoon = statuses.indexOf("coming-soon");
-        expect(statuses.slice(firstSoon === -1 ? statuses.length : firstSoon)).not.toContain(
-          "ready",
-        );
+      expect(listed.indexOf(focusTemplateId({ baseId: "release", kind: "rag" }))).toBeGreaterThan(
+        listed.indexOf("release"),
+      );
+    });
+
+    /** @scenario "Finder: coming-soon, coding-agent and org-wide templates are hidden" */
+    it("offers no template still missing widget code", () => {
+      expect(POOL.every(({ board }) => board.comingSoon === void 0)).toBe(true);
+      expect(TEMPLATE_LIBRARY.some(({ board }) => board.comingSoon !== void 0)).toBe(true);
+    });
+
+    /** @scenario "Finder: coming-soon, coding-agent and org-wide templates are hidden" */
+    it("keeps coding-agent and org-wide templates out of the finder", () => {
+      const known = new Set(poolIds(TEMPLATE_LIBRARY));
+      for (const template of CATALOGUE_TEMPLATES) {
+        const hidden = template.scope === "org" || template.focusKind === "coding";
+        expect(known.has(template.id), template.id).toBe(!hidden);
       }
+    });
+  });
+
+  describe("when the member picks an agent type", () => {
+    /** @scenario "Finder: an agent-type chip finds only the templates made for that type" */
+    it("offers only the ready templates made for that type", () => {
+      const voice = finderPool({ agentKind: "voice" });
+
+      expect(poolIds(voice)).toEqual(
+        poolIds(POOL.filter(({ board }) => catalogue.get(board.id)?.focusKind === "voice")),
+      );
+      expect(poolIds(voice)).toContain("calls");
+      expect(poolIds(voice)).not.toContain("cockpit");
     });
   });
 
@@ -83,12 +91,7 @@ describe("the templates library", () => {
       ["a widget question", "which model costs me the most", "costs"],
       ["an agent kind", "VOICE AGENT", "calls"],
     ])("matches %s, ignoring case", (_what, search, id) => {
-      const shown = filterCatalogue({
-        items: TEMPLATE_LIBRARY,
-        filters: { ...NO_CATALOGUE_FILTERS, search },
-      });
-
-      expect(shown.map(({ board }) => board.id)).toContain(id);
+      expect(shownIds({ search })).toContain(id);
     });
 
     /** @scenario "AC102 Templates library: search matches name, job, widget questions and agent kinds" */
@@ -97,73 +100,59 @@ describe("the templates library", () => {
     });
   });
 
-  describe("when the member picks chips", () => {
-    /** @scenario "AC103 Templates library: filter chips narrow by trunk, agent kind and readiness" */
-    it("shows templates matching any chip in one group", () => {
-      expect(shownIds({ trunks: ["Profit", "Protect"] })).toEqual(["costs", "models", "safety"]);
-    });
-
-    /** @scenario "AC103 Templates library: filter chips narrow by trunk, agent kind and readiness" */
-    it("applies chips in different groups together", () => {
-      expect(shownIds({ trunks: ["Profit"], statuses: ["ready"] })).toEqual(["models"]);
-    });
-
-    /** @scenario "AC103 Templates library: filter chips narrow by trunk, agent kind and readiness" */
-    it("keeps a template that names no agent kind under every agent kind", () => {
-      expect(shownIds({ agentKinds: ["voice"] })).toEqual(["costs", "models", "calls"]);
-    });
-
-    /** @scenario "AC103 Templates library: filter chips narrow by trunk, agent kind and readiness" */
-    it("counts each chip with the search and the other groups applied, never its own", () => {
-      const counts = catalogueChipCounts({
-        items: TEMPLATES,
-        filters: { ...NO_CATALOGUE_FILTERS, trunks: ["Profit"], statuses: ["ready"] },
+  describe("when the member picks a category", () => {
+    /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
+    it("shows only that category's templates, with the search applied", () => {
+      const result = filterCatalogue({
+        items: POOL,
+        filters: { ...NO_CATALOGUE_FILTERS, trunk: "Profit", search: "cost" },
       });
 
-      expect(counts.trunks).toEqual({
-        all: 2,
-        byValue: { Profit: 1, Growth: 1, Protect: 0, Trust: 0 },
+      expect(result.length).toBeGreaterThan(0);
+      for (const { board, trunk, searchText } of result) {
+        expect(trunk, board.id).toBe("Profit");
+        expect(searchText, board.id).toContain("cost");
+      }
+    });
+
+    /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
+    it("counts each category with the search applied, never another category", () => {
+      const counts = trunkCounts({ items: POOL, search: "cost" });
+      const searched = filterCatalogue({
+        items: POOL,
+        filters: { ...NO_CATALOGUE_FILTERS, search: "cost" },
       });
-      expect(counts.statuses).toEqual({ all: 2, byValue: { ready: 1, "coming-soon": 1 } });
-      expect(counts.agentKinds.all).toBe(1);
-      expect(counts.agentKinds.byValue.voice).toBe(1);
+
+      expect(counts.all).toBe(searched.length);
+      for (const trunk of TRUNKS) {
+        expect(counts.byTrunk[trunk], trunk).toBe(
+          searched.filter((template) => template.trunk === trunk).length,
+        );
+      }
     });
   });
 
   describe("given a view in the address", () => {
     /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
     it("writes the search and chips over the rest of the query, and reads them back", () => {
-      const filters: CatalogueFilters = {
-        search: "cost",
-        trunks: ["Profit", "Growth"],
-        agentKinds: ["voice"],
-        statuses: [],
-      };
+      const filters: CatalogueFilters = { search: "cost", trunk: "Profit", agentKind: "voice" };
 
       const query = templateFiltersQuery({ query: { other: "kept" }, filters });
 
-      expect(query).toEqual({
-        other: "kept",
-        q: "cost",
-        trunk: "Profit,Growth",
-        agent: "voice",
-        status: undefined,
-      });
+      expect(query).toEqual({ other: "kept", q: "cost", trunk: "Profit", agent: "voice" });
       expect(templateFiltersFromQuery(query)).toEqual(filters);
     });
 
     /** @scenario "AC104 Templates library: the search and filters are kept in the address" */
     it("drops chip values it does not know", () => {
-      expect(templateFiltersFromQuery({ trunk: "Profit,Nope", status: "later" })).toEqual({
-        ...NO_CATALOGUE_FILTERS,
-        trunks: ["Profit"],
-      });
+      expect(templateFiltersFromQuery({ trunk: "Growth", agent: "robot" })).toEqual(
+        NO_CATALOGUE_FILTERS,
+      );
     });
   });
 
   describe("given each template's preview", () => {
     const titles = new Map(CATALOGUE_WIDGETS.map(({ id, title }) => [id, title]));
-    const catalogue = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
 
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
     it("shows the captured image of a template that has one", () => {

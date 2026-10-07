@@ -294,6 +294,7 @@ const SPANS: UngatedViewDefinition = {
       type: "Nullable(String)",
       description: "Parent span, null for the root span.",
       sourceColumns: ["ParentSpanId"],
+      nullIsValue: true,
     },
     {
       name: "StartTime",
@@ -516,6 +517,7 @@ const EVALUATIONS: UngatedViewDefinition = {
       type: "Nullable(DateTime64(3))",
       description: "When the run was archived, null while it is live.",
       sourceColumns: ["ArchivedAt"],
+      nullIsValue: true,
     },
     {
       name: "CapturedInputs",
@@ -642,6 +644,7 @@ const SIMULATIONS: UngatedViewDefinition = {
       type: "Nullable(DateTime64(3))",
       description: "When the run was archived, null while it is live.",
       sourceColumns: ["ArchivedAt"],
+      nullIsValue: true,
     },
     {
       name: "MessageContents",

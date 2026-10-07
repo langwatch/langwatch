@@ -177,7 +177,7 @@ describe("Ask Langy on a widget card", () => {
 
   describe("when the member opens a widget's menu without Langy", () => {
     /** @scenario "AC143b Widget menu: without Langy the menu offers no alert or report" */
-    it("offers Edit, Duplicate and Delete only", async () => {
+    it("offers no Edit with Langy, alert or report", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       openBoard({ server: inMemoryServer(), permissions: MEMBER });
 
@@ -185,7 +185,9 @@ describe("Ask Langy on a widget card", () => {
 
       const items = await screen.findAllByRole("menuitem");
       expect(items.map((item) => item.textContent?.trim())).toEqual([
-        "Edit",
+        "Edit code",
+        "Copy widget id",
+        "Copy API snippet",
         "Duplicate",
         "Delete",
       ]);

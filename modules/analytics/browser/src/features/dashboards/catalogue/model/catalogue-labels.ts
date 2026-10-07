@@ -28,6 +28,25 @@ export const AGENT_KIND_LABELS: Readonly<Record<AgentKind, string>> = {
   coding: "Coding agent",
 };
 
+/** The finder's agent-type chips: the full names, shortened where they run long. */
+export const AGENT_KIND_CHIP_LABELS: Readonly<Record<AgentKind, string>> = {
+  ...AGENT_KIND_LABELS,
+  vendor: "Agent platform",
+};
+
+/** How a focus template names its agent kind: "Release check: voice focus". */
+export const AGENT_KIND_FOCUS_LABELS: Readonly<Record<AgentKind, string>> = {
+  "support-bot": "support bot",
+  rag: "RAG",
+  vendor: "agent platform",
+  voice: "voice",
+  extraction: "extraction",
+  regulated: "regulated",
+  "tools-agent": "tools agent",
+  generative: "generative",
+  coding: "coding",
+};
+
 export const PERSONAS = [
   "eng",
   "product",
@@ -78,8 +97,28 @@ export const QUESTION_TYPE_LABELS: Readonly<Record<QuestionType, string>> = {
   prove: "Can I show or prove it?",
 };
 
-export const TRUNKS = ["Profit", "Growth", "Protect", "Trust"] as const;
+/** The question tree's trunks: each a verb for what the member wants from their agent. */
+export const TRUNKS = ["Profit", "Grow", "Protect", "Trust"] as const;
 export type Trunk = (typeof TRUNKS)[number];
+
+/** The question each trunk answers. */
+export const TRUNK_QUESTIONS: Readonly<Record<Trunk, string>> = {
+  Profit: "Am I spending well?",
+  Grow: "Is it growing my business?",
+  Protect: "Can it hurt me?",
+  Trust: "Can I trust the numbers?",
+};
+
+/** What a trunk's templates are for, under its question when the finder shows one trunk. */
+export const TRUNK_PITCHES: Readonly<Record<Trunk, string>> = {
+  Profit:
+    "See what your agent costs, where the money goes and what each result costs, so you can spend less without losing quality.",
+  Grow: "See who uses your agent, what they ask and whether they come back, so you know what to build next.",
+  Protect:
+    "Check that answers are right, safe and working, and that a change did not break anything. Use these before and after you ship.",
+  Trust:
+    "Check that your traces carry what the other dashboards need. Use this when a number looks wrong.",
+};
 
 /** Whether a widget reads one project or the whole org. */
 export type CatalogueScope = "project" | "org";

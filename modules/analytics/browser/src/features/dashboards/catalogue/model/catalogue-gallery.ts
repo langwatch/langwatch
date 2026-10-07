@@ -1,6 +1,6 @@
 /**
- * The template gallery from the catalogue: every template, built ones first. A template
- * whose widgets all have code is laid out and offered; the rest say how far along they are.
+ * The template gallery from the catalogue: every template as a board. A template whose
+ * widgets all have code is laid out; the rest say how far along they are.
  */
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
@@ -57,7 +57,5 @@ function galleryTemplate(template: CatalogueTemplate): BoardTemplate {
   return { ...base, widgets: stackWidgets(built) };
 }
 
-/** Every catalogue template: the ones that can be made today, then those coming soon. */
-export const GALLERY_TEMPLATES: readonly BoardTemplate[] = CATALOGUE_TEMPLATES.map(
-  galleryTemplate,
-).toSorted((a, b) => Number(a.comingSoon !== void 0) - Number(b.comingSoon !== void 0));
+/** Every catalogue template, in catalogue order. */
+export const GALLERY_TEMPLATES: readonly BoardTemplate[] = CATALOGUE_TEMPLATES.map(galleryTemplate);

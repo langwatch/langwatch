@@ -8,6 +8,7 @@ import {
   CHART_FRAME_HEARTBEAT_INTERVAL_MS,
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
+  CHART_QUERY_MAX_RETRIES,
 } from "./chart-frame-protocol.ts";
 import {
   createChartQueryRunner,
@@ -195,6 +196,7 @@ export function buildShimScript(): string {
           return planChartQueryRetry({
             rejection: args.rejection,
             retriesUsed: args.retriesUsed,
+            maxRetries: ${CHART_QUERY_MAX_RETRIES},
             random: Math.random
           });
         },

@@ -101,7 +101,8 @@ interface LwQueryCompleteness {
   readonly buckets?: readonly LwCompletenessBucket[];
   /**
    * Only when the query reads cost: rows with at least one unpriced span, and their models.
-   * A cost total with unpriced rows is a lower bound ("$830+").
+   * A cost total with unpriced rows is a lower bound ("$830+"): ask \`isLowerBound\` from
+   * "@langwatch/charts".
    */
   readonly unpriced?: { readonly count: number; readonly models: readonly string[] };
 }

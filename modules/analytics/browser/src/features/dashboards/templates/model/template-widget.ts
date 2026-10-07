@@ -1,7 +1,7 @@
 /**
  * What every template builds its widgets from: a stored definition from code, its
- * description and named queries, plus the presence query its empty face runs, and
- * the full-width and half-width places on the chart grid.
+ * description and named queries, plus the presence query its empty face runs when it has a
+ * source to set up, and the full-width and half-width places on the chart grid.
  */
 
 import { CHART_GRID_COLUMNS } from "../../../../model/chart-grid.ts";
@@ -20,7 +20,7 @@ export function definition({
   code: WidgetCode;
   queries: Readonly<Record<string, string>>;
 }): DashboardWidgetDefinition {
-  const all = { ...queries, present: PRESENCE_SQL[code.source] };
+  const all = code.source ? { ...queries, present: PRESENCE_SQL[code.source] } : queries;
   return {
     version: DASHBOARD_WIDGET_DEFINITION_VERSION,
     code: code.tsx,

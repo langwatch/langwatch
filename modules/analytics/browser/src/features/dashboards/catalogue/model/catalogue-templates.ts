@@ -1,9 +1,16 @@
 /**
  * Every template: one dashboard each. Rogerio's boards are preloaded for their agent kinds.
- * Generated from the dashboards library draft on 2026-10-06; edit here from now on.
+ * A template's per-kind widget lists become their own "<Base>: <kind> focus" templates.
  */
 
-import type { AgentKind, CatalogueScope, Persona, Trunk } from "./catalogue-labels.ts";
+import {
+  AGENT_KIND_FOCUS_LABELS,
+  type AgentKind,
+  type CatalogueScope,
+  type Persona,
+  type Trunk,
+} from "./catalogue-labels.ts";
+import { CATALOGUE_WIDGETS } from "./catalogue-widgets.ts";
 
 export interface CatalogueTemplate {
   readonly id: string;
@@ -14,22 +21,31 @@ export interface CatalogueTemplate {
   readonly origin: "prototype" | "library";
   readonly scope: CatalogueScope;
   readonly isDefault: boolean;
-  /** The widgets, top to bottom, for any agent kind without its own list. */
+  /** The widgets, top to bottom. */
   readonly widgets: readonly string[];
-  readonly byAgentKind: Readonly<Partial<Record<AgentKind, readonly string[]>>>;
   /** The agent kinds whose projects get this board made for them; empty means gallery only. */
   readonly preloadFor: readonly AgentKind[];
+  /**
+   * The one agent kind the template is made for. It only helps find the template: the board
+   * it makes covers the whole project.
+   */
+  readonly focusKind?: AgentKind;
   /** What Langy is asked when a board is made from the template: a short written report. */
   readonly reportPrompt: string;
 }
 
-export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
+/** A template as written: its widgets, and other widgets for some agent kinds. */
+interface AuthoredTemplate extends Omit<CatalogueTemplate, "focusKind"> {
+  readonly byAgentKind: Readonly<Partial<Record<AgentKind, readonly string[]>>>;
+}
+
+const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
   {
     id: "cockpit",
-    name: "Agent Flight Deck",
+    name: "Agent health",
     job: "Is my agent doing its job and working normally? One glance.",
     personas: ["leader", "product", "ops", "eng"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: true,
@@ -49,7 +65,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "generative",
     ],
     reportPrompt:
-      'Write a short report on my "Agent Flight Deck" dashboard for the dashboard period. Is my agent doing its job and working normally? One glance. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my agent doing its job, and what does each success cost? (2) Is my agent up right now? (3) What is the one problem I should look at first this week? (4) What do users ask for most that my agent cannot do? (5) Does my agent resolve more conversations each day? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+      'Write a short report on my "Agent health" dashboard for the dashboard period. Is my agent doing its job and working normally? One glance. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my agent doing its job, and what does each success cost? (2) Is my agent up right now? (3) What is the one problem I should look at first this week? (4) What do users ask for most that my agent cannot do? (5) Does my agent resolve more conversations each day? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "costs",
@@ -112,7 +128,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Usage and adoption",
     job: "Who uses my agent, how much, and do users come back?",
     personas: ["product", "leader"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -127,7 +143,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "What users ask",
     job: "Learn what users want, and what my agent cannot do yet.",
     personas: ["product", "expert"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -151,7 +167,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Are users happy?",
     job: "Are users happy, and where are they frustrated?",
     personas: ["product", "ops"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -166,7 +182,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Answer quality",
     job: "Check whether my agent's answers are good, and where they fail.",
     personas: ["product", "qa", "expert"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -203,7 +219,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Questions my agent cannot answer",
     job: "I know the subject. Show me where my agent fails to answer, and why.",
     personas: ["expert", "product"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -227,7 +243,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Where my agent breaks",
     job: "Find the errors, failing steps and loops in my agent.",
     personas: ["eng", "ops"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -259,7 +275,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Make my agent faster",
     job: "Find out what makes my agent slow.",
     personas: ["eng"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -288,7 +304,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Tool use",
     job: "Does my agent pick the right tools, without wasted steps?",
     personas: ["eng", "prompt"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -303,7 +319,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Release check",
     job: "Decide if the next version of my agent can go out.",
     personas: ["qa", "eng", "product"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -334,7 +350,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Did my change help?",
     job: "I just changed a prompt, model or tool. Did the change help or hurt?",
     personas: ["eng", "prompt", "product"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -356,7 +372,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Can I trust my evals?",
     job: "Check that my automatic graders, tests and test sets tell the truth.",
     personas: ["qa", "expert"],
-    trunk: "Trust",
+    trunk: "Protect",
     origin: "library",
     scope: "project",
     isDefault: false,
@@ -422,7 +438,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "By customer",
     job: "See how each of my customers uses my agent, and how my agent does for them.",
     personas: ["ops", "product", "finance"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -437,7 +453,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Call quality",
     job: "Check that my voice agent's calls feel natural and get the job done.",
     personas: ["ops", "eng", "qa"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -452,7 +468,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Field accuracy",
     job: "See which fields and document types my agent gets wrong.",
     personas: ["expert", "ops", "qa"],
-    trunk: "Growth",
+    trunk: "Protect",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -467,7 +483,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Outputs users keep",
     job: "See whether users keep what my agent writes.",
     personas: ["product"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -544,7 +560,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "Building speed",
     job: "My coding sessions through the day: parallel work, idle time, what ran at night.",
     personas: ["eng"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -588,7 +604,7 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
     name: "My harness",
     job: "The skills, MCPs and CLIs I installed: use, effect and speed.",
     personas: ["eng"],
-    trunk: "Growth",
+    trunk: "Grow",
     origin: "prototype",
     scope: "project",
     isDefault: false,
@@ -628,3 +644,60 @@ export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = [
       "Write a short report on my \"The market\" dashboard for the dashboard period. My real coding-agent use priced on other vendors' rate cards. Prices only, no quality adjustment. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Is my seat cheaper than paying API list prices? (2) What would my last month cost with other vendors? (3) How many of my calls would be too big for other vendors' context limits? (4) How would my bill change at a different cache hit rate? (5) Do my tokens fall in vendors' peak-price hours? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.",
   },
 ];
+
+const QUESTIONS = new Map(CATALOGUE_WIDGETS.map(({ id, question }) => [id, question] as const));
+
+/** The report Langy is asked for: the board's job, then each widget's question in order. */
+function reportPromptFor({
+  name,
+  job,
+  widgets,
+}: Pick<CatalogueTemplate, "name" | "job" | "widgets">): string {
+  const questions = widgets.map((id, index) => `(${index + 1}) ${QUESTIONS.get(id) ?? id}`);
+  return [
+    `Write a short report on my "${name}" dashboard for the dashboard period. ${job}`,
+    "For each of these questions, answer in one or two sentences with the real numbers from",
+    `LangWatchQL: ${questions.join(" ")} Then name the one thing that most needs attention,`,
+    "and why. If a question has no data for the period, say so rather than guessing.",
+  ].join(" ");
+}
+
+/** A focus template's id: its base's, then its agent kind, so each stays stable. */
+export function focusTemplateId({ baseId, kind }: { baseId: string; kind: AgentKind }): string {
+  return `${baseId}__${kind}`;
+}
+
+/** The template as written, made for one agent kind when only one kind gets it preloaded. */
+function baseTemplate({ byAgentKind, ...template }: AuthoredTemplate): CatalogueTemplate {
+  const variantKinds = new Set(Object.keys(byAgentKind));
+  const [onlyKind, ...otherKinds] = template.preloadFor;
+  return {
+    ...template,
+    preloadFor: template.preloadFor.filter((kind) => !variantKinds.has(kind)),
+    ...(onlyKind && otherKinds.length === 0 ? { focusKind: onlyKind } : {}),
+  };
+}
+
+/** Each per-kind widget list as its own template, preloaded where the base was for that kind. */
+function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTemplate[] {
+  return (Object.entries(byAgentKind) as [AgentKind, readonly string[]][]).map(
+    ([kind, widgets]) => {
+      const name = `${base.name}: ${AGENT_KIND_FOCUS_LABELS[kind]} focus`;
+      return {
+        ...base,
+        id: focusTemplateId({ baseId: base.id, kind }),
+        name,
+        isDefault: false,
+        widgets,
+        preloadFor: base.preloadFor.includes(kind) ? [kind] : [],
+        focusKind: kind,
+        reportPrompt: reportPromptFor({ name, job: base.job, widgets }),
+      };
+    },
+  );
+}
+
+/** Every template, each base followed by its focus templates. */
+export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
+  (template) => [baseTemplate(template), ...focusTemplates(template)],
+);

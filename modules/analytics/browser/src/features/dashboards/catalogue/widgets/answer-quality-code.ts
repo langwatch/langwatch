@@ -5,8 +5,10 @@
  */
 
 import {
+  BUCKETS,
   CHART_STYLE,
   DATES,
+  GAP_BRIDGE,
   HEADLINE,
   NUMBERS,
   SERIES_CHART,
@@ -18,7 +20,7 @@ import {
 } from "../../templates/model/widget-code-parts.ts";
 import { SHARE_ROWS, SPARK, TOPIC_NAME } from "./answers-asks-parts.ts";
 
-const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, SERIES_CHART];
+const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE, SERIES_CHART];
 
 const OUTCOMES = `const FAILURES = [
   ["misunderstood", "Misunderstood", C.orange],
@@ -38,7 +40,8 @@ export const OUTCOMES_CODE = widgetCode({
   const closed = trend.data.reduce((sum, row) => sum + num(row.closed), 0);
   const resolved = trend.data.reduce((sum, row) => sum + num(row.resolved), 0);
   const previous = num(totals.data[0]?.closed_previous);
-  const points = trend.data.map((row) => {
+  const keys = ["closed", ...FAILURES.map(([key]) => key)];
+  const points = withBuckets(trend, keys).map((row) => {
     const point = { x: bucketLabel(row.bucket) };
     for (const [key] of FAILURES) {
       point[key] = ratio(row[key], row.closed);
@@ -126,7 +129,9 @@ const KAPPA_TARGET = 0.8;
 
 export const JUDGE_AGREEMENT_CODE = widgetCode({
   summary: "Agreement beyond chance between each judge and reviewer thumbs, week by week.",
-  subtitle: "Reviewers in LangWatch against the judges, 0.8 or more is good",
+  subtitle:
+    "Reviewers in LangWatch against the judges: how often they agree beyond chance (Cohen's " +
+    "kappa), 0.8 or more is good",
   source: "feedback",
   recharts: SERIES_CHART_IMPORTS,
   parts: SERIES_PARTS,
@@ -152,23 +157,9 @@ export const JUDGE_AGREEMENT_CODE = widgetCode({
     ...judges.map((name, index) => ({ key: "j" + index, label: name, colour: colours[index] })),
     { key: "target", label: "target", colour: C.red, dashed: true },
   ];
-  const latest = points[points.length - 1];
   return (
     <Panel>
       <SeriesChart points={points} series={series} format={kappa} domain={["auto", 1]} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4, fontSize: 11 }}>
-        {judges.map((name, index) => {
-          const value = latest["j" + index];
-          if (value === undefined) return null;
-          const colour = value < ${KAPPA_TARGET} ? C.red : C.text;
-          return (
-            <span key={name} title={count(reviewed[name]) + " answers reviewed in the period"}>
-              <span style={{ color: C.subtle }}>{name + " this week "}</span>
-              <b style={{ color: colour }}>{kappa(value)}</b>
-            </span>
-          );
-        })}
-      </div>
     </Panel>
   );`,
 });
@@ -223,7 +214,8 @@ export const FAILURE_SOURCE_CODE = widgetCode({
   const searched = sum("searched");
   const failures = sum("retrieval") + sum("generation") + sum("errors");
   const ofFailed = (value) => count(value) + " · " + pct(ratio(value, failures), 0);
-  const points = trend.data.map((row) => ({
+  const counts = ["retrieval", "generation", "errors"].map((key) => ({ key, kind: "count" }));
+  const points = withBuckets(trend, counts).map((row) => ({
     x: bucketLabel(row.bucket),
     retrieval: num(row.retrieval),
     generation: num(row.generation),
@@ -259,7 +251,7 @@ export const EMPTY_RETRIEVAL_CODE = widgetCode({
   const sum = (key) => trend.data.reduce((total, row) => total + num(row[key]), 0);
   const questions = sum("questions");
   const empty = sum("empty_searches");
-  const points = trend.data.map((row) => ({
+  const points = withBuckets(trend, ["empty_searches", "questions"]).map((row) => ({
     x: bucketLabel(row.bucket),
     rate: ratio(row.empty_searches, row.questions),
   }));

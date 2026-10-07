@@ -3,6 +3,7 @@
  * "Duplicate to edit". No procedure copies a board; a failure removes the half-made one.
  */
 
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
@@ -15,6 +16,7 @@ import {
   templateBoardName,
 } from "../model/boards.ts";
 import { type CuratedBoard, curatedCopyWidgets } from "../model/curated-boards.ts";
+import { catalogueSource } from "../model/widget-source.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
@@ -24,7 +26,12 @@ type BoardSource = {
   name: string;
   description: string | null;
   widgets: () => Promise<readonly BoardTemplateWidget[]>;
+  /** Where each new widget says it came from: its catalogue widget, or the copied one's. */
+  widgetSource: (widget: BoardTemplateWidget) => DashboardWidgetSource | undefined;
 };
+
+/** A template's widgets are catalogue widgets, keyed by their catalogue id. */
+const fromCatalogue = (widget: BoardTemplateWidget) => catalogueSource(widget.key);
 
 /** The board just made and opened, for what follows it, such as a Langy draft. */
 export type CreatedBoard = {
@@ -45,16 +52,19 @@ export function useBoardFromTemplate() {
   const fill = async ({
     description,
     widgets,
+    widgetSource,
     dashboardId,
   }: {
     description: string | null;
     widgets: readonly BoardTemplateWidget[];
+    widgetSource: BoardSource["widgetSource"];
     dashboardId: string;
   }) => {
     await client.dashboards.updateDetails.mutate({ projectId, dashboardId, description });
     // Independent rows, so the creates run together; the layout lands in one write after.
     const layouts = await Promise.all(
-      widgets.map(async ({ name, definition, layout }) => {
+      widgets.map(async (widget) => {
+        const { name, definition, layout } = widget;
         const created = await client.dashboardWidgets.create.mutate({
           projectId,
           dashboardId,
@@ -63,6 +73,7 @@ export function useBoardFromTemplate() {
           queries: definition.queries,
           description: definition.description,
           prompt: definition.prompt,
+          source: widgetSource(widget),
         });
         return { graphId: created.id, ...layout };
       }),
@@ -94,7 +105,12 @@ export function useBoardFromTemplate() {
         name: templateBoardName({ templateName: source.name, existingNames }),
       });
       dashboardId = board.id;
-      await fill({ description: source.description, widgets, dashboardId });
+      await fill({
+        description: source.description,
+        widgets,
+        widgetSource: source.widgetSource,
+        dashboardId,
+      });
       // Re-read first, so the new board is listed by the time its address opens.
       await refresh();
       host.navigate(dashboardsPath({ projectSlug, dashboardId }));
@@ -121,7 +137,11 @@ export function useBoardFromTemplate() {
     existingNames: readonly string[];
   }) =>
     createFrom({
-      source: { ...template, widgets: () => Promise.resolve(template.widgets) },
+      source: {
+        ...template,
+        widgets: () => Promise.resolve(template.widgets),
+        widgetSource: fromCatalogue,
+      },
       existingNames,
       fallbackTitle: "Couldn't create the dashboard from the template",
     });
@@ -139,6 +159,7 @@ export function useBoardFromTemplate() {
         id: board.id,
         name: boardCopyName(board.name),
         description: board.description,
+        widgetSource: ({ definition }) => definition.source,
         widgets: async () => {
           const stored = await utils.dashboardWidgets.list.fetch({ projectId });
           return boardCopyWidgets(boardWidgetsOf({ widgets: stored, dashboardId: board.id }));
@@ -162,6 +183,7 @@ export function useBoardFromTemplate() {
         name: curatedCopyName(board.name),
         description: board.job,
         widgets: () => Promise.resolve(curatedCopyWidgets(board)),
+        widgetSource: fromCatalogue,
       },
       existingNames,
       fallbackTitle: "Couldn't duplicate the dashboard",

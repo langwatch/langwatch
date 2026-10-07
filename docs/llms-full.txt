@@ -40355,6 +40355,9 @@ Once connected, your agent has these dashboard tools:
 - `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
   it returns. Use this to check a query before it goes into a widget.
 - `add_dashboard_widget`: create a custom widget and add it to a dashboard.
+- `update_dashboard_widget`: change a widget's name, code, queries or
+  description. Pass the dashboard id, the widget id, and only the fields to
+  change. Every field you leave out keeps its value.
 
 ### The widget definition format
 
@@ -40443,6 +40446,23 @@ for the last 7 days.
 Your agent will validate the LWQL with `run_query`, write the widget's TSX
 code against `LW.useChartQuery`, and call `add_dashboard_widget` to add it to
 the board.
+
+### Edit a widget through the REST API
+
+The same edit works without MCP. Send a `PATCH` with your project API key and
+only the fields to change:
+
+```bash
+curl -X PATCH "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/dashboard-widgets/$WIDGET_ID" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Errors per day", "code": "<the widget code>"}'
+```
+
+The body takes any of `name`, `code`, `queries` and `description`. The answer
+is the updated widget. Each widget also records where it came from in
+`definition.source`: a catalogue template, Langy, the code editor or the API.
+A widget you create through the API without a `source` is recorded as `api`.
 
 ---
 

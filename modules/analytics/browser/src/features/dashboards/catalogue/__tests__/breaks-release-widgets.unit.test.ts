@@ -77,7 +77,8 @@ describe("given the Release check widgets", () => {
     expect(sql.costs).toContain("median(duration_ms) AS typical_ms");
     expect(sql.costs).toContain("FROM simulation_trace_metrics");
     expect(code).toContain("Math.min(current, 1 - current)");
-    expect(code).toContain("Hold the newest run");
+    expect(code).toContain('"Scenarios worse"');
+    expect(code).not.toContain("Hold the newest run");
   });
 
   /** @scenario "AC66 Release check: flaky tests show each scenario's last ten runs" */

@@ -127,9 +127,10 @@ Feature: Dashboards v1
   Scenario: AC15 Widget menu actions persist after reload
     Given a widget on a board, including one made from the template
     When the member opens its menu
-    Then it offers Edit, Duplicate and Delete
-    And Edit opens the widget drawer on that widget's own code and queries
+    Then it offers Edit code, Copy widget id, Copy API snippet, Duplicate and Delete
+    And Edit code opens the widget editor on that widget's own code and queries
     And a Duplicate, a Delete, a move or a resize on the grid is still there after reload
+    # (changed by langwatch/tasks#911: the menu follows the prototype; see dashboards-widget-flow.feature)
 
   @integration
   Scenario: AC16 Ask Langy from the board
@@ -303,7 +304,7 @@ Feature: Dashboards v1
   # AC 12: "Only working questions are offered" (changed by langwatch/tasks#911: the picker lists every question with or without Langy) → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block
   # AC 14: "Rename and describe" → Scenario: AC14 Rename and describe
-  # AC 15: "Widget menu" (changed: Edit, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload
+  # AC 15: "Widget menu" (changed: Edit code, Copy widget id, Copy API snippet, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload
   # AC 16: "Ask Langy from the board" → Scenario: AC16 Ask Langy from the board
   # AC 17: "Langy insights on a block" (withdrawn: a widget's result lives in its sandboxed frame; no scenario until it can be read)
   # AC 18: "Sharing removed: every board is visible to every project member" (changed by langwatch/tasks#911) -> Scenario: AC18 Every board in the project is visible to every member; Scenario: AC18 Blocks on any board are reachable to every member; Scenario: AC18 Saved charts on any board are reachable to every member

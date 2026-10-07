@@ -15,6 +15,7 @@ import {
   dashboardWidgetNameSchema,
   dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
+  dashboardWidgetSourceSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
@@ -80,6 +81,7 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       queries: dashboardWidgetQueriesSchema,
       description: dashboardWidgetDescriptionSchema.optional(),
       prompt: dashboardWidgetPromptSchema.optional(),
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)
@@ -92,6 +94,8 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema.optional(),
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      /** Kept as stored when absent. */
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)

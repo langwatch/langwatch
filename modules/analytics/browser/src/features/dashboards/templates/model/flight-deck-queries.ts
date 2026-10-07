@@ -6,8 +6,7 @@
 
 import { bucketOf, inPeriod, inPeriodAndPrevious, START } from "./lwql-period.ts";
 
-const COMPARISON_WINDOW = inPeriodAndPrevious("BucketStart");
-
+/** Cost reads `TotalCost` of each trace, so the completeness report counts the unpriced ones. */
 export const PERIOD_COMPARISON_SQL = `SELECT
   uniqExactIf(TraceId, OccurredAt >= ${START}) AS requests,
   uniqExactIf(TraceId, OccurredAt < ${START}) AS requests_prev,
@@ -15,8 +14,8 @@ export const PERIOD_COMPARISON_SQL = `SELECT
   uniqExactIf(TraceId, OccurredAt < ${START} AND HasError) AS errors_prev,
   quantileExactIf(0.95)(TotalDurationMs, OccurredAt >= ${START}) AS p95_ms,
   quantileExactIf(0.95)(TotalDurationMs, OccurredAt < ${START}) AS p95_ms_prev,
-  (SELECT sumIf(CostSum, BucketStart >= ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost,
-  (SELECT sumIf(CostSum, BucketStart < ${START}) FROM trace_metrics_by_minute WHERE ${COMPARISON_WINDOW}) AS cost_prev
+  sumIf(TotalCost, OccurredAt >= ${START}) AS cost,
+  sumIf(TotalCost, OccurredAt < ${START}) AS cost_prev
 FROM trace_metrics
 WHERE ${inPeriodAndPrevious("OccurredAt")}`;
 
@@ -31,7 +30,7 @@ ORDER BY bucket`;
 
 export const COST_SUMMARY_SQL = `SELECT
   uniqExact(TraceId) AS traces,
-  (SELECT sum(CostSum) FROM trace_metrics_by_minute WHERE ${inPeriod("BucketStart")}) AS cost,
+  sum(TotalCost) AS cost,
   countIf(NOT HasError) AS successes,
   sum(PromptTokens) AS tokens_in,
   sum(CompletionTokens) AS tokens_out

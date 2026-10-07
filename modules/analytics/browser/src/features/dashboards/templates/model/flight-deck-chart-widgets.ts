@@ -4,8 +4,11 @@
  */
 
 import {
+  BUCKETS,
   CHART_STYLE,
+  COMPLETENESS,
   DATES,
+  GAP_BRIDGE,
   NUMBERS,
   THUMBS,
   widgetCode,
@@ -15,11 +18,14 @@ import {
 /** The Status tiles, with the not-connected face of `source`. */
 export const statusCode = ({ source }: { source: WidgetSource }) =>
   widgetCode({
-    summary: "Request volume, success rate, p95 latency and total cost against the period before.",
-    subtitle: "Traffic, quality, latency and cost at a glance",
+    summary:
+      "Request volume, success rate, response time and total cost against the period before.",
+    subtitle:
+      "Traffic, quality, latency and cost at a glance. Response time is the 95th percentile: " +
+      "1 in 20 traces took longer",
     source,
     compactCallToAction: true,
-    parts: [NUMBERS],
+    parts: [NUMBERS, COMPLETENESS],
     components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
@@ -68,9 +74,9 @@ function Tile({ label, value, current, previous, rising }) {
           current={requests} previous={requestsPrev} rising="neutral" />
         <Tile label="Success rate" value={pct(success)}
           current={success} previous={successPrev} rising="good" />
-        <Tile label="p95 latency" value={ms(num(row.p95_ms))}
+        <Tile label="Response time" value={ms(num(row.p95_ms))}
           current={num(row.p95_ms)} previous={num(row.p95_ms_prev)} rising="bad" />
-        <Tile label="Total cost" value={usd(num(row.cost))}
+        <Tile label="Total cost" value={usd(num(row.cost)) + plus(main)}
           current={num(row.cost)} previous={num(row.cost_prev)} rising="bad" />
       </div>
     </Panel>
@@ -80,8 +86,10 @@ function Tile({ label, value, current, previous, rising }) {
 export const STATUS_CODE = statusCode({ source: "traces" });
 
 export const THROUGHPUT_CODE = widgetCode({
-  summary: "Traces per bucket as bars, p95 latency as a line and the error rate as a low ribbon.",
-  subtitle: "Correlate traffic spikes with degradation",
+  summary: "Traces per bucket as bars, response time as a line and the error rate as a low ribbon.",
+  subtitle:
+    "Correlate traffic spikes with degradation. Response time is the 95th percentile: 1 in 20 " +
+    "traces took longer",
   source: "traces",
   recharts: [
     "ResponsiveContainer",
@@ -94,20 +102,22 @@ export const THROUGHPUT_CODE = widgetCode({
     "Bar",
     "Line",
   ],
-  parts: [NUMBERS, DATES, CHART_STYLE],
+  parts: [NUMBERS, DATES, CHART_STYLE, BUCKETS, GAP_BRIDGE],
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const points = main.data.map((row) => ({
+  const rows = withBuckets(main, [{ key: "throughput", kind: "count" }, "p95_ms", "error_rate"]);
+  const points = rows.map((row) => ({
     x: bucketLabel(row.bucket),
     throughput: num(row.throughput),
     p95: num(row.p95_ms),
     errorRate: num(row.error_rate),
   }));
-  const maxRate = Math.max(0.01, ...points.map((point) => point.errorRate));
-  const formats = { throughput: count, "p95 latency": ms, "error rate": pct };
+  const maxRate = Math.max(0.01, ...points.map((point) => point.errorRate ?? 0));
+  const formats = { throughput: count, "response time": ms, "error rate": pct };
+  const tip = (value, name) => [known(value) ? formats[name](value) : "No data", name];
   return (
     <Panel>
-      <Legend items={[[C.orange, "throughput"], [C.teal, "p95 latency"], [C.red, "error rate"]]} />
+      <Legend items={[[C.orange, "throughput"], [C.teal, "response time"], [C.red, "error rate"]]} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
@@ -119,13 +129,14 @@ export const THROUGHPUT_CODE = widgetCode({
             <YAxis yAxisId="ms" orientation="right" tick={AXIS} tickLine={false}
               axisLine={false} width={48} tickFormatter={ms} />
             <YAxis yAxisId="rate" hide domain={[0, maxRate * 4]} />
-            <Tooltip contentStyle={TIP} formatter={(value, name) => [formats[name](value), name]} />
+            <Tooltip contentStyle={TIP} formatter={tip} filterNull={false} />
             <Area yAxisId="rate" type="monotone" dataKey="errorRate" name="error rate"
               stroke={C.red} strokeWidth={1.2} fill={C.red} fillOpacity={0.1}
               isAnimationActive={false} />
             <Bar yAxisId="req" dataKey="throughput" name="throughput" fill={C.orange}
               radius={[2, 2, 0, 0]} isAnimationActive={false} />
-            <Line yAxisId="ms" type="monotone" dataKey="p95" name="p95 latency" stroke={C.teal}
+            {bridge({ key: "p95", colour: C.teal, yAxisId: "ms" })}
+            <Line yAxisId="ms" type="monotone" dataKey="p95" name="response time" stroke={C.teal}
               strokeWidth={2} dot={false} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -149,11 +160,11 @@ export const QUALITY_CODE = widgetCode({
   subtitle: "Evaluator pass rate over time, against the error rate",
   source: "judges",
   recharts: LINE_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE],
+  parts: [NUMBERS, DATES, CHART_STYLE, BUCKETS, GAP_BRIDGE],
   queries: ["passRate", "errorRate"],
   body: `  if (passRate.data.length === 0) return <Panel><CallToAction /></Panel>;
   const errors = new Map(errorRate.data.map((row) => [row.bucket, num(row.error_rate)]));
-  const points = passRate.data.map((row) => ({
+  const points = withBuckets(passRate, ["pass_rate"]).map((row) => ({
     x: bucketLabel(row.bucket),
     passRate: num(row.pass_rate),
     errorRate: errors.get(row.bucket) ?? null,
@@ -169,7 +180,9 @@ export const QUALITY_CODE = widgetCode({
               dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40} domain={[0, 1]}
               tickFormatter={(value) => pct(value, 0)} />
-            <Tooltip contentStyle={TIP} formatter={(value, name) => [pct(value), name]} />
+            <Tooltip contentStyle={TIP} formatter={tipValue(pct)} filterNull={false} />
+            {bridge({ key: "passRate", colour: C.teal })}
+            {bridge({ key: "errorRate", colour: C.red })}
             <Line type="monotone" dataKey="passRate" name="pass rate" stroke={C.teal}
               strokeWidth={2} dot={false} isAnimationActive={false} />
             <Line type="monotone" dataKey="errorRate" name="error rate" stroke={C.red}
@@ -186,12 +199,12 @@ export const FEEDBACK_CODE = widgetCode({
   subtitle: "What users think of the answers",
   source: "feedback",
   recharts: LINE_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, THUMBS],
+  parts: [NUMBERS, DATES, CHART_STYLE, THUMBS, BUCKETS, GAP_BRIDGE],
   queries: ["summary", "rate"],
   body: `  const up = num(summary.data[0]?.thumbs_up);
   const down = num(summary.data[0]?.thumbs_down);
   if (!add(up, down)) return <Panel><CallToAction /></Panel>;
-  const points = rate.data.map((row) => ({
+  const points = withBuckets(rate, ["positive_rate"]).map((row) => ({
     x: bucketLabel(row.bucket),
     positive: num(row.positive_rate),
   }));
@@ -212,7 +225,9 @@ export const FEEDBACK_CODE = widgetCode({
               dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={40} domain={[0, 1]}
               tickFormatter={(value) => pct(value, 0)} />
-            <Tooltip contentStyle={TIP} formatter={(value) => [pct(value, 0), "positive"]} />
+            <Tooltip contentStyle={TIP} formatter={tipValue((value) => pct(value, 0))}
+              filterNull={false} />
+            {bridge({ key: "positive", colour: C.pink })}
             <Line type="monotone" dataKey="positive" name="positive feedback" stroke={C.pink}
               strokeWidth={1.8} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
           </ComposedChart>

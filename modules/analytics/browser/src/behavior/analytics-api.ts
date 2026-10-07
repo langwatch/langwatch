@@ -9,6 +9,7 @@ import type {
   analyticsLwqlTrpc,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
   DashboardSourcePresence,
@@ -301,6 +302,7 @@ type BorrowedProcedures = {
           queries: unknown[];
           description?: string;
           prompt?: string;
+          source?: DashboardWidgetSource;
         };
         output: DashboardWidget;
       };

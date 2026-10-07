@@ -8,7 +8,12 @@ import { defineProcessModule } from "@langwatch/process";
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
-import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
+import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
+import {
+  dashboardWidgetCallerSource,
+  dashboardWidgetRest,
+  dashboardWidgetUrl,
+} from "./transport/dashboard-widget.rest.ts";
 import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
 import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
@@ -57,5 +62,8 @@ export const dashboardProcessModule = defineProcessModule("dashboard")
       app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
       }),
+    ),
+    bindRestMiddleware(dashboardWidgetCallerSource, (context) =>
+      widgetSourceOfCredential({ credential: projectCredentialOfRequest(context.req.raw) }),
     ),
   ]);

@@ -116,19 +116,22 @@ export const OUTCOME_EMPTY = `function OutcomeEmpty({ quiet }) {
 export const PIVOT = `function pivot(rows, key, value) {
   const byBucket = new Map();
   for (const row of rows) {
-    const point = byBucket.get(row.bucket) || { x: bucketLabel(row.bucket) };
+    const point = byBucket.get(row.bucket) || { bucket: row.bucket };
     point[row[key]] = value(row);
     byBucket.set(row.bucket, point);
   }
   return [...byBucket.values()];
-}`;
+}
+// Every point named by its bucket, the empty buckets the report added included.
+const labelled = (points) => points.map((point) => ({ ...point, x: bucketLabel(point.bucket) }));`;
 
-/** A time series of bars and lines with change markers; reads `CHART_STYLE`. */
+/** A time series of bars and lines with change markers; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const MARKED_CHART = `// series: { key, label, colour, dashed?, bars?, stack?, right? }; markers: { x, label }.
 function MarkedChart({ points, series, format, rightFormat, markers = [], domain }) {
   const right = series.some((item) => item.right);
   const shown = markers.filter((marker) => points.some((point) => point.x === marker.x));
   const formatOf = (name) => (series.find((item) => item.label === name)?.right ? rightFormat : format);
+  const tip = (value, name) => tipValue(formatOf(name))(value, name);
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <Legend items={series.map((item) => [item.colour, item.label, item.dashed])} />
@@ -144,12 +147,14 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
               <YAxis yAxisId="right" orientation="right" tick={AXIS} tickLine={false}
                 axisLine={false} width={40} domain={[0, 1]} tickFormatter={rightFormat} />
             )}
-            <Tooltip contentStyle={TIP} formatter={(value, name) => [formatOf(name)(value), name]} />
+            <Tooltip contentStyle={TIP} formatter={tip} filterNull={false} />
             {shown.map((marker) => (
               <ReferenceLine key={marker.x + marker.label} yAxisId="left" x={marker.x}
                 stroke={C.faint} strokeDasharray="3 3"
                 label={{ value: marker.label, position: "top", fontSize: 10, fill: C.faint }} />
             ))}
+            {series.filter((item) => !item.bars).map((item) =>
+              bridge({ ...item, yAxisId: item.right ? "right" : "left" }))}
             {series.map((item) => item.bars ? (
               <Bar key={item.key} yAxisId={item.right ? "right" : "left"} dataKey={item.key}
                 name={item.label} fill={item.colour} stackId={item.stack}

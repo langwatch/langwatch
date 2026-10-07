@@ -36,7 +36,7 @@ function runnerOver(answers: (() => Promise<{ rows: unknown; completeness?: unkn
     },
     toError: (rejection) => rejection,
     planRetry: ({ rejection, retriesUsed }) =>
-      planChartQueryRetry({ rejection, retriesUsed, random: () => 0.5 }),
+      planChartQueryRetry({ rejection, retriesUsed, maxRetries: 3, random: () => 0.5 }),
     setTimer: (callback, delayMs) => {
       delays.push(delayMs);
       return setTimeout(callback, delayMs);
@@ -232,7 +232,7 @@ describe("the retry plan", () => {
   /** @scenario "A retryable failure is retried with backoff before it counts" */
   it("spreads each wait over the upper half of a doubling ceiling", () => {
     const plan = (retriesUsed: number, random: number) =>
-      planChartQueryRetry({ rejection: BUSY, retriesUsed, random: () => random });
+      planChartQueryRetry({ rejection: BUSY, retriesUsed, maxRetries: 3, random: () => random });
 
     expect(plan(0, 0)).toEqual({ retry: true, delayMs: 200 });
     expect(plan(0, 0.999)).toEqual({ retry: true, delayMs: 400 });
@@ -242,7 +242,9 @@ describe("the retry plan", () => {
 
   it("retries only a rejection that says it is retryable", () => {
     for (const rejection of [BROKEN, { retryable: "yes" }, null, "busy", new Error("x")]) {
-      expect(planChartQueryRetry({ rejection, retriesUsed: 0, random: () => 0 })).toEqual({
+      expect(
+        planChartQueryRetry({ rejection, retriesUsed: 0, maxRetries: 3, random: () => 0 }),
+      ).toEqual({
         retry: false,
       });
     }

@@ -1,6 +1,7 @@
 /**
  * The data a widget must have before it can show a number, and who provides it.
  * Generated from the dashboards library draft on 2026-10-06; edit here from now on.
+ * A widget lists only what no query can see: a trace field is its query's report to name.
  */
 
 /** data: the customer sends it; setup: the customer turns it on; feature: LangWatch builds it. */
@@ -13,6 +14,11 @@ export interface DataRequirement {
   /** Share of orgs that have it today, or null when not measured. */
   readonly coveragePercent: number | null;
   readonly note: string;
+  /**
+   * The trace column it arrives in. A query that reads the column gets its coverage in the
+   * completeness report, which the widget frame shows, so no widget lists it as a need.
+   */
+  readonly field?: string;
 }
 
 export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
@@ -31,15 +37,30 @@ export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
     note: "Orgs with any error status recorded.",
   },
   { key: "model", name: "Model name", kind: "data", coveragePercent: 49, note: "" },
-  { key: "cost", name: "Cost and tokens", kind: "data", coveragePercent: 39, note: "" },
+  {
+    key: "cost",
+    name: "Cost and tokens",
+    kind: "data",
+    coveragePercent: 39,
+    note: "",
+    field: "TotalCost",
+  },
   {
     key: "thread",
     name: "Conversation id",
     kind: "data",
     coveragePercent: 32,
     note: "Thread id on the trace.",
+    field: "ConversationId",
   },
-  { key: "user", name: "User id", kind: "data", coveragePercent: 24, note: "" },
+  {
+    key: "user",
+    name: "User id",
+    kind: "data",
+    coveragePercent: 24,
+    note: "",
+    field: "UserId",
+  },
   {
     key: "labels",
     name: "Labels or metadata",
@@ -67,6 +88,7 @@ export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
     kind: "data",
     coveragePercent: 11,
     note: "Topic clustering on traces.",
+    field: "TopicId",
   },
   {
     key: "deploys",
@@ -82,6 +104,7 @@ export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
     kind: "data",
     coveragePercent: 6,
     note: "Only 22 orgs have two or more customer ids.",
+    field: "CustomerId",
   },
   {
     key: "thumbs",
@@ -196,7 +219,14 @@ export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
     coveragePercent: null,
     note: "Org-wide views need more than one project.",
   },
-  { key: "tokens", name: "Token counts", kind: "data", coveragePercent: 43, note: "" },
+  {
+    key: "tokens",
+    name: "Token counts",
+    kind: "data",
+    coveragePercent: 43,
+    note: "",
+    field: "PromptTokens",
+  },
   {
     key: "spans",
     name: "Spans inside traces",
@@ -210,6 +240,7 @@ export const DATA_REQUIREMENTS: readonly DataRequirement[] = [
     kind: "data",
     coveragePercent: null,
     note: "LangWatch derives it per trace. Coverage not measured.",
+    field: "SatisfactionScore",
   },
   {
     key: "history",

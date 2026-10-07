@@ -277,7 +277,10 @@ WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket, action
 ORDER BY bucket`;
 
-/** Month to date, the last 7 days' pace and the month's length, for the forecast. */
+/**
+ * Month to date, the last 7 days' spend and how many of them had traces, and the month's
+ * length, for the forecast: a day with no traces never drags the pace down.
+ */
 export const MONTH_FORECAST_SQL = `SELECT
   ${costTotal(
     "SELECT sum(TotalCost) FROM trace_metrics WHERE OccurredAt >= toStartOfMonth(now())",
@@ -287,20 +290,28 @@ export const MONTH_FORECAST_SQL = `SELECT
     "SELECT sum(TotalCost) FROM trace_metrics WHERE OccurredAt >= subtractDays(now(), 7)",
     "SELECT sum(TotalCost) FROM evaluation_metrics WHERE OccurredAt >= subtractDays(now(), 7)",
   )} AS last_7_days,
+  (SELECT uniqExact(toDate(OccurredAt)) FROM trace_metrics
+    WHERE OccurredAt >= subtractDays(now(), 7)) AS days_with_data,
   toDayOfMonth(now()) AS day_of_month,
   toDayOfMonth(subtractDays(toStartOfMonth(addMonths(now(), 1)), 1)) AS days_in_month`;
 
-/** Spend per bucket by where it came from; evaluator runs count as evaluations. */
-export const SPEND_BY_SOURCE_SQL = `SELECT bucket, source, sum(cost) AS cost
+/**
+ * Spend, traces and traces with an unpriced call per bucket by where they came from; evaluator
+ * runs count as evaluations.
+ */
+export const SPEND_BY_SOURCE_SQL = `SELECT bucket, source, sum(cost) AS cost, sum(traces) AS traces,
+  sum(unpriced) AS unpriced
 FROM (
-  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost,
+  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost, 1 AS traces,
+    if(UnpricedSpanCount > 0, 1, 0) AS unpriced,
     multiIf(${PRODUCTION}, 'production', Origin = 'evaluation', 'evaluations',
       Origin = 'simulation', 'simulations', Origin IN ('playground', 'workflow'), 'experiments',
       'other') AS source
   FROM trace_metrics
   WHERE ${inPeriod("OccurredAt")}
   UNION ALL
-  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost, 'evaluations' AS source
+  SELECT ${bucketOf("OccurredAt")} AS bucket, TotalCost AS cost, 1 AS traces, 0 AS unpriced,
+    'evaluations' AS source
   FROM evaluation_metrics
   WHERE ${inPeriod("OccurredAt")}
 )

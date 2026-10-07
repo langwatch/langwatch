@@ -3,6 +3,8 @@
  * parameters (ADR-130), so a stored widget follows the board's period and grain.
  */
 
+import { LWQL_BUCKET_ALIGNMENT_SECONDS } from "@langwatch/analytics-contract";
+
 export const START = "{dashboard_context_period_start:DateTime}";
 export const END = "{dashboard_context_period_end:DateTime}";
 const GRAIN = "{dashboard_context_granularity_seconds:UInt32}";
@@ -11,9 +13,6 @@ export const PREVIOUS_START = `subtractSeconds(${START}, dateDiff('second', ${ST
 /** The middle of the page period, for "first half against second half". */
 export const MIDPOINT = `subtractSeconds(${END}, intDiv(dateDiff('second', ${START}, ${END}), 2))`;
 
-/** Seconds from the epoch (a Thursday) to the first Monday: pins week buckets to Monday. */
-const MONDAY_OFFSET_SECONDS = 345_600;
-
 export const inPeriod = (column: string) => `${column} >= ${START} AND ${column} < ${END}`;
 
 /** `column` inside the page period or the equally long window before it. */
@@ -21,7 +20,7 @@ export const inPeriodAndPrevious = (column: string) =>
   `${column} >= ${PREVIOUS_START} AND ${column} < ${END}`;
 
 export const bucketOf = (column: string) => {
-  const shifted = `subtractSeconds(${column}, ${MONDAY_OFFSET_SECONDS})`;
+  const shifted = `subtractSeconds(${column}, ${LWQL_BUCKET_ALIGNMENT_SECONDS})`;
   const bucket = `toStartOfInterval(${shifted}, INTERVAL ${GRAIN} SECOND)`;
-  return `addSeconds(${bucket}, ${MONDAY_OFFSET_SECONDS})`;
+  return `addSeconds(${bucket}, ${LWQL_BUCKET_ALIGNMENT_SECONDS})`;
 };

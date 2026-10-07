@@ -6,6 +6,7 @@
 
 import {
   BARS,
+  COMPLETENESS,
   DATES,
   HEADLINE,
   NUMBERS,
@@ -18,22 +19,36 @@ import {
 /** A share of a whole, a dash when the part is unknown or the whole is zero. */
 const SHARE = `const share = (part, whole) => pct(ratio(part, whole), 0);`;
 
+/** A model's cost, or "no price" when none of its calls had one: unknown, never $0.00. */
+const MODEL_COST = `function ModelCost({ cost }) {
+  if (num(cost) > 0) return <b>{usd(cost)}</b>;
+  return <span style={{ color: C.faint }}>no price</span>;
+}`;
+
 export const MODEL_SPEND_CODE = widgetCode({
   summary: "The five models that cost the most, with each one's share of all model spend.",
-  subtitle: "The models behind the bill",
+  subtitle:
+    "The models behind the bill. A model with no price shows its row with a dash: its cost is " +
+    "unknown, not zero",
   source: "models",
-  parts: [NUMBERS, TABLE, SHARE],
+  parts: [NUMBERS, COMPLETENESS, TABLE, SHARE, MODEL_COST],
   queries: ["models", "spend"],
   body: `  const total = num(spend.data[0]?.cost);
-  if (models.data.length === 0 || !total) return <Panel><CallToAction /></Panel>;
+  if (models.data.length === 0 && !total) return <Panel><CallToAction /></Panel>;
+  const listed = models.data.map((row) => row.model);
+  const rows = [
+    ...models.data,
+    ...unpricedRows(spend, listed).map((row) => ({ model: row.label, cost: null })),
+  ];
   const columns = [
     { header: "Model", cell: (row) => mono(row.model) },
-    { header: "Cost", align: "right", cell: (row) => <b>{usd(num(row.cost))}</b> },
-    { header: "Share", align: "right", cell: (row) => share(num(row.cost), total) },
+    { header: "Cost", align: "right", cell: (row) => <ModelCost cost={row.cost} /> },
+    { header: "Share", align: "right",
+      cell: (row) => (num(row.cost) > 0 ? share(num(row.cost), total) : GAP) },
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={models.data} />
+      <Table columns={columns} rows={rows} />
     </Panel>
   );`,
 });
@@ -42,7 +57,7 @@ export const TOP_MODELS_CODE = widgetCode({
   summary: "The ten models most traces use, with their share of all traces and their cost.",
   subtitle: "The models behind most of your traffic, and so most of your bill",
   source: "models",
-  parts: [NUMBERS, TABLE, SHARE],
+  parts: [NUMBERS, TABLE, SHARE, MODEL_COST],
   queries: ["models", "modelCosts", "traffic"],
   body: `  if (models.data.length === 0) return <Panel><CallToAction /></Panel>;
   const traces = num(traffic.data[0]?.traces);
@@ -51,7 +66,7 @@ export const TOP_MODELS_CODE = widgetCode({
     { header: "Model", cell: (row) => mono(row.model) },
     { header: "Traces", align: "right", cell: (row) => count(num(row.traces)) },
     { header: "Share", align: "right", cell: (row) => share(num(row.traces), traces) },
-    { header: "Cost", align: "right", cell: (row) => <b>{usd(costs.get(row.model) ?? null)}</b> },
+    { header: "Cost", align: "right", cell: (row) => <ModelCost cost={costs.get(row.model)} /> },
   ];
   return (
     <Panel>
@@ -63,10 +78,11 @@ export const TOP_MODELS_CODE = widgetCode({
 export const TOPICS_CODE = widgetCode({
   summary: "The ten topics with the most traces, their share, and the topic that grew most.",
   subtitle: "Turn the most common questions into a roadmap",
-  source: "topics",
   parts: [NUMBERS, TABLE, HEADLINE, SHARE],
   queries: ["topics", "topicTraffic"],
-  body: `  if (topics.data.length === 0) return <Panel><CallToAction /></Panel>;
+  body: `  if (topics.data.length === 0) {
+    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+  }
   const total = num(topicTraffic.data[0]?.traces);
   const name = (row) => row.topic || row.topic_id;
   const grew = topics.data.reduce((top, row) => (num(row.growth) > num(top.growth) ? row : top));
@@ -92,7 +108,9 @@ export const TOPICS_CODE = widgetCode({
 
 export const SLOWEST_OPERATIONS_CODE = widgetCode({
   summary: "Typical and slowest trace latency, then the five operations that take the most time.",
-  subtitle: "Find the slow tail, then watch it shrink as you fix it",
+  subtitle:
+    "Find the slow tail, then watch it shrink as you fix it. Typical is the median trace, " +
+    "slowest the 99th percentile; an operation's slowest is its 95th percentile",
   source: "spans",
   parts: [NUMBERS, TABLE, STAT],
   queries: ["operations", "latency"],
@@ -101,15 +119,15 @@ export const SLOWEST_OPERATIONS_CODE = widgetCode({
   const columns = [
     { header: "Operation", cell: (row) => mono(row.operation) },
     { header: "Total time", align: "right", cell: (row) => <b>{ms(num(row.total_ms))}</b> },
-    { header: "p95", align: "right", cell: (row) => ms(num(row.p95_ms)) },
+    { header: "Slowest", align: "right", cell: (row) => ms(num(row.p95_ms)) },
     { header: "Spans", align: "right", cell: (row) => count(num(row.spans)) },
   ];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
         marginBottom: 8 }}>
-        <Stat label="Trace p50" value={ms(num(spread.p50_ms))} />
-        <Stat label="Trace p99" value={ms(num(spread.p99_ms))} />
+        <Stat label="Typical trace" value={ms(num(spread.p50_ms))} />
+        <Stat label="Slowest traces" value={ms(num(spread.p99_ms))} />
       </div>
       <Table columns={columns} rows={operations.data} />
     </Panel>
@@ -117,8 +135,10 @@ export const SLOWEST_OPERATIONS_CODE = widgetCode({
 });
 
 export const SLOWEST_MODELS_CODE = widgetCode({
-  summary: "The five models whose traces have the highest p95 latency.",
-  subtitle: "p95 latency of the traces that call each model",
+  summary: "The five models whose traces have the slowest response time.",
+  subtitle:
+    "Response time of the traces that call each model, at the 95th percentile: 1 in 20 took " +
+    "longer",
   source: "models",
   parts: [NUMBERS, BARS, HEADLINE],
   queries: ["main"],
@@ -126,7 +146,7 @@ export const SLOWEST_MODELS_CODE = widgetCode({
   const ranked = main.data.map((row) => ({ label: row.model, value: num(row.p95_ms) }));
   return (
     <Panel>
-      <Headline value={ms(ranked[0].value)} label={ranked[0].label + " is slowest at p95"} />
+      <Headline value={ms(ranked[0].value)} label={ranked[0].label + " is slowest"} />
       <Bars rows={ranked} format={ms} />
     </Panel>
   );`,

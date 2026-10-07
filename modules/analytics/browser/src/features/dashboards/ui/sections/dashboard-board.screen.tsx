@@ -1,8 +1,8 @@
 /**
- * One stored board: its header, the ask bar, and its widgets on the grid, or the one empty
- * board view (the ask bar with suggested questions, then "Or start from a template"). Every
- * widget is editable; "Add a widget", the footer and typing in the ask bar open the picker.
- * @see modules/dashboard/specs/dashboards-v2.feature
+ * One stored board: its header, the ask bar, its widgets on the grid or the one empty board
+ * view, and its one widget editor. "Add a widget", the footer and typing in the ask bar open
+ * the picker, whose Skip opens the editor on a new widget.
+ * @see modules/dashboard/specs/dashboards-v2.feature and dashboards-widget-flow.feature
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
@@ -16,15 +16,21 @@ import {
   useDashboardAutoRefresh,
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
-import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
+import {
+  useBlockPickerAddress,
+  WIDGET_PICKER_QUERY_KEY,
+} from "../../behavior/use-block-picker-address.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
+import { useBoardEditor } from "../../behavior/use-board-editor.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   boardSubject,
+  widgetMissingDataDraft,
   widgetPromptDraft,
   widgetSetupDraft,
 } from "../../langy/model/board-langy.ts";
@@ -36,6 +42,7 @@ import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
+import { BoardWidgetEditor } from "./board-widget-editor.tsx";
 import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -43,7 +50,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
-  const boardWidgets = useBoardWidgets();
+  const boardWidgets = useBoardWidgets({ dashboardId: board.id });
   const { description, saveDescription } = useBoardDescription({
     dashboardId: board.id,
     stored: board.description,
@@ -52,15 +59,27 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const [pickerSearch, setPickerSearch] = useState("");
-  const widgets = boardWidgets.widgetsOn(board.id);
+  const { widgets } = boardWidgets;
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
+  const editor = useBoardEditor({ board: subject, period, widgets });
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
-  useBoardOnScreen(board.id);
 
   const openPicker = (search = "") => {
     setPickerSearch(search);
     if (!picker.isOpen) picker.open();
+  };
+  const closePicker = () => {
+    setPickerSearch("");
+    picker.close();
+  };
+  /** Saves the editor's widget, a new one or an edit, and closes it once that landed. */
+  const saveEdited = async (edited: DashboardWidgetDraft) => {
+    const widget = editor.editing?.widget;
+    const landed = widget
+      ? await boardWidgets.saveWidget({ widget, draft: edited })
+      : await boardWidgets.addWidget(edited);
+    if (landed) editor.close();
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
@@ -135,26 +154,23 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 widgets={widgets}
                 period={period}
                 isWriting={boardWidgets.isWriting}
-                isSaving={boardWidgets.isSaving}
-                onDuplicate={(widget) =>
-                  void boardWidgets.duplicateWidget({ dashboardId: board.id, widget })
+                langyFor={
+                  langy.enabled
+                    ? (widget) => ({
+                        ask: () => langy.ask(widgetPromptDraft({ widget, board: subject, period })),
+                        setUp: (setup) =>
+                          langy.ask(widgetSetupDraft({ setup, widget, board: subject, period })),
+                        setUpMissing: (missing) =>
+                          langy.ask(
+                            widgetMissingDataDraft({ missing, widget, board: subject, period }),
+                          ),
+                      })
+                    : undefined
                 }
-                onDelete={(widget) => void boardWidgets.removeWidget({ widget })}
-                onSave={({ widget, draft, onSaved }) =>
-                  void boardWidgets.saveWidget({ widgetId: widget.id, draft, onSaved })
-                }
+                onEdit={editor.open}
+                onDuplicate={(widget) => void boardWidgets.duplicateWidget(widget)}
+                onDelete={(widget) => void boardWidgets.removeWidget(widget)}
                 onPlacementsCommit={(placements) => void boardWidgets.commitPlacements(placements)}
-                onAskLangy={
-                  langy.enabled
-                    ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
-                    : undefined
-                }
-                onSetUp={
-                  langy.enabled
-                    ? ({ widget, setup }) =>
-                        langy.ask(widgetSetupDraft({ setup, widget, board: subject, period }))
-                    : undefined
-                }
               />
               <AddBlockCard onClick={() => openPicker()} />
             </VStack>
@@ -166,13 +182,27 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           board={subject}
           period={period}
           initialSearch={pickerSearch}
-          onAddWidgets={(question) =>
-            boardWidgets.addQuestionWidgets({ dashboardId: board.id, question })
-          }
-          onClose={() => {
+          onAddWidgets={boardWidgets.addQuestionWidgets}
+          onSkip={() => {
             setPickerSearch("");
-            picker.close();
+            editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
           }}
+          onClose={closePicker}
+        />
+      )}
+      {editor.editing && (
+        <BoardWidgetEditor
+          key={editor.editing.widget?.id ?? "new"}
+          widget={editor.editing.widget}
+          projectId={projectId}
+          projectSlug={saved.projectSlug}
+          dashboardId={board.id}
+          period={period}
+          isSaving={boardWidgets.isSaving}
+          {...(editor.asks ? { asks: editor.asks } : {})}
+          onAsk={editor.ask}
+          onClose={editor.close}
+          onSave={(edited) => void saveEdited(edited)}
         />
       )}
     </BoardPage>

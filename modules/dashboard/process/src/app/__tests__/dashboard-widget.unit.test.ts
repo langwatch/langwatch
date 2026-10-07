@@ -3,6 +3,7 @@
  * them. Exercises the app's widget operations through its private service.
  * @vitest-environment node
  */
+import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -106,6 +107,75 @@ describe("DashboardModule dashboard widgets", () => {
     ).resolves.toMatchObject({
       definition: { code: "export default () => <div />;", description: "Traces per bucket" },
     });
+  });
+
+  /** @scenario "A widget created with a source stores that source" */
+  it("stores the source a widget is created with", async () => {
+    const dashboard = createDashboardTestApp();
+
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Errors per day",
+      code: "export default () => null;",
+      queries: [],
+      source: { kind: "catalogue", catalogueId: "errors-per-day" },
+    });
+
+    expect(created.definition.source).toEqual({
+      kind: "catalogue",
+      catalogueId: "errors-per-day",
+    });
+  });
+
+  /** @scenario "An update keeps the stored source unless it names one" */
+  it("keeps the stored source on an update without one, and replaces it with one", async () => {
+    const dashboard = createDashboardTestApp();
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Errors per day",
+      code: "export default () => null;",
+      queries: [],
+      source: { kind: "catalogue", catalogueId: "errors-per-day" },
+    });
+
+    const kept = await dashboard.updateDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+      code: "export default () => <div />;",
+    });
+    const replaced = await dashboard.updateDashboardWidget({
+      projectId: "project-1",
+      id: created.id,
+      source: { kind: "code" },
+    });
+
+    expect(kept.definition.source).toEqual({ kind: "catalogue", catalogueId: "errors-per-day" });
+    expect(replaced.definition).toMatchObject({
+      code: "export default () => <div />;",
+      source: { kind: "code" },
+    });
+  });
+
+  /** @scenario "A widget saved before sources existed still reads" */
+  it("reads a definition stored with no source", async () => {
+    const dashboard = createDashboardTestApp();
+    const created = await dashboard.createDashboardWidget({
+      projectId: "project-1",
+      name: "Usage",
+      code: "export default () => null;",
+      queries: [],
+    });
+
+    const stored = dashboardWidgetDefinitionSchema.safeParse({
+      version: 1,
+      code: "export default () => null;",
+      queries: [{ name: "usage", sql: "SELECT 1" }],
+    });
+
+    expect(stored.success).toBe(true);
+    await expect(
+      dashboard.getDashboardWidget({ projectId: "project-1", id: created.id }),
+    ).resolves.not.toHaveProperty("definition.source");
   });
 
   it("mints widget ids under the house scheme", async () => {

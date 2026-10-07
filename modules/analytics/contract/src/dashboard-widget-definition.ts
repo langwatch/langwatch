@@ -145,6 +145,16 @@ export const dashboardWidgetDescriptionSchema = z
   .max(MAX_WIDGET_DESCRIPTION_LENGTH);
 /** Optional like the description: widgets saved before it, and Langy-made ones, carry none. */
 export const dashboardWidgetPromptSchema = z.string().min(1).max(MAX_WIDGET_PROMPT_LENGTH);
+/**
+ * Where a widget came from: a catalogue template, Langy, the code editor, or the REST/MCP API.
+ * Optional like the description: widgets saved before it carry none.
+ */
+export const dashboardWidgetSourceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("catalogue"), catalogueId: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("langy") }),
+  z.object({ kind: z.literal("code") }),
+  z.object({ kind: z.literal("api") }),
+]);
 
 export const dashboardWidgetDefinitionSchema = z.object({
   version: z.literal(DASHBOARD_WIDGET_DEFINITION_VERSION),
@@ -152,6 +162,7 @@ export const dashboardWidgetDefinitionSchema = z.object({
   queries: dashboardWidgetQueriesSchema,
   description: dashboardWidgetDescriptionSchema.optional(),
   prompt: dashboardWidgetPromptSchema.optional(),
+  source: dashboardWidgetSourceSchema.optional(),
 });
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<
@@ -159,6 +170,7 @@ export type DashboardWidgetQueryParameterDeclaration = z.infer<
 >;
 export type DashboardWidgetQuery = z.infer<typeof dashboardWidgetQuerySchema>;
 export type DashboardWidgetDefinition = z.infer<typeof dashboardWidgetDefinitionSchema>;
+export type DashboardWidgetSource = z.infer<typeof dashboardWidgetSourceSchema>;
 
 /** A bound parameter's value, as `LW.query`'s caller may supply it. */
 export type DashboardWidgetQueryParamValue = string | number | boolean;

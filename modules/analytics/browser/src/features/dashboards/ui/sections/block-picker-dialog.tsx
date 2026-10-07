@@ -1,32 +1,28 @@
 /**
- * "Add a widget": every catalogue widget in branch sections by trunk, searched from what the
- * ask bar had typed. A pick adds it and drafts its prompt in Langy (AC141); a footer asks Langy.
+ * "Add a widget", laid out like the templates finder: one centred search, category chips and
+ * agent-type chips over the built widgets in question-tree branch sections. A pick adds the
+ * widget and drafts its prompt in Langy (AC141); Skip goes to the widget editor instead.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { SearchInput } from "@langwatch/design-system/search-input";
 import {
   Activity,
   AlertTriangle,
-  Coins,
-  Cpu,
-  DollarSign,
-  FlaskConical,
+  Bot,
   Gauge,
   GitCompare,
   HelpCircle,
   type LucideIcon,
-  MessageSquare,
   Scale,
   Sparkles,
   TrendingDown,
-  XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  PICKER_QUESTIONS,
+  AGENT_KIND_CHIP_LABELS,
+  pickerPool,
   type PickerQuestion,
   type PickerSection,
   pickerSections,
@@ -38,38 +34,29 @@ import {
   boardQuestion,
   widgetPromptDraft,
 } from "../../langy/model/board-langy.ts";
-import type { BlockQuestion, BlockQuestionIcon } from "../../model/block-questions.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import {
-  type CatalogueFilterPick,
   type CatalogueFilters,
-  catalogueChipCounts,
   filterCatalogue,
-  isPicked,
   NO_CATALOGUE_FILTERS,
-  toggleCatalogueFilter,
+  trunkCounts,
 } from "../../model/catalogue-filter.ts";
+import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import {
-  AgentKindLabels,
-  CatalogueFilterBar,
-  CatalogueFilterLabel,
+  AgentKindChips,
+  CatalogueSearch,
   TRUNK_ICONS,
   TRUNK_PALETTES,
+  TrunkChips,
 } from "../blocks/catalogue-filters.tsx";
 
-const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
-  gauge: Gauge,
+const QUESTION_ICONS: Readonly<Record<WidgetQuestionIcon, LucideIcon>> = {
   activity: Activity,
   trendingDown: TrendingDown,
-  coins: Coins,
-  messageSquare: MessageSquare,
   alertTriangle: AlertTriangle,
-  xCircle: XCircle,
-  flaskConical: FlaskConical,
   gitCompare: GitCompare,
-  dollarSign: DollarSign,
-  cpu: Cpu,
   helpCircle: HelpCircle,
+  gauge: Gauge,
   scale: Scale,
 };
 
@@ -78,6 +65,7 @@ export function BlockPickerDialog({
   period,
   initialSearch = "",
   onAddWidgets,
+  onSkip,
   onClose,
 }: {
   /** The board the picker opened on, attached as Langy's context. */
@@ -86,7 +74,9 @@ export function BlockPickerDialog({
   /** The search it opens with, such as what the ask bar had typed. */
   initialSearch?: string;
   /** Adds the picked question's widget(s) to the board; false when the write failed. */
-  onAddWidgets: (question: BlockQuestion) => Promise<boolean>;
+  onAddWidgets: (question: WidgetQuestion) => Promise<boolean>;
+  /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */
+  onSkip: () => void;
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
@@ -105,14 +95,13 @@ export function BlockPickerDialog({
     return () => cancelAnimationFrame(frame);
   }, [initialSearch]);
 
-  const shown = filterCatalogue({ items: PICKER_QUESTIONS, filters });
-  const counts = catalogueChipCounts({ items: PICKER_QUESTIONS, filters });
-  const sections = pickerSections({ questions: shown });
+  // The agent type picks the pool; the search and the category narrow it.
+  const pool = pickerPool({ agentKind: filters.agentKind });
+  const sections = pickerSections({ questions: filterCatalogue({ items: pool, filters }) });
   const typed = filters.search.trim();
   const hasMatches = sections.length > 0;
-  const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
 
-  const addBlock = async (question: BlockQuestion) => {
+  const addWidget = async (question: WidgetQuestion) => {
     // A failed write is reported by the host; leave the picker open and seed nothing.
     if (!(await onAddWidgets(question))) return;
     if (langy.enabled) {
@@ -122,8 +111,6 @@ export function BlockPickerDialog({
     }
     onClose();
   };
-
-  const choose = (question: PickerQuestion) => void addBlock(question);
 
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
@@ -138,48 +125,60 @@ export function BlockPickerDialog({
       initialFocusEl={() => searchRef.current}
       onOpenChange={({ open }) => !open && onClose()}
     >
-      <Dialog.Content maxHeight="76vh" maxWidth="720px" borderRadius="xl">
+      <Dialog.Content maxHeight="76vh" maxWidth="800px" borderRadius="xl">
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
-            Add a widget
-          </Dialog.Title>
-          <Dialog.CloseTrigger />
+          <HStack width="full" gap={2}>
+            <Dialog.Title fontSize="14px" fontWeight="semibold">
+              Add a widget
+            </Dialog.Title>
+            <Button
+              size="sm"
+              variant="outline"
+              marginStart="auto"
+              title="Write the widget yourself, with Langy"
+              onClick={onSkip}
+            >
+              Skip
+            </Button>
+            <Dialog.CloseTrigger position="static" />
+          </HStack>
         </Dialog.Header>
-        <VStack align="stretch" gap={3} paddingX={5} paddingY={4} borderBottomWidth="1px">
-          <SearchInput
-            ref={searchRef}
-            aria-label="Search questions"
-            placeholder={langy.enabled ? "What do you need to know?" : "Search questions"}
-            height="44px"
-            borderRadius="xl"
-            fontSize="14px"
+        <VStack gap={3} paddingX={5} paddingY={4} borderBottomWidth="1px">
+          <CatalogueSearch
+            inputRef={searchRef}
+            placeholder="Search widgets"
             value={filters.search}
-            onChange={(event) => setFilters({ ...filters, search: event.target.value })}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || !canAskOnEnter) return;
-              event.preventDefault();
-              askLangy(typed);
-            }}
+            onChange={(search) => setFilters({ ...filters, search })}
+            onEnter={
+              langy.enabled && !hasMatches && typed.length > 0 ? () => askLangy(typed) : void 0
+            }
           />
-          <CatalogueFilterBar compact filters={filters} counts={counts} onChange={setFilters} />
+          <TrunkChips
+            picked={filters.trunk}
+            counts={trunkCounts({ items: pool, search: filters.search })}
+            onPick={(trunk) => setFilters({ ...filters, trunk })}
+          />
+          <AgentKindChips
+            picked={filters.agentKind}
+            countOf={(agentKind) =>
+              filterCatalogue({ items: pickerPool({ agentKind }), filters }).length
+            }
+            onPick={(agentKind) => setFilters({ ...filters, agentKind })}
+          />
         </VStack>
         <Dialog.Body overflowY="auto" paddingX={3} paddingY={4}>
           <VStack align="stretch" gap={5}>
             {sections.map((section) => (
-              <QuestionSection
+              <WidgetSection
                 key={section.id}
                 section={section}
-                filters={filters}
-                onFilter={(pick) => setFilters(toggleCatalogueFilter({ filters, pick }))}
-                onChoose={choose}
+                onChoose={(question) => void addWidget(question)}
               />
             ))}
             {!hasMatches && (
-              <VStack align="start" gap={2} paddingX={2}>
+              <VStack align="start" gap={2} paddingX={3}>
                 <Text fontSize="13px" color="fg.muted">
-                  {langy.enabled
-                    ? "No matching questions. Ask Langy below."
-                    : "No matching questions."}
+                  No widget matches. Skip to write your own with Langy.
                 </Text>
                 <Button
                   size="xs"
@@ -217,7 +216,7 @@ export function BlockPickerDialog({
   );
 }
 
-/** A branch's heading: its trunk's icon as the one touch of colour, its name and why it matters. */
+/** A branch's heading: its trunk's icon as the one touch of colour, its name and what it covers. */
 function SectionHeading({ section }: { section: PickerSection }) {
   const Icon = TRUNK_ICONS[section.trunk];
   return (
@@ -241,18 +240,13 @@ function SectionHeading({ section }: { section: PickerSection }) {
   );
 }
 
-function QuestionSection({
+function WidgetSection({
   section,
-  filters,
-  onFilter,
   onChoose,
 }: {
   section: PickerSection;
-  filters: CatalogueFilters;
-  onFilter: (pick: CatalogueFilterPick) => void;
   onChoose: (question: PickerQuestion) => void;
 }) {
-  const palette = TRUNK_PALETTES[section.trunk];
   return (
     <VStack
       as="section"
@@ -266,9 +260,7 @@ function QuestionSection({
         <PickerRow
           key={question.id}
           question={question}
-          palette={palette}
-          filters={filters}
-          onFilter={onFilter}
+          palette={TRUNK_PALETTES[section.trunk]}
           onChoose={() => onChoose(question)}
         />
       ))}
@@ -276,80 +268,60 @@ function QuestionSection({
   );
 }
 
-/** A row: the button that adds the widget, then its trunk and agent kind labels that filter. */
+/** A row: the question that adds the widget, what it shows, and the agent types it is made for. */
 function PickerRow({
   question,
   palette,
-  filters,
-  onFilter,
   onChoose,
 }: {
   question: PickerQuestion;
-  /** The trunk's design-system palette, tinting the icon and the trunk label. */
+  /** The trunk's design-system palette, tinting the icon. */
   palette: string;
-  filters: CatalogueFilters;
-  onFilter: (pick: CatalogueFilterPick) => void;
   onChoose: () => void;
 }) {
   const Icon = QUESTION_ICONS[question.icon];
-  const comingSoon = question.status === "coming-soon";
-  const trunkPick: CatalogueFilterPick = { group: "trunks", value: question.trunk };
   return (
-    <VStack
-      align="stretch"
-      gap={1.5}
+    <Button
+      variant="plain"
+      height="auto"
+      width="full"
+      justifyContent="flex-start"
+      gap={3}
       paddingX={3}
       paddingY={2.5}
       borderRadius="lg"
-      _hover={comingSoon ? void 0 : { background: "bg.muted" }}
+      fontWeight="normal"
+      data-widget={question.id}
+      _hover={{ background: "bg.muted" }}
+      onClick={onChoose}
     >
-      <Button
-        variant="plain"
-        height="auto"
-        padding={0}
-        justifyContent="flex-start"
-        gap={3}
-        fontWeight="normal"
-        disabled={comingSoon}
-        onClick={onChoose}
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize={7}
+        borderRadius="md"
+        colorPalette={palette}
+        background="colorPalette.subtle"
+        color="colorPalette.fg"
+        flexShrink={0}
       >
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          boxSize={7}
-          borderRadius="md"
-          colorPalette={palette}
-          background="colorPalette.subtle"
-          color="colorPalette.fg"
-          flexShrink={0}
-        >
-          <Icon size={14} strokeWidth={2.1} aria-hidden />
-        </Box>
-        <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
-          <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg" truncate>
-            {question.question}
-          </Text>
-          <Text fontSize="12px" lineHeight="18px" color="fg.muted" truncate>
-            {question.why}
-          </Text>
-        </VStack>
-        {comingSoon && (
-          <Text flexShrink={0} fontSize="12px" color="fg.subtle">
-            Coming soon
-          </Text>
-        )}
-      </Button>
-      {/* Lined up under the question text: the icon's width and the gap. */}
-      <HStack gap={1} wrap="wrap" paddingStart={10}>
-        <CatalogueFilterLabel
-          label={question.trunk}
-          colorPalette={palette}
-          isActive={isPicked({ filters, pick: trunkPick })}
-          onToggle={() => onFilter(trunkPick)}
-        />
-        <AgentKindLabels agentKinds={question.agentKinds} filters={filters} onFilter={onFilter} />
-      </HStack>
-    </VStack>
+        <Icon size={14} strokeWidth={2.1} aria-hidden />
+      </Box>
+      <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
+        <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg" truncate>
+          {question.question}
+        </Text>
+        <Text fontSize="12px" lineHeight="18px" color="fg.muted" truncate>
+          {question.why}
+        </Text>
+      </VStack>
+      {question.madeFor.length > 0 && (
+        <HStack flexShrink={0} gap={1} fontSize="12px" color="fg.muted">
+          <Bot size={12} aria-hidden />
+          {question.madeFor.map((kind) => AGENT_KIND_CHIP_LABELS[kind]).join(", ")}
+        </HStack>
+      )}
+    </Button>
   );
 }

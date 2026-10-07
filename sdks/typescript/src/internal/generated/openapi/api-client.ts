@@ -967,7 +967,7 @@ export interface paths {
         put?: never;
         /**
          * Create a dashboard widget
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon and an optional prompt Langy is drafted with when asked about it. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
         delete?: never;
@@ -8388,7 +8388,7 @@ export interface operations {
                         start: string | number;
                         end: string | number;
                     };
-                    granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+                    granularitySeconds?: 1 | 60 | 3600;
                 };
             };
         };
@@ -8425,25 +8425,6 @@ export interface operations {
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
-                        completeness?: {
-                            /** @enum {string} */
-                            state: "complete" | "partial" | "missing" | "no_traffic";
-                            unit: string;
-                            total: number;
-                            fields: {
-                                field: string;
-                                label: string;
-                                present: number;
-                            }[];
-                            buckets?: {
-                                start: string;
-                                n: number;
-                            }[];
-                            unpriced?: {
-                                count: number;
-                                models: string[];
-                            };
-                        };
                     };
                 };
             };
@@ -12613,8 +12594,6 @@ export interface operations {
                                         default?: string | number | boolean;
                                     }[];
                                 }[];
-                                description?: string;
-                                prompt?: string;
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -12750,8 +12729,6 @@ export interface operations {
                             default?: string | number | boolean;
                         }[];
                     }[];
-                    description?: string;
-                    prompt?: string;
                 };
             };
         };
@@ -12778,8 +12755,6 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
-                            description?: string;
-                            prompt?: string;
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -12924,8 +12899,6 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
-                            description?: string;
-                            prompt?: string;
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -13261,8 +13234,6 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
-                            description?: string;
-                            prompt?: string;
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -13437,8 +13408,6 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
-                            description?: string;
-                            prompt?: string;
                         };
                         createdAt: string;
                         updatedAt: string;

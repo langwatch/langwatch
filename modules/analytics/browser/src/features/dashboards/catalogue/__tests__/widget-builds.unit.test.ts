@@ -1,6 +1,6 @@
 /**
  * Every built catalogue widget stores a definition the widget schema accepts, reads
- * every query its code asks for, sends an empty face to an allowlisted setup page,
+ * every query its code asks for, sends a setup face to an allowlisted setup page,
  * carries its description and Langy prompt outside its code, and fits its empty face.
  */
 
@@ -47,11 +47,18 @@ describe("given every built catalogue widget", () => {
     }
   });
 
-  it("sends its empty face to an allowlisted setup page", () => {
+  it("sends its setup face to an allowlisted setup page", () => {
+    const withSetup = built.filter(({ definition }) =>
+      definition.code.includes("function CallToAction()"),
+    );
+    expect(withSetup.length).toBeGreaterThan(0);
+    for (const { key, definition } of withSetup) {
+      expect(called(definition.code, "navigate").length, key).toBeGreaterThan(0);
+    }
     for (const { key, definition } of built) {
-      const targets = called(definition.code, "navigate");
-      expect(targets.length, key).toBeGreaterThan(0);
-      for (const target of targets) expect(NAVIGABLE_TARGETS, key).toContain(target);
+      for (const target of called(definition.code, "navigate")) {
+        expect(NAVIGABLE_TARGETS, key).toContain(target);
+      }
     }
   });
 

@@ -68,6 +68,11 @@ export interface LangWatchQLViewColumn {
    * the view's `GROUP BY`.
    */
   readonly aggregate?: boolean;
+  /**
+   * Set when NULL is a state, not a gap: `ParentSpanId` is null on a root span, `ArchivedAt` on
+   * a live run. A result's completeness never counts such a column as missing.
+   */
+  readonly nullIsValue?: boolean;
 }
 
 /**

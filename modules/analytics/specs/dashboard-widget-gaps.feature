@@ -58,7 +58,43 @@ Feature: Dashboard widgets never show missing data as zero
       When the chart helper merges them
       Then the first and last buckets are present, a measure null and a count 0
 
+    @unit
+    Scenario: A measure gap breaks the line with a faint dashed bridge
+      Given a time chart whose measure has no value in the middle bucket
+      When it renders
+      Then a dashed bridge joins the buckets either side, and a stacked chart draws none
+
+    @unit
+    Scenario: The hover over a gap says there is no data
+      Given a time chart with a bucket where no series has a value
+      When the reader hovers that bucket
+      Then the hover says "No data on Oct 7", or the widget's own words when it gives them
+
+    @unit
+    Scenario: A big number never averages in empty buckets
+      Given per-bucket averages where one bucket has no value
+      When the chart helper averages them, weighted by each bucket's rows
+      Then the empty bucket counts for nothing, and with no value at all the result is null
+
+    @unit
+    Scenario: The charts library reads instants without the Temporal polyfill
+      Given ISO instants with a zone offset, and ones that are not instants
+      When the charts library reads them
+      Then each reads as the same epoch milliseconds Temporal gives, and the others read as none
+
   Rule: Cost with no price is not $0
+
+    @unit
+    Scenario: A sum is a lower bound when some rows lack its field or its price
+      Given a partial report where cost is on every trace but some traces have no price
+      When widget code asks whether the cost sum is a lower bound
+      Then it is, while a complete report or a fully present field is not
+
+    @unit
+    Scenario: A cost leaderboard lists an unpriced model with no price
+      Given a cost leaderboard and the report's unpriced models
+      When it renders
+      Then each unpriced model has a "no price" row with a dash for its cost, sorted last
 
     @unit
     Scenario: Template cost queries never count a missing cost as $0

@@ -1,11 +1,13 @@
 /**
  * `@langwatch/charts`, bundled into the sandboxed frame as `window.LWCharts` (see
  * `chart-frame-document.ts`). Reads `window.React`/`window.Recharts` so hooks share the author's
- * instance.
+ * instance. How it keeps missing data off the screen: features/dashboards/WIDGET_STANDARD.md.
  */
 
-import { Temporal } from "@langwatch/time";
+import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type * as RechartsLibrary from "recharts";
+
+import { parseIsoInstant, utcParts } from "./utc-instant.ts";
 
 type Row = Record<string, unknown>;
 
@@ -121,12 +123,7 @@ function isNumeric(value: unknown): boolean {
 }
 
 function parseInstantEpochMs(value: unknown): number | undefined {
-  if (typeof value !== "string") return undefined;
-  try {
-    return Temporal.Instant.from(value).epochMilliseconds;
-  } catch {
-    return undefined;
-  }
+  return typeof value === "string" ? parseIsoInstant(value) : undefined;
 }
 
 /** A column reads as time-like by name, or by its first value parsing as a date. */
@@ -158,7 +155,7 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
     if (!timeLike) return raw;
     const instant = parseInstantEpochMs(raw);
     if (instant === undefined) return raw;
-    const date = Temporal.Instant.fromEpochMilliseconds(instant).toZonedDateTimeISO("UTC");
+    const date = utcParts(instant);
     if (spansMultipleDays) {
       const mm = String(date.month).padStart(2, "0");
       const dd = String(date.day).padStart(2, "0");
@@ -218,7 +215,7 @@ function bucketEpochMs(value: unknown): number | undefined {
 }
 
 function clickHouseInstant(epochMs: number): string {
-  const utc = Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO("UTC");
+  const utc = utcParts(epochMs);
   const two = (part: number) => String(part).padStart(2, "0");
   const date = `${utc.year}-${two(utc.month)}-${two(utc.day)}`;
   return `${date} ${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)}`;
@@ -280,6 +277,55 @@ export function mergeBuckets({
     .toSorted(([left], [right]) => left - right)
     .flatMap(([, bucketRows]) => bucketRows);
   return [...placed, ...unplaced];
+}
+
+/** Unpriced spans leave every cost sum short, whichever cost column the query reads. */
+const COST_FIELD = /cost/i;
+
+/**
+ * Whether a sum over `field` is a lower bound, so its figure reads "$830+": the data is
+ * partial and some rows lack the field, or it is a cost and some traces have no price.
+ * Never put a "+" on an average or a rate.
+ */
+export function isLowerBound({
+  completeness,
+  field,
+}: {
+  completeness: QueryCompleteness | null | undefined;
+  field: string;
+}): boolean {
+  if (completeness?.state !== "partial") return false;
+  const present =
+    completeness.fields.find((candidate) => candidate.field === field)?.present ??
+    completeness.total;
+  const unpriced = COST_FIELD.test(field) ? (completeness.unpriced?.count ?? 0) : 0;
+  return present < completeness.total || unpriced > 0;
+}
+
+/**
+ * The mean of `key` over the rows that have it, so an empty bucket never pulls a big number
+ * down. With `weight` (a row count column), each row counts by its weight. Null when no row has
+ * a value.
+ */
+export function averageOf({
+  rows,
+  key,
+  weight,
+}: {
+  rows: readonly Row[];
+  key: string;
+  weight?: string;
+}): number | null {
+  let total = 0;
+  let count = 0;
+  for (const row of rows) {
+    const value = toNumber(row[key]);
+    const rowWeight = weight === undefined ? 1 : (toNumber(row[weight]) ?? 0);
+    if (value === null || rowWeight <= 0) continue;
+    total += value * rowWeight;
+    count += rowWeight;
+  }
+  return count > 0 ? total / count : null;
 }
 
 /** Index of the first row whose x value is at/after `projectionFrom`. -1 if none. */
@@ -483,6 +529,124 @@ export interface AreaTimeseriesProps {
   projectionFrom?: string | number;
   colors?: string[];
   height?: number;
+  /** How the hover prints a value. */
+  format?: MetricFormat;
+  /** What the hover says over a bucket with no data, from its date: "No evals ran on Oct 7". */
+  gapLabel?: (date: string) => string;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Oct 7", or "Oct 7, 14:00" for a bucket that starts inside a day; UTC, as the axis is. */
+function bucketDate(value: unknown): string {
+  const epochMs = bucketEpochMs(value);
+  if (epochMs === undefined) return cellText(value);
+  const utc = utcParts(epochMs);
+  const day = `${MONTHS[utc.month - 1]} ${utc.day}`;
+  if (utc.hour === 0 && utc.minute === 0) return day;
+  return `${day}, ${String(utc.hour).padStart(2, "0")}:${String(utc.minute).padStart(2, "0")}`;
+}
+
+const GAP_BRIDGE = "__gap";
+
+/**
+ * A two-point series across each gap of each key with a point on both sides, drawn as a faint
+ * dashed line so the trend still reads where the area breaks.
+ */
+function withGapBridges({ rows, keys }: { rows: Row[]; keys: readonly string[] }): {
+  rows: Row[];
+  bridges: { key: string; of: number }[];
+} {
+  const bridged = rows.map((row) => ({ ...row }));
+  const bridges: { key: string; of: number }[] = [];
+  keys.forEach((key, of) => {
+    let last = -1;
+    bridged.forEach((row, index) => {
+      const value = toNumber(row[key]);
+      if (value === null) return;
+      const before = bridged[last];
+      if (before && index - last > 1) {
+        const bridge = `${key}${GAP_BRIDGE}${bridges.length}`;
+        before[bridge] = toNumber(before[key]);
+        row[bridge] = value;
+        bridges.push({ key: bridge, of });
+      }
+      last = index;
+    });
+  });
+  return { rows: bridged, bridges };
+}
+
+/** The hover for a time chart: each series' value, "no data" for a gap, and the gap's own words. */
+function gapAwareTooltip({
+  keys,
+  palette,
+  format,
+  gapLabel,
+}: {
+  keys: readonly string[];
+  palette: string[];
+  format?: MetricFormat;
+  gapLabel: (date: string) => string;
+}) {
+  return ({
+    active,
+    label,
+    payload,
+  }: {
+    active?: boolean;
+    label?: unknown;
+    payload?: readonly { payload?: Row }[];
+  }) => {
+    const row = payload?.[0]?.payload;
+    if (!active || !row) return null;
+    const c = chrome();
+    const date = bucketDate(label);
+    const box = {
+      background: c.tooltipBg,
+      border: `1px solid ${c.tooltipBorder}`,
+      borderRadius: 6,
+      padding: "6px 10px",
+      fontSize: 12,
+      color: c.text,
+    };
+    if (keys.every((key) => toNumber(row[key]) === null)) {
+      return h("div", { style: { ...box, color: c.axis } }, gapLabel(date));
+    }
+    return h(
+      "div",
+      { style: box },
+      h("div", { style: { fontSize: 11, color: c.axis, marginBottom: 2 } }, date),
+      ...keys.map((key, index) => {
+        const value = toNumber(row[key]);
+        return h(
+          "div",
+          { key, style: { display: "flex", alignItems: "center", gap: 6 } },
+          h("span", {
+            style: {
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: colorAt(palette, index),
+            },
+          }),
+          h("span", { style: { color: c.axis } }, key),
+          h(
+            "span",
+            {
+              style: {
+                marginLeft: "auto",
+                paddingLeft: 12,
+                fontWeight: value === null ? 400 : 600,
+                color: value === null ? c.axis : c.text,
+              },
+            },
+            value === null ? "no data" : formatValue(value, format),
+          ),
+        );
+      }),
+    );
+  };
 }
 
 /**
@@ -521,6 +685,8 @@ export function AreaTimeseries({
   projectionFrom,
   colors,
   height = DEFAULT_HEIGHT,
+  format,
+  gapLabel = (date) => `No data on ${date}`,
 }: AreaTimeseriesProps) {
   const R = recharts();
   const c = chrome();
@@ -528,7 +694,27 @@ export function AreaTimeseries({
   const keys = Array.isArray(series) ? series : [series];
   const splitAt = projectionIndex(data, x, projectionFrom);
 
-  const rows = splitActualFromProjected({ data, keys, splitAt });
+  // A bridge over a stacked area would sit at its own value, not on the stack, so none there.
+  const { rows, bridges } = withGapBridges({
+    rows: splitActualFromProjected({ data, keys, splitAt }),
+    keys: stacked ? [] : keys,
+  });
+  const bridgeLines = bridges.map((bridge) =>
+    h(R.Line, {
+      key: bridge.key,
+      dataKey: bridge.key,
+      stroke: colorAt(palette, bridge.of),
+      strokeOpacity: 0.45,
+      strokeWidth: 1.2,
+      strokeDasharray: "3 3",
+      dot: false,
+      activeDot: false,
+      connectNulls: true,
+      legendType: "none",
+      tooltipType: "none",
+      isAnimationActive: false,
+    }),
+  );
 
   const areas = keys.flatMap((key, index) => {
     const color = colorAt(palette, index);
@@ -574,7 +760,7 @@ export function AreaTimeseries({
         R.ResponsiveContainer,
         { width: "100%", height: "100%" },
         h(
-          R.AreaChart,
+          R.ComposedChart,
           { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
           h(R.CartesianGrid, { stroke: c.grid, vertical: false }),
           h(R.XAxis, {
@@ -592,13 +778,12 @@ export function AreaTimeseries({
             tick: { fill: c.axis, fontSize: 11 },
             tickFormatter: compactNumber,
           }),
+          // filterNull off: a bucket with no data still hovers, to say so.
           h(R.Tooltip, {
-            contentStyle: {
-              background: c.tooltipBg,
-              border: `1px solid ${c.tooltipBorder}`,
-            },
-            labelStyle: { color: c.text },
+            filterNull: false,
+            content: gapAwareTooltip({ keys, palette, format, gapLabel }),
           }),
+          ...bridgeLines,
           ...areas,
         ),
       ),
@@ -972,6 +1157,34 @@ export interface LeaderboardProps {
   format?: MetricFormat;
   height?: number;
   navigateTo?: { target: string; params: (row: Row) => object };
+  /**
+   * The report's unpriced models, for a cost list by model: each gets a "no price" row with a
+   * dash for its cost, never $0, added when the data has no row for it.
+   */
+  unpriced?: { models: readonly string[] };
+}
+
+/** The rows with each unpriced model's value cleared, and a row for any model they lack. */
+function withUnpricedRows({
+  data,
+  labelKey,
+  valueKey,
+  models,
+}: {
+  data: Row[];
+  labelKey: string;
+  valueKey: string;
+  models: ReadonlySet<string>;
+}): Row[] {
+  const listed = new Set(data.map((row) => cellText(row[labelKey])));
+  return [
+    ...data.map((row) =>
+      models.has(cellText(row[labelKey])) ? { ...row, [valueKey]: null } : row,
+    ),
+    ...[...models]
+      .filter((model) => !listed.has(model))
+      .map((model) => ({ [labelKey]: model, [valueKey]: null })),
+  ];
 }
 
 export function Leaderboard({
@@ -982,11 +1195,14 @@ export function Leaderboard({
   format,
   height,
   navigateTo,
+  unpriced,
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
+  const noPrice = new Set(unpriced?.models ?? []);
+  const rows = withUnpricedRows({ data, labelKey, valueKey, models: noPrice });
   // Rows with no value sort last and draw no bar: a missing value is not a 0.
-  const ranked = [...data].toSorted((a, b) =>
+  const ranked = rows.toSorted((a, b) =>
     compareDescending(toNumber(a[valueKey]), toNumber(b[valueKey])),
   );
   const known = ranked
@@ -1033,6 +1249,8 @@ export function Leaderboard({
             style: { fontSize: 12, color: c.text, minWidth: 96, flexShrink: 0 },
           },
           cellText(row[labelKey]),
+          noPrice.has(cellText(row[labelKey])) &&
+            h("span", { style: { marginLeft: 6, color: c.axis } }, "no price"),
         ),
         h(
           "div",
@@ -1235,7 +1453,7 @@ function Table({ data, height }: { data: Row[]; height?: number }) {
                     color: c.text,
                   },
                 },
-                cellText(row[col]),
+                isMissingNumber(row[col]) ? "–" : cellText(row[col]),
               ),
             ),
           ),
@@ -1259,6 +1477,8 @@ export interface LwqlChartProps {
   series?: string;
   colors?: string[];
   height?: number;
+  /** The report's unpriced models; a leaderboard lists each with "no price". */
+  unpriced?: { models: readonly string[] };
 }
 
 interface InferredShape {
@@ -1314,6 +1534,7 @@ export function LwqlChart({
   series,
   colors,
   height = DEFAULT_HEIGHT,
+  unpriced,
 }: LwqlChartProps) {
   const inferred = inferShape(data, x, y);
   const resolvedKind = kind ?? inferred.kind;
@@ -1351,6 +1572,7 @@ export function LwqlChart({
         labelKey: resolvedX,
         valueKey: (resolvedY[0] as string) ?? "",
         height,
+        unpriced,
       });
     case "table":
     default:

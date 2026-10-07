@@ -8,14 +8,22 @@ import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-co
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";
+import { useWidgetQueryRecords } from "../../behavior/use-widget-query-records.ts";
+import { usePublishWidgetCompleteness } from "../../behavior/widget-completeness-sink.ts";
 import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
 import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
+import { type WidgetFace, widgetFace } from "../../model/dashboard-widget/widget-completeness.ts";
+import {
+  WidgetFailedFace,
+  WidgetNoTrafficFace,
+  WidgetSetupFace,
+} from "../elements/widget-state-face.tsx";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
@@ -56,6 +64,7 @@ export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
 /**
  * A widget over a window its caller owns, such as a Dashboards board's period.
  * `granularitySeconds`, when given, is the step the reserved parameters carry.
+ * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
  */
 export function DashboardWidgetFrameOverWindow({
   id,
@@ -67,9 +76,12 @@ export function DashboardWidgetFrameOverWindow({
   widgetName,
   timeWindow,
   granularitySeconds,
+  onAskLangyToSetUp,
 }: DashboardWidgetFrameProps & {
   readonly timeWindow: { start: number; end: number };
   readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
+  readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
 }) {
   const { colorMode } = useColorMode();
   const refreshedAt = useDashboardRefreshedAt();
@@ -81,11 +93,21 @@ export function DashboardWidgetFrameOverWindow({
   const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const { executeQuery, params: hostParams } = useDashboardWidgetExecutor(
+  const { executeQuery: runQuery, params: hostParams } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
     granularitySeconds === void 0 ? { timeWindow } : { timeWindow, granularitySeconds },
   );
+  const { executeQuery, records, reset } = useWidgetQueryRecords({ executeQuery: runQuery });
+  const face = useMemo(() => widgetFace(records), [records]);
+  usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
+
+  // Retry starts the frame over, so every query of the widget runs again.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => {
+    reset();
+    setAttempt((n) => n + 1);
+  }, [reset]);
 
   // Known host-side at this boundary; timezone reads the browser's own zone
   // the same way a widget's clock would. dashboardId/widgetName are optional
@@ -128,19 +150,64 @@ export function DashboardWidgetFrameOverWindow({
     );
   }
 
+  const cover = faceInPlaceOfChart({
+    face,
+    name: widgetName ?? "this widget",
+    onRetry: retry,
+    onAskLangyToSetUp,
+  });
+
+  // The frame stays mounted under a face, so a new period can bring the chart back.
   return (
-    <Box position="relative">
-      <SandboxedChartFrame
-        key={id}
-        code={definition.code}
-        executeQuery={executeQuery}
-        dashboardContext={dashboardContext}
-        params={paramsSnapshot}
-        onLog={onLog}
-        onNavigate={onNavigate}
-        maxHeight={maxHeight}
-      />
+    <Box position="relative" height="full">
+      <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
+        <SandboxedChartFrame
+          key={`${id}:${attempt}`}
+          code={definition.code}
+          executeQuery={executeQuery}
+          dashboardContext={dashboardContext}
+          params={paramsSnapshot}
+          onLog={onLog}
+          onNavigate={onNavigate}
+          maxHeight={maxHeight}
+        />
+      </Box>
+      {cover && (
+        <Box position="absolute" inset={0} data-testid="widget-state-face">
+          {cover}
+        </Box>
+      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
   );
+}
+
+/** The face drawn over the frame, or null when the widget's own code draws the card. */
+function faceInPlaceOfChart({
+  face,
+  name,
+  onRetry,
+  onAskLangyToSetUp,
+}: {
+  face: WidgetFace;
+  name: string;
+  onRetry: () => void;
+  onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+}) {
+  switch (face.kind) {
+    case "failed":
+      return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+    case "no_traffic":
+      return <WidgetNoTrafficFace unit={face.unit} />;
+    case "missing":
+      return (
+        <WidgetSetupFace
+          label={face.missing.label}
+          unit={face.unit}
+          onAskLangy={onAskLangyToSetUp && (() => onAskLangyToSetUp(face.missing))}
+        />
+      );
+    case "chart":
+      return null;
+  }
 }

@@ -75,9 +75,10 @@ WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket
 ORDER BY bucket`;
 
-export const COST_TREND_SQL = `SELECT ${bucketOf("BucketStart")} AS bucket, sum(CostSum) AS cost
-FROM trace_metrics_by_minute
-WHERE ${inPeriod("BucketStart")}
+/** Each trace's `TotalCost`, so the completeness report counts the traces with no price. */
+export const COST_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket, sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket
 ORDER BY bucket`;
 
@@ -96,10 +97,10 @@ GROUP BY model
 ORDER BY cost DESC
 LIMIT 50`;
 
-export const MODEL_SPEND_TOTAL_SQL = `SELECT sum(CostSum) AS cost
-FROM model_usage_by_minute
-WHERE ${inPeriod("BucketStart")}
-  AND Model != ''`;
+/** All trace spend, read from `TotalCost` so the report names the models with no price. */
+export const MODEL_SPEND_TOTAL_SQL = `SELECT sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}`;
 
 export const SLOWEST_MODELS_SQL = `SELECT arrayJoin(Models) AS model,
   quantileExact(0.95)(TotalDurationMs) AS p95_ms,

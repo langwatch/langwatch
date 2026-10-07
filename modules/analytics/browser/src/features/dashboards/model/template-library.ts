@@ -1,8 +1,8 @@
 /**
- * The templates library: every catalogue template with what its card shows, its trunk
- * sections, and the address that carries the search and chips so a link shares the view.
- * The narrowing itself is the shared catalogue filter.
- * @see modules/dashboard/specs/dashboards-v2.feature
+ * The templates finder: every catalogue template with what its card shows, the pool an agent
+ * type picks, the trunk sections, and the address that carries the search and chips so a link
+ * shares the view. The narrowing itself is the shared catalogue filter.
+ * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
 import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
@@ -29,7 +29,6 @@ import {
   type CatalogueSection,
   catalogueSearchText,
   catalogueSections,
-  CATALOGUE_STATUSES,
 } from "./catalogue-filter.ts";
 
 /** Templates with a board image captured from the demo seed, served at `templatePreviewSrc`. */
@@ -74,14 +73,15 @@ export type TemplatePreview =
   | { readonly kind: "image"; readonly src: string }
   | { readonly kind: "layout"; readonly widgets: readonly PreviewWidget[] };
 
-/** One template as the library lists it; `board` is what "Add to this project" makes. */
+/** One template as the finder lists it; `board` is what "Add to this project" makes. */
 export interface LibraryTemplate extends CatalogueItem {
   readonly board: BoardTemplate;
   readonly widgetCount: number;
   readonly preview: TemplatePreview;
+  /** The one agent type the template is made for; its chip finds it. */
+  readonly focusKind?: AgentKind;
 }
 
-const QUESTIONS = new Map(CATALOGUE_WIDGETS.map(({ id, question }) => [id, question]));
 const WIDGETS = new Map(CATALOGUE_WIDGETS.map((widget) => [widget.id, widget]));
 
 const PLACEHOLDERS: Readonly<Record<QuestionType, PreviewPlaceholder>> = {
@@ -116,14 +116,6 @@ function previewOf(template: CatalogueTemplate): TemplatePreview {
   return { kind: "layout", widgets: stackWidgets(widgets) };
 }
 
-function agentKindsOf(template: CatalogueTemplate): AgentKind[] {
-  const named = new Set<AgentKind>([
-    ...template.preloadFor,
-    ...(Object.keys(template.byAgentKind) as AgentKind[]),
-  ]);
-  return AGENT_KINDS.filter((kind) => named.has(kind));
-}
-
 function libraryTemplate({
   board,
   template,
@@ -131,38 +123,50 @@ function libraryTemplate({
   board: BoardTemplate;
   template: CatalogueTemplate;
 }): LibraryTemplate {
-  const agentKinds = agentKindsOf(template);
-  const widgetIds = new Set([
-    ...template.widgets,
-    ...Object.values(template.byAgentKind).flatMap((ids) => ids ?? []),
-  ]);
-  const searchText = catalogueSearchText({
-    words: [template.name, template.job, ...[...widgetIds].map((id) => QUESTIONS.get(id) ?? "")],
-    agentKinds,
-  });
+  const { focusKind } = template;
+  const agentKinds = focusKind ? [focusKind] : template.preloadFor;
+  const questions = template.widgets.map((id) => WIDGETS.get(id)?.question ?? "");
   return {
     board,
     trunk: template.trunk,
-    agentKinds,
     widgetCount: template.widgets.length,
-    status: board.comingSoon ? "coming-soon" : "ready",
-    searchText,
+    searchText: catalogueSearchText({
+      words: [template.name, template.job, ...questions],
+      agentKinds,
+    }),
     preview: previewOf(template),
+    ...(focusKind ? { focusKind } : {}),
   };
 }
 
+/** Kept out of the finder: coding-agent boards live with coding agents; org boards come later. */
+const isHidden = ({ scope, focusKind }: CatalogueTemplate): boolean =>
+  scope === "org" || focusKind === "coding";
+
 const CATALOGUE_BY_ID = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
 
-/** Every catalogue template, in the gallery's order: the ones that can be made first. */
+/** Every template the finder knows, built or not, each base followed by its focus templates. */
 export const TEMPLATE_LIBRARY: readonly LibraryTemplate[] = BOARD_TEMPLATES.flatMap((board) => {
   const template = CATALOGUE_BY_ID.get(board.id);
-  return template ? [libraryTemplate({ board, template })] : [];
+  return template && !isHidden(template) ? [libraryTemplate({ board, template })] : [];
 });
 
-/** One trunk's templates on the library screen. */
+/** The templates that can be made today; one still missing widget code is not offered. */
+const READY_TEMPLATES = TEMPLATE_LIBRARY.filter(({ board }) => board.comingSoon === void 0);
+
+/**
+ * The templates a finder view offers: every ready template when no agent type is picked,
+ * else only the ones made for that type.
+ */
+export function finderPool({ agentKind }: { agentKind?: AgentKind }): readonly LibraryTemplate[] {
+  if (!agentKind) return READY_TEMPLATES;
+  return READY_TEMPLATES.filter(({ focusKind }) => focusKind === agentKind);
+}
+
+/** One trunk's templates on the finder. */
 export type TemplateSection = CatalogueSection<Trunk, LibraryTemplate>;
 
-/** Sections in the question tree's trunk order, ready templates first; empty trunks left out. */
+/** Sections in the question tree's trunk order; empty trunks left out. */
 export function templateSections({
   templates,
 }: {
@@ -173,31 +177,28 @@ export function templateSections({
 
 const QUERY_KEYS = {
   search: "q",
-  trunks: "trunk",
-  agentKinds: "agent",
-  statuses: "status",
+  trunk: "trunk",
+  agentKind: "agent",
 } as const satisfies Record<keyof CatalogueFilters, string>;
 
-function pickedFrom<Value extends string>({
+const oneOf = <Value extends string>({
   raw,
   values,
 }: {
   raw: string | undefined;
   values: readonly Value[];
-}): Value[] {
-  const picked = new Set((raw ?? "").split(","));
-  return values.filter((value) => picked.has(value));
-}
+}): Value | undefined => values.find((value) => value === raw);
 
 /** The view an address opens; unknown chip values are dropped. */
 export function templateFiltersFromQuery(
   query: Readonly<Record<string, string | undefined>>,
 ): CatalogueFilters {
+  const trunk = oneOf({ raw: query[QUERY_KEYS.trunk], values: TRUNKS });
+  const agentKind = oneOf({ raw: query[QUERY_KEYS.agentKind], values: AGENT_KINDS });
   return {
     search: query[QUERY_KEYS.search] ?? "",
-    trunks: pickedFrom({ raw: query[QUERY_KEYS.trunks], values: TRUNKS }),
-    agentKinds: pickedFrom({ raw: query[QUERY_KEYS.agentKinds], values: AGENT_KINDS }),
-    statuses: pickedFrom({ raw: query[QUERY_KEYS.statuses], values: CATALOGUE_STATUSES }),
+    ...(trunk ? { trunk } : {}),
+    ...(agentKind ? { agentKind } : {}),
   };
 }
 
@@ -209,12 +210,10 @@ export function templateFiltersQuery({
   query: Readonly<Record<string, string | undefined>>;
   filters: CatalogueFilters;
 }): Record<string, string | undefined> {
-  const listed = (values: readonly string[]) => (values.length ? values.join(",") : void 0);
   return {
     ...query,
     [QUERY_KEYS.search]: filters.search || void 0,
-    [QUERY_KEYS.trunks]: listed(filters.trunks),
-    [QUERY_KEYS.agentKinds]: listed(filters.agentKinds),
-    [QUERY_KEYS.statuses]: listed(filters.statuses),
+    [QUERY_KEYS.trunk]: filters.trunk,
+    [QUERY_KEYS.agentKind]: filters.agentKind,
   };
 }

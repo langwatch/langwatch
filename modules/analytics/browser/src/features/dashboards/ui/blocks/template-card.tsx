@@ -1,128 +1,93 @@
 /**
- * One template in the library: name and trunk badge, its job, a preview, the agent kinds it
- * suits, and its action with the widget count. Given `onFilter`, the trunk badge and agent
- * kind labels toggle the library's filters.
+ * One template, top to bottom: its name, its job and a preview of the top of its board, then
+ * a one-row footer (a focus template's agent type, the widget count), then whatever actions
+ * the surface gives it. Cards carry no data status: missing data shows inside the widgets.
  */
 
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check, Clock, Plus } from "lucide-react";
+import { Bot, Check, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
-import {
-  type CatalogueFilterPick,
-  type CatalogueFilters,
-  isPicked,
-} from "../../model/catalogue-filter.ts";
+import { AGENT_KIND_CHIP_LABELS } from "../../catalogue/index.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
-import { AgentKindLabels, CatalogueFilterLabel, TRUNK_PALETTES } from "./catalogue-filters.tsx";
 import { TemplatePreview } from "./template-preview.tsx";
 
 export function TemplateCard({
   template,
-  isCreating,
-  addedHref,
-  onCreate,
-  filters,
-  onFilter,
+  actions,
 }: {
   template: LibraryTemplate;
-  isCreating: boolean;
-  /** The address of the board this project already made from the template, if any. */
-  addedHref?: string;
-  onCreate: () => void;
-  /** The view the labels show as picked; only where the labels filter. */
-  filters?: CatalogueFilters;
-  onFilter?: (pick: CatalogueFilterPick) => void;
+  /** What this surface lets the member do with the template, such as add it. */
+  actions?: ReactNode;
 }) {
-  const { board, trunk, agentKinds, widgetCount, preview } = template;
-  const progress = board.comingSoon;
-  const trunkPick: CatalogueFilterPick = { group: "trunks", value: trunk };
+  const { board, focusKind, widgetCount, preview } = template;
   return (
     <VStack
       as="article"
       aria-label={board.name}
+      data-template={board.id}
       align="stretch"
-      gap={4}
-      padding={{ base: 5, md: 6 }}
+      gap={3}
+      width="full"
+      height="full"
       minWidth={0}
+      padding={4}
       borderWidth="1px"
-      borderColor="border.muted"
+      borderColor="border"
       borderRadius="xl"
       background="bg.panel"
     >
       <VStack align="stretch" gap={1} minWidth={0}>
-        <HStack gap={2} minWidth={0}>
-          <Text as="h3" fontSize="15px" fontWeight="semibold" color="fg" truncate>
-            {board.name}
-          </Text>
-          <CatalogueFilterLabel
-            shape="badge"
-            label={trunk}
-            colorPalette={TRUNK_PALETTES[trunk]}
-            isActive={filters !== void 0 && isPicked({ filters, pick: trunkPick })}
-            onToggle={onFilter && (() => onFilter(trunkPick))}
-          />
-        </HStack>
+        <Text as="h3" fontSize="15px" lineHeight="20px" fontWeight="semibold" lineClamp={2}>
+          {board.name}
+        </Text>
         {/* Two lines kept even for a short job, so previews line up across a row. */}
         <Text fontSize="13px" lineHeight="20px" minHeight="40px" color="fg.muted" lineClamp={2}>
           {board.summary ?? board.description}
         </Text>
       </VStack>
-      <TemplatePreview preview={preview} isMuted={progress !== void 0} />
-      <HStack gap={1} wrap="wrap">
-        <AgentKindLabels agentKinds={agentKinds} filters={filters} onFilter={onFilter} />
-      </HStack>
-      <HStack gap={3} marginTop="auto">
-        <TemplateAction
-          name={board.name}
-          isComingSoon={progress !== void 0}
-          isCreating={isCreating}
-          addedHref={addedHref}
-          onCreate={onCreate}
-        />
-        <Text marginLeft="auto" fontSize="12px" color="fg.subtle" textAlign="end">
-          {progress
-            ? `${progress.built} of ${progress.total} widgets built`
-            : `${widgetCount} widgets`}
+      <TemplatePreview preview={preview} />
+      {/* One fixed-height row on every card, the agent type slot kept even when empty, so the
+          actions below sit level across a row. */}
+      <HStack height="20px" minWidth={0} justify="space-between" gap={3} fontSize="12px">
+        <HStack gap={1} minWidth={0} color="fg.muted">
+          {focusKind && (
+            <>
+              <Bot size={12} aria-hidden />
+              <Text as="span" truncate>
+                {AGENT_KIND_CHIP_LABELS[focusKind]}
+              </Text>
+            </>
+          )}
+        </HStack>
+        <Text flexShrink={0} color="fg.muted">
+          {widgetCount} widgets
         </Text>
       </HStack>
+      {actions && <HStack gap={2}>{actions}</HStack>}
     </VStack>
   );
 }
 
 /**
  * "Add to this project", or "Added" linking to the board already made from the template
- * (AC145), or "Coming soon" while it is not built.
+ * (AC145).
  */
-function TemplateAction({
+export function AddTemplateButton({
   name,
-  isComingSoon,
   isCreating,
   addedHref,
   onCreate,
 }: {
   name: string;
-  isComingSoon: boolean;
   isCreating: boolean;
+  /** The address of the board this project already made from the template, if any. */
   addedHref: string | undefined;
   onCreate: () => void;
 }) {
   const host = useAnalyticsHost();
-  if (isComingSoon) {
-    return (
-      <Button
-        size="sm"
-        variant="subtle"
-        colorPalette="gray"
-        aria-label={`Add ${name} to this project`}
-        disabled
-      >
-        <Clock size={14} aria-hidden />
-        Coming soon
-      </Button>
-    );
-  }
   if (addedHref) {
     // A real link, so a modified click still opens the board in a new tab.
     return (

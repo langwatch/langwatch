@@ -61,6 +61,8 @@ describe("given the Flight Deck cockpit widgets", () => {
     ].map((text) => code.indexOf(text));
     expect(order.every((index) => index > 0)).toBe(true);
     expect(order.toSorted((a, b) => a - b)).toEqual(order);
+    expect(code).toContain("<div title={detail}");
+    expect(code).not.toContain("the biggest drop of all {segments.data.length}");
     expect(queries.segments).toContain("'customer'");
     expect(queries.agreement).toContain("FROM annotations");
     expect(queries.step).toContain("countIf(errored AND NOT failed) AS recovered");
@@ -121,12 +123,13 @@ describe("given the Flight Deck cockpit widgets", () => {
 
 describe("given the Running costs widgets", () => {
   /** @scenario "AC28 Running costs: Spend shows the period, the cost per success and the month forecast" */
-  it("adds evaluator cost to trace cost and runs the month on at the last 7 days' pace", () => {
+  it("adds evaluator cost to trace cost and runs the month on at the pace of days with traces", () => {
     const { code, queries } = build("cost-verdict");
     expect(queries.spend).toContain("FROM evaluation_metrics");
     expect(queries.month).toContain("toStartOfMonth(now())");
     expect(queries.month).toContain("subtractDays(now(), 7)");
-    expect(code).toContain("const pace = ratio(m.last_7_days, 7);");
+    expect(queries.month).toContain("uniqExact(toDate(OccurredAt))");
+    expect(code).toContain("const pace = ratio(m.last_7_days, m.days_with_data);");
     expect(code).toContain('label="Cost per success"');
   });
 
@@ -137,7 +140,7 @@ describe("given the Running costs widgets", () => {
       expect(queries.main).toContain(source);
     }
     expect(queries.main).toContain("'evaluations' AS source\n  FROM evaluation_metrics");
-    expect(code).toContain('" is test traffic"');
+    expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */

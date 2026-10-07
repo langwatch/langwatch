@@ -1,7 +1,7 @@
 /**
- * What a board tells Langy: the self-describing context a question rides with
- * (AC16): which board, what is on it and the period it reads over, and the drafts
- * about the board or one widget on it (AC120, AC140, AC142). Pure.
+ * What a board tells Langy: the self-describing context a question rides with (AC16): which
+ * board, what is on it and the period it reads over, and the drafts about the board or one
+ * widget on it (AC120, AC140, AC142), including those from the widget editor. Pure.
  */
 
 import { Temporal } from "@langwatch/time";
@@ -12,6 +12,7 @@ import type {
   AnalyticsLangyDraftAbout,
 } from "../../../../model/analytics-host.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
+import type { WidgetShape } from "../../model/widget-shape.ts";
 
 /** The rollout flag that gives a project Langy at all. */
 export const LANGY_RELEASE_FLAG = "release_langy_enabled";
@@ -263,24 +264,189 @@ export function widgetSetupDraft({
   return widgetDraft({ prompt: SETUP_PROMPTS[setup](widget.name), widget, board, period });
 }
 
-function widgetDraft({
+/**
+ * "Ask Langy to help" on a widget whose traces lack a field it reads: how to start sending
+ * it. Drafted from the board, so it is about the board, as the other card actions are.
+ */
+export function widgetMissingDataDraft({
+  missing,
+  widget,
+  board,
+  period,
+}: {
+  missing: { field: string; label: string };
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const prompt =
+    `Help me send ${missing.label} on my traces. "${widget.name}" needs it (the ` +
+    `${missing.field} field), and my traces do not have it yet. Explain in plain words what ` +
+    "it is, how I start sending it from my agent, and what the widget will show once it arrives.";
+  return widgetDraft({ prompt, widget, board, period });
+}
+
+/** What a draft from the editor is about when the editor is open on a widget not saved yet. */
+export const NEW_WIDGET_REF = "new";
+
+/** The widget open in the editor: a saved one has its id, a new one has none yet. */
+export type EditedWidget = WidgetSubject & { readonly id?: string };
+
+/** What a draft from the editor is about: the board, and the widget open in the editor. */
+export function widgetDraftAbout({
+  board,
+  widget,
+}: {
+  board: Pick<BoardSubject, "id">;
+  widget: Pick<EditedWidget, "id">;
+}): AnalyticsLangyDraftAbout {
+  return { ref: board.id, itemRef: widget.id ?? NEW_WIDGET_REF };
+}
+
+/** The widget being edited as the agent reads it: which one, on which board, over when. */
+export function widgetEditorContext({
+  widget,
+  board,
+  period,
+}: {
+  widget: EditedWidget;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyContext {
+  const which =
+    widget.id === void 0
+      ? `new widget "${widget.name}", not saved yet`
+      : `widget "${widget.name}" (id ${widget.id})`;
+  return context({
+    ref: `${which}, open in the editor on ${boardAskContext({ board, period }).ref}`,
+    label: widget.name,
+  });
+}
+
+/** Langy beside the editor, with the widget attached and nothing drafted ("Edit code"). */
+export function widgetEditorOpened({
+  widget,
+  board,
+  period,
+}: {
+  widget: EditedWidget;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  return { context: [widgetEditorContext({ widget, board, period })] };
+}
+
+/** "Edit with Langy": Langy asks what the widget should show, then proposes and saves it. */
+export function widgetEditDraft({
+  widget,
+  board,
+  period,
+}: {
+  widget: EditedWidget;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const prompt =
+    `Edit "${widget.name}" with me. Ask what I want it to show, propose the change to its ` +
+    "code and queries, and save it only when I agree.";
+  return editorDraft({ prompt, widget, board, period });
+}
+
+/** One change Langy suggests beside the editor, and why it helps. */
+export interface WidgetAsk {
+  readonly ask: string;
+  readonly why: string;
+}
+
+/** Starting points for a new widget, then changes that fit what a widget draws. */
+const WIDGET_ASKS: Readonly<Record<WidgetShape | "new", readonly WidgetAsk[]>> = {
+  new: [
+    { ask: "Show daily cost by model", why: "A bar per day, one colour per model." },
+    { ask: "Show errors per day by type", why: "See which error grew." },
+    { ask: "Show my slowest steps this week", why: "Find where the time goes." },
+  ],
+  line: [
+    { ask: "Change this to a weekly view", why: "One bucket per week instead of per day." },
+    { ask: "Split it by model", why: "One series per model." },
+  ],
+  bars: [
+    { ask: "Show the top 10", why: "Keep the ten largest, fold the rest." },
+    { ask: "Group by topic", why: "One row per topic instead." },
+    { ask: "Show what changed since last period", why: "Add each row's change." },
+  ],
+  tile: [
+    { ask: "Compare with last period", why: "Show the change beside the figure." },
+    { ask: "Show the trend behind it", why: "Add a small line over the period." },
+  ],
+};
+
+/** What Langy suggests in the editor: starting points for a new widget, else what fits it. */
+export function widgetAsks(shape: WidgetShape | "new"): readonly WidgetAsk[] {
+  return WIDGET_ASKS[shape];
+}
+
+/** A suggestion picked in the editor, drafted for the reader to send. */
+export function widgetAskDraft({
+  ask,
+  widget,
+  board,
+  period,
+}: {
+  ask: WidgetAsk;
+  widget: EditedWidget;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const prompt =
+    widget.id === void 0
+      ? `${ask.ask}. Build it as a new widget on this dashboard: write its code and ` +
+        "LangWatchQL queries, and save it only when I agree."
+      : `For "${widget.name}": ${ask.ask}. Propose the change to its code and queries, and ` +
+        "save it only when I agree.";
+  return editorDraft({ prompt, widget, board, period });
+}
+
+/** A draft from the editor: about the widget open in it, with that widget attached. */
+function editorDraft({
   prompt,
   widget,
   board,
   period,
 }: {
   prompt: string;
+  widget: EditedWidget;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  return widgetDraft({
+    prompt,
+    widget,
+    board,
+    period,
+    about: widgetDraftAbout({ board, widget }),
+    attached: widgetEditorContext({ widget, board, period }),
+  });
+}
+
+function widgetDraft({
+  prompt,
+  widget,
+  board,
+  period,
+  about = boardDraftAbout(board),
+  attached = boardAskContext({ board, period }),
+}: {
+  prompt: string;
   widget: WidgetSubject;
   board: BoardSubject;
   period: BoardPeriod;
+  about?: AnalyticsLangyDraftAbout;
+  /** What rides with the draft: the board, or the widget open in the editor. */
+  attached?: AnalyticsLangyContext;
 }): AnalyticsLangyAskRequest {
   const draftWith = (sqls: readonly string[]) =>
     promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });
   const sqls = widget.definition.queries.map(({ sql }) => sql);
   const room = MAX_WIDGET_DRAFT_LENGTH - draftWith([]).length;
-  return {
-    draft: draftWith(fittedSql({ sqls, room })),
-    about: boardDraftAbout(board),
-    context: [boardAskContext({ board, period })],
-  };
+  return { draft: draftWith(fittedSql({ sqls, room })), about, context: [attached] };
 }

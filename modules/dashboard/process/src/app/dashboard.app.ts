@@ -486,12 +486,13 @@ export class DashboardModule implements DashboardApi {
         queries: input.queries,
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+        ...(input.source === undefined ? {} : { source: input.source }),
       },
       viewer: input.viewer,
     });
   }
 
-  /** A widget's name, its code, its queries, its description or its prompt. */
+  /** A widget's name, code, queries, description, prompt or source; the rest is kept. */
   updateDashboardWidget(
     input: {
       projectId: string;
@@ -510,6 +511,7 @@ export class DashboardModule implements DashboardApi {
         ...(input.queries === undefined ? {} : { queries: input.queries }),
         ...(input.description === undefined ? {} : { description: input.description }),
         ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+        ...(input.source === undefined ? {} : { source: input.source }),
       },
     });
   }

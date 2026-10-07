@@ -77,6 +77,12 @@ export const LWQL_ACCEPTED_GRANULARITY_STEPS = [
   604_800,
 ] as const;
 
+/**
+ * How far dashboard buckets sit from the epoch, a Thursday, so a week starts on Monday. Every
+ * accepted step below a week divides it, so only week buckets move.
+ */
+export const LWQL_BUCKET_ALIGNMENT_SECONDS = 345_600;
+
 /** One of the accepted steps: the only values any door accepts. */
 export type LangWatchQLAcceptedGranularityStep = (typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number];
 

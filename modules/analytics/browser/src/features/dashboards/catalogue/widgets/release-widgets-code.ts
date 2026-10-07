@@ -7,6 +7,7 @@
 import {
   CHART_STYLE,
   DATES,
+  GAP_BRIDGE,
   NUMBERS,
   SERIES_CHART,
   SERIES_CHART_IMPORTS,
@@ -48,12 +49,12 @@ const RUN_DAY = `const runDay = (value) =>
 export const NEW_VERSION_CODE = widgetCode({
   summary:
     "The newest test run against the runs before it: pass rate, worse scenarios, time, cost.",
-  subtitle: "Ship when no scenario got worse by more than its normal flakiness",
+  subtitle:
+    "Ship when no scenario got worse by more than its normal flakiness. The newest run is " +
+    "compared with every earlier run of the same scenarios in this period",
   source: "scenarios",
-  parts: [NUMBERS, DATES, STAT],
+  parts: [NUMBERS, STAT],
   components: `${TAG}
-
-${RUN_DAY}
 
 // Worse or better only beyond the scenario's own flake rate; under 3 new runs it is unclear.
 function classify(row) {
@@ -77,21 +78,9 @@ const TONE = { Worse: "bad", Unclear: "warn", Better: "good" };`,
   const side = (isNew) => costs.data.find((row) => num(row.is_new) === (isNew ? 1 : 0)) || {};
   const next = side(true);
   const current = side(false);
-  // An unknown side compares as no change, never as a rise from 0.
-  const rose = (key, factor) =>
-    known(next[key]) && known(current[key]) && num(next[key]) > num(current[key]) * factor;
-  const slower = rose("typical_ms", 1.25);
-  const dearer = rose("cost_per_run", 1.1);
-  let sentence = "The newest run can ship: no scenario got worse.";
-  if (slower || dearer) sentence = "No scenario got worse, but check the " +
-    (slower ? "run time" : "cost") + ".";
-  if (worse.length > 0) sentence = "Hold the newest run: " + worse.length +
-    (worse.length === 1 ? " scenario got" : " scenarios got") + " worse.";
   const listed = rows.filter((row) => row.verdict !== "Same").slice(0, 4);
   return (
     <Panel>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8,
-        color: worse.length > 0 ? C.red : C.text }}>{sentence}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         <Stat label={"Scenarios passed, " + pct(currentRate, 0) + " before"}
           value={pct(newRate, 0)} />
@@ -115,10 +104,6 @@ const TONE = { Worse: "bad", Unclear: "warn", Better: "good" };`,
             </span>
           </div>
         ))}
-      </div>
-      <div style={{ marginTop: "auto", fontSize: 10.5, color: C.faint }}>
-        Newest run {next.started_at ? runDay(next.started_at) : ""}, against every earlier run
-        of the same scenarios in this period
       </div>
     </Panel>
   );`,
@@ -211,7 +196,7 @@ const MEASURES = [
   const baseline = runs[Math.min(1, runs.length - 1)];
   const cell = (run) => (measure) => {
     const value = measure.of(run);
-    if (!known(value)) return <span style={{ color: C.faint }}>n/a</span>;
+    if (!known(value)) return <span style={{ color: C.faint }}>{GAP}</span>;
     const base = measure.of(baseline);
     const delta = run === baseline || !known(base) ? 0 : (value - base) * measure.better;
     const color = delta > measure.tolerance ? C.green : delta < -measure.tolerance ? C.red : C.text;
@@ -234,14 +219,16 @@ const MEASURES = [
 
 export const ROLLOUT_CODE = widgetCode({
   summary: "Production up to 7 days after the newest change against the same days a week before.",
-  subtitle: "Roll back if production got worse after the change",
+  subtitle:
+    "Roll back if production got worse after the change. Response time is the 95th " +
+    "percentile: 1 in 20 traces took longer",
   source: "traces",
   parts: [NUMBERS, DATES, TABLE],
   components: `${RUN_DAY}
 
 // better: which way is good; a relative change under 5% (1 point for rates) is no change.
 function verdict({ before, after, better, rate }) {
-  if (!known(before) || !known(after)) return <span style={{ color: C.faint }}>n/a</span>;
+  if (!known(before) || !known(after)) return <span style={{ color: C.faint }}>{GAP}</span>;
   const change = rate ? after - before : before > 0 ? (after - before) / before : 0;
   const limit = rate ? 0.01 : 0.05;
   if (change * better > limit) return <span style={{ color: C.green }}>better</span>;
@@ -265,7 +252,7 @@ function verdict({ before, after, better, rate }) {
     }] : []),
     { label: "Error rate", better: -1, rate: true, format: pct,
       before: num(before.error_rate), after: num(after.error_rate) },
-    { label: "Response time, p95", better: -1, format: ms,
+    { label: "Response time", better: -1, format: ms,
       before: num(before.p95_ms), after: num(after.p95_ms) },
     { label: "Cost per trace", better: -1, format: usd,
       before: num(before.cost_per_trace), after: num(after.cost_per_trace) },
@@ -291,8 +278,11 @@ function verdict({ before, after, better, rate }) {
 const EQUAL_MARGIN = 0.05;
 
 export const MODELS_COMPARED_CODE = widgetCode({
-  summary: "Pass rate, cost per test and p95 reply per model, from experiments that compared them.",
-  subtitle: "Pick the cheapest model that holds quality",
+  summary:
+    "Pass rate, cost per test and reply time per model, from experiments that compared them.",
+  subtitle:
+    "Pick the cheapest model that holds quality. Reply time is the 95th percentile: 1 in 20 " +
+    "replies took longer",
   source: "scenarios",
   parts: [NUMBERS, TABLE],
   components: `${TAG}
@@ -318,8 +308,7 @@ ${experimentFace("No experiment in this period ran two or more models side by si
     { header: "Tests passed", align: "right",
       cell: (row) => pct(num(row.pass_rate), 0) + " of " + count(num(row.graded)) },
     { header: "Cost per test", align: "right", cell: (row) => usd(num(row.cost_per_row)) },
-    { header: "p95 reply", align: "right",
-      cell: (row) => (row.p95_ms === null ? "n/a" : ms(num(row.p95_ms))) },
+    { header: "Reply time", align: "right", cell: (row) => ms(num(row.p95_ms)) },
   ];
   return (
     <Panel>
@@ -331,10 +320,11 @@ ${experimentFace("No experiment in this period ran two or more models side by si
 export const TEST_SET_DRIFT_CODE = widgetCode({
   summary: "Each test run's pass rate, and the same rate weighted to production's topic mix.",
   subtitle:
-    "Trust the weighted figure before a release; a large gap means the test set is out of date",
+    "Trust the weighted figure before a release; a large gap between the two means the test " +
+    "set is out of date",
   source: "scenarios",
   recharts: SERIES_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, STAT, SERIES_CHART],
+  parts: [NUMBERS, DATES, CHART_STYLE, STAT, GAP_BRIDGE, SERIES_CHART],
   components: `${RUN_DAY}\n\n${SETUP_NOTE}`,
   queries: ["main"],
   body: `  if (main.data.length === 0) {
@@ -355,12 +345,10 @@ ${experimentFace("No experiment ran in this period. Run your test set as an expe
   ];
   return (
     <Panel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
         marginBottom: 8 }}>
         <Stat label={"Latest run, " + count(num(latest.judged)) + " checks"} value={pct(raw, 0)} />
         <Stat label="Weighted to real traffic" value={pct(weighted, 0)} />
-        <Stat label="Gap, test set against traffic"
-          value={known(raw) && known(weighted) ? Math.round((raw - weighted) * 100) + " pts" : GAP} />
       </div>
       <SeriesChart points={points} series={series} format={(value) => pct(value, 0)} />
     </Panel>
@@ -372,7 +360,7 @@ export const FIELD_ACCURACY_CODE = widgetCode({
   subtitle: "Hold a release that finds fewer fields",
   source: "scenarios",
   recharts: SERIES_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, STAT, SERIES_CHART],
+  parts: [NUMBERS, DATES, CHART_STYLE, STAT, GAP_BRIDGE, SERIES_CHART],
   components: `${RUN_DAY}\n\n${SETUP_NOTE}`,
   queries: ["main"],
   body: `  if (main.data.length === 0) {

@@ -205,7 +205,6 @@
     ["Name", "name", []],
     ["Order", "order", []],
     ["Description", "description", ["output"]],
-    ["Visibility", "visibility", []],
     ["CreatedById", "createdById", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]

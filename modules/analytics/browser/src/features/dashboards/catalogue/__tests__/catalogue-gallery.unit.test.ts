@@ -1,6 +1,6 @@
 /**
- * The gallery lists every catalogue template. One whose widgets all have code is laid
- * out on the grid and can be made; the rest say how many widgets are built.
+ * The gallery holds every catalogue template as a board. One whose widgets all have code is
+ * laid out on the grid; the rest hold no widgets and say how many are built.
  */
 
 import { describe, expect, it } from "vitest";
@@ -12,16 +12,13 @@ const ready = GALLERY_TEMPLATES.filter(({ comingSoon }) => comingSoon === void 0
 const soon = GALLERY_TEMPLATES.filter(({ comingSoon }) => comingSoon !== void 0);
 
 describe("given the template gallery", () => {
-  /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
-  it("lists every catalogue template once, the ones that can be made first", () => {
-    expect(GALLERY_TEMPLATES.map(({ id }) => id).toSorted()).toEqual(
-      CATALOGUE_TEMPLATES.map(({ id }) => id).toSorted(),
-    );
-    expect(GALLERY_TEMPLATES.slice(0, ready.length)).toEqual(ready);
+  /** @scenario "AC17 Only what is built is offered" */
+  it("holds every catalogue template once, in catalogue order", () => {
+    expect(GALLERY_TEMPLATES.map(({ id }) => id)).toEqual(CATALOGUE_TEMPLATES.map(({ id }) => id));
     expect(ready.length).toBeGreaterThan(0);
   });
 
-  /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
+  /** @scenario "AC17 Only what is built is offered" */
   it("says how far a coming-soon template is built, and holds no widgets yet", () => {
     for (const { id, comingSoon, widgets } of soon) {
       const total = CATALOGUE_TEMPLATES.find((template) => template.id === id)?.widgets.length;
@@ -31,7 +28,7 @@ describe("given the template gallery", () => {
     }
   });
 
-  /** @scenario "AC17 Every widget and template is listed, coming soon until it is built" */
+  /** @scenario "AC17 Only what is built is offered" */
   it("lays a ready template's widgets out inside the grid, none overlapping", () => {
     for (const { id, widgets } of ready) {
       const cells = widgets.flatMap(({ layout }) =>
@@ -45,7 +42,7 @@ describe("given the template gallery", () => {
   });
 
   /** @scenario "AC18 Every widget and template carries a default Langy prompt" */
-  it("gives every template a report prompt that asks each of its questions", () => {
+  it("gives every template a report prompt that names it", () => {
     for (const template of CATALOGUE_TEMPLATES) {
       expect(template.reportPrompt, template.id).toContain(template.name);
     }

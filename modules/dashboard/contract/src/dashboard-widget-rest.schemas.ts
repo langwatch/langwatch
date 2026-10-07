@@ -2,6 +2,7 @@
  * The dashboard-widget REST family's wire shapes. Bounds mirror
  * `DashboardWidgetDefinition` in `@langwatch/analytics-contract/dashboard-widget-definition`.
  */
+import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { z } from "zod";
 
 const MAX_WIDGET_NAME_LENGTH = 200;
@@ -46,6 +47,8 @@ export const createDashboardWidgetSchema = z.object({
   queries: dashboardWidgetQueriesSchema,
   description: dashboardWidgetDescriptionSchema.optional(),
   prompt: dashboardWidgetPromptSchema.optional(),
+  /** Where the widget came from; the API records `{ kind: "api" }` when the body names none. */
+  source: dashboardWidgetSourceSchema.optional(),
 });
 
 export const updateDashboardWidgetSchema = z
@@ -53,16 +56,13 @@ export const updateDashboardWidgetSchema = z
     name: dashboardWidgetNameSchema.optional(),
     code: dashboardWidgetCodeSchema.optional(),
     queries: dashboardWidgetQueriesSchema.optional(),
+    description: dashboardWidgetDescriptionSchema.optional(),
+    source: dashboardWidgetSourceSchema.optional(),
   })
-  // A PATCH naming nothing is a mistake worth reporting, and `code` without
-  // `queries` (or the reverse) would write half a definition.
+  // A PATCH naming nothing is a mistake worth reporting; a field it leaves out keeps its value.
   .refine(
-    (body) => body.name !== undefined || (body.code !== undefined && body.queries !== undefined),
-    "Provide a name, a full { code, queries } definition, or both.",
-  )
-  .refine(
-    (body) => (body.code === undefined) === (body.queries === undefined),
-    "code and queries must be provided together.",
+    (body) => Object.values(body).some((value) => value !== undefined),
+    "Provide at least one of name, code, queries, description or source.",
   )
   .meta({ minProperties: 1 });
 
@@ -80,6 +80,7 @@ export const dashboardWidgetResourceSchema = z.object({
     queries: z.array(dashboardWidgetQuerySchema),
     description: z.string().optional(),
     prompt: z.string().optional(),
+    source: dashboardWidgetSourceSchema.optional(),
   }),
   createdAt: z.string(),
   updatedAt: z.string(),

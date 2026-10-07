@@ -6,8 +6,10 @@
 
 import {
   BARS,
+  BUCKETS,
   CHART_STYLE,
   DATES,
+  GAP_BRIDGE,
   HEADLINE,
   NUMBERS,
   SERIES_CHART,
@@ -23,7 +25,7 @@ const MARKED_CHART_IMPORTS = [...SERIES_CHART_IMPORTS, "ReferenceLine"] as const
 
 /**
  * Stacked bars on the left axis, an optional line on its own axis, and a dashed
- * vertical line at each change; reads `CHART_STYLE` and `DATES`.
+ * vertical line at each change; reads `CHART_STYLE`, `DATES` and `GAP_BRIDGE`.
  */
 const MARKED_CHART = `// marks: the changes query's rows; one line per bucket, its labels joined.
 function changeMarks(rows) {
@@ -57,12 +59,13 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
               <YAxis yAxisId="line" orientation="right" tick={AXIS} tickLine={false}
                 axisLine={false} width={48} tickFormatter={lineFormat} />
             )}
-            <Tooltip contentStyle={TIP} formatter={(value, name) =>
-              [name === line?.label ? lineFormat(value) : barFormat(value), name]} />
+            <Tooltip contentStyle={TIP} filterNull={false} formatter={(value, name) =>
+              tipValue(name === line?.label ? lineFormat : barFormat)(value, name)} />
             {bars.map((item) => (
               <Bar key={item.key} yAxisId="bars" dataKey={item.key} name={item.label}
                 stackId="bars" fill={item.colour} isAnimationActive={false} />
             ))}
+            {line && bridge({ ...line, yAxisId: lineAxis })}
             {line && (
               <Line yAxisId={lineAxis} type="monotone" dataKey={line.key} name={line.label}
                 stroke={line.colour} strokeWidth={2} dot={false} isAnimationActive={false} />
@@ -79,7 +82,7 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
   );
 }`;
 
-const MARKED_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, MARKED_CHART];
+const MARKED_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE, MARKED_CHART];
 
 export const ERRORS_PER_DAY_CODE = widgetCode({
   summary: "Traces with an error per bucket by what failed first, the error rate, and changes.",
@@ -105,7 +108,7 @@ const COLOURS = [C.red, C.orange, C.pink, "#9f7aea", C.faint];`,
     point[keyOf(row.category)] = (point[keyOf(row.category)] || 0) + num(row.traces);
     byBucket[bucketLabel(row.bucket)] = point;
   });
-  const points = rate.data.map((row) => ({
+  const points = withBuckets(rate, ["error_rate"]).map((row) => ({
     x: bucketLabel(row.bucket),
     rate: num(row.error_rate),
     ...byBucket[bucketLabel(row.bucket)],
@@ -217,7 +220,7 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <Stat label={"Tool error rate, " + count(failures) + " of " + count(calls) + " calls"}
-          value={pct(calls > 0 ? failures / calls : 0)} />
+          value={pct(ratio(failures, calls))} />
         <Stat label={"Recovered, of " + count(failures) + " errors"}
           value={failures > 0 ? pct(recovered / failures) : "-"} />
         <Stat label="Worst tool" value={failures > 0 ? worst.step : "none"} />
@@ -233,14 +236,15 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   subtitle: "Cap retries on the step that loops most",
   source: "spans",
   recharts: SERIES_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, STAT, SERIES_CHART],
+  parts: [NUMBERS, DATES, CHART_STYLE, STAT, BUCKETS, GAP_BRIDGE, SERIES_CHART],
   queries: ["daily", "steps", "totals"],
   body: `  const traffic = num(totals.data[0]?.traces);
   if (!traffic) return <Panel><CallToAction /></Panel>;
   if (daily.data.length === 0) {
     return <Panel><Note>No trace looped or retried in this period.</Note></Panel>;
   }
-  const points = daily.data.map((row) => ({
+  const counts = ["looped_traces", "retried_traces"].map((key) => ({ key, kind: "count" }));
+  const points = withBuckets(daily, counts).map((row) => ({
     x: bucketLabel(row.bucket),
     looped: num(row.looped_traces),
     retried: num(row.retried_traces),
@@ -303,9 +307,9 @@ export const WRONG_TOOL_CODE = widgetCode({
   const first = ratio(totals.wrong_first, firstJudged);
   const secondJudged = judged - firstJudged;
   const second = ratio(num(totals.wrong) - num(totals.wrong_first), secondJudged);
-  const points = trend.data.map((row) => ({ x: bucketLabel(row.bucket), wrong: num(row.wrong_rate) }));
-  const label = "wrong first tool, " + count(num(totals.wrong)) + " of " + count(judged) +
-    " judged tasks · first half " + pct(first) + ", second half " + pct(second);
+  const points = withBuckets(trend, ["wrong_rate"])
+    .map((row) => ({ x: bucketLabel(row.bucket), wrong: num(row.wrong_rate) }));
+  const label = "wrong first tool · first half " + pct(first) + ", second half " + pct(second);
   return (
     <Panel>
       <Headline value={pct(ratio(totals.wrong, judged))} label={label} />

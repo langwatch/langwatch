@@ -1,7 +1,7 @@
 /**
  * An empty template widget tells a quiet period from a source that was never set
  * up: its empty face asks whether the source sent data in the last 90 days, and
- * only offers the setup step when it did not.
+ * only offers the setup step when it did not. A trace field is the completeness report's.
  */
 
 import { describe, expect, it } from "vitest";
@@ -51,8 +51,15 @@ describe.each(SOURCES)("given a widget that reads %s", (source) => {
   });
 });
 
-describe("given every built catalogue widget", () => {
-  const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
+describe("given every built catalogue widget with a source to set up", () => {
+  const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []).filter(
+    ({ definition }) => definition.code.includes("function CallToAction()"),
+  );
+
+  /** @scenario "AC13c Every template widget checks its own source" */
+  it("finds most widgets among them", () => {
+    expect(widgets.length).toBeGreaterThan(IMPLEMENTED_WIDGET_IDS.length / 2);
+  });
 
   /** @scenario "AC13c Every template widget checks its own source" */
   it("stores the presence query each widget's empty face asks for", () => {

@@ -17,13 +17,17 @@ export function useLangyAsk() {
 }
 
 /**
- * Tells Langy this board is on screen while it is mounted, so a draft about it is kept and
- * one about another board is dropped once it has shown.
+ * Tells Langy this board, and the widget open in its editor, is on screen while it is
+ * mounted, so a draft about it is kept and one about anything else is dropped once shown.
  */
-export function useBoardOnScreen(boardId: string) {
+export function useBoardOnScreen({ boardId, itemRef }: { boardId: string; itemRef?: string }) {
   const host = useAnalyticsHost();
   useEffect(() => {
-    host.showLangy(boardDraftAbout({ id: boardId }));
-    return () => host.showLangy(null);
-  }, [host, boardId]);
+    host.showLangy({
+      ...boardDraftAbout({ id: boardId }),
+      ...(itemRef === void 0 ? {} : { itemRef }),
+    });
+  }, [host, boardId, itemRef]);
+  // Apart, so closing the editor tells Langy the board alone, never nothing in between.
+  useEffect(() => () => host.showLangy(null), [host, boardId]);
 }

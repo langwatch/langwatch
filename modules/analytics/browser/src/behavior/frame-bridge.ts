@@ -270,7 +270,7 @@ export class FrameBridgeSession implements FrameBridge {
  * else (a bug in the mapping itself) degrades to a generic shape rather than
  * leaking a raw message across the boundary.
  */
-function toChartQueryErrorPayload(error: unknown): ChartQueryError {
+export function toChartQueryErrorPayload(error: unknown): ChartQueryError {
   if (typeof error !== "object" || error === null) return unknownChartQueryError();
   if (!("code" in error && "title" in error && "message" in error)) {
     return unknownChartQueryError();

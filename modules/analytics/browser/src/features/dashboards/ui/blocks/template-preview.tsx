@@ -1,6 +1,7 @@
 /**
- * A template card's preview: its board as a captured image, or faint blocks where its widgets
- * sit. Decoration only: no query, no focus; it fits the card's width and fades off the bottom.
+ * A template card's preview: the top of its board as a captured image, or faint blocks where
+ * its widgets sit. Decoration only: no query, no focus. Its top margin takes up the slack, so
+ * previews line up when a name or job is shorter than its neighbours'.
  */
 
 import { Box, Grid, HStack, Image } from "@langwatch/design-system/primitives";
@@ -82,16 +83,7 @@ function LayoutSketch({ widgets }: { widgets: readonly PreviewWidget[] }) {
   );
 }
 
-export function TemplatePreview({
-  preview,
-  isMuted,
-  isCompact = false,
-}: {
-  preview: Preview;
-  isMuted: boolean;
-  /** The short frame an empty board's cards use, showing the top of the board only. */
-  isCompact?: boolean;
-}) {
+export function TemplatePreview({ preview }: { preview: Preview }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.36);
   useEffect(() => {
@@ -109,8 +101,9 @@ export function TemplatePreview({
       ref={box}
       aria-hidden
       inert
-      position="relative"
-      height={isCompact ? "144px" : { base: "260px", md: "320px" }}
+      height="144px"
+      marginTop="auto"
+      flexShrink={0}
       overflow="hidden"
       borderWidth="1px"
       borderColor="border.muted"
@@ -119,25 +112,21 @@ export function TemplatePreview({
       pointerEvents="none"
       userSelect="none"
     >
-      <Box height="full" opacity={isMuted ? 0.55 : 1}>
-        {preview.kind === "image" ? (
-          <Image src={preview.src} alt="" width="full" height="auto" />
-        ) : (
-          <Box width={`${BOARD_WIDTH}px`} transform={`scale(${scale})`} transformOrigin="top left">
-            <LayoutSketch widgets={preview.widgets} />
-          </Box>
-        )}
-      </Box>
-      {/* Fades into the frame's own surface, so the board seems to continue below. */}
-      <Box
-        position="absolute"
-        insetX={0}
-        bottom={0}
-        height={20}
-        bgGradient="to-t"
-        gradientFrom="bg.subtle"
-        gradientTo="transparent"
-      />
+      {preview.kind === "image" ? (
+        <Image
+          src={preview.src}
+          alt=""
+          display="block"
+          width="full"
+          height="full"
+          objectFit="cover"
+          objectPosition="top"
+        />
+      ) : (
+        <Box width={`${BOARD_WIDTH}px`} transform={`scale(${scale})`} transformOrigin="top left">
+          <LayoutSketch widgets={preview.widgets} />
+        </Box>
+      )}
     </Box>
   );
 }

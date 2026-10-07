@@ -1438,6 +1438,49 @@ function registerDashboardTools(server: McpServer): void {
       };
     }),
   );
+
+  server.tool(
+    "update_dashboard_widget",
+    "Changes one custom widget on a dashboard: its name, its TSX `code`, its named LangWatchQL `queries` or its `description`. Pass only the fields to change; every field left out keeps its stored value. Validate any new query's SQL with run_query first. Returns the updated widget.",
+    {
+      dashboardId: z.string().describe("The dashboard the widget is on"),
+      widgetId: z.string().describe("The widget to change, as add_dashboard_widget returned it"),
+      name: z.string().optional().describe("The widget's new display name"),
+      code: z
+        .string()
+        .optional()
+        .describe(
+          "The widget's new TSX source. Runs sandboxed with a global LW (LW.useChartQuery(name), LW.navigate, LW.theme) in scope.",
+        ),
+      queries: z
+        .union([
+          z.record(z.string(), z.string()).describe('{"<name>": "<LWQL SQL>"}'),
+          z
+            .array(
+              z.object({
+                name: z.string().describe('Referenced from code as LW.useChartQuery("name")'),
+                sql: z.string().describe("The LangWatchQL statement"),
+              }),
+            )
+            .describe("Named LWQL queries, array form"),
+        ])
+        .optional()
+        .describe(
+          "The widget's new named LangWatchQL queries, replacing the stored set: either {name: sql} or an array of {name, sql}. Max 8.",
+        ),
+      description: z
+        .string()
+        .optional()
+        .describe("What the widget's info tip says: a sentence or two"),
+    },
+    withToolLogging("update_dashboard_widget", async (params) => {
+      requireApiKey();
+      const { handleUpdateDashboardWidget } = await import("./tools/update-dashboard-widget.js");
+      return {
+        content: [{ type: "text", text: await handleUpdateDashboardWidget(params) }],
+      };
+    }),
+  );
 }
 
 // --- Platform Workflow Tools (require API key) ---
@@ -1635,7 +1678,7 @@ function registerTriggerTools(server: McpServer): void {
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { handleCreateTrigger } = await import("./tools/create-trigger.ts");
-      return await handleCreateTrigger(params);
+      return handleCreateTrigger(params);
     }),
   );
 

@@ -62,16 +62,19 @@ export type ChartQueryRetryPlan = { retry: true; delayMs: number } | { retry: fa
 
 /**
  * Whether to try again, and after how long: only a rejection marked retryable,
- * at most three times. Half the exponential ceiling plus jitter, so widgets
+ * at most `maxRetries` times. Half the exponential ceiling plus jitter, so widgets
  * refused together do not return together.
  */
 export function planChartQueryRetry({
   rejection,
   retriesUsed,
+  maxRetries,
   random,
 }: {
   rejection: unknown;
   retriesUsed: number;
+  /** CHART_QUERY_MAX_RETRIES; passed in because the shim embeds this function's source. */
+  maxRetries: number;
   /** Uniform in [0, 1). */
   random: () => number;
 }): ChartQueryRetryPlan {
@@ -79,7 +82,7 @@ export function planChartQueryRetry({
     typeof rejection === "object" &&
     rejection !== null &&
     (rejection as { retryable?: unknown }).retryable === true;
-  if (!retryable || retriesUsed >= 3) return { retry: false };
+  if (!retryable || retriesUsed >= maxRetries) return { retry: false };
   const ceiling = Math.min(5000, 400 * Math.pow(2, retriesUsed));
   return { retry: true, delayMs: Math.round(ceiling * (0.5 + random() * 0.5)) };
 }

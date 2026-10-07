@@ -21,7 +21,7 @@ const OWN_CALL_TO_ACTION = [
     source: "scenarios",
     title: "Run a scenario",
     target: "scenarios",
-    noRowsCheck: "if (runs === 0) return <Panel><CallToAction /></Panel>;",
+    noRowsCheck: "if (!runs) return <Panel><CallToAction /></Panel>;",
   },
   {
     widget: "Quality signal",
@@ -37,7 +37,7 @@ const OWN_CALL_TO_ACTION = [
     source: "feedback",
     title: "Collect feedback",
     target: "annotations",
-    noRowsCheck: "if (up + down === 0) return <Panel><CallToAction /></Panel>;",
+    noRowsCheck: "if (!add(up, down)) return <Panel><CallToAction /></Panel>;",
   },
   {
     widget: "Gateway routing",

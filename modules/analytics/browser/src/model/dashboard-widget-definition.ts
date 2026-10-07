@@ -5,6 +5,7 @@
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
+import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { z } from "zod";
 
 /** The version this build writes, and the only one it reads. */
@@ -151,6 +152,7 @@ export const dashboardWidgetDefinitionSchema = z.object({
   queries: dashboardWidgetQueriesSchema,
   description: dashboardWidgetDescriptionSchema.optional(),
   prompt: dashboardWidgetPromptSchema.optional(),
+  source: dashboardWidgetSourceSchema.optional(),
 });
 
 export type DashboardWidgetQueryParameterDeclaration = z.infer<

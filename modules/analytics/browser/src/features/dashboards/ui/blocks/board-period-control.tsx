@@ -1,6 +1,7 @@
 /**
  * The period pill ("30d", "30d · 1d", "Live") and its menu: Range, Grain, Refresh, then
  * "Refresh now". Unfit grains are greyed out; Live refreshes every minute (dashboards-v2 AC19).
+ * The refresh lives in the menu only; the pill never shows it.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -111,14 +112,6 @@ export function BoardPeriodControl({
                 <Text as="span" color="gray.400">
                   · {grain}
                 </Text>
-              )}
-              {refresh !== "off" && (
-                <HStack as="span" gap={0.5} color="gray.400" title={REFRESH_LABEL[refresh]}>
-                  <RefreshCw size={11} aria-label="auto-refresh" />
-                  <Text as="span" fontFamily="mono">
-                    {refresh}
-                  </Text>
-                </HStack>
               )}
             </>
           )}

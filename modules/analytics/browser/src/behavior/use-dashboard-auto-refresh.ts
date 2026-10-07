@@ -25,7 +25,8 @@ export const DASHBOARD_AUTO_REFRESH_MS: Record<DashboardAutoRefreshOption, numbe
   "5m": 300_000,
 };
 
-export const DASHBOARD_AUTO_REFRESH_DEFAULT: DashboardAutoRefreshOption = "1m";
+/** Off until the member picks an interval: a board reads once, and Refresh now re-reads it. */
+export const DASHBOARD_AUTO_REFRESH_DEFAULT: DashboardAutoRefreshOption = "off";
 
 type DashboardAutoRefreshState = {
   option: DashboardAutoRefreshOption;

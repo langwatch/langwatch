@@ -43,7 +43,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
       widget.kind === "built" ? widget.widget : { name: widget.name },
     ),
   });
-  useBoardOnScreen(subject.id);
+  useBoardOnScreen({ boardId: subject.id });
 
   return (
     <BoardPage

@@ -1,11 +1,17 @@
 /**
  * A board card's chrome: its name and a faint info tip, the controls a board gives it (shown
- * only on hover or focus, so a board of cards stays calm), then its body.
+ * only on hover or focus, so a board of cards stays calm), then its body. A widget frame in the
+ * body publishes what its data is missing here, and the info tip says it.
  */
 
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
+import { WidgetCompletenessSinkContext } from "../../../../behavior/widget-completeness-sink.ts";
+import {
+  completenessNotes,
+  type WidgetCompleteness,
+} from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { boardCardHeightPx } from "../../model/board-grid.ts";
 import { WidgetInfoTip } from "./widget-info-tip.tsx";
 
@@ -31,6 +37,8 @@ export function WidgetCardShell({
   controls?: ReactNode;
   children: ReactNode;
 }) {
+  const [completeness, setCompleteness] = useState<WidgetCompleteness | null>(null);
+  const hasNotes = completenessNotes(completeness).length > 0;
   return (
     <VStack
       className="group"
@@ -56,7 +64,9 @@ export function WidgetCardShell({
         <Text minWidth={0} truncate fontSize="13px" lineHeight="20px" fontWeight="medium">
           {name}
         </Text>
-        {description && <WidgetInfoTip name={name} description={description} />}
+        {(description || hasNotes) && (
+          <WidgetInfoTip name={name} description={description} completeness={completeness} />
+        )}
         {controls && (
           <HStack
             gap={0.5}
@@ -77,7 +87,9 @@ export function WidgetCardShell({
         )}
       </HStack>
       <Box flex={1} minHeight={0} paddingX={2} paddingBottom={2}>
-        {children}
+        <WidgetCompletenessSinkContext.Provider value={setCompleteness}>
+          {children}
+        </WidgetCompletenessSinkContext.Provider>
       </Box>
     </VStack>
   );

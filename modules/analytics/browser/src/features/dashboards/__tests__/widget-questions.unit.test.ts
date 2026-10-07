@@ -1,5 +1,5 @@
 /**
- * The picker's questions, the prompts they ask Langy, and how a board reads its stored widgets.
+ * The "Add a widget" questions, the prompts they ask Langy, and how a board reads its widgets.
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
@@ -11,9 +11,7 @@ import { boardPromptDraft, boardSubject } from "../langy/model/board-langy.ts";
 import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
 import { addedWidgetSlots, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
-const every = PICKER_SECTIONS.flatMap(({ questions }) => questions).filter(
-  ({ status }) => status === "ready",
-);
+const every = PICKER_SECTIONS.flatMap(({ questions }) => questions);
 
 const PERIOD = {
   periodStart: Temporal.Instant.from("2026-09-01T00:00:00Z").epochMilliseconds,

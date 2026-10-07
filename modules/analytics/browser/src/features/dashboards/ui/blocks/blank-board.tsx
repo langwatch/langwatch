@@ -9,7 +9,6 @@ import {
   Button,
   Grid,
   Heading,
-  HStack,
   Link as ChakraLink,
   Text,
   VStack,
@@ -20,7 +19,7 @@ import type { ReactNode } from "react";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 import type { CuratedBoard } from "../../model/curated-boards.ts";
-import { TemplatePreview } from "./template-preview.tsx";
+import { TemplateCard } from "./template-card.tsx";
 
 /** The compact footer below a board's widgets, opening "Add a widget". */
 export function AddBlockCard({ onClick }: { onClick: () => void }) {
@@ -114,39 +113,7 @@ export function EmptyBoard({
       >
         {boards.map((board) => (
           <CardLink key={board.templateId} href={boardHref(board)} label={board.name}>
-            <VStack
-              as="article"
-              align="stretch"
-              gap={3}
-              width="full"
-              padding={4}
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="xl"
-              background="bg.panel"
-            >
-              <VStack align="stretch" gap={1} minWidth={0}>
-                <Text as="h3" fontSize="15px" lineHeight="20px" fontWeight="semibold" lineClamp={2}>
-                  {board.name}
-                </Text>
-                {/* Two lines kept even for a short job, so previews line up across a row. */}
-                <Text
-                  fontSize="13px"
-                  lineHeight="20px"
-                  minHeight="40px"
-                  color="fg.muted"
-                  lineClamp={2}
-                >
-                  {board.job}
-                </Text>
-              </VStack>
-              <Box marginTop="auto">
-                <TemplatePreview preview={board.card.preview} isMuted={false} isCompact />
-              </Box>
-              <HStack justify="end" fontSize="12px" color="fg.muted">
-                {board.card.widgetCount} widgets
-              </HStack>
-            </VStack>
+            <TemplateCard template={board.card} />
           </CardLink>
         ))}
         <CardLink href={templatesHref} label="View all templates">

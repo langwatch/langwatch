@@ -8,8 +8,10 @@ import { TRACE_COUNT_SQL } from "../../templates/model/question-queries.ts";
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
 import {
   BARS,
+  BUCKETS,
   CHART_STYLE,
   DATES,
+  GAP_BRIDGE,
   HEADLINE,
   NUMBERS,
   SERIES_CHART,
@@ -44,7 +46,8 @@ const NO_UNIT = "No trace in this period carries a customer id, labels or a grou
 
 /** A pass rate and whether it fell: enough judged on both sides, 2 points down, beyond chance. */
 const PASS_RATES = `const MIN_JUDGED = 30;
-const rate = (passed, judged) => (judged > 0 ? passed / judged : 0);
+// Nothing judged is no pass rate at all: a gap, never 0%.
+const rate = (passed, judged) => (judged > 0 ? passed / judged : null);
 function worse(before, after) {
   if (before.judged < MIN_JUDGED || after.judged < MIN_JUDGED) return false;
   const drop = rate(before.passed, before.judged) - rate(after.passed, after.judged);
@@ -74,7 +77,16 @@ function Figures({ columns, children }) {
   );
 }`;
 
-const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, SERIES_CHART, FIGURES];
+const SERIES_PARTS = [
+  NUMBERS,
+  DATES,
+  CHART_STYLE,
+  HEADLINE,
+  BUCKETS,
+  GAP_BRIDGE,
+  SERIES_CHART,
+  FIGURES,
+];
 
 const CHART = 6;
 
@@ -137,7 +149,9 @@ function ShareRows({ rows, total, unit }) {
 
 const ATT_TABLE_CODE = widgetCode({
   summary: "Per customer: conversations, judged pass rate against the period before, AI cost.",
-  subtitle: "One row per customer or group; a red earlier pass rate fell beyond chance",
+  subtitle:
+    "One row per customer or group; a red earlier pass rate fell beyond chance. A pass rate " +
+    "needs 30 judged answers, else it reads as a dash",
   source: "requests",
   parts: [NUMBERS, TABLE, UNITS, PASS_RATES],
   queries: ["units", "passRates"],
@@ -153,7 +167,8 @@ const ATT_TABLE_CODE = widgetCode({
       before: { passed: num(verdicts.passed_before), judged: num(verdicts.judged_before) },
     };
   };
-  const shown = (side) => (side.judged >= MIN_JUDGED ? pct(rate(side.passed, side.judged), 0) : "-");
+  const shown = (side) =>
+    side.judged >= MIN_JUDGED ? pct(rate(side.passed, side.judged), 0) : GAP;
   const perConversation = (row) => usd(ratio(row.cost, row.conversations));
   const columns = [
     { header: cap(unit.one), cell: (row) => <b>{unitName(row.unit, key)}</b> },
@@ -174,9 +189,6 @@ const ATT_TABLE_CODE = widgetCode({
   return (
     <Panel>
       <Table columns={columns} rows={units.data} rowPadding={3} />
-      <div style={{ marginTop: 6, fontSize: 10.5, color: C.faint }}>
-        Pass rates need {MIN_JUDGED} judged answers; "-" means fewer.
-      </div>
     </Panel>
   );`,
 });
@@ -309,7 +321,7 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
   }));
   const largest = stages.reduce((top, stage) => (stage.p95 > top.p95 ? stage : top));
   const grew = stages.reduce((top, stage) => (stage.change > top.change ? stage : top));
-  const points = trend.data.map((row) => ({
+  const points = withBuckets(trend, STAGES.map((stage) => stage.key + "_p95")).map((row) => ({
     x: bucketLabel(row.bucket),
     ...Object.fromEntries(STAGES.map((stage) => [stage.key, num(row[stage.key + "_p95"])])),
   }));
@@ -347,7 +359,7 @@ const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   const first = perK(num(totals.dropped_first), num(totals.calls_first));
   const second = perK(num(totals.dropped_second), num(totals.calls_second));
   const change = drift(first, second);
-  const points = trend.data.map((row) => ({
+  const points = withBuckets(trend, ["dropped", "repeating", "calls"]).map((row) => ({
     x: bucketLabel(row.bucket),
     dropped: perK(num(row.dropped), num(row.calls)),
     repeating: perK(num(row.repeating), num(row.calls)),
@@ -460,7 +472,7 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
   const firstShare = ratio(totals.sent_first, totals.documents_first);
   const top = byUnit.data[0];
   const unit = top ? unitOf(top.unit_key) : unitOf("");
-  const points = trend.data.map((row) => ({
+  const points = withBuckets(trend, ["sent", "documents"]).map((row) => ({
     x: bucketLabel(row.bucket),
     share: ratio(row.sent, row.documents),
   }));
@@ -537,13 +549,15 @@ const GEN_DROPOFF_CODE = widgetCode({
 
 const SO_VERDICT_CODE = widgetCode({
   summary: "Guardrail coverage, risky answers flagged but not blocked, and the review backlog.",
-  subtitle: "Sign off only when every figure is clear; this period against the one before",
+  subtitle:
+    "Sign off only when every figure is clear: a red figure blocks the release. This period " +
+    "against the one before",
   source: "evaluations",
   parts: [NUMBERS, FIGURES],
   queries: ["guardrails", "traffic", "backlog"],
   body: `  if (guardrails.data.length === 0) return <Panel><CallToAction /></Panel>;
   const traces = num(traffic.data[0]?.traces);
-  const coverage = (row) => (traces > 0 ? Math.min(1, num(row.checked) / traces) : 0);
+  const coverage = (row) => (traces > 0 ? Math.min(1, num(row.checked) / traces) : null);
   const weakest = guardrails.data.reduce((low, row) => (coverage(row) < coverage(low) ? row : low));
   const lowest = coverage(weakest);
   const flagged = guardrails.data.reduce((sum, row) => sum + num(row.flagged), 0);
@@ -557,30 +571,22 @@ const SO_VERDICT_CODE = widgetCode({
       value: pct(lowest, 0),
       sub: weakest.control + " checks the fewest of " + count(traces) + " traces",
       tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined,
-      why: "guardrails miss part of the traffic",
     },
     {
       label: "Risky answers that got through",
       value: count(flagged),
       sub: "flagged, not blocked; " + count(flaggedBefore) + " the period before",
       tone: zone(flagged > flaggedBefore * 2 + 3, flagged > flaggedBefore * 1.25 + 1),
-      why: "more risky answers got through",
     },
     {
       label: "Waiting for review",
       value: count(pending),
       sub: count(pendingBefore) + " at the start of the period",
       tone: zone(pending > pendingBefore * 1.5 + 20, pending > pendingBefore * 1.1 + 5),
-      why: "the review queue is growing",
     },
   ];
-  const blocking = figures.find((figure) => figure.tone === "act");
   return (
     <Panel>
-      <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 600,
-        color: blocking ? C.red : C.green }}>
-        {blocking ? "Not ready to sign: " + blocking.why + "." : "Ready to sign."}
-      </div>
       <Figures columns={3}>
         {figures.map((figure) => <Figure key={figure.label} {...figure} />)}
       </Figures>
@@ -665,7 +671,8 @@ const SO_QUEUE_CODE = widgetCode({
   if (!add(cameIn, totals.reviewed, pending)) return <Panel><CallToAction /></Panel>;
   const grew = pending - before;
   let backlog = before;
-  const points = flow.data.map((row) => {
+  const counts = ["came_in", "reviewed"].map((key) => ({ key, kind: "count" }));
+  const points = withBuckets(flow, counts).map((row) => {
     backlog += num(row.came_in) - num(row.reviewed);
     return { x: bucketLabel(row.bucket), pending: backlog };
   });

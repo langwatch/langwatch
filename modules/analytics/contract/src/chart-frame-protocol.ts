@@ -207,6 +207,8 @@ export const CHART_FRAME_MAX_HEIGHT_PX = 640;
  */
 export const CHART_FRAME_HEARTBEAT_INTERVAL_MS = 2000;
 export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 10000;
+/** How often the frame retries a retryable query failure before it counts; the host reads it. */
+export const CHART_QUERY_MAX_RETRIES = 3;
 
 /**
  * The one structural mapping from the server's result to the wire payload.

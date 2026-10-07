@@ -10,6 +10,9 @@ import { describe, expect, it } from "vitest";
 import {
   boardSubject,
   MAX_WIDGET_DRAFT_LENGTH,
+  widgetAskDraft,
+  widgetEditDraft,
+  widgetMissingDataDraft,
   widgetPromptDraft,
   widgetSetupDraft,
 } from "../model/board-langy.ts";
@@ -137,5 +140,65 @@ describe("widgetSetupDraft", () => {
         expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
       ]);
     });
+  });
+});
+
+describe("widgetMissingDataDraft", () => {
+  describe("given a widget whose traces lack a field it reads", () => {
+    /** @scenario "Missing data: Ask Langy to help drafts how to send the missing field" */
+    it("drafts how to send that field, then the widget and the window, about the board", () => {
+      const request = widgetMissingDataDraft({
+        missing: { field: "metadata.user_id", label: "user ids" },
+        widget: widget({ prompt: PROMPT }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.question).toBeUndefined();
+      expect(request.draft?.startsWith("Help me send user ids on my traces.")).toBe(true);
+      expect(request.draft).toContain("metadata.user_id");
+      expect(request.draft).toContain("Name: Traffic");
+      expect(request.draft).toContain("SELECT count() FROM trace_metrics_by_minute");
+      expect(request.draft).toContain("Dashboard period:");
+      expect(request.about).toEqual({ ref: "board-1" });
+      expect(request.context).toEqual([
+        expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
+      ]);
+    });
+  });
+});
+
+describe("editor drafts", () => {
+  /** @scenario "Widget editor: Edit with Langy drafts the edit about that widget" */
+  it("drafts the edit about the board and the widget, with the widget attached", () => {
+    const request = widgetEditDraft({
+      widget: { id: "w-1", ...widget({}) },
+      board: BOARD,
+      period: PERIOD,
+    });
+
+    expect(request.draft?.startsWith('Edit "Traffic" with me.')).toBe(true);
+    expect(request.about).toEqual({ ref: "board-1", itemRef: "w-1" });
+    expect(request.context).toEqual([
+      expect.objectContaining({ kind: "dashboard", label: "Traffic" }),
+    ]);
+    expect(request.context[0]?.ref).toContain('widget "Traffic" (id w-1)');
+  });
+
+  /** @scenario "Widget editor: Langy's suggestions fit the widget's shape" */
+  it("drafts a picked suggestion about the widget, or about the new one being made", () => {
+    const ask = { ask: "Show the top 10", why: "Keep the ten largest, fold the rest." };
+    const saved = widgetAskDraft({
+      ask,
+      widget: { id: "w-1", ...widget({}) },
+      board: BOARD,
+      period: PERIOD,
+    });
+    const fresh = widgetAskDraft({ ask, widget: widget({}), board: BOARD, period: PERIOD });
+
+    expect(saved.draft?.startsWith('For "Traffic": Show the top 10.')).toBe(true);
+    expect(saved.about).toEqual({ ref: "board-1", itemRef: "w-1" });
+    expect(fresh.draft?.startsWith("Show the top 10. Build it as a new widget")).toBe(true);
+    expect(fresh.about).toEqual({ ref: "board-1", itemRef: "new" });
   });
 });

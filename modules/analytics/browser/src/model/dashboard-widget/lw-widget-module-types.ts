@@ -106,6 +106,13 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     projectionFrom?: string | number;
     colors?: readonly string[];
     height?: number;
+    /** How the hover prints a value. */
+    format?: MetricFormat;
+    /**
+     * What the hover says over a bucket with no data, from its date. Default "No data on Oct 7".
+     * A null value is a gap: the area breaks and a faint dashed line bridges it.
+     */
+    gapLabel?: (date: string) => string;
   }
   export interface StackedBarsProps {
     data: readonly Row[];
@@ -147,6 +154,8 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     format?: MetricFormat;
     height?: number;
     navigateTo?: { target: string; params: (row: Row) => object };
+    /** \`completeness.unpriced\`: each model gets a "no price" row with a dash, never $0. */
+    unpriced?: { models: readonly string[] };
   }
   export interface HeatmapProps {
     data: readonly Row[];
@@ -177,6 +186,21 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     series?: string;
     colors?: readonly string[];
     height?: number;
+    /** \`completeness.unpriced\`: a leaderboard lists each model with "no price". */
+    unpriced?: { models: readonly string[] };
+  }
+  /** A query's completeness report, as \`LW.useChartQuery\` returns it. */
+  export interface CompletenessReport {
+    readonly state: "complete" | "partial" | "missing" | "no_traffic";
+    readonly unit: string;
+    readonly total: number;
+    readonly fields: readonly {
+      readonly field: string;
+      readonly label: string;
+      readonly present: number;
+    }[];
+    readonly buckets?: readonly CompletenessBucket[];
+    readonly unpriced?: { readonly count: number; readonly models: readonly string[] };
   }
 
   export const Sparkline: Chart<SparklineProps>;
@@ -203,6 +227,24 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     x: string;
     series?: readonly SeriesSpec[];
   }): Row[];
+  /**
+   * Whether a sum over \`field\` is a lower bound, so its figure reads "$830+": the report is
+   * partial and some rows lack the field, or the field is a cost and some traces have no price.
+   * Never on an average or a rate.
+   */
+  export function isLowerBound(input: {
+    completeness: CompletenessReport | null | undefined;
+    field: string;
+  }): boolean;
+  /**
+   * The mean of \`key\` over the rows that have it, so an empty bucket never pulls a big number
+   * down; with \`weight\` (a row count column) each row counts by it. Null when none has a value.
+   */
+  export function averageOf(input: {
+    rows: readonly Row[];
+    key: string;
+    weight?: string;
+  }): number | null;
 }`;
 
 /**

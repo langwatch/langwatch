@@ -105,24 +105,31 @@ const bar = (colour) => ({
   background: colour,
 });
 
-// height fixes the list's box, else it fills what the panel leaves.
+// height fixes the list's box, else it fills what the panel leaves. A row with no value (a model
+// with no price) shows its note where the bar goes and a dash, never a $0.00 bar.
 function Bars({ rows, format, height }) {
-  const max = Math.max(...rows.map((row) => row.value), Number.MIN_VALUE);
+  const max = Math.max(...rows.filter((row) => known(row.value)).map((row) => row.value),
+    Number.MIN_VALUE);
   const box = height ? { height } : { flex: 1 };
   return (
     <div style={{ ...box, display: "flex", flexDirection: "column", justifyContent: "center",
       gap: 6 }}>
       {rows.map((row, index) => (
-        <div key={row.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+        <div key={row.label} title={row.title}
+          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>
             {row.label || "Unknown"}
           </span>
-          <span style={{ flex: 1, height: 16, borderRadius: 4, background: C.muted }}>
-            <span style={{ ...bar(colourFor(row.label, index)),
-              width: (row.value / max) * 100 + "%" }} />
+          <span style={{ flex: 1, height: 16, borderRadius: 4, background: C.muted,
+            fontSize: 10.5, lineHeight: "16px", paddingLeft: known(row.value) ? 0 : 6,
+            color: C.faint }}>
+            {known(row.value) ? (
+              <span style={{ ...bar(colourFor(row.label, index)),
+                width: (row.value / max) * 100 + "%" }} />
+            ) : row.note}
           </span>
           <span style={{ width: 56, textAlign: "right", fontWeight: 500,
-            fontVariantNumeric: "tabular-nums" }}>{format(row.value)}</span>
+            fontVariantNumeric: "tabular-nums" }}>{known(row.value) ? format(row.value) : GAP}</span>
         </div>
       ))}
     </div>
@@ -200,6 +207,42 @@ export const TRACE_LINK = `function TraceLink({ id }) {
   );
 }`;
 
+/**
+ * Rows over every bucket of the window, and the latest value a bucket has; reads `DATES`. A
+ * report bucketed on other edges (a week from Monday) leaves the rows as they are.
+ */
+export const BUCKETS = `// series: keys, or { key, kind: "count" } for a count, whose empty bucket is a real 0.
+function withBuckets(query, series, rows = query.data) {
+  const buckets = query.completeness?.buckets || [];
+  const starts = new Set(buckets.map((bucket) => Date.parse(bucket.start)));
+  const aligned = buckets.length > 0 && rows.every((row) => starts.has(utc(row.bucket).getTime()));
+  if (!aligned) return [...rows];
+  return mergeBuckets({ rows, buckets, x: "bucket", series });
+}
+// "Lately" is the last bucket with a value: an empty one never stands in for it.
+const latest = (points, key) =>
+  [...points].reverse().find((point) => known(point[key]))?.[key] ?? null;
+const earliest = (points, key) => points.find((point) => known(point[key]))?.[key] ?? null;`;
+
+/**
+ * What a query's completeness report says about a sum or an average that reads cost. Uses
+ * `isLowerBound` from the chart kit.
+ */
+export const COMPLETENESS = `// "+" on a sum that can only grow once the missing rows or prices arrive ("$830+").
+const plus = (query, field = "TotalCost") =>
+  isLowerBound({ completeness: query.completeness, field }) ? "+" : "";
+// The share of rows with a known price: an average cost divides by these rows only.
+function pricedShare(query) {
+  const report = query.completeness;
+  if (!report || !report.unpriced || !(report.total > 0)) return 1;
+  return (report.total - report.unpriced.count) / report.total;
+}
+// The models the report found with no price, as rows a cost list shows with a dash.
+const unpricedRows = (query, listed = []) => (query.completeness?.unpriced?.models || [])
+  .filter((model) => !listed.includes(model))
+  .map((model) => ({ label: model, value: null, note: "no price",
+    title: model + " has no price, so its cost is unknown." }));`;
+
 /** The Recharts components `SERIES_CHART` draws with. */
 export const SERIES_CHART_IMPORTS = [
   "ResponsiveContainer",
@@ -212,7 +255,21 @@ export const SERIES_CHART_IMPORTS = [
   "Line",
 ] as const;
 
-/** A time series of bars and lines on one axis; reads `CHART_STYLE`. */
+/**
+ * The faint dashed line under a measure, joining the points either side of an empty bucket so
+ * the trend still reads while the line itself breaks; reads `CHART_STYLE`.
+ */
+export const GAP_BRIDGE = `function bridge({ key, colour, yAxisId }) {
+  return (
+    <Line key={key + "-bridge"} yAxisId={yAxisId} type="monotone" dataKey={key} stroke={colour}
+      strokeOpacity={0.4} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls
+      legendType="none" tooltipType="none" isAnimationActive={false} />
+  );
+}
+// An empty bucket of a measure has no value: the hover says so instead of showing 0.
+const tipValue = (format) => (value, name) => [known(value) ? format(value) : "No data", name];`;
+
+/** A time series of bars and lines on one axis; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
 function SeriesChart({ points, series, format, domain }) {
   const legend = series.map((item) => [item.colour, item.label, item.dashed]);
@@ -227,7 +284,8 @@ function SeriesChart({ points, series, format, domain }) {
               dy={4} />
             <YAxis tick={AXIS} tickLine={false} axisLine={false} width={48} domain={domain}
               tickFormatter={format} />
-            <Tooltip contentStyle={TIP} formatter={(value, name) => [format(value), name]} />
+            <Tooltip contentStyle={TIP} formatter={tipValue(format)} filterNull={false} />
+            {series.filter((item) => !item.bars).map(bridge)}
             {series.map((item) => item.bars ? (
               <Bar key={item.key} dataKey={item.key} name={item.label} fill={item.colour}
                 radius={[2, 2, 0, 0]} isAnimationActive={false} />
@@ -388,7 +446,8 @@ function queryStatesCode(queries: readonly string[]): string {
 /** A widget's stored TSX, and the source its empty face checks for. */
 export interface WidgetCode {
   readonly tsx: string;
-  readonly source: WidgetSource;
+  /** Absent when the query reads only trace fields its completeness report covers. */
+  readonly source?: WidgetSource;
   /** What the card's info tip says; the stored code no longer draws it. */
   readonly description: string;
 }
@@ -398,7 +457,11 @@ export interface WidgetCodeSpec {
   readonly summary: string;
   /** One line on what the panel is for: the widget's description, not part of its code. */
   readonly subtitle: string;
-  readonly source: WidgetSource;
+  /**
+   * The source a member connects or sets up; its empty face checks whether it ever sent data.
+   * Leave it out when the frame's completeness report already says what is missing.
+   */
+  readonly source?: WidgetSource;
   /** Recharts components the panel imports, if it draws a chart. */
   readonly recharts?: readonly string[];
   /** Helper snippets from this file, in the order the widget reads them. */
@@ -410,6 +473,19 @@ export interface WidgetCodeSpec {
   readonly body: string;
   /** Draws the not-connected face as one row, for a panel only a strip tall. */
   readonly compactCallToAction?: boolean;
+}
+
+/** The chart kit helpers a widget may call; each is imported only by the code that calls it. */
+const CHART_KIT_HELPERS = ["isLowerBound", "mergeBuckets"] as const;
+
+function importsOf({ recharts, code }: { recharts?: readonly string[]; code: string }): string {
+  const charts = CHART_KIT_HELPERS.filter((name) => code.includes(`${name}(`));
+  return [
+    ...(recharts ? [`import { ${recharts.join(", ")} } from "recharts";`] : []),
+    ...(charts.length > 0 ? [`import { ${charts.join(", ")} } from "@langwatch/charts";`] : []),
+  ]
+    .map((line) => `${line}\n`)
+    .join("");
 }
 
 /** One widget's stored TSX, put together from its spec. */
@@ -424,15 +500,16 @@ export function widgetCode({
   body,
   compactCallToAction = false,
 }: WidgetCodeSpec): WidgetCode {
-  const imports = recharts ? `import { ${recharts.join(", ")} } from "recharts";\n\n` : "";
   const sections = [
     PALETTE,
     ...parts,
     panelCode(),
-    callToActionCode({ source, compact: compactCallToAction }),
+    ...(source ? [callToActionCode({ source, compact: compactCallToAction })] : []),
     ...(components ? [components] : []),
     `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
   ];
-  const tsx = `// ${summary}\n${imports}${sections.join("\n\n")}\n`;
-  return { tsx, source, description: subtitle };
+  const code = sections.join("\n\n");
+  const imports = importsOf({ recharts, code });
+  const tsx = `// ${summary}\n${imports}${imports ? "\n" : ""}${code}\n`;
+  return { tsx, ...(source ? { source } : {}), description: subtitle };
 }

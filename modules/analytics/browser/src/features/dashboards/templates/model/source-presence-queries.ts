@@ -32,21 +32,6 @@ export const PRESENCE_SQL: Readonly<Record<WidgetSource, string>> = {
     also: "Model != ''",
   }),
   spans: presenceSql({ view: "spans", column: "StartTime" }),
-  conversations: presenceSql({
-    view: "trace_metrics",
-    column: "OccurredAt",
-    also: "ConversationId IS NOT NULL AND ConversationId != ''",
-  }),
-  satisfaction: presenceSql({
-    view: "traces",
-    column: "OccurredAt",
-    also: "SatisfactionScore IS NOT NULL",
-  }),
-  topics: presenceSql({
-    view: "trace_metrics",
-    column: "OccurredAt",
-    also: "TopicId IS NOT NULL AND TopicId != ''",
-  }),
   scenarios: presenceSql({ view: "simulations", column: "StartedAt", also: "ArchivedAt IS NULL" }),
   judges: EVALUATIONS,
   evaluations: EVALUATIONS,

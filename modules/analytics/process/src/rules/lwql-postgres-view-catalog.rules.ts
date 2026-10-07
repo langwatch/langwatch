@@ -354,7 +354,6 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Name: { source: "name" },
       Order: { source: "order" },
       Description: { source: "description", content: "output" },
-      Visibility: { source: "visibility" },
       CreatedById: { source: "createdById" },
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },

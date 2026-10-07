@@ -32,6 +32,7 @@ import type {
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
+  DashboardWidgetSource,
 } from "./dashboard-widget-definition.ts";
 import type {
   LangWatchQLAcceptedStatement,
@@ -63,6 +64,8 @@ export interface DashboardWidgetDefinitionInput {
   readonly description?: string;
   /** What Langy is drafted with when asked about the widget; Langy falls back without one. */
   readonly prompt?: string;
+  /** Where the widget came from; an update without one keeps the stored source. */
+  readonly source?: DashboardWidgetSource;
 }
 
 /** The callable analytics capability shared by process peers. */

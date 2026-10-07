@@ -6,6 +6,7 @@
 
 import {
   BARS,
+  COMPLETENESS,
   DATES,
   NUMBERS,
   STAT,
@@ -17,14 +18,18 @@ import {
 
 export const COST_EFFICIENCY_CODE = widgetCode({
   summary: "Cost per successful trace, tokens in and out, and the five models that cost the most.",
-  subtitle: "What the spend buys",
+  subtitle:
+    "What the spend buys. Cost per success counts only the traces with a known price, so a " +
+    "model with no price never pulls it down",
   source: "traces",
-  parts: [NUMBERS, BARS, STAT],
+  parts: [NUMBERS, COMPLETENESS, BARS, STAT],
   queries: ["summary", "models"],
   body: `  const totals = summary.data[0] || {};
   if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
-  const perSuccess = ratio(totals.cost, totals.successes);
-  const ranked = models.data.map((row) => ({ label: row.model, value: num(row.cost) }));
+  const perSuccess = ratio(totals.cost, num(totals.successes) * pricedShare(summary));
+  const priced = models.data.map((row) => ({ label: row.model, value: num(row.cost) || null,
+    note: "no price" }));
+  const ranked = [...priced, ...unpricedRows(summary, priced.map((row) => row.label))];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>

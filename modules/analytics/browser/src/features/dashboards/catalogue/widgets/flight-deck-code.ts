@@ -6,8 +6,11 @@
 
 import {
   BARS,
+  BUCKETS,
   CHART_STYLE,
+  COMPLETENESS,
   DATES,
+  GAP_BRIDGE,
   NUMBERS,
   TRACE_LINK,
   TABLE,
@@ -27,10 +30,12 @@ import {
 /** This period: whether the agent does its job and what a success costs, at a glance. */
 export const KPIS_CODE = widgetCode({
   summary: "How often my agent resolves, how much it is used, checks passing and cost per success.",
-  subtitle: "Each figure against the period before",
+  subtitle:
+    "Each figure against the period before. Cost per resolved counts only the traces with a " +
+    "known price",
   source: "traces",
   compactCallToAction: true,
-  parts: [NUMBERS, FIGURES],
+  parts: [NUMBERS, COMPLETENESS, FIGURES],
   queries: ["outcomes", "spend", "checks"],
   body: `  const o = outcomes.data[0] || {};
   const s = spend.data[0] || {};
@@ -39,7 +44,7 @@ export const KPIS_CODE = widgetCode({
   if (!conversations) return <Panel><CallToAction /></Panel>;
   const resolved = num(o.resolved);
   const resolvedPrev = num(o.resolved_prev);
-  const perSuccess = ratio(num(s.cost), resolved);
+  const perSuccess = ratio(num(s.cost), resolved * pricedShare(spend));
   const perSuccessPrev = ratio(num(s.cost_prev), resolvedPrev);
   const addJudge = () => LW.navigate("onlineEvaluations", {});
   const percent = (value) => pct(value, 0);
@@ -73,7 +78,7 @@ export const KPIS_CODE = widgetCode({
           {resolved > 0 ? (
             <Change now={perSuccess} before={perSuccessPrev} better="down" format={usd} />
           ) : (
-            <Hint>{usd(num(s.cost))} spent, nothing resolved yet</Hint>
+            <Hint>{usd(num(s.cost)) + plus(spend)} spent, nothing resolved yet</Hint>
           )}
         </Figure>
       </Figures>
@@ -81,9 +86,10 @@ export const KPIS_CODE = widgetCode({
   );`,
 });
 
-const PROBLEM = `function Problem({ title, onOpen, children }) {
+// The problem's name and its figure; the sentence that explains it is the hover.
+const PROBLEM = `function Problem({ title, detail, onOpen, children }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div title={detail} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div onClick={onOpen} style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.35,
         color: C.red, cursor: onOpen ? "pointer" : "default" }}>{title}</div>
       <div style={{ fontSize: 12.5, color: C.subtle }}>{children}</div>
@@ -136,7 +142,10 @@ function kappa(row) {
 /** Needs attention: one problem, so the reader knows where to start this week. */
 export const ATTENTION_CODE = widgetCode({
   summary: "The one problem to look at first: a segment that slid, a failure, a judge or a step.",
-  subtitle: "The one thing that got worse the most",
+  subtitle:
+    "The one thing that got worse the most: a customer or topic whose checks slid, a failure " +
+    "that grew, a judge that disagrees with reviewers (Cohen's kappa under 0.80) or a step that " +
+    "keeps failing. Hover it for the detail",
   source: "evaluations",
   compactCallToAction: true,
   parts: [NUMBERS, WORDS, TRACES_LINK],
@@ -150,9 +159,9 @@ ${ATTENTION_RULES}`,
     const filter = drop.kind === "customer" ? { customer: drop.segment } : {};
     return (
       <Panel>
-        <Problem title={drop.segment} onOpen={() => openTraces(filter)}>
-          Pass rate {strong(pct(drop.baseRate, 0) + " → " + pct(drop.rate, 0))} this period, the
-          biggest drop of all {segments.data.length} {many}.
+        <Problem title={drop.segment} onOpen={() => openTraces(filter)}
+          detail={"The biggest drop of all " + segments.data.length + " " + many + "."}>
+          Pass rate {strong(pct(drop.baseRate, 0) + " → " + pct(drop.rate, 0))}
         </Problem>
       </Panel>
     );
@@ -161,9 +170,9 @@ ${ATTENTION_RULES}`,
   if (reason) {
     return (
       <Panel>
-        <Problem title={words(reason.reason)} onOpen={() => openTraces()}>
-          {strong(pct(reason.baseShare, 0) + " → " + pct(reason.share, 0))} of conversations,
-          the fastest growing problem.
+        <Problem title={words(reason.reason)} onOpen={() => openTraces()}
+          detail="The fastest growing reason conversations failed, against the period before.">
+          {strong(pct(reason.baseShare, 0) + " → " + pct(reason.share, 0))} of conversations
         </Problem>
       </Panel>
     );
@@ -174,9 +183,10 @@ ${ATTENTION_RULES}`,
     return (
       <Panel>
         <Problem title={drifted.name + " drifted"}
-          onOpen={() => LW.navigate("annotations", {})}>
-          Its agreement score with human reviewers is {strong(drifted.kappa.toFixed(2))}, under
-          the 0.80 target.
+          onOpen={() => LW.navigate("annotations", {})}
+          detail={"Agreement with human reviewers " + drifted.kappa.toFixed(2) +
+            " (Cohen's kappa), under the 0.80 target."}>
+          Disagrees with your reviewers
         </Problem>
       </Panel>
     );
@@ -188,9 +198,10 @@ ${ATTENTION_RULES}`,
     return (
       <Panel>
         <Problem title={failing.step + " keeps failing"}
-          onOpen={() => openTraces({ spanName: failing.step, status: "error" })}>
-          Fails {strong(pct(ratio(num(failing.errors), calls)))} of the time;{" "}
-          {strong(pct(reaching))} reach the user.
+          onOpen={() => openTraces({ spanName: failing.step, status: "error" })}
+          detail={"Fails " + pct(ratio(num(failing.errors), calls)) + " of " + count(calls) +
+            " calls; the rest of the trace did not recover from " + pct(reaching) + "."}>
+          {strong(pct(reaching))} reach the user
         </Problem>
       </Panel>
     );
@@ -240,12 +251,22 @@ export const RESOLVED_TREND_CODE = widgetCode({
   subtitle: "Resolved per day, with prompt and model changes marked",
   source: "judges",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, MARKED_CHART, SEEN_OR_SETUP, OUTCOME_EMPTY],
+  parts: [
+    NUMBERS,
+    DATES,
+    CHART_STYLE,
+    BUCKETS,
+    GAP_BRIDGE,
+    MARKED_CHART,
+    SEEN_OR_SETUP,
+    OUTCOME_EMPTY,
+  ],
   queries: ["trend", "changes"],
   body: `  if (trend.data.length === 0) {
     return <Panel><OutcomeEmpty quiet="No conversation outcomes in this period." /></Panel>;
   }
-  const points = trend.data.map((row) => ({
+  const counts = [{ key: "resolved", kind: "count" }, { key: "closed", kind: "count" }];
+  const points = withBuckets(trend, counts).map((row) => ({
     x: bucketLabel(row.bucket),
     resolved: num(row.resolved),
     share: num(row.closed) > 0 ? num(row.resolved) / num(row.closed) : null,
@@ -282,6 +303,8 @@ export const TASK_SUCCESS_CODE = widgetCode({
     CHART_STYLE,
     BARS,
     FIGURES,
+    BUCKETS,
+    GAP_BRIDGE,
     MARKED_CHART,
     PIVOT,
     SEEN_OR_SETUP,
@@ -299,7 +322,8 @@ export const TASK_SUCCESS_CODE = widgetCode({
     byLanguage.set(row.language, total);
   }
   const languages = [...byLanguage.values()].toSorted((a, b) => b.calls - a.calls).slice(0, 6);
-  const points = pivot(trend.data, "language", (row) => ratio(num(row.done), num(row.calls)));
+  const shares = pivot(trend.data, "language", (row) => ratio(num(row.done), num(row.calls)));
+  const points = labelled(withBuckets(trend, languages.map((row) => row.language), shares));
   const series = languages.map((row, index) => ({
     key: row.language,
     label: row.language,
@@ -329,7 +353,18 @@ export const ACCEPTANCE_CODE = widgetCode({
   subtitle: "What users did with each generated output",
   source: "requests",
   recharts: MARKED_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, FIGURES, MARKED_CHART, PIVOT, TRACES_LINK, SEEN_OR_SETUP],
+  parts: [
+    NUMBERS,
+    DATES,
+    CHART_STYLE,
+    FIGURES,
+    BUCKETS,
+    GAP_BRIDGE,
+    MARKED_CHART,
+    PIVOT,
+    TRACES_LINK,
+    SEEN_OR_SETUP,
+  ],
   queries: ["actions"],
   body: `  if (actions.data.length === 0) {
     return (
@@ -346,7 +381,9 @@ export const ACCEPTANCE_CODE = widgetCode({
   for (const row of actions.data) {
     totals.set(row.bucket, (totals.get(row.bucket) || 0) + num(row.outputs));
   }
-  const points = pivot(actions.data, "action", (row) => num(row.outputs) / totals.get(row.bucket));
+  const actionKeys = ["accepted", "edited", "regenerated", "dropped"];
+  const shares = pivot(actions.data, "action", (row) => num(row.outputs) / totals.get(row.bucket));
+  const points = labelled(withBuckets(actions, actionKeys, shares));
   const all = [...totals.values()].reduce((sum, value) => sum + value, 0);
   const share = (action) => ratio(actions.data.filter((row) => row.action === action)
     .reduce((sum, row) => sum + num(row.outputs), 0), all);

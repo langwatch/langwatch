@@ -5,8 +5,10 @@
  */
 
 import {
+  BUCKETS,
   CHART_STYLE,
   DATES,
+  GAP_BRIDGE,
   HEADLINE,
   NUMBERS,
   SERIES_CHART,
@@ -48,10 +50,11 @@ export const CANNOT_SERVE_CODE = widgetCode({
 export const RISING_TOPICS_CODE = widgetCode({
   summary: "Topics whose share of traces grew against the period before, and topics that are new.",
   subtitle: "Check whether the product covers them",
-  source: "topics",
   parts: [NUMBERS, TOPIC_NAME, SPARK],
   queries: ["shares", "daily"],
-  body: `  if (shares.data.length === 0) return <Panel><CallToAction /></Panel>;
+  body: `  if (shares.data.length === 0) {
+    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+  }
   const total = (key) => shares.data.reduce((sum, row) => sum + num(row[key]), 0);
   const now = total("in_period");
   const before = total("in_previous");
@@ -106,10 +109,11 @@ export const RISING_TOPICS_CODE = widgetCode({
 export const TOPIC_QUALITY_CODE = widgetCode({
   summary: "Per topic: traces, the share that went well, and requests the agent could not serve.",
   subtitle: "Open a weak topic's traces to see what goes wrong",
-  source: "topics",
   parts: [NUMBERS, TABLE, TOPIC_NAME],
   queries: ["topics"],
-  body: `  if (topics.data.length === 0) return <Panel><CallToAction /></Panel>;
+  body: `  if (topics.data.length === 0) {
+    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+  }
   // Judged outcomes read best; without an outcome judge, the checks' pass rate stands in.
   const byOutcome = topics.data.some((row) => num(row.closed) > 0);
   const went = (row) => {
@@ -147,14 +151,14 @@ export const ASKED_AGAIN_CODE = widgetCode({
   subtitle: "A high share means the first answer missed what people meant",
   source: "judges",
   recharts: SERIES_CHART_IMPORTS,
-  parts: [NUMBERS, DATES, CHART_STYLE, SERIES_CHART, STAT],
+  parts: [NUMBERS, DATES, CHART_STYLE, BUCKETS, GAP_BRIDGE, SERIES_CHART, STAT],
   queries: ["trend", "users"],
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
   const closed = trend.data.reduce((sum, row) => sum + num(row.closed), 0);
   const misread = trend.data.reduce((sum, row) => sum + num(row.misunderstood), 0);
   const active = num(users.data[0]?.active);
   const returning = num(users.data[0]?.returning);
-  const points = trend.data.map((row) => ({
+  const points = withBuckets(trend, ["misunderstood", "closed"]).map((row) => ({
     x: bucketLabel(row.bucket),
     misread: ratio(row.misunderstood, row.closed),
   }));

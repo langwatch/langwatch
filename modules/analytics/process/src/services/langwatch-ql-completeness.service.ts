@@ -5,6 +5,7 @@
  */
 import {
   formatLangWatchQLDateTimeParameter,
+  LWQL_BUCKET_ALIGNMENT_SECONDS,
   type LangWatchQLTimeWindow,
   type QueryCompleteness,
   type QueryCompletenessState,
@@ -43,6 +44,7 @@ interface CompletenessPlan {
   readonly unit: string;
   readonly timeColumn: string;
   readonly fields: readonly LangWatchQLViewColumn[];
+  /** The view records unpriced spans and the query reads a cost from it. */
   readonly readsCost: boolean;
 }
 
@@ -112,7 +114,8 @@ export class LangWatchQLCompletenessService {
 }
 
 /**
- * The first catalogued view the query reads, and the nullable columns of it the query names.
+ * The first catalogued view the query reads, and the columns its result is made of that a row
+ * can lack. A filter or sort only picks rows, so a column named nowhere else does not count.
  * A rollup view is skipped: its rows are buckets, so `count()` would not count traces.
  */
 function planCompleteness({
@@ -133,23 +136,40 @@ function planCompleteness({
     return { kind: "uncountable" };
   }
 
-  const referenced = new Set(validation.blocks.flatMap((block) => block.referencedColumns));
-  const reads = (column: LangWatchQLViewColumn) => referenced.has(column.name.toLowerCase());
+  const read = new Set(
+    validation.blocks.flatMap((block) => [...block.projectedColumns, ...block.groupByColumns]),
+  );
+  const reads = (column: LangWatchQLViewColumn) => read.has(column.name.toLowerCase());
   const hasColumn = (name: string) => view.columns.some((column) => column.name === name);
+  const recordsUnpriced = hasColumn(UNPRICED_COUNT_COLUMN) && hasColumn(UNPRICED_MODELS_COLUMN);
+  // A null cost is also a row with no model call, so only the unpriced record tells a gap.
+  const canLack = (column: LangWatchQLViewColumn) =>
+    isCost(column)
+      ? recordsUnpriced
+      : NULLABLE_TYPE.test(column.type) && column.nullIsValue !== true;
+  const fields = view.columns.filter(
+    (column) => column !== timeColumn && reads(column) && canLack(column),
+  );
 
   return {
     kind: "countable",
     viewName: reference.viewName,
     unit: unitOf(view.name),
     timeColumn: timeColumn.name,
-    fields: view.columns.filter(
-      (column) => NULLABLE_TYPE.test(column.type) && column !== timeColumn && reads(column),
-    ),
-    readsCost:
-      view.columns.some((column) => column.unit === COST_UNIT && reads(column)) &&
-      hasColumn(UNPRICED_COUNT_COLUMN) &&
-      hasColumn(UNPRICED_MODELS_COLUMN),
+    fields,
+    readsCost: fields.some(isCost),
   };
+}
+
+function isCost(column: LangWatchQLViewColumn): boolean {
+  return column.unit === COST_UNIT;
+}
+
+/** A cost is present on a row with no unpriced span: a row with no model call has none to miss. */
+function presentSql({ field }: { field: LangWatchQLViewColumn }): string {
+  return isCost(field)
+    ? `countIf(${quoted(UNPRICED_COUNT_COLUMN)} = 0)`
+    : `countIf(${quoted(field.name)} IS NOT NULL)`;
 }
 
 /** Catalogue identifiers only, never caller text; bucketed exactly as dashboard templates do. */
@@ -161,15 +181,16 @@ function completenessSql({
   isBucketed: boolean;
 }): string {
   const time = quoted(plan.timeColumn);
+  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
   const select = [
     ...(isBucketed
       ? [
-          `toUnixTimestamp(toStartOfInterval(${time}, ` +
-            `INTERVAL {${GRANULARITY_PARAMETER}:UInt32} SECOND)) AS bucket`,
+          `toUnixTimestamp(addSeconds(toStartOfInterval(subtractSeconds(${time}, ${shift}), ` +
+            `INTERVAL {${GRANULARITY_PARAMETER}:UInt32} SECOND), ${shift})) AS bucket`,
         ]
       : []),
     "count() AS n",
-    ...plan.fields.map((field, index) => `countIf(${quoted(field.name)} IS NOT NULL) AS f${index}`),
+    ...plan.fields.map((field, index) => `${presentSql({ field })} AS f${index}`),
     ...(plan.readsCost
       ? [
           `countIf(${quoted(UNPRICED_COUNT_COLUMN)} > 0) AS unpriced_count`,
@@ -254,8 +275,10 @@ function windowBuckets({
   const startSeconds = Temporal.Instant.from(timeWindow.start).epochMilliseconds / 1000;
   const endSeconds = Temporal.Instant.from(timeWindow.end).epochMilliseconds / 1000;
   const buckets: { start: string; n: number }[] = [];
+  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
   for (
-    let bucket = Math.floor(startSeconds / granularitySeconds) * granularitySeconds;
+    let bucket =
+      Math.floor((startSeconds - shift) / granularitySeconds) * granularitySeconds + shift;
     bucket < endSeconds;
     bucket += granularitySeconds
   ) {

@@ -156,7 +156,8 @@ describe("given the Risk sign-off widgets", () => {
     expect(sql.guardrails).toContain("Label = 'flagged'");
     expect(sql.guardrails).toContain("IsGuardrail = true");
     expect(sql.backlog).toContain("FROM annotation_queue_items");
-    expect(code).toContain('"Ready to sign."');
+    expect(code).toContain("tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined");
+    expect(code).not.toContain("Ready to sign");
   });
 
   /** @scenario "AC91 Risk sign-off: policy checks with their margin" */

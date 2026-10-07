@@ -24,6 +24,16 @@ const BUCKETED_SQL =
   "INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   `count() AS value FROM analytics.traces ${PERIOD} GROUP BY bucket`;
 const UNWINDOWED_SQL = "SELECT count() AS n FROM analytics.traces";
+const SPAN_PERIOD =
+  "WHERE StartTime >= {dashboard_context_period_start:DateTime} " +
+  "AND StartTime < {dashboard_context_period_end:DateTime}";
+const FILTERED_SQL =
+  "SELECT TopicId, count() AS n FROM analytics.traces " +
+  `${PERIOD} AND TotalCost IS NULL GROUP BY TopicId ORDER BY max(SatisfactionScore)`;
+const ROOT_SPANS_SQL =
+  "SELECT countIf(ParentSpanId IS NULL) AS roots FROM analytics.spans " +
+  `${SPAN_PERIOD} GROUP BY ParentSpanId`;
+const SPAN_COST_SQL = `SELECT sum(Cost) AS cost FROM analytics.spans ${SPAN_PERIOD}`;
 const ROLLUP_SQL =
   "SELECT sum(TraceCount) AS n FROM analytics.trace_metrics_by_minute " +
   "WHERE BucketStart >= {dashboard_context_period_start:DateTime} " +
@@ -65,11 +75,13 @@ function run({
   answers,
   granularitySeconds,
   maxResultBytes = 8_000_000,
+  timeWindow = WINDOW,
 }: {
   sql: string;
   answers: readonly Answer[];
   granularitySeconds?: number;
   maxResultBytes?: number;
+  timeWindow?: { start: string; end: string };
 }) {
   const executor = new ScriptedExecutor(answers);
   const service = LangWatchQLService.create({
@@ -81,7 +93,7 @@ function run({
     project: { id: "project-1", lwqlKey: "key-1" },
     protections: EVERYTHING_VISIBLE,
     sql,
-    timeWindow: WINDOW,
+    timeWindow,
     ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
   });
 
@@ -95,12 +107,12 @@ function epochSeconds(instant: string): number {
 describe("LangWatchQLService completeness", () => {
   describe("given a windowed statement over traces that reads TotalCost", () => {
     /** @scenario "A windowed query over traces reports how many traces carry each field it reads" */
-    it("reports the traces in the window and how many carry a cost", async () => {
+    it("reports the traces in the window and how many carry a known cost", async () => {
       const { result } = run({
         sql: COST_SQL,
         answers: [
           [{ cost: 4.2 }],
-          [{ n: "10", f0: "4", unpriced_count: "0", unpriced_models: [] }],
+          [{ n: "10", f0: "6", unpriced_count: "4", unpriced_models: ["acme-llm"] }],
         ],
       });
 
@@ -110,9 +122,23 @@ describe("LangWatchQLService completeness", () => {
         state: "partial",
         unit: "traces",
         total: 10,
-        fields: [{ field: "TotalCost", label: "total cost", present: 4 }],
+        fields: [{ field: "TotalCost", label: "total cost", present: 6 }],
       });
       expect(completeness).not.toHaveProperty("buckets");
+    });
+
+    /** @scenario "A trace with no model call has a known cost" */
+    it("counts a cost as known on every trace without an unpriced span", async () => {
+      const { executor, result } = run({
+        sql: COST_SQL,
+        answers: [[{ cost: null }], [{ n: 10, f0: 10, unpriced_count: 0, unpriced_models: [] }]],
+      });
+
+      const { completeness } = await result;
+
+      expect(executor.requests[1]?.sql).toContain("countIf(`UnpricedSpanCount` = 0) AS f0");
+      expect(executor.requests[1]?.sql).not.toContain("`TotalCost` IS NOT NULL");
+      expect(completeness).toMatchObject({ state: "complete", unpriced: { count: 0 } });
     });
 
     /** @scenario "Every field present on every row is complete" */
@@ -149,7 +175,7 @@ describe("LangWatchQLService completeness", () => {
       const [statement, report] = executor.requests;
       expect(report?.tenantCapability).toBe(statement?.tenantCapability);
       expect(report?.sql).toContain("FROM analytics.traces");
-      expect(report?.sql).toContain("countIf(`TotalCost` IS NOT NULL)");
+      expect(report?.sql).toContain("countIf(`UnpricedSpanCount` > 0)");
       expect(report?.parameters).toMatchObject({
         completeness_window_start: "2026-02-01 00:00:00",
         completeness_window_end: "2026-02-04 00:00:00",
@@ -172,6 +198,59 @@ describe("LangWatchQLService completeness", () => {
       state: "missing",
       fields: [{ field: "TopicId", label: "topic", present: 0 }],
     });
+  });
+
+  /** @scenario "A column the query only filters or sorts on is not counted" */
+  it("counts only the columns the result is made of, not those it filters or sorts on", async () => {
+    const { executor, result } = run({ sql: FILTERED_SQL, answers: [[], [{ n: 8, f0: 8 }]] });
+
+    const { completeness } = await result;
+
+    expect(completeness).toMatchObject({ state: "complete", fields: [{ field: "TopicId" }] });
+    expect(completeness?.fields).toHaveLength(1);
+    expect(executor.requests[1]?.sql).not.toContain("TotalCost");
+    expect(executor.requests[1]?.sql).not.toContain("SatisfactionScore");
+  });
+
+  /** @scenario "A column whose null is a state is not counted" */
+  it("never counts ParentSpanId, whose null marks a root span", async () => {
+    const { executor, result } = run({ sql: ROOT_SPANS_SQL, answers: [[], [{ n: 5 }]] });
+
+    const { completeness } = await result;
+
+    expect(completeness).toMatchObject({ state: "complete", unit: "spans", fields: [] });
+    expect(executor.requests[1]?.sql).not.toContain("ParentSpanId");
+  });
+
+  /** @scenario "A cost on a view with no unpriced record is not counted" */
+  it("does not count a span cost, where null cannot tell unpriced from no model call", async () => {
+    const { result } = run({ sql: SPAN_COST_SQL, answers: [[], [{ n: 5 }]] });
+
+    const { completeness } = await result;
+
+    expect(completeness).toMatchObject({ state: "complete", fields: [] });
+    expect(completeness).not.toHaveProperty("unpriced");
+  });
+
+  /** @scenario "Week buckets start on Monday, as the dashboard templates bucket them" */
+  it("aligns week buckets to Monday in the report query and the bucket list", async () => {
+    const { executor, result } = run({
+      sql: BUCKETED_SQL,
+      granularitySeconds: 604_800,
+      timeWindow: { start: "2026-02-01T00:00:00.000Z", end: "2026-02-15T00:00:00.000Z" },
+      answers: [[], [{ bucket: epochSeconds("2026-02-02T00:00:00Z"), n: 3 }]],
+    });
+
+    const { completeness } = await result;
+
+    expect(executor.requests[1]?.sql).toContain(
+      "addSeconds(toStartOfInterval(subtractSeconds(`OccurredAt`, 345600)",
+    );
+    expect(completeness?.buckets).toEqual([
+      { start: "2026-01-26T00:00:00Z", n: 0 },
+      { start: "2026-02-02T00:00:00Z", n: 3 },
+      { start: "2026-02-09T00:00:00Z", n: 0 },
+    ]);
   });
 
   /** @scenario "Empty buckets at the start and end of the window are listed with n 0" */

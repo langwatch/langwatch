@@ -47,6 +47,8 @@ describe("given the board period control", () => {
       const pill = screen.getByRole("button", { name: "Period" });
       expect(pill).toHaveTextContent("30d");
       expect(pill).not.toHaveTextContent("auto");
+      expect(pill).not.toHaveTextContent("5m");
+      expect(within(pill).queryByLabelText("auto-refresh")).toBeNull();
 
       await user.click(pill);
       for (const column of ["Range", "Grain", "Refresh"]) {
