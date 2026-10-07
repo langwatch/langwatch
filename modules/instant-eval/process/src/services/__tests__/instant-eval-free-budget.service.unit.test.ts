@@ -134,8 +134,8 @@ describe("given an organization with no paid plan", () => {
 
 describe("given an organization on a paid plan", () => {
   describe("when it has spent ten dollars", () => {
-    /** @scenario "A usage-billed organization has no budget" */
-    /** @scenario "The estimate tells a usage-billed organization nothing about a free budget" */
+    /** @scenario "A paid organization has no budget" */
+    /** @scenario "The estimate tells a paid organization nothing about a free budget" */
     it("has no budget to be within, and reads no spend", async () => {
       const { service, sumSpendNanoUsdByRequestType } = serviceWith({
         spentNanoUsd: 10 * NANO,
@@ -149,7 +149,7 @@ describe("given an organization on a paid plan", () => {
   });
 
   describe("when a run reserves and releases", () => {
-    /** @scenario "A usage-billed organization has no budget" */
+    /** @scenario "A paid organization has no budget" */
     it("holds nothing and refuses nothing", async () => {
       const { service, reservations } = serviceWith({
         isFree: false,
@@ -236,7 +236,7 @@ describe("given a free organization with sixty cents of budget left", () => {
 
 describe("given a deployment that does not bill Instant Evals", () => {
   describe("when a free organization at ten dollars of spend runs one", () => {
-    /** @scenario "A usage-billed organization has no budget" */
+    /** @scenario "A paid organization has no budget" */
     it("reads no ledger, holds nothing and refuses nothing", async () => {
       const { service, sumSpendNanoUsdByRequestType, reservations } = serviceWith({
         spentNanoUsd: 10 * NANO,

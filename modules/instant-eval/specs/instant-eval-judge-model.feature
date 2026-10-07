@@ -13,8 +13,9 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     classify, record one spend row priced for the customer. The meter, the pricing rule and the
     $1 check already exist and are reused. The spend row lands in the ledger the meter reads.
   - The judge runs on LangWatch cloud only, with LangWatch's key.
-  - An organization the meter does not bill may spend one dollar in total. Calls admitted
-    together may run it slightly past, and every one of them is recorded.
+  - A judge call from an organization the meter does not bill may spend one dollar in total.
+    Calls admitted together may run it slightly past, and every one of them is recorded.
+    Instant Evals runs and judged queries keep today's free-plan rule in wave 1.
 
   Rule: A judge with Instant Evals as its model is answered by Instant Evals
 
@@ -213,7 +214,8 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     @unit @unimplemented
     Scenario: The not configured copy never asks for a key of one's own
       Given the copy shown when Instant Evals is not configured
-      Then neither the error tip, the error message nor the error copy the customer reads tells anyone to add a classifier key of their own
+      Then the error tip, the error message and the error copy the customer reads each never mention adding or setting a key
+      And none of them names JEV_API_KEY
 
     @unit @unimplemented
     Scenario: A guardrail check on the stream chunk direction is skipped
@@ -230,16 +232,22 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
     @integration @unimplemented
     Scenario: A stream chunk sent through the gateway's guardrail check never reaches the classifier
-      Given a guardrail whose judge is on Instant Evals
+      Given a fail-closed guardrail whose judge is on Instant Evals
       When the gateway's guardrail service checks a chunk of a streamed reply through the evaluation's guardrail check
-      Then the chunk is allowed
+      Then the evaluation result is skipped
+      And the chunk is allowed
       And the classifier is never called
 
     @unit @unimplemented
-    Scenario: A guardrail check on the response direction is judged
+    Scenario Outline: A guardrail check on the request or response direction is judged
       Given a judge on Instant Evals
-      When a guardrail check evaluates it on the response direction
+      When a guardrail check evaluates it on the <direction> direction
       Then Instant Evals answers it once
+
+      Examples:
+        | direction |
+        | request   |
+        | response  |
 
   Rule: One judge call is one spend row, once
 
@@ -341,7 +349,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a judge call arrives
       Then it is refused with the project unknown error, returned rather than thrown
       And the classifier is not called
-      And no spend row is recorded
+      And no priced event is appended
 
     @integration @unimplemented
     Scenario: A run's and a judged query's spend reach the judge's total
@@ -351,16 +359,18 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
 
     @integration @unimplemented
     Scenario: Judge spend in the ledger counts against a run
-      Given a free organization whose judge calls put $1.00 of spend in the gateway ledger
+      Given a free organization whose judge calls were priced at $1.00 in total
+      And the gateway wrote their spend rows from the judge's priced events
       When an Instant Evals run starts
-      Then it is refused with the free budget exhausted error
+      Then the ledger rows carry the Instant Evals request type under the judged project
+      And the run is refused with the free budget exhausted error
 
     @unit @unimplemented
     Scenario Outline: Runs and judged queries record spend under the organization Instant Evals resolves
       Given a project the Instant Evals judge has not learned, in an organization Instant Evals resolves
       When an Instant Evals <work> records its spend through the judge
-      Then the spend is recorded under that organization
-      And the <work> is not refused
+      Then the record carries that organization
+      And the judge is never asked to look up the project
 
       Examples:
         | work         |
@@ -387,12 +397,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then it is refused with the free budget exhausted error
       And its message does not ask it to upgrade to a paid plan
 
-    @integration @unimplemented
-    Scenario: A paid organization the meter does not bill gets the free row cap
-      Given a paid organization the meter does not bill
-      When it starts a run asking for 100,000 rows
-      Then it is refused with the row cap exceeded error
-      And the error names a cap of 10,000 rows
+    @unit @unimplemented
+    Scenario: A paid organization on tiered pricing keeps today's run rules in wave 1
+      Given a paid organization the meter does not bill that has spent one dollar on Instant Evals
+      And the judge holds no billing row for it
+      When it starts a run
+      Then the run is accepted
+      And its usage billing is never read
 
   Rule: Billing says which organizations the meter bills
 
@@ -411,20 +422,21 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | marked self-hosted with a connected billing account         | yes    |
         | that does not exist                                         | no     |
 
-  Rule: Catch-up jobs fill the judge's copies before the picker shows
+  Rule: Catch-up jobs fill the judge's copies right after the rollout
 
     @integration @unimplemented
     Scenario: The project catch-up teaches the judge every existing project
       Given projects created before the judge existed
+      And a project whose created fact failed to write
       When the project catch-up runs twice
       Then the judge knows each project's organization
       And each project appears once
 
-    @integration @unimplemented
-    Scenario: A project whose created fact was lost is learned on the next project catch-up
-      Given a project whose created fact failed to write
-      When the project catch-up runs
-      Then the judge knows its organization
+    @unit @unimplemented
+    Scenario: A failed project created fact logs the catch-up that recovers it
+      Given recording a new project's created fact fails
+      When the failure is logged
+      Then the log names the backfill-project-created catch-up
 
     @unit @unimplemented
     Scenario: A repeated project created fact leaves one judge row
@@ -437,7 +449,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given an organization the meter bills today
       When the usage-billing catch-up runs twice
       Then the judge reads it as usage billed
-      And the judge's state is unchanged after the second run
+      And the judge's row for it, including when it was recorded, is unchanged after the second run
 
     @integration @unimplemented
     Scenario: A billing change after the catch-up is kept
@@ -446,16 +458,50 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the judge reads it as not usage billed
 
     @integration @unimplemented
-    Scenario: A catch-up fact never overrides a real billing fact
+    Scenario Outline: A catch-up fact never overrides a real billing fact
       Given billing reported an organization is not usage billed
-      When the usage-billing catch-up later marks it usage billed
+      And the usage-billing catch-up marked it usage billed, stamped <stamp> the real fact
+      When the judge folds both facts, <order>
       Then the judge reads it as not usage billed
+
+      Examples:
+        | stamp  | order                 |
+        | after  | real fact first       |
+        | after  | catch-up fact first   |
+        | before | catch-up fact first   |
+
+    @integration @unimplemented
+    Scenario: The judge refuses calls until the project catch-up has run
+      Given the judge was just deployed and holds no projects
+      When a judge call arrives for a project with Instant Evals released
+      Then it is refused with the project unknown error
+      And the classifier is not called
 
     @integration @unimplemented
     Scenario: The spend catch-up adds the spend recorded before the cutover once
       Given an organization with $0.40 of Instant Evals spend in the gateway ledger before the cutover
       When the spend catch-up runs twice
       Then the judge's spend for it is $0.40
+      And the judge holds one seed for it
+
+    @integration @unimplemented
+    Scenario: A redeploy's spend catch-up replaces the earlier seed
+      Given an organization seeded with $0.40 at a first cutover
+      And $0.20 more Instant Evals spend in the gateway ledger after it
+      When the spend catch-up runs again with a later cutover
+      Then the judge's spend for it is $0.60
+
+    @integration @unimplemented
+    Scenario: A repeated priced event adds nothing to the judge's spend
+      Given the judge recorded a $0.10 priced event
+      When the same priced event is delivered again, live and on rebuild
+      Then the judge's spend from it is $0.10
+
+    @unit @unimplemented
+    Scenario: A retried run's spend keeps the stamp of its first attempt
+      Given an Instant Evals run whose finish failed after recording its spend
+      When the finish is retried later
+      Then the spend it records again carries the first attempt's stamp
 
     @integration @unimplemented
     Scenario Outline: Spend judged after the cutover is counted once
@@ -469,6 +515,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | folded into the judge's total and in the ledger |
         | in the ledger but not yet folded                |
         | folded but not yet in the ledger                |
+        | stamped before a cutover passed too late        |
 
   Rule: The picker offers Instant Evals behind the release flag
 

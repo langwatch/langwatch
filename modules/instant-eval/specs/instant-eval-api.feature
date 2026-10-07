@@ -11,7 +11,7 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     must project `TraceId` and at least one eval function column.
   - `POST /api/v1/instant-evals` accepts and answers 202 with a queued run; the work happens
     on the queue and progress is polled.
-  - The default row cap is 10,000 for every plan, and an organization the meter bills may ask for up to 100,000.
+  - The default row cap is 10,000 for every plan, and a paid plan may ask for up to 100,000.
   - Results live in ClickHouse and are read back page by page with a keyset cursor. The
     sample door re-reads the text that was judged, without judging anything again.
 
@@ -90,7 +90,7 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     And the refusal carries the cap and the plan
 
   @integration
-  Scenario: An organization the meter bills may ask up to the raised cap
+  Scenario: A paid plan may ask up to the raised cap
     Given a project on a plan with the raised cap
     When a run is requested for fifty thousand rows
     Then the run is accepted with that limit

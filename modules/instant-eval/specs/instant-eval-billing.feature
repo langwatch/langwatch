@@ -14,8 +14,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
   - The customer price rides the record as its cost. Our own cost and the request count ride the
     metadata beside it, so the margin is recoverable without recomputing a rate that will change.
   - A Stripe meter, `langwatch_instant_eval_usd`, receives the month's price per organization.
-  - An organization the meter does not bill may spend one dollar on Instant Evals in total: a free
-    plan, or a paid plan on tiered pricing (ADR-174 decision 12).
+  - An organization with no paid plan may spend one dollar on Instant Evals in total.
 
   Rule: A judged query or run is one spend record
 
@@ -134,7 +133,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the month is reported
       Then no Instant Eval meter event is sent
 
-  Rule: An organization the meter does not bill may spend one dollar in total
+  Rule: A free organization may spend one dollar in total
 
     @unit
     Scenario: Under the budget a run is accepted
@@ -168,16 +167,10 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And the refusal counts the run's own spend alongside the ledger's
 
     @unit
-    Scenario: A usage-billed organization has no budget
-      Given an organization the meter bills that has spent ten dollars on Instant Evals
+    Scenario: A paid organization has no budget
+      Given an organization on a paid plan that has spent ten dollars on Instant Evals
       When a run is requested
       Then it is accepted
-
-    @unit @unimplemented
-    Scenario: A paid organization on tiered pricing is held to the budget
-      Given a paid organization the meter does not bill that has spent 1.00 dollars on Instant Evals
-      When a run is requested
-      Then it is refused with instant_eval_free_budget_exhausted
 
     # The ledger learns about a run when the run finishes, so an admission
     # check that read the ledger alone would admit any number of runs while
@@ -246,8 +239,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then the estimate carries the price and sixty cents of free budget remaining
 
     @unit
-    Scenario: The estimate tells a usage-billed organization nothing about a free budget
-      Given an organization the meter bills
+    Scenario: The estimate tells a paid organization nothing about a free budget
+      Given an organization on a paid plan
       When a run is estimated
       Then the estimate carries the price and no free budget figure
 
