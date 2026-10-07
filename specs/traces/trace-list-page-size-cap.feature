@@ -19,16 +19,25 @@ Feature: Trace list page size cap
   #     and only shows ids once the whole walk finished without a failure
 
   @unit
-  Scenario: A trace list read above the page cap is rejected
+  Scenario: A trace list read above the caller's plan bound is refused by name
+    Given the caller's plan bounds a trace list page at 1000
     When a trace list is read with pageSize 1001
-    Then the read is rejected on pageSize
+    Then the read is refused with "trace_page_size_too_large" naming the bound 1000
     And a read with pageSize 1000 is accepted
 
   @unit
-  Scenario: A trace download may read up to the download ceiling
+  Scenario: A paid plan keeps its larger trace list page
+    Given the caller's plan bounds a trace list page at 2000
+    When a trace list is read with pageSize 2000
+    Then it is accepted
+    And a read with pageSize 2001 is refused with "trace_page_size_too_large"
+
+  @unit
+  Scenario: A trace download above the plan's download bound is refused by name
+    Given the caller's plan bounds a trace download page at 10 000
     When a trace download is requested with pageSize 10 000
     Then it is accepted
-    And a download with pageSize 10 001 is rejected
+    And a download with pageSize 10 001 is refused with "trace_page_size_too_large"
 
   @unit
   Scenario: Public trace search clamps an oversized page instead of rejecting it
