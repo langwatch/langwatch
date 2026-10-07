@@ -3,22 +3,11 @@ import {
   EVALUATOR_LABEL_FIELD,
   EVALUATOR_SCORE_FIELD,
   EVALUATOR_VERDICT_FIELD,
-  type InMemoryTrace,
   type LiqeQuery,
   type LogicalExpressionToken,
   type TagToken,
-  type TraceQueryEvaluationRun,
-  type TranslationContext,
   type UnaryOperatorToken,
-  UNSUPPORTED,
-  type Unsupported,
 } from "@langwatch/trace-contract";
-
-import { TABLE_TIME_COLUMNS } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { expressionFacet, FIELD_DEF_BY_NAME } from "./trace-query-fields.rules.ts";
-import { latestEvaluationRunsSubquery } from "./trace-query-subquery.rules.ts";
-import { translateNumericField, translateStringField } from "./trace-query-translators.rules.ts";
-import { extractStringValue, nextParam, validateValueLength } from "./trace-query-values.rules.ts";
 
 /**
  * Binds an evaluator's result to that evaluator: within one AND chain naming
@@ -32,7 +21,7 @@ import { extractStringValue, nextParam, validateValueLength } from "./trace-quer
  * the facet its SQL expression comes from. `evaluatorStatus` is typed by hand;
  * `evaluatorPassed` is the old name of `evaluatorVerdict`.
  */
-const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
+export const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
   [EVALUATOR_VERDICT_FIELD, "evaluatorVerdict"],
   [EVALUATOR_SCORE_FIELD, "evaluatorScore"],
   [EVALUATOR_LABEL_FIELD, "evaluatorLabel"],
@@ -41,7 +30,7 @@ const SCOPED_FACET_KEY_BY_FIELD: ReadonlyMap<string, string> = new Map([
 ]);
 
 /** A result condition bound to the evaluator, kept or excluded. */
-interface ScopedCondition {
+export interface ScopedCondition {
   /** The chain operand: the tag, or the NOT around it. */
   node: LiqeQuery;
   tag: TagToken;
@@ -53,7 +42,7 @@ interface ScopedCondition {
 }
 
 /** The evaluator and the result conditions bound to it. */
-interface EvaluationScope {
+export interface EvaluationScope {
   anchor: TagToken;
   conditions: ScopedCondition[];
 }
@@ -93,95 +82,6 @@ export function buildAndChain(node: LogicalExpressionToken): AndChain {
     rest: operands.filter((operand) => !bound.has(operand)),
     nodeCount: andNodes + boundNodes,
   };
-}
-
-/** The bound group as `evaluation_runs` subqueries over X's latest rows. */
-export function translateEvaluationScope(scope: EvaluationScope, ctx: TranslationContext): string {
-  const evaluatorId = extractStringValue(scope.anchor);
-  validateValueLength(evaluatorId);
-  const p = nextParam(ctx, "evaluatorId");
-  ctx.params[p] = evaluatorId;
-
-  const runsOfX = (predicates: string[]): string =>
-    latestEvaluationRunsSubquery({
-      timeCol: TABLE_TIME_COLUMNS.evaluation_runs,
-      scopeWhere: `EvaluatorId = {${p}:String}`,
-      innerWhere: predicates.length > 0 ? predicates.join(" AND ") : "1 = 1",
-    });
-
-  const keptSql = keptGroups(scope).map(({ conditions, anyOf }) => {
-    const joined = conditions.map((c) => conditionSql(c, ctx)).join(anyOf ? " OR " : " AND ");
-    return conditions.length > 1 ? `(${joined})` : joined;
-  });
-  const excluded = scope.conditions.filter((c) => c.negated);
-  return [runsOfX(keptSql), ...excluded.map((c) => `NOT ${runsOfX([conditionSql(c, ctx)])}`)].join(
-    " AND ",
-  );
-}
-
-/**
- * The bound group in memory, mirroring {@link translateEvaluationScope}. Each
- * condition reuses its field's own in-memory predicate over one evaluation, so
- * the two sides keep reading values the same way.
- */
-export function evaluateEvaluationScope(
-  scope: EvaluationScope,
-  trace: InMemoryTrace,
-): boolean | Unsupported {
-  if (trace.evaluations == null) return UNSUPPORTED;
-  const evaluatorId = extractStringValue(scope.anchor);
-  const runsOfX = trace.evaluations.filter((evaluation) => evaluation.evaluatorId === evaluatorId);
-  const holds = (evaluation: TraceQueryEvaluationRun, c: ScopedCondition) =>
-    FIELD_DEF_BY_NAME.get(c.field)?.evaluateInMemory(c.tag, false, {
-      ...trace,
-      evaluations: [evaluation],
-    }) === true;
-
-  const groups = keptGroups(scope);
-  const excluded = scope.conditions.filter((c) => c.negated);
-  return (
-    runsOfX.some((evaluation) =>
-      groups.every(({ conditions, anyOf }) =>
-        anyOf
-          ? conditions.some((c) => holds(evaluation, c))
-          : conditions.every((c) => holds(evaluation, c)),
-      ),
-    ) && !excluded.some((c) => runsOfX.some((evaluation) => holds(evaluation, c)))
-  );
-}
-
-/**
- * The kept conditions grouped by facet, in first-seen order. A categorical
- * group is a set of alternatives (`anyOf`); a range group is joined.
- */
-function keptGroups(scope: EvaluationScope): { conditions: ScopedCondition[]; anyOf: boolean }[] {
-  const groups = new Map<string, { conditions: ScopedCondition[]; anyOf: boolean }>();
-  for (const condition of scope.conditions) {
-    if (condition.negated) continue;
-    const facet = scopedFacet(condition.field);
-    const group = groups.get(facet.key) ?? {
-      conditions: [],
-      anyOf: facet.kind !== "range",
-    };
-    group.conditions.push(condition);
-    groups.set(facet.key, group);
-  }
-  return [...groups.values()];
-}
-
-/**
- * A condition's predicate on one `evaluation_runs` row, always in its kept
- * form: an excluded condition is applied by excluding the rows it matches. A
- * NULL column (no score, no label) matches no row either way.
- */
-function conditionSql({ tag, field }: ScopedCondition, ctx: TranslationContext): string {
-  const facet = scopedFacet(field);
-  const args = { columnExpr: facet.expression, tag, negated: false, ctx, name: facet.key };
-  return facet.kind === "range" ? translateNumericField(args) : translateStringField(args);
-}
-
-function scopedFacet(field: string) {
-  return expressionFacet(SCOPED_FACET_KEY_BY_FIELD.get(field) ?? field);
 }
 
 /** The operands of an AND chain, without looking inside parentheses. */

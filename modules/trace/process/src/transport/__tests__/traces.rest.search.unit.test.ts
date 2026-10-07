@@ -26,8 +26,8 @@ import {
 } from "#rules/trace-filter-hidden-origins.rules";
 import type * as projectionCompileRules from "#rules/trace-projection-compile.rules";
 import { compileProjection } from "#rules/trace-projection-compile.rules";
-import { translateFilter } from "#rules/trace-query.rules";
 
+import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 vi.mock("#rules/trace-projection-compile.rules", async (importOriginal) => {
@@ -47,7 +47,7 @@ function compileExplorerTraceFilter(input: {
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } {
-  const compiled = translateFilter({
+  const compiled = traceQueryTranslation.translateFilter({
     queryText: input.query,
     tenantId: input.tenantId,
     timeRange: input.timeRange,

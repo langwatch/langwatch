@@ -7,7 +7,7 @@
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { traceFacetRegistry as FACET_REGISTRY } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import {
   LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS,
   LANGWATCH_QL_TRACE_FILTER_FIELDS,

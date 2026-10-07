@@ -1,14 +1,14 @@
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  translateFilter({
+  traceQueryTranslation.translateFilter({
     queryText: query,
     tenantId: TENANT,
     timeRange: TIME_RANGE,

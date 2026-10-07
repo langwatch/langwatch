@@ -12,7 +12,7 @@ import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwa
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "./open-protections.ts";
@@ -83,7 +83,7 @@ async function search({
   input?: Partial<GetAllTracesForProjectInput>;
 }): Promise<string[]> {
   const filterWhere = queryText
-    ? translateFilter({
+    ? traceQueryTranslation.translateFilter({
         queryText,
         tenantId,
         timeRange: { from: window.startDate, to: window.endDate },

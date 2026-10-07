@@ -2,7 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { translateFilter } from "../../../rules/trace-query.rules.ts";
+import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 /**
  * @vitest-environment node
  * @integration
@@ -89,7 +89,7 @@ describe.skipIf(!clickHouseConfigured)(
 
     /** The filter the sidebar compiles, so the test reads the production SQL. */
     const filterFor = (queryText: string) => {
-      const compiled = translateFilter({
+      const compiled = traceQueryTranslation.translateFilter({
         queryText,
         tenantId: versionTenant,
         timeRange,

@@ -226,6 +226,7 @@ import {
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { ClickHouseTraceFacetRegistryRepository } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import {
   ResolverTraceClickHouse,
   type TraceClickHouseResolver,
@@ -284,9 +285,8 @@ import {
 } from "../rules/trace-llm-messages.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
-import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
 import { compile as compileLangWatchQLTraceFilter } from "../rules/trace-query-langwatch-ql.rules.ts";
-import { extractFreeTextTerms, translateFilter } from "../rules/trace-query.rules.ts";
+import { extractFreeTextTerms } from "../rules/trace-query.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
 import { renderThreadConversation } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
@@ -349,6 +349,10 @@ import {
   TraceQueryClassificationService,
   type TraceQueryClassifier,
 } from "../services/trace-query-classification.service.ts";
+import { TraceQueryEvaluationScopeService } from "../services/trace-query-evaluation-scope.service.ts";
+import { TraceQueryEvaluationService } from "../services/trace-query-evaluation.service.ts";
+import { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
+import { TraceQueryTranslationService } from "../services/trace-query-translation.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import {
   TraceReadFullIoService,
@@ -1041,7 +1045,9 @@ export class TraceModule implements TraceApi, CollectorApp {
           resolveClient: resolve,
           modelProviders: options.modelProviders,
           queryFieldValues: TraceReadQueryFieldValues.create(list),
-          queryClassification: TraceQueryClassificationService.create(),
+          queryClassification: TraceQueryClassificationService.create({
+            evaluation: TraceModule.#composeQuery().evaluation,
+          }),
           summaryReader: FoldedTraceSummaryReader.create(summaryStore),
           records: {
             getById: async ({ projectId, traceId }) => {
@@ -1179,6 +1185,20 @@ export class TraceModule implements TraceApi, CollectorApp {
     });
   }
 
+  /** The trace query compiler and its in-memory mirror, over the ClickHouse facet registry. */
+  static #composeQuery(): {
+    translation: TraceQueryTranslationService;
+    evaluation: TraceQueryEvaluationService;
+  } {
+    const fields = TraceQueryFieldsService.create({
+      facetRegistry: ClickHouseTraceFacetRegistryRepository.create(),
+    });
+    const evaluationScope = TraceQueryEvaluationScopeService.create({ fields });
+    const translation = TraceQueryTranslationService.create({ fields, evaluationScope });
+    const evaluation = TraceQueryEvaluationService.create({ fields, evaluationScope, translation });
+    return { translation, evaluation };
+  }
+
   /** The trace-tree read over this process's ClickHouse and query-value boundaries. */
   static composeTree(options: TraceTreeCompositionOptions): TraceService {
     const clickhouse = ResolverTraceClickHouse.create(options.resolveClient);
@@ -1277,8 +1297,13 @@ export class TraceModule implements TraceApi, CollectorApp {
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
   #tenantUpdates: TraceTenantUpdateStreamService;
+  #queryTranslation: TraceQueryTranslationService;
+  #queryEvaluation: TraceQueryEvaluationService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
+    const query = TraceModule.#composeQuery();
+    this.#queryTranslation = query.translation;
+    this.#queryEvaluation = query.evaluation;
     this.#transcriptRead = TraceTranscriptReadService.create();
     this.#tenantUpdates = TraceTenantUpdateStreamService.create({
       emitters: dependencies.broadcast,
@@ -2120,7 +2145,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return traceMatchesQuery(input.query, {
+    return this.#queryEvaluation.traceMatchesQuery(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,
@@ -2347,7 +2372,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null {
-    return translateFilter({
+    return this.#queryTranslation.translateFilter({
       queryText: input.query,
       tenantId: input.tenantId,
       timeRange: input.timeRange,

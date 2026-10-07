@@ -1,4 +1,5 @@
 import {
+  type FieldDef,
   type FieldHandler,
   FilterFieldUnknownError,
   FilterParseError,
@@ -10,16 +11,14 @@ import {
   parseTraceQuerySyntax,
   type TagToken,
   type UnaryOperatorToken,
-  type ResolvedInstantEvalRun,
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
 import {
   type AndChain,
   buildAndChain,
-  translateEvaluationScope,
+  type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
-import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.rules.ts";
 import { boundedSubquery } from "./trace-query-subquery.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -43,6 +42,9 @@ const MAX_PARAM_COUNT = 50;
  * clothes, and the trace-level filter still applies every one of them.
  */
 const MAX_CONTENT_TERMS = 8;
+
+/** Compiles an evaluator and the result conditions bound to it as one evaluation. */
+export type EvaluationScopeTranslator = (scope: EvaluationScope, ctx: TranslationContext) => string;
 
 /**
  * Translates trace filters to ClickHouse SQL with value binding and free text.
@@ -114,13 +116,13 @@ function translateNode({
   negated,
   ctx,
   translateTag,
-  bindEvaluations,
+  translateScope,
 }: {
   node: LiqeQuery;
   negated: boolean;
   ctx: TranslationContext;
   translateTag: FieldHandler;
-  bindEvaluations: boolean;
+  translateScope: EvaluationScopeTranslator | undefined;
 }): string {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
@@ -128,7 +130,7 @@ function translateNode({
   }
 
   const branch = (side: LiqeQuery, sideNegated: boolean): string =>
-    translateNode({ node: side, negated: sideNegated, ctx, translateTag, bindEvaluations });
+    translateNode({ node: side, negated: sideNegated, ctx, translateTag, translateScope });
 
   switch (node.type) {
     case "EmptyExpression":
@@ -140,10 +142,10 @@ function translateNode({
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
       const chain =
-        bindEvaluations && !negated && logExpr.operator.operator !== "OR"
+        translateScope && !negated && logExpr.operator.operator !== "OR"
           ? buildAndChain(logExpr)
           : null;
-      if (chain) return translateAndChain({ chain, ctx, branch });
+      if (chain && translateScope) return translateAndChain({ chain, ctx, branch, translateScope });
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
       return `(${branch(logExpr.left, negated)} ${op} ${branch(logExpr.right, negated)})`;
     }
@@ -173,10 +175,12 @@ function translateAndChain({
   chain,
   ctx,
   branch,
+  translateScope,
 }: {
   chain: AndChain;
   ctx: TranslationContext;
   branch: (side: LiqeQuery, sideNegated: boolean) => string;
+  translateScope: EvaluationScopeTranslator;
 }): string {
   // The chain's own node is already counted; its nested AND nodes and the
   // bound group are not walked, so they are counted here.
@@ -185,7 +189,7 @@ function translateAndChain({
     throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
   const parts = [
-    ...(chain.scope ? [translateEvaluationScope(chain.scope, ctx)] : []),
+    ...(chain.scope ? [translateScope(chain.scope, ctx)] : []),
     ...chain.rest.map((operand) => branch(operand, false)),
   ];
   const [first = "1 = 1", ...others] = parts;
@@ -193,7 +197,18 @@ function translateAndChain({
   return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
 }
 
-function translateTag(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+/** One tag of the `trace_summaries` dialect, its plain fields looked up in `fieldDefs`. */
+export function translateTraceTag({
+  tag,
+  negated,
+  ctx,
+  fieldDefs,
+}: {
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+  fieldDefs: ReadonlyMap<string, FieldDef>;
+}): string {
   if (tag.field.type === "ImplicitField") {
     return translateFreeText(tag, negated, ctx);
   }
@@ -231,10 +246,10 @@ function translateTag(tag: TagToken, negated: boolean, ctx: TranslationContext):
   // `.get()` — own keys only. A plain-object index would resolve a field named
   // `constructor` / `toString` / `__proto__` off `Object.prototype`, sail past
   // this guard, and persist a filter no reader can evaluate.
-  const def = FIELD_DEF_BY_NAME.get(fieldName);
+  const def = fieldDefs.get(fieldName);
 
   if (!def) {
-    throw new FilterFieldUnknownError(fieldName, KNOWN_FIELDS);
+    throw new FilterFieldUnknownError(fieldName, [...fieldDefs.keys()]);
   }
 
   return def.toClickHouse(tag, negated, ctx);
@@ -396,44 +411,6 @@ export function extractFreeTextTerms(queryText: string): string[] {
 }
 
 /**
- * Translates a liqe query into a parameterized WHERE fragment or null.
- * `evalRuns` carries the runs registered for the query's `eval` chips.
- */
-export function translateFilter({
-  queryText,
-  tenantId,
-  timeRange,
-  evalRuns,
-}: {
-  queryText: string;
-  tenantId: string;
-  timeRange: { from: number; to: number };
-  evalRuns?: readonly ResolvedInstantEvalRun[];
-}): { sql: string; params: Record<string, unknown> } | null {
-  const ctx: TranslationContext = {
-    paramCounter: 0,
-    nodeCount: 0,
-    params: {
-      tenantId,
-      timeFrom: timeRange.from,
-      timeTo: timeRange.to,
-    },
-    tenantId,
-    timeRange,
-    ...(evalRuns ? { evalRuns } : {}),
-  };
-
-  const sql = translateFilterAst({
-    queryText,
-    ctx,
-    translateTag: (tag, negated, tagCtx) => translateTag(tag, negated, tagCtx),
-    bindEvaluations: true,
-  });
-
-  return sql === null ? null : { sql, params: ctx.params };
-}
-
-/**
  * The language's boolean structure, compiled with the tag translator given:
  * a second dialect over other tables supplies its own `translateTag`. Null
  * for an empty query, and the parameters land on `ctx.params`.
@@ -442,7 +419,7 @@ export function translateFilterAst({
   queryText,
   ctx,
   translateTag,
-  bindEvaluations = false,
+  translateScope,
 }: {
   queryText: string;
   ctx: TranslationContext;
@@ -451,7 +428,7 @@ export function translateFilterAst({
    * Compile an evaluator and the result conditions beside it as one
    * evaluation. Only the `trace_summaries` dialect has the evaluator fields.
    */
-  bindEvaluations?: boolean;
+  translateScope?: EvaluationScopeTranslator;
 }): string | null {
   const trimmed = normalizeQuery(queryText);
   if (!trimmed) return null;
@@ -465,7 +442,7 @@ export function translateFilterAst({
 
   if (ast.type === "EmptyExpression") return null;
 
-  const sql = translateNode({ node: ast, negated: false, ctx, translateTag, bindEvaluations });
+  const sql = translateNode({ node: ast, negated: false, ctx, translateTag, translateScope });
 
   if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
     throw new FilterParseError("Too many filter conditions");
