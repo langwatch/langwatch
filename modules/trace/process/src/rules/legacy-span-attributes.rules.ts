@@ -4,6 +4,7 @@
  * so the value-envelope unwrapping is stated once.
  */
 
+import { isRecord } from "@langwatch/span-normalisation";
 import type {
   NormalizedAttributes,
   ChatMessage,
@@ -12,8 +13,6 @@ import type {
   LegacySpanInputOutput,
 } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
-
-import { isRecord } from "./canonical-guard.rules.ts";
 
 type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
 

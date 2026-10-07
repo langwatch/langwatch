@@ -1,13 +1,13 @@
+import { vi } from "vitest";
+
 import {
-  type CanonicalAttributes,
-  type CanonicalEvent,
   canonicalLogRecordStore,
   canonicalSpanStore,
   type ExtractorContext,
   type LogExtractorContext,
-  parseJsonStringValues as parseJsonStringAttrs,
-} from "@langwatch/span-normalisation";
-import { vi } from "vitest";
+} from "../canonicalAttributes.ts";
+import { parseJsonStringValues as parseJsonStringAttrs } from "../canonicalJson.ts";
+import type { CanonicalAttributes, CanonicalEvent } from "../canonicalTypes.ts";
 
 export { parseJsonStringAttrs };
 

@@ -1,4 +1,4 @@
-import type { CanonicalSpanContext } from "@langwatch/trace-contract";
+import type { CanonicalSpanContext } from "@langwatch/span-normalisation";
 
 import { TraceCanonicalisationService } from "../../trace-canonicalisation.service.ts";
 

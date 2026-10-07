@@ -1,5 +1,6 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type {
   TraceCanonicalisationService,
   OtlpInstrumentationScope,
@@ -9,7 +10,6 @@ import type {
   NormalizedEvent,
   NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 import {
   decodeOtlpSpan,
   deriveRagContextsWithIds,

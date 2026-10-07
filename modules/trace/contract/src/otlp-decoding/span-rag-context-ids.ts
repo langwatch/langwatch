@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 
-import { ATTR_KEYS } from "../trace-attributes.ts";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
+
 import type { NormalizedAttributes } from "../trace.spans.ts";
 
 /**

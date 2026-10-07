@@ -1,4 +1,4 @@
-import { isReplyTextPart } from "@langwatch/trace-contract/transcript";
+import { isReplyTextPart } from "@langwatch/span-normalisation";
 
 import {
   isInjectedContextOnly,

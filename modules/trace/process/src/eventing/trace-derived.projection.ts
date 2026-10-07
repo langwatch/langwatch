@@ -5,6 +5,7 @@ import {
   type FoldEventHandlers,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
   annotationAddedEventSchema,
@@ -21,7 +22,6 @@ import {
   mergeModelsMostRecentFirst,
   metricDataPointCorrelatedEventSchema,
   type MetricDataPointCorrelatedEvent,
-  NON_BILLABLE_ATTR,
   RESERVED_CACHE_CREATION_TOKENS,
   RESERVED_CACHE_READ_TOKENS,
   RESERVED_REASONING_TOKENS,

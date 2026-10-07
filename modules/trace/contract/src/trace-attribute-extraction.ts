@@ -4,7 +4,8 @@
  * else, while folding across a trace needs the origin service.
  */
 
-import { ATTR_KEYS } from "./trace-attributes.ts";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
+
 import { findStringAttribute, parseJsonStringArray } from "./trace-summary-attribute-values.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 

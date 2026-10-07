@@ -1,8 +1,9 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
+
 import {
   extractTraceSpanAttributes,
   RESERVED_CAUSALITY_DEPTH,
 } from "./trace-attribute-extraction.ts";
-import { ATTR_KEYS } from "./trace-attributes.ts";
 import {
   hoistTraceOrigin,
   hoistTraceOriginSource,

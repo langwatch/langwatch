@@ -1,3 +1,4 @@
+import { capPayloadString } from "@langwatch/span-normalisation";
 /**
  * Claude Code span content enrichment, the pure core. Real `llm_request` spans carry tokens but no
  * content, which lives in separate OTLP log records, so this joins the two: output exactly by
@@ -24,7 +25,6 @@ import {
   TOOL_DECISION_EVENT,
   TOOL_RESULT_EVENT,
 } from "./claude-code-tool-enrichment.rules.ts";
-import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /**
  * Computes the input and output to attach to each model-call span from the trace's content logs.

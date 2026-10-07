@@ -1,3 +1,5 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
+
 import {
   extractSpanCacheTokens,
   extractSpanModels,
@@ -5,7 +7,6 @@ import {
   isSpanCostNonBillable,
   isSpanTokenAccumulationSkipped,
 } from "./span-cost-metrics.ts";
-import { ATTR_KEYS } from "./trace-attributes.ts";
 import { NormalizedStatusCode, type NormalizedSpan } from "./trace.spans.ts";
 
 /** One span's additive contribution to the per-minute analytics rollup. */

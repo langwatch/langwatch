@@ -1,4 +1,5 @@
 import { contentAttrKeys } from "@langwatch/coding-agent-contract";
+import { capPayloadString } from "@langwatch/span-normalisation";
 import type { TraceCanonicalisationService, Span, SpanSummaryRow } from "@langwatch/trace-contract";
 
 import { type ClaudeContentLog, type ClaudeSpanRef } from "./claude-code-message-index.rules.ts";
@@ -26,7 +27,6 @@ import {
 } from "./claude-code-span-keys.rules.ts";
 import { type ClaudeToolLog, type ClaudeToolSpanRef } from "./claude-code-tool-enrichment.rules.ts";
 import { DERIVED_ATTRS } from "./trace-log-content-derivation.rules.ts";
-import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /**
  * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace

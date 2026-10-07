@@ -1,7 +1,6 @@
 /**
- * Canonical attribute key constants. These constants provide a single source of truth for all
- * attribute keys used in the canonicalization process, reducing magic strings and improving
- * maintainability.
+ * A copy of `ATTR_KEYS` in @langwatch/span-normalisation, kept until data-privacy and gateway
+ * import it from there.
  */
 export const ATTR_KEYS = {
   // Span type
@@ -278,13 +277,3 @@ export const ATTR_KEYS = {
   MASTRA_MODEL_STEP_INPUT: "mastra.model_step.input",
   MASTRA_METADATA_PREFIX: "mastra.metadata.",
 } as const;
-
-export const CLAUDE_CODE_LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
-export const CODEX_TURN_SPAN_NAME = "session_task.turn";
-
-export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {
-  llm: "chat",
-  tool: "tool",
-  agent: "agent",
-  rag: "retrieval",
-};

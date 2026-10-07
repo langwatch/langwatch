@@ -1,7 +1,6 @@
+import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { z } from "zod";
 
-import { NON_BILLABLE_ATTR } from "./cost-attribution.ts";
-import { ATTR_KEYS } from "./trace-attributes.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 

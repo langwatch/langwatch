@@ -1,8 +1,5 @@
-import {
-  type NormalizedSpan,
-  ATTR_KEYS,
-  type TraceCanonicalisationService,
-} from "@langwatch/trace-contract";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
+import { type NormalizedSpan, type TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * FROZEN TWIN of `platform/app/src/server/app-layer/traces/trace-io-extraction.service.ts`. The
  * application keeps its copy while both graphs ingest; edit neither without editing the other.

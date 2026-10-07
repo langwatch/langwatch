@@ -1,3 +1,4 @@
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +7,6 @@ import {
   hasOversizedAttribute,
   valueExceeds,
 } from "../trace-attribute-cap.rules.ts";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../trace-payload-cap.rules.ts";
 
 function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {

@@ -5,6 +5,7 @@
  */
 
 import type { ReplayEventLean } from "@langwatch/eventing/server";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   serializeTraceEventReference,
@@ -15,7 +16,6 @@ import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { clonePayload } from "./payload-clone.rules.ts";
 import { capOversizedAttributes, hasOversizedAttribute } from "./trace-attribute-cap.rules.ts";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "./trace-payload-cap.rules.ts";
 
 type LeanableEvent = { id: string; type: string; data: unknown };
 

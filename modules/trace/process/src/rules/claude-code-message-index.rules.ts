@@ -4,13 +4,12 @@
  * positionally within one query source, since neither a request body nor a prompt carries one.
  */
 
+import { capPayloadString } from "@langwatch/span-normalisation";
 import type {
   ChatMessage,
   SpanInputOutput,
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
-
-import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /** A claude_code content log record, normalized by the caller. */
 export interface ClaudeContentLog {

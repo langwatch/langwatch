@@ -4,10 +4,10 @@
  * sides carrying the tool use id, so nothing here pairs by position.
  */
 
+import { capPayloadString } from "@langwatch/span-normalisation";
 import type { SpanInputOutput, TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 import { INPUT_BODY_EVENT, type ClaudeContentLog } from "./claude-code-message-index.rules.ts";
-import { capPayloadString } from "./trace-payload-cap.rules.ts";
 
 /** A claude_code tool event log (`tool_decision` / `tool_result`), normalized. */
 export interface ClaudeToolLog {

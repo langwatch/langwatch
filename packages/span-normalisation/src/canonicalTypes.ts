@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-const canonicalAttributesSchema = z.record(z.string(), z.unknown());
+export const canonicalAttributesSchema = z.record(z.string(), z.unknown());
 
-const canonicalEventSchema = z.object({
+export const canonicalEventSchema = z.object({
   name: z.string(),
   timeUnixMs: z.number(),
   attributes: canonicalAttributesSchema,
 });
 
-const canonicalSpanContextSchema = z.object({
+export const canonicalSpanContextSchema = z.object({
   name: z.string(),
   kind: z.union([z.number(), z.string(), z.null()]),
   instrumentationScope: z.object({

@@ -1,5 +1,5 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { SpanNormalizationPipelineService } from "#services/span-normalization.service";

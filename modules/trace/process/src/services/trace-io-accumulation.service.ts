@@ -1,5 +1,5 @@
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import {
-  ATTR_KEYS,
   OUTPUT_SOURCE,
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,

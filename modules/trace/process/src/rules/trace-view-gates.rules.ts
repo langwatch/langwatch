@@ -1,3 +1,4 @@
+import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import type {
   Protections,
   Evaluation,
@@ -5,7 +6,6 @@ import type {
   TraceHeader,
   TraceResourceInfoDto,
 } from "@langwatch/trace-contract";
-import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 
 import { createAttributeRedactor } from "./trace-attribute-redaction.rules.ts";
 

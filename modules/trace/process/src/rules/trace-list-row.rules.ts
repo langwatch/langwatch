@@ -4,6 +4,7 @@
  * service and its tests can exercise the shaping without one.
  */
 
+import { resolveNonBilledCost } from "@langwatch/span-normalisation";
 import {
   deriveTraceOrigin,
   deriveTraceStatus,
@@ -11,7 +12,6 @@ import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
-  resolveNonBilledCost,
   type TraceListCursor,
   type TraceListItem,
   type TraceListSort,

@@ -4,8 +4,8 @@
  * one line a reader sees. Pure, so the traversal and its heuristics can be tested apart.
  */
 
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**
  * Represents a span organized in a tree structure with its children.

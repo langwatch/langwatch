@@ -16,7 +16,6 @@ export * from "./trace-view.contract.ts";
 export * from "./trace-explorer.contract.ts";
 export * from "./trace-canonicalisation.ts";
 export * from "./trace-ingress.events.ts";
-export * from "./trace-content-part.ts";
 export type {
   AsyncContentPartVisitor,
   BinaryPart,
