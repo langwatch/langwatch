@@ -17,10 +17,11 @@ Feature: Experimentation resources are OSS (Apache 2.0) and uncapped
   projects and teams — is uncapped on every plan, same as the experimentation
   resources above.
 
-  As a LangWatch user on any plan (paid, or self-hosted with or without a license)
+  As a LangWatch user on a paid cloud plan or a self-hosted deployment
   I want to create unlimited prompts, evaluators, scenarios, and other
   experimentation resources
-  So that I can build and iterate without hitting an artificial "up to 3" cap
+  So that I can build and iterate without a creation cap
+  (cloud Free keeps its 3 scenario, simulation and custom evaluator caps)
 
   Background:
     Given an organization "org-123" exists

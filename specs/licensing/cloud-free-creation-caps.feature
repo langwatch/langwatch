@@ -5,6 +5,10 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
   uncapped. Self-hosted deployments are uncapped with or without a license: the
   caps live on the cloud Free plan and are never read from a signed license.
 
+  A custom evaluator is any evaluator saved in a project's evaluator library,
+  whatever its kind (built-in configuration, code or workflow). Online
+  evaluations (monitors) are not evaluators and stay uncapped.
+
   Only creating one more is refused. An organization already above a cap keeps
   everything it has and can still edit and run it. A refusal carries the limit
   type, the current count and the cap, and in the app it opens the upgrade
@@ -92,6 +96,27 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     And it has 3 active custom evaluators
     When a member saves a new custom evaluator
     Then the request fails as FORBIDDEN with limit type "evaluators", current 3 and max 3
+
+  @integration
+  Scenario: Copying a custom evaluator past the cap is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it has 3 active custom evaluators
+    When a member copies one of them into another project
+    Then the request fails as FORBIDDEN with limit type "evaluators", current 3 and max 3
+
+  @integration
+  Scenario: Creating a fourth scenario through the API is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it has 3 active scenarios
+    When an API key posts a new scenario
+    Then the response is 403 with limit type "scenarios", current 3 and max 3
+
+  @integration
+  Scenario: Creating a fourth custom evaluator through the API is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it has 3 active custom evaluators
+    When an API key posts a new custom evaluator
+    Then the response is 403 with limit type "evaluators", current 3 and max 3
 
   @integration
   Scenario: The upgrade modal names the cap that was reached

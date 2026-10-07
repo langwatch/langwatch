@@ -49,6 +49,7 @@ describe("cloud Free creation caps", () => {
   let organizationId: string;
   let teamId: string;
   let projectId: string;
+  let otherProjectId: string;
   let userId: string;
   let caller: ReturnType<typeof appRouter.createCaller>;
 
@@ -72,6 +73,17 @@ describe("cloud Free creation caps", () => {
       },
     });
     projectId = project.id;
+    const otherProject = await prisma.project.create({
+      data: {
+        name: "ACME Second Project",
+        slug: `--test-project-b-${ns}`,
+        apiKey: `sk-lw-test-${nanoid()}`,
+        teamId,
+        language: "en",
+        framework: "test",
+      },
+    });
+    otherProjectId = otherProject.id;
     const user = await prisma.user.create({
       data: { name: "ACME Admin", email: `admin-${ns}@example.com` },
     });
@@ -102,7 +114,7 @@ describe("cloud Free creation caps", () => {
       ["scenarioVersion", { projectId }],
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
-      ["evaluator", { projectId }],
+      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
     ]);
   });
 
@@ -111,8 +123,8 @@ describe("cloud Free creation caps", () => {
       ["scenarioVersion", { projectId }],
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
-      ["evaluator", { projectId }],
-      ["project", { id: projectId }],
+      ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
+      ["project", { id: { in: [projectId, otherProjectId] } }],
       ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { teamId }],
@@ -206,6 +218,36 @@ describe("cloud Free creation caps", () => {
         expect(((error as TRPCError).cause as LimitExceededError).meta).toEqual(
           { limitType: "evaluators", current: 3, max: 3 },
         );
+      });
+    });
+  });
+
+  describe("given the organization is on the cloud Free plan with 3 custom evaluators", () => {
+    describe("when a member copies one into another project", () => {
+      /** @scenario Copying a custom evaluator past the cap is refused with the limit shape */
+      it("refuses as FORBIDDEN with limit type, current and max", async () => {
+        const created = [];
+        for (const name of ["One", "Two", "Three"]) {
+          created.push(await createEvaluator(name));
+        }
+
+        const error = await refusal(
+          caller.evaluators.copy({
+            evaluatorId: created[0]!.id,
+            sourceProjectId: projectId,
+            projectId: otherProjectId,
+          }),
+        );
+
+        expect((error as TRPCError).code).toBe("FORBIDDEN");
+        expect(((error as TRPCError).cause as LimitExceededError).meta).toEqual(
+          { limitType: "evaluators", current: 3, max: 3 },
+        );
+        expect(
+          await prisma.evaluator.count({
+            where: { projectId: otherProjectId },
+          }),
+        ).toBe(0);
       });
     });
   });

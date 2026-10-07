@@ -60,7 +60,7 @@ export class UsageService {
     private readonly simulationRunService: Pick<
       SimulationRunService,
       "getDistinctExternalSetIds"
-    > | null = null,
+    >,
   ) {
     this.countCache = new TtlCache<number>(
       CACHE_TTL_MS,
@@ -127,7 +127,6 @@ export class UsageService {
     const cached = await this.scenarioSetCache.get(organizationId);
     if (cached) return cached;
 
-    if (!this.simulationRunService) return [];
     const projectIds =
       await this.organizationService.getProjectIds(organizationId);
     const known = projectIds.length

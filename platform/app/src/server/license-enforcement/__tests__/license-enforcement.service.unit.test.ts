@@ -51,7 +51,11 @@ describe("LicenseEnforcementService", () => {
       getActivePlan: vi.fn().mockResolvedValue(basePlan),
     };
 
-    service = new LicenseEnforcementService(mockRepository, mockPlanProvider);
+    service = new LicenseEnforcementService(
+      mockRepository,
+      mockPlanProvider,
+      vi.fn().mockResolvedValue(0),
+    );
   });
 
   describe("checkLimit", () => {

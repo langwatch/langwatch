@@ -108,8 +108,7 @@ export class LicenseEnforcementService {
   constructor(
     repository: ILicenseEnforcementRepository,
     private readonly planProvider: PlanProvider,
-    countScenarioSets: (organizationId: string) => Promise<number> = () =>
-      Promise.resolve(0),
+    countScenarioSets: (organizationId: string) => Promise<number>,
   ) {
     this.countSources = { repository, countScenarioSets };
   }
