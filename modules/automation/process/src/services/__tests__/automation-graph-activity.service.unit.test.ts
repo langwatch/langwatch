@@ -33,6 +33,7 @@ import { SlackDestinationService } from "../slack-destination.service.ts";
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,

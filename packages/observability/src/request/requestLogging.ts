@@ -1,5 +1,6 @@
 import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import type { Logger } from "../logger.ts";
+import { summarizeError } from "./errorSummary.ts";
 import type { RequestAttribution } from "./trafficAttribution.ts";
 
 /**
@@ -97,8 +98,9 @@ export function getLogLevelForRequest(
 const UNCAUSED_SERVER_ERROR = "UncausedServerError";
 
 /**
- * Attaches the cause under the field its level allows: error-level uses "error",
- * others use {@link REQUEST_CAUSE_FIELD}.
+ * Attaches the cause, as a bounded {@link summarizeError} summary, under the
+ * field its level allows: error-level uses "error", others use
+ * {@link REQUEST_CAUSE_FIELD}. See specs/observability/request-log-cause-and-level.feature.
  */
 function attachCause({
   logData,
@@ -110,9 +112,9 @@ function attachCause({
   level: "info" | "warn" | "error";
 }): void {
   if (level === "error") {
-    logData.error = error;
+    logData.error = summarizeError(error);
   } else {
-    logData[REQUEST_CAUSE_FIELD] = error;
+    logData[REQUEST_CAUSE_FIELD] = summarizeError(error);
     // Re-keying costs the derived `error_type`, which is how these records
     // were grouped. Restated flat so the grouping survives the move.
     const name = (error as { name?: unknown }).name;

@@ -346,7 +346,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 The two URLs are split for **auth + routing convenience**, not for architectural reasons. Internally they share everything that matters:
 
-- **Same hardened OTLP parser**: `packages/otlp/src/body.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli decompression, JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
+- **Same hardened OTLP parser**: `packages/otlp/src/body.ts` (`readOtlpBody` + `parseOtlpTraces`, `parseOtlpLogs`) handles gzip, deflate, brotli and zstd decompression (gzip and zstd are also detected from the body's leading bytes), JSON + protobuf decode, and the JSON-then-protobuf-encode fallback path. Both URLs call into it. There is no parser-quality gap.
 - **Same trace pipeline**: both URLs hand off to the existing `traces.collection.handleOtlpTraceRequest` (or `traces.logCollection.handleOtlpLogRequest` for log-shaped sources) that powers `/api/otel/v1/traces`. No parallel write path. No parallel storage.
 - **Same `recorded_spans` and `log_records` tables**, governance-ingested events land in the same ClickHouse storage that powers the rest of the platform. They're distinguished by reserved attribute namespaces stamped at the receiver edge:
   - `langwatch.origin.kind = "ingestion_source"`, discriminator
@@ -14052,7 +14052,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 - **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
-- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
+- **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli, zstd per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
 - **Pipeline:** Receiver lazy-ensures the hidden Governance Project, stamps `langwatch.origin.*` on every span, hands off to the existing trace pipeline. Cowork tool-call spans land as the OCSF "Action = tool_call"; model-call spans land as "Action = chat" via the governance fold's heuristic.
 - **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
@@ -14500,7 +14500,7 @@ If a field doesn't resolve from the precedence list, the fold projection stores 
 
 ## What is still envelope-only, follow-up work
 
-- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli and zstd accepted via the shared parser; gzip and zstd bodies are recognised even without a correct Content-Encoding). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
 - **Span events, span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web

@@ -19,6 +19,7 @@ import {
   type StatementMetrics,
   type WindowedReadMetrics,
   type ClickHouseClientCreationInput,
+  type ClickHouseLaneStats,
   type ClickHouseStatementOperation,
   type LimiterStats,
   type TenantDirectory,
@@ -113,7 +114,8 @@ class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
   }
 }
 
-const limiterProbes = new Map<string, () => LimiterStats>();
+/** One entry per lane, so a saturated insert lane cannot hide behind an idle read lane. */
+const limiterProbes = new Map<string, () => readonly ClickHouseLaneStats[]>();
 
 observableGauge(
   {
@@ -121,7 +123,9 @@ observableGauge(
     description: "ClickHouse statements this process currently has in flight",
   },
   (observer) => {
-    for (const [instance, stats] of limiterProbes) observer.observe(stats().inFlight, { instance });
+    for (const [instance, lanes] of limiterProbes) {
+      for (const { lane, inFlight } of lanes()) observer.observe(inFlight, { instance, lane });
+    }
   },
 );
 
@@ -131,7 +135,9 @@ observableGauge(
     description: "ClickHouse statements waiting for a concurrency slot in this process",
   },
   (observer) => {
-    for (const [instance, stats] of limiterProbes) observer.observe(stats().queued, { instance });
+    for (const [instance, lanes] of limiterProbes) {
+      for (const { lane, queued } of lanes()) observer.observe(queued, { instance, lane });
+    }
   },
 );
 
@@ -146,8 +152,16 @@ class StatementBoundTelemetry extends ClickHouseManagedClientTelemetry {
     description: "ClickHouse statements refused because the concurrency wait queue was full",
   });
 
-  registerLimiter({ instance, stats }: { instance: string; stats: () => LimiterStats }): void {
-    limiterProbes.set(instance, stats);
+  registerLimiter({
+    instance,
+    stats,
+    lanes,
+  }: {
+    instance: string;
+    stats: () => LimiterStats;
+    lanes?: () => readonly ClickHouseLaneStats[];
+  }): void {
+    limiterProbes.set(instance, lanes ?? (() => [{ lane: "all", ...stats() }]));
   }
 
   unregisterLimiter(instance: string): void {
@@ -223,8 +237,13 @@ export function buildClickHouse(options: {
     telemetry,
     overloadErrorFactory: new OverloadedRefusal(),
     logger: createLogger("langwatch:clickhouse:statement-limit"),
+    reserveShare: config.statementLaneReserveShare,
   });
-  telemetry.registerLimiter({ instance: STATEMENT_BOUND_INSTANCE, stats: () => admission.stats() });
+  telemetry.registerLimiter({
+    instance: STATEMENT_BOUND_INSTANCE,
+    stats: () => admission.stats(),
+    lanes: () => admission.laneStats(),
+  });
 
   const client = new ClickHouseQueryClient({
     driver: routingDriver(connection),

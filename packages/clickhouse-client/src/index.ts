@@ -67,11 +67,15 @@ export {
   DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
   DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
   DEFAULT_STATEMENT_QUEUE_DEPTH_PER_SLOT,
+  DEFAULT_STATEMENT_LANE_RESERVE_SHARE,
   DEFAULT_STATEMENT_WAIT_TIMEOUT_MS,
+  statementLaneCaps,
 } from "./managed-client.ts";
 export type {
+  ClickHouseLaneStats,
   ClickHouseManagedClientOptions,
   ClickHouseStatementAdmissionOptions,
+  ClickHouseStatementLane,
   ClickHouseStatementLimitOptions,
   ClickHouseStatementOperation,
   ClickHouseVendorClient,

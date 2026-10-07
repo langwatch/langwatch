@@ -332,8 +332,10 @@ describe("requestLogging", () => {
         expect(warnData()).not.toHaveProperty("error");
       });
 
-      it("still carries the cause for diagnosis", () => {
-        expect(warnData()[REQUEST_CAUSE_FIELD]).toBe(handledCustomer);
+      it("still carries a bounded summary of the cause for diagnosis", () => {
+        const cause = warnData()[REQUEST_CAUSE_FIELD];
+        expect(cause).toMatchObject({ type: "PlanLimitExceededError", message: "over quota" });
+        expect(cause).not.toBe(handledCustomer);
       });
 
       /** @scenario The error type stays groupable after the cause is re-keyed */
@@ -365,7 +367,7 @@ describe("requestLogging", () => {
 
     describe("when the record is logged at error level", () => {
       /** @scenario A record at error level keeps its cause on the error field */
-      it("keeps the cause under error so 5xx dashboards are unchanged", () => {
+      it("keeps a bounded cause summary under error so 5xx dashboards are unchanged", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
         const boom = new Error("boom");
 
@@ -379,7 +381,8 @@ describe("requestLogging", () => {
         });
 
         const logData = logger.error.mock.calls[0][0];
-        expect(logData.error).toBe(boom);
+        expect(logData.error).toMatchObject({ type: "Error", message: "boom" });
+        expect(logData.error).not.toBe(boom);
         expect(logData).not.toHaveProperty(REQUEST_CAUSE_FIELD);
       });
     });
