@@ -31,7 +31,6 @@ import {
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
-  type USAGE_UNKNOWN,
   type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
@@ -67,7 +66,6 @@ import {
 } from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
-import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import {
   planLimitCooldown,
   planLimitInFlight,
@@ -392,7 +390,6 @@ export class BillingModule
       | "connectedBilling"
       | "checkpoints"
       | "reportOrganizations"
-      | "billableEvents"
       | "organizationCache"
       | "subscriptions"
       | "organizationPricing"
@@ -440,7 +437,6 @@ export class BillingModule
       isSaas,
       usageWarnings,
       resourceLimitAlerts,
-      billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingModule.#composeReporting({
         repositories,
@@ -737,7 +733,6 @@ export class BillingModule
   readonly #overview: ConnectedBillingOverviewService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
-  readonly #billableEvents: BillableEventsQueryService;
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
   readonly #usageWarnings: UsageWarningService;
@@ -753,7 +748,6 @@ export class BillingModule
     overview,
     subscriptionPlans,
     isSaas,
-    billableEvents,
     pricing,
     reporting,
     usageWarnings,
@@ -769,7 +763,6 @@ export class BillingModule
     overview: ConnectedBillingOverviewService;
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
-    billableEvents: BillableEventsQueryService;
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
     usageWarnings: UsageWarningService;
@@ -783,7 +776,6 @@ export class BillingModule
     this.#overview = overview;
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
-    this.#billableEvents = billableEvents;
     this.#pricing = pricing;
     this.#reporting = reporting;
     this.#usageWarnings = usageWarnings;
@@ -805,13 +797,6 @@ export class BillingModule
       notificationId: result.notification.id,
       sentAt: fromDate(result.notification.sentAt),
     };
-  }
-
-  countBillableEventsByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN> {
-    return this.#billableEvents.countBillableEventsByProjects(input);
   }
 
   getPricingModel(input: {

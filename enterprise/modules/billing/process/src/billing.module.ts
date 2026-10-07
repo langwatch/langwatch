@@ -1,9 +1,8 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { defineProcessModule, instantiateRepositories } from "@langwatch/process";
+import { defineProcessModule } from "@langwatch/process";
 
 /**
  * What a process composes billing's process-side work from: the
- * ClickHouse, Redis and Stripe substrates it already holds. Everything
+ * Redis and Stripe substrates it already holds. Everything
  * behind these stays private — composition states substrates, never classes.
  */
 import { BillingModule } from "./app/billing.app.ts";
@@ -12,15 +11,11 @@ import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
 import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
-import {
-  billingClickhouseRepositories,
-  billingRepositories,
-} from "./repositories/billing-repositories.registry.ts";
+import { billingRepositories } from "./repositories/billing-repositories.registry.ts";
 import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
-import { BillableEventsQueryService } from "./services/billable-events-query.service.ts";
 import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
@@ -61,22 +56,6 @@ export const billingProcessModule = defineProcessModule("billing")
       }),
     ),
   ]);
-
-/** The billable-events totals a reporting run reads, over the process's own endpoints. */
-export function createBillableEventsQuery(options: {
-  clickhouse: ClickHouseQueryClient;
-}): BillableEventsQueryService {
-  return BillableEventsQueryService.create(
-    liveClickhouseRepositories(options.clickhouse).billableEvents,
-  );
-}
-
-function liveClickhouseRepositories(clickhouse: ClickHouseQueryClient) {
-  return instantiateRepositories(billingClickhouseRepositories, {
-    tier: "live",
-    members: { clickhouse },
-  });
-}
 
 /** The organization cache a reporting run reads, over the process's own Redis. */
 export function createBillingOrganizationCache(options: {

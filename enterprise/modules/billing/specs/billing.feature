@@ -80,12 +80,6 @@ Feature: Enterprise billing compatibility
     And an operator impersonating a customer gets the adding limitations lifted
 
   @unit
-  Scenario: Billable events are counted per named project
-    Given an organization metered in events whose second project sent nothing this month
-    When its billable events are counted for both projects
-    Then the first project reports its events and the second reports zero
-
-  @unit
   Scenario: LangWatch Cloud detects the currency a reader's prices are shown in
     Given LangWatch Cloud and a request that names no country
     When the plans page asks which currency to show

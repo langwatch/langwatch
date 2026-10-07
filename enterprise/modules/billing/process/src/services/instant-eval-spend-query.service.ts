@@ -8,11 +8,11 @@
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 
+import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";
 import {
   billingMonthWindowMs,
   nanoUsdToInstantEvalMeterUnits,
 } from "../rules/instant-eval-meter.rules.ts";
-import type { BillableEventsTotalResult } from "./billable-events-query.service.ts";
 
 const logger = createLogger("langwatch:billing:instantEvalSpendQuery");
 

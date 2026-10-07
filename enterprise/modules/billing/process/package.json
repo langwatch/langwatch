@@ -22,11 +22,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",

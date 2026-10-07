@@ -3037,9 +3037,6 @@ importers:
 
   enterprise/modules/billing/process:
     dependencies:
-      '@clickhouse/client':
-        specifier: 'catalog:'
-        version: 1.23.0
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
@@ -3049,9 +3046,6 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
-      '@langwatch/clickhouse-client':
-        specifier: workspace:*
-        version: link:../../../../packages/clickhouse-client
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../../../modules/data-retention/contract

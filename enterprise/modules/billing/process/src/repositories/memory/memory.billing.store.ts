@@ -23,16 +23,6 @@ export type MemoryBillingOrganization = {
   signupData: Record<string, unknown>;
 };
 
-/** One billable-event row of the ClickHouse table usage's meter writes. */
-export type MemoryBillableEvent = {
-  organizationId: string;
-  tenantId: string;
-  eventId: string;
-  eventType: string;
-  deduplicationKey: string;
-  eventTimestamp: number;
-};
-
 /**
  * One store behind the billing memory tier, the way one Postgres schema serves
  * the Prisma tier: a subscription written through `subscriptions` is what the
@@ -51,7 +41,6 @@ export class MemoryBillingStore {
   readonly subscriptions: BillingSubscriptionRecord[] = [];
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();
-  readonly billableEvents: MemoryBillableEvent[] = [];
 
   static create(): MemoryBillingStore {
     return new MemoryBillingStore();

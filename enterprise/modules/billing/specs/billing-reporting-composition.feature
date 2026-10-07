@@ -59,13 +59,6 @@ Feature: Composing the monthly billing roll-up
     And nothing is sent to Stripe
 
   @unit
-  Scenario: The worker reads the month's total by organization, not by tenant
-    Given a worker composing the roll-up over its own tenant-keyed ClickHouse client
-    When the month's total for a private-instance customer is read
-    Then the client is resolved for the organization
-    And it is never resolved for the project
-
-  @unit
   Scenario: The worker reports into the meter the App reports into
     Given a composed usage reporter
     When the deployment names its runtime mode

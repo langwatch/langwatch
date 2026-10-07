@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { BillableEventsRepository } from "./billable-events.repository.ts";
 import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
 import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
 import type { BillingOrganizationCacheRepository } from "./billing-organization-cache.repository.ts";
@@ -17,7 +16,6 @@ import type { BillingSubscriptionRepository } from "./subscription.repository.ts
  * The rows the billing module owns, chosen once at boot.
  */
 export interface BillingRepositories {
-  readonly billableEvents: BillableEventsRepository;
   readonly checkpoints: BillingCheckpointRepository;
   readonly connectedBilling: ConnectedBillingRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
@@ -31,12 +29,5 @@ export interface BillingRepositories {
   readonly webhookSubscriptions: BillingWebhookSubscriptionRepository;
 }
 
-/** ClickHouse-backed billing rows, selected through their own registry and store tier. */
-export type BillingPostgresRepositories = Omit<
-  BillingRepositories,
-  "billableEvents" | "organizationCache"
->;
-
-export interface BillingClickHouseRepositories {
-  readonly billableEvents: BillableEventsRepository;
-}
+/** The Postgres-backed billing rows: every row but the Redis organization cache. */
+export type BillingPostgresRepositories = Omit<BillingRepositories, "organizationCache">;

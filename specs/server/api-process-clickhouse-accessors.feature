@@ -84,13 +84,6 @@ Feature: The API process routes its three ClickHouse reads by the right id
       Then only the organization-keyed accessor is asked
       And the tenant-keyed resolver is not asked at all
 
-    @unit
-    Scenario: A deployment with no ClickHouse reads the volume as unknown, not as zero
-      Given a process that opened no ClickHouse connection
-      When the usage panel is read
-      Then the month's volume is reported as unknown
-      And it is not reported as zero, which would say the organization sent nothing
-
   Rule: The operator's event log is searchable where there is an install-wide endpoint
 
     @integration

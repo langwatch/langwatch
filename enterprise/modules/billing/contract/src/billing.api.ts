@@ -9,7 +9,6 @@ import type {
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
   UsageWarningDecision,
-  USAGE_UNKNOWN,
 } from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
@@ -74,14 +73,6 @@ export interface BillingApi {
    * subscription's own limit overrides; the free plan where none is active or off Cloud.
    */
   getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
-  /**
-   * This UTC billing month's approximate billable events per named project, 0 where a project
-   * has none; unknown when no analytics store is composed. Main's `EventUsageService`.
-   */
-  countBillableEventsByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
   /**
    * Mails the organization's admins the usage warning entitlement decided, once per threshold a
    * month. Billing counts nothing: the threshold and per-project counts arrive decided.
