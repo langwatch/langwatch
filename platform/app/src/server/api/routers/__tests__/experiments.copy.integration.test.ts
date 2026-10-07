@@ -417,12 +417,22 @@ describe("experiments.copy", () => {
 
         // handledErrorMiddleware re-raises the domain error as a TRPCError
         // whose cause is the HandledError itself.
+        expect(error).toBeDefined();
         expect((error as { cause?: unknown }).cause).toBeInstanceOf(
           WorkbenchMissingReferenceError,
         );
         expect((error as { cause: { code: string } }).cause.code).toBe(
           "experiment_workbench_missing_reference",
         );
+        expect(
+          (
+            error as {
+              cause: {
+                meta: Record<string, unknown>;
+              };
+            }
+          ).cause.meta,
+        ).toEqual({ refType: "prompt", refId: promptId });
 
         const after = await findRow(sourceId);
         expect(after.workbenchState).toEqual(before.workbenchState);
