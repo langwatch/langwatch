@@ -34,6 +34,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

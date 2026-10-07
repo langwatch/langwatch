@@ -378,3 +378,8 @@ recommendation, and "default taken" if a lane proceeded on it.
 ### r-upgrade-logging-e2e
 
 - Tampered ledger row (manifest e2e case, spec `specs/upgrade/upgrade-e2e.feature` tagged `@unimplemented`): the ledger carries no checksum (ADR-173 D11) and an unknown step id is exactly what a rollback leaves behind. Options: (a) refuse ids no release manifest and no live presence row names; (b) add a checksum column, reversing D11; (c) keep tolerating them. No default taken; held for Alex.
+
+### r-lends-2
+
+- `customGraph` (analytics lends it to project's home): its props name dashboard's `CustomGraphInput` (graph type and colour-set literal unions over analytics' series schemas) and design-system's `SystemStyleObject` (`titleProps`); a client may import neither. Same open choice as r-lends-1's line: widen to `string` or copy the literal unions. No recommendation on record: stopped, held for Alex.
+- Readers cannot import a new `<owner>-client` until its `package.json` line is installed (shared), and LANE.md §5 forbids importing before declaring; the wave runs in two steps (scaffold and request, then convert after the install). Default taken, held for Alex.

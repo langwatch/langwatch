@@ -27,6 +27,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/agent-client": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
@@ -33,6 +34,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -41,6 +43,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-client": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",

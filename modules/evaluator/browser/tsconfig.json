@@ -18,6 +18,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../analytics/client/tsconfig.build.json"
+    },
+    {
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
@@ -51,10 +54,16 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../experiment/client/tsconfig.build.json"
+    },
+    {
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/client/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -79,6 +88,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/client/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

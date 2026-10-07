@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/annotation-client": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser": "workspace:*",

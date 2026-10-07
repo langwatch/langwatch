@@ -33,6 +33,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",

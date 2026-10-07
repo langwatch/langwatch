@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-client": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser": "workspace:*",

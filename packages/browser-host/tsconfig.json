@@ -19,9 +19,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../modules/agent/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/annotation/contract/tsconfig.build.json"
     },
     {

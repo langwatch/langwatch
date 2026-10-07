@@ -4,12 +4,9 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
-import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
-import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type { UiTokenIdentity } from "@langwatch/module";
 import type { MediaAudioElement } from "@langwatch/scenario-contract";
@@ -21,7 +18,6 @@ import type {
   LLMConfig,
   LocalPromptConfig,
   Signature,
-  WorkflowField,
 } from "@langwatch/workflow-contract";
 import type { ComponentType, ReactElement, ReactNode } from "react";
 import type { IconType } from "react-icons";
@@ -155,25 +151,6 @@ export type UiLicenseBillingSectionProps = {
   commitUsdCents: number;
 };
 
-/** What a screen hands model-provider's model picker. */
-export type UiModelSelectorProps = {
-  model: string;
-  options: string[];
-  onChange: (model: string) => void;
-  size?: "sm" | "md" | "full";
-  mode?: "chat" | "embedding";
-  /** A "Configure available models" link at the bottom of the dropdown. */
-  showConfigureAction?: boolean;
-  /** Names the feature in the callout shown when no model is available. */
-  forFeatureLabel?: string;
-};
-
-/** What a screen hands model-provider's display of one chosen model. */
-export type UiModelDisplayProps = {
-  model: string;
-  fontSize?: string;
-};
-
 /**
  * Playback coordination for one audio part, as the host's sequential player
  * hands it out. The thread never starts a clip; it passes these to the media.
@@ -246,24 +223,6 @@ export type UiHoverableBigTextProps = {
   expandable?: boolean;
 };
 
-/** What a screen hands workflow's version badge; no version draws an empty badge. */
-export type UiVersionBoxProps = {
-  version?: { autoSaved?: boolean; version: string };
-  minWidth?: string;
-  backgroundColor?: string;
-};
-
-/** What the experiment workbench hands workflow's "Run via API" dialog. */
-export type UiRunExperimentViaApiDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  experimentSlug: string;
-  entryFields: WorkflowField[];
-  datasetColumns: string[];
-  datasetName?: string;
-  projectSlug?: string;
-};
-
 /** What a screen hands workflow's marker for a trace field the reader may not see. */
 export type UiRedactedFieldProps = {
   field: "input" | "output";
@@ -324,44 +283,12 @@ export type UiStudioPromptEditorProps = {
   onInputMappingsChange: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
-/** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
-export type UiFilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
-
 /** What a check form hands trace's mapping editor, which reads its own sample traces. */
 export type UiEvaluatorTracesMappingProps = {
   targetFields: string[];
   traceMapping?: MappingState;
   setTraceMapping?: (mapping: MappingState) => void;
   disableExpansions?: boolean;
-};
-
-/** What an evaluator editor hands experiment's comparison evaluator form. */
-export type UiComparisonConfigFormProps = {
-  value: ComparisonEvaluatorConfig;
-  onChange: (next: ComparisonEvaluatorConfig) => void;
-  targets: TargetConfig[];
-  datasetColumns: { id: string; name: string }[];
-  datasetName?: string;
-};
-
-/** What an HTTP agent's properties panel hands agent's configuration editor. */
-export type UiHttpConfigEditorProps = {
-  url: string;
-  onUrlChange: (url: string) => void;
-  method: HttpMethod;
-  onMethodChange: (method: HttpMethod) => void;
-  bodyTemplate: string;
-  onBodyTemplateChange: (body: string) => void;
-  outputPath: string;
-  onOutputPathChange: (path: string) => void;
-  auth: HttpAuth | undefined;
-  onAuthChange: (auth: HttpAuth | undefined) => void;
-  headers: HttpHeader[];
-  onHeadersChange: (headers: HttpHeader[]) => void;
-  onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
-  paddingX?: number | string;
-  /** The saved agent's credentials are shown as "Stored on the agent" and cannot be edited. */
-  credentialsReadOnly?: boolean;
 };
 
 /** One declared output of a prompt, code or agent node. */
@@ -488,22 +415,16 @@ export type UiDeclaredCapabilities = {
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
-  comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
   evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
-  filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
   firstTouchAttribution: UiFirstTouchAttribution;
-  httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
-  modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
-  modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   pendingJoinRequests: UiDeclaredComponent<UiPendingJoinRequestsProps>;
   projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
-  runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
   sampleChoice: UiGovernanceSampleChoice;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   sidebar: UiNavigationSidebar;
@@ -511,7 +432,6 @@ export type UiDeclaredCapabilities = {
   studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;
-  versionBox: UiDeclaredComponent<UiVersionBoxProps>;
 };
 
 export type UiDeclaredName = keyof UiDeclaredCapabilities;

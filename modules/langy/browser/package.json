@@ -38,6 +38,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",

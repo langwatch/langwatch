@@ -54,6 +54,9 @@
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/model-provider/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
