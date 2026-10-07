@@ -77,6 +77,7 @@ export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";
 // composition is published: a process that mounted a fragment on its own would
 // claim `ops` a second time.
 export { opsTrpcTransport } from "./transport/ops.trpc.ts";
+export { opsUpgradeTrpcTransport } from "./transport/ops-upgrade.trpc.ts";
 export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the

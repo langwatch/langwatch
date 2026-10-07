@@ -70,41 +70,69 @@ Feature: Ops shows an installation's release upgrades, read-only
     When an operator opens the run
     Then each release's steps are listed under it, 3.22.0 first, in the reader's order
 
-  @unimplemented
-  Scenario: A run's phases are listed per release in the order they ran
+  @integration
+  Scenario: A run's phases are listed in the order they ran
     Given a run from 3.21.0 to 3.23.0 that passed through two releases
     When an operator opens the run
     Then the preflight is listed first
-    And each release's Postgres schema, ClickHouse schema and blocking steps follow in order
+    And each release's Postgres schema and ClickHouse schema phases follow in the order they ran
     And the reconcile phase is listed last
 
-  @unimplemented
+  @integration
   Scenario: A view-only operator reads every upgrade screen
     Given a reader holding the operator view grant and not the manage grant
     When they open each Upgrades page
     Then every page opens
 
-  @unimplemented
+  @integration
   Scenario: A reader without the operator grant is refused every upgrade screen by the router
     Given a reader holding no operator grant
     When they open an Upgrades page
     Then the page is refused and names the grant "ops:view"
 
-  @unimplemented
+  @unit
   Scenario: Every upgrade read asks the operator view grant at the door
     Given the six ops.upgrade queries
     When their declarations are read
     Then each asks "ops:view" at the platform scope before its handler runs
 
-  @unimplemented
+  @unit
   Scenario: A non-operator calling an upgrade read is refused by the door
     Given a signed-in user who is not a platform operator
     When they call ops.upgrade.status
     Then the call is refused before the handler runs
     And the reader is never asked
 
-  @unimplemented
+  @unit
   Scenario: Upgrade reads answer the reader's shapes unchanged
     Given a ledger with a release, a step and a run
     When an operator calls ops.upgrade.status, listReleases, listSteps, getStep, listRuns and getRun
     Then each answers what UpgradeReader answers for the same ledger
+
+  @unit
+  Scenario: Opening a step or a run the ledger does not hold says it was not found
+    Given a ledger that holds no step and no run with the id asked for
+    When an operator calls ops.upgrade.getStep or ops.upgrade.getRun with that id
+    Then the call answers "upgrade_not_found" rather than an empty record
+
+  @integration
+  Scenario: The upgrade pages re-read when the runner raises a read hint, without a timer
+    Given an operator has a run open while it is running
+    When the runner raises its read hint for that run
+    Then the run view reads the run again and shows its new outcome
+    And nothing re-reads it on a timer
+
+  @integration
+  Scenario: The upgrade read-hint stream relays the runner's hints and nothing else
+    Given an operator holding the operator view grant has opened the upgrade read-hint stream
+    When the runner publishes a hint on the platform upgrade scope
+    And a malformed frame arrives on the same scope
+    Then the stream relays the runner's hint once
+    And it listens on no organisation's, project's or user's hints
+
+  @integration
+  Scenario: A reader without the operator view grant is refused the upgrade read-hint stream
+    Given a signed-in user who is not a platform operator
+    When they open the upgrade read-hint stream
+    Then the stream is refused at the door
+    And nothing listens on the platform upgrade scope

@@ -92,6 +92,17 @@ import type {
   OpsMigrationOverview,
   OpsMigrationTargetedRunResult,
 } from "./ops-system-migration.ts";
+import type {
+  OpsUpgradeIdInput,
+  OpsUpgradeListRunsInput,
+  OpsUpgradeListStepsInput,
+  OpsUpgradeReleasePage,
+  OpsUpgradeRun,
+  OpsUpgradeRunPage,
+  OpsUpgradeStatus,
+  OpsUpgradeStepDetail,
+  OpsUpgradeStepPage,
+} from "./ops-upgrade.ts";
 import type { ProductAnalyticsTarget } from "./ops.config.ts";
 import type {
   OpsApiGetBadgeCountsOutput,
@@ -654,6 +665,15 @@ export interface OpsApi {
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
+  // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
+  getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
+  listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
+  /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */
+  getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+  listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
+  /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
+  getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

@@ -19,6 +19,7 @@ import { checkupTrpcTransport } from "#transport/checkup.trpc";
 import { bugReportCredential, opsBugReportRest } from "#transport/ops-bug-report.rest";
 import { opsBugReportTrpcTransport } from "#transport/ops-bug-report.trpc";
 import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest";
+import { opsUpgradeTrpcTransport } from "#transport/ops-upgrade.trpc";
 import { opsTrpcTransport } from "#transport/ops.trpc";
 
 export const opsProcessModule = defineProcessModule("ops")
@@ -29,6 +30,7 @@ export const opsProcessModule = defineProcessModule("ops")
     opsBugReportRest,
     opsClickHouseExplainRest,
     opsTrpcTransport,
+    opsUpgradeTrpcTransport,
     opsBugReportTrpcTransport,
     checkupTrpcTransport,
     checkupRest,

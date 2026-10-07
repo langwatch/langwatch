@@ -225,6 +225,15 @@ import {
   type OpsSignUpHealthInput,
   type SignUpHealth,
   type OpsDoorAnswer,
+  type OpsUpgradeIdInput,
+  type OpsUpgradeListRunsInput,
+  type OpsUpgradeListStepsInput,
+  type OpsUpgradeReleasePage,
+  type OpsUpgradeRun,
+  type OpsUpgradeRunPage,
+  type OpsUpgradeStatus,
+  type OpsUpgradeStepDetail,
+  type OpsUpgradeStepPage,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -293,6 +302,7 @@ import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
+import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
 import { OpsService } from "../services/ops.service.ts";
 import {
   PlatformOperatorsService,
@@ -688,6 +698,8 @@ type OpsRuntimeDependencies = Readonly<{
   signUpHealth: SignUpHealthService | undefined;
   /** The Operators page, the recovery task and the seed; absent where a composition built none. */
   platformOperators: PlatformOperatorsService | undefined;
+  /** The Upgrades pages' reads over the upgrade ledger. */
+  upgrades: OpsUpgradeService;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -934,6 +946,7 @@ export class OpsModule implements OpsApi {
         }),
       }),
       checkup: setup.checkup,
+      upgrades: OpsUpgradeService.create({ ledger: repositories.upgradeLedger }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
       signUpHealth: setup.signUpHealth,
@@ -1914,6 +1927,30 @@ export class OpsModule implements OpsApi {
   }
 
   /** A project key has no person behind it, so it reads its organization's verdicts only. */
+  getUpgradeStatus(): Promise<OpsUpgradeStatus> {
+    return this.#dependencies.upgrades.getStatus();
+  }
+
+  listUpgradeReleases(): Promise<OpsUpgradeReleasePage> {
+    return this.#dependencies.upgrades.listReleases();
+  }
+
+  listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage> {
+    return this.#dependencies.upgrades.listSteps(input);
+  }
+
+  getUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
+    return this.#dependencies.upgrades.getStep(input);
+  }
+
+  listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage> {
+    return this.#dependencies.upgrades.listRuns(input);
+  }
+
+  getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
+    return this.#dependencies.upgrades.getRun(input);
+  }
+
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
     const checkup = this.#checkup;
     if (checkup.isSaas) throw new CheckupNotSelfHostedError();

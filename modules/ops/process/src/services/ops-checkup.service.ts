@@ -90,7 +90,7 @@ interface OpsCheckupDependencies {
     readonly clickhouse: ClickHouseHealthRepository;
     readonly redis: RedisHealthRepository;
     /** The upgrade ledger both migration rows read, as the Upgrades page reads it. */
-    readonly upgradeLedger: UpgradeLedgerRepository;
+    readonly upgradeLedger: Pick<UpgradeLedgerRepository, "findStatus" | "findSteps">;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
   /** The ops health the usage report carries; left out where the process composes none. */

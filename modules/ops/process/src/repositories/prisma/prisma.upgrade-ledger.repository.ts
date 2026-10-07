@@ -3,10 +3,15 @@ import { imageSteps } from "@langwatch/upgrade";
 import { loadReleases } from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
+  type ListRunsInput,
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
+  type UpgradeReleasePage,
+  type UpgradeRunDetail,
+  type UpgradeRunPage,
   type UpgradeStatus,
+  type UpgradeStepDetail,
   type UpgradeStepPage,
 } from "@langwatch/upgrade/reader";
 
@@ -54,5 +59,21 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {
     return this.reader.listSteps(filter);
+  }
+
+  findReleases(): Promise<UpgradeReleasePage> {
+    return this.reader.listReleases();
+  }
+
+  findRuns(input?: ListRunsInput): Promise<UpgradeRunPage> {
+    return this.reader.listRuns(input);
+  }
+
+  getStep(input: { id: string }): Promise<UpgradeStepDetail> {
+    return this.reader.getStep(input);
+  }
+
+  getRun(input: { id: string }): Promise<UpgradeRunDetail> {
+    return this.reader.getRun(input);
   }
 }
