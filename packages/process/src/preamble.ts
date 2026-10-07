@@ -23,12 +23,7 @@ import {
   type ServerLogger,
   type ServerOptions,
 } from "./server.ts";
-import {
-  assertGatedRole,
-  upgradeGateComponent,
-  type UpgradeGatedRole,
-  type UpgradeGate,
-} from "./upgrade-gate.ts";
+import { assertGatedRole, type UpgradeGatedRole, type UpgradeGate } from "./upgrade-gate.ts";
 
 /** An owner as the preamble reads one: a name, and what it declared (§6). */
 export type PreambleOwner = ConfigOwner &
@@ -200,7 +195,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     if (upgradeGate) {
       const { role } = upgradeGate;
       const gate = await upgradeGate.gate({ config, secrets: frameworkSecrets, redactPaths, role });
-      server.with(upgradeGateComponent({ server: this.name, role, gate, logger: boundary.logger }));
+      server.hostUpgradeGate({ role, gate, logger: boundary.logger });
     }
 
     return server;

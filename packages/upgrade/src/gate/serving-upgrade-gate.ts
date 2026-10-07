@@ -4,12 +4,14 @@ import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
 
+import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
-import { createPresence } from "../presence/presence.service.ts";
+import { createPresence, type Presence } from "../presence/presence.service.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
 import type { ServingRole, ServingVerdict } from "./serving-gate.ts";
@@ -23,6 +25,21 @@ const NO_LEDGER_GATE: UpgradeGate = {
   admit: async () => ({ admitted: true, outcome: "current" }),
   release: async () => undefined,
   serving: () => true,
+};
+
+/** ClickHouse is mandatory (rounds 20 and 22): a database with no ClickHouse refuses by name. */
+export const NO_CLICKHOUSE_REFUSAL =
+  "ClickHouse is required and no ClickHouse target is configured. Set CLICKHOUSE_URL (or a " +
+  "private ClickHouse route), run `pnpm task upgrade`, then start this process again.";
+
+const NO_CLICKHOUSE_GATE: UpgradeGate = {
+  admit: async () => ({
+    admitted: false,
+    outcome: "no-clickhouse",
+    refusal: NO_CLICKHOUSE_REFUSAL,
+  }),
+  release: async () => undefined,
+  serving: () => false,
 };
 
 /** Where the gate reports what it cannot refuse on: a lapse, a recovery, a rollback, a failure. */
@@ -62,6 +79,19 @@ export function upgradeGateOver({
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
   const { blockingSteps, declaredSteps } = imageGateSteps({ tree, withClickHouse });
+  const presence = createPresence({
+    ledger,
+    ...PRESENCE_TIMING,
+    onRefreshError: (error) =>
+      warn("presence refresh failed", { processId, error: messageOf(error) }),
+    onLapseChange: (lapsed) =>
+      warn(
+        lapsed
+          ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving`
+          : `presence written again: ${processId} serves again`,
+        { processId },
+      ),
+  });
   const gate = createUpgradeGate({
     role,
     processId,
@@ -70,19 +100,7 @@ export function upgradeGateOver({
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
       findRuns: async () => ((await runner.ledgerExists()) ? ledger.findRuns() : []),
     },
-    presence: createPresence({
-      ledger,
-      ...PRESENCE_TIMING,
-      onRefreshError: (error) =>
-        warn("presence refresh failed", { processId, error: messageOf(error) }),
-      onLapseChange: (lapsed) =>
-        warn(
-          lapsed
-            ? `presence lapsed past ${PRESENCE_TIMING.staleAfterMs} ms: ${processId} stops serving`
-            : `presence written again: ${processId} serves again`,
-          { processId },
-        ),
-    }),
+    presence,
     schemaIsEmpty: async () => !(await runner.prismaHistoryExists()),
     rollback: {
       reopen: (input) => runner.reopenDoneSteps(input),
@@ -95,17 +113,7 @@ export function upgradeGateOver({
   return {
     async admit(): Promise<ServingVerdict> {
       try {
-        let verdict = await gate.admit();
-        if (verdict.outcome === "first-install") {
-          const exitCode = await firstInstall();
-          verdict =
-            exitCode === 0
-              ? await gate.admit()
-              : {
-                  ...verdict,
-                  refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.`,
-                };
-        }
+        const verdict = await admitAfterFirstInstall({ gate, firstInstall });
         if (!verdict.admitted) await closeOnce();
         return verdict;
       } catch (error) {
@@ -121,6 +129,77 @@ export function upgradeGateOver({
       }
     },
     serving: () => gate.serving(),
+    ...(role === "worker"
+      ? {
+          backgroundSteps: backgroundStepsOver({
+            postgres,
+            presence,
+            gate,
+            processId,
+            release,
+            warn,
+          }),
+        }
+      : {}),
+  };
+}
+
+/** The api's first install runs `upgrade` once and asks again (Q10). */
+async function admitAfterFirstInstall({
+  gate,
+  firstInstall,
+}: {
+  gate: Pick<UpgradeGate, "admit">;
+  firstInstall: FirstInstallUpgrade;
+}): Promise<ServingVerdict> {
+  const verdict = await gate.admit();
+  if (verdict.outcome !== "first-install") return verdict;
+  const exitCode = await firstInstall();
+  if (exitCode === 0) return gate.admit();
+  return { ...verdict, refusal: `${verdict.refusal} The api ran it; it exited ${exitCode}.` };
+}
+
+/** The worker's background steps over the gate's own connection (round 14: framework runs). */
+function backgroundStepsOver({
+  postgres,
+  presence,
+  gate,
+  processId,
+  release,
+  warn,
+}: {
+  postgres: UpgradePostgres;
+  presence: Pick<Presence, "oldWritersGoneFor">;
+  gate: Pick<UpgradeGate, "serving">;
+  processId: string;
+  release: string | null;
+  warn: ServingGateWarn;
+}) {
+  const ledger = UpgradeLedgerRepository.create({ postgres });
+  const runner = UpgradeRunnerRepository.create({ postgres });
+  const log = (level: "info" | "warn", message: string, fields: object) =>
+    level === "warn" ? warn(message, { processId, ...fields }) : undefined;
+  return {
+    isStep: isMigrationStep,
+    start: (steps: readonly unknown[]) => {
+      const service = BackgroundStepsService.create({
+        ledger: {
+          findSteps: () => ledger.findSteps(),
+          acquireLease: (input) => ledger.acquireLease(input),
+          renewLease: (input) => ledger.renewLease(input),
+          releaseLease: (input) => ledger.releaseLease(input),
+          markRunning: (input) => runner.markRunning(input),
+          setStatus: (input) => runner.setStatus(input),
+          saveReport: (input) => runner.saveReport(input),
+        },
+        steps: steps.filter(isMigrationStep),
+        serving: () => gate.serving(),
+        oldWritersGoneFor: (input) => presence.oldWritersGoneFor(input),
+        identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
+        log,
+      });
+      return startBackgroundSteps({ service, log });
+    },
   };
 }
 
@@ -155,6 +234,7 @@ export async function servingUpgradeGate({
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) => {
         if (!database?.trim()) return NO_LEDGER_GATE;
+        if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
         const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
         return upgradeGateOver({
           role,
@@ -162,7 +242,7 @@ export async function servingUpgradeGate({
           close: () => pool.end(),
           tree,
           release,
-          withClickHouse: Boolean(clickhouse?.trim()) || routes.size > 0,
+          withClickHouse: true,
           processId: `${hostname()}:${process.pid}:${role}`,
           firstInstall: spawnFirstInstallUpgrade(),
           warn,

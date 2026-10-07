@@ -13,7 +13,8 @@ import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { imageSteps, type UpgradeClickHouse } from "@langwatch/upgrade";
-import { loadReleases } from "@langwatch/upgrade/manifest";
+import { readImageTree } from "@langwatch/upgrade/gate";
+import { loadReleases, type ManifestStep } from "@langwatch/upgrade/manifest";
 import { formatStatus } from "@langwatch/upgrade/reader";
 import {
   createUpgradeRunner,
@@ -26,9 +27,11 @@ import {
   type UpgradeSchemaApplier,
   upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
+import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
 
 import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
+import { withTasksApp } from "./module-task.ts";
 
 export type UpgradeCommand = { command: "run" } | { command: "status" | "plan"; json: boolean };
 
@@ -216,21 +219,52 @@ function runnerLog(): UpgradeRunnerLog {
   };
 }
 
+/** Hands `use` the steps the installed modules declare, then closes the process that built them. */
+export type DeclaredCodeSteps = <Result>(
+  use: (steps: readonly MigrationStep[]) => Promise<Result>,
+) => Promise<Result>;
+
+/** The tasks process's `.withMigrations` steps (round 14: the framework runs them). */
+export const installedCodeSteps: DeclaredCodeSteps = (use) =>
+  withTasksApp({ use: (app) => use(app.migrationSteps(isMigrationStep)) });
+
+/** A declared step as the image's tree names it: its owner is the module its id starts with. */
+export function codeStepOf(step: MigrationStep): ManifestStep {
+  const { id, kind, mode, description } = step;
+  return { id, kind, mode, owner: id.slice(0, id.indexOf(":")), description };
+}
+
 /**
  * `pnpm task upgrade [status | plan] [--json]` (specs/upgrade/upgrade-command.feature). Exit codes:
- * 0 done, 1 failed, 2 refused below the floor, 3 lease not acquired. Code steps join once the
- * tasks container collects `.withMigrations` (handoff mig-s3-runner).
+ * 0 done, 1 failed, 2 refused below the floor, 3 lease not acquired. The installed modules'
+ * code steps are booted first and handed to the runner.
  */
 export async function runUpgradeCommand({
   args,
   input,
   write = (text) => process.stdout.write(text),
+  codeSteps = installedCodeSteps,
 }: {
   args: readonly string[];
   input: TaskInput;
   write?: (text: string) => void;
+  codeSteps?: DeclaredCodeSteps;
 }): Promise<number> {
   const command = parseUpgradeArgs({ args });
+  return codeSteps((steps) => runWithCodeSteps({ command, input, write, steps }));
+}
+
+async function runWithCodeSteps({
+  command,
+  input,
+  write,
+  steps,
+}: {
+  command: UpgradeCommand;
+  input: TaskInput;
+  write: (text: string) => void;
+  steps: readonly MigrationStep[];
+}): Promise<number> {
   const database = input.connections.database;
   if (!database) throw new Error("DATABASE_URL is required to upgrade");
   const releases = loadReleases();
@@ -245,7 +279,14 @@ export async function runUpgradeCommand({
     const runner = createUpgradeRunner({
       postgres: database.sql,
       clickhouse: shared ? sqlReader({ client: shared }) : undefined,
-      image: { release: newest, steps: imageSteps({ release: newest ?? "0.0.0" }) },
+      image: {
+        release: newest,
+        steps: imageSteps({
+          release: newest ?? "0.0.0",
+          tree: readImageTree({ codeSteps: steps.map(codeStepOf) }),
+        }),
+      },
+      codeSteps: steps,
       releases,
       applier: oneReleaseApplier({ input }),
       reconcilers: reconcilers({ input }),

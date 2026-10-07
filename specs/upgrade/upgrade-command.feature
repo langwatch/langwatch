@@ -102,6 +102,13 @@ Feature: The upgrade command
     Then the blocking step runs after the schema applier
     And the step is recorded done with the report it returned
 
+  @unit
+  Scenario: The upgrade task runs the code steps every installed module declares
+    Given the tasks process's modules declare steps with .withMigrations
+    When the upgrade command runs
+    Then the runner receives every declared step as a code step and in its image steps
+    And the tasks process that built them is closed afterwards
+
   @integration
   Scenario: A transient schema failure that left no failed migration is retried with backoff
     Given an applier that fails once without recording a failed Prisma migration, then succeeds

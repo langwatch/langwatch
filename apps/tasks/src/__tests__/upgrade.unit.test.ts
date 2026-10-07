@@ -4,10 +4,20 @@
 import { type ClickHouseClient, ClickHouseError } from "@clickhouse/client";
 import { SecretsChain } from "@langwatch/secrets";
 import type { UpgradePostgres } from "@langwatch/upgrade";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { resolveTasksConfig, type TaskInput, type TasksDatabase } from "../config.ts";
-import { parseUpgradeArgs, runUpgradeCommand, sqlReader, withLockTimeout } from "../upgrade.ts";
+import {
+  type DeclaredCodeSteps,
+  parseUpgradeArgs,
+  runUpgradeCommand,
+  sqlReader,
+  withLockTimeout,
+} from "../upgrade.ts";
+
+/** No module declares a step: the command never boots the tasks process. */
+const noCodeSteps: DeclaredCodeSteps = (use) => use([]);
 
 /** A database with no ledger and no Prisma history: every presence probe finds nothing. */
 const emptyDatabase: UpgradePostgres = {
@@ -69,10 +79,41 @@ describe("the upgrade subcommands", () => {
       args: ["plan", "--json"],
       input: inputOver({ sql: emptyDatabase }),
       write: (text) => written.push(text),
+      codeSteps: noCodeSteps,
     });
     expect(exitCode).toBe(0);
     const printed = JSON.parse(written.join(""));
     expect(printed).toMatchObject({ installed: null, plan: { outcome: "planned", fresh: true } });
+  });
+
+  /** @scenario "The upgrade task runs the code steps every installed module declares" */
+  it("plans the installed modules' declared steps and closes the process that built them", async () => {
+    const step = defineMigrationStep({
+      id: "identity:reopen-unproven-accounts",
+      kind: "data",
+      mode: "background",
+      description: "Reopens accounts that never proved their address.",
+      run: async () => ({}),
+    });
+    const events: string[] = [];
+    const declared: DeclaredCodeSteps = async (use) => {
+      events.push("booted");
+      try {
+        return await use([step]);
+      } finally {
+        events.push("closed");
+      }
+    };
+    const written: string[] = [];
+    const exitCode = await runUpgradeCommand({
+      args: ["plan", "--json"],
+      input: inputOver({ sql: emptyDatabase }),
+      write: (text) => written.push(text),
+      codeSteps: declared,
+    });
+    expect(exitCode).toBe(0);
+    expect(written.join("")).toContain("identity:reopen-unproven-accounts");
+    expect(events).toEqual(["booted", "closed"]);
   });
 });
 
