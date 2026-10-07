@@ -7,10 +7,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import {
-  ParameterLineFieldToken,
-  type ParameterLineFieldProps,
-} from "@langwatch/scenario-contract";
+import { ParameterLineFieldToken, type ParameterLineFieldProps } from "@langwatch/scenario-client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -70,6 +67,7 @@ afterEach(cleanup);
 
 describe("the parameter line scenario lends agent", () => {
   describe("given scenario is installed", () => {
+    /** @scenario Agent renders scenario's parameter line through the client token */
     it("renders scenario's field with the agent's declared parameters", async () => {
       renderField({
         declarations: scenarioLends,
@@ -80,6 +78,7 @@ describe("the parameter line scenario lends agent", () => {
   });
 
   describe("given nothing lends it", () => {
+    /** @scenario An uninstalled lender leaves the reader's fallback */
     it("renders no field", () => {
       const { container } = renderField({
         declarations: uiDeclarations([]),

@@ -13160,6 +13160,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../contract

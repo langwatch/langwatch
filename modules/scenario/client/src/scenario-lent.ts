@@ -1,8 +1,7 @@
-/** Scenario UI lent by token to the modules that test an agent (§10, §10.1). */
+/** Scenario UI lent by token to the modules that test an agent (§10.1). */
 
 import { uiTokens } from "@langwatch/module";
-
-import type { ScenarioParameterDefinition } from "./scenario.parameters.ts";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 /** What agent's test panel hands scenario's parameter line: the agent's own parameters. */
 export type ParameterLineFieldProps = {
