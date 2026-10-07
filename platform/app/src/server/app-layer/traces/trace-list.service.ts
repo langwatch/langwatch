@@ -11,6 +11,7 @@ import type { TenantEvalSummary } from "~/server/app-layer/evaluations/repositor
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import {
   parseMediaRefs,
@@ -1465,7 +1466,7 @@ function teasedBeyondCutoff({
 
 /** A listed row's identity: its tenant and trace id together. */
 function listedRowKey(row: { tenantId: string; traceId: string }): string {
-  return `${row.tenantId}:${row.traceId}`;
+  return listedTraceKey({ projectId: row.tenantId, traceId: row.traceId });
 }
 
 /**
