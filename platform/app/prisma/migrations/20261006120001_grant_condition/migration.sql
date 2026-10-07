@@ -9,8 +9,11 @@
 --
 -- Down, to roll back by hand:
 --   ALTER TABLE "Grant" DROP COLUMN "condition";
--- Rolling back forgets the window on every shared grant; the shape
--- refinement refuses a project-reader grant without one, so the next
--- reconcile re-emits them rather than reading unbounded.
+-- Rolling back forgets the window on every shared grant, and nothing puts
+-- it back. The reconciler still sees each row as held and attaches nothing,
+-- while the proof minter leaves out a shared row with no condition, so
+-- every aggregate reads nothing at all, never unbounded, with no repair.
+-- Roll back the rule column first (see 20261006120002), which needs every
+-- aggregate retired before it.
 ALTER TABLE "Grant"
   ADD COLUMN "condition" JSONB;

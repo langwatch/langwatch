@@ -11,7 +11,11 @@
 --
 -- Down, to roll back by hand:
 --   ALTER TABLE "Project" DROP COLUMN "aggregateRule";
--- Rolling back forgets every aggregate's rule; the grants already in the
--- ledger stay until the reconciler, finding no rule, revokes them.
+-- Rolling back forgets every aggregate's rule, and the shared grants
+-- already in the ledger stay live: a reconcile that finds no rule revokes
+-- nothing. Before rolling back, an operator must retire every aggregate
+-- project (AggregateReconciler.retire, once per aggregate in each
+-- organisation), which revokes its shared reads and switches its nightly
+-- sweep off.
 ALTER TABLE "Project"
   ADD COLUMN "aggregateRule" JSONB;
