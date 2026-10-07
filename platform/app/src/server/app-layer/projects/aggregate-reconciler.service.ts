@@ -44,7 +44,7 @@ export type SharedProjectGrantsLedger = Pick<
 /** What the reconciler needs of the scheduler: one row per aggregate. */
 export type AggregateSweepSchedule = Pick<
   ScheduledJobRepository,
-  "upsertForTarget" | "deactivateForTarget"
+  "upsertForTarget" | "deactivateForTarget" | "findAllForProject"
 >;
 
 /** Member project ids, each in exactly one list. */
@@ -139,6 +139,9 @@ export class AggregateReconciler {
     });
     if (!aggregate || aggregate.archived) return NOTHING;
     const { organizationId } = aggregate;
+    // Every reconcile, triggered or swept, puts back a sweep row that went
+    // missing, so a failed schedule at creation is repaired by the next run.
+    await this.ensureSweepScheduled({ organizationId, aggregateProjectId });
     if (!aggregate.rule) {
       logger.error(
         { organizationId, aggregateProjectId },
@@ -244,8 +247,9 @@ export class AggregateReconciler {
 
   /**
    * For a trigger whose own write must not fail on this one: a person joining
-   * or moving department has already happened, and the nightly sweep is the
-   * retry. Never throws.
+   * or moving department has already happened. Never throws; the aggregates'
+   * nightly sweeps, which every reconcile and every boot puts back when one
+   * is missing, are the retry.
    */
   async reconcileOrganizationOrLog({
     organizationId,
@@ -260,17 +264,19 @@ export class AggregateReconciler {
       const failure = toError(error);
       logger.error(
         { organizationId, trigger, error: failure },
-        "failed to reconcile the organisation's aggregate projects; the nightly sweep retries",
+        "failed to reconcile the organisation's aggregate projects; each aggregate's nightly sweep retries",
       );
       captureException(failure, { extra: { organizationId, trigger } });
     }
   }
 
   /**
-   * A new aggregate: its nightly sweep is scheduled first, so a reconcile
-   * that fails here is still caught tonight, then its members are attached.
-   * Never throws: the project row already exists, and failing the request
-   * would only invite a second, duplicate aggregate.
+   * A new aggregate: its nightly sweep is scheduled, then its members are
+   * attached. Each step fails alone: a sweep that could not be written is put
+   * back by the reconcile right after it, by the next trigger or by the next
+   * boot, and a reconcile that fails is retried by the sweep. Never throws:
+   * the project row already exists, and failing the request would only
+   * invite a second, duplicate aggregate.
    */
   async start({
     aggregateProjectId,
@@ -279,14 +285,86 @@ export class AggregateReconciler {
   }): Promise<void> {
     try {
       await this.scheduleSweep({ aggregateProjectId });
+    } catch (error) {
+      const failure = toError(error);
+      logger.error(
+        { aggregateProjectId, trigger: "aggregate-created", error: failure },
+        "failed to schedule a new aggregate project's nightly sweep; its first reconcile puts it back",
+      );
+      captureException(failure, { extra: { aggregateProjectId } });
+    }
+    try {
       await this.reconcile({ aggregateProjectId });
     } catch (error) {
       const failure = toError(error);
       logger.error(
         { aggregateProjectId, trigger: "aggregate-created", error: failure },
-        "failed to start a new aggregate project's reconciliation; the nightly sweep retries",
+        "failed to reconcile a new aggregate project; its nightly sweep retries",
       );
       captureException(failure, { extra: { aggregateProjectId } });
+    }
+  }
+
+  /**
+   * Boot-time repair, on the pattern of the report schedules' (ADR-044): a
+   * live aggregate with no sweep row at all, from before block E or from a
+   * schedule write that failed, gets one. A row that exists, active or
+   * paused by an operator, is left as it stands. Race-safe on every worker,
+   * as the row's create is.
+   */
+  async scheduleMissingSweeps(): Promise<{ repaired: number }> {
+    if (!this.deps.schedule) return { repaired: 0 };
+    let repaired = 0;
+    for (const aggregate of await this.deps.aggregates.findAllLiveAggregates()) {
+      if (
+        await this.ensureSweepScheduled({
+          organizationId: aggregate.organizationId,
+          aggregateProjectId: aggregate.id,
+        })
+      ) {
+        repaired++;
+      }
+    }
+    return { repaired };
+  }
+
+  /**
+   * Writes the aggregate's sweep row when it has none, and reports whether it
+   * did. Create-if-missing rather than an upsert: the upsert re-arms a row an
+   * operator paused and clears the slot the scheduler is firing, and the
+   * sweep's own reconcile runs inside that fire. Never throws: the members
+   * matter more than tonight's catch-up, which the next run puts back.
+   */
+  private async ensureSweepScheduled({
+    organizationId,
+    aggregateProjectId,
+  }: {
+    organizationId: string;
+    aggregateProjectId: string;
+  }): Promise<boolean> {
+    if (!this.deps.schedule) return false;
+    try {
+      const rows = await this.deps.schedule.findAllForProject({
+        projectId: aggregateProjectId,
+        targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+      });
+      if (rows.some((row) => row.targetId === aggregateProjectId)) return false;
+      await this.scheduleSweep({ aggregateProjectId });
+      logger.info(
+        { organizationId, aggregateProjectId },
+        "put back an aggregate project's missing nightly sweep",
+      );
+      return true;
+    } catch (error) {
+      const failure = toError(error);
+      logger.error(
+        { organizationId, aggregateProjectId, error: failure },
+        "failed to put back an aggregate project's nightly sweep; the next reconcile tries again",
+      );
+      captureException(failure, {
+        extra: { organizationId, aggregateProjectId },
+      });
+      return false;
     }
   }
 

@@ -529,6 +529,58 @@ describe("Feature: the reconciler keeps members current", () => {
       });
     });
 
+    describe("and its nightly sweep row is gone", () => {
+      const sweepRowsOf = (aggregateProjectId: string) =>
+        prisma.scheduledJob.findMany({
+          where: {
+            projectId: aggregateProjectId,
+            targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+          },
+        });
+
+      describe("when the aggregate is next reconciled", () => {
+        it("puts the sweep row back", async () => {
+          const aggregate = await createAggregate({ kind: "all-personal" });
+          await prisma.scheduledJob.deleteMany({
+            where: {
+              projectId: aggregate.id,
+              targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+            },
+          });
+
+          await reconciler.reconcile({ aggregateProjectId: aggregate.id });
+
+          const rows = await sweepRowsOf(aggregate.id);
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            targetId: aggregate.id,
+            cron: AGGREGATE_RECONCILE_SWEEP.cron,
+            active: true,
+          });
+        });
+      });
+
+      describe("when a worker boots", () => {
+        it("schedules a sweep for the aggregate missing one", async () => {
+          const aggregate = await createAggregate({ kind: "all-personal" });
+          await prisma.scheduledJob.deleteMany({
+            where: {
+              projectId: aggregate.id,
+              targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+            },
+          });
+
+          const { repaired } = await reconciler.scheduleMissingSweeps();
+
+          expect(repaired).toBeGreaterThanOrEqual(1);
+          expect(await sweepRowsOf(aggregate.id)).toHaveLength(1);
+          // A second boot finds nothing left to repair for it.
+          await reconciler.scheduleMissingSweeps();
+          expect(await sweepRowsOf(aggregate.id)).toHaveLength(1);
+        });
+      });
+    });
+
     describe("when the aggregate is archived", () => {
       it("switches its nightly sweep off", async () => {
         const aggregate = await createAggregate({ kind: "all-personal" });

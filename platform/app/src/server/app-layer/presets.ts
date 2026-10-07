@@ -1515,6 +1515,28 @@ export function initializeDefaultApp(options?: {
       targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
       handler: aggregateReconcileSweepHandler(aggregateReconciler),
     });
+    // And its own boot self-heal, like the reports' below: a live aggregate
+    // with no sweep row (one from before block E, or a schedule write that
+    // failed) gets one. Fire-and-forget; a failure waits for the next boot.
+    const aggregateSweepLogger = createLogger(
+      "langwatch:projects:aggregate-reconciler",
+    );
+    void aggregateReconciler
+      .scheduleMissingSweeps()
+      .then(({ repaired }) => {
+        if (repaired > 0) {
+          aggregateSweepLogger.info(
+            { repaired },
+            "Scheduled the nightly sweep of aggregate projects missing one at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        aggregateSweepLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Aggregate sweep self-heal failed at boot (will retry next boot)",
+        );
+      });
 
     // ADR-044 durable self-heal: the report upsert route writes the Trigger row
     // and its ScheduledJob in two non-atomic steps, so a crash between them can

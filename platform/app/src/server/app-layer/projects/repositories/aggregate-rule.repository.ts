@@ -44,6 +44,13 @@ export interface AggregateProjectRepository {
   }): Promise<StoredAggregateProject | null>;
   /** The organisation's live aggregates, ordered by id. */
   findLiveAggregateIds(params: { organizationId: string }): Promise<string[]>;
+  /**
+   * Every live aggregate in every organisation, ordered by id. For the
+   * boot-time sweep repair only, which is the one caller with no organisation.
+   */
+  findAllLiveAggregates(): Promise<
+    Array<{ id: string; organizationId: string }>
+  >;
 }
 
 /**

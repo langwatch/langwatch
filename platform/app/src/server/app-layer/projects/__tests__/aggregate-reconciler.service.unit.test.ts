@@ -17,6 +17,7 @@ import {
   type SharedProjectGrantsLedger,
 } from "../aggregate-reconciler.service";
 import type { AggregateRule } from "../aggregate-rule";
+import type { ScheduledJobRecord } from "../../scheduler/scheduler.types";
 import type {
   AggregateProjectRepository,
   AggregateReconcileLock,
@@ -114,7 +115,32 @@ function aggregatesOf(
         .filter((row) => row.organizationId === organizationId && !row.archived)
         .map((row) => row.id);
     },
+    async findAllLiveAggregates() {
+      return stored
+        .filter((row) => !row.archived)
+        .map((row) => ({ id: row.id, organizationId: row.organizationId }));
+    },
   };
+}
+
+/** A scheduler table holding the sweep rows written, keyed by target. */
+function inMemorySchedule(existingTargetIds: string[] = []) {
+  const targets = new Set(existingTargetIds);
+  const upserts: Array<Parameters<AggregateSweepSchedule["upsertForTarget"]>[0]> =
+    [];
+  const schedule: AggregateSweepSchedule = {
+    async upsertForTarget(params) {
+      upserts.push(params);
+      targets.add(params.targetId);
+    },
+    async deactivateForTarget() {},
+    async findAllForProject({ projectId }) {
+      return targets.has(projectId)
+        ? [{ targetId: projectId } as ScheduledJobRecord]
+        : [];
+    },
+  };
+  return { schedule, upserts };
 }
 
 /** Membership by rule kind, fixed: the rule service has its own tests. */
@@ -359,6 +385,7 @@ describe("AggregateReconciler", () => {
             findLiveAggregateIds: async () => {
               throw new Error("database unavailable");
             },
+            findAllLiveAggregates: async () => [],
           },
           lock: NO_CONTENTION,
           rules: rulesResolvingTo({}),
@@ -379,13 +406,7 @@ describe("AggregateReconciler", () => {
     describe("when it is started", () => {
       it("schedules its nightly sweep and attaches its members", async () => {
         const { ledger, rows } = inMemoryLedger();
-        const upserts: unknown[] = [];
-        const schedule: AggregateSweepSchedule = {
-          async upsertForTarget(params) {
-            upserts.push(params);
-          },
-          async deactivateForTarget() {},
-        };
+        const { schedule, upserts } = inMemorySchedule();
 
         await reconcilerFor({ ledger, schedule }).start({
           aggregateProjectId: "agg_1",
@@ -418,6 +439,56 @@ describe("AggregateReconciler", () => {
             aggregateProjectId: "agg_1",
           }),
         ).resolves.toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a live aggregate whose nightly sweep row went missing", () => {
+    describe("when anything reconciles it", () => {
+      it("writes the sweep row back", async () => {
+        const { ledger } = inMemoryLedger();
+        const { schedule, upserts } = inMemorySchedule();
+
+        await reconcilerFor({ ledger, schedule }).reconcile({
+          aggregateProjectId: "agg_1",
+        });
+
+        expect(upserts.map((row) => row.targetId)).toEqual(["agg_1"]);
+      });
+    });
+
+    describe("when the app boots", () => {
+      it("schedules a sweep for each live aggregate without one, and leaves the rest", async () => {
+        const { ledger } = inMemoryLedger();
+        const { schedule, upserts } = inMemorySchedule(["agg_has_row"]);
+
+        const outcome = await reconcilerFor({
+          stored: [
+            aggregate({ id: "agg_missing" }),
+            aggregate({ id: "agg_has_row" }),
+            aggregate({ id: "agg_archived", archived: true }),
+          ],
+          ledger,
+          schedule,
+        }).scheduleMissingSweeps();
+
+        expect(outcome).toEqual({ repaired: 1 });
+        expect(upserts.map((row) => row.targetId)).toEqual(["agg_missing"]);
+      });
+    });
+  });
+
+  describe("given a live aggregate whose nightly sweep row exists", () => {
+    describe("when it is reconciled", () => {
+      it("leaves the row as it stands", async () => {
+        const { ledger } = inMemoryLedger();
+        const { schedule, upserts } = inMemorySchedule(["agg_1"]);
+
+        await reconcilerFor({ ledger, schedule }).reconcile({
+          aggregateProjectId: "agg_1",
+        });
+
+        expect(upserts).toEqual([]);
       });
     });
   });

@@ -466,8 +466,9 @@ export class ProjectService {
    * ADR-144 block E, trigger "rule created": a new aggregate gets its nightly
    * sweep and its members' shared reads. Awaited, so the creator opens an
    * aggregate that already reads its members, but it never fails the create:
-   * the row exists, and the sweep retries tonight. Both create paths call
-   * this, the tRPC router included.
+   * the row exists, a failed reconcile is retried by the sweep tonight, and a
+   * sweep that failed to schedule is put back by the next reconcile or boot.
+   * Both create paths call this, the tRPC router included.
    */
   async startAggregate({
     aggregateProjectId,

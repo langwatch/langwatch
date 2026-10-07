@@ -122,4 +122,22 @@ export class PrismaAggregateRuleRepository
     });
     return rows.map((row) => row.id);
   }
+
+  async findAllLiveAggregates(): Promise<
+    Array<{ id: string; organizationId: string }>
+  > {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        kind: AGGREGATE_PROJECT_KIND,
+        archivedAt: null,
+        team: { archivedAt: null },
+      },
+      select: { id: true, team: { select: { organizationId: true } } },
+      orderBy: { id: "asc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.team.organizationId,
+    }));
+  }
 }
