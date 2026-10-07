@@ -368,3 +368,13 @@ recommendation, and "default taken" if a lane proceeded on it.
 ### trace-refuse-event-read
 
 - Seat wiring (Q209): the seat reaches registries as a sixteenth store member, `eventReadSeat` (packages/process-stores `ProcessMembers`/`MEMBER_NAMES`, both §15 deleted spellings still in use), built from `eventing.eventReadSeat`; a role whose eventing reads no event log hands a seat that refuses each read by name (MemberNotConfiguredError, as encryption's refusing cipher), so building trace's live registry never fails. Alternative not taken: trace's registry requiring `eventing` itself (hands a module the shared EventSourcing client, against §7). Default taken, held for Alex.
+
+### r-trace-api-reads
+
+- Experiment trace cost (Q207 A2): `clickhouse.experiment-run.repository.ts:593` is a bounded by-ids read, but experiment's app does not demand TraceApi and trace already demands ExperimentApi (trace.app.ts:863), so a `findTraceCosts` peer call adds a two-node peer cycle. Options: (a) add TraceApi to experiment and accept +1 peer-cycles, (b) trace publishes the trace's settled cost and experiment folds it into the run item (record §5, reactor side), (c) a named ownership exception. No recommendation in the plan: item stopped, held for Alex.
+- Evaluation monitor performance (Q207 A3): `monitor-performance.repository.ts:36` joins evaluation_runs to trace_summaries in one statement; splitting it returns an unbounded trace id list. Per the round 3 ruling it becomes a named policy exception (enforcer request in the r-trace-api-reads handoff §10). Default taken, held for Alex.
+- trace -> log_records (Q207 C): `session-groups.repository.ts:279` is a WHERE-clause subquery (sessions whose logs contain the search terms) inside trace's one statement; a LogApi read would return an unbounded session id list (the edge itself exists, trace.app.ts:866, so no new cycle). The manifest's recommendation "log publishes the count and trace folds it" does not fit a content search; recorded as a named policy exception instead (§10 request). Default taken, held for Alex.
+
+### r-upgrade-logging-e2e
+
+- Tampered ledger row (manifest e2e case, spec `specs/upgrade/upgrade-e2e.feature` tagged `@unimplemented`): the ledger carries no checksum (ADR-173 D11) and an unknown step id is exactly what a rollback leaves behind. Options: (a) refuse ids no release manifest and no live presence row names; (b) add a checksum column, reversing D11; (c) keep tolerating them. No default taken; held for Alex.
