@@ -157611,6 +157611,7 @@ type PostApiSuitesByIdRunResponse struct {
 		} `json:"items"`
 		JobCount        float32 `json:"jobCount"`
 		PlanName        *string `json:"planName,omitempty"`
+		PlanSlug        string  `json:"planSlug"`
 		Scheduled       bool    `json:"scheduled"`
 		SetId           string  `json:"setId"`
 		SkippedArchived struct {
@@ -186955,6 +186956,7 @@ func ParsePostApiSuitesByIdRunResponse(rsp *http.Response) (*PostApiSuitesByIdRu
 			} `json:"items"`
 			JobCount        float32 `json:"jobCount"`
 			PlanName        *string `json:"planName,omitempty"`
+			PlanSlug        string  `json:"planSlug"`
 			Scheduled       bool    `json:"scheduled"`
 			SetId           string  `json:"setId"`
 			SkippedArchived struct {

@@ -100393,6 +100393,9 @@
                     },
                     "created": {
                       "type": "boolean"
+                    },
+                    "planSlug": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -100401,7 +100404,8 @@
                     "setId",
                     "jobCount",
                     "skippedArchived",
-                    "items"
+                    "items",
+                    "planSlug"
                   ],
                   "additionalProperties": false
                 }

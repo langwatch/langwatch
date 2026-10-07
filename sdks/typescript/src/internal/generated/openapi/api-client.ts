@@ -37215,6 +37215,7 @@ export interface operations {
                         }[];
                         planName?: string;
                         created?: boolean;
+                        planSlug: string;
                     };
                 };
             };
