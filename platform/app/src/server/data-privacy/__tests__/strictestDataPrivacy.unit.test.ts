@@ -10,6 +10,7 @@ import {
   type ResolvedAudience,
   type ResolvedDataPrivacy,
 } from "../dataPrivacy.types";
+import { ESSENTIAL_PII_ENTITIES } from "../redaction/essentialPii";
 import { strictestDataPrivacy } from "../strictestDataPrivacy";
 
 function policy(
@@ -112,20 +113,41 @@ describe("strictestDataPrivacy", () => {
   });
 
   describe("when the members disagree on personal data", () => {
-    it("takes the strictest level in the order strict, custom, essential, disabled", () => {
-      const levels = (
-        ...picked: ResolvedDataPrivacy["pii"]["level"][]
-      ): string =>
-        strictestDataPrivacy(
-          picked.map((level) =>
-            policy({ pii: { level, entities: [], exceptPatterns: [] } }),
-          ),
-        ).pii.level;
+    const pii = (
+      level: ResolvedDataPrivacy["pii"]["level"],
+      entities: string[] = [],
+    ): ResolvedDataPrivacy =>
+      policy({ pii: { level, entities, exceptPatterns: [] } });
 
-      expect(levels("disabled", "essential")).toBe("essential");
-      expect(levels("essential", "custom")).toBe("custom");
-      expect(levels("custom", "strict", "disabled")).toBe("strict");
-      expect(levels("disabled", "disabled")).toBe("disabled");
+    it("redacts strictly when any member does", () => {
+      expect(
+        strictestDataPrivacy([
+          pii("custom", ["EMAIL_ADDRESS"]),
+          pii("strict"),
+          pii("disabled"),
+        ]).pii.level,
+      ).toBe("strict");
+    });
+
+    it("takes essential over disabled", () => {
+      expect(
+        strictestDataPrivacy([pii("disabled"), pii("essential")]).pii.level,
+      ).toBe("essential");
+      expect(
+        strictestDataPrivacy([pii("disabled"), pii("disabled")]).pii.level,
+      ).toBe("disabled");
+    });
+
+    it("folds an essential member into a custom one by adding every essential identifier", () => {
+      const folded = strictestDataPrivacy([
+        pii("custom", ["PERSON"]),
+        pii("essential"),
+      ]).pii;
+
+      expect(folded.level).toBe("custom");
+      expect([...folded.entities].sort()).toEqual(
+        [...ESSENTIAL_PII_ENTITIES, "PERSON"].sort(),
+      );
     });
 
     it("unions the entities and keeps only the exceptions every member allows", () => {

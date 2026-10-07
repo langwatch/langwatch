@@ -11,6 +11,7 @@ import {
   type ResolvedCustomAttributeRule,
   type ResolvedDataPrivacy,
 } from "./dataPrivacy.types";
+import { ESSENTIAL_PII_ENTITIES } from "./redaction/essentialPii";
 
 /**
  * The most restrictive of several resolved privacy policies (ADR-144
@@ -38,11 +39,7 @@ export function strictestDataPrivacy(
       ]),
     ) as Record<ContentCategory, ResolvedCategory>,
     pii: {
-      level: strictestOf(
-        policies.map((p) => p.pii.level),
-        PII_STRICTNESS,
-      ),
-      entities: union(policies.map((p) => p.pii.entities)),
+      ...strictestPii(policies.map((p) => p.pii)),
       // An exception removes redaction, so only one every member allows
       // survives.
       exceptPatterns: intersection(policies.map((p) => p.pii.exceptPatterns)),
@@ -64,12 +61,35 @@ const DISPOSITION_STRICTNESS: Record<Disposition, number> = {
   drop: 2,
 };
 
-const PII_STRICTNESS: Record<PiiLevel, number> = {
-  disabled: 0,
-  essential: 1,
-  custom: 2,
-  strict: 3,
-};
+/**
+ * The level that redacts everything any member redacts. Strict covers every
+ * identifier, so any strict member makes the fold strict. A custom level
+ * redacts only its own selection, so where the members mix custom with
+ * essential the fold stays custom and selects every essential identifier
+ * too; ranking either above the other would drop what the other redacts.
+ * With neither strict nor custom, essential beats disabled.
+ */
+function strictestPii(
+  settings: readonly ResolvedDataPrivacy["pii"][],
+): Pick<ResolvedDataPrivacy["pii"], "level" | "entities"> {
+  const levels = new Set<PiiLevel>(settings.map((setting) => setting.level));
+  if (levels.has("strict")) return { level: "strict", entities: [] };
+  if (levels.has("custom")) {
+    return {
+      level: "custom",
+      entities: union([
+        ...settings
+          .filter((setting) => setting.level === "custom")
+          .map((setting) => setting.entities),
+        levels.has("essential") ? ESSENTIAL_PII_ENTITIES : [],
+      ]),
+    };
+  }
+  return {
+    level: levels.has("essential") ? "essential" : "disabled",
+    entities: [],
+  };
+}
 
 const CUSTOM_ATTRIBUTE_STRICTNESS: Record<CustomAttributeDisposition, number> =
   {
