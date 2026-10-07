@@ -453,26 +453,15 @@ function ledgerKeyOf({
  * here: it arrives already loaded from the tab, and this hook only ever
  * prepends older turns to it.
  */
-export function useSessionScrollback({
-  projectId,
-  tenantId,
-  traceId,
-  occurredAtMs,
-  conversationId,
-  openedTranscript,
-  openedToolSpans,
-}: SessionScrollbackInput): SessionScrollback {
+export function useSessionScrollback(
+  input: SessionScrollbackInput,
+): SessionScrollback {
+  const { traceId, occurredAtMs, conversationId, openedTranscript } = input;
   const { turns, isLoading: isTurnListLoading } = useConversationContext(
     conversationId,
     traceId,
   );
-  const ledger = useTurnLedger({
-    projectId,
-    tenantId,
-    traceId,
-    conversationId,
-  });
-  const { current, loadTurn } = ledger;
+  const { current, loadTurn } = useTurnLedger(input);
 
   const { openedIndex, hasSession, oldestLoadedIndex } = useSessionPosition({
     turns,
@@ -499,7 +488,7 @@ export function useSessionScrollback({
       openedTranscript[0]?.atMs ??
       0,
     entries: openedTranscript,
-    toolSpans: openedToolSpans,
+    toolSpans: input.openedToolSpans,
   });
 
   const merged = useMergedTurns({
