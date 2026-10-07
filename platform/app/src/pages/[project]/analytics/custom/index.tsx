@@ -18,7 +18,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
-
 import {
   chakraComponents,
   Select as MultiSelect,
@@ -58,6 +57,7 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -1650,4 +1650,7 @@ function GraphTypeField({
 }
 
 // No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
-export default AnalyticsCustomGraphContent;
+export default withAggregateAnalyticsGate(
+  "Custom Graph",
+  AnalyticsCustomGraphContent,
+);

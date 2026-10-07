@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
 import {
   DashboardRefreshedAtContext,
@@ -290,4 +291,6 @@ function ReportsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(ReportsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("Reports", ReportsContent),
+);

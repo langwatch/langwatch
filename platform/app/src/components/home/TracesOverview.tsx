@@ -13,6 +13,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
 import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
+import { AggregateAnalyticsMessage } from "../analytics/AggregateAnalyticsGate";
 import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { usePeriodSelector } from "../PeriodSelector";
 import { Link } from "../ui/link";
@@ -105,11 +106,7 @@ function AggregateTracesOverview({ projectSlug }: { projectSlug: string }) {
     <HomeCard width="full" padding={HOME_SECTION_PADDING}>
       <HomeSectionHeader title="Traces overview" />
       <Text fontSize="sm" color="fg.muted" paddingY={3}>
-        Analytics across member projects is not available yet.{" "}
-        <Link href={`/${projectSlug}/traces`} color="fg">
-          Open Trace Explorer
-        </Link>{" "}
-        to see member traces.
+        <AggregateAnalyticsMessage projectSlug={projectSlug} />
       </Text>
     </HomeCard>
   );

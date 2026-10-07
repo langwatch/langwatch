@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { CustomReportsSection } from "~/components/analytics/CustomReportsSection";
 import {
   DocumentsCountsSummary,
@@ -118,4 +119,4 @@ function DocumentsMetrics() {
 
 export default withPermissionGuard("analytics:view", {
   layoutComponent: DashboardLayout,
-})(AnalyticsContent);
+})(withAggregateAnalyticsGate("Analytics", AnalyticsContent));

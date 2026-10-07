@@ -427,6 +427,13 @@ Feature: An aggregate project reads its member projects
     And its prompt playground shows that notice in place of the chat and sends no message
     And managing the aggregate itself stays available
 
+  @integration
+  Scenario: A direct link to the aggregate's analytics says it is not available yet
+    Given an aggregate project
+    When ana opens a link to its analytics, LLM metrics, topics, users, online evaluations, reports or custom graph page
+    Then the page shows its heading and says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
+    And it draws no chart and runs no analytics query
+
   @unit
   Scenario: The aggregate's home points at its traces instead of saying no data
     When ana opens the aggregate project's home
