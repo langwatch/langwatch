@@ -26,6 +26,7 @@ import {
   lintPrismaTableOwnership,
   prismaModelNames,
 } from "./persistence/prisma-table-ownership.ts";
+import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
@@ -121,6 +122,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "migration-owners",
     spec: "specs/migration-owners.feature",
     run: lintMigrationOwners,
+  }),
+  definePolicy({
+    id: "rerunnable-migrations",
+    spec: "specs/rerunnable-migrations.feature",
+    run: lintRerunnableMigrations,
   }),
   definePolicy({
     id: "prisma-migration-access",
