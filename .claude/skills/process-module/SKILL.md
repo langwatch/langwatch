@@ -140,3 +140,5 @@ function with its own unit test.
 REST and tRPC binding: `api-transports`. Pipelines, subscribers, schedules:
 `eventing-and-worker`. Tests: `testing`. Peers, config, secrets, availability,
 entitlements, peer cycles: `module-dependencies`. Review: `architecture-review`.
+After adding an operation, route, worker or config leaf, run `pnpm generate:readmes`; the module's
+`process/README.md` is the review artefact (`readmes` skill).
