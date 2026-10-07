@@ -6,7 +6,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { ModelSelectorToken } from "@langwatch/model-provider-contract";
+import { ModelSelectorToken } from "@langwatch/model-provider-client";
 import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-contract";
 import { HeroAskFieldToken } from "@langwatch/project-contract";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -97,6 +97,15 @@ describe("given governance's screens", () => {
   describe("when model-provider lends its picker", () => {
     /** @scenario The insights setup drawer draws model-provider's lent model picker */
     it("draws the picker with the models", async () => {
+      renderPeers({ declarations: peersLend });
+
+      expect(await screen.findByText("Models gpt-5,gpt-5-mini")).toBeDefined();
+    });
+  });
+
+  describe("when model-provider lends its picker from its client", () => {
+    /** @scenario Governance renders model-provider's model picker through its client token */
+    it("draws the picker by the client token", async () => {
       renderPeers({ declarations: peersLend });
 
       expect(await screen.findByText("Models gpt-5,gpt-5-mini")).toBeDefined();
