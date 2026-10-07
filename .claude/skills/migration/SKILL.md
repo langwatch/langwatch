@@ -66,7 +66,10 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   own Postgres schema (`<schema>_upgrade_ledger`, round 21), takes the runner lease there, seeds an
   empty ledger, refuses an installation below the floor, then applies release by release: the
   release's Prisma folders, goose up to its last version on **every** ClickHouse target, its
-  blocking steps, then the reconcilers. Postgres sessions carry `lock_timeout` (10 s).
+  blocking steps, then the reconcilers. Postgres sessions carry `lock_timeout` (10 s). A Prisma
+  migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a `lock_timeout` cancel) is marked rolled
+  back and retried under the same backoff, logged by name; an older one stops the run naming the
+  `prisma migrate resolve` command (`specs/upgrade/rerunnable-migrations.feature`).
 - `pnpm start:prepare:db` (apps/api) is the one preparation script: `upgrade`, then the
   system-migrations pass. Every entry point runs it once (Helm pre-upgrade Job, the compose
   `migrate` service, the npx server, haven); on a Helm first install the api runs `upgrade` once
@@ -94,7 +97,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | The upgrade task running declared code steps; the worker running background ones | landed (`apps/tasks/src/upgrade.ts`, `packages/upgrade/src/background`)                                 |
 | `.withUpcasts` read-time upcast and drain                                        | landed (`packages/eventing/src/upcast`)                                                                 |
 | Upcast rewrite step, drain-age lint                                              | **not landed** (`@unimplemented` in `packages/eventing/specs/event-upcast.feature`)                     |
-| Re-runnable migration guard rule and the runner's auto-resolve                   | **ruled, not landed** (round 21); write re-runnable SQL now                                             |
+| Re-runnable migration guard rule and the runner's auto-resolve                   | landed (`rerunnable-migrations` policy; `packages/upgrade/src/stepping/rerunnable-migrations.ts`)       |
 | A lapsed roster entry turning `/readyz` 503 and pausing the worker               | landed for readiness and background steps; queue consumers pause once `packages/eventing` implements it |
 
 ## Never
@@ -115,6 +118,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | An upcast              | unit over the pipeline (`packages/eventing/src/upcast/__tests__/eventUpcast.unit.test.ts`)                                                                          |
 | The whole upgrade path | live suites: `apps/api/src/__tests__/live-upgrade.fixture.ts` runs `upgrade` once per test process on the test stores (`specs/upgrade/live-test-fixtures.feature`)  |
 | Ownership and order    | `pnpm lint:architecture --policies migration-owners`; the `migration-order` workflow on the PR                                                                      |
+| Re-runnable SQL        | `pnpm lint:architecture --policies rerunnable-migrations` (every Prisma folder newer than the marker)                                                               |
 
 ## What an operator sees
 

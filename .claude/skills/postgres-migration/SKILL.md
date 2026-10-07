@@ -39,10 +39,15 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
    claims the model). `pnpm lint:architecture --policies migration-owners` refuses two; split the file.
 4. **Unqualified table names.** `"Monitor"`, never `"langwatch_db"."Monitor"`.
 5. **Every new column is nullable or has a `DEFAULT`.** Releases still serving do not name it.
-6. **Re-runnable statements** (round 21, guard rule not landed yet): Prisma applies a migration
-   statement by statement, so one cancelled by `lock_timeout` keeps its earlier statements. Write
-   `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
-   `DROP ... IF EXISTS`, and guard a constraint with a `DO` block that checks `pg_constraint`.
+6. **Re-runnable statements** (round 21): Prisma applies a migration statement by statement, so one
+   cancelled by `lock_timeout` keeps its earlier statements. Every folder newer than the marker
+   `RERUNNABLE_PRISMA_FROM` (`packages/upgrade/src/stepping/rerunnable-migrations.ts`) must survive a
+   second run from its first statement; `pnpm lint:architecture --policies rerunnable-migrations`
+   refuses anything else. Write `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`,
+   `CREATE INDEX IF NOT EXISTS` (never `CONCURRENTLY` in the file), `DROP ... IF EXISTS`,
+   `ADD VALUE IF NOT EXISTS`, `INSERT ... ON CONFLICT`, `CREATE OR REPLACE`; guard a constraint, a
+   type or a rename with a `DO $$ ... $$` block that checks the catalogue. Prisma's generated SQL
+   has none of these: edit it before you commit. Never move the marker back.
 7. **Nothing is dropped while a release at or above the floor uses it**, and the statement carries
    `-- contract: retired in <release>` with `<release>` at or below the floor. A later release is
    refused (`retirement-note-above-floor`) with the first release it may ship in.
@@ -135,9 +140,18 @@ runs at its own release against its own schema. Keep it small and copy, never mo
 
 ## When it failed on deploy
 
-`upgrade` names a failed folder with the command to clear it: check what it left, then
+A folder newer than the marker is re-runnable, so `upgrade` clears it itself: it marks the failed
+row rolled back (`prisma migrate resolve --rolled-back`), waits the retry backoff and applies it
+again, logging each by name ("failed on attempt 1 of 3 and is re-runnable: marked it rolled back").
+A failed row an earlier run left is cleared the same way at preflight. Still failing after the last
+attempt, the run exits `rerunnable_migration_failed`: fix the cause (often a lock another session
+holds) and run `upgrade` again; no resolve command is needed.
+
+A folder at or below the marker, or one the image does not ship, keeps the conservative path:
+`upgrade` names it with the command to clear it. Check what it left, then
 `prisma migrate resolve --rolled-back <name>` if nothing remains, or `--applied <name>` if you
 completed it by hand, then run `upgrade` again. Nothing has rolled; the old image still serves.
+specs/upgrade/rerunnable-migrations.feature.
 
 ## The scanner
 
