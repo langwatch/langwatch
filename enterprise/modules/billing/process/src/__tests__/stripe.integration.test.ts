@@ -7,6 +7,7 @@ import {
 import Stripe from "stripe";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { HttpStripeSubscriptionsChannel } from "../channels/http/http.stripe-subscriptions.channel.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 
 const prices = BillingPriceCatalogue.create("test").prices;
@@ -29,6 +30,7 @@ const describeIfStripeKey = STRIPE_SECRET_KEY ? describe : describe.skip;
 
 describeIfStripeKey("Stripe billing integration", () => {
   const stripe = new Stripe(STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
+  const subscriptions = HttpStripeSubscriptionsChannel.create({ stripe });
 
   const createdCustomerIds: string[] = [];
   const createdSubscriptionIds: string[] = [];
@@ -278,9 +280,10 @@ describeIfStripeKey("Stripe billing integration", () => {
       });
       createdSubscriptionIds.push(subscription.id);
 
-      // Feed real subscription items into getItemsToUpdate
+      // Feed real subscription items, in billing's shape, into getItemsToUpdate
       const itemsToUpdate = calculator.getItemsToUpdate({
-        currentItems: subscription.items.data,
+        currentItems: (await subscriptions.getSubscription({ subscriptionId: subscription.id }))
+          .items,
         plan: PlanTypes.LAUNCH,
         tracesToAdd: 50_000,
         membersToAdd: 8,
@@ -318,7 +321,8 @@ describeIfStripeKey("Stripe billing integration", () => {
       createdSubscriptionIds.push(subscription.id);
 
       const itemsToUpdate = calculator.getItemsToUpdate({
-        currentItems: subscription.items.data,
+        currentItems: (await subscriptions.getSubscription({ subscriptionId: subscription.id }))
+          .items,
         plan: PlanTypes.ACCELERATE,
         tracesToAdd: 250_000,
         membersToAdd: 9,

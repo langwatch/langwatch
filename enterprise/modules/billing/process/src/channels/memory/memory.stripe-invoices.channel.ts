@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type Stripe from "stripe";
-
+import type { BillingInvoice } from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeInvoicesChannel } from "../stripe-invoices.channel.ts";
 
 type Operation = keyof StripeInvoicesChannel;
@@ -12,7 +11,7 @@ type Operation = keyof StripeInvoicesChannel;
  */
 export class MemoryStripeInvoicesChannel extends StripeInvoicesChannel {
   readonly listings: { customerId: string; limit: number }[] = [];
-  private readonly held: Stripe.Invoice[] = [];
+  private readonly held: BillingInvoice[] = [];
   private readonly refusals = new Map<Operation, Error>();
 
   private constructor() {
@@ -24,7 +23,7 @@ export class MemoryStripeInvoicesChannel extends StripeInvoicesChannel {
   }
 
   /** Puts an invoice at the provider, under the customer it names. */
-  seed({ invoice }: { invoice: Stripe.Invoice }): void {
+  seed({ invoice }: { invoice: BillingInvoice }): void {
     this.held.push(invoice);
   }
 
@@ -39,25 +38,13 @@ export class MemoryStripeInvoicesChannel extends StripeInvoicesChannel {
   }: {
     customerId: string;
     limit: number;
-  }): Promise<Stripe.Invoice[]> {
+  }): Promise<BillingInvoice[]> {
     const refusal = this.refusals.get("listInvoices");
     if (refusal) throw refusal;
     this.listings.push({ customerId, limit });
     return this.held
-      .filter((invoice) => isIssuedTo({ invoice, customerId }))
+      .filter((invoice) => invoice.customerId === customerId)
       .toSorted((a, b) => b.created - a.created)
       .slice(0, limit);
   }
-}
-
-function isIssuedTo({
-  invoice,
-  customerId,
-}: {
-  invoice: Stripe.Invoice;
-  customerId: string;
-}): boolean {
-  const { customer } = invoice;
-  if (customer === null || typeof customer === "string") return customer === customerId;
-  return customer.id === customerId;
 }

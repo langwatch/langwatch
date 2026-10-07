@@ -396,7 +396,7 @@ export class BillingSubscriptionLifecycleService {
       try {
         await this.stripeSubscriptions.cancelSubscription({
           subscriptionId: oldSub.stripeSubscriptionId,
-          params: { prorate: true },
+          prorate: true,
         });
       } catch (err) {
         logger.error(

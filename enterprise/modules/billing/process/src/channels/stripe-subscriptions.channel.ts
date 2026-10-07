@@ -2,38 +2,49 @@
 
 /**
  * The subscriptions subject of billing's Stripe channels (Q69): subscriptions,
- * their checkout and portal sessions, and a seat change's invoice preview, in
- * Stripe's own shapes because the item and quote rules are written over them.
+ * their checkout and portal sessions, and a change's invoice preview, in
+ * billing's own shapes; the http tier maps them to and from the SDK's.
  */
 
-import type Stripe from "stripe";
+import type {
+  BillingCheckoutRequest,
+  BillingInvoicePreview,
+  BillingPurchasedLineItem,
+  BillingSubscription,
+  BillingSubscriptionChange,
+  BillingSubscriptionPreviewChange,
+} from "../rules/billing-stripe-shapes.rules.ts";
 
 export abstract class StripeSubscriptionsChannel {
   /** Throws the provider's `resource_missing` refusal for a subscription it never held. */
-  abstract getSubscription(input: { subscriptionId: string }): Promise<Stripe.Subscription>;
+  abstract getSubscription(input: { subscriptionId: string }): Promise<BillingSubscription>;
 
   abstract updateSubscription(input: {
     subscriptionId: string;
-    params: Stripe.SubscriptionUpdateParams;
-  }): Promise<Stripe.Subscription>;
+    change: BillingSubscriptionChange;
+  }): Promise<BillingSubscription>;
 
-  /** `params` as Stripe takes them, `{ prorate: true }` for a superseded plan. */
+  /** `prorate` for a superseded plan; absent cancels as the provider defaults. */
   abstract cancelSubscription(input: {
     subscriptionId: string;
-    params?: Stripe.SubscriptionCancelParams;
-  }): Promise<Stripe.Subscription>;
+    prorate?: boolean;
+  }): Promise<BillingSubscription>;
 
-  abstract createCheckoutSession(
-    params: Stripe.Checkout.SessionCreateParams,
-  ): Promise<{ url: string | null }>;
+  abstract createCheckoutSession(request: BillingCheckoutRequest): Promise<{ url: string | null }>;
 
   /** The first page of a checkout session's line items; `resource_missing` for an unknown one. */
-  abstract listCheckoutLineItems(input: { checkoutSessionId: string }): Promise<Stripe.LineItem[]>;
+  abstract listCheckoutLineItems(input: {
+    checkoutSessionId: string;
+  }): Promise<BillingPurchasedLineItem[]>;
 
   abstract createBillingPortalSession(input: {
     customerId: string;
     returnUrl: string;
   }): Promise<{ url: string }>;
 
-  abstract previewInvoice(params: Stripe.InvoiceCreatePreviewParams): Promise<Stripe.Invoice>;
+  /** Prices `change` against the subscription as the provider would invoice it now. */
+  abstract previewInvoice(input: {
+    subscriptionId: string;
+    change: BillingSubscriptionPreviewChange;
+  }): Promise<BillingInvoicePreview>;
 }

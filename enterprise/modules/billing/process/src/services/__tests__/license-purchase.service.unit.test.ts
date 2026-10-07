@@ -1,4 +1,3 @@
-import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
@@ -29,7 +28,7 @@ function purchasedSeats(): MemoryStripeSubscriptionsChannel {
   const stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
   stripeSubscriptions.seedCheckoutLineItems({
     checkoutSessionId: "cs_1",
-    lineItems: [{ id: "li_1", object: "item", quantity: 1 } as Stripe.LineItem],
+    lineItems: [{ priceId: null, quantity: 1 }],
   });
   return stripeSubscriptions;
 }

@@ -1,11 +1,16 @@
 import { QuoteExpiredError, type SubscriptionInvite } from "@langwatch/enterprise-billing-contract";
 import { nowInstant } from "@langwatch/time";
+
 /**
  * The pure shape and arithmetic behind a seat-change quote: what a previewed invoice's two
- * money figures mean, the Stripe parameters a seat quantity change is made with, and how long
- * a quote stays confirmable. No Stripe call and no database read happens here.
+ * money figures mean, the change a seat quantity change is made with, and how long a quote
+ * stays confirmable. No Stripe call and no database read happens here.
  */
-import type Stripe from "stripe";
+import type {
+  BillingInvoicePreview,
+  BillingSubscription,
+  BillingSubscriptionItem,
+} from "./billing-stripe-shapes.rules.ts";
 
 export type InviteInput = {
   email: string;
@@ -18,7 +23,7 @@ export type InviteInput = {
  * on: an `always_invoice` preview, where the invoice IS the immediate one — only the
  * proration lines, not next cycle's recurring and metered usage.
  */
-type AlwaysInvoicePreview = Pick<Stripe.Invoice, "total" | "amount_due">;
+type AlwaysInvoicePreview = Pick<BillingInvoicePreview, "total" | "amountDue">;
 
 /**
  * The two money figures a seat quote reports, read off a previewed invoice.
@@ -30,51 +35,51 @@ export const quotedAmounts = (
   const isCredit = invoiceTotalCents < 0;
 
   return {
-    prorationCents: isCredit ? invoiceTotalCents : preview.amount_due,
+    prorationCents: isCredit ? invoiceTotalCents : preview.amountDue,
     // Credit spent on this invoice, so the dialog can explain a "Due today"
     // smaller than the change itself. Zero on a clean account, and never
     // reported for a credit — nothing is drawn down by one.
-    creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amount_due,
+    creditAppliedCents: isCredit ? 0 : invoiceTotalCents - preview.amountDue,
   };
 };
 
-type SeatChangeParams = {
-  cancel_at_period_end?: false;
+type SeatChange = {
+  cancelAtPeriodEnd?: false;
   items: { id: string; quantity: number }[];
-  proration_behavior: "always_invoice";
-  proration_date: number;
+  prorationBehavior: "always_invoice";
+  prorationDate: number;
 };
 
 /**
  * The seat change itself — read by BOTH the preview and the update, so the quote cannot
  * describe a different operation from the one performed.
  */
-export const seatChangeParams = ({
-  stripeSubscription,
+export const seatChange = ({
+  subscription,
   seatItem,
   quantity,
   prorationDate,
 }: {
-  stripeSubscription: Stripe.Subscription;
-  seatItem: Stripe.SubscriptionItem;
+  subscription: Pick<BillingSubscription, "canceledAt">;
+  seatItem: Pick<BillingSubscriptionItem, "id">;
   quantity: number;
   prorationDate: number;
-}): SeatChangeParams => {
-  const params: SeatChangeParams = {
+}): SeatChange => {
+  const change: SeatChange = {
     items: [{ id: seatItem.id, quantity }],
-    proration_behavior: "always_invoice",
+    prorationBehavior: "always_invoice",
     // Prorations are priced by the moment they are applied, so a quote issued
     // at one instant and confirmed at another are two different amounts. The
     // quote issues this timestamp and the confirmation sends it back, which
     // makes the charge reproduce the number the customer read rather than
     // merely resemble it.
-    proration_date: prorationDate,
+    prorationDate,
   };
-  if (stripeSubscription.canceled_at) {
-    params.cancel_at_period_end = false;
+  if (subscription.canceledAt) {
+    change.cancelAtPeriodEnd = false;
   }
 
-  return params;
+  return change;
 };
 
 /**

@@ -27,13 +27,11 @@ import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
 } from "../repositories/subscription.repository.ts";
+import type { SubscriptionItemUpdate } from "../rules/billing-stripe-shapes.rules.ts";
 import { BillingInvoicesService } from "./billing-invoices.service.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
-import {
-  type SubscriptionItemCalculatorService,
-  type SubscriptionItemUpdate,
-} from "./subscription-item-calculator.service.ts";
+import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionService");
 
@@ -155,14 +153,14 @@ export class BillingSubscriptionService {
         subscriptionId: lastSubscription.stripeSubscriptionId,
       });
       const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
-        currentItems: subscription.items.data,
+        currentItems: subscription.items,
         plan,
         tracesToAdd: effectiveTraces,
         membersToAdd: effectiveMembers,
       });
       await this.stripeSubscriptions.updateSubscription({
         subscriptionId: lastSubscription.stripeSubscriptionId,
-        params: { items: itemsToUpdate },
+        change: { items: itemsToUpdate },
       });
 
       return { success: true };
@@ -417,14 +415,14 @@ export class BillingSubscriptionService {
       subscriptionId: stripeSubscriptionId,
     });
     const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
-      currentItems: current.items.data,
+      currentItems: current.items,
       plan,
       tracesToAdd,
       membersToAdd,
     });
     const response = await this.stripeSubscriptions.updateSubscription({
       subscriptionId: stripeSubscriptionId,
-      params: { items: itemsToUpdate },
+      change: { items: itemsToUpdate },
     });
     if (response.status === "active") {
       await this.repository.updatePlan({ id: subscriptionId, plan });
@@ -480,19 +478,13 @@ export class BillingSubscriptionService {
       : undefined;
     const checkoutCurrency = rawCurrency === "usd" || rawCurrency === "eur" ? rawCurrency : "usd";
     const session = await this.stripeSubscriptions.createCheckoutSession({
-      mode: "subscription",
+      customerId,
       currency: checkoutCurrency,
-      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
-      customer: customerId,
-      customer_update: { address: "auto", name: "auto" },
-      automatic_tax: { enabled: true },
-      billing_address_collection: "required",
-      tax_id_collection: { enabled: true },
-      line_items: itemsToAdd,
-      success_url: `${baseUrl}/settings/subscription?success`,
-      cancel_url: `${baseUrl}/settings/subscription`,
-      client_reference_id: `subscription_setup_${subscription.id}`,
-      allow_promotion_codes: true,
+      lineItems: itemsToAdd,
+      successUrl: `${baseUrl}/settings/subscription?success`,
+      cancelUrl: `${baseUrl}/settings/subscription`,
+      clientReferenceId: `subscription_setup_${subscription.id}`,
+      allowPromotionCodes: true,
     });
 
     return { url: session.url };

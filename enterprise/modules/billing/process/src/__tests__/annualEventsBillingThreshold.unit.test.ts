@@ -16,9 +16,8 @@ const prices = {
   GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_events_usd_annual_until_mar_2026",
 } as StripePriceMap;
 
-import type Stripe from "stripe";
-
 import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
+import type { BillingSubscription } from "../rules/billing-stripe-shapes.rules.ts";
 import {
   ANNUAL_EVENTS_BILLING_THRESHOLD,
   AnnualEventsBillingThresholdService,
@@ -35,22 +34,31 @@ const applyThreshold = ({
 
 const makeStripeSubscription = ({
   priceIds,
-  billingThresholds = null,
+  billingThreshold = null,
 }: {
   priceIds: string[];
-  billingThresholds?: {
-    amount_gte: number;
-    reset_billing_cycle_anchor?: boolean;
+  billingThreshold?: {
+    amountGte: number;
+    resetBillingCycleAnchor?: boolean;
   } | null;
-}) =>
-  ({
-    id: "sub_stripe_1",
-    billing_thresholds: billingThresholds,
-    items: { data: priceIds.map((id) => ({ price: { id } })) },
-  }) as Stripe.Subscription;
+}): BillingSubscription => ({
+  id: "sub_stripe_1",
+  status: "active",
+  canceledAt: null,
+  billingThreshold: billingThreshold && {
+    amountGte: billingThreshold.amountGte,
+    resetBillingCycleAnchor: billingThreshold.resetBillingCycleAnchor ?? null,
+  },
+  items: priceIds.map((priceId) => ({
+    id: `si_${priceId}`,
+    priceId,
+    unitAmount: null,
+    interval: null,
+  })),
+});
 
 /** The subscriptions twin holding one subscription; its `updates` are what Stripe was sent. */
-const twinHolding = (subscription: Stripe.Subscription) => {
+const twinHolding = (subscription: BillingSubscription) => {
   const subscriptions = MemoryStripeSubscriptionsChannel.create();
   subscriptions.seed({ subscription });
   return subscriptions;
@@ -75,10 +83,10 @@ describe("applyThreshold", () => {
       expect(subscriptions.updates).toEqual([
         {
           subscriptionId: "sub_stripe_1",
-          params: {
-            billing_thresholds: {
-              amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-              reset_billing_cycle_anchor: false,
+          change: {
+            billingThreshold: {
+              amountGte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+              resetBillingCycleAnchor: false,
             },
           },
         },
@@ -108,7 +116,7 @@ describe("applyThreshold", () => {
       const subscriptions = twinHolding(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
-          billingThresholds: { amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD },
+          billingThreshold: { amountGte: ANNUAL_EVENTS_BILLING_THRESHOLD },
         }),
       );
 
@@ -128,7 +136,7 @@ describe("applyThreshold", () => {
       const subscriptions = twinHolding(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
-          billingThresholds: { amount_gte: 120_000 },
+          billingThreshold: { amountGte: 120_000 },
         }),
       );
 
@@ -148,9 +156,9 @@ describe("applyThreshold", () => {
       const subscriptions = twinHolding(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
-          billingThresholds: {
-            amount_gte: 120_000,
-            reset_billing_cycle_anchor: true,
+          billingThreshold: {
+            amountGte: 120_000,
+            resetBillingCycleAnchor: true,
           },
         }),
       );
@@ -164,10 +172,10 @@ describe("applyThreshold", () => {
       expect(subscriptions.updates).toEqual([
         {
           subscriptionId: "sub_stripe_1",
-          params: {
-            billing_thresholds: {
-              amount_gte: 120_000,
-              reset_billing_cycle_anchor: false,
+          change: {
+            billingThreshold: {
+              amountGte: 120_000,
+              resetBillingCycleAnchor: false,
             },
           },
         },
@@ -178,9 +186,9 @@ describe("applyThreshold", () => {
       const subscriptions = twinHolding(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
-          billingThresholds: {
-            amount_gte: 120_000,
-            reset_billing_cycle_anchor: true,
+          billingThreshold: {
+            amountGte: 120_000,
+            resetBillingCycleAnchor: true,
           },
         }),
       );

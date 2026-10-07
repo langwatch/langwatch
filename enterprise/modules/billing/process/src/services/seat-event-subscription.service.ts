@@ -15,7 +15,6 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi, OrganizationCaller } from "@langwatch/organization-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
-import type Stripe from "stripe";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
@@ -24,7 +23,7 @@ import {
   type SeatEventProrationQuote,
   quotedAmounts,
   resolveProrationDate,
-  seatChangeParams,
+  seatChange,
 } from "../rules/seat-event-quote.rules.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
@@ -160,8 +159,8 @@ export class SeatEventSubscriptionService {
       throw new NoActiveSubscriptionError();
     }
 
-    const seatItem = stripeSubscription.items.data.find((item) =>
-      isGrowthSeatPrice(item.price.id, this.prices),
+    const seatItem = stripeSubscription.items.find((item) =>
+      isGrowthSeatPrice(item.priceId, this.prices),
     );
 
     if (!seatItem) {
@@ -279,32 +278,20 @@ export class SeatEventSubscriptionService {
       .toZonedDateTime("UTC")
       .add({ months: 1 })
       .toInstant();
-    const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] = {
-      metadata: selectedOptionsMetadata,
-      billing_cycle_anchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
-      proration_behavior:
-        "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
-    };
-
     const session = await this.stripeSubscriptions.createCheckoutSession({
-      mode: "subscription",
+      customerId,
       currency: checkoutCurrency.toLowerCase(),
-      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
-      customer: customerId,
-      customer_update: {
-        address: "auto",
-        name: "auto",
-      },
-      automatic_tax: { enabled: true },
-      billing_address_collection: "required",
-      tax_id_collection: { enabled: true },
-      line_items: lineItems,
+      lineItems,
       metadata: selectedOptionsMetadata,
-      subscription_data: subscriptionData,
-      success_url: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
-      cancel_url: `${baseUrl}/settings/subscription`,
-      client_reference_id: `subscription_setup_${subscriptionId}`,
-      allow_promotion_codes: true,
+      subscription: {
+        metadata: selectedOptionsMetadata,
+        billingCycleAnchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
+        prorationBehavior: "create_prorations",
+      },
+      successUrl: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
+      cancelUrl: `${baseUrl}/settings/subscription`,
+      clientReferenceId: `subscription_setup_${subscriptionId}`,
+      allowPromotionCodes: true,
     });
 
     return { url: session.url };
@@ -380,8 +367,8 @@ export class SeatEventSubscriptionService {
     // choosing to keep it.
     await this.stripeSubscriptions.updateSubscription({
       subscriptionId: subscription.stripeSubscriptionId,
-      params: seatChangeParams({
-        stripeSubscription,
+      change: seatChange({
+        subscription: stripeSubscription,
         seatItem,
         quantity: totalMembers,
         prorationDate,
@@ -416,9 +403,9 @@ export class SeatEventSubscriptionService {
     // every API version, and subscriptions migrated to flexible billing are
     // live customer state.
     const preview = await this.stripeSubscriptions.previewInvoice({
-      subscription: subscription.stripeSubscriptionId,
-      subscription_details: seatChangeParams({
-        stripeSubscription,
+      subscriptionId: subscription.stripeSubscriptionId,
+      change: seatChange({
+        subscription: stripeSubscription,
         seatItem,
         quantity: newTotalSeats,
         prorationDate,
@@ -426,12 +413,12 @@ export class SeatEventSubscriptionService {
     });
 
     const currency = (preview.currency?.toUpperCase() ?? Currency.USD) as CurrencyType;
-    const billingInterval = seatItem.price.recurring?.interval ?? "month";
+    const billingInterval = seatItem.interval ?? "month";
 
     const { prorationCents, creditAppliedCents } = quotedAmounts(preview);
 
     // Recurring total: new seat count × per-seat price.
-    const unitAmountCents = seatItem.price.unit_amount;
+    const unitAmountCents = seatItem.unitAmount;
     if (unitAmountCents === null) {
       throw new SubscriptionItemNotFoundError("seat_unit_amount");
     }

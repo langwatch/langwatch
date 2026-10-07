@@ -1,8 +1,8 @@
 import type { BillingDisplayInvoice } from "@langwatch/enterprise-billing-contract";
-import type Stripe from "stripe";
 
 import type { StripeInvoicesChannel } from "../channels/stripe-invoices.channel.ts";
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import type { BillingInvoice } from "../rules/billing-stripe-shapes.rules.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
 
 export const RECENT_INVOICES_LIMIT = 4;
@@ -36,7 +36,7 @@ export class BillingInvoicesService {
       return [];
     }
 
-    let invoices: Stripe.Invoice[];
+    let invoices: BillingInvoice[];
     try {
       invoices = await this.options.stripeInvoices.listInvoices({
         customerId: stripeCustomerId,
@@ -50,13 +50,13 @@ export class BillingInvoicesService {
       .filter((invoice) => invoice.status !== "draft")
       .map((invoice) => ({
         id: invoice.id,
-        number: invoice.number ?? null,
+        number: invoice.number,
         date: invoice.created,
-        amountDue: invoice.amount_due,
+        amountDue: invoice.amountDue,
         currency: invoice.currency,
         status: invoice.status ?? "unknown",
-        pdfUrl: invoice.invoice_pdf ?? null,
-        hostedUrl: invoice.hosted_invoice_url ?? null,
+        pdfUrl: invoice.pdfUrl,
+        hostedUrl: invoice.hostedUrl,
       }));
   }
 }

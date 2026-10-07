@@ -5,7 +5,6 @@ import {
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { traced } from "@langwatch/observability/node";
 import { Temporal } from "@langwatch/time";
-import type Stripe from "stripe";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
@@ -14,6 +13,10 @@ import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.t
 import { type BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
 import { type BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import { type BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
+import type {
+  BillingSubscription,
+  BillingSubscriptionItem,
+} from "../../rules/billing-stripe-shapes.rules.ts";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
 import { BillingLifecycleAnnouncerService } from "../billing-lifecycle-announcer.service.ts";
 import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
@@ -133,17 +136,25 @@ const makeSubscriptionWithOrg = (
 };
 
 /** Stripe's subscription as the webhook path reads it: active, no threshold, no items. */
-const stripeSubscription = (overrides: Partial<Stripe.Subscription> = {}) =>
-  ({
-    id: "sub_stripe_1",
-    status: "active",
-    billing_thresholds: null,
-    items: { data: [] },
-    ...overrides,
-  }) as Stripe.Subscription;
+const stripeSubscription = (overrides: Partial<BillingSubscription> = {}): BillingSubscription => ({
+  id: "sub_stripe_1",
+  status: "active",
+  canceledAt: null,
+  billingThreshold: null,
+  items: [],
+  ...overrides,
+});
+
+/** A subscription line billing the given price. */
+const itemFor = (priceId: string): BillingSubscriptionItem => ({
+  id: `si_${priceId}`,
+  priceId,
+  unitAmount: null,
+  interval: null,
+});
 
 /** The subscriptions twin holding the given subscriptions, or the default active one. */
-const subscriptionsTwin = (...held: Stripe.Subscription[]) => {
+const subscriptionsTwin = (...held: BillingSubscription[]) => {
   const twin = MemoryStripeSubscriptionsChannel.create();
   for (const subscription of held.length > 0 ? held : [stripeSubscription()]) {
     twin.seed({ subscription });
@@ -417,12 +428,10 @@ describe("EEWebhookService", () => {
 
       const annualStripeSubscription = () =>
         stripeSubscription({
-          items: {
-            data: [
-              { price: { id: itemCalculator.prices.GROWTH_SEAT_USD_ANNUAL } },
-              { price: { id: itemCalculator.prices.GROWTH_EVENTS_USD_ANNUAL } },
-            ],
-          } as Stripe.Subscription["items"],
+          items: [
+            itemFor(itemCalculator.prices.GROWTH_SEAT_USD_ANNUAL),
+            itemFor(itemCalculator.prices.GROWTH_EVENTS_USD_ANNUAL),
+          ],
         });
 
       /** @scenario An annual subscription gets a billing threshold after checkout completes */
@@ -441,10 +450,10 @@ describe("EEWebhookService", () => {
         expect(stripeSubscriptions.updates).toEqual([
           {
             subscriptionId: "sub_stripe_1",
-            params: {
-              billing_thresholds: {
-                amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
-                reset_billing_cycle_anchor: false,
+            change: {
+              billingThreshold: {
+                amountGte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+                resetBillingCycleAnchor: false,
               },
             },
           },
@@ -548,12 +557,10 @@ describe("EEWebhookService", () => {
         });
         stripeSubscriptions.seed({
           subscription: stripeSubscription({
-            items: {
-              data: [
-                { price: { id: itemCalculator.prices.GROWTH_SEAT_USD_MONTHLY } },
-                { price: { id: itemCalculator.prices.GROWTH_EVENTS_USD_MONTHLY } },
-              ],
-            } as Stripe.Subscription["items"],
+            items: [
+              itemFor(itemCalculator.prices.GROWTH_SEAT_USD_MONTHLY),
+              itemFor(itemCalculator.prices.GROWTH_EVENTS_USD_MONTHLY),
+            ],
           }),
         });
 
@@ -698,11 +705,11 @@ describe("EEWebhookService", () => {
         });
         expect(localStripe.cancellations).toContainEqual({
           subscriptionId: "sub_old_1",
-          params: { prorate: true },
+          prorate: true,
         });
         expect(localStripe.cancellations).toContainEqual({
           subscriptionId: "sub_old_2",
-          params: { prorate: true },
+          prorate: true,
         });
       });
 

@@ -130,7 +130,7 @@ Feature: Enterprise billing compatibility
   Scenario: A Stripe subscription changes alike over the provider and its memory twin
     Given the Stripe subscriptions channel over the provider and over its memory twin, each holding an active subscription
     When the subscription is read, updated and cancelled, an invoice preview is asked for, and a checkout and a billing portal session are opened
-    Then each tier answers the subscription with its items, then answers it cancelled
+    Then each tier answers the subscription in billing's own shape with its items, then answers it cancelled
     And each tier cancels a superseded subscription with proration when asked to prorate
     And each tier answers the preview and each session with a url
     And each tier answers a completed checkout session's line items with their quantities
@@ -138,12 +138,23 @@ Feature: Enterprise billing compatibility
     And each tier refuses the line items of a checkout session it never held with resource_missing
 
   @unit
+  Scenario: Billing's subscription shapes reach Stripe as the same requests
+    Given the Stripe subscriptions channel over the provider
+    When a subscription is read, and a seat change, a billing threshold, a preview and a checkout are sent in billing's own shapes
+    Then the subscription is answered with each item's price, unit amount and interval, its cancellation instant and its billing threshold
+    And the change, the threshold and the preview reach Stripe as the same parameters the services sent before
+    And the preview is answered from the invoice's total and amount due, however many lines it carries
+    And every checkout is raised as a subscription with automatic tax, a required billing address, tax id collection, the customer's address and name updated, and adaptive pricing off
+    And a completed checkout's line items are answered with their price and quantity, a line with no price answered with none
+
+  @unit
   Scenario: A Stripe customer's invoices list alike over the provider and its memory twin
     Given the Stripe invoices channel over the provider and over its memory twin, each holding five invoices for one customer and one for another
     When the customer's invoices are listed with a limit of four
-    Then each tier answers that customer's four newest invoices, newest first
+    Then each tier answers that customer's four newest invoices in billing's own shape, newest first
     And each tier answers an empty list for a customer with no invoices
     And each tier passes a refused listing through as the provider's own error
+    And the provider's invoice is answered with its number, amount due, status and links, a customer held as an object answered by its id
 
   @unit
   Scenario: Stripe prices page alike over the provider and its memory twin

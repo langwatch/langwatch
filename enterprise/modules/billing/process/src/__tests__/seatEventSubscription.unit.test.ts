@@ -10,6 +10,10 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { MemoryStripeCustomersChannel } from "../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
+import type {
+  BillingInvoicePreview,
+  BillingSubscription,
+} from "../rules/billing-stripe-shapes.rules.ts";
 import {
   type SeatCheckoutInvites,
   SeatEventSubscriptionService,
@@ -31,10 +35,19 @@ const prices = {
 // ── Mock factories ──────────────────────────────────────────────────────────
 
 /** A subscription as the provider holds it, with only the fields these paths read. */
-const subscriptionOf = (fields: object) => fields as Stripe.Subscription;
+const subscriptionOf = (fields: Partial<BillingSubscription>): BillingSubscription => ({
+  id: "sub_stripe_1",
+  status: "active",
+  canceledAt: null,
+  billingThreshold: null,
+  items: [],
+  ...fields,
+});
 
-/** An invoice preview as the provider computes it, with only the fields a quote reads. */
-const previewOf = (fields: object) => fields as Stripe.Invoice;
+/** An invoice preview as the provider computes it; decoy lines, subtotal and tax go unread. */
+const previewOf = (
+  preview: BillingInvoicePreview & { lines?: unknown; subtotal?: number; tax?: number },
+): BillingInvoicePreview => preview;
 
 const createMockSubscriptions = (): {
   [K in keyof SeatEventSubscriptionRepository]: Mock<SeatEventSubscriptionRepository[K]>;
@@ -107,19 +120,8 @@ describe("seatEventSubscription", () => {
     subscriptionOf({
       id,
       status: "active",
-      canceled_at: canceledAt,
-      items: {
-        data: [
-          {
-            id: "si_seat",
-            price: {
-              id: priceId,
-              unit_amount: unitAmount,
-              recurring: { interval },
-            },
-          },
-        ],
-      },
+      canceledAt,
+      items: [{ id: "si_seat", priceId, unitAmount, interval }],
     });
 
   describe("previewProration()", () => {
@@ -131,11 +133,11 @@ describe("seatEventSubscription", () => {
 
       it("returns formatted proration amount and recurring total for USD", async () => {
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 1500,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 1500,
+            amountDue: 1500,
           }),
         });
 
@@ -161,11 +163,11 @@ describe("seatEventSubscription", () => {
         });
 
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "eur",
             total: 2000,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 2000,
+            amountDue: 2000,
           }),
         });
 
@@ -181,11 +183,11 @@ describe("seatEventSubscription", () => {
 
       it("formats whole amounts without decimals", async () => {
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 5000,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 5000,
+            amountDue: 5000,
           }),
         });
 
@@ -201,11 +203,11 @@ describe("seatEventSubscription", () => {
 
       it("formats fractional amounts with two decimal places", async () => {
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 1450,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 1450,
+            amountDue: 1450,
           }),
         });
 
@@ -224,11 +226,11 @@ describe("seatEventSubscription", () => {
         // change, so anything less than the invoice total under-quotes what
         // the card is debited.
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 4000,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 4000,
+            amountDue: 4000,
             lines: {
               data: [
                 { proration: true, amount: 3000 },
@@ -251,13 +253,13 @@ describe("seatEventSubscription", () => {
         // Line amounts are pre-tax. Where tax is exclusive (USD here), summing
         // them quoted a fifth under what the card is debited.
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             subtotal: 2458,
             tax: 516,
             total: 2974,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 2974,
+            amountDue: 2974,
             lines: {
               data: [
                 { proration: true, amount: -4917 },
@@ -281,11 +283,11 @@ describe("seatEventSubscription", () => {
         // `lines` is a paginated sublist, so a subscription carrying enough
         // pending prorations silently dropped everything past the first page.
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 140000,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 140000,
+            amountDue: 140000,
             lines: {
               has_more: true,
               data: [{ proration: true, amount: 10000 }],
@@ -304,12 +306,12 @@ describe("seatEventSubscription", () => {
       /** @scenario "Reducing seats previews a credit rather than an amount owed" */
       it("reports a seat reduction as a signed credit", async () => {
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: -2500,
             // Stripe clamps a negative invoice here, which is exactly why the
             // credit case cannot read this field.
-            amount_due: 0,
+            amountDue: 0,
           }),
         });
 
@@ -328,10 +330,10 @@ describe("seatEventSubscription", () => {
         // invoice is 293.70 either way, but an account holding 200.00 of
         // credit is charged 93.70.
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "eur",
             total: 29370,
-            amount_due: 9370,
+            amountDue: 9370,
           }),
         });
 
@@ -347,11 +349,11 @@ describe("seatEventSubscription", () => {
       /** @scenario "Preview works for subscriptions on flexible billing" */
       it("previews the seat change through the Create Preview Invoice API, in one call", async () => {
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 0,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 0,
+            amountDue: 0,
           }),
         });
 
@@ -365,11 +367,11 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.previews).toHaveLength(1);
         expect(stripeSubscriptions.previews).toEqual([
           {
-            subscription: "sub_stripe_1",
-            subscription_details: {
+            subscriptionId: "sub_stripe_1",
+            change: {
               items: [{ id: "si_seat", quantity: 7 }],
-              proration_behavior: "always_invoice",
-              proration_date: expect.any(Number),
+              prorationBehavior: "always_invoice",
+              prorationDate: expect.any(Number),
             },
           },
         ]);
@@ -384,11 +386,11 @@ describe("seatEventSubscription", () => {
         subscriptions.findSeatCandidates.mockResolvedValue([linkedActive]);
         stripeSubscriptions.seed({ subscription: seatSubscription({ unitAmount: null }) });
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 1500,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 1500,
+            amountDue: 1500,
           }),
         });
 
@@ -408,11 +410,11 @@ describe("seatEventSubscription", () => {
           subscription: seatSubscription({ canceledAt: 1700000000, interval: "year" }),
         });
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "eur",
             total: 63991,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 63991,
+            amountDue: 63991,
           }),
         });
       });
@@ -428,12 +430,12 @@ describe("seatEventSubscription", () => {
         // same change quoted 54.25 and charged 639.91.
         expect(stripeSubscriptions.previews).toEqual([
           {
-            subscription: "sub_stripe_1",
-            subscription_details: {
-              cancel_at_period_end: false,
+            subscriptionId: "sub_stripe_1",
+            change: {
+              cancelAtPeriodEnd: false,
               items: [{ id: "si_seat", quantity: 8 }],
-              proration_behavior: "always_invoice",
-              proration_date: expect.any(Number),
+              prorationBehavior: "always_invoice",
+              prorationDate: expect.any(Number),
             },
           },
         ]);
@@ -450,8 +452,8 @@ describe("seatEventSubscription", () => {
           totalMembers: 8,
         });
 
-        const previewed = stripeSubscriptions.previews[0]!.subscription_details;
-        const applied = stripeSubscriptions.updates[0]!.params;
+        const previewed = stripeSubscriptions.previews[0]!.change;
+        const applied = stripeSubscriptions.updates[0]!.change;
 
         expect(previewed).toEqual(applied);
       });
@@ -578,11 +580,11 @@ describe("seatEventSubscription", () => {
         ]);
         stripeSubscriptions.seed({ subscription: seatSubscription({ id: "sub_stripe_live" }) });
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 0,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 0,
+            amountDue: 0,
           }),
         });
 
@@ -607,11 +609,11 @@ describe("seatEventSubscription", () => {
         ]);
         stripeSubscriptions.seed({ subscription: seatSubscription() });
         stripeSubscriptions.seedPreview({
-          invoice: previewOf({
+          preview: previewOf({
             currency: "usd",
             total: 0,
             // Clean account: nothing to draw down, so the card is charged the total.
-            amount_due: 0,
+            amountDue: 0,
           }),
         });
 
@@ -631,7 +633,7 @@ describe("seatEventSubscription", () => {
           subscription: subscriptionOf({
             id: "sub_stripe_1",
             status: "canceled",
-            items: { data: [] },
+            items: [],
           }),
         });
 
@@ -651,9 +653,14 @@ describe("seatEventSubscription", () => {
           subscription: subscriptionOf({
             id: "sub_stripe_1",
             status: "active",
-            items: {
-              data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
-            },
+            items: [
+              {
+                id: "si_events",
+                priceId: "price_events_usd_monthly",
+                unitAmount: null,
+                interval: null,
+              },
+            ],
           }),
         });
 
@@ -686,10 +693,10 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.updates).toEqual([
           {
             subscriptionId: "sub_stripe_1",
-            params: {
+            change: {
               items: [{ id: "si_seat", quantity: 10 }],
-              proration_behavior: "always_invoice",
-              proration_date: expect.any(Number),
+              prorationBehavior: "always_invoice",
+              prorationDate: expect.any(Number),
             },
           },
         ]);
@@ -708,7 +715,7 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.updates).toEqual([
           {
             subscriptionId: "sub_stripe_1",
-            params: expect.objectContaining({ proration_date: quotedAt }),
+            change: expect.objectContaining({ prorationDate: quotedAt }),
           },
         ]);
       });
@@ -746,8 +753,8 @@ describe("seatEventSubscription", () => {
           totalMembers: 10,
         });
 
-        const params = stripeSubscriptions.updates[0]!.params;
-        expect(params.proration_date).toBeGreaterThanOrEqual(before);
+        const change = stripeSubscriptions.updates[0]!.change;
+        expect(change.prorationDate).toBeGreaterThanOrEqual(before);
       });
 
       it("updates DB subscription to ACTIVE with new seat count", async () => {
@@ -776,11 +783,11 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.updates).toEqual([
           {
             subscriptionId: "sub_stripe_1",
-            params: {
-              cancel_at_period_end: false,
+            change: {
+              cancelAtPeriodEnd: false,
               items: [{ id: "si_seat", quantity: 5 }],
-              proration_behavior: "always_invoice",
-              proration_date: expect.any(Number),
+              prorationBehavior: "always_invoice",
+              prorationDate: expect.any(Number),
             },
           },
         ]);
@@ -827,7 +834,7 @@ describe("seatEventSubscription", () => {
           subscription: subscriptionOf({
             id: "sub_stripe_1",
             status: "canceled",
-            items: { data: [] },
+            items: [],
           }),
         });
 
@@ -848,9 +855,14 @@ describe("seatEventSubscription", () => {
           subscription: subscriptionOf({
             id: "sub_stripe_1",
             status: "active",
-            items: {
-              data: [{ id: "si_events", price: { id: "price_events_usd_monthly" } }],
-            },
+            items: [
+              {
+                id: "si_events",
+                priceId: "price_events_usd_monthly",
+                unitAmount: null,
+                interval: null,
+              },
+            ],
           }),
         });
 
@@ -1019,11 +1031,10 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
           expect.objectContaining({
-            mode: "subscription",
-            customer: "cus_1",
-            line_items: [
+            customerId: "cus_1",
+            lineItems: [
               { price: "price_seat_usd_monthly", quantity: 3 },
               { price: "price_events_usd_monthly" },
             ],
@@ -1031,8 +1042,8 @@ describe("seatEventSubscription", () => {
               selectedCurrency: "USD",
               selectedBillingInterval: "monthly",
             },
-            client_reference_id: "subscription_setup_sub_new_1",
-            allow_promotion_codes: true,
+            clientReferenceId: "subscription_setup_sub_new_1",
+            allowPromotionCodes: true,
           }),
         );
       });
@@ -1047,8 +1058,8 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
-        expect(callArgs.success_url).toBe("https://app.test/settings/subscription?success");
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.request;
+        expect(callArgs.successUrl).toBe("https://app.test/settings/subscription?success");
       });
 
       it("appends upgraded_from param when isUpgradeFromTiered is true", async () => {
@@ -1062,8 +1073,8 @@ describe("seatEventSubscription", () => {
           isUpgradeFromTiered: true,
         });
 
-        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
-        expect(callArgs.success_url).toBe(
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.request;
+        expect(callArgs.successUrl).toBe(
           "https://app.test/settings/subscription?success&upgraded_from=tiered",
         );
       });
@@ -1078,8 +1089,8 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        const callArgs = stripeSubscriptions.checkoutSessions[0]!.params;
-        const anchor = callArgs.subscription_data?.billing_cycle_anchor as number;
+        const callArgs = stripeSubscriptions.checkoutSessions[0]!.request;
+        const anchor = callArgs.subscription?.billingCycleAnchor as number;
 
         // Anchor should be a Unix timestamp for the 1st of next month
         const anchorDate = new Date(anchor * 1000);
@@ -1106,10 +1117,10 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
           expect.objectContaining({
             currency: "eur",
-            line_items: [
+            lineItems: [
               { price: "price_seat_eur_monthly", quantity: 3 },
               { price: "price_events_eur_monthly" },
             ],
@@ -1131,7 +1142,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
           expect.objectContaining({ currency: "eur" }),
         );
       });
@@ -1351,7 +1362,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(stripeSubscriptions.checkoutSessions[0]?.params).toEqual(
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
           expect.objectContaining({ currency: "usd" }),
         );
       });

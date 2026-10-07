@@ -48,18 +48,18 @@ export class AnnualEventsBillingThresholdService {
       subscriptionId: stripeSubscriptionId,
     });
 
-    const hasAnnualEventsItem = (subscription.items?.data ?? []).some((item) =>
-      isAnnualGrowthEventsPrice(item.price.id, this.prices),
+    const hasAnnualEventsItem = subscription.items.some((item) =>
+      isAnnualGrowthEventsPrice(item.priceId, this.prices),
     );
     if (!hasAnnualEventsItem) {
       return "not_annual_events";
     }
 
-    const existingThreshold = subscription.billing_thresholds;
-    const existingAmount = existingThreshold?.amount_gte;
+    const existingThreshold = subscription.billingThreshold;
+    const existingAmount = existingThreshold?.amountGte;
 
     if (existingAmount != null) {
-      if (existingThreshold?.reset_billing_cycle_anchor !== true) {
+      if (existingThreshold?.resetBillingCycleAnchor !== true) {
         return "already_set";
       }
 
@@ -68,8 +68,8 @@ export class AnnualEventsBillingThresholdService {
       if (!isDryRun) {
         await this.subscriptions.updateSubscription({
           subscriptionId: stripeSubscriptionId,
-          params: {
-            billing_thresholds: { amount_gte: existingAmount, reset_billing_cycle_anchor: false },
+          change: {
+            billingThreshold: { amountGte: existingAmount, resetBillingCycleAnchor: false },
           },
         });
       }
@@ -80,12 +80,12 @@ export class AnnualEventsBillingThresholdService {
     if (!isDryRun) {
       await this.subscriptions.updateSubscription({
         subscriptionId: stripeSubscriptionId,
-        params: {
-          billing_thresholds: {
-            amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
+        change: {
+          billingThreshold: {
+            amountGte: ANNUAL_EVENTS_BILLING_THRESHOLD,
             // The billing anniversary must never move — threshold invoices
             // collect mid-cycle, the renewal date stays as sold.
-            reset_billing_cycle_anchor: false,
+            resetBillingCycleAnchor: false,
           },
         },
       });

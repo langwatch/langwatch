@@ -2,28 +2,35 @@
 
 import Stripe from "stripe";
 
+import type {
+  BillingCheckoutRequest,
+  BillingInvoicePreview,
+  BillingPurchasedLineItem,
+  BillingSubscription,
+  BillingSubscriptionChange,
+  BillingSubscriptionPreviewChange,
+} from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
 
 type Operation = keyof StripeSubscriptionsChannel;
 
 /**
  * Stripe's subscriptions where no provider is composed: keeps what a test seeds
- * and every change and session asked for, cancels in place (recording Stripe's
- * cancel params), answers seeded checkout line items, and answers an
- * invoice preview only once one is scripted (no proration arithmetic here).
+ * and every change and session asked for, cancels in place (recording any
+ * proration), answers seeded checkout line items, and answers an invoice
+ * preview only once one is scripted (no proration arithmetic here).
  */
 export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   readonly reads: string[] = [];
-  readonly updates: { subscriptionId: string; params: Stripe.SubscriptionUpdateParams }[] = [];
-  readonly cancellations: { subscriptionId: string; params?: Stripe.SubscriptionCancelParams }[] =
-    [];
-  readonly checkoutSessions: { params: Stripe.Checkout.SessionCreateParams; url: string }[] = [];
+  readonly updates: { subscriptionId: string; change: BillingSubscriptionChange }[] = [];
+  readonly cancellations: { subscriptionId: string; prorate?: boolean }[] = [];
+  readonly checkoutSessions: { request: BillingCheckoutRequest; url: string }[] = [];
   readonly portalSessions: { customerId: string; returnUrl: string; url: string }[] = [];
-  readonly previews: Stripe.InvoiceCreatePreviewParams[] = [];
-  private readonly held = new Map<string, Stripe.Subscription>();
-  private readonly lineItems = new Map<string, Stripe.LineItem[]>();
+  readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
+  private readonly held = new Map<string, BillingSubscription>();
+  private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
   private readonly refusals = new Map<Operation, Error>();
-  private preview: Stripe.Invoice | undefined;
+  private preview: BillingInvoicePreview | undefined;
 
   private constructor() {
     super();
@@ -34,7 +41,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   }
 
   /** Puts a subscription at the provider, as a test declares it. */
-  seed({ subscription }: { subscription: Stripe.Subscription }): void {
+  seed({ subscription }: { subscription: BillingSubscription }): void {
     this.held.set(subscription.id, subscription);
   }
 
@@ -44,14 +51,14 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     lineItems,
   }: {
     checkoutSessionId: string;
-    lineItems: Stripe.LineItem[];
+    lineItems: BillingPurchasedLineItem[];
   }): void {
     this.lineItems.set(checkoutSessionId, lineItems);
   }
 
   /** What every invoice preview answers from now on. */
-  seedPreview({ invoice }: { invoice: Stripe.Invoice }): void {
-    this.preview = invoice;
+  seedPreview({ preview }: { preview: BillingInvoicePreview }): void {
+    this.preview = preview;
   }
 
   /** Makes `operation` throw `error` from now on, as a failing provider would. */
@@ -63,7 +70,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     subscriptionId,
   }: {
     subscriptionId: string;
-  }): Promise<Stripe.Subscription> {
+  }): Promise<BillingSubscription> {
     this.throwIfRefused("getSubscription");
     this.reads.push(subscriptionId);
     return this.find(subscriptionId);
@@ -71,28 +78,30 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
 
   async updateSubscription({
     subscriptionId,
-    params,
+    change,
   }: {
     subscriptionId: string;
-    params: Stripe.SubscriptionUpdateParams;
-  }): Promise<Stripe.Subscription> {
+    change: BillingSubscriptionChange;
+  }): Promise<BillingSubscription> {
     this.throwIfRefused("updateSubscription");
     const subscription = this.find(subscriptionId);
-    this.updates.push({ subscriptionId, params });
+    this.updates.push({ subscriptionId, change });
     return subscription;
   }
 
   async cancelSubscription({
     subscriptionId,
-    params,
+    prorate,
   }: {
     subscriptionId: string;
-    params?: Stripe.SubscriptionCancelParams;
-  }): Promise<Stripe.Subscription> {
+    prorate?: boolean;
+  }): Promise<BillingSubscription> {
     this.throwIfRefused("cancelSubscription");
-    const cancelled: Stripe.Subscription = { ...this.find(subscriptionId), status: "canceled" };
+    const cancelled: BillingSubscription = { ...this.find(subscriptionId), status: "canceled" };
     this.held.set(subscriptionId, cancelled);
-    this.cancellations.push(params ? { subscriptionId, params } : { subscriptionId });
+    this.cancellations.push(
+      prorate === undefined ? { subscriptionId } : { subscriptionId, prorate },
+    );
     return cancelled;
   }
 
@@ -100,19 +109,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     checkoutSessionId,
   }: {
     checkoutSessionId: string;
-  }): Promise<Stripe.LineItem[]> {
+  }): Promise<BillingPurchasedLineItem[]> {
     this.throwIfRefused("listCheckoutLineItems");
     const lineItems = this.lineItems.get(checkoutSessionId);
     if (lineItems) return lineItems;
     throw missing(`No such checkout.session: '${checkoutSessionId}'`);
   }
 
-  async createCheckoutSession(
-    params: Stripe.Checkout.SessionCreateParams,
-  ): Promise<{ url: string | null }> {
+  async createCheckoutSession(request: BillingCheckoutRequest): Promise<{ url: string | null }> {
     this.throwIfRefused("createCheckoutSession");
     const url = `https://checkout.memory.test/cs_memory_${this.checkoutSessions.length + 1}`;
-    this.checkoutSessions.push({ params, url });
+    this.checkoutSessions.push({ request, url });
     return { url };
   }
 
@@ -129,9 +136,15 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     return { url };
   }
 
-  async previewInvoice(params: Stripe.InvoiceCreatePreviewParams): Promise<Stripe.Invoice> {
+  async previewInvoice({
+    subscriptionId,
+    change,
+  }: {
+    subscriptionId: string;
+    change: BillingSubscriptionPreviewChange;
+  }): Promise<BillingInvoicePreview> {
     this.throwIfRefused("previewInvoice");
-    this.previews.push(params);
+    this.previews.push({ subscriptionId, change });
     if (!this.preview) throw new Error("no scripted Stripe invoice preview");
     return this.preview;
   }
@@ -141,7 +154,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     if (refusal) throw refusal;
   }
 
-  private find(subscriptionId: string): Stripe.Subscription {
+  private find(subscriptionId: string): BillingSubscription {
     const subscription = this.held.get(subscriptionId);
     if (subscription) return subscription;
     throw missing(`No such subscription: '${subscriptionId}'`);

@@ -16,6 +16,10 @@ import { type BillingAccountFactsRepository } from "../repositories/billing-acco
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
+import type {
+  BillingSubscription,
+  BillingSubscriptionStatus,
+} from "../rules/billing-stripe-shapes.rules.ts";
 import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
 import {
   type SeatCheckoutInvites,
@@ -53,9 +57,15 @@ const providerSubscription = ({
   items = [],
 }: {
   id?: string;
-  status?: Stripe.Subscription.Status;
-  items?: { id: string; price: { id: string } }[];
-}) => ({ id, status, items: { data: items } }) as Stripe.Subscription;
+  status?: BillingSubscriptionStatus;
+  items?: { id: string; priceId: string }[];
+}): BillingSubscription => ({
+  id,
+  status,
+  canceledAt: null,
+  billingThreshold: null,
+  items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
+});
 
 const createMockRepository = (): {
   [K in keyof BillingSubscriptionRepository]: Mock<BillingSubscriptionRepository[K]>;
@@ -202,7 +212,7 @@ describe("BillingSubscriptionService", () => {
         );
         stripeSubscriptions.seed({
           subscription: providerSubscription({
-            items: [{ id: "si_1", price: { id: "price_launch" } }],
+            items: [{ id: "si_1", priceId: "price_launch" }],
           }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
@@ -218,7 +228,7 @@ describe("BillingSubscriptionService", () => {
 
         expect(result).toEqual({ success: true });
         expect(stripeSubscriptions.updates).toEqual([
-          { subscriptionId: "sub_stripe_1", params: { items: [{ id: "si_1", quantity: 1 }] } },
+          { subscriptionId: "sub_stripe_1", change: { items: [{ id: "si_1", quantity: 1 }] } },
         ]);
       });
     });
@@ -235,7 +245,7 @@ describe("BillingSubscriptionService", () => {
         );
         stripeSubscriptions.seed({
           subscription: providerSubscription({
-            items: [{ id: "si_1", price: { id: "price_launch" } }],
+            items: [{ id: "si_1", priceId: "price_launch" }],
           }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([]);
@@ -270,7 +280,7 @@ describe("BillingSubscriptionService", () => {
         );
         stripeSubscriptions.seed({
           subscription: providerSubscription({
-            items: [{ id: "si_1", price: { id: "price_launch" } }],
+            items: [{ id: "si_1", priceId: "price_launch" }],
           }),
         });
         itemCalculator.getItemsToUpdate.mockReturnValue([]);
@@ -383,10 +393,9 @@ describe("BillingSubscriptionService", () => {
           organizationId: "org_123",
           plan: PlanTypes.LAUNCH,
         });
-        expect(stripeSubscriptions.checkoutSessions[0]?.params).toMatchObject({
-          mode: "subscription",
-          customer: "cus_123",
-          client_reference_id: "subscription_setup_sub_new",
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toMatchObject({
+          customerId: "cus_123",
+          clientReferenceId: "subscription_setup_sub_new",
         });
       });
     });
@@ -784,28 +793,28 @@ describe("BillingSubscriptionService", () => {
         stripeInvoices.seed({
           invoice: {
             id: "inv_1",
-            customer: "cus_123",
+            customerId: "cus_123",
             number: "INV-001",
             created: 1700000000,
-            amount_due: 5000,
+            amountDue: 5000,
             currency: "usd",
             status: "paid",
-            invoice_pdf: "https://pdf.example.com/inv_1",
-            hosted_invoice_url: "https://hosted.example.com/inv_1",
-          } as Stripe.Invoice,
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
         });
         stripeInvoices.seed({
           invoice: {
             id: "inv_draft",
-            customer: "cus_123",
+            customerId: "cus_123",
             number: null,
             created: 1700001000,
-            amount_due: 3000,
+            amountDue: 3000,
             currency: "eur",
             status: "draft",
-            invoice_pdf: null,
-            hosted_invoice_url: null,
-          } as Stripe.Invoice,
+            pdfUrl: null,
+            hostedUrl: null,
+          },
         });
 
         const result = await service.listInvoices({

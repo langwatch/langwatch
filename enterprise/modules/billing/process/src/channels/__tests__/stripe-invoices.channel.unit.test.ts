@@ -5,6 +5,7 @@ import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
+import type { BillingInvoice } from "../../rules/billing-stripe-shapes.rules.ts";
 import { HttpStripeInvoicesChannel } from "../http/http.stripe-invoices.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../memory/memory.stripe-invoices.channel.ts";
 import type { StripeInvoicesChannel } from "../stripe-invoices.channel.ts";
@@ -41,9 +42,22 @@ function overTheProvider({ refused }: { refused?: Error } = {}): StripeInvoicesC
   return HttpStripeInvoicesChannel.create({ stripe });
 }
 
+/** An invoice in billing's own shape, as the twin holds it. */
+const heldInvoice = (invoice: Stripe.Invoice): BillingInvoice => ({
+  id: invoice.id,
+  customerId: invoice.customer as string,
+  number: null,
+  created: invoice.created,
+  amountDue: 0,
+  currency: "usd",
+  status: "paid",
+  pdfUrl: null,
+  hostedUrl: null,
+});
+
 function overTheTwin({ refused }: { refused?: Error } = {}): StripeInvoicesChannel {
   const invoices = MemoryStripeInvoicesChannel.create();
-  for (const held of HELD) invoices.seed({ invoice: held });
+  for (const held of HELD) invoices.seed({ invoice: heldInvoice(held) });
   if (refused) invoices.refuse({ operation: "listInvoices", error: refused });
   return invoices;
 }
@@ -75,5 +89,70 @@ describe.each(tiers)("Stripe invoices over $tier", ({ compose }) => {
         compose({ refused: rateLimited() }).listInvoices({ customerId: "cus_1", limit: 4 }),
       ).rejects.toMatchObject({ type: "StripeRateLimitError" });
     });
+  });
+});
+
+describe("Billing's invoice shape over the provider", () => {
+  it("answers an invoice's number, amount due, status and links, and an expanded customer by its id", async () => {
+    const stripe = stripeDouble({
+      invoices: {
+        list: async () => ({
+          object: "list",
+          has_more: false,
+          url: "/v1/invoices",
+          data: [
+            {
+              id: "in_1",
+              object: "invoice",
+              customer: { id: "cus_1", object: "customer" },
+              number: "INV-001",
+              created: 1_700_000_000,
+              amount_due: 5000,
+              currency: "usd",
+              status: "paid",
+              invoice_pdf: "https://pdf.example.com/in_1",
+              hosted_invoice_url: "https://hosted.example.com/in_1",
+            },
+            {
+              id: "in_draft",
+              object: "invoice",
+              customer: "cus_1",
+              number: null,
+              created: 1_700_001_000,
+              amount_due: 3000,
+              currency: "eur",
+              status: "draft",
+            },
+          ],
+        }),
+      },
+    });
+
+    await expect(
+      HttpStripeInvoicesChannel.create({ stripe }).listInvoices({ customerId: "cus_1", limit: 4 }),
+    ).resolves.toEqual([
+      {
+        id: "in_1",
+        customerId: "cus_1",
+        number: "INV-001",
+        created: 1_700_000_000,
+        amountDue: 5000,
+        currency: "usd",
+        status: "paid",
+        pdfUrl: "https://pdf.example.com/in_1",
+        hostedUrl: "https://hosted.example.com/in_1",
+      },
+      {
+        id: "in_draft",
+        customerId: "cus_1",
+        number: null,
+        created: 1_700_001_000,
+        amountDue: 3000,
+        currency: "eur",
+        status: "draft",
+        pdfUrl: null,
+        hostedUrl: null,
+      },
+    ]);
   });
 });
