@@ -8,13 +8,11 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
  * @see specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
@@ -72,8 +70,6 @@ function installed(peers: Peers) {
         }),
       }),
       "api-key": createApiFixture<ApiKeyApi>({}),
-      share: createApiFixture<ShareApi>({}),
-      topic: createApiFixture<TopicApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       trace: peers.trace,
       "audit-log": peers.auditLog,

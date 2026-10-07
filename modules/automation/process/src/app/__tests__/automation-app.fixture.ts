@@ -114,7 +114,6 @@ export function createCanonicalAutomationApp(): {
     create: vi.fn(),
     updateSettings: vi.fn(),
     archive: vi.fn(),
-    requestTopicClustering: vi.fn(),
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),
     touchCodingAgentPullRequestSeen: vi.fn(),

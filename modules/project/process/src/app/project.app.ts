@@ -23,7 +23,6 @@ import {
   type ProjectIdentity,
   type ProjectWithTeam,
   type PaginatedProjects,
-  type TopicClusteringRequest,
   type TraceDestinationDecision,
   type TraceDestinationInput,
   type TraceDestinationProject,
@@ -35,9 +34,7 @@ import {
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
 import type * as projectContractModule from "@langwatch/project-contract";
-import { ShareApi } from "@langwatch/share-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
-import { TopicApi } from "@langwatch/topic-contract";
+import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
@@ -59,8 +56,6 @@ import type {
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   apiKeys: typeof ApiKeyApi;
-  share: typeof ShareApi;
-  topics: typeof TopicApi;
   /**
    * Asked about a scope the door's declared check did not resolve. Every
    * process that installs this module installs AuthZ, which is what makes it
@@ -106,8 +101,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   static readonly dependencies: ProjectDependencies = {
     organizations: OrganizationApi,
     apiKeys: ApiKeyApi,
-    share: ShareApi,
-    topics: TopicApi,
     authorization: AuthzApi,
     trace: TraceApi,
     auditLog: AuditLogApi,
@@ -121,12 +114,9 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
-  readonly #logger: ProjectLogger;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
-    reportTopicClusteringFailure: (error, context) =>
-      this.#reportTopicClusteringFailure(error, context),
   });
   private constructor({
     projectService,
@@ -136,7 +126,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     authorization,
     trace,
     dataPrivacy,
-    logger,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
@@ -145,7 +134,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     authorization: AuthzApi;
     trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
-    logger: ProjectLogger;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
@@ -154,7 +142,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#authorization = authorization;
     this.#trace = trace;
     this.#dataPrivacy = dataPrivacy;
-    this.#logger = logger;
   }
 
   static create({
@@ -178,9 +165,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       auditLog: dependencies.auditLog,
       lifecycle,
       logger,
-      share: dependencies.share,
-      topics: dependencies.topics,
-      now: () => nowInstant().epochMilliseconds,
     });
     return new ProjectModule({
       projectService: projects,
@@ -190,7 +174,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       authorization: dependencies.authorization,
       trace: dependencies.trace,
       dataPrivacy: dependencies.dataPrivacy,
-      logger,
     });
   }
 
@@ -273,15 +256,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
   }
 
-  /**
-   * A clustering request that did not land. Reported rather than raised: the
-   * door has already decided this is best effort, and the topic module
-   * re-schedules on its own.
-   */
-  #reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void {
-    this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
-  }
-
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
@@ -296,13 +270,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void> {
     return this.#operations.revokeLegacyProjectKey({ projectId: input.projectId }, input.by);
-  }
-
-  triggerTopicClustering(input: {
-    projectId: string;
-    by: Readonly<{ id: string }>;
-  }): Promise<TopicClusteringRequest> {
-    return this.#requests.triggerTopicClustering(input);
   }
 
   /**
@@ -534,13 +501,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     input: Readonly<{ organizationId: string; scopeId: string }>,
   ): Promise<{ ownerUserId: string | null } | null> {
     return this.#projectService.findPersonalWorkspaceOwner(input);
-  }
-
-  requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<TopicClusteringRequest> {
-    return this.#operations.requestTopicClustering(input, by);
   }
 
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {

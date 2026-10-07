@@ -1,10 +1,5 @@
 import { ProjectPermissionDeniedError } from "@langwatch/authorization";
-import { HandledError } from "@langwatch/handled-error";
-import {
-  CannotArchiveCurrentProjectError,
-  type ProjectApi,
-  type TopicClusteringRequest,
-} from "@langwatch/project-contract";
+import { CannotArchiveCurrentProjectError, type ProjectApi } from "@langwatch/project-contract";
 
 type Actor = Readonly<{ id: string }>;
 
@@ -15,7 +10,6 @@ type ProjectRequestOptions = Readonly<{
     scope: { tier: "project"; id: string };
     by: Actor;
   }) => Promise<boolean>;
-  reportTopicClusteringFailure: (error: unknown, context: { projectId: string }) => void;
 }>;
 
 /** The decisions the project browser door makes around one project call. */
@@ -49,26 +43,5 @@ export class ProjectRequestService {
     if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
 
     return this.options.projects.archive({ projectId: projectToArchiveId });
-  }
-
-  /**
-   * A refusal the deployment already named is re-raised untouched; anything
-   * else is event-store internals, so it stays an ordinary error the boundary
-   * degrades to an unknown failure with a trace id.
-   */
-  async triggerTopicClustering({
-    projectId,
-    by,
-  }: {
-    projectId: string;
-    by: Actor;
-  }): Promise<TopicClusteringRequest> {
-    try {
-      return await this.options.projects.requestTopicClustering({ projectId }, by);
-    } catch (error) {
-      this.options.reportTopicClusteringFailure(error, { projectId });
-      if (HandledError.isHandled(error)) throw error;
-      throw new Error("Failed to trigger topic clustering", { cause: error });
-    }
   }
 }

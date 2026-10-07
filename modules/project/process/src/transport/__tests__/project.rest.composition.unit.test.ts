@@ -19,9 +19,7 @@ import {
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -45,16 +43,12 @@ const NOW = new Date("2026-09-01T00:00:00.000Z");
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   apis.declare(OrganizationApi);
-  apis.declare(ShareApi);
-  apis.declare(TopicApi);
   apis.declare(AuthzApi);
   apis.declare(TraceApi);
   apis.declare(AuditLogApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
-    share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
     authorization: apis.reference(AuthzApi),
     trace: apis.reference(TraceApi),
     auditLog: apis.reference(AuditLogApi),

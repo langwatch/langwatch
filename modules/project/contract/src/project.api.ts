@@ -1,7 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
-import type { TopicClusteringRequest } from "./project.responses.ts";
 import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
@@ -124,10 +123,6 @@ export interface ProjectApi {
   findPersonalWorkspaceOwner(
     input: Readonly<{ organizationId: string; scopeId: string }>,
   ): Promise<{ ownerUserId: string | null } | null>;
-  requestTopicClustering(
-    input: Readonly<{ projectId: string }>,
-    by: Readonly<{ id: string }>,
-  ): Promise<TopicClusteringRequest>;
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;

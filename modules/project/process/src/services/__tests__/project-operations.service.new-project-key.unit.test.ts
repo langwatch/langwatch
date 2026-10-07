@@ -1,8 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { Project } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { ProjectCredentialsService } from "../project-credentials.service.ts";
@@ -66,8 +64,6 @@ function operationsOver({ project }: { project: Project }): ProjectOperationsSer
   return ProjectOperationsService.create({
     projects: new NewProjectDirectory(project),
     storageSettings: { update: async ({ settings }) => settings },
-    share: createApiFixture<ShareApi>({}, "ShareApi"),
-    topics: createApiFixture<TopicApi>({}, "TopicApi"),
     auditLog: createApiFixture<AuditLogApi>({}, "AuditLogApi"),
     lifecycle: {
       legacyKeyRevoked: async () => undefined,
@@ -75,7 +71,6 @@ function operationsOver({ project }: { project: Project }): ProjectOperationsSer
       traceSharingDisabled: async () => undefined,
     },
     logger: { error: () => undefined },
-    now: () => 0,
   });
 }
 

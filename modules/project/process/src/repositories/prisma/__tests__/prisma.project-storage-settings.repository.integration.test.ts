@@ -8,7 +8,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { aesEncryption } from "@langwatch/process-stores";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 /**
  * @vitest-environment node
@@ -16,7 +15,6 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @see specs/projects/projects-browser-door.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -65,9 +63,6 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
       traceSharingDisabled: async () => undefined,
     },
     logger: { error: () => undefined },
-    share: createApiFixture<ShareApi>({}, "share"),
-    topics: createApiFixture<TopicApi>({}, "topics"),
-    now: () => 0,
   });
 
   const storedRow = () =>

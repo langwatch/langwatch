@@ -56,13 +56,6 @@ export const projectArchivedSchema = z
   .strict();
 export type ProjectArchived = z.infer<typeof projectArchivedSchema>;
 
-/** What a manual clustering request did, which is not always "started a run". */
-export const topicClusteringRequestSchema = z.union([
-  z.object({ started: z.literal(true) }).strict(),
-  z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
-]);
-export type TopicClusteringRequest = z.infer<typeof topicClusteringRequestSchema>;
-
 /**
  * One project as `/api/projects` answers it: identity, setup fields, team —
  * no credential (its own gated route) or archive stamp (never listed).

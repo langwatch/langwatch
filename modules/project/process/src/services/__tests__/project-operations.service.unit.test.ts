@@ -1,6 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
  * `ProjectOperationsService`'s cross-entity half: saving the settings form
@@ -8,7 +7,6 @@ import type { ShareApi } from "@langwatch/share-contract";
  * here because it is the application's decision, not one door's.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProjectStorageSettingsRepository } from "../../repositories/project-storage-settings.repository.ts";
@@ -46,36 +44,6 @@ class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
     );
   }
 }
-
-class CharacterizationShareApi implements ShareApi {
-  readonly revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
-
-  constructor(revoke: ShareApi["revokeAllTraceShares"]) {
-    this.revokeAllTraceShares = revoke;
-  }
-
-  listForResource: ShareApi["listForResource"] = () => this.unimplemented();
-  resolveForViewer: ShareApi["resolveForViewer"] = () => this.unimplemented();
-  createShare: ShareApi["createShare"] = () => this.unimplemented();
-  revokeById: ShareApi["revokeById"] = () => this.unimplemented();
-  unshare: ShareApi["unshare"] = () => this.unimplemented();
-  pinTrace: ShareApi["pinTrace"] = () => this.unimplemented();
-  unpinTrace: ShareApi["unpinTrace"] = () => this.unimplemented();
-  findTracePin: ShareApi["findTracePin"] = () => this.unimplemented();
-  listTracePins: ShareApi["listTracePins"] = () => this.unimplemented();
-  findCachedPayload: ShareApi["findCachedPayload"] = () => this.unimplemented();
-  cachePayload: ShareApi["cachePayload"] = () => this.unimplemented();
-
-  private unimplemented(): Promise<never> {
-    return Promise.reject(new Error("CharacterizationShareApi operation is not configured"));
-  }
-}
-
-const refusingTopics = (): TopicApi =>
-  new Proxy({} as TopicApi, {
-    get: () => (): Promise<never> =>
-      Promise.reject(new Error("the topic boundary is not configured for this test")),
-  });
 
 function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam {
   const timestamp = new Date("2026-01-01T00:00:00.000Z");
@@ -135,7 +103,6 @@ type TraceSharingDisabled = Parameters<ProjectCreatedNoticeService["traceSharing
 function characterizationOperations(options: {
   projects: Partial<ProjectOperationsDirectory>;
   storageSettings?: ProjectStorageSettingsRepository["update"];
-  revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
   presenceChanges?: PresenceSettingChange[];
   sharingDisabled?: TraceSharingDisabled[];
 }): ProjectOperationsService {
@@ -144,8 +111,6 @@ function characterizationOperations(options: {
     storageSettings: {
       update: options.storageSettings ?? (async ({ settings }) => settings),
     },
-    share: new CharacterizationShareApi(options.revokeAllTraceShares),
-    topics: refusingTopics(),
     auditLog: createApiFixture<AuditLogApi>({
       record: async () => ({ id: "audit", occurredAt: 0 }),
     }),
@@ -159,21 +124,18 @@ function characterizationOperations(options: {
       },
     },
     logger: { error: () => undefined },
-    now: () => 0,
   });
 }
 
 describe("ProjectOperationsService", () => {
   describe("when the settings form turns trace sharing off", () => {
     /** @scenario Switching trace sharing off is recorded as project's fact */
-    it("revokes outstanding trace shares", async () => {
-      const revokeAllTraceShares = vi.fn(async () => {});
+    it("records trace sharing disabled for share to revoke from its side", async () => {
       const updated = characterizationProject(false);
       const update = vi.fn(async () => updated);
       const sharingDisabled: TraceSharingDisabled[] = [];
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => characterizationProject(true), update },
-        revokeAllTraceShares,
         sharingDisabled,
       });
 
@@ -185,7 +147,6 @@ describe("ProjectOperationsService", () => {
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({ id: "project_123", organizationId: "org-1" }),
       );
-      expect(revokeAllTraceShares).toHaveBeenCalledWith("project_123");
       expect(sharingDisabled).toEqual([
         { projectId: "project_123", organizationId: "org-1", disabledByUserId: MEMBER.id },
       ]);
@@ -194,15 +155,13 @@ describe("ProjectOperationsService", () => {
 
   describe("given trace sharing was already off", () => {
     /** @scenario Saving project settings with trace sharing already off records no sharing fact */
-    it("leaves the shares alone", async () => {
-      const revokeAllTraceShares = vi.fn(async () => {});
+    it("records no trace sharing fact", async () => {
       const sharingDisabled: TraceSharingDisabled[] = [];
       const operations = characterizationOperations({
         projects: {
           findWithTeam: async () => characterizationProject(false),
           update: async () => characterizationProject(false),
         },
-        revokeAllTraceShares,
         sharingDisabled,
       });
 
@@ -211,7 +170,6 @@ describe("ProjectOperationsService", () => {
         MEMBER,
       );
 
-      expect(revokeAllTraceShares).not.toHaveBeenCalled();
       expect(sharingDisabled).toEqual([]);
     });
   });
@@ -228,7 +186,6 @@ describe("ProjectOperationsService", () => {
       const update = vi.fn(async () => characterizationProject(false));
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => characterizationProject(false), update },
-        revokeAllTraceShares: async () => {},
       });
 
       await expect(operations.updateSettings(storage, MEMBER)).rejects.toMatchObject({
@@ -244,7 +201,6 @@ describe("ProjectOperationsService", () => {
       const update = vi.fn(async () => stored);
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => stored, update },
-        revokeAllTraceShares: async () => {},
       });
 
       await operations.updateSettings(storage, MEMBER);
@@ -262,7 +218,6 @@ describe("ProjectOperationsService", () => {
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => characterizationProject(false), update },
         storageSettings,
-        revokeAllTraceShares: async () => {},
       });
 
       const answer = await operations.updateSettings(
@@ -298,7 +253,6 @@ describe("ProjectOperationsService", () => {
       const operations = characterizationOperations({
         projects: { findWithTeam: async () => held, update: async () => held },
         storageSettings,
-        revokeAllTraceShares: async () => {},
       });
 
       await operations.updateSettings(
@@ -318,7 +272,6 @@ describe("ProjectOperationsService", () => {
           findWithTeam: async () => characterizationProject(false),
           update: async () => characterizationProject(false),
         },
-        revokeAllTraceShares: async () => {},
         presenceChanges,
       });
       return { operations, presenceChanges };
@@ -378,7 +331,6 @@ describe("ProjectOperationsService", () => {
             apiKey: rotations[0]?.token ?? "sk-lw-test",
           }),
         },
-        revokeAllTraceShares: async () => undefined,
       });
 
       await operations.revokeLegacyProjectKey({ projectId: "project_123" }, MEMBER);

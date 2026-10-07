@@ -5,7 +5,6 @@
  * against the declared output schema. Spec: modules/project/specs/project-service.feature.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
-import { HandledError } from "@langwatch/handled-error";
 import {
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
@@ -24,22 +23,6 @@ import { projectTrpcTransport, type ProjectBrowserApi } from "../project.trpc.ts
 import type { ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 
 const ACTOR_ID = "test-user-id";
-
-/**
- * The refusal a deployment raises when it composed no clustering scheduler —
- * the API process is the deployment that does.
- */
-class NoClusteringSchedulerError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super("service_unavailable", "This deployment has no topic-clustering scheduler.", {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "NoClusteringSchedulerError";
-  }
-}
 
 async function expectRefusal(
   call: Promise<unknown>,
@@ -66,13 +49,11 @@ function mount({
    */
   permits?: (permission: string) => boolean;
 } = {}) {
-  const reportTopicClusteringFailure = vi.fn();
   const probe = vi.fn(probePermission);
   const application = createApiFixture<ProjectApi>(projects, "ProjectApi");
   const requests = ProjectRequestService.create({
     projects: application,
     probePermission: probe,
-    reportTopicClusteringFailure,
   });
 
   const revokeProjectApiKey = vi.fn(
@@ -86,7 +67,6 @@ function mount({
     probePermission: probe,
     getFieldProtections: async () => fieldProtections,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
-    triggerTopicClustering: (input) => requests.triggerTopicClustering(input),
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
@@ -98,7 +78,6 @@ function mount({
 
   return {
     router,
-    reportTopicClusteringFailure,
     revokeProjectApiKey,
     getLegacyKeyStatus,
     probePermission: probe,
@@ -118,7 +97,6 @@ describe("the project tRPC namespace", () => {
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
-        "triggerTopicClustering",
         "update",
       ]);
     });
@@ -575,92 +553,6 @@ describe("the project tRPC namespace", () => {
       await expect(caller.getFieldRedactionStatus({ projectId: "project_123" })).resolves.toEqual({
         isRedacted: { input: true, output: false },
         visibleTo: { input: "Admins, Security", output: null },
-      });
-    });
-  });
-
-  describe("when a manual topic-clustering run is asked for", () => {
-    it("says a run is already going rather than reporting a start that did not happen", async () => {
-      const requestClustering = vi.fn(async () => ({
-        started: false,
-        reason: "already_running" as const,
-      }));
-      const { caller } = mount({ projects: { requestTopicClustering: requestClustering } });
-
-      await expect(caller.triggerTopicClustering({ projectId: "project_123" })).resolves.toEqual({
-        started: false,
-        reason: "already_running",
-      });
-      expect(requestClustering).toHaveBeenCalledWith(
-        { projectId: "project_123" },
-        expect.objectContaining({ id: ACTOR_ID }),
-      );
-    });
-
-    it("sends the manual request attributed to the caller", async () => {
-      const requestClustering = vi.fn(async () => ({ started: true as const }));
-      const { caller } = mount({ projects: { requestTopicClustering: requestClustering } });
-
-      await expect(caller.triggerTopicClustering({ projectId: "project_123" })).resolves.toEqual({
-        started: true,
-      });
-      expect(requestClustering).toHaveBeenCalledWith(
-        { projectId: "project_123" },
-        expect.objectContaining({ id: ACTOR_ID }),
-      );
-    });
-
-    /**
-     * The one cause behind this that IS nameable: a deployment that composed
-     * no scheduler refuses by name, and the caller can act on it — there is
-     * nothing to retry, and somebody has to turn the service on. Re-raised
-     * untouched, it reaches the client as its own code; wrapped, the client
-     * would get a trace id for a condition we could have named.
-     *
-     * @scenario "A deployment without a clustering scheduler refuses by name"
-     */
-    it("re-raises a named refusal rather than degrading it", async () => {
-      const { caller, reportTopicClusteringFailure } = mount({
-        projects: {
-          requestTopicClustering: async () => {
-            throw new NoClusteringSchedulerError();
-          },
-        },
-      });
-
-      await expectRefusal(caller.triggerTopicClustering({ projectId: "project_123" }), {
-        code: "service_unavailable",
-        httpStatus: 503,
-      });
-      expect(reportTopicClusteringFailure).toHaveBeenCalledWith(expect.any(Error), {
-        projectId: "project_123",
-      });
-    });
-
-    /**
-     * The cause is an event-store internal, which is neither nameable nor
-     * actionable, so it stays an ordinary error and degrades to an unknown
-     * failure with a trace id rather than being dressed up as handled.
-     *
-     * @scenario "A clustering run that fails inside the platform degrades to an unknown failure"
-     */
-    it("reports the failure and raises an unhandled error", async () => {
-      const { caller, reportTopicClusteringFailure } = mount({
-        projects: {
-          requestTopicClustering: async () => {
-            throw new Error("projection host db-7 unreachable");
-          },
-        },
-      });
-
-      await expect(
-        caller.triggerTopicClustering({ projectId: "project_123" }),
-      ).rejects.toMatchObject({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to trigger topic clustering",
-      });
-      expect(reportTopicClusteringFailure).toHaveBeenCalledWith(expect.any(Error), {
-        projectId: "project_123",
       });
     });
   });
