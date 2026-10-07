@@ -7,6 +7,7 @@ import { AuthzCollectorService, AuthzService } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AuthorizationService } from "./authorization.service";
 import { demoProjectId } from "./demo-project";
+import { authzEpochCacheEnabled, getAuthzEpoch } from "./epoch";
 import { GrantsAuthzReadRepository } from "./repositories/authz-read.grants.repository";
 import { SharedReadsGrantsRepository } from "./repositories/shared-reads.grants.repository";
 
@@ -48,6 +49,8 @@ export function authorizationServiceFor(
     authz: authzChecksFor(prisma),
     collector: collectorFor(prisma),
     sharedReads: new SharedReadsGrantsRepository(prisma),
+    epochReader: getAuthzEpoch,
+    cacheEnabled: authzEpochCacheEnabled,
   });
   doorsByPrisma.set(prisma, service);
   return service;

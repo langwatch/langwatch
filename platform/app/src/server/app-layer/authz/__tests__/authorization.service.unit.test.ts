@@ -290,3 +290,134 @@ describe("AuthorizationService.authorizeInternal", () => {
     });
   });
 });
+
+describe("the shared-read lookup behind each mint", () => {
+  const mintFor = (service: AuthorizationService) =>
+    service.authorize({
+      actor: ANA,
+      principal: ANA,
+      permission: "traces:view",
+      scope: { projectId: AGGREGATE },
+      purpose: ROUTE,
+    });
+
+  const cachedDoor = ({
+    epoch,
+    clock = { now: NOW },
+    rows = [sharedRow()],
+  }: {
+    epoch: { value: number | null };
+    clock?: { now: number };
+    rows?: SharedReadRow[];
+  }) => {
+    const { deps } = door({ rows });
+    const findLiveSharedReads = deps.sharedReads.findLiveSharedReads;
+    const service = new AuthorizationService({
+      ...(deps as unknown as ConstructorParameters<
+        typeof AuthorizationService
+      >[0]),
+      epochReader: async () => epoch.value,
+      cacheEnabled: () => true,
+      now: () => clock.now,
+    });
+    return { service, findLiveSharedReads };
+  };
+
+  describe("given the organisation's epoch has not moved", () => {
+    describe("when the same aggregate mints twice", () => {
+      it("reads the ledger once", async () => {
+        const { service, findLiveSharedReads } = cachedDoor({
+          epoch: { value: 7 },
+        });
+
+        await mintFor(service);
+        const second = await mintFor(service);
+
+        expect(findLiveSharedReads).toHaveBeenCalledTimes(1);
+        expect(second.grants.map((grant) => grant.projectId)).toEqual([
+          AGGREGATE,
+          "proj_member_1",
+        ]);
+      });
+    });
+  });
+
+  describe("given a member is attached after the first mint", () => {
+    describe("when the attach bumps the epoch and the aggregate mints again", () => {
+      it("reads the ledger afresh and carries the new member", async () => {
+        const epoch = { value: 7 as number | null };
+        const { service, findLiveSharedReads } = cachedDoor({ epoch });
+        await mintFor(service);
+
+        findLiveSharedReads.mockResolvedValue([
+          sharedRow(),
+          sharedRow({
+            grantId: "grant_shared_2",
+            memberProjectId: "proj_member_2",
+          }),
+        ]);
+        epoch.value = 8;
+        const proof = await mintFor(service);
+
+        expect(findLiveSharedReads).toHaveBeenCalledTimes(2);
+        expect(proof.grants.map((grant) => grant.projectId)).toEqual([
+          AGGREGATE,
+          "proj_member_1",
+          "proj_member_2",
+        ]);
+      });
+    });
+  });
+
+  describe("given the epoch never moves", () => {
+    describe("when the cached lookup is older than its ceiling", () => {
+      it("reads the ledger afresh", async () => {
+        const clock = { now: NOW };
+        const { service, findLiveSharedReads } = cachedDoor({
+          epoch: { value: 7 },
+          clock,
+        });
+        await mintFor(service);
+
+        clock.now = NOW + 30_000;
+        await mintFor(service);
+
+        expect(findLiveSharedReads).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given there is no epoch to compare against", () => {
+    describe("when the aggregate mints twice", () => {
+      it("reads the ledger every time", async () => {
+        const { service, findLiveSharedReads } = cachedDoor({
+          epoch: { value: null },
+        });
+
+        await mintFor(service);
+        await mintFor(service);
+
+        expect(findLiveSharedReads).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given a cached row whose grant has since expired", () => {
+    describe("when the aggregate mints after the expiry", () => {
+      it("leaves the expired grant out though the row came from the cache", async () => {
+        const clock = { now: NOW };
+        const { service } = cachedDoor({
+          epoch: { value: 7 },
+          clock,
+          rows: [sharedRow({ expiresAt: new Date(NOW + 1_000) })],
+        });
+        await mintFor(service);
+
+        clock.now = NOW + 2_000;
+        const proof = await mintFor(service);
+
+        expect(proof.grants.map((grant) => grant.kind)).toEqual(["own"]);
+      });
+    });
+  });
+});

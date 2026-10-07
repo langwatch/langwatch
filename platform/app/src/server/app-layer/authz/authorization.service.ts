@@ -23,6 +23,7 @@ import {
 } from "@langwatch/authz";
 import type {
   AuthzCollectorService,
+  AuthzEpochReader,
   AuthzService,
   GrantCondition,
 } from "@langwatch/authz-server";
@@ -39,11 +40,34 @@ export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
  *  project never changes organisation, so this bounds memory, not staleness. */
 const INTERNAL_SCOPE_CACHE_MS = 60 * 1000;
 
+/**
+ * Absolute ceiling on a cached shared-read lookup, epoch agreement or not,
+ * the same as the engine's own snapshot cache: a wedged epoch store or a
+ * swallowed bump cannot pin a revoked read past it.
+ */
+const SHARED_READS_CACHE_MAX_AGE_MS = 30_000;
+
+/** Bounds the cache's memory; the oldest entry goes first. */
+const SHARED_READS_CACHE_MAX_ENTRIES = 5_000;
+
 export type AuthorizationServiceDeps = {
   authz: Pick<AuthzService, "effectivePermissions">;
   collector: Pick<AuthzCollectorService, "resolveScopeRef">;
   sharedReads: Pick<SharedReadsGrantsRepository, "findLiveSharedReads">;
+  /**
+   * The organisation's authz epoch, bumped on every grant write (attach and
+   * revoke included), or null when nothing may be cached. With none wired,
+   * or the flag off, every mint reads the ledger.
+   */
+  epochReader?: AuthzEpochReader;
+  cacheEnabled?: () => boolean;
   now?: () => number;
+};
+
+type SharedReadsEntry = {
+  epoch: number;
+  rows: SharedReadRow[];
+  storedAt: number;
 };
 
 export class AuthorizationService {
@@ -51,6 +75,7 @@ export class AuthorizationService {
     string,
     { organizationId: string; until: number }
   >();
+  private readonly sharedReadsCache = new Map<string, SharedReadsEntry>();
 
   constructor(private readonly deps: AuthorizationServiceDeps) {}
 
@@ -134,7 +159,7 @@ export class AuthorizationService {
     scope: { projectId: string };
     purpose: AuthorizationPurpose;
   }): Promise<Authorization> {
-    const { authz, collector, sharedReads } = this.deps;
+    const { authz, collector } = this.deps;
     const now = this.deps.now?.() ?? Date.now();
 
     const scopeRef = await collector.resolveScopeRef({
@@ -165,9 +190,10 @@ export class AuthorizationService {
       permission,
     });
     const rows = sharedPermitted
-      ? await sharedReads.findLiveSharedReads({
+      ? await this.liveSharedReads({
           organizationId: scopeRef.organizationId,
           readerProjectId: scope.projectId,
+          now,
         })
       : [];
     const { shared, expiresAt } = sharedGrantsFrom({
@@ -185,6 +211,57 @@ export class AuthorizationService {
       expiresAt,
       purpose,
     });
+  }
+
+  /**
+   * The reader's live shared reads, cached per organisation epoch (ADR-144,
+   * Consequences): every proof-bearing call on every project mints, and an
+   * aggregate's lookup reads one row per member. The epoch is read before
+   * the rows, so a write that lands between the two bumps it past the entry
+   * and the next mint reads afresh. Expiry and the reader naming itself are
+   * still applied per mint, against the rows, so a cached row never outlives
+   * its grant.
+   */
+  private async liveSharedReads({
+    organizationId,
+    readerProjectId,
+    now,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    now: number;
+  }): Promise<SharedReadRow[]> {
+    const { epochReader, cacheEnabled, sharedReads } = this.deps;
+    const epoch =
+      epochReader && cacheEnabled?.() === true
+        ? await epochReader({ organizationId })
+        : null;
+    if (epoch === null) {
+      return sharedReads.findLiveSharedReads({
+        organizationId,
+        readerProjectId,
+      });
+    }
+    const key = `${organizationId}:${readerProjectId}`;
+    const cached = this.sharedReadsCache.get(key);
+    if (
+      cached !== undefined &&
+      cached.epoch === epoch &&
+      now - cached.storedAt < SHARED_READS_CACHE_MAX_AGE_MS
+    ) {
+      return cached.rows;
+    }
+    const rows = await sharedReads.findLiveSharedReads({
+      organizationId,
+      readerProjectId,
+    });
+    this.sharedReadsCache.delete(key);
+    if (this.sharedReadsCache.size >= SHARED_READS_CACHE_MAX_ENTRIES) {
+      const oldest = this.sharedReadsCache.keys().next().value;
+      if (oldest !== undefined) this.sharedReadsCache.delete(oldest);
+    }
+    this.sharedReadsCache.set(key, { epoch, rows, storedAt: now });
+    return rows;
   }
 }
 
