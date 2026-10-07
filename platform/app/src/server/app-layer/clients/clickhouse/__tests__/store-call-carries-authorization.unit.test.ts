@@ -127,6 +127,52 @@ const ROUTE_CHUNKS_WITHOUT_PROOF: Array<{
   owner: string;
 }> = [];
 
+/**
+ * The proof-taking trace services and the evaluation runs service, reached
+ * as `traces.<service>.<method>(` or `evaluations.runs.<method>(`. Every such
+ * call in a trace router names the proof in its own argument object: a call
+ * that hands the service a project id, by name or by position, picks its
+ * tenant by hand and is refused (ADR-144 blocks B and F).
+ */
+const PROOF_TAKING_CALL =
+  /\b(?:traces\.(?:list|summary|spans|sessionGroups)|evaluations\.runs)\.(\w+)\s*\(/g;
+
+/**
+ * Trace reads a router still hands a tenant by hand, kept behind the
+ * baseline on purpose. Each entry names the router, the service, how many
+ * references it holds today, the owner and the reason. A router that gains
+ * a reference fails; one that loses its last, or drops below the count,
+ * fails as stale, so the list can only shrink. This list is the answer to
+ * ADR-144's open question on which trace reads take the proof in v1.
+ */
+const HAND_TENANT_READS: Array<{
+  file: string;
+  service: string;
+  references: number;
+  reason: string;
+  owner: string;
+}> = [
+  {
+    file: "server/api/routers/tracesV2.ts",
+    service: "traces.logRecords",
+    references: 3,
+    reason:
+      "log_records and its canonical table window on TimeUnixMs, which is not one of the client's time columns; admitting a fifth is the decision ADR-144 v4.2 leaves open. On an aggregate the logs read the aggregate's own tenant and find none.",
+    owner: "decision pending (fifth time column)",
+  },
+  {
+    file: "server/api/routers/tracesV2.ts",
+    service: "codingAgents.sessions",
+    references: 1,
+    reason:
+      "the coding-agent session tables have no proof-reading repository yet; on an aggregate the Session view finds no session for a member trace.",
+    owner: "follow-up to block F",
+  },
+];
+
+/** Services whose reads take a tenant by hand; see {@link HAND_TENANT_READS}. */
+const HAND_TENANT_SERVICE = /\b(traces\.logRecords|codingAgents\.sessions)\b/g;
+
 function read(relativeToSrc: string): string {
   return readFileSync(path.join(SRC, relativeToSrc), "utf8");
 }
@@ -466,6 +512,76 @@ function routeReadsWithoutProofIn({
     );
 }
 
+/** Offset of the `)` closing the call whose `(` is at `open`. */
+function callEnd(code: string, open: number): number {
+  let depth = 0;
+  let i = open;
+  while (i < code.length) {
+    const ch = code[i];
+    if (ch === "(" || ch === "{" || ch === "[") depth += 1;
+    else if (ch === ")" || ch === "}" || ch === "]") {
+      depth -= 1;
+      if (depth === 0) return i;
+    } else if (ch === '"' || ch === "'") i = quotedEnd(code, i);
+    else if (ch === "`") i = templateEnd(code, i);
+    i += 1;
+  }
+  return code.length;
+}
+
+/**
+ * Every call into a proof-taking trace service whose own arguments carry no
+ * proof, as `file:line service.method passes no proof`. The arguments are
+ * read without comments, so a comment naming the proof does not count, and
+ * a positional project id has nowhere to hide.
+ */
+function serviceCallsWithoutProofIn({
+  file,
+  source,
+}: {
+  file: string;
+  source: string;
+}): string[] {
+  const code = withoutComments(source);
+  const missing: string[] = [];
+  for (const match of code.matchAll(PROOF_TAKING_CALL)) {
+    const start = match.index as number;
+    const open = start + match[0].length - 1;
+    const args = code.slice(open + 1, callEnd(code, open));
+    if (PROOF.test(args)) continue;
+    const callee = match[0].replace(/\s*\($/, "");
+    missing.push(`${file}:${lineAt(code, start)} ${callee} passes no proof`);
+  }
+  return missing;
+}
+
+/** How many times each hand-tenant service is referenced in a source. */
+function handTenantReferencesIn(source: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const match of withoutComments(source).matchAll(HAND_TENANT_SERVICE)) {
+    const service = match[1] as string;
+    counts[service] = (counts[service] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Every router under `server/api/routers` that calls, or hands over, a
+ * proof-taking service: a router passing `traces.spans` to a helper reaches
+ * it as surely as one calling it.
+ */
+function routersReachingProofTakingServices(): string[] {
+  return sourceFilesUnder(path.join(SRC, "server/api/routers"))
+    .filter((file) => !isTestFile(file))
+    .filter((file) =>
+      CONVERTED_SERVICE_READ.test(
+        withoutComments(readFileSync(path.join(APP, file), "utf8")),
+      ),
+    )
+    .map((file) => path.relative(SRC, path.join(APP, file)))
+    .sort();
+}
+
 describe("store calls carry authorization", () => {
   describe("given the fence is the only tenant predicate", () => {
     /** @scenario "Trace repositories write no tenant of their own" */
@@ -766,6 +882,102 @@ describe("store calls carry authorization", () => {
       );
 
       expect(stale).toEqual([]);
+    });
+  });
+
+  describe("given a trace route calls a trace service", () => {
+    /** @scenario "A trace route without a proof fails the build" */
+    it("hands every proof-taking service the proof by name", () => {
+      const missing = TRACE_ROUTERS.flatMap((file) =>
+        serviceCallsWithoutProofIn({ file, source: read(file) }),
+      );
+
+      expect(missing).toEqual([]);
+    });
+
+    it("lists every router that reaches a proof-taking service", () => {
+      // A new router reaching a trace service joins the list, or the checks
+      // above never read it.
+      expect(routersReachingProofTakingServices()).toEqual(
+        [...TRACE_ROUTERS].sort(),
+      );
+    });
+
+    it.each([
+      {
+        shape: "a project id passed by position",
+        source: [
+          "export const fixtureRouter = createTRPCRouter({",
+          "  spans: protectedProcedure",
+          "    .query(async ({ ctx, input }) => {",
+          "      const authorization = requireRouteAuthorization(ctx);",
+          "      return getApp().traces.spans.getSpansByTraceId(input.projectId, input.traceId);",
+          "    }),",
+          "});",
+        ],
+        expected: [
+          "fixture.ts:5 traces.spans.getSpansByTraceId passes no proof",
+        ],
+      },
+      {
+        shape: "a project id passed by name, with a comment naming the proof",
+        source: [
+          "export const fixtureRouter = createTRPCRouter({",
+          "  evals: protectedProcedure",
+          "    .query(async ({ input }) => {",
+          "      return getApp().evaluations.runs.findByTraceId({",
+          "        // authorization is the caller's job",
+          "        tenantId: input.projectId,",
+          "        traceId: input.traceId,",
+          "      });",
+          "    }),",
+          "});",
+        ],
+        expected: [
+          "fixture.ts:4 evaluations.runs.findByTraceId passes no proof",
+        ],
+      },
+      {
+        shape: "the proof passed by name",
+        source: [
+          "export const fixtureRouter = createTRPCRouter({",
+          "  evals: protectedProcedure",
+          "    .query(async ({ ctx, input }) => {",
+          "      return getApp().evaluations.runs.findByTraceId({",
+          "        authorization: requireRouteAuthorization(ctx),",
+          "        traceId: input.traceId,",
+          "      });",
+          "    }),",
+          "});",
+        ],
+        expected: [],
+      },
+    ])("refuses $shape unless the call carries the proof", ({
+      source,
+      expected,
+    }) => {
+      expect(
+        serviceCallsWithoutProofIn({
+          file: "fixture.ts",
+          source: source.join("\n"),
+        }),
+      ).toEqual(expected);
+    });
+
+    it("keeps the hand-tenant reads to the baseline, and the baseline to what is still there", () => {
+      const counted = TRACE_ROUTERS.flatMap((file) =>
+        Object.entries(handTenantReferencesIn(read(file))).map(
+          ([service, references]) => ({ file, service, references }),
+        ),
+      );
+
+      expect(counted).toEqual(
+        HAND_TENANT_READS.map(({ file, service, references }) => ({
+          file,
+          service,
+          references,
+        })),
+      );
     });
   });
 });
