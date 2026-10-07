@@ -18,7 +18,8 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
-import { landingProjectOf } from "../project-kinds";
+import { InviteService } from "~/server/invites/invite.service";
+import { AGGREGATE_PROJECT_KIND, landingProjectOf } from "../project-kinds";
 import {
   type AggregateFixture,
   realOrganizationService,
@@ -90,6 +91,58 @@ describe("Feature: an aggregate is never the default landing project", () => {
         expect(landingProjectOf([...sharedTeamProjects].reverse())?.id).toBe(
           fixture.shared.id,
         );
+      });
+    });
+  });
+  describe("given an admin is invited to a team whose only project is an aggregate", () => {
+    describe("when the invite is accepted and the app picks where to land", () => {
+      /** @scenario "An aggregate is never the project the app lands on" */
+      it("lands on an ordinary project elsewhere in the organisation", async () => {
+        const viewTeam = await prisma.team.create({
+          data: {
+            name: `View team ${fixture.organizationId}`,
+            slug: `--test-team-view-${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+          },
+        });
+        const onlyAggregate = await prisma.project.create({
+          data: {
+            name: "Team view",
+            slug: `--test-project-team-view-${fixture.organizationId}`,
+            apiKey: `test-key-team-view-${fixture.organizationId}`,
+            teamId: viewTeam.id,
+            language: "other",
+            framework: "other",
+            kind: AGGREGATE_PROJECT_KIND,
+          },
+        });
+        const invite = await prisma.organizationInvite.create({
+          data: {
+            email: `invited-admin-${fixture.organizationId}@example.com`,
+            inviteCode: `invite-${fixture.organizationId}`,
+            expiration: new Date(Date.now() + 60_000),
+            organizationId: fixture.organizationId,
+            teamIds: viewTeam.id,
+            role: "ADMIN",
+          },
+        });
+
+        try {
+          const slug =
+            await InviteService.create(prisma).findLandingProjectSlug(invite);
+
+          expect(slug).not.toBeNull();
+          expect(slug).not.toBe(onlyAggregate.slug);
+          const landed = await prisma.project.findFirstOrThrow({
+            where: {
+              slug: slug ?? "",
+              team: { organizationId: fixture.organizationId },
+            },
+          });
+          expect(landed.kind).not.toBe(AGGREGATE_PROJECT_KIND);
+        } finally {
+          await prisma.organizationInvite.delete({ where: { id: invite.id } });
+        }
       });
     });
   });
