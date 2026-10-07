@@ -931,7 +931,7 @@ function bindingOf(node: Node): { target: Node; value: Node } | undefined {
     isVariableDeclaration(node) ||
     isBindingElement(node) ||
     isParameterDeclaration(node);
-  if (hasInitializer && node.initializer) {
+  if (hasInitializer && node.initializer && node.name) {
     return { target: node.name, value: node.initializer };
   }
   if (
