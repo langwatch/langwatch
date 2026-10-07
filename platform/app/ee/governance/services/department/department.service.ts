@@ -15,9 +15,9 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
 import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
+import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
 
 import { DepartmentRepository } from "../../repositories/department.repository";
-import { PROJECT_KIND } from "../governanceProject.service";
 
 export class DepartmentNotFoundError extends Error {
   readonly code = "department_not_found" as const;
@@ -125,11 +125,17 @@ export class DepartmentService {
    * department currently stored on it. The admin UI joins these against
    * `getAll` to render the assignment pickers. A user shows the email when
    * no display name is set so the row is never blank.
+   *
+   * `governance:view` reaches a non-admin through a custom role, so the
+   * project list hides what `callerOrganizationRole` may not see: the
+   * governance project for everyone, the aggregate for non-admins.
    */
   async getAssignments({
     organizationId,
+    callerOrganizationRole,
   }: {
     organizationId: string;
+    callerOrganizationRole: string | null | undefined;
   }): Promise<DepartmentAssignments> {
     const [members, teams, projects] = await Promise.all([
       this.prisma.organizationUser.findMany({
@@ -148,7 +154,7 @@ export class DepartmentService {
       this.prisma.project.findMany({
         where: {
           team: { organizationId },
-          kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+          kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
         },
         select: { id: true, name: true, departmentId: true },
         orderBy: { name: "asc" },

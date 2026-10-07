@@ -210,7 +210,7 @@ const surfaces: ListingSurface[] = [
     module: "ee/governance/services/department/department.service.ts",
     ids: async () => {
       const assignments = await DepartmentService.create(prisma).getAssignments(
-        { organizationId },
+        { organizationId, callerOrganizationRole: OrganizationUserRole.ADMIN },
       );
       return assignments.projects.map((p) => p.id);
     },
@@ -374,11 +374,6 @@ const AGGREGATE_FILTERED_ELSEWHERE: Record<
     count: 1,
     reason:
       "lists connected agents, and an aggregate has none: it accepts no credential and receives no traces",
-  },
-  "ee/governance/services/department/department.service.ts": {
-    count: 1,
-    reason:
-      "behind governance:view, an organisation-tier permission only the admin role carries",
   },
   "ee/governance/services/setupState.service.ts": {
     count: 1,
@@ -910,6 +905,18 @@ function roleAwareListings({
           callerOrganizationRole: role,
         });
         return teams.flatMap((t) => t.projects.map((p) => p.id));
+      },
+    },
+    {
+      // Behind governance:view, which a custom role can grant without the
+      // admin role, so it asks the role like every other listing.
+      name: "department assignment",
+      module: "ee/governance/services/department/department.service.ts",
+      ids: async () => {
+        const assignments = await DepartmentService.create(
+          prisma,
+        ).getAssignments({ organizationId, callerOrganizationRole: role });
+        return assignments.projects.map((p) => p.id);
       },
     },
     {
