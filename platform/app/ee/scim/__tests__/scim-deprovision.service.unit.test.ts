@@ -14,11 +14,11 @@
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
-import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
 } from "~/server/app-layer/organizations/errors";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
 
 type Reconcile = AggregateReconciler["reconcileOrganizationOrLog"];
@@ -55,7 +55,9 @@ describe("ScimDeprovisionService", () => {
     grants = createGrants();
     syncLifecycle = createSyncLifecycle();
     aggregateMembers = {
-      reconcileOrganizationOrLog: vi.fn<Reconcile>().mockResolvedValue(undefined),
+      reconcileOrganizationOrLog: vi
+        .fn<Reconcile>()
+        .mockResolvedValue(undefined),
     };
   });
 
@@ -91,9 +93,10 @@ describe("ScimDeprovisionService", () => {
         op: "delete_user",
       });
 
-      expect(aggregateMembers.reconcileOrganizationOrLog).toHaveBeenCalledWith(
-        { organizationId: ORGANIZATION, trigger: "member-offboarded" },
-      );
+      expect(aggregateMembers.reconcileOrganizationOrLog).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        trigger: "member-offboarded",
+      });
     });
   });
 
@@ -150,7 +153,9 @@ describe("ScimDeprovisionService", () => {
         })
         .catch(() => undefined);
 
-      expect(aggregateMembers.reconcileOrganizationOrLog).not.toHaveBeenCalled();
+      expect(
+        aggregateMembers.reconcileOrganizationOrLog,
+      ).not.toHaveBeenCalled();
     });
 
     it("surfaces it as a dead letter naming the person and the operation", async () => {

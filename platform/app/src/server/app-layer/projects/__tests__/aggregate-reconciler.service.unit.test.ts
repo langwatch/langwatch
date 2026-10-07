@@ -8,6 +8,7 @@
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ScheduledJobRecord } from "../../scheduler/scheduler.types";
 import {
   AGGREGATE_ARCHIVED,
   AGGREGATE_RECONCILE_SWEEP,
@@ -18,7 +19,6 @@ import {
   type SharedProjectGrantsLedger,
 } from "../aggregate-reconciler.service";
 import type { AggregateRule } from "../aggregate-rule";
-import type { ScheduledJobRecord } from "../../scheduler/scheduler.types";
 import type {
   AggregateProjectRepository,
   AggregateReconcileLock,
@@ -152,8 +152,9 @@ function aggregatesOf(
 /** A scheduler table holding the sweep rows written, keyed by target. */
 function inMemorySchedule(existingTargetIds: string[] = []) {
   const targets = new Set(existingTargetIds);
-  const upserts: Array<Parameters<AggregateSweepSchedule["upsertForTarget"]>[0]> =
-    [];
+  const upserts: Array<
+    Parameters<AggregateSweepSchedule["upsertForTarget"]>[0]
+  > = [];
   const schedule: AggregateSweepSchedule = {
     async upsertForTarget(params) {
       upserts.push(params);
@@ -384,7 +385,12 @@ describe("AggregateReconciler", () => {
           stored: [aggregate({ rule: null })],
         }).reconcile({ aggregateProjectId: "agg_1" });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
+        expect(result).toEqual({
+          attached: [],
+          revoked: [],
+          unchanged: [],
+          failed: [],
+        });
         expect(rows).toHaveLength(1);
         expect(revoked).toHaveLength(0);
       });
@@ -415,7 +421,12 @@ describe("AggregateReconciler", () => {
           stored: [aggregate({ archived: true })],
         }).reconcile({ aggregateProjectId: "agg_1" });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
+        expect(result).toEqual({
+          attached: [],
+          revoked: [],
+          unchanged: [],
+          failed: [],
+        });
         expect(rows).toHaveLength(0);
       });
     });
@@ -430,7 +441,12 @@ describe("AggregateReconciler", () => {
           aggregateProjectId: "p_ordinary",
         });
 
-        expect(result).toEqual({ attached: [], revoked: [], unchanged: [], failed: [] });
+        expect(result).toEqual({
+          attached: [],
+          revoked: [],
+          unchanged: [],
+          failed: [],
+        });
         expect(rows).toHaveLength(0);
       });
     });
@@ -547,7 +563,9 @@ describe("AggregateReconciler", () => {
             trigger: "aggregate-created",
             error: expect.objectContaining({ message: "ledger unavailable" }),
           }),
-          expect.stringContaining("failed to reconcile a new aggregate project"),
+          expect.stringContaining(
+            "failed to reconcile a new aggregate project",
+          ),
         );
         expect(captureException).toHaveBeenCalledWith(
           expect.objectContaining({ message: "ledger unavailable" }),

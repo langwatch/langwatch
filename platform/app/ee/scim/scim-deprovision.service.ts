@@ -105,8 +105,7 @@ export class ScimDeprovisionService {
       // Never throws: the removal stands, and each aggregate's nightly sweep
       // is the retry.
       await (
-        this.deps.aggregateMembers ??
-        tryGetApp()?.projects.aggregateReconciler
+        this.deps.aggregateMembers ?? tryGetApp()?.projects.aggregateReconciler
       )?.reconcileOrganizationOrLog({
         organizationId,
         trigger: "member-offboarded",

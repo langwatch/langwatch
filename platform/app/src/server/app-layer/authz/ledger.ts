@@ -862,7 +862,8 @@ export class GrantsLedgerWriter {
         select: { id: true, revokedAt: true },
       });
       if (!taken) return { grantId, occurredAtMs, live: false };
-      if (taken.revokedAt === null) return { grantId, occurredAtMs, live: true };
+      if (taken.revokedAt === null)
+        return { grantId, occurredAtMs, live: true };
       occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
     }
   }

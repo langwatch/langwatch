@@ -86,7 +86,10 @@ export class DepartmentService {
        * aggregates. Unset means the App's reconciler, resolved when a member
        * moves.
        */
-      aggregateMembers?: Pick<AggregateReconciler, "reconcileOrganizationOrLog">;
+      aggregateMembers?: Pick<
+        AggregateReconciler,
+        "reconcileOrganizationOrLog"
+      >;
     } = {},
   ) {
     this.repo = deps.repo ?? new DepartmentRepository();

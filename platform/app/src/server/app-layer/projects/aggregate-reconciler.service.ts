@@ -486,28 +486,31 @@ export class AggregateReconciler {
   }: {
     aggregateProjectId: string;
   }): Promise<string[]> {
-    return this.deps.lock.withAggregateLock({ aggregateProjectId }, async () => {
-      await this.unscheduleSweep({ aggregateProjectId });
-      const aggregate = await this.deps.aggregates.findAggregate({
-        aggregateProjectId,
-      });
-      if (!aggregate) return [];
-      const revoked = await this.deps.ledger().revokeSharedProjectGrants({
-        organizationId: aggregate.organizationId,
-        readerProjectId: aggregateProjectId,
-        actor: ACTOR,
-        reason: AGGREGATE_ARCHIVED,
-      });
-      logger.info(
-        {
-          organizationId: aggregate.organizationId,
+    return this.deps.lock.withAggregateLock(
+      { aggregateProjectId },
+      async () => {
+        await this.unscheduleSweep({ aggregateProjectId });
+        const aggregate = await this.deps.aggregates.findAggregate({
           aggregateProjectId,
-          revoked: revoked.length,
-        },
-        "retired an archived aggregate project's shared reads",
-      );
-      return revoked;
-    });
+        });
+        if (!aggregate) return [];
+        const revoked = await this.deps.ledger().revokeSharedProjectGrants({
+          organizationId: aggregate.organizationId,
+          readerProjectId: aggregateProjectId,
+          actor: ACTOR,
+          reason: AGGREGATE_ARCHIVED,
+        });
+        logger.info(
+          {
+            organizationId: aggregate.organizationId,
+            aggregateProjectId,
+            revoked: revoked.length,
+          },
+          "retired an archived aggregate project's shared reads",
+        );
+        return revoked;
+      },
+    );
   }
 
   /** Switches the aggregate's nightly sweep off, as an archived one reads nothing. */

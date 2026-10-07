@@ -293,7 +293,8 @@ describe("given a shared project read in the ledger", () => {
     let firstLookup = true;
     const racedPrisma = new Proxy(prisma, {
       get(target, property, receiver) {
-        if (property !== "grant") return Reflect.get(target, property, receiver);
+        if (property !== "grant")
+          return Reflect.get(target, property, receiver);
         return new Proxy(target.grant, {
           get(grants, method, grantsReceiver) {
             if (method === "findFirst" && firstLookup) {
