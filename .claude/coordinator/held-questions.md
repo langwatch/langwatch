@@ -383,3 +383,10 @@ recommendation, and "default taken" if a lane proceeded on it.
 
 - `customGraph` (analytics lends it to project's home): its props name dashboard's `CustomGraphInput` (graph type and colour-set literal unions over analytics' series schemas) and design-system's `SystemStyleObject` (`titleProps`); a client may import neither. Same open choice as r-lends-1's line: widen to `string` or copy the literal unions. No recommendation on record: stopped, held for Alex.
 - Readers cannot import a new `<owner>-client` until its `package.json` line is installed (shared), and LANE.md §5 forbids importing before declaring; the wave runs in two steps (scaffold and request, then convert after the install). Default taken, held for Alex.
+- `ManagedModelProviderAlertToken` (managed-provider lends it to core model-provider): oxlint `package-boundaries` refuses core importing `@langwatch/enterprise-managed-provider-client`, while the enforcer treats a client like a contract. Options: keep the token in the enterprise contract, have model-provider declare an extension token managed-provider lends, or let the rule admit an enterprise client. No recommendation on record: stopped, held for Alex.
+
+### r-ops-upgrade-page
+
+- `presence.onUpgradeReadHints` answers `{ path: "upgrade.run" }` (presence's `readHintSchema`), not the runner's full hint: the presence contract would otherwise import `@langwatch/upgrade/runner` (Node-only) into every browser. The page re-reads all mounted `ops.upgrade.*` reads on any hint. Default taken, held for Alex.
+- `PresenceApi.upgradeReadHints` is the one new presence operation behind that stream (the manifest's target shape implies it; the ruling names the relay, not the operation). Default taken, held for Alex.
+- The ops browser opens presence's stream through `useUiRpc().subscribe("presence.onUpgradeReadHints", ...)` (the shell's own spelling, packages/browser/src/query-hints.ts:37), so ops-browser gains no presence-contract edge. Default taken, held for Alex.
