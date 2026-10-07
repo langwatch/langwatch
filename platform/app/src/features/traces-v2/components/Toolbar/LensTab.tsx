@@ -158,6 +158,57 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
 };
 
 /**
+ * The body of the unsaved-changes popover: what the changes are, and what can
+ * be done with them. Saving as a new lens is offered only where the project
+ * takes lens writes.
+ */
+const DraftDotOptions: React.FC<{
+  lensName: string;
+  canSaveLenses: boolean;
+  onDiscard: () => void;
+  onSaveAsNew: () => void;
+}> = ({ lensName, canSaveLenses, onDiscard, onSaveAsNew }) => (
+  <PopoverBody>
+    <Stack gap={3}>
+      <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
+        You've changed columns, filters or sort on{" "}
+        <Text as="span" color="fg" fontWeight="semibold">
+          {lensName}
+        </Text>
+        .{" "}
+        {canSaveLenses
+          ? "These edits live in your browser only. Save them as a new lens to keep them, or discard to snap back."
+          : "These edits live in your browser only. Discard them to snap back."}
+      </Text>
+      <HStack gap={2} justify="flex-end">
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDiscard();
+          }}
+        >
+          Discard changes
+        </Button>
+        {canSaveLenses && (
+          <Button
+            size="xs"
+            colorPalette="orange"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSaveAsNew();
+            }}
+          >
+            Save as new lens
+          </Button>
+        )}
+      </HStack>
+    </Stack>
+  </PopoverBody>
+);
+
+/**
  * Orange dot marking a lens with unsaved local edits. Clicking the dot
  * opens a popover explaining "changes made" and offering Discard /
  * Save as new lens. Replaces the previous bare dot — which carried the
@@ -236,46 +287,18 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
               />
             </PopoverTrigger>
             <PopoverContent width="280px">
-              <PopoverBody>
-                <Stack gap={3}>
-                  <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
-                    You've changed columns, filters or sort on{" "}
-                    <Text as="span" color="fg" fontWeight="semibold">
-                      {lensName}
-                    </Text>
-                    .{" "}
-                    {canSaveLenses
-                      ? "These edits live in your browser only. Save them as a new lens to keep them, or discard to snap back."
-                      : "These edits live in your browser only. Discard them to snap back."}
-                  </Text>
-                  <HStack gap={2} justify="flex-end">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        revertLens(lensId);
-                        setPopoverOpen(false);
-                      }}
-                    >
-                      Discard changes
-                    </Button>
-                    {canSaveLenses && (
-                      <Button
-                        size="xs"
-                        colorPalette="orange"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPopoverOpen(false);
-                          setSaveDialogOpen(true);
-                        }}
-                      >
-                        Save as new lens
-                      </Button>
-                    )}
-                  </HStack>
-                </Stack>
-              </PopoverBody>
+              <DraftDotOptions
+                lensName={lensName}
+                canSaveLenses={canSaveLenses}
+                onDiscard={() => {
+                  revertLens(lensId);
+                  setPopoverOpen(false);
+                }}
+                onSaveAsNew={() => {
+                  setPopoverOpen(false);
+                  setSaveDialogOpen(true);
+                }}
+              />
             </PopoverContent>
           </PopoverRoot>
         </Box>

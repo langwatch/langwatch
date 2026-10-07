@@ -56,6 +56,43 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
 }
 
 /**
+ * The three lens writes the sync bridge mirrors to the server.
+ *
+ * Every lens write reloads the strip from the server once it settles. On
+ * success that picks up the saved row; on a refusal it drops the lens the
+ * store added locally, so nothing lingers that the server never kept. A
+ * refusal also tells the user, since the store wrote first and showed it as
+ * done.
+ */
+function useLensWriteMutations(projectId: string | undefined) {
+  const utils = api.useUtils();
+  const reloadLenses = () => {
+    if (projectId) {
+      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
+    }
+  };
+  const lensWriteOptions = (fallbackTitle: string) => ({
+    onSuccess: reloadLenses,
+    onError: (error: unknown) => {
+      showErrorToast({ error, fallbackTitle });
+      reloadLenses();
+    },
+  });
+
+  return {
+    createMutation: api.savedViews.create.useMutation(
+      lensWriteOptions("Couldn't save the lens"),
+    ),
+    renameMutation: api.savedViews.rename.useMutation(
+      lensWriteOptions("Couldn't rename the lens"),
+    ),
+    deleteMutation: api.savedViews.delete.useMutation(
+      lensWriteOptions("Couldn't delete the lens"),
+    ),
+  };
+}
+
+/**
  * Wires the lens viewStore to the server-side SavedView table. Call
  * once at the top of TracesPage. The hook:
  *
@@ -75,7 +112,6 @@ function decode(id: string, name: string, filters: unknown): LensConfig | null {
 export function useLensSync(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const utils = api.useUtils();
 
   const lensesQuery = api.savedViews.getAll.useQuery(
     { projectId: projectId ?? "", kind: KIND },
@@ -89,33 +125,8 @@ export function useLensSync(): void {
     },
   );
 
-  // Every lens write reloads the strip from the server once it settles. On
-  // success that picks up the saved row; on a refusal it drops the lens the
-  // store added locally, so nothing lingers that the server never kept. A
-  // refusal also tells the user, since the store wrote first and showed it as
-  // done.
-  const reloadLenses = () => {
-    if (projectId) {
-      void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
-    }
-  };
-  const lensWriteOptions = (fallbackTitle: string) => ({
-    onSuccess: reloadLenses,
-    onError: (error: unknown) => {
-      showErrorToast({ error, fallbackTitle });
-      reloadLenses();
-    },
-  });
-
-  const createMutation = api.savedViews.create.useMutation(
-    lensWriteOptions("Couldn't save the lens"),
-  );
-  const renameMutation = api.savedViews.rename.useMutation(
-    lensWriteOptions("Couldn't rename the lens"),
-  );
-  const deleteMutation = api.savedViews.delete.useMutation(
-    lensWriteOptions("Couldn't delete the lens"),
-  );
+  const { createMutation, renameMutation, deleteMutation } =
+    useLensWriteMutations(projectId);
 
   // Refs so the bridge closures stay stable across renders — `set...Bridge`
   // is called once on mount, but the mutate functions identity changes
