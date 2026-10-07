@@ -11,11 +11,16 @@ import {
   scimCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
+import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { ScimModule } from "./app/scim.app.ts";
 import { scimCostCenterEventing } from "./eventing/scim-cost-center.pipeline.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
-import { scimSsoConnectionEventing } from "./eventing/scim-sso-connection.pipeline.ts";
+import {
+  SCIM_SSO_CONNECTION_PIPELINE_NAME,
+  scimSsoConnectionEventing,
+} from "./eventing/scim-sso-connection.pipeline.ts";
+import { SCIM_SSO_CONNECTION_PROJECTION_NAME } from "./eventing/scim-sso-connection.projection.ts";
 import { scimSyncEventing } from "./eventing/scim-sync.pipeline.ts";
 import { scimEventing } from "./eventing/scim.pipeline.ts";
 import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
@@ -68,4 +73,12 @@ export const scimProcessModule = defineProcessModule("scim")
   .withEventing(scimDirectoryEventing)
   .withEventing(scimSyncEventing)
   .withEventing(scimCostCenterEventing)
-  .withEventing(scimSsoConnectionEventing);
+  .withEventing(scimSsoConnectionEventing)
+  .withMigrations(({ replayer }) => [
+    defineProjectionReplayStep({
+      id: "scim:replay-sso-connection-view",
+      description: "Fills SCIM's SSO connection view from identity's connection log at deploy.",
+      lane: `${SCIM_SSO_CONNECTION_PIPELINE_NAME}.${SCIM_SSO_CONNECTION_PROJECTION_NAME}`,
+      replayer,
+    }),
+  ]);

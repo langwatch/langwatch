@@ -32,6 +32,15 @@ Feature: SCIM folds identity's SSO connection facts into its own connection list
     And folding identity's stored facts rebuilds the connection as live delivery does
 
   @unit
+  Scenario: The worker collects SCIM's connection view replay step and it fills an empty view once
+    Given a worker installs SCIM over an empty connection view
+    And identity's connection log holds a registered and activated connection
+    When the worker collects its migration steps
+    Then it collects "scim:replay-sso-connection-view" as a background data step
+    And running it fills the view with the activated connection
+    And a second run from the first run's cursor replays nothing and leaves the view as it was
+
+  @unit
   Scenario: SCIM reads back every connection state identity's reducer folds
     Given identity's reducer folded a connection through a rejection, an attestation and a ceremony in flight
     And identity's reducer folded a connection whose first fact SCIM saw was not its registration

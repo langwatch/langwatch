@@ -13,7 +13,11 @@ import {
   type EventSourcingOptions,
   type EventStore,
   EventStoreProducerOnly,
+  pipelineUpcastsOf,
   type ProcessStore,
+  replayLeanOf,
+  ReplayService,
+  upcastReplayEventSource,
 } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
@@ -22,6 +26,7 @@ import {
   createReadHintsPipeline,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  EventingClickHouseReplayEventSource,
   OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
   type EventingClickHouseClientResolver,
@@ -104,6 +109,14 @@ export function buildEventing(options: {
           maintenance: eventingMaintenance({ redis: options.redis, processStore }),
           readHints: readHintsOver(options.redis),
         }),
+    ...(options.redis === undefined || options.eventLog === undefined
+      ? {}
+      : {
+          replayEngine: replayEngineOver({
+            redis: options.redis,
+            clickhouse: options.eventLog.clickhouse,
+          }),
+        }),
   });
 
   return { value: eventing, close: () => eventing.close() };
@@ -147,6 +160,45 @@ function readHintsOver(redis: RedisConnection): NonNullable<EventSourcingOptions
       declaredEventTypes,
       publish: (channel, message) => redis.publish(channel, message),
     });
+}
+
+/**
+ * One replay run's engine: the event log through the routed member, markers on a standalone
+ * Redis connection sharing no socket with live traffic. A Cluster refuses replay's multi-key
+ * operations (CROSSSLOT), as on main.
+ */
+function replayEngineOver({
+  redis,
+  clickhouse,
+}: {
+  readonly redis: RedisConnection;
+  readonly clickhouse: ClickHouseQueryClient;
+}): NonNullable<EventSourcingOptions["replayEngine"]> {
+  return ({ definitions, retentionPolicyResolver }) => {
+    if (redis.isCluster) {
+      throw new Error(
+        "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
+      );
+    }
+    const connection = redis.duplicate();
+    const service = new ReplayService({
+      eventSource: upcastReplayEventSource({
+        source: new EventingClickHouseReplayEventSource({
+          clickhouse,
+          lean: replayLeanOf(definitions),
+        }),
+        upcasts: pipelineUpcastsOf(definitions),
+      }),
+      redis: connection,
+      ...(retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver }),
+    });
+    return {
+      service,
+      close: async () => {
+        connection.disconnect();
+      },
+    };
+  };
 }
 
 /** Where this role appends: a producer refuses reads, a draining role reads the event log. */

@@ -34,6 +34,7 @@ import type {
   JobDelivery,
 } from "./queues/index.ts";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
+import type { ReplayService } from "./replay/replayService.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.ts";
 import { EventSourcingPipeline } from "./runtimePipeline.ts";
 import {
@@ -98,6 +99,11 @@ export interface EventSourcingOptions {
     hinted: ReadHintMap;
     declaredEventTypes: ReadonlySet<string>;
   }) => StaticPipelineDefinition<never>;
+  /** Opens one replay run's engine over the event log; absent where the role holds no log. */
+  replayEngine?: (input: {
+    definitions: readonly SealedPipelineDefinition[];
+    retentionPolicyResolver?: RetentionPolicyResolver;
+  }) => { service: ReplayService; close: () => Promise<void> };
 }
 
 /**
@@ -160,6 +166,7 @@ export class EventSourcing {
   private readonly _participation?: EventingParticipation;
   private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
   private readonly _readHints?: EventSourcingOptions["readHints"];
+  private readonly _replayEngine?: EventSourcingOptions["replayEngine"];
   private _processRuntimeInstance?: ProcessRuntime;
   /** Each registered pipeline's re-drive of its recorded hand-offs, by pipeline name. */
   private readonly handoffRedrives = new Map<
@@ -185,6 +192,7 @@ export class EventSourcing {
     this._participation = options.participation;
     this._maintenance = options.maintenance;
     this._readHints = options.readHints;
+    this._replayEngine = options.replayEngine;
 
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
@@ -383,6 +391,16 @@ export class EventSourcing {
     if (this._described.size === 0) return this._definitions;
     const kept = this._definitions.filter(({ metadata }) => !this._described.has(metadata.name));
     return [...kept, ...this._described.values()];
+  }
+
+  /** One replay run's engine over the registered pipelines; undefined where none is wired. */
+  replayEngine(): { service: ReplayService; close: () => Promise<void> } | undefined {
+    return this._replayEngine?.({
+      definitions: this.definitions,
+      ...(this._retentionPolicyResolver === undefined
+        ? {}
+        : { retentionPolicyResolver: this._retentionPolicyResolver }),
+    });
   }
 
   /** Lists a pipeline's consume side without starting it: no queue, consumer, timer or sender. */

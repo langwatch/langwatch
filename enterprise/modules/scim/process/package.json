@@ -55,6 +55,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
