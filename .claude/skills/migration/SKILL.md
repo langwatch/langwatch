@@ -123,3 +123,12 @@ in background, Up to date. The Upgrades page (`/ops/upgrades`, platform operator
 release's steps with the **description** you wrote, and refreshes on the runner's read hint. Settings,
 Checkup and `langwatch doctor` name pending or failed migrations with the fix. A refused process logs
 the outstanding step ids and `pnpm task upgrade`. Operator docs: `docs/self-hosting/upgrade.mdx`.
+
+On the console, every upgrade line carries `phase`, `waitingOn`, `elapsedMs` and `next` (the operator's
+next action), and no line carries a password or token. A first run opens with a banner, says how many
+migrations it applies before the api and worker serve, and ends with "first run finished in N ms". Each
+phase logs its start and its end with its time; each blocking step is named before it runs and timed
+after. A runner waiting for the lease names the holder every 30 s. The task's last line names the UI's
+address from `BASE_HOST` and `pnpm task upgrade status`. A serving process logs its ledger check and
+the time it took; a lapsed presence says readiness answers 503 and, on a worker, that it takes no new
+jobs while in-flight ones finish; recovery says how long serving stopped.

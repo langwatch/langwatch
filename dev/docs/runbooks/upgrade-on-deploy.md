@@ -76,6 +76,26 @@ A background step that fails does not fail a deploy, because it runs on the
 worker after the rollout. It surfaces through metrics and alerts, and the step
 stays `failed` in the ledger until a later build fixes it.
 
+## Reading the console
+
+Every line `pnpm task upgrade` writes names its `phase`, what it is waiting on
+(`waitingOn`), the milliseconds so far (`elapsedMs`) and the operator's next
+action (`next`). Passwords and tokens are masked. A first run opens with a
+banner, says how many schema migrations and blocking steps it applies before the
+api and worker serve, and closes with "first run finished in N ms". Each phase
+(preflight, Postgres schema, ClickHouse schema, reconcile) logs its start and its
+end with its time, and each blocking step is named before it runs. A second
+runner waiting for the lease names the holder and how long it has waited, every
+30 s. A failure names its code and the command or setting that fixes it. The last
+line names the UI's address from `BASE_HOST` and `pnpm task upgrade status`.
+Exit codes are unchanged.
+
+An api or worker logs that it is checking the ledger, then that it serves and how
+long the check took. If its presence lapses, it logs that readiness answers 503;
+a worker also takes no new jobs while in-flight ones finish. When a presence
+write succeeds again it logs how long serving stopped, and the worker takes jobs
+again.
+
 ## How long presence takes to clear
 
 - **Graceful stop**: the row is deleted as the process shuts down, so it stops
