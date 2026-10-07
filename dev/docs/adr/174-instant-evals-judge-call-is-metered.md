@@ -10,6 +10,8 @@
 
 - tasks#915 makes Instant Evals a judge model on every LLM-as-a-judge evaluator. tasks#902 asks for the same thing and says every call goes through the gateway on purpose. The two issues are to be merged before wave 2.
 - This record covers wave 1 only: question building, result mapping, the metered call and the picker entry. Wave 1 calls the classifier the way the search bar and runs already do, inside the app. Whether the call later travels out through a Lambda and back through the gateway is wave 2. Self-hosted installs are wave 3.
+- Hard rule (the user, 2026-10-08): customers use LangWatch's servers and never supply their own classifier key. The judge runs on cloud only in wave 1 (decision 14).
+- Instant Evals is on main today, under `platform/app`. This pull request stacks on #7536, which moves it into `modules/instant-eval` and lands on main first. Nobody is charged for Instant Evals yet: the meter's code exists, but neither Stripe catalogue holds an Instant Evals price.
 - ADR-144 says a search-bar classification is "counted, not metered". That stays true for the search bar. A judge call is a customer's evaluation, so it is metered. This record is the exception, and ADR-144 is unchanged.
 - ADR-153 (the run is a judgment job) holds a budget reservation per run. A judge call is not a run.
 - What breaks if this is wrong: customer money, and guardrails that block the wrong outputs.
@@ -36,9 +38,13 @@
    | `classifier_input_too_large`                                                | `skipped`, with the reason in details                           |
    | `classifier_not_configured`, `classifier_rate_limited`, `classifier_failed` | `error`, so alerts fire                                         |
    | Free budget spent (decision 12)                                             | `error`, carrying the code `instant_eval_free_budget_exhausted` |
+   | Project the judge leaf does not know yet (decision 15)                      | `error`, carrying the code `instant_eval_project_unknown`       |
+   | Install is not LangWatch cloud (decision 14)                                | `error`, as `classifier_not_configured`                         |
+   | Guardrail on the stream chunk direction (decision 16)                       | `skipped`, with the reason in details                           |
 
    An `error` reaches each caller the way any judge error does today, such as a missing provider key. A guardrail follows its own fail-open or fail-closed setting, so a fail-closed guardrail blocks once a free organization is past $1. This was the user's call. A monitor records the error, so its alerts fire.
    - The Instant Evals branch catches the refusal and returns the `error` result itself. A thrown refusal would reach the outcome handler as a customer fault and become `skipped`, which a guardrail allows.
+   - The error code survives into the stored result. Today `executionResultOf` (`evaluation-execution-result.rules.ts`) drops `error_type`, so wave 1 carries it through.
 
 8. **One call is check, classify, record.**
    - Check the organization's spend against the free budget. A spent budget refuses here, before the classifier is called.
@@ -56,10 +62,12 @@
    - A client that retries a REST call pays twice, as it would at its own provider today.
 10. **A new method on the Instant Evals judge's contract** answers one judge call. It sits on the leaf's contract, not the Instant Evals contract (decision 13). It takes the project, the text, the question and an optional request key, and returns the verdict plus the price charged.
 11. **The picker reuses the release flag `release_instant_evals`, and the option works in wave 1.** This was the user's call over a separate judge flag. The picker ships in the same pull request as the rest of wave 1. The judge model id is `langwatch/instant-evals`. The evaluation module answers it before any provider lookup, so a project with no model provider can pick it too.
-12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. Billing keeps the rule for whether the meter bills an organization: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing now publishes that rule as an event the judge leaf folds (decision 13), and the monthly report reads the same rule. The Instant Evals run row cap reads the same fold, so the two caps agree. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
+12. **Only usage-billed organizations judge without a cap.** The $1 cap applies to every organization the meter does not bill: free plans, and paid plans on tiered pricing. Before, the cap read only the plan's free flag and the meter read only the pricing model, so a paid tiered organization was neither capped nor charged. Nobody had decided that overlap. Billing keeps the rule for whether the meter bills an organization: usage pricing, a Stripe customer and an active subscription, or a connected self-hosted account. Billing now publishes that rule as an event the judge leaf folds (decision 13), and the monthly report reads the same rule. The Instant Evals run row cap reads the same fold, so the two caps agree. Kept in v8 after a review against main: capping every organization would cap Growth customers, who have no cap today. Until the Stripe price for Instant Evals exists, usage-billed organizations judge uncapped and uncharged, and every call still writes its spend row, so it can be charged once the price exists. Consequence: a paying tiered customer stops at $1 until top-up lands in wave 3, then uses their own provider key. This also closes the gap for Instant Evals runs, which share the check. A tiered organization already past $1 is refused for runs as well as judges on the day this ships. The refusal message must not tell an organization that already pays to upgrade to a paid plan, so its copy changes in wave 1 to fit both free and paid tiered organizations.
 13. **The judge call lives in a leaf module, so wave 1 adds no peer cycle and cuts no edge.**
     - Why: evaluation calling Instant Evals closes a loop through gateway, and a second one through trace. The policy allows no new cycle. Cutting an existing edge needs a ruling first (ARCHITECTURE, peer cycles), and the leaf alone breaks the new loop, so wave 1 cuts none.
-    - Shape: a new module, the Instant Evals judge (`modules/instant-eval-judge`), with no peer Api dependency. It owns the classifier client, the pricing rule, the budget check and the judge method. Evaluation and Instant Evals both depend on it. This is the shape the guardrail ruling gives the evaluation runtime: a dependency leaf.
+    - Shape: a new module, the Instant Evals judge (`modules/instant-eval-judge`), with no peer Api dependency. It owns the cloud classifier client (LangWatch's own key), the pricing rule, the budget check and the judge method. Evaluation and Instant Evals both depend on it. This is the shape the guardrail ruling gives the evaluation runtime: a dependency leaf.
+    - The Connect classifier stays in Instant Evals. Connect goes through licensing, and licensing lists Instant Evals as a dependency (`licensing.app.ts`), so the leaf calling it would close a loop. Instant Evals keeps choosing between the cloud key and Connect for its runs and search bar, as today.
+    - Own tables: the leaf keeps its own copy of the facts it needs, in its own tables (Schema). This is the documented pattern: "A peer subscriber writes its own read-model row" (ARCHITECTURE, eventing), and authz learns who is deactivated "into its own table, never from the User table". Data privacy, authz and nurturing already do this.
     - Own total: the leaf appends one priced event per call on the organization's aggregate and folds them into that organization's Instant Evals spend. The judge's $1 check reads that total before the classifier is called, so the check stays as immediate as today. This follows entitlement counting from its own meters.
     - Gateway learns by event: the priced event carries the project, organization, model, tokens, price and request id. Gateway peer-subscribes and writes the spend row the meter already reads, looking up the team through the project dependency it already has. The request id makes a repeated event one row. This is how gateway already handles governance's priced pulled usage. The meter does not change.
     - Organization lookup: the leaf folds project's `lw.project.created` into its own project to organization map, as data privacy does. A project move stays inside its organization, so the map never changes after creation. Callers pass only the project.
@@ -68,42 +76,56 @@
     - A run keeps today's rule: if its priced event cannot be stored, the recording fails and the run retries it.
     - Search-bar classification moves with the classifier client and stays unmetered (ADR-144).
     - The picker checks the opt-in. The judge call does not recheck it, since the $1 cap already guards spend.
+14. **The judge runs on LangWatch cloud only, with LangWatch's key.** Customers never supply a classifier key (the user's hard rule). The leaf answers `classifier_not_configured` on any install that is not cloud. The public self-hosting docs, `.env.example` and the error tip in `remediation.ts` stop telling customers to set `JEV_API_KEY` with their own key. Self-hosted judging waits for wave 3. Rejected: letting a self-hosted operator judge with their own key, which the hard rule forbids.
+15. **A project the leaf does not know is refused, never judged free.** The leaf learns each project's organization from project's created event. Until it holds a project, a call for it returns `error` with `instant_eval_project_unknown` and calls no classifier. Rejected: judging an unknown project uncapped, which would let it judge for free and drop its spend row.
+16. **Guardrails never judge a stream chunk.** A guardrail can run on every chunk of a streamed reply, which would charge one reply many times. The guardrail check returns `skipped` on the stream chunk direction, with the reason in details. It still judges the request and the full response.
+17. **Three catch-up jobs run before the flag shows the picker.** Subscribers never replay old events (ARCHITECTURE, eventing), so the leaf's tables start empty.
+    - Projects: re-run project's existing `backfill-project-created` task. It is safe to re-run: the event keeps the key `${projectId}:created`, and duplicates are dropped when the store is read.
+    - Usage billing: a new billing task sends the usage-billed event once for every organization the meter bills today. Without it, those organizations read as capped.
+    - Spend: a new Instant Evals task reads each organization's Instant Evals spend from the gateway ledger and seeds the leaf's total. Instant Evals already depends on both gateway and the leaf, so the task adds no edge. Without it, every organization with spend on main would get a fresh $1.
+    - Instant Evals runs and judged queries record through the leaf too, so on existing projects they are refused (decision 15) from deploy until the project job finishes. The project job runs in the same deploy, right after the migration.
 
 ## Constants
 
-| Name                       | Value                                  | Purpose                                                    |
-| -------------------------- | -------------------------------------- | ---------------------------------------------------------- |
-| Score range default        | min 0, max 1                           | Matches the default score prompt                           |
-| Most levels asked directly | 10 (`maxScoreLevels`)                  | Wider or fractional ranges are asked as 1 to 10 and mapped |
-| Judge model id             | `langwatch/instant-evals`              | What the picker stores as the judge's model                |
-| Boolean threshold          | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean`                                  |
-| Free budget                | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`)    | Unchanged, per free organization                           |
-| Flag                       | `release_instant_evals`                | Shows the picker entry                                     |
+| Name                        | Value                                  | Purpose                                                    |
+| --------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| Score range default         | min 0, max 1                           | Matches the default score prompt                           |
+| Most levels asked directly  | 10 (`maxScoreLevels`)                  | Wider or fractional ranges are asked as 1 to 10 and mapped |
+| Judge model id              | `langwatch/instant-evals`              | What the picker stores as the judge's model                |
+| Boolean threshold           | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean`                                  |
+| Free budget                 | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`)    | Unchanged, per free organization                           |
+| Flag                        | `release_instant_evals`                | Shows the picker entry                                     |
+| Unknown project code        | `instant_eval_project_unknown`         | Refusal before the leaf knows a project (decision 15)      |
+| Skipped guardrail direction | `stream_chunk`                         | The guardrail check never judges it (decision 16)          |
 
 ## Invariants
 
-| Invariant                            | Meaning                                                       | How it holds (test anchor)                                                                                       |
-| ------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| One evaluation, one spend row        | A redelivered command is not billed twice                     | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                        |
-| No tokens, no row                    | A skipped judgement is never billed                           | Unit test on the judge method with a skipped classifier                                                          |
-| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called      |
-| Overshoot is on record               | A call that runs past $1 still writes its spend row           | Unit test: a call admitted while the leaf's total was under $1 records its full price                            |
-| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                        | Builder unit test on the question text, plus one live classifier check before the picker merges                  |
-| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                               |
-| Every skip has a status              | No skip reads as a pass or a crash                            | Unit test over every `skippedReason`                                                                             |
-| Search bar stays unmetered           | ADR-144 still holds                                           | Existing `classify` path untouched; test that it records no spend                                                |
-| No peer cycle                        | Wave 1 adds no edge whose peer reaches back                   | `pnpm lint:architecture --policies peer-cycles --all` shows no new finding, and the ratchet test is not loosened |
-| No edge cut                          | Every existing peer dependency stays                          | Instant Evals still lists gateway; the peer-cycle findings list loses no line                                    |
+| Invariant                            | Meaning                                                         | How it holds (test anchor)                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| One evaluation, one spend row        | A redelivered command is not billed twice                       | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                        |
+| No tokens, no row                    | A skipped judgement is never billed                             | Unit test on the judge method with a skipped classifier                                                          |
+| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying   | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called      |
+| Overshoot is on record               | A call that runs past $1 still writes its spend row             | Unit test: a call admitted while the leaf's total was under $1 records its full price                            |
+| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                          | Builder unit test on the question text, plus one live classifier check before the picker merges                  |
+| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                  | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                               |
+| Every skip has a status              | No skip reads as a pass or a crash                              | Unit test over every `skippedReason`                                                                             |
+| Search bar stays unmetered           | ADR-144 still holds                                             | Existing `classify` path untouched; test that it records no spend                                                |
+| No peer cycle                        | Wave 1 adds no edge whose peer reaches back                     | `pnpm lint:architecture --policies peer-cycles --all` shows no new finding, and the ratchet test is not loosened |
+| No edge cut                          | Every existing peer dependency stays                            | Instant Evals still lists gateway; the peer-cycle findings list loses no line                                    |
+| Unknown project never judged free    | A project the leaf has not learned is refused                   | Unit test: the judge method returns `instant_eval_project_unknown` and the classifier is never called            |
+| Cloud only                           | No install judges with a customer's own key                     | Unit test: off cloud the judge answers `classifier_not_configured` with a key set                                |
+| Stream chunks never judged           | One streamed reply is charged once per direction, not per chunk | Unit test on the guardrail check for the `stream_chunk` direction                                                |
+| Catch-up jobs are safe to re-run     | A second run changes no total and sends no new fact             | Unit tests: seeding twice gives one total; the usage-billed task sends the same key twice                        |
 
 ## Assumptions
 
-| Assumption                                              | What breaks if false                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cloud runs Instant Evals with Redis and `IS_SAAS`       | `INSTANT_EVAL_BOUNDED` arrives with the module tree and is not set in production (checked on the prod cluster, 2026-10-07), so unset follows `IS_SAAS`: cloud is bounded from the day the stack lands, self-hosted is not. Without Redis a bounded process refuses to boot |
-| Every project has an organization                       | A project with none is uncapped and its spend row is dropped, so it judges for free                                                                                                                                                                                        |
-| The langevals service port is internal in production    | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole                                                                                                                                                         |
-| The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas                                                                                                                                                                                                     |
-| No Instant Evals spend exists in production yet         | The module tree has not shipped, so the leaf's total starts at zero with nothing to carry over. If spend exists, the leaf must be seeded from the gateway ledger before the cap goes live                                                                                  |
+| Assumption                                              | What breaks if false                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloud runs Instant Evals with Redis and `IS_SAAS`       | `INSTANT_EVAL_BOUNDED` arrives with the module tree and is not set in production (checked on the prod cluster, 2026-10-07), so unset follows `IS_SAAS`: cloud is bounded from the day the stack lands, self-hosted is not. Without Redis a bounded process refuses to boot. The base branch (#7536) defaults it to false instead, so #7536 must take the same default before it lands, or cloud runs uncapped |
+| Every project has an organization                       | The leaf cannot place the project, so it refuses it (decision 15) and the project can never judge                                                                                                                                                                                                                                                                                                             |
+| The langevals service port is internal in production    | Anyone reaching it runs judges with no app in between. It never reaches Instant Evals, so it is not a billing hole                                                                                                                                                                                                                                                                                            |
+| The three judge settings shapes stay as generated today | The builder maps the wrong field. Its tests read the generated schemas                                                                                                                                                                                                                                                                                                                                        |
+| The gateway ledger holds all Instant Evals spend so far | Main records Instant Evals spend there today. The spend job seeds the leaf from it (decision 17). Spend recorded anywhere else is missed, and those organizations get headroom back                                                                                                                                                                                                                           |
 
 ## Gates
 
@@ -115,10 +137,21 @@
 | Builder and result mapping   | Yes                            | Large for guardrails                      | Unit tests against the generated schemas, plus the polarity check                                                      |
 | Picker entry                 | Yes                            | Large, customer-visible                   | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
 | Judge leaf                   | Yes                            | Medium                                    | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
+| Leaf tables migration        | No, it is a schema migration   | Medium, new tables only                   | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
+| Catch-up jobs                | Yes, each is safe to re-run    | Large, they set every organization's cap  | Re-run tests, then a dry run on staging that prints counts before production                                           |
+| Flag on in production        | Yes                            | Large, customer-visible                   | Only after the three catch-up jobs report done                                                                         |
 
 ## Schema
 
-No database change. The score judge's settings gain an optional `min` and `max` in the langevals settings definition, regenerated into `evaluators.generated.ts`. Old settings without them read as 0 to 1.
+Three new Postgres tables, owned by the judge leaf. Each is a fold of another module's facts or of the leaf's own priced events. They ship in one migration under `packages/prisma-client/prisma/migrations/`, claimed in the table catalogue.
+
+| Table                          | Key              | Columns                       | Fed by                                  |
+| ------------------------------ | ---------------- | ----------------------------- | --------------------------------------- |
+| `InstantEvalJudgeProject`      | `projectId`      | `organizationId`, `createdAt` | project's `lw.project.created`          |
+| `InstantEvalJudgeUsageBilling` | `organizationId` | `usageBilled`, `occurredAt`   | billing's new usage-billed event        |
+| `InstantEvalJudgeSpend`        | `organizationId` | `spendNanoUsd`, `updatedAt`   | the leaf's own priced events, plus seed |
+
+The score judge's settings gain an optional `min` and `max` in the langevals settings definition, regenerated into `evaluators.generated.ts`. Old settings without them read as 0 to 1.
 
 ## Rejected alternatives
 
@@ -145,7 +178,10 @@ No database change. The score judge's settings gain an optional `min` and `max` 
 - Negative: details is a confidence line, not a reason.
 - Positive: wave 1 adds no peer cycle and cuts no edge.
 - Negative: a spend row lands in the gateway ledger a short time after the call, through the event, so the run check lags by that delay.
-- Negative: wave 1 grows by one module, one priced event, one gateway subscriber and one billing event.
+- Negative: wave 1 grows by one module, three tables, one priced event, one gateway subscriber, one billing event and three catch-up jobs.
+- Negative: usage-billed organizations judge uncapped and uncharged until the Stripe price for Instant Evals exists. Every call still writes its spend row.
+- Negative: between deploy and the end of the project job, Instant Evals refuses existing projects.
+- Negative: self-hosted installs lose the documented own-key path. The code still honours an operator-set key for runs and the search bar until wave 3.
 - Neutral: the Instant Evals process lists the evaluator contract as a dependency it never imports. Remove it in the same change.
 
 ## Open questions
@@ -154,6 +190,8 @@ No database change. The score judge's settings gain an optional `min` and `max` 
 - Merging tasks#902 into tasks#915. Owner: the user. Not blocking.
 - Whether an organization's model restrictions should be able to block Instant Evals. The judge skips the provider lookup, which is where restrictions are checked. Owner: the user. Not blocking.
 - Whether the priced event also lets billing meter Instant Evals directly, retiring the gateway spend row. Owner: the user. Not blocking.
+- When the Stripe price for Instant Evals goes live, which turns on charging for usage-billed organizations. Owner: the user. Not blocking.
+- Whether runs and the search bar stop honouring an operator-set key on self-hosted. Owner: the user. Wave 3.
 
 ## Revisions
 
@@ -191,3 +229,13 @@ No database change. The score judge's settings gain an optional `min` and `max` 
   - Instant Evals keeps its gateway dependency, since cutting an edge needs a ruling. Runs and judged queries record through the leaf instead (decision 13).
   - Gateway looks up the team itself. The leaf folds only project creation, since a move stays inside the organization (decision 13).
   - The picker checks the opt-in and the judge call does not recheck it (decision 13). The spend row lag joins the overshoot (decision 8).
+- v8, 2026-10-08, after a review against main. Captain: Sergio Esteban.
+  - The leaf owns three tables. This replaces "no database change" (Schema, decision 13).
+  - The Connect classifier stays in Instant Evals, since the leaf calling it would loop through licensing (decision 13).
+  - Cloud only, no customer key, self-hosted in wave 3. The own-key lines leave the public docs (decision 14).
+  - Unknown projects are refused, not judged free (decision 15).
+  - Guardrails skip the stream chunk direction (decision 16).
+  - Three catch-up jobs run before the flag, including a spend seed from the gateway ledger (decision 17).
+  - Decision 12 kept. Capping every organization was rejected because it would cap Growth customers, who have no cap today.
+  - The base branch must default `INSTANT_EVAL_BOUNDED` to `IS_SAAS` before it lands (Assumptions).
+  - `error_type` survives into the stored result (decision 7).
