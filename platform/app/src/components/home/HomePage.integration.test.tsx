@@ -22,6 +22,7 @@ const gates = {
   langy: false,
   isNewProject: false,
   activePlan: undefined as { free?: boolean | null } | undefined,
+  projectKind: "application",
 };
 
 vi.mock("./useHomeComposition", () => ({
@@ -57,6 +58,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   // about which home composition resolves.
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
+    project: { id: "project-1", kind: gates.projectKind },
     hasPermission: () => false,
   }),
 }));
@@ -138,6 +140,26 @@ describe("HomePage composition", () => {
     gates.langy = false;
     gates.isNewProject = false;
     gates.activePlan = { free: true };
+    gates.projectKind = "application";
+  });
+
+  describe("given the open project is an aggregate", () => {
+    /** @scenario "The aggregate's home points at its traces instead of saying no data" */
+    it.each([
+      "classic",
+      "signal-focused",
+      "langy",
+    ] as const)("shows the traces overview alone on the %s composition", (composition) => {
+      gates.composition = composition;
+      gates.projectKind = "aggregate";
+      renderHome();
+
+      expect(screen.getByTestId("traces-overview")).toBeDefined();
+      expect(screen.queryByTestId("onboarding-checklist")).toBeNull();
+      expect(screen.queryByTestId("recent-items")).toBeNull();
+      expect(screen.queryByTestId("briefing-sheet")).toBeNull();
+      expect(screen.queryByTestId("lantern")).toBeNull();
+    });
   });
 
   describe("given the signal-focused home is enabled but Langy is not", () => {

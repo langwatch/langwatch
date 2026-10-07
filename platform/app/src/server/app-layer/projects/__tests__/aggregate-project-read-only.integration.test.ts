@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * ADR-144 decision 8: the aggregate is read only in v1. Its navigation is
- * Analytics and Traces, and no monitor can be created on it: the refusal is
+ * Traces only, and no monitor can be created on it: the refusal is
  * the server's, so a hidden button is a convenience and not the guard.
  * Driven as an organisation admin, who passes every permission involved.
  *
@@ -58,7 +58,7 @@ describe("Feature: the aggregate project is read only", () => {
   describe("given an organisation admin opening the aggregate", () => {
     describe("when its navigation is built", () => {
       /** @scenario "Test, Build and Online Evals are hidden on the aggregate" */
-      it("shows Traces and Analytics, and no Prompts, Experiments or Online Evaluations", async () => {
+      it("shows Traces, and no Analytics, Prompts, Experiments or Online Evaluations", async () => {
         const organizations = await admin.organization.getAll({});
         const opened = organizations
           .flatMap((organization) => organization.teams)
@@ -68,6 +68,7 @@ describe("Feature: the aggregate project is read only", () => {
 
         const navigation = projectNavigation(opened?.kind);
         expect(navigation.observe).toBe(true);
+        expect(navigation.analytics).toBe(false);
         expect(navigation.onlineEvaluations).toBe(false);
         expect(navigation.test).toBe(false);
         expect(navigation.build).toBe(false);

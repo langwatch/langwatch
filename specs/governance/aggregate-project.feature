@@ -201,8 +201,9 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: Test, Build and Online Evals are hidden on the aggregate
     When ana opens the aggregate project
-    Then the navigation shows Traces and Analytics
-    And Prompts, Experiments and Online Evaluations are absent
+    Then the navigation shows Traces
+    And Analytics, Prompts, Experiments and Online Evaluations are absent
+    # Analytics leaves the navigation until analytics across members ships.
     And no monitor can be created on the aggregate
 
   # ── E. The reconciler keeps members current ──────────────────────────────
@@ -394,3 +395,10 @@ Feature: An aggregate project reads its member projects
     Then no control offers to comment, suggest an edit, edit a trace, automate or add a dashboard
     And its datasets and automations pages say "Data can't be added to this project" instead of offering to create one
     And managing the aggregate itself stays available
+
+  @unit
+  Scenario: The aggregate's home points at its traces instead of saying no data
+    When ana opens the aggregate project's home
+    Then its traces overview says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
+    And it links to the aggregate's Trace Explorer
+    And the home shows no "Nothing here yet", no quick starts and no setup steps

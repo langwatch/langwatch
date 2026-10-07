@@ -74,6 +74,7 @@ export const MainMenuSections = function MainMenuSections({
       <ObserveSection
         {...sectionProps}
         codingAgentLinks={codingAgentLinks}
+        showAnalytics={navigation.analytics}
         showOnlineEvaluations={navigation.onlineEvaluations}
       />
       {navigation.test && (
@@ -148,9 +149,11 @@ function ObserveSection({
   project,
   pathname,
   codingAgentLinks,
+  showAnalytics,
   showOnlineEvaluations,
 }: ProjectSectionProps & {
   codingAgentLinks: CodingAgentLinks;
+  showAnalytics: boolean;
   showOnlineEvaluations: boolean;
 }) {
   return (
@@ -160,14 +163,16 @@ function ObserveSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      <PageMenuLink
-        path={projectRoutes.analytics.path}
-        icon={featureIcons.analytics.icon}
-        label={projectRoutes.analytics.title}
-        project={project}
-        isActive={pathname.includes("/analytics")}
-        showLabel={showExpanded}
-      />
+      {showAnalytics && (
+        <PageMenuLink
+          path={projectRoutes.analytics.path}
+          icon={featureIcons.analytics.icon}
+          label={projectRoutes.analytics.title}
+          project={project}
+          isActive={pathname.includes("/analytics")}
+          showLabel={showExpanded}
+        />
+      )}
       <PageMenuLink
         path={projectRoutes.traces_v2.path}
         icon={featureIcons.traces_v2.icon}

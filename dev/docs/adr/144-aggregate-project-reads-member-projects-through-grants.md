@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-26, revised 2026-10-07
 
-**Status:** Accepted (v4.7, 2026-10-07)
+**Status:** Accepted (v4.8, 2026-10-07)
 
 **Builds on:** ADR-166 (grant-scoped data access: a sealed `Authorization`
 proof minted once at the door, carried by hand, applied by the store client),
@@ -189,8 +189,9 @@ on the Postgres side.
    list and detail show the owner's existing evaluation results. No monitor
    can be created on an aggregate, and the evaluation trigger subscriber is
    untouched. Online Evals, Test and Build are hidden from the aggregate's
-   navigation; Observe shows Analytics and Traces. Annotations on member
-   traces are out of scope. (Block D.)
+   navigation; Observe shows Traces. Analytics leaves the navigation until
+   analytics across members ships (v4.8). Annotations on member traces are
+   out of scope. (Block D.)
 
 9. **Strictest member privacy policy, audited like admin workspace views
    today.** The effective privacy policy of an aggregate read is the most
@@ -704,3 +705,19 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   deprovisioning and department moves run the organisation reconcile
   inline on the request path. Moving it to a queue is listed under open
   questions.
+- v4.8 (2026-10-07, after the use-proof of the PR). Decision 8 changed:
+  Analytics leaves the aggregate's navigation. Analytics across members is
+  not delivered (its scenario stays `@unimplemented`), so every card read
+  "No data" while the trace list held rows. The aggregate's home shows one
+  sentence pointing at the Trace Explorer in place of the traces overview,
+  and returns to the overview when analytics across members ships.
+
+  Settled in code, no decision changed. An aggregate counts as a project
+  with traces, so no "has this project ever received a trace" gate keeps it
+  on the ingest onboarding. Key creation refuses a project binding on an
+  aggregate with `aggregate_project_has_no_credential`, the code the ingest
+  door answers, so decision 7's "no credential" holds for every mint path.
+  The browser never remembers an aggregate as the selected project, so
+  block F's landing rule holds on the client's remembered-selection path
+  too. The client's permission check asks `writesUnderProject` on an
+  aggregate, so no control offers a write decision 8's guard refuses.

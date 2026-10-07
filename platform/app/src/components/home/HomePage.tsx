@@ -21,6 +21,7 @@ import {
 } from "~/features/briefing";
 import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { DashboardLayout } from "../DashboardLayout";
 import { DocsGuides } from "./DocsGuides";
@@ -63,6 +64,11 @@ import { WelcomeHeader } from "./WelcomeHeader";
  */
 export function HomePage() {
   const composition = useHomeComposition();
+  // An aggregate (ADR-144) is never set up and never sent data, so its home
+  // is the traces overview alone: no onboarding, no setup steps, no quick
+  // starts. The overview itself points at the Trace Explorer.
+  const { project } = useOrganizationTeamProject();
+  const isAggregate = isAggregateProjectKind(project?.kind);
 
   return (
     <DashboardLayout>
@@ -85,7 +91,9 @@ export function HomePage() {
               {/* The Langy home greets from the centre of its own hero, where
                   the question is being asked. Rendering the greeting here as
                   well would put it on the page twice. */}
-              {composition === "langy" ? null : <WelcomeHeader />}
+              {composition === "langy" && !isAggregate ? null : (
+                <WelcomeHeader />
+              )}
               <Spacer />
               {/* The one sales-y ask: the friendly line, small and quiet, with
                   the demo link as a compact pill beside it. Shown to people who
@@ -103,10 +111,13 @@ export function HomePage() {
 
             {/* The Langy home carries the offer inside its hero, under the
                 ask field; the other homes carry it here, under the header. */}
-            {composition === "signal-focused" || composition === "classic" ? (
+            {!isAggregate &&
+            (composition === "signal-focused" || composition === "classic") ? (
               <GuidedOnboardingOffer space="project" />
             ) : null}
-            {composition === "undecided" ? (
+            {isAggregate ? (
+              <TracesOverview />
+            ) : composition === "undecided" ? (
               <HomeCompositionSkeleton />
             ) : composition === "signal-focused" ? (
               <>

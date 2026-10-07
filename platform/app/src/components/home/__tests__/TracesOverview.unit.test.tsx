@@ -6,9 +6,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const currentProject = { slug: "my-project", kind: "application" };
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { slug: "my-project" },
+    project: currentProject,
     hasPermission: () => true,
   }),
 }));
@@ -87,6 +88,32 @@ describe("<TracesOverview />", () => {
     expect(
       screen.getByRole("link", { name: /Run a simulation/ }),
     ).toHaveAttribute("href", "/my-project/simulations");
+  });
+});
+
+describe("<TracesOverview /> on an aggregate project", () => {
+  afterEach(() => {
+    cleanup();
+    currentProject.slug = "my-project";
+    currentProject.kind = "application";
+  });
+
+  /** @scenario "The aggregate's home points at its traces instead of saying no data" */
+  it("says analytics across members is not available and links to the traces", () => {
+    currentProject.slug = "company-traces";
+    currentProject.kind = "aggregate";
+
+    renderWithProviders(<TracesOverview />);
+
+    expect(
+      screen.getByText(/Analytics across member projects is not available yet/),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "Open Trace Explorer" }),
+    ).toHaveAttribute("href", "/company-traces/traces");
+    expect(screen.queryByTestId("traces-overview-graph")).toBeNull();
+    expect(screen.queryByText(/Nothing here yet/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /Connect tracing/ })).toBeNull();
   });
 });
 
