@@ -200,6 +200,30 @@ describe("authorize", () => {
         "proj_member_1",
       ]);
     });
+
+    it("leaves out a stored window with no start rather than opening it from the epoch", async () => {
+      const { service } = door({
+        rows: [
+          sharedRow({
+            grantId: "grant_no_start",
+            memberProjectId: "proj_no_start",
+            condition: { type: "trace" },
+          }),
+          sharedRow(),
+        ],
+      });
+      const proof = await service.authorize({
+        actor: ANA,
+        principal: ANA,
+        permission: "traces:view",
+        scope: { projectId: AGGREGATE },
+        purpose: ROUTE,
+      });
+      expect(proof.grants.map((grant) => grant.projectId)).toEqual([
+        AGGREGATE,
+        "proj_member_1",
+      ]);
+    });
   });
 
   describe("when the door refuses", () => {

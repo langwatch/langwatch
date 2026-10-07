@@ -730,4 +730,6 @@ side keeps its existing guards until ADR-166's `prisma.as` lands.
   bounds staleness, and only the cap bounds memory. The store client keeps
   a shared grant in a fence only when its window applies to the resource
   read: a trace or analytics read takes `trace` windows, so a `span` or
-  `log` window a later minter writes can never open trace rows.
+  `log` window a later minter writes can never open trace rows. The door
+  leaves a stored window with no start out of the proof, as it does one
+  with a `where`, rather than reading the missing start as the epoch.

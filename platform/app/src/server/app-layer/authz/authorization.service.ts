@@ -317,13 +317,16 @@ function sharedGrantsFrom({
  * The ledger stores ISO instants and keeps `where` as a slot; the proof
  * carries epoch milliseconds and only a window the client can apply. A
  * non-empty `where` has no compiler in v1, so the row stays out of the
- * proof rather than in it unfiltered.
+ * proof rather than in it unfiltered. A window with no start stays out too:
+ * the reconciler always writes one, and reading a missing start as the
+ * epoch would open the widest window there is.
  */
 function proofCondition(
   condition: GrantCondition,
 ): AuthorizationCondition | undefined {
   if (condition.where !== undefined && condition.where !== "") return undefined;
-  const from = condition.from === undefined ? 0 : Date.parse(condition.from);
+  if (condition.from === undefined) return undefined;
+  const from = Date.parse(condition.from);
   const until =
     condition.until === undefined ? null : Date.parse(condition.until);
   if (Number.isNaN(from) || (until !== null && Number.isNaN(until))) {
