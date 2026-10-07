@@ -274,6 +274,13 @@ export const scenarioCrudRouter = createTRPCRouter({
         "Duplicating scenario",
       );
 
+      await enforceCreationLimit({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        limitType: "scenarios",
+        user: ctx.session.user,
+      });
+
       const service = ScenarioService.create(ctx.prisma);
       try {
         return await service.duplicate({

@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { enforceCreationLimit } from "../../license-enforcement";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const optimizationRouter = createTRPCRouter({
@@ -160,6 +161,23 @@ export const optimizationRouter = createTRPCRouter({
 
         if (!workflow) {
           throw new Error("Workflow not found");
+        }
+
+        // Saving as an evaluator creates one when none is linked yet, so the
+        // plan's evaluator cap is checked before any flag changes.
+        if (isEvaluator) {
+          const linked = await ctx.prisma.evaluator.findFirst({
+            where: { workflowId, projectId, archivedAt: null },
+            select: { id: true },
+          });
+          if (!linked) {
+            await enforceCreationLimit({
+              prisma: ctx.prisma,
+              projectId,
+              limitType: "evaluators",
+              user: ctx.session.user,
+            });
+          }
         }
 
         // Update workflow flags

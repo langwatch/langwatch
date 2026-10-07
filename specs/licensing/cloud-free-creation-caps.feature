@@ -105,6 +105,21 @@ Feature: Cloud Free plan caps scenarios, simulations and custom evaluators
     Then the request fails as FORBIDDEN with limit type "evaluators", current 3 and max 3
 
   @integration
+  Scenario: Duplicating a scenario past the cap is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it has 3 active scenarios
+    When a member duplicates one of them
+    Then the request fails as FORBIDDEN with limit type "scenarios", current 3 and max 3
+
+  @integration
+  Scenario: Saving a workflow as a fourth custom evaluator is refused with the limit shape
+    Given the organization is on the cloud Free plan
+    And it has 3 active custom evaluators
+    When a member saves a workflow as an evaluator
+    Then the request fails as FORBIDDEN with limit type "evaluators", current 3 and max 3
+    And the workflow is not flagged as an evaluator
+
+  @integration
   Scenario: Creating a fourth scenario through the API is refused with the limit shape
     Given the organization is on the cloud Free plan
     And it has 3 active scenarios

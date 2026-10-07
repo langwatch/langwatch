@@ -115,6 +115,7 @@ describe("cloud Free creation caps", () => {
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
       ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
+      ["workflow", { projectId }],
     ]);
   });
 
@@ -124,6 +125,7 @@ describe("cloud Free creation caps", () => {
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
       ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
+      ["workflow", { projectId }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
@@ -248,6 +250,73 @@ describe("cloud Free creation caps", () => {
             where: { projectId: otherProjectId },
           }),
         ).toBe(0);
+      });
+    });
+  });
+
+  describe("given the organization is on the cloud Free plan with 3 scenarios", () => {
+    describe("when a member duplicates one", () => {
+      /** @scenario Duplicating a scenario past the cap is refused with the limit shape */
+      it("refuses as FORBIDDEN and writes nothing", async () => {
+        const created = [];
+        for (const name of ["One", "Two", "Three"]) {
+          created.push(await createScenario(name));
+        }
+
+        const error = await refusal(
+          caller.scenarios.duplicate({
+            projectId,
+            scenarioId: created[0]!.id,
+          }),
+        );
+
+        expect((error as TRPCError).code).toBe("FORBIDDEN");
+        expect(((error as TRPCError).cause as LimitExceededError).meta).toEqual(
+          { limitType: "scenarios", current: 3, max: 3 },
+        );
+        expect(
+          await prisma.scenario.count({
+            where: { projectId, archivedAt: null },
+          }),
+        ).toBe(3);
+      });
+    });
+  });
+
+  describe("given the organization is on the cloud Free plan with 3 custom evaluators", () => {
+    describe("when a member saves a workflow as an evaluator", () => {
+      /** @scenario Saving a workflow as a fourth custom evaluator is refused with the limit shape */
+      it("refuses before flagging the workflow", async () => {
+        for (const name of ["One", "Two", "Three"]) {
+          await createEvaluator(name);
+        }
+        const workflow = await prisma.workflow.create({
+          data: {
+            id: `workflow_${nanoid()}`,
+            projectId,
+            name: "Tone judge",
+            icon: "🧪",
+            description: "",
+          },
+        });
+
+        const error = await refusal(
+          caller.optimization.toggleSaveAsEvaluator({
+            projectId,
+            workflowId: workflow.id,
+            isEvaluator: true,
+            isComponent: false,
+          }),
+        );
+
+        expect((error as TRPCError).code).toBe("FORBIDDEN");
+        expect(((error as TRPCError).cause as LimitExceededError).meta).toEqual(
+          { limitType: "evaluators", current: 3, max: 3 },
+        );
+        const after = await prisma.workflow.findFirst({
+          where: { id: workflow.id, projectId },
+        });
+        expect(after?.isEvaluator).toBe(false);
       });
     });
   });
