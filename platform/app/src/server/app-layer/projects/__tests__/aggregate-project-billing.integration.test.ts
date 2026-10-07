@@ -58,6 +58,10 @@ describe("Feature: billing stays with the owning project", () => {
       values: Array.from({ length: MEMBER_TRACES }, () => ({
         TenantId: fixture.personal.engineer.id,
         TraceId: `agg-billing-${nanoid(12)}`,
+        // The table's retention TTL is anchored on OccurredAt. Left unset it
+        // is 1970, already past any retention, so a database with the TTL
+        // applied (CI's, after the migrate task) deletes these rows.
+        OccurredAt: now,
         CreatedAt: now,
         UpdatedAt: now,
       })),
