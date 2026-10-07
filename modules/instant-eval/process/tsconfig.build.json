@@ -8,7 +8,7 @@
       "@langwatch/instant-eval-process": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts"],
+  "files": ["./src/index.ts", "./src/__tests__/testing.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -43,9 +43,6 @@
     },
     {
       "path": "../../entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"

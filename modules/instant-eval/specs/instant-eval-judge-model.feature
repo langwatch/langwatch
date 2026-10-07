@@ -357,7 +357,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When a run records $0.50 and a judged query records $0.25 through the Instant Evals judge
       Then the judge's spend for it is $0.75
 
-    @integration @unimplemented
+    @integration
     Scenario: Judge spend in the ledger counts against a run
       Given a free organization whose judge calls were priced at $1.00 in total
       And the gateway wrote their spend rows from the judge's priced events

@@ -122,6 +122,9 @@
       "path": "../../evaluation/process/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval/process/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]

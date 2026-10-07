@@ -9259,6 +9259,9 @@ importers:
       '@langwatch/evaluation-process':
         specifier: workspace:*
         version: link:../../evaluation/process
+      '@langwatch/instant-eval-process':
+        specifier: workspace:*
+        version: link:../../instant-eval/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9836,9 +9839,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

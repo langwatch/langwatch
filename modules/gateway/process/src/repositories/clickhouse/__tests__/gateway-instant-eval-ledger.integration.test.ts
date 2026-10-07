@@ -4,11 +4,19 @@
  * A judged run or query's priced outcome, appended through the internal protocol and folded into
  * the spend record: the row the ledger holds is the row the customer is charged on.
  * @see modules/instant-eval/specs/instant-eval-billing.feature
+ * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId } from "@langwatch/eventing";
 import type { GatewayPricedSpend } from "@langwatch/gateway-contract";
+import {
+  INSTANT_EVAL_REQUEST_TYPE,
+  InstantEvalFreeBudgetExhaustedError,
+  type InstantEvalJudgeSpendPricedEventData,
+} from "@langwatch/instant-eval-judge-contract";
+import { instantEvalRunStartBudgetOver } from "@langwatch/instant-eval-process/testing";
+import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -16,6 +24,7 @@ import { confirmSpendCommandDataSchema } from "../../../eventing/gateway-spend-c
 import { ConfirmSpendCommand } from "../../../eventing/gateway-spend.intent.ts";
 import { GatewaySpendStore } from "../../../eventing/gateway-spend.pipeline.ts";
 import { GatewaySpendFoldProjection } from "../../../eventing/gateway-spend.projection.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../../../services/gateway-instant-eval-judge-spend.service.ts";
 import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
@@ -38,6 +47,7 @@ const CUSTOMER_PRICE_NANO_USD = 13_000_000;
 let client: ClickHouseClient;
 let store: GatewaySpendStore;
 let protocol: GatewayInternalProtocolService;
+let ledger: ClickHouseGatewaySpendEventsRepository;
 
 /** The ledger's own confirm path: the command's event, folded and stored as the pipeline does. */
 async function confirmThroughTheSpine(payload: unknown): Promise<void> {
@@ -121,9 +131,8 @@ async function ledgerRowsFor(requestId: string) {
 describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real ClickHouse)", () => {
   beforeAll(async () => {
     ({ client } = await startMigratedGatewayClickHouse());
-    store = GatewaySpendStore.create(
-      new ClickHouseGatewaySpendEventsRepository(async () => client),
-    );
+    ledger = new ClickHouseGatewaySpendEventsRepository(async () => client);
+    store = GatewaySpendStore.create(ledger);
     protocol = GatewayInternalProtocolService.create(
       suppliedMembers({
         spend: {
@@ -219,6 +228,100 @@ describe.skipIf(!enabled)("the spend record of an Instant Eval outcome (real Cli
         VirtualKeyId: managedKey,
       });
       expect(Number(row?.CostNanoUSD)).toBe(CUSTOMER_PRICE_NANO_USD);
+    });
+  });
+
+  describe("given a free organization whose judge calls were priced at $1.00 in total", () => {
+    const organizationId = `org-judge-${run}`;
+    const judgedProject = `${TENANT}-judged`;
+
+    /** The judge's priced fact for one call, as the leaf appends it. */
+    function judgeFact({
+      requestId,
+      priceNanoUsd,
+    }: {
+      requestId: string;
+      priceNanoUsd: number;
+    }): InstantEvalJudgeSpendPricedEventData {
+      return {
+        tenantId: organizationId,
+        occurredAt: OCCURRED_AT,
+        organizationId,
+        projectId: judgedProject,
+        requestId,
+        model: "langwatch/instant-evals",
+        rateVersion: "instant_eval@0.8x1.3",
+        inputTokens: 900,
+        priceNanoUsd,
+        costNanoUsd: Math.round(priceNanoUsd / 1.3),
+      };
+    }
+
+    afterAll(async () => {
+      if (!client) return;
+      await client.command({
+        query: "ALTER TABLE gateway_spend DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: judgedProject },
+      });
+    }, 120_000);
+
+    /** @scenario Judge spend in the ledger counts against a run */
+    it("holds one row per judge call, however often its fact arrives, and refuses the run", async () => {
+      const spend = GatewayInstantEvalJudgeSpendService.create({
+        projects: {
+          findWithTeam: async (projectId) =>
+            projectId === judgedProject
+              ? ({ id: projectId, team: { id: `team-${run}`, organizationId } } as ProjectWithTeam)
+              : null,
+        },
+        recordPricedSpend: (input) => protocol.recordPricedSpend(input),
+      });
+      const first = judgeFact({
+        requestId: `instantevaljudge_a-${run}`,
+        priceNanoUsd: 600_000_000,
+      });
+      const second = judgeFact({
+        requestId: `instantevaljudge_b-${run}`,
+        priceNanoUsd: 400_000_000,
+      });
+
+      // The first call's fact is delivered twice, as a redelivery would.
+      await spend.recordJudgeSpend({ fact: first });
+      await spend.recordJudgeSpend({ fact: first });
+      await spend.recordJudgeSpend({ fact: second });
+
+      const rows = async (requestId: string) =>
+        (
+          await client.query({
+            query: `
+              SELECT RequestType, OrganizationId, CostNanoUSD
+              FROM gateway_spend FINAL
+              WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String}`,
+            query_params: { tenantId: judgedProject, requestId },
+            format: "JSONEachRow",
+          })
+        ).json<{ RequestType: string; OrganizationId: string; CostNanoUSD: number | string }>();
+      const firstRows = await rows(first.requestId);
+      expect(firstRows).toHaveLength(1);
+      expect(firstRows[0]).toMatchObject({
+        RequestType: INSTANT_EVAL_REQUEST_TYPE,
+        OrganizationId: organizationId,
+      });
+      expect(Number(firstRows[0]?.CostNanoUSD)).toBe(600_000_000);
+      expect(await rows(second.requestId)).toHaveLength(1);
+
+      const budget = instantEvalRunStartBudgetOver({
+        peers: {
+          findOrganizationId: async () => organizationId,
+          listProjectIds: async () => [judgedProject],
+          isFreePlan: async () => true,
+          sumSpendNanoUsdByRequestType: ({ tenantIds, requestType }) =>
+            ledger.sumCostNanoUsdByRequestType({ tenantIds: [...tenantIds], requestType }),
+        },
+      });
+      await expect(budget.assertWithinBudget({ projectId: judgedProject })).rejects.toBeInstanceOf(
+        InstantEvalFreeBudgetExhaustedError,
+      );
     });
   });
 });
