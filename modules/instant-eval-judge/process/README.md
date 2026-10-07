@@ -34,7 +34,7 @@ classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
 
 #### `judge`
 
-One metered judge call: unknown project, cloud only, budget, classify, price, priced event. A refusal is returned, never thrown, and calls no classifier.
+One metered judge call: cloud only, unknown project, budget, classify, price, priced event. A refusal is returned, never thrown, and calls no classifier.
 
 ```typescript
 judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;

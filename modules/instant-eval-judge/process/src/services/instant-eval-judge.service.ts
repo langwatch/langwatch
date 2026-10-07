@@ -1,6 +1,6 @@
 /**
- * One metered judge call (ADR-174 decisions 8, 10, 14, 15), in a fixed order: unknown project,
- * cloud only, budget, classify, price, priced fact. A refusal is returned, never thrown, and
+ * One metered judge call (ADR-174 decisions 8, 10, 14, 15), in a fixed order: cloud only,
+ * unknown project, budget, classify, price, priced fact. A refusal is returned, never thrown, and
  * calls no classifier. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -68,6 +68,11 @@ export class InstantEvalJudgeService {
     requestKey,
     signal,
   }: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer> {
+    // Off cloud nothing judges, so the project's placement is never the reason to give.
+    const { classifier } = this.deps;
+    if (!this.deps.isCloud || !classifier) {
+      return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
+    }
     const placement = await this.deps.repositories.projects.getPlacement({ projectId });
     if (placement.outcome === "unknown") {
       // The project catch-up teaches it: the log names the job, so the gap shows on first refusal.
@@ -76,10 +81,6 @@ export class InstantEvalJudgeService {
         "Instant Evals judge refused a project it has not learned; re-run backfill-project-created",
       );
       return refused({ code: "instant_eval_project_unknown", message: PROJECT_UNKNOWN_MESSAGE });
-    }
-    const { classifier } = this.deps;
-    if (!this.deps.isCloud || !classifier) {
-      return refused({ code: "classifier_not_configured", message: NOT_CONFIGURED_MESSAGE });
     }
 
     const { organizationId } = placement;

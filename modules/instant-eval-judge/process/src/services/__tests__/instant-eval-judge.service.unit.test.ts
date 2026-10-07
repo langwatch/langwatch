@@ -1,5 +1,5 @@
 /**
- * The judge call's fixed order (ADR-174 decisions 8, 9, 12, 14, 15): unknown project, cloud only,
+ * The judge call's fixed order (ADR-174 decisions 8, 9, 12, 14, 15): cloud only, unknown project,
  * budget, classify, price, priced fact. Refusals are returned and call no classifier.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
@@ -233,6 +233,18 @@ describe("given a judge call off LangWatch cloud", () => {
 
       expect(answer).toMatchObject({ outcome: "refused", code: "classifier_not_configured" });
       expect(classifier.classify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the judge has not learned the project either", () => {
+    it("answers it as not configured, with no log asking for the project catch-up", async () => {
+      const { service, seed, lines } = harness({ isCloud: false, isProjectKnown: false });
+      await seed();
+
+      const answer = await service.judge(call);
+
+      expect(answer).toMatchObject({ outcome: "refused", code: "classifier_not_configured" });
+      expect(lines.findLine("warn", "backfill-project-created")).toBeUndefined();
     });
   });
 });

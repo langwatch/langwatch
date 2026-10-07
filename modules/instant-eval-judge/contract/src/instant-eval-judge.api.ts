@@ -25,7 +25,7 @@ export interface InstantEvalJudgeApi {
    */
   classify(input: InstantEvalClassification): Promise<InstantEvalJudgement>;
   /**
-   * One metered judge call: unknown project, cloud only, budget, classify, price, priced event.
+   * One metered judge call: cloud only, unknown project, budget, classify, price, priced event.
    * A refusal is returned, never thrown, and calls no classifier.
    */
   judge(input: InstantEvalJudgeCall): Promise<InstantEvalJudgeAnswer>;

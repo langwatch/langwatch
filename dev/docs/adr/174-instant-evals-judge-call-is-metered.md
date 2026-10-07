@@ -79,7 +79,7 @@
     - Search-bar classification moves with the classifier client and stays unmetered (ADR-144).
     - The picker checks the opt-in. The judge call does not recheck it, since the $1 cap already guards spend.
 14. **The judge runs on LangWatch cloud only, with LangWatch's key.** Customers never supply a classifier key (the user's hard rule). The leaf answers `classifier_not_configured` on any install that is not cloud. The public self-hosting docs, `.env.example` and the error tip in `remediation.ts` stop telling customers to set `JEV_API_KEY` with their own key. Self-hosted judging waits for wave 3. Rejected: letting a self-hosted operator judge with their own key, which the hard rule forbids.
-15. **A judge call for a project the leaf does not know is refused, never judged free.** The leaf learns each project's organization from project's created event. Until it holds a project, a judge call for it returns `error` with `instant_eval_project_unknown` and calls no classifier. Runs and judged queries are never refused this way, since they pass their organization. Rejected: judging an unknown project uncapped, which would let it judge for free and drop its spend row.
+15. **A judge call for a project the leaf does not know is refused, never judged free.** The leaf learns each project's organization from project's created event. Until it holds a project, a judge call for it returns `error` with `instant_eval_project_unknown` and calls no classifier. Off cloud the call is answered as not configured first (decision 14), so this refusal and its log only appear where the leaf judges. Runs and judged queries are never refused this way, since they pass their organization. Rejected: judging an unknown project uncapped, which would let it judge for free and drop its spend row.
     - A project whose created event fails to write is logged and dropped today, and the log names the wrong recovery. The log is fixed to name `backfill-project-created`, and a re-run of that job teaches the leaf the project.
 16. **Guardrails never judge a stream chunk.** A guardrail can run on every chunk of a streamed reply, which would charge one reply many times. The guardrail check passes its direction to the evaluation, and the Instant Evals branch returns `skipped` on the stream chunk direction, with the reason in details. The gateway reads a skip as allow. It still judges the request, and the response of a reply that is not streamed.
     - A streamed reply's output is not judged by an Instant Evals guardrail in wave 1. The gateway checks only the request and each chunk of a streamed reply, never the full response (`services/aigateway/app/pipeline/guardrail.go`). A full-response check on the stream path is later work, tracked in the wave 1 issue.
@@ -89,6 +89,14 @@
     - Spend: a new Instant Evals task copies each confirmed Instant Evals row in the gateway ledger into the leaf as a spend row under its request id. A request id the leaf already holds is skipped, whichever side wrote it first. There is no cutover, so a re-run at any time adds only rows still missing. A ledger row written after the task ran, by a lagging fold or by an old pod during a rollback, is copied by the next run. The release runs it again once the gateway's spend fold has caught up, and again after any rollback and redeploy.
     - A run records every attempt under one request id, `instanteval_<runId>` (`instant-eval-spend-outcome.rules.ts`). A finish confirmed by an old pod and retried on a new one is one ledger row and one leaf row.
     - Nothing runs module tasks on deploy today (`dev/docs/plans/migrations-rethink-2026-10-06.md`, K4). The release runs the three jobs by hand right after the rollout, in this order: usage billing, spend, then projects. The flag is already on for organizations that use Instant Evals, so the picker shows at deploy. Until the project job finishes, the judge refuses calls for existing projects as unknown, so they are not judged against an empty total or an empty billing copy. A project created live during that window is learned at once and judges against what the leaf holds so far, which can give an organization that already spent its dollar up to one more dollar until the spend job has run. Every such call writes its spend row, and the overshoot stops at one dollar per organization. This is the accepted overshoot: recorded, never free. Runs and judged queries keep working through that window, since they pass their organization and keep main's free-plan rule.
+    - Each job takes `--dry-run`: it reads what it would write, logs the counts and writes nothing. Usage billing logs organizations billed and not billed. Spend logs the ledger rows and their total, and copies none. Projects logs the projects it would record. The release runs each one dry on staging, then for real:
+
+      ```
+      pnpm --filter @langwatch/tasks task usage-billing-catch-up --dry-run
+      pnpm --filter @langwatch/tasks task instant-eval-judge-spend-catch-up --dry-run
+      pnpm --filter @langwatch/tasks task backfill-project-created --dry-run
+      ```
+
     - A project whose created fact is lost is refused until someone re-runs the project job. The failure log names `backfill-project-created`, and the judge's unknown-project refusal logs the project, so the gap shows on its first refused call.
     - Two billing changes send no usage-billing fact today: an operator setting the self-hosted flag, which lives in the organization module, and the tiered-to-usage pricing task, which moves only organizations with no subscription, so their answer stays "not billed". A re-run of the usage-billing catch-up corrects both.
 
@@ -107,26 +115,26 @@
 
 ## Invariants
 
-| Invariant                            | Meaning                                                         | How it holds (test anchor)                                                                                             |
-| ------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| One evaluation, one spend row        | A redelivered command is not billed twice                       | Unit test: the same request key gives the same spend id, and a keyed ledger keeps one row                              |
-| No tokens, no row                    | A skipped judgement is never billed                             | Unit test on the judge method with a skipped classifier                                                                |
-| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying   | Unit test: the budget check throws `InstantEvalFreeBudgetExhaustedError` and the classifier is never called            |
-| Overshoot is on record               | A call that runs past $1 still writes its spend row             | Unit test: a call admitted while the leaf's total was under $1 records its full price                                  |
-| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                          | Builder unit test on the question text, plus one live classifier check before the picker merges                        |
-| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                  | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                                     |
-| Every skip has a status              | No skip reads as a pass or a crash                              | Unit test over every `skippedReason`                                                                                   |
-| Search bar stays unmetered           | ADR-144 still holds                                             | Existing `classify` path untouched; test that it records no spend                                                      |
-| No peer cycle                        | Wave 1 adds no edge whose peer reaches back                     | `pnpm lint:architecture --policies peer-cycles --all` shows no new finding, and the ratchet test is not loosened       |
-| No edge cut                          | Every existing peer dependency stays                            | Instant Evals still lists gateway; the peer-cycle findings list loses no line                                          |
-| Unknown project never judged free    | A project the leaf has not learned is refused                   | Unit test: the judge method returns `instant_eval_project_unknown` and the classifier is never called                  |
-| Cloud only                           | No install judges with a customer's own key                     | Unit test: off cloud the judge answers `classifier_not_configured` with a key set                                      |
-| Stream chunks never judged           | One streamed reply is charged once per direction, not per chunk | Unit test on the guardrail check for the `stream_chunk` direction                                                      |
-| Catch-up jobs are safe to re-run     | A second run adds no spend and changes no billing answer        | Integration tests: copying twice gives one row per request; a re-run of the usage-billed task keeps the answer         |
-| Copied and live spend never overlap  | A request in both the ledger and the leaf is counted once       | Integration test: the live priced event folded before and after the copy, one row each time                            |
-| One request, one leaf row            | Two priced events for one request add one row                   | Integration test: two events with different ids and one request id, live and on rebuild, give one row                  |
-| One run, one request id              | Every finish attempt of a run records under the same request id | Unit test: a retried finish records under `instanteval_<runId>`                                                        |
-| Newest billing fact wins             | A catch-up read before a change never overrides it              | Integration tests: catch-up read before or after a real change, folded in either order; a re-run fixes a missed change |
+| Invariant                            | Meaning                                                         | How it holds (test anchor)                                                                                                |
+| ------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| One evaluation, one spend row        | A redelivered command is not billed twice                       | Unit test: the same request key gives the same spend id. ClickHouse test: a priced fact delivered twice is one ledger row |
+| No tokens, no row                    | A skipped judgement is never billed                             | Unit test on the judge method with a skipped classifier                                                                   |
+| Unbilled orgs refused past $1        | A call after the spend shows $1 is refused before classifying   | Unit test: the judge method returns the `instant_eval_free_budget_exhausted` refusal and never calls the classifier       |
+| Overshoot is on record               | A call that runs past $1 still writes its spend row             | Unit test: a call admitted while the leaf's total was under $1 records its full price                                     |
+| Fail-condition prompts keep polarity | "Return false if X" fails when X holds                          | Builder unit test on the question text, plus one live classifier check before the picker merges                           |
+| Score stays on the customer's scale  | A 1 to 5 prompt returns 1 to 5                                  | Builder unit tests for 0 to 1, 1 to 5 and 0 to 100                                                                        |
+| Every skip has a status              | No skip reads as a pass or a crash                              | Unit test over every `skippedReason`                                                                                      |
+| Search bar stays unmetered           | ADR-144 still holds                                             | Existing `classify` path untouched; test that it records no spend                                                         |
+| No peer cycle                        | Wave 1 adds no edge whose peer reaches back                     | `pnpm lint:architecture --policies peer-cycles --all` shows no new finding, and the ratchet test is not loosened          |
+| No edge cut                          | Every existing peer dependency stays                            | Instant Evals still lists gateway; the peer-cycle findings list loses no line                                             |
+| Unknown project never judged free    | A project the leaf has not learned is refused                   | Unit test: the judge method returns `instant_eval_project_unknown` and the classifier is never called                     |
+| Cloud only                           | No install judges with a customer's own key                     | Unit test: off cloud the judge answers `classifier_not_configured` with a key set                                         |
+| Stream chunks never judged           | One streamed reply is charged once per direction, not per chunk | Unit test on the guardrail check for the `stream_chunk` direction                                                         |
+| Catch-up jobs are safe to re-run     | A second run adds no spend and changes no billing answer        | Integration tests: copying twice gives one row per request; a re-run of the usage-billed task keeps the answer            |
+| Copied and live spend never overlap  | A request in both the ledger and the leaf is counted once       | Integration test: the live priced event folded before and after the copy, one row each time                               |
+| One request, one leaf row            | Two priced events for one request add one row                   | Integration test: two events with different ids and one request id, live and on rebuild, give one row                     |
+| One run, one request id              | Every finish attempt of a run records under the same request id | Unit test: a retried finish records under `instanteval_<runId>`                                                           |
+| Newest billing fact wins             | A catch-up read before a change never overrides it              | Integration tests: catch-up read before or after a real change, folded in either order; a re-run fixes a missed change    |
 
 ## Assumptions
 
@@ -149,7 +157,7 @@
 | Picker entry                    | Yes                                     | Large, customer-visible                                | Ships with wave 1 behind `release_instant_evals`. Reviewer confirms the bounded flag in the deploy config before merge |
 | Judge leaf                      | Yes                                     | Medium                                                 | The peer-cycle policy shows no new finding and no removed edge before merge                                            |
 | Leaf tables migration           | No, it is a schema migration            | Medium, new tables only                                | Human review of the migration. It only creates tables, so rollback is dropping them                                    |
-| Catch-up jobs                   | Yes, each is safe to re-run             | Large, they set every organization's cap               | Re-run tests, then a dry run on staging that prints counts before production                                           |
+| Catch-up jobs                   | Yes, each is safe to re-run             | Large, they set every organization's cap               | Re-run tests, then each job with `--dry-run` on staging, which logs its counts and writes nothing, before production   |
 | Catch-up after rollout          | Yes                                     | Large, customer-visible                                | Run the three jobs right after the rollout, projects last. Judge calls are refused as unknown projects until then      |
 
 ## Schema
@@ -192,8 +200,7 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
 - Negative: wave 1 grows by one module, three tables, one priced event, one gateway subscriber, one billing event and three catch-up jobs.
 - Negative: usage-billed organizations judge uncapped and uncharged until the Stripe price for Instant Evals exists. Every call still writes its spend row.
 - Negative: the three catch-up jobs are run by hand, since nothing runs module tasks on deploy. The flag gate is the guard.
-- Negative: self-hosted installs lose the documented own-key path. The code still honours an operator-set key for runs and the search bar until wave 3.
-- Neutral: the Instant Evals process lists the evaluator contract as a dependency it never imports. Remove it in the same change.
+- Negative: self-hosted installs lose the documented own-key path. A key a self-hosted install sets builds no classifier, so judge calls, runs, judged queries and the search bar judge through Connect or not at all until wave 3.
 
 ## Open questions
 
@@ -202,7 +209,6 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
 - Whether an organization's model restrictions should be able to block Instant Evals. The judge skips the provider lookup, which is where restrictions are checked. Owner: the user. Not blocking.
 - Whether the priced event also lets billing meter Instant Evals directly, retiring the gateway spend row. Owner: the user. Not blocking.
 - When the Stripe price for Instant Evals goes live, which turns on charging for usage-billed organizations. Owner: the user. Not blocking.
-- Whether runs and the search bar stop honouring an operator-set key on self-hosted. Owner: the user. Wave 3.
 
 ## Revisions
 
@@ -292,3 +298,10 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - The leaf reads the classifier key on LangWatch Cloud only, so a key a self-hosted install sets builds no classifier. Runs and judged queries then judge through Connect or not at all, as the judge call already did (decision 14).
   - The self-hosting docs, the not configured tip and its customer copy point at Connect and never at a key of one's own. The tracked `.env.example` says a self-hosted install ignores the key (decision 14).
   - The connect-settings scenario that kept an install's own judge key now says a self-hosted install never judges with one (decision 14).
+- v18, 2026-10-07, after the decision audit. Captain: Sergio Esteban.
+  - A ClickHouse test now proves the judge's priced fact delivered twice is one ledger row, and that $1 of judge spend in the ledger refuses a run (decisions 9 and 13).
+  - The three catch-up jobs take `--dry-run`, which logs the counts the staging gate asks for and writes nothing (decision 17, Gates).
+  - Off cloud a judge call is answered as not configured before the project is looked up, so a self-hosted install never logs a request to re-run the project job (decisions 14 and 15).
+  - Tests now cover the judge app building no classifier off cloud with a key set, and the usage-billing catch-up stopping at the first organization it cannot record (decisions 14 and 17).
+  - The Instant Evals process drops the evaluator contract it never imported. The score judge's `min` and `max` are in the published evaluator API reference (decision 4).
+  - The open question on runs and the search bar honouring an operator-set key is closed: v17 settled it, since the leaf builds no classifier off cloud.
