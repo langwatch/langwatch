@@ -7,8 +7,6 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import type { DashboardVisibility } from "@langwatch/dashboard-contract";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -17,7 +15,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { StubAnalyticsHost } from "../../../testing.tsx";
 import { AGENT_KIND_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
-import { BOARD_VISIBILITY_LOCKED_REASON } from "../model/board-visibility.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -31,8 +28,9 @@ type Board = {
   id: string;
   name: string;
   description: string | null;
-  visibility: DashboardVisibility;
   createdById: string | null;
+  isStarred: boolean;
+  updatedAt: Date;
 };
 type Widget = {
   id: string;
@@ -88,13 +86,10 @@ function storedWidget({
 function inMemoryServer({
   boards,
   widgets = [],
-  refuseVisibility = false,
   refuseWidgetCreate = false,
 }: {
   boards: Board[];
   widgets?: Widget[];
-  /** Answers `setVisibility` as the server does for a member who is neither creator nor admin. */
-  refuseVisibility?: boolean;
   /** Answers `dashboardWidgets.create` as the server does when the write is rejected. */
   refuseWidgetCreate?: boolean;
 }) {
@@ -118,8 +113,9 @@ function inMemoryServer({
           id: `board-new-${state.boards.length + 1}`,
           name: String(input.name),
           description: null,
-          visibility: input.visibility as DashboardVisibility,
           createdById: "user-1",
+          isStarred: true,
+          updatedAt: new Date("2026-01-01"),
         };
         state.boards.push(created);
         return Promise.resolve({ ...created });
@@ -134,13 +130,14 @@ function inMemoryServer({
         described.description = input.description as string | null;
         return Promise.resolve({ ...described });
       }
-      case "dashboards.setVisibility": {
-        if (refuseVisibility) {
-          return Promise.reject(new UiProcedureRefusal("dashboard_owner_only", 403));
-        }
-        const shared = board(input.dashboardId);
-        shared.visibility = input.visibility as DashboardVisibility;
-        return Promise.resolve({ ...shared });
+      case "dashboards.listStarred":
+        return Promise.resolve(
+          state.boards.filter((each) => each.isStarred).map((each) => ({ ...each })),
+        );
+      case "dashboards.star":
+      case "dashboards.unstar": {
+        board(input.dashboardId).isStarred = call.path === "dashboards.star";
+        return Promise.resolve({ success: true });
       }
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
@@ -227,17 +224,21 @@ const OWN_BOARDS: Board[] = [
     id: "board-1",
     name: "Weekly review",
     description: null,
-    visibility: "only_me",
     createdById: "user-1",
+    isStarred: false,
+    updatedAt: new Date("2026-01-01"),
   },
   {
     id: "board-2",
     name: "Latency",
     description: null,
-    visibility: "only_me",
     createdById: "user-1",
+    isStarred: false,
+    updatedAt: new Date("2026-01-01"),
   },
 ];
+
+const STARRED_BOARDS: Board[] = OWN_BOARDS.map((each) => ({ ...each, isStarred: true }));
 
 function openBoard({
   server,
@@ -771,7 +772,7 @@ describe("a member's board", () => {
       /** @scenario "AC14 Rename and describe" */
       it("saves the name and shows it on the board and in the sidebar", async () => {
         const user = userEvent.setup();
-        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const server = inMemoryServer({ boards: STARRED_BOARDS });
         openBoard({ server, withSidebar: true });
 
         await user.click(await screen.findByRole("button", { name: "Rename dashboard" }));
@@ -786,7 +787,7 @@ describe("a member's board", () => {
         });
         expect(await screen.findByRole("heading", { name: "Launch week" })).toBeInTheDocument();
         expect(
-          within(screen.getByRole("list", { name: "Mine" })).getByRole("link", {
+          within(screen.getByRole("list", { name: "Starred dashboards" })).getByRole("link", {
             name: /Launch week/,
           }),
         ).toBeInTheDocument();
@@ -823,76 +824,47 @@ describe("a member's board", () => {
     });
   });
 
-  describe("given a member on a board they created", () => {
-    const chooseVisibility = async ({ from, to }: { from: string; to: RegExp }) => {
-      const user = userEvent.setup({ pointerEventsCheck: 0 });
-      await user.click(await screen.findByRole("button", { name: `Visibility: ${from}` }));
-      await user.click(await screen.findByRole("menuitem", { name: to }));
-    };
-
-    describe("when they share it with their team", () => {
-      /** @scenario "AC18 Visibility hides a board from members outside its audience" */
-      it("saves the visibility and lists the board under Team in the sidebar", async () => {
+  describe("given a board the member has not starred", () => {
+    describe("when they star and unstar it from the board header", () => {
+      /** @scenario "AC153 A member stars and unstars a board from a row and from the board header" */
+      it("stars it for them, then unstars it", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
         const server = inMemoryServer({ boards: OWN_BOARDS });
-        openBoard({ server, withSidebar: true });
-
-        await chooseVisibility({ from: "Only me", to: /^Team/ });
-
-        expect(callsTo(server, "dashboards.setVisibility")[0]?.input).toEqual({
-          projectId: "proj-1",
-          dashboardId: "board-1",
-          visibility: "team",
-        });
-        expect(await screen.findByRole("button", { name: "Visibility: Team" })).toBeEnabled();
-        const team = await screen.findByRole("list", { name: "Team" });
-        expect(within(team).getByRole("link", { name: /Weekly review/ })).toBeInTheDocument();
-        expect(
-          within(screen.getByRole("list", { name: "Mine" })).queryByRole("link", {
-            name: /Weekly review/,
-          }),
-        ).toBeNull();
-      });
-    });
-
-    describe("when the server refuses the change", () => {
-      /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
-      it("says why beside the control, in the words for the refusal's code", async () => {
-        const server = inMemoryServer({ boards: OWN_BOARDS, refuseVisibility: true });
         openBoard({ server });
 
-        await chooseVisibility({ from: "Only me", to: /^Organisation/ });
+        await user.click(await screen.findByRole("button", { name: "Star dashboard" }));
+        await waitFor(() =>
+          expect(callsTo(server, "dashboards.star")[0]?.input).toEqual({
+            projectId: "proj-1",
+            dashboardId: "board-1",
+          }),
+        );
 
-        const expected = explainAnyError({
-          data: { error: { code: "dashboard_owner_only", httpStatus: 403, meta: {} } },
-        });
-        expect(await screen.findByRole("alert")).toHaveTextContent(expected.title);
-        expect(screen.getByRole("button", { name: "Visibility: Only me" })).toBeInTheDocument();
+        await user.click(await screen.findByRole("button", { name: "Unstar dashboard" }));
+        await waitFor(() =>
+          expect(callsTo(server, "dashboards.unstar")[0]?.input).toEqual({
+            projectId: "proj-1",
+            dashboardId: "board-1",
+          }),
+        );
+        expect(await screen.findByRole("button", { name: "Star dashboard" })).toBeInTheDocument();
       });
     });
   });
 
-  describe("given a shared board someone else created", () => {
-    const sharedBoard = (): Board[] => [
-      { ...OWN_BOARDS[0]!, visibility: "organisation", createdById: "user-2" },
-    ];
+  describe("given any board with the sidebar beside it", () => {
+    /** @scenario "AC159 No sharing control appears anywhere" */
+    it("offers no visibility or share control in the header or the sidebar menu", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: STARRED_BOARDS });
+      openBoard({ server, withSidebar: true });
 
-    /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
-    it("shows the control disabled, with the reason, to a member who is not an admin", async () => {
-      openBoard({ server: inMemoryServer({ boards: sharedBoard() }) });
+      await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
+      await screen.findByRole("menuitem", { name: "Delete" });
 
-      const control = await screen.findByRole("button", { name: "Visibility: Organisation" });
-      expect(control).toBeDisabled();
-      expect(control).toHaveAttribute("title", BOARD_VISIBILITY_LOCKED_REASON);
-    });
-
-    /** @scenario "AC26 Only the creator or an admin can change visibility or delete the board" */
-    it("lets an admin change it", async () => {
-      openBoard({
-        server: inMemoryServer({ boards: sharedBoard() }),
-        permissions: ["analytics:view", "project:manage"],
-      });
-
-      expect(await screen.findByRole("button", { name: "Visibility: Organisation" })).toBeEnabled();
+      expect(screen.queryByRole("menuitem", { name: /share|default/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /visibility|share/i })).toBeNull();
+      expect(screen.queryByText(/only me|organisation/i)).toBeNull();
     });
   });
 

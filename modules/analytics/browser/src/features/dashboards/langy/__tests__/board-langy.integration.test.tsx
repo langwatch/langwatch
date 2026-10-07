@@ -22,8 +22,9 @@ const BOARD = {
   id: "board-1",
   name: "Weekly review",
   description: null,
-  visibility: "only_me",
   createdById: "user-1",
+  isStarred: false,
+  updatedAt: new Date("2026-01-01"),
 };
 
 /** One board with nothing on it, answered from memory; every call is kept. */
@@ -32,6 +33,8 @@ function inMemoryServer() {
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
     switch (call.path) {
+      case "dashboards.listStarred":
+        return Promise.resolve([]);
       case "dashboards.getAll":
         return Promise.resolve([{ ...BOARD }]);
       case "dashboardWidgets.list":
@@ -47,7 +50,7 @@ const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = ["analytics:view", "cost:view", "traces:view", "langy:create"];
 /** The bar's own words, which name the button. */
 const ASK_BAR = "What would you like to know?";
-const WRITES = /^dashboards\.(?!getAll|sourcePresence)|^dashboardWidgets\.(?!list)/;
+const WRITES = /^dashboards\.(?!getAll|listStarred|sourcePresence)|^dashboardWidgets\.(?!list)/;
 
 function openBoard({
   server,

@@ -1,10 +1,7 @@
 /**
- * The member's boards, stored as `Dashboard` rows: which one the area opens
- * on, and the names new boards get. Addresses are built here and nowhere else.
+ * The member's boards, stored as `Dashboard` rows: the names new boards get and
+ * the addresses in the area. Addresses are built here and nowhere else.
  */
-
-/** The board made for a member who can see none, so the area never opens empty. */
-export const FIRST_BOARD_NAME = "My dashboard";
 
 /** The address of the area, or of one board in it. */
 export function dashboardsPath({
@@ -26,26 +23,7 @@ export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string })
   return `${dashboardsPath({ projectSlug })}/${TEMPLATES_SEGMENT}`;
 }
 
-/**
- * The board `/[project]/dashboards` opens: the member's default while it exists, else
- * their first own board, else the first they can see; undefined when they can see none.
- */
-export function landingBoardId({
-  boards,
-  userId,
-  defaultBoardId,
-}: {
-  boards: readonly { id: string; createdById: string | null }[];
-  userId: string | undefined;
-  /** The board the member set as their default; ignored once it is gone. */
-  defaultBoardId?: string;
-}): string | undefined {
-  if (boards.some(({ id }) => id === defaultBoardId)) return defaultBoardId;
-  const own = boards.find(({ createdById }) => userId !== void 0 && createdById === userId);
-  return (own ?? boards[0])?.id;
-}
-
-/** The name a board gets when created from the sidebar, before the member renames it. */
+/** The name a board gets when created blank, before the member renames it. */
 export function untitledBoardName({ existingCount }: { existingCount: number }): string {
   return `Untitled dashboard ${existingCount + 1}`;
 }

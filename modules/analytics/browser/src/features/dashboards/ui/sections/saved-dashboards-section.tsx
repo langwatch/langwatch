@@ -1,27 +1,22 @@
 /**
- * The "Saved dashboards" list navigation draws in the sidebar, lent through
- * `SavedDashboardsToken` (§10.1): analytics keeps the reads and writes.
- * Grouped Mine, Team, Organisation; only stored boards are listed, then the templates library.
+ * The sidebar list navigation draws, lent through `SavedDashboardsToken`
+ * (§10.1): the member's starred boards for this project, in their own order,
+ * then an "All dashboards" link. Analytics keeps the reads and writes.
  */
 
-import { Box, IconButton, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { SavedDashboardsProps } from "@langwatch/analytics-contract";
-import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Building2, LayoutTemplate, type LucideIcon, Plus, Star, Users } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { HandledErrorAlert } from "@langwatch/error-views";
+import { LayoutDashboard } from "lucide-react";
+import { useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
-import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
-import { useDefaultBoard } from "../../behavior/use-default-board.ts";
-import { useSavedDashboards, type SavedBoard } from "../../behavior/use-saved-dashboards.ts";
-import { boardVisibilityGroups } from "../../model/board-visibility.ts";
-import { dashboardsPath, dashboardTemplatesPath, TEMPLATES_SEGMENT } from "../../model/boards.ts";
-import {
-  SavedDashboardRow,
-  type SavedDashboardRowActions,
-} from "../blocks/saved-dashboard-row.tsx";
+import { useFavourites, type StarredBoard } from "../../behavior/use-favourites.ts";
+import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { dashboardsPath, TEMPLATES_SEGMENT } from "../../model/boards.ts";
+import { SavedDashboardLink, SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 
 const GROUP_LABEL_STYLE = {
   fontSize: "10px",
@@ -31,30 +26,17 @@ const GROUP_LABEL_STYLE = {
   color: "gray.400",
 } as const;
 
-/** The prototype tints a shared board's icon by who it is shown to. */
-const ROW_ICONS: Readonly<Record<DashboardVisibility, { icon: LucideIcon; color?: string }>> = {
-  only_me: { icon: Star },
-  team: { icon: Users, color: "blue.600" },
-  organisation: { icon: Building2, color: "orange.600" },
-};
-
-function RowIcon({ icon: Icon, color }: { icon: LucideIcon; color?: string }) {
-  return (
-    <Box as="span" display="flex" color={color}>
-      <Icon size={15} strokeWidth={1.9} aria-hidden />
-    </Box>
-  );
-}
-
 export function SavedDashboardsSection({ activeDashboardId }: SavedDashboardsProps) {
   const host = useAnalyticsHost();
   const saved = useSavedDashboards();
-  const [renamingId, setRenamingId] = useState<string | undefined>();
-  const [pendingDelete, setPendingDelete] = useState<SavedBoard | undefined>();
-  const { projectSlug } = saved;
-  const { defaultBoardId, setDefaultBoard } = useDefaultBoard();
+  const favourites = useFavourites();
   const fromTemplate = useBoardFromTemplate();
+  const [renamingId, setRenamingId] = useState<string | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<StarredBoard | undefined>();
+  const { projectSlug } = saved;
   const boardNames = saved.boards.map(({ name }) => name);
+  const stars = favourites.stars;
+  const allActive = activeDashboardId === void 0 || activeDashboardId === TEMPLATES_SEGMENT;
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
@@ -63,132 +45,125 @@ export function SavedDashboardsSection({ activeDashboardId }: SavedDashboardsPro
       dashboardId,
       onDeleted: () => {
         setPendingDelete(void 0);
-        // The area's landing picks the next board, or makes one when none is left.
         if (dashboardId === activeDashboardId) host.navigate(dashboardsPath({ projectSlug }));
       },
     });
   };
 
+  const renderStars = () => {
+    if (favourites.loadError) {
+      return (
+        <Box paddingX={2}>
+          <HandledErrorAlert
+            error={favourites.loadError}
+            fallbackTitle="Your starred dashboards could not be loaded"
+          />
+          <Button size="xs" variant="outline" marginTop={2} onClick={favourites.retry}>
+            Retry
+          </Button>
+        </Box>
+      );
+    }
+    if (favourites.isLoading) {
+      return (
+        <HStack paddingX={2} paddingY={1}>
+          <Spinner size="xs" />
+        </HStack>
+      );
+    }
+    if (stars.length === 0) {
+      return (
+        <Text paddingX={2} paddingY={1} fontSize="12px" color="fg.subtle">
+          Star a dashboard to pin it here.
+        </Text>
+      );
+    }
+    return (
+      <VStack
+        as="ul"
+        aria-label="Starred dashboards"
+        align="stretch"
+        gap={0.5}
+        margin={0}
+        padding={0}
+      >
+        {stars.map((board, index) => (
+          <SavedDashboardRow
+            key={board.id}
+            name={board.name}
+            href={dashboardsPath({ projectSlug, dashboardId: board.id })}
+            isActive={activeDashboardId === board.id}
+            actions={{
+              isRenaming: renamingId === board.id,
+              onRenameStart: () => setRenamingId(board.id),
+              onRenameCommit: (name) => {
+                setRenamingId(void 0);
+                saved.renameBoard({ dashboardId: board.id, name });
+              },
+              onRenameCancel: () => setRenamingId(void 0),
+              onDuplicate: () =>
+                void fromTemplate.duplicateBoard({ board, existingNames: boardNames }),
+              onUnstar: () => favourites.toggleStar({ dashboardId: board.id, isStarred: true }),
+              onDelete: () => setPendingDelete(board),
+              ...(index > 0
+                ? {
+                    onMoveUp: () => favourites.moveStar({ dashboardId: board.id, direction: "up" }),
+                  }
+                : {}),
+              ...(index < stars.length - 1
+                ? {
+                    onMoveDown: () =>
+                      favourites.moveStar({ dashboardId: board.id, direction: "down" }),
+                  }
+                : {}),
+            }}
+          />
+        ))}
+      </VStack>
+    );
+  };
+
   return (
     <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
-      <HStack paddingX={2} gap={1} marginBottom={0.5}>
-        <Text {...GROUP_LABEL_STYLE}>Saved dashboards</Text>
-        <Spacer />
-        <IconButton
-          variant="ghost"
-          boxSize={4}
-          minWidth={4}
-          borderRadius="sm"
-          color="gray.400"
-          _hover={{ background: "border/60", color: "fg" }}
-          aria-label="New dashboard"
-          loading={saved.isCreating}
-          onClick={saved.createBoard}
-        >
-          <Plus size={12} />
-        </IconButton>
+      <HStack paddingX={2} marginBottom={0.5}>
+        <Text {...GROUP_LABEL_STYLE}>Starred</Text>
       </HStack>
-      {boardVisibilityGroups(saved.boards).map((group) => (
-        <BoardGroup key={group.key} label={group.label}>
-          {group.boards.map((board) => (
-            <BoardRow
-              key={board.id}
-              board={board}
-              href={dashboardsPath({ projectSlug, dashboardId: board.id })}
-              isActive={activeDashboardId === board.id}
-              actions={{
-                isRenaming: renamingId === board.id,
-                onRenameStart: () => setRenamingId(board.id),
-                onRenameCommit: (name) => {
-                  setRenamingId(void 0);
-                  saved.renameBoard({ dashboardId: board.id, name });
-                },
-                onRenameCancel: () => setRenamingId(void 0),
-                isDefault: defaultBoardId === board.id,
-                onSetDefault: () => {
-                  setDefaultBoard(board.id);
-                  host.succeeded({ title: `"${board.name}" is now your default dashboard` });
-                },
-                onDuplicate: () =>
-                  void fromTemplate.duplicateBoard({ board, existingNames: boardNames }),
-                onDelete: () => setPendingDelete(board),
-              }}
-            />
-          ))}
-        </BoardGroup>
-      ))}
-      <VStack as="ul" aria-label="Templates" align="stretch" gap={0.5} margin={0} padding={0}>
-        <SavedDashboardRow
-          name="Templates"
-          href={dashboardTemplatesPath({ projectSlug })}
-          icon={<RowIcon icon={LayoutTemplate} />}
-          isActive={activeDashboardId === TEMPLATES_SEGMENT}
+
+      {renderStars()}
+
+      <VStack
+        as="ul"
+        aria-label="All dashboards"
+        align="stretch"
+        gap={0.5}
+        margin={0}
+        padding={0}
+        marginTop={1}
+      >
+        <SavedDashboardLink
+          name="All dashboards"
+          href={dashboardsPath({ projectSlug })}
+          icon={
+            <Box as="span" display="flex" color="fg.subtle">
+              <LayoutDashboard size={15} strokeWidth={1.9} aria-hidden />
+            </Box>
+          }
+          isActive={allActive}
         />
       </VStack>
+
       <ConfirmDialog
         open={pendingDelete !== void 0}
         onOpenChange={(isOpen) => {
           if (!isOpen) setPendingDelete(void 0);
         }}
         title="Delete dashboard"
-        message={`Delete "${pendingDelete?.name ?? ""}" and every block on it? This cannot be undone.`}
+        message={`Delete "${pendingDelete?.name ?? ""}" and every widget on it? This cannot be undone.`}
         confirmLabel="Delete"
         tone="danger"
         loading={saved.isDeleting}
         onConfirm={confirmDelete}
       />
     </VStack>
-  );
-}
-
-/** A board's row, with Share and Delete offered only to a member who may use them (AC26). */
-function BoardRow({
-  board,
-  href,
-  isActive,
-  actions,
-}: {
-  board: SavedBoard;
-  href: string;
-  isActive: boolean;
-  actions: SavedDashboardRowActions;
-}) {
-  const visibility = useBoardVisibility({ board, reportsRefusal: true });
-  return (
-    <SavedDashboardRow
-      name={board.name}
-      href={href}
-      icon={<RowIcon {...ROW_ICONS[board.visibility]} />}
-      isActive={isActive}
-      actions={{
-        ...actions,
-        share: visibility.canChange
-          ? { visibility: visibility.visibility, onChange: visibility.setVisibility }
-          : void 0,
-        onDelete: visibility.canChange ? actions.onDelete : void 0,
-      }}
-    />
-  );
-}
-
-function BoardGroup({ label, children }: { label: string; children: ReactNode }) {
-  const labelId = useId();
-  return (
-    <>
-      <Text
-        id={labelId}
-        paddingX={2}
-        marginTop={1}
-        marginBottom={0.5}
-        {...GROUP_LABEL_STYLE}
-        fontSize="9px"
-        color="gray.400/80"
-      >
-        {label}
-      </Text>
-      <VStack as="ul" aria-labelledby={labelId} align="stretch" gap={0.5} margin={0} padding={0}>
-        {children}
-      </VStack>
-    </>
   );
 }

@@ -12,7 +12,6 @@ import type {
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
   DashboardSourcePresence,
-  DashboardVisibility,
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   dashboardWidgetTrpcRowSchema,
@@ -181,7 +180,7 @@ type BorrowedProcedures = {
     };
     create: {
       mutation: {
-        input: ProjectScope & { name: string; visibility?: DashboardVisibility };
+        input: ProjectScope & { name: string };
         output: DashboardRow;
       };
     };
@@ -194,6 +193,7 @@ type BorrowedProcedures = {
     delete: {
       mutation: { input: ProjectScope & { dashboardId: string }; output: unknown };
     };
+    // Legacy Analytics reports ordering; the Dashboards feature uses favourites.
     reorderDashboards: {
       mutation: {
         input: ProjectScope & { dashboardIds: string[] };
@@ -213,10 +213,19 @@ type BorrowedProcedures = {
         output: DashboardRow;
       };
     };
-    setVisibility: {
+    listStarred: {
+      query: { input: ProjectScope; output: DashboardRow[] };
+    };
+    star: {
+      mutation: { input: ProjectScope & { dashboardId: string }; output: { success: true } };
+    };
+    unstar: {
+      mutation: { input: ProjectScope & { dashboardId: string }; output: { success: true } };
+    };
+    reorderStars: {
       mutation: {
-        input: ProjectScope & { dashboardId: string; visibility: DashboardVisibility };
-        output: DashboardRow;
+        input: ProjectScope & { dashboardIds: string[] };
+        output: { success: true };
       };
     };
     sourcePresence: {

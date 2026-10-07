@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The "+" in the Dashboards sidebar must create a board only its creator
- * sees, matching the prototype's Mine grouping (#907).
+ * Creating a board sends no visibility (every board is the project's), and
+ * the list carries each board's star and last change.
  * @see specs/dashboards-v1.feature
  */
 
@@ -9,11 +9,15 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  updated: new Date("2026-01-02"),
   create: { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false },
   rename: { mutate: vi.fn(), isPending: false },
   remove: { mutate: vi.fn(), isPending: false },
   utils: {
-    dashboards: { getAll: { invalidate: vi.fn() } },
+    dashboards: {
+      getAll: { invalidate: vi.fn() },
+      listStarred: { invalidate: vi.fn() },
+    },
     licenseEnforcement: { checkLimit: { invalidate: vi.fn() } },
   },
   host: {
@@ -27,7 +31,22 @@ vi.mock("../../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
     useUtils: () => mocks.utils,
     dashboards: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+      getAll: {
+        useQuery: () => ({
+          data: [
+            {
+              id: "board-1",
+              name: "Weekly",
+              description: null,
+              createdById: "user-1",
+              isStarred: true,
+              updatedAt: mocks.updated,
+              order: 0,
+              _count: { graphs: 2 },
+            },
+          ],
+        }),
+      },
       create: { useMutation: () => mocks.create },
       rename: { useMutation: () => mocks.rename },
       delete: { useMutation: () => mocks.remove },
@@ -45,16 +64,34 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("given a member clicks + in the Dashboards sidebar", () => {
+describe("given a member creates a board", () => {
   /** @scenario "AC10 Blank board matches the reference" */
-  it("creates the board visible only to them", () => {
+  it("sends the project and a numbered name, and no visibility", () => {
     const { result } = renderHook(() => useSavedDashboards());
 
     act(() => result.current.createBoard());
 
     expect(mocks.create.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: "project-1", visibility: "only_me" }),
+      { projectId: "project-1", name: "Untitled dashboard 2" },
       expect.anything(),
     );
+  });
+});
+
+describe("given the project has boards", () => {
+  /** @scenario "AC151 The Dashboards tab lists every board with a star, name, menu and link" */
+  it("lists each with its star and last change", () => {
+    const { result } = renderHook(() => useSavedDashboards());
+
+    expect(result.current.boards).toEqual([
+      {
+        id: "board-1",
+        name: "Weekly",
+        description: null,
+        createdById: "user-1",
+        isStarred: true,
+        updatedAt: mocks.updated,
+      },
+    ]);
   });
 });

@@ -122,7 +122,7 @@ afterEach(cleanup);
 describe("starting a board from a template", () => {
   describe("given no board has the template's name yet", () => {
     /** @scenario "AC8 Starting from the template makes a new board of editable widgets" */
-    it("makes a board only the member sees, fills it, places it and opens it", async () => {
+    it("makes a board, fills it, places it and opens it", async () => {
       const user = userEvent.setup();
       const server = inMemoryServer();
       const host = startFromTemplate({ server });
@@ -131,7 +131,7 @@ describe("starting a board from a template", () => {
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
       expect(inputsTo(server, "dashboards.create")).toEqual([
-        { projectId: "proj-1", name: "Small deck", visibility: "only_me" },
+        { projectId: "proj-1", name: "Small deck" },
       ]);
       expect(inputsTo(server, "dashboards.updateDetails")).toEqual([
         { projectId: "proj-1", dashboardId: "board-1", description: "Two widgets side by side." },
@@ -155,6 +155,7 @@ describe("starting a board from a template", () => {
           })),
         },
       ]);
+      expect(inputsTo(server, "dashboards.star")).toEqual([]);
       expect(host.failures).toEqual([]);
     });
   });
@@ -170,7 +171,7 @@ describe("starting a board from a template", () => {
 
       await waitFor(() =>
         expect(inputsTo(server, "dashboards.create")).toEqual([
-          { projectId: "proj-1", name: "Small deck 3", visibility: "only_me" },
+          { projectId: "proj-1", name: "Small deck 3" },
         ]),
       );
     });

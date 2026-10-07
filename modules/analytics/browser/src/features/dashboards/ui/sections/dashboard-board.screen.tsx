@@ -18,8 +18,8 @@ import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboa
 import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
-import { useBoardVisibility } from "../../behavior/use-board-visibility.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
+import { useFavourites } from "../../behavior/use-favourites.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
@@ -32,7 +32,6 @@ import { dashboardTemplatesPath } from "../../model/boards.ts";
 import { AddBlockCard, BlankBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
-import { BoardVisibilityControl } from "../blocks/board-visibility-control.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
@@ -67,7 +66,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     stored: board.description,
   });
-  const visibility = useBoardVisibility({ board });
+  const favourites = useFavourites();
   const { range, grain, period, setRange, setGrain } = useBoardPeriod();
   const picker = useBlockPickerAddress();
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
@@ -83,7 +82,10 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         <BoardHeader
           name={board.name}
           description={description}
-          visibility={visibility.visibility}
+          isStarred={board.isStarred}
+          onToggleStar={() =>
+            favourites.toggleStar({ dashboardId: board.id, isStarred: board.isStarred })
+          }
           onRename={(name) => saved.renameBoard({ dashboardId: board.id, name })}
           onDescribe={saveDescription}
           onAddChart={() => setIsAddChartOpen(true)}
@@ -95,14 +97,6 @@ function OpenBoard({ board }: { board: SavedBoard }) {
               onRangeChange={setRange}
               onGrainChange={setGrain}
               onRefreshChange={autoRefresh.setOption}
-            />
-          }
-          shareControl={
-            <BoardVisibilityControl
-              visibility={visibility.visibility}
-              canChange={visibility.canChange}
-              refusal={visibility.refusal}
-              onChange={visibility.setVisibility}
             />
           }
           refreshControl={

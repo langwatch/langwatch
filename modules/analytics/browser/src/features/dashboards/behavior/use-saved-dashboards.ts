@@ -1,10 +1,8 @@
 /**
- * The member's own boards and the writes the sidebar and board offer, over the
- * existing `dashboards.*` procedures. Failures travel raw to the host, which
- * resolves their words from the code (#5984).
+ * Every board in the project and the writes the page and board offer, over the
+ * `dashboards.*` procedures; every board is editable by everyone in the project.
+ * Failures travel raw to the host, which resolves their words from the code (#5984).
  */
-
-import type { DashboardVisibility } from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
@@ -15,14 +13,24 @@ export type SavedBoard = {
   id: string;
   name: string;
   description: string | null;
-  visibility: DashboardVisibility;
   /** Null for a board older than creators. */
   createdById: string | null;
+  /** Whether the member reading the list has starred it. */
+  isStarred: boolean;
+  /** ISO 8601 off the wire; sorted and formatted without minting a Date. */
+  updatedAt: string;
 };
 
 /** The fields a board reads off a stored row, whichever procedure answered it. */
-function savedBoardOf({ id, name, description, visibility, createdById }: SavedBoard): SavedBoard {
-  return { id, name, description, visibility, createdById };
+function savedBoardOf({
+  id,
+  name,
+  description,
+  createdById,
+  isStarred,
+  updatedAt,
+}: SavedBoard): SavedBoard {
+  return { id, name, description, createdById, isStarred, updatedAt };
 }
 
 export function useSavedDashboards() {
@@ -38,15 +46,15 @@ export function useSavedDashboards() {
   const remove = analyticsApi.dashboards.delete.useMutation();
 
   const boards: SavedBoard[] = (list.data ?? []).map(savedBoardOf);
-  const refresh = () => utils.dashboards.getAll.invalidate({ projectId });
+  const refresh = () =>
+    Promise.all([
+      utils.dashboards.getAll.invalidate({ projectId }),
+      utils.dashboards.listStarred.invalidate({ projectId }),
+    ]);
 
   const createBoard = () => {
     create.mutate(
-      {
-        projectId,
-        name: untitledBoardName({ existingCount: boards.length }),
-        visibility: "only_me",
-      },
+      { projectId, name: untitledBoardName({ existingCount: boards.length }) },
       {
         onSuccess: (created) => {
           void refresh();

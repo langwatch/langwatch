@@ -1,10 +1,9 @@
 /**
- * One board in the saved-dashboards list, after the prototype's sidebar row: one truncated
- * line, a quiet gauge on the member's default, and a "⋮" menu (Set as default, Rename, Share,
- * Duplicate, Delete; Share and Delete only for a member who may use them). Rename edits inline.
+ * One starred board in the sidebar list: a star that unstars it, one truncated
+ * line linking to the board, and a "⋮" menu (Rename, Duplicate, Move up, Move
+ * down, Delete). Rename edits inline.
  */
 
-import { DASHBOARD_VISIBILITIES, type DashboardVisibility } from "@langwatch/dashboard-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -13,45 +12,41 @@ import {
   Link as ChakraLink,
   Text,
 } from "@langwatch/design-system/primitives";
-import { Check, Copy, Gauge, MoreVertical, Pencil, Share2, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
-import { boardVisibilityLabel } from "../../model/board-visibility.ts";
+import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
-import { VISIBILITY_ICONS } from "./board-visibility-control.tsx";
 
 export type SavedDashboardRowActions = {
   isRenaming: boolean;
   onRenameStart: () => void;
   onRenameCommit: (name: string) => void;
   onRenameCancel: () => void;
-  /** Whether this is the board the member lands on; its menu item is then checked. */
-  isDefault: boolean;
-  onSetDefault: () => void;
   onDuplicate: () => void;
-  /** Absent for a member who may not change who sees the board (AC26). */
-  share?: { visibility: DashboardVisibility; onChange: (visibility: DashboardVisibility) => void };
-  /** Absent for a member who may not delete the board (AC26). */
-  onDelete?: () => void;
+  onUnstar: () => void;
+  onDelete: () => void;
+  /** Absent when the board is at the top of the member's order. */
+  onMoveUp?: () => void;
+  /** Absent when the board is at the bottom. */
+  onMoveDown?: () => void;
 };
 
 export function SavedDashboardRow({
   name,
   href,
-  icon,
   isActive,
   actions,
 }: {
   name: string;
   href: string;
-  icon: ReactNode;
   isActive: boolean;
-  actions?: SavedDashboardRowActions;
+  actions: SavedDashboardRowActions;
 }) {
   const host = useAnalyticsHost();
-  if (actions?.isRenaming) {
+  if (actions.isRenaming) {
     return <RenameField name={name} actions={actions} />;
   }
 
@@ -64,6 +59,56 @@ export function SavedDashboardRow({
       _hover={{ "& .row-menu": { opacity: 1 } }}
       _focusWithin={{ "& .row-menu": { opacity: 1 } }}
     >
+      <ChakraLink
+        href={href}
+        display="flex"
+        alignItems="center"
+        gap={1.5}
+        width="full"
+        borderRadius="lg"
+        paddingX={2}
+        paddingY="3px"
+        fontSize="13px"
+        fontWeight={isActive ? "medium" : "normal"}
+        color={isActive ? "fg" : "fg.subtle"}
+        background={isActive ? "border" : "transparent"}
+        textDecoration="none"
+        _hover={{ color: "fg", background: isActive ? "border" : "border/50" }}
+        aria-current={isActive ? "page" : void 0}
+        onClick={(event) => {
+          if (opensElsewhere(event)) return;
+          event.preventDefault();
+          host.navigate(href);
+        }}
+      >
+        <Box as="span" display="flex" flexShrink={0}>
+          <BoardStar isStarred onToggle={actions.onUnstar} size={14} />
+        </Box>
+        <Text as="span" truncate minWidth={0}>
+          {name}
+        </Text>
+        <Box width="24px" flexShrink={0} marginLeft="auto" />
+      </ChakraLink>
+      <RowMenu name={name} isActive={isActive} actions={actions} />
+    </Box>
+  );
+}
+
+/** A plain row with no star and no reorder, for the "All dashboards" link. */
+export function SavedDashboardLink({
+  name,
+  href,
+  icon,
+  isActive,
+}: {
+  name: string;
+  href: string;
+  icon: ReactNode;
+  isActive: boolean;
+}) {
+  const host = useAnalyticsHost();
+  return (
+    <Box as="li" listStyleType="none" width="full">
       <ChakraLink
         href={href}
         display="flex"
@@ -92,14 +137,7 @@ export function SavedDashboardRow({
         <Text as="span" truncate minWidth={0}>
           {name}
         </Text>
-        {actions?.isDefault && (
-          <Box as="span" display="flex" flexShrink={0} color="fg.subtle">
-            <Gauge size={11} aria-label="Your default dashboard" />
-          </Box>
-        )}
-        {actions && <Box width="24px" flexShrink={0} marginLeft="auto" />}
       </ChakraLink>
-      {actions && <RowMenu name={name} isActive={isActive} actions={actions} />}
     </Box>
   );
 }
@@ -137,46 +175,30 @@ function RowMenu({
             <MoreVertical size={14} aria-hidden />
           </IconButton>
         </Menu.Trigger>
-        <Menu.Content minWidth="196px">
-          <Menu.Item
-            value="set-default"
-            disabled={actions.isDefault}
-            onClick={actions.onSetDefault}
-          >
-            <MenuRow icon={<Gauge size={13} />} isChecked={actions.isDefault}>
-              Set as default
-            </MenuRow>
-          </Menu.Item>
+        <Menu.Content minWidth="188px">
           <Menu.Item value="rename" onClick={actions.onRenameStart}>
             <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
           </Menu.Item>
-          {actions.share && <ShareMenu share={actions.share} />}
           <Menu.Item value="duplicate" onClick={actions.onDuplicate}>
             <MenuRow icon={<Copy size={13} />}>Duplicate</MenuRow>
           </Menu.Item>
-          {actions.onDelete && (
-            <>
-              <Menu.Separator />
-              <Menu.Item value="delete" color="red.fg" onClick={actions.onDelete}>
-                <MenuRow icon={<Trash2 size={13} />}>Delete</MenuRow>
-              </Menu.Item>
-            </>
-          )}
+          <Menu.Item value="move-up" disabled={!actions.onMoveUp} onClick={actions.onMoveUp}>
+            <MenuRow icon={<ArrowUp size={13} />}>Move up</MenuRow>
+          </Menu.Item>
+          <Menu.Item value="move-down" disabled={!actions.onMoveDown} onClick={actions.onMoveDown}>
+            <MenuRow icon={<ArrowDown size={13} />}>Move down</MenuRow>
+          </Menu.Item>
+          <Menu.Separator />
+          <Menu.Item value="delete" color="red.fg" onClick={actions.onDelete}>
+            <MenuRow icon={<Trash2 size={13} />}>Delete</MenuRow>
+          </Menu.Item>
         </Menu.Content>
       </Menu.Root>
     </Box>
   );
 }
 
-function MenuRow({
-  icon,
-  isChecked = false,
-  children,
-}: {
-  icon: ReactNode;
-  isChecked?: boolean;
-  children: ReactNode;
-}) {
+function MenuRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <HStack width="full" gap={2} fontSize="12.5px">
       <Box as="span" display="flex" flexShrink={0}>
@@ -185,40 +207,7 @@ function MenuRow({
       <Text as="span" flex="1">
         {children}
       </Text>
-      {isChecked && <Check size={13} aria-label="selected" />}
     </HStack>
-  );
-}
-
-/** The audiences as a submenu; the current one is checked. */
-function ShareMenu({ share }: { share: NonNullable<SavedDashboardRowActions["share"]> }) {
-  return (
-    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
-      <Menu.TriggerItem value="share">
-        <MenuRow icon={<Share2 size={13} />}>Share</MenuRow>
-      </Menu.TriggerItem>
-      <Menu.Content>
-        <Menu.RadioItemGroup
-          value={share.visibility}
-          onValueChange={({ value }) => {
-            const picked = DASHBOARD_VISIBILITIES.find((option) => option === value);
-            if (picked) share.onChange(picked);
-          }}
-        >
-          {DASHBOARD_VISIBILITIES.map((option) => {
-            const Icon = VISIBILITY_ICONS[option];
-            return (
-              <Menu.RadioItem key={option} value={option}>
-                <HStack gap={2} fontSize="12.5px">
-                  <Icon size={13} />
-                  {boardVisibilityLabel(option)}
-                </HStack>
-              </Menu.RadioItem>
-            );
-          })}
-        </Menu.RadioItemGroup>
-      </Menu.Content>
-    </Menu.Root>
   );
 }
 

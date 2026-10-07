@@ -36,6 +36,7 @@ import {
   templateSections,
 } from "../../model/template-library.ts";
 import { CatalogueFilterBar, TRUNK_ICONS, TRUNK_PALETTES } from "../blocks/catalogue-filters.tsx";
+import { DashboardsTabs } from "../blocks/dashboards-tabs.tsx";
 import { TemplateCard } from "../blocks/template-card.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
@@ -137,12 +138,10 @@ function TemplatesLibrary() {
       paddingY={{ base: 5, md: 7 }}
     >
       <VStack align="stretch" gap={5}>
-        <VStack align="stretch" gap={1}>
-          <Heading as="h1" fontSize="19px" fontWeight="semibold" letterSpacing="tight">
-            Dashboard templates
-          </Heading>
+        <VStack align="stretch" gap={2}>
+          <DashboardsTabs projectSlug={saved.projectSlug} active="templates" />
           <Text fontSize="13px" color="fg.muted" maxWidth="680px">
-            Each template answers one job with a ready-made dashboard you can edit and share.
+            Each template answers one job with a ready-made dashboard you can edit.
           </Text>
         </VStack>
         <CatalogueFilterBar

@@ -87,7 +87,6 @@ export function useBoardFromTemplate() {
       const board = await client.dashboards.create.mutate({
         projectId,
         name: templateBoardName({ templateName: source.name, existingNames }),
-        visibility: "only_me",
       });
       dashboardId = board.id;
       await fill({ description: source.description, widgets, dashboardId });
@@ -127,7 +126,7 @@ export function useBoardFromTemplate() {
     board,
     existingNames,
   }: {
-    board: SavedBoard;
+    board: Pick<SavedBoard, "id" | "name" | "description">;
     existingNames: readonly string[];
   }) =>
     createFrom({

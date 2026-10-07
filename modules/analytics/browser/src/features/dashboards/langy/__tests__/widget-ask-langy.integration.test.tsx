@@ -22,8 +22,9 @@ const BOARD = {
   id: "board-1",
   name: "Weekly review",
   description: null,
-  visibility: "only_me",
   createdById: "user-1",
+  isStarred: false,
+  updatedAt: new Date("2026-01-01"),
 };
 const PROMPT = "How much traffic did my agent get? Quote the real numbers.";
 const SQL = "SELECT count() FROM trace_metrics_by_minute";
@@ -50,6 +51,8 @@ function inMemoryServer() {
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
     switch (call.path) {
+      case "dashboards.listStarred":
+        return Promise.resolve([]);
       case "dashboards.getAll":
         return Promise.resolve([{ ...BOARD }]);
       case "dashboardWidgets.list":

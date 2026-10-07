@@ -31,14 +31,15 @@ function inMemoryServer({ boards = [] }: { boards?: { id: string; name: string }
           state.boards.map((board) => ({
             ...board,
             description: null,
-            visibility: "only_me",
             createdById: "user-1",
+            isStarred: false,
+            updatedAt: new Date("2026-01-01"),
           })),
         );
       case "dashboards.create": {
         const board = { id: `board-${state.boards.length + 1}`, name: String(input.name) };
         state.boards.push(board);
-        return Promise.resolve({ ...board, visibility: input.visibility });
+        return Promise.resolve(board);
       }
       case "dashboards.updateDetails":
       case "dashboardWidgets.batchUpdateLayouts":
@@ -89,7 +90,7 @@ describe("the templates library", () => {
     it("lists every template once, under its trunk, in trunk order", () => {
       openLibrary();
 
-      expect(screen.getByRole("heading", { name: "Dashboard templates" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Templates" })).toBeInTheDocument();
       const regions = screen.getAllByRole("region");
       expect(
         regions.map((region) => within(region).getByRole("heading", { level: 2 }).textContent),
@@ -166,7 +167,7 @@ describe("the templates library", () => {
     const READY = TEMPLATE_LIBRARY.find(({ status }) => status === "ready")!.board;
 
     /** @scenario "AC106 Templates library: a ready template creates a board, a coming-soon one cannot" */
-    it("makes a board only they see, named after the template, and opens it", async () => {
+    it("makes a board named after the template, and opens it", async () => {
       const user = userEvent.setup();
       const { host, server } = openLibrary();
 
@@ -174,7 +175,7 @@ describe("the templates library", () => {
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-1"]));
       const created = server.state.calls.find(({ path }) => path === "dashboards.create");
-      expect(created?.input).toMatchObject({ name: READY.name, visibility: "only_me" });
+      expect(created?.input).toEqual({ projectId: "proj-1", name: READY.name });
     });
 
     /** @scenario "AC140 Template pick: the new board opens with the template's report drafted in Langy" */

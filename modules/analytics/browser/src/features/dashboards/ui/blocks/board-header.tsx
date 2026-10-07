@@ -1,61 +1,49 @@
 /**
- * A board's header, after the reference: the title with its rename pencil, the
- * share control and "Add chart" on the first row, the description and period
- * on the second. Without `onRename`/`onDescribe` the name and description stay fixed.
+ * A board's header, after the reference: a star that pins the board, the title
+ * with its rename pencil and "Add chart" on the first row, the description and
+ * period on the second. Without `onRename`/`onDescribe` the text stays fixed.
  */
 
 import { Box, Button, Heading, HStack, IconButton, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { DashboardVisibility } from "@langwatch/dashboard-contract";
-import { Building2, type LucideIcon, Pencil, Plus, Star, Users } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { boardVisibilityLabel } from "../../model/board-visibility.ts";
+import { BoardStar } from "../elements/board-star.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
-
-/** The prototype's tinted chip beside the title for a board shown beyond its creator. */
-const SHARED_CHIPS: Partial<
-  Readonly<Record<DashboardVisibility, { icon: LucideIcon; palette: string }>>
-> = {
-  team: { icon: Users, palette: "blue" },
-  organisation: { icon: Building2, palette: "orange" },
-};
 
 export function BoardHeader({
   name,
   description,
-  visibility,
+  isStarred,
+  onToggleStar,
   onRename,
   onDescribe,
   onAddChart,
   periodControl,
-  shareControl,
   refreshControl,
 }: {
   name: string;
   description: string;
-  visibility: DashboardVisibility;
+  isStarred: boolean;
+  onToggleStar: () => void;
   onRename?: (name: string) => void;
   onDescribe?: (description: string) => void;
   onAddChart: () => void;
   periodControl: ReactNode;
-  /** The share icon: the board's visibility menu. */
-  shareControl: ReactNode;
   /** Data age and the auto-refresh menu. */
   refreshControl?: ReactNode;
 }) {
   return (
     <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
-        <HStack gap={2.5} flex={1} minWidth={0}>
-          <Box color="teal.solid" flexShrink={0}>
-            <Star size={16} aria-hidden />
+        <HStack gap={2} flex={1} minWidth={0}>
+          <Box flexShrink={0}>
+            <BoardStar isStarred={isStarred} onToggle={onToggleStar} size={17} />
           </Box>
           <BoardTitle name={name} onRename={onRename} />
-          <SharedChip visibility={visibility} />
         </HStack>
         <HStack gap={3} flexShrink={0}>
           {refreshControl}
-          {shareControl}
           <Button
             variant="outline"
             height={8}
@@ -78,28 +66,6 @@ export function BoardHeader({
         {periodControl}
       </HStack>
     </VStack>
-  );
-}
-
-function SharedChip({ visibility }: { visibility: DashboardVisibility }) {
-  const chip = SHARED_CHIPS[visibility];
-  if (!chip) return null;
-  const Icon = chip.icon;
-  return (
-    <HStack
-      as="span"
-      gap={1}
-      flexShrink={0}
-      borderRadius="sm"
-      background={`${chip.palette}.50`}
-      color={`${chip.palette}.600`}
-      paddingX={1.5}
-      paddingY={0.5}
-      fontSize="10px"
-      fontWeight="medium"
-    >
-      <Icon size={11} aria-hidden /> {boardVisibilityLabel(visibility)}
-    </HStack>
   );
 }
 
