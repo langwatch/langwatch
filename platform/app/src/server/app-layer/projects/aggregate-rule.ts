@@ -16,32 +16,18 @@ export const AGGREGATE_RULE_KINDS = [
   "explicit",
 ] as const;
 
-/** A named list of member projects: never empty, so "none" is never stored as `[]`. */
-const projectIdsSchema = z.array(z.string().min(1)).min(1);
-
-/**
- * The personal rules may also name projects to read on top of the personal
- * workspaces they resolve to: "every personal workspace, plus the support
- * bot". Optional, so a rule stored before the field existed still parses.
- */
 export const aggregateRuleSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("all-personal"),
-      projectIds: projectIdsSchema.optional(),
-    })
-    .strict(),
+  z.object({ kind: z.literal("all-personal") }).strict(),
   z
     .object({
       kind: z.literal("personal-by-department"),
       departmentId: z.string().min(1),
-      projectIds: projectIdsSchema.optional(),
     })
     .strict(),
   z
     .object({
       kind: z.literal("explicit"),
-      projectIds: projectIdsSchema,
+      projectIds: z.array(z.string().min(1)).min(1),
     })
     .strict(),
 ]);

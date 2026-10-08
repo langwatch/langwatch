@@ -20,7 +20,7 @@ export interface AggregateRuleRepository {
     projectIds: readonly string[];
   }): Promise<string[]>;
   /**
-   * Every project a rule of this organisation may name, by the same
+   * Every project an explicit rule of this organisation may name, by the same
    * filter as {@link findReadableProjectIds}, with what the new-project form
    * shows of it: its name, whether it is a personal workspace, and whose.
    * Ordered by name.
