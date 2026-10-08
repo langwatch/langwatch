@@ -20,9 +20,11 @@ import {
   type UpgradeStepStatus,
   type UpgradeTarget,
   upgradeTargetSchema,
+  type UpcastStepInput,
+  upcastStepInputSchema,
+  upcastStepStatus,
 } from "./ledger.ts";
 import type { UpgradePostgres } from "./ports.ts";
-import { type UpcastStepInput, upcastStepInputSchema, upcastStepStatus } from "./upcast-steps.ts";
 
 // The columns are TIMESTAMP(3) holding UTC, as Prisma writes them; read back as instants.
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;

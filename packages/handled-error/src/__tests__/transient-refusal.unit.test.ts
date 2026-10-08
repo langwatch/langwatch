@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { HandledError } from "../handled-error.ts";
-import { TRANSIENT_REFUSAL_CODES, isTransientRefusal } from "../transient-refusal.ts";
+import { HandledError, TRANSIENT_REFUSAL_CODES, isTransientRefusal } from "../handled-error.ts";
 
 class Refusal extends HandledError {
   constructor({ code, httpStatus }: { code: string; httpStatus: number }) {

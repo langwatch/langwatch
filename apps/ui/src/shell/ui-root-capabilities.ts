@@ -5,10 +5,13 @@
 
 import { analyticsWeb } from "@langwatch/analytics-browser/declaration";
 import { authWeb } from "@langwatch/auth-browser/declaration";
+import { createDesignSystem } from "@langwatch/design-system/system";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
 import { opsWeb } from "@langwatch/ops-browser/declaration";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
+
+import { langyThemeConfig } from "./ui/elements/langy/langy-theme.ts";
 
 const auth = authWeb.installation.capabilities;
 const organization = organizationWeb.installation.capabilities;
@@ -74,4 +77,11 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     presenceMenuItem,
     impersonationBanner,
   };
+}
+
+/** The application-composed system: shared foundations plus installed features. */
+export function composeUiDesignSystem({
+  frontDoorTheme,
+}: Pick<UiRootCapabilities, "frontDoorTheme">) {
+  return createDesignSystem(langyThemeConfig, frontDoorTheme.frontDoorThemeConfig);
 }

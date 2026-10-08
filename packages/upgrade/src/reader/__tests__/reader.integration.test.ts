@@ -8,9 +8,8 @@ import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createLedgerTables, LEDGER_TABLE } from "../../ledger-tables.ts";
-import { UpgradeReadError } from "../reader.errors.ts";
 import type { UpgradeImage } from "../reader.schema.ts";
-import { type UpgradeReader, createUpgradeReader } from "../reader.service.ts";
+import { UpgradeReadError, type UpgradeReader, createUpgradeReader } from "../reader.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 

@@ -1,6 +1,5 @@
 export * from "./attributeKeys.ts";
 export * from "./canonicalTypes.ts";
-export * from "./contentPart.ts";
 export * from "./costAttribution.ts";
 export {
   type AttributeCanonicaliser,
@@ -11,10 +10,13 @@ export {
   remainingAttributes,
   remainingEvents,
 } from "./canonicalAttributes.ts";
-export { isRecord } from "./canonicalGuard.ts";
+export { isRecord, isReplyTextPart } from "./canonicalGuard.ts";
 export { parseJsonStringValues } from "./canonicalJson.ts";
 export { extractLastUserMessageText, extractMessageContentText } from "./canonicalMessage.ts";
-export { claudeCacheWritesLongLived, isConversationalQuerySource } from "./claudeCodeCallPolicy.ts";
+export {
+  claudeCacheWritesLongLived,
+  isConversationalQuerySource,
+} from "./claudeCodeCanonicaliser.ts";
 export {
   CLAUDE_CODE_SCOPE_NAMES,
   ClaudeCodeCanonicaliserService,
@@ -27,7 +29,7 @@ export { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 export { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 export { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
 export { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
-export { LangWatchCanonicaliserService } from "./langwatchCanonicaliser.ts";
+export { LangWatchCanonicaliserService } from "./spanCanonicalisation.ts";
 export { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 export { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 export { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
@@ -36,7 +38,7 @@ export { SPRING_AI_SCOPE_NAMES, SpringAICanonicaliserService } from "./springAiC
 export { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 export { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
 export { capPayloadString, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "./tracePayloadCap.ts";
-export { VercelCanonicaliserService } from "./vercelCanonicaliser.ts";
+export { VercelCanonicaliserService } from "./spanCanonicalisation.ts";
 export { VertexAdkCanonicaliserService } from "./vertexAdkCanonicaliser.ts";
 export {
   type CanonicalisedLogRecord,

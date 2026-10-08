@@ -12,12 +12,25 @@ import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
-import { UiTraceFilters, type UiTraceFilterReading } from "./trace-filters.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
 export { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget };
-export { UiTraceFilters, type UiTraceFilterReading };
+
+/** The filters a trace list read narrows by, without the project it reads in. */
+export type UiTraceFilterReading = {
+  startDate: number;
+  endDate: number;
+  filters: Record<string, unknown>;
+  query?: string;
+  negateFilters?: boolean;
+};
+
+/** The reader's applied trace filters; a capability travels by declaration (§10.1). */
+export abstract class UiTraceFilters {
+  /** Undefined while no filter narrows anything: a free-text query alone stays unfiltered. */
+  abstract applied(): UiTraceFilterReading | undefined;
+}
 
 /** The composition never filled this port, and something asked it to work. */
 export class UiCapabilityUnavailableError extends Error {

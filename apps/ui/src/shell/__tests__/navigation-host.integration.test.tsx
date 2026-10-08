@@ -19,7 +19,7 @@ import {
   UiScope,
 } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

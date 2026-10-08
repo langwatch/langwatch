@@ -42,9 +42,12 @@ import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
 import { browserModules } from "./browser-modules.generated.ts";
-import { composeUiDesignSystem } from "./design-system";
 import { installedUiDeclarations } from "./shell/ui-declarations";
-import { loadUiRootCapabilities, type UiRootCapabilities } from "./shell/ui-root-capabilities";
+import {
+  composeUiDesignSystem,
+  loadUiRootCapabilities,
+  type UiRootCapabilities,
+} from "./shell/ui-root-capabilities";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";

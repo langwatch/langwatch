@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isConversationalQuerySource } from "../claudeCodeCallPolicy.ts";
-import { ClaudeCodeCanonicaliserService } from "../claudeCodeCanonicaliser.ts";
+import {
+  ClaudeCodeCanonicaliserService,
+  isConversationalQuerySource,
+} from "../claudeCodeCanonicaliser.ts";
 import { ClaudeCodeRequestService } from "../claudeCodeRequest.ts";
 import { ClaudeCodeResponseService } from "../claudeCodeResponse.ts";
 import { createExtractorContext, createLogExtractorContext } from "./testHelpers.ts";

@@ -2,8 +2,6 @@ import { cp, mkdir, mkdtemp, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { SteppingError } from "./stepping.errors.ts";
-
 /** The lock file Prisma checks the provider against; a different provider is refused (P3019). */
 export const MIGRATION_LOCK = 'provider = "postgresql"\n';
 
@@ -43,4 +41,21 @@ export async function writeReleaseDirectory({
   );
   await writeFile(join(migrations, "migration_lock.toml"), MIGRATION_LOCK);
   return root;
+}
+
+export const steppingErrorCodes = [
+  "duplicate_folder",
+  "missing_migration_sql",
+  "invalid_goose_version",
+] as const;
+
+/** A release the applier refuses before it runs any tool; `code` is what a caller branches on. */
+export class SteppingError extends Error {
+  readonly code: (typeof steppingErrorCodes)[number];
+
+  constructor({ code, message }: { code: SteppingError["code"]; message: string }) {
+    super(message);
+    this.name = "SteppingError";
+    this.code = code;
+  }
 }

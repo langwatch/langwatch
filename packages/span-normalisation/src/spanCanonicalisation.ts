@@ -20,7 +20,10 @@ import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 import { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 import { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
 import { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
-import { LangWatchCanonicaliserService } from "./langwatchCanonicaliser.ts";
+import { canonicaliseLangWatchIdentity } from "./langwatchIdentity.ts";
+import { canonicaliseLangWatchMetadata } from "./langwatchMetadata.ts";
+import { canonicaliseLangWatchMetrics } from "./langwatchMetrics.ts";
+import { canonicaliseLangWatchValues } from "./langwatchValue.ts";
 import { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 import { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 import { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
@@ -28,8 +31,44 @@ import { OpenInferenceCanonicaliserService } from "./openinferenceCanonicaliser.
 import { SpringAICanonicaliserService } from "./springAiCanonicaliser.ts";
 import { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 import { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
-import { VercelCanonicaliserService } from "./vercelCanonicaliser.ts";
+import { canonicaliseVercelCore } from "./vercelCore.ts";
+import { canonicaliseVercelIO } from "./vercelIo.ts";
 import { VertexAdkCanonicaliserService } from "./vertexAdkCanonicaliser.ts";
+
+export class LangWatchCanonicaliserService implements AttributeCanonicaliser {
+  static create(): LangWatchCanonicaliserService {
+    return new LangWatchCanonicaliserService();
+  }
+
+  private constructor() {}
+
+  readonly id = "langwatch";
+
+  apply(ctx: ExtractorContext): void {
+    canonicaliseLangWatchIdentity(ctx);
+    canonicaliseLangWatchMetadata(ctx);
+    canonicaliseLangWatchValues(ctx);
+    canonicaliseLangWatchMetrics(ctx);
+  }
+}
+
+export class VercelCanonicaliserService implements AttributeCanonicaliser {
+  static create(): VercelCanonicaliserService {
+    return new VercelCanonicaliserService();
+  }
+
+  private constructor() {}
+
+  readonly id = "vercel";
+
+  apply(ctx: ExtractorContext): void {
+    if (!canonicaliseVercelCore(ctx)) {
+      return;
+    }
+
+    canonicaliseVercelIO(ctx);
+  }
+}
 
 /** The canonicalisers in the order they run; the order is load-bearing. */
 export function orderedSpanCanonicalisers({

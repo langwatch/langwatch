@@ -1,7 +1,6 @@
 import { Cron } from "croner";
 
-import type { Instant } from "./temporal.ts";
-import { fromDate, toDate } from "./zoned.ts";
+import { fromDate, type Instant, toDate } from "./zoned.ts";
 
 /**
  * The first instant strictly after `after` that `cron` names, read in the IANA

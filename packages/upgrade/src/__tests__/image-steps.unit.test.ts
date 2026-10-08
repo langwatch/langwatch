@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { imageSteps } from "../image-steps.ts";
+import { imageSteps } from "../gate/image-tree.ts";
 
 describe("imageSteps", () => {
   describe("given a tree of one Prisma folder and one goose file", () => {

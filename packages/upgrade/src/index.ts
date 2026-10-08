@@ -1,4 +1,4 @@
-export { imageSteps } from "./image-steps.ts";
+export { imageSteps } from "./gate/image-tree.ts";
 export {
   LEDGER_SCHEMA_SUFFIX,
   LEDGER_TABLE,
@@ -31,7 +31,7 @@ export {
   upgradeTargetSchema,
 } from "./ledger.ts";
 export type { UpgradeClickHouse, UpgradePostgres } from "./ports.ts";
-export { type UpcastStepInput, upcastStepInputSchema, upcastStepStatus } from "./upcast-steps.ts";
+export { type UpcastStepInput, upcastStepInputSchema, upcastStepStatus } from "./ledger.ts";
 export {
   type GooseVersionRow,
   type PrismaMigrationRow,

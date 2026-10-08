@@ -75,10 +75,6 @@
       "types": "./dist/ui-error-actions.d.ts",
       "default": "./src/ui-error-actions.tsx"
     },
-    "./design-system-shell": {
-      "types": "./dist/ui-design-system-shell.d.ts",
-      "default": "./src/ui-design-system-shell.tsx"
-    },
     "./web-installation": {
       "types": "./dist/ui-web-installation.d.ts",
       "default": "./src/ui-web-installation.ts"

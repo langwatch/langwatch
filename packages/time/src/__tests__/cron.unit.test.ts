@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { computeNextRunAt } from "../cron.ts";
-import { Temporal } from "../temporal.ts";
+import { Temporal } from "../zoned.ts";
 
 const at = (iso: string) => Temporal.Instant.from(iso);
 

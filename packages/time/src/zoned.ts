@@ -4,7 +4,18 @@
  * calculation after that is Temporal.
  */
 
-import { Temporal, type Instant, type ZonedDateTime } from "./temporal.ts";
+import { Temporal as PolyfilledTemporal } from "temporal-polyfill";
+
+type TemporalNamespace = typeof PolyfilledTemporal;
+
+const scope = globalThis as { Temporal?: TemporalNamespace };
+
+/** The runtime's own Temporal when it has one, the polyfill otherwise. */
+export const Temporal: TemporalNamespace = scope.Temporal ?? PolyfilledTemporal;
+
+export type Instant = PolyfilledTemporal.Instant;
+export type ZonedDateTime = PolyfilledTemporal.ZonedDateTime;
+export type PlainDateTime = PolyfilledTemporal.PlainDateTime;
 
 /** What every operation in this package accepts where a moment is wanted. */
 export type TimeInput = Date | number | string | ZonedDateTime;

@@ -1,6 +1,7 @@
 // julia's lane: orchestrator that implements RuntimeApi.
 // Wired up by the CLI through its static import of `runtime`.
 
+import { scaffoldEnvFile } from "../shared/env.ts";
 import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
 import type {
   RuntimeApi,
@@ -12,7 +13,6 @@ import { startAigateway } from "./aigateway.ts";
 import { ensureAppDir } from "./app-dir.ts";
 import { startClickhouse } from "./clickhouse.ts";
 import { readEnvFile } from "./env-file.ts";
-import { scaffoldEnv } from "./env.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
@@ -42,8 +42,13 @@ function busFor(ctx: RuntimeContext): EventBus {
 }
 
 const runtimeImpl: RuntimeApi = {
-  async scaffoldEnv(ctx, opts) {
-    return scaffoldEnv(ctx, opts);
+  // Idempotent .env scaffolder. reconcilePorts defaults to true (start flow).
+  async scaffoldEnv(ctx, { shouldReconcilePorts = true } = {}) {
+    return scaffoldEnvFile({
+      ports: ctx.ports,
+      path: ctx.envFile,
+      shouldReconcilePorts,
+    });
   },
 
   async installServices(ctx) {

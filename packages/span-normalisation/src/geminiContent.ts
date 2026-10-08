@@ -4,8 +4,7 @@
  * chat messages. Used by the VertexAdk extractor.
  */
 
-import { isNonEmptyString, isRecord, stringifySafely } from "./canonicalGuard.ts";
-import { isReplyTextPart } from "./contentPart.ts";
+import { isNonEmptyString, isRecord, isReplyTextPart, stringifySafely } from "./canonicalGuard.ts";
 
 /**
  * Gemini content roles are "user" | "model"; chat messages use

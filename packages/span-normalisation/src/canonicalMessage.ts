@@ -1,11 +1,11 @@
 import {
   isMessageLike,
   isRecord,
+  isReplyTextPart,
   isUnknownArray,
   type MessageLike,
   stringifySafely,
 } from "./canonicalGuard.ts";
-import { isReplyTextPart } from "./contentPart.ts";
 
 /**
  * Extracts text content from a single message object.

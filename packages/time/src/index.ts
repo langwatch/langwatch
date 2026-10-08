@@ -4,7 +4,7 @@
  * @see ../../../specs/dependencies/temporal-time.feature
  */
 
-export { Temporal, type Instant, type PlainDateTime, type ZonedDateTime } from "./temporal.ts";
+export { Temporal, type Instant, type PlainDateTime, type ZonedDateTime } from "./zoned.ts";
 export {
   currentTimeZone,
   fromDate,

@@ -5,8 +5,7 @@ import {
   differenceInMilliseconds,
   wallClockSecondsBetween,
 } from "../difference.ts";
-import { Temporal } from "../temporal.ts";
-import { toDate, toEpochMs, toZonedDateTime } from "../zoned.ts";
+import { Temporal, toDate, toEpochMs, toZonedDateTime } from "../zoned.ts";
 
 const AMSTERDAM = { timeZone: "Europe/Amsterdam" } as const;
 const NEW_YORK = { timeZone: "America/New_York" } as const;

@@ -5,14 +5,13 @@ import { defineBrowserModule } from "@langwatch/browser";
  * one registry, and the address bar is what opens and stacks it.
  */
 import { CurrentDrawer, useDrawer } from "@langwatch/browser-host/drawer";
-import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
+import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { composeUiDesignSystem } from "../../design-system";
-import { loadUiRootCapabilities } from "../ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootCapabilities } from "../ui-root-capabilities";
 
 const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
 

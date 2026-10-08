@@ -1,8 +1,8 @@
+import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import type { UpgradePostgres } from "../ports.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
-import { UpgradeReadError } from "./reader.errors.ts";
 import {
   type LedgerLeaseRow,
   type LedgerRunRow,
@@ -315,3 +315,20 @@ export function createUpgradeReader({
 }
 
 export type UpgradeReader = ReturnType<typeof createUpgradeReader>;
+
+export type UpgradeReadErrorCode = "upgrade_not_found" | "upgrade_invalid_cursor";
+
+const HTTP_STATUS: Record<UpgradeReadErrorCode, number> = {
+  upgrade_not_found: 404,
+  upgrade_invalid_cursor: 400,
+};
+
+/** A read the ledger cannot answer. Consumers branch on `code`, never on the message. */
+export class UpgradeReadError extends HandledError {
+  declare readonly code: UpgradeReadErrorCode;
+
+  constructor(code: UpgradeReadErrorCode, message: string) {
+    super(code, message, { httpStatus: HTTP_STATUS[code], fault: "customer" });
+    this.name = "UpgradeReadError";
+  }
+}

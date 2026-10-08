@@ -83,7 +83,6 @@ const TARGET_FILES = new Set([
   "web/index.ts",
   "web/module-api.ts",
   "web/trpc-query-key.ts",
-  "web/use-invalidate-procedure.ts",
 ]);
 
 function sourceFiles(directory: string): string[] {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "../attributeKeys.ts";
-import { VercelCanonicaliserService } from "../vercelCanonicaliser.ts";
+import { VercelCanonicaliserService } from "../spanCanonicalisation.ts";
 import { createExtractorContext } from "./testHelpers.ts";
 
 describe("VercelCanonicaliserService", () => {

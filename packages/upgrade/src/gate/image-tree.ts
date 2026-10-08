@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { ManifestStep } from "../manifest/manifest.ts";
-import { type ReleaseTreeSteps, treeStepIds } from "../manifest/stamp.ts";
+import { type ReleaseTreeSteps, stampRelease, treeStepIds } from "../manifest/stamp.ts";
 
 /** Where this image ships its Postgres and ClickHouse migrations, beside this package. */
 export const IMAGE_MIGRATION_DIRECTORIES = {
@@ -48,4 +48,22 @@ export function imageGateSteps({
     blockingSteps: [...blocking].toSorted(),
     declaredSteps: tree.codeSteps.filter((step) => step.mode !== "blocking").map(({ id }) => id),
   };
+}
+
+/** Every Prisma folder and goose file this image ships, as steps (ids per blitz plan 5.3). */
+export function imageSteps({
+  release,
+  tree = readImageTree(),
+}: {
+  release: string;
+  tree?: ReleaseTreeSteps;
+}) {
+  return stampRelease({
+    release,
+    previous: null,
+    cutAt: "1970-01-01T00:00:00Z",
+    current: tree,
+    shipped: new Set(),
+    ownerOf: () => null,
+  }).steps;
 }

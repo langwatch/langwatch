@@ -1,8 +1,7 @@
 import { createDesignSystem } from "@langwatch/design-system/system";
 import { describe, expect, it } from "vitest";
 
-import { composeUiDesignSystem } from "../design-system";
-import { loadUiRootCapabilities } from "../shell/ui-root-capabilities";
+import { composeUiDesignSystem, loadUiRootCapabilities } from "../shell/ui-root-capabilities";
 
 const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
 

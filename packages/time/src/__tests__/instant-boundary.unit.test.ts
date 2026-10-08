@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Temporal } from "../temporal.ts";
-import { fromDate, nowInstant, toDate } from "../zoned.ts";
+import { Temporal, fromDate, nowInstant, toDate } from "../zoned.ts";
 
 const MOMENT_MS = Date.UTC(2026, 5, 15, 10, 30, 0);
 
