@@ -1,0 +1,381 @@
+{
+  "pipelines": {
+    "modules/trace/process/src/eventing/trace-processing.pipeline.ts": "trace_processing",
+    "tracePipeline.service": "trace_processing",
+    "simulationPipeline.service": "simulation_processing"
+  },
+  "names": {
+    "join-requests:command:?name": {
+      "names": [
+        "requestJoin",
+        "approveJoin",
+        "rejectJoin",
+        "withdrawJoin",
+        "expireJoin"
+      ],
+      "ref": "JOIN_REQUEST_COMMANDS, platform/app/src/server/event-sourcing/pipelines/join-requests/pipeline.ts:61 on main"
+    },
+    "scim-sync:command:?name": {
+      "names": [
+        "issueScimToken",
+        "recordScimUserPush",
+        "recordScimGroupMapping",
+        "recordScimApplyFailure",
+        "redriveScimApply",
+        "revokeScimSync"
+      ],
+      "ref": "SCIM_SYNC_COMMANDS, platform/app/ee/event-sourcing/pipelines/scim-sync/pipeline.ts:38 on main"
+    },
+    "sso-connections:command:?name": {
+      "names": [
+        "registerConnection",
+        "registerReplacementConnection",
+        "selectMigrationRoute",
+        "beginMigrationFinalization",
+        "finalizeMigration",
+        "claimDomain",
+        "approveDomainClaim",
+        "rejectDomainClaim",
+        "discardConnection",
+        "requestVerification",
+        "attestDomain",
+        "verifyDomain",
+        "withdrawDomain",
+        "activateConnection",
+        "suspendConnection",
+        "resumeConnection",
+        "requestTeardown",
+        "completeTeardown",
+        "setArrivalPolicy",
+        "renameConnection",
+        "updateConnectionIdp",
+        "recordDomainProofAbsent",
+        "recordDomainProofPresent",
+        "grandfatherConnection"
+      ],
+      "ref": "CONNECTION_COMMANDS, platform/app/ee/event-sourcing/pipelines/sso-connections/pipeline.ts:91 on main"
+    },
+    "log_processing:subscriber:?subscriber.name": {
+      "names": [
+        "codingAgentLogFactsDispatch"
+      ],
+      "ref": "pipelineRegistry.ts:798-802 on main"
+    },
+    "metric_processing:subscriber:?subscriber.name": {
+      "names": [
+        "codingAgentMetricFactsDispatch"
+      ],
+      "ref": "pipelineRegistry.ts:791-795 on main"
+    },
+    "trace_processing:subscriber:?subscriber.name": {
+      "names": [
+        "codingAgentSpanFactsDispatch"
+      ],
+      "ref": "pipelineRegistry.ts:820-826, passed at :1673 on main"
+    },
+    "langy_conversation_processing:subscriber:?subscriber.name": {
+      "names": [
+        "agentTurnLiveness",
+        "langyConversationUpdateBroadcast",
+        "langyTurnAdmissionLifecycle",
+        "guidedOnboardingTurnFailed",
+        "langyLocalConnectTurn"
+      ],
+      "ref": "pipelineRegistry.ts:1192-1198 on main; head's list (langy-conversation-runtime.pipeline.ts:217-224) is the same plus langyWebPush, a head-only lane this shared key does not list"
+    },
+    "global:handler:?orgBillableEventsMeterProjection": {
+      "names": [
+        "orgBillableEventsMeter"
+      ],
+      "ref": "orgBillableEventsMeter.mapProjection.ts:32 on main"
+    },
+    "global:handler:?BillableEventsMeterProjection.create(billableEventsMeter).bu...": {
+      "names": [
+        "orgBillableEventsMeter"
+      ],
+      "ref": "BILLABLE_EVENTS_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/billable-events-meter.projection.ts:20"
+    },
+    "global:handler:entitlement.?": {
+      "names": [
+        "entitlement.usageTraceMeter"
+      ],
+      "ref": "TRACE_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/trace-meter.projection.ts:11"
+    },
+    "gateway_spend_processing:subscriber:pm:?this.options.gatewayDebits.name": {
+      "names": [
+        "pm:gatewayDebits"
+      ],
+      "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
+    },
+    "process:gateway_spend_processing:?this.options.gatewayDebits.name": {
+      "names": [
+        "gatewayDebits"
+      ],
+      "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
+    },
+    "simulation_processing:subscriber:pm:?deps.scenarioRunExecution.name": {
+      "names": [
+        "pm:simulation_run_execution"
+      ],
+      "ref": "modules/scenario/process/src/eventing/simulation-processing-runtime.pipeline.ts:172"
+    },
+    "process:simulation_processing:?deps.scenarioRunExecution.name": {
+      "names": [
+        "simulation_run_execution"
+      ],
+      "ref": "simulation-processing-runtime.pipeline.ts:172"
+    },
+    "simulation_processing:subscriber:pm:?deps.scenarioEvaluations.name": {
+      "names": [
+        "pm:scenario_evaluations"
+      ],
+      "ref": "simulation-processing-runtime.pipeline.ts:180"
+    },
+    "process:simulation_processing:?deps.scenarioEvaluations.name": {
+      "names": [
+        "scenario_evaluations"
+      ],
+      "ref": "simulation-processing-runtime.pipeline.ts:180"
+    }
+  },
+  "rules": [
+    {
+      "match": "trace_processing:subscriber:?deps.evaluationTrigger.name",
+      "class": "accepted",
+      "ref": "Q01; rounds 25 and 38",
+      "note": "main's evaluationTrigger subscriber (pipeline.ts:209 on main), moved to evaluation"
+    },
+    {
+      "match": "trace_processing:reactor:customEvaluationSync",
+      "class": "accepted",
+      "ref": "Q01; rounds 25 and 38"
+    },
+    {
+      "match": "trace_processing:reactor:experimentMetricsSync",
+      "class": "accepted",
+      "ref": "Q01; rounds 25 and 38"
+    },
+    {
+      "match": "trace_processing:reactor:triggerMatch",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "moved to automation's peer subscriber"
+    },
+    {
+      "match": "trace_processing:subscriber:graphTriggerActivity",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "moved to automation's peer subscriber"
+    },
+    {
+      "match": "trace_processing:reactor:simulationMetricsSync",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "moved to scenario's peer subscriber"
+    },
+    {
+      "match": "trace_processing:subscriber:customerIoTraceSync",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "moved to nurturing's peer subscriber"
+    },
+    {
+      "match": "trace_processing:reactor:originGate",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "renamed deferredOriginResolution; no drain maps the old name"
+    },
+    {
+      "match": "trace_processing:job:deferredOriginResolution",
+      "class": "pending",
+      "ref": "E4 (Q02)",
+      "note": "main's delayed job (registerJob, pipelineRegistry.ts:1685); head declares a reactor of that name, so the job type differs"
+    },
+    {
+      "match": "trace_processing:subscriber:governanceKpisSync",
+      "class": "catch-up",
+      "ref": "Q03",
+      "note": "governance's minute poll looks back one hour (governance-trace-facts.process.ts:18,43)"
+    },
+    {
+      "match": "trace_processing:subscriber:governanceOcsfEventsSync",
+      "class": "catch-up",
+      "ref": "Q03",
+      "note": "governance's minute poll looks back one hour (governance-trace-facts.process.ts:18,43)"
+    },
+    {
+      "match": "evaluation_processing:reactor:triggerMatch",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to automations' peer subscribers evaluationCompletedTriggerMatch and evaluationReportedTriggerMatch"
+    },
+    {
+      "match": "evaluation_processing:subscriber:graphTriggerActivity",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to automations' peer subscribers evaluationCompletedGraphActivity and evaluationReportedGraphActivity"
+    },
+    {
+      "match": "evaluation_processing:subscriber:customerIoEvaluationSync",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to nurturing's peer subscribers (evaluationCompleted, evaluationRan)"
+    },
+    {
+      "match": "simulation_processing:subscriber:customerIoSimulationSync",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to nurturing's peer subscribers (simulationRunFinished, scenarioRunSucceeded)"
+    },
+    {
+      "match": "simulation_processing:subscriber:scenarioRunMilestones",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to peer subscribers in suite_run_processing and nurturing; exact successor not pinned"
+    },
+    {
+      "match": "simulation_processing:subscriber:suiteRunSync",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to suite_run_processing's peer subscribers scenarioRunStarted, scenarioRunFinished, scenarioRunEvaluated"
+    },
+    {
+      "match": "simulation_processing:subscriber:scenarioEvaluations",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "replaced by the scenario_evaluations process manager (scenario-evaluations.process.ts:19)"
+    },
+    {
+      "match": "simulation_processing:job:scenarioEvaluations",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "main's delayed job (pipelineRegistry.ts:1989); replaced by the scenario_evaluations process manager"
+    },
+    {
+      "match": "simulation_processing:job:deferredComputeRunMetrics",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "main's delayed job (pipelineRegistry.ts:2037); head declares command computeRunMetrics (simulation-processing.pipeline.ts:167)"
+    },
+    {
+      "match": "trace_processing:job:datasetNormalize",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "main's job (pipelineRegistry.ts:1728); moved to dataset's own pipeline as dataset_normalization:command:datasetNormalize; a lost job leaves an upload un-normalised"
+    },
+    {
+      "match": "global:reactor:billingMeterDispatch",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "cloud only (isSaas); renamed usageMeterCount in entitlement; no plan row covers it"
+    },
+    {
+      "match": "log_processing:subscriber:codingAgentLogFactsDispatch",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to coding_agent_processing's peer subscriber"
+    },
+    {
+      "match": "metric_processing:subscriber:codingAgentMetricFactsDispatch",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to coding_agent_processing's peer subscriber"
+    },
+    {
+      "match": "trace_processing:subscriber:codingAgentSpanFactsDispatch",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "moved to coding_agent_processing's peer subscriber"
+    },
+    {
+      "match": "gateway_spend_processing:subscriber:pm:webhookDelivery",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "event-driven (gateway spend events); moved to webhook_delivery, so pm jobs queued on the old lane at the cut are lost"
+    },
+    {
+      "match": "governance_events_processing:subscriber:pm:governanceEventsDelivery",
+      "class": "pending",
+      "ref": "E4 (Q02's kind, not in Q02)",
+      "note": "event-driven (governance events); moved to webhook_delivery, so pm jobs queued on the old lane at the cut are lost"
+    },
+    {
+      "match": "automations:subscriber:pm:webhookDeliveryPrune",
+      "class": "none",
+      "ref": "wake-only process manager",
+      "note": "no pm lane on either tree: a process manager with no event types gets no subscriber (processRuntime.ts:207 on main, packages/eventing/src/process-manager/processRuntime.ts:348 on head)"
+    },
+    {
+      "match": "scim-sync:subscriber:pm:scimRequestLogRetention",
+      "class": "none",
+      "ref": "wake-only process manager",
+      "note": "no pm lane on either tree: a process manager with no event types gets no subscriber (processRuntime.ts:207 on main, packages/eventing/src/process-manager/processRuntime.ts:348 on head)"
+    },
+    {
+      "match": "sso-connections:subscriber:pm:breakGlassExpiryWarn",
+      "class": "none",
+      "ref": "wake-only process manager",
+      "note": "no pm lane on either tree: a process manager with no event types gets no subscriber (processRuntime.ts:207 on main, packages/eventing/src/process-manager/processRuntime.ts:348 on head)"
+    },
+    {
+      "match": "sso-connections:subscriber:pm:ssoDomainReproofSweep",
+      "class": "none",
+      "ref": "wake-only process manager",
+      "note": "no pm lane on either tree: a process manager with no event types gets no subscriber (processRuntime.ts:207 on main, packages/eventing/src/process-manager/processRuntime.ts:348 on head)"
+    },
+    {
+      "match": "cli_login_key_maintenance:subscriber:pm:cliLoginKeyReap",
+      "class": "none",
+      "ref": "wake-only process manager",
+      "note": "no pm lane on either tree: a process manager with no event types gets no subscriber (processRuntime.ts:207 on main, packages/eventing/src/process-manager/processRuntime.ts:348 on head)"
+    },
+    {
+      "match": "process:gateway_spend_processing:webhookDelivery",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on webhook_delivery; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:governance_events_processing:governanceEventsDelivery",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on webhook_delivery; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:scim-sync:scimRequestLogRetention",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on scim_maintenance; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:sso-connections:breakGlassExpiryWarn",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on identity_maintenance; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:sso-connections:ssoDomainReproofSweep",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on identity_maintenance; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:cli_login_key_maintenance:cliLoginKeyReap",
+      "class": "none",
+      "ref": "process store keying (Q04 revised)",
+      "note": "same name on agent_sandbox_maintenance; state, scheduled wakes and outbox intents follow: rows keyed by processName, not pipeline (ProcessManagerInstance @@unique([processName, projectId, processKey]), outbox by (processName, projectId, messageKey), both trees); head's wake worker and outbox claim by name (processRuntime.ts:456,490)"
+    },
+    {
+      "match": "process:automations:webhookDeliveryPrune",
+      "class": "tombstone",
+      "ref": "process store keying",
+      "note": "no head process of that name: its instance rows (nextWakeAt) and any pending `prune` intents are never claimed; clear them. The pruning itself continues in webhook's hourly maintenance (webhook-delivery.service.ts:348-350)"
+    },
+    {
+      "match": "pipeline:cli_login_key_maintenance",
+      "class": "none",
+      "ref": "Q04 revised",
+      "note": "main's pipeline declared only the wake-only cliLoginKeyReap; nothing is queued on it, and its rows follow by name"
+    }
+  ]
+}
