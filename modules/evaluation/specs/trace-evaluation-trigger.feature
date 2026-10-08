@@ -1,6 +1,7 @@
 Feature: Triggering online evaluations from an ingested trace
 
-  Every trace with a resolved origin is offered to the project's enabled
+  Evaluation subscribes to trace's span_received and origin_resolved facts and reads
+  the folded trace summary. Every trace with a resolved origin is offered to the project's enabled
   on-message monitors, one evaluation command per monitor. Three guards stand
   in front of that dispatch, and each of them exists because of an incident.
 
@@ -98,10 +99,10 @@ Feature: Triggering online evaluations from an ingested trace
     Then no command is sent
 
   @unit
-  Scenario: The subscriber keeps its registered name
-    Given the trace-processing pipeline
-    When the subscriber is registered
-    Then it is named evaluationTrigger on the trace summary fold, because the name is its queue lane
+  Scenario: The trigger's lanes are evaluation's own
+    Given the worker hosts trace and evaluation
+    When evaluation's pipeline registers its reactions to trace's span facts
+    Then the trigger runs on evaluation_processing's own lanes and none remains on trace_processing
 
   @unit
   Scenario: The evaluation trigger composes from published services

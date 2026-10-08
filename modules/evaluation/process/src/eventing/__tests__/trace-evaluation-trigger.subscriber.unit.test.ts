@@ -1,5 +1,5 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -12,6 +12,7 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TRACK_EVENT_SPAN_NAME,
+  isSpanReceivedEvent,
   type OtlpKeyValue,
   type OtlpSpan,
   type TraceProcessingEvent,
@@ -19,26 +20,19 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
 import type {
-  TraceEvaluationLoopMetrics,
-  TraceEvaluationLoopBlockReason,
-} from "../../services/trace-evaluation-loop-metrics.service.ts";
-import { TraceOriginService } from "../../services/trace-origin.service.ts";
-import { needsOriginResolution } from "../deferred-origin.subscriber.ts";
-import type {
-  TraceEvaluationDispatch,
-  TraceEvaluationMonitor,
-} from "../evaluation-trigger.subscriber.ts";
+  EvaluationLoopMetrics,
+  EvaluationLoopBlockReason,
+} from "../../services/evaluation-loop-metrics.service.ts";
 import {
-  createEvaluationTriggerSubscriber,
+  createTraceEvaluationTrigger,
   detectCausalityLoop,
   detectFoldedCausalityLoop,
-} from "../evaluation-trigger.subscriber.ts";
-import { createInitState, createTestSpan } from "./trace-summary-test.fixtures.ts";
+  isDispatchableTraceSpan,
+} from "../trace-evaluation-trigger.subscriber.ts";
 
 /**
- * Spec: modules/trace/specs/evaluation-trigger.feature
+ * Spec: modules/evaluation/specs/trace-evaluation-trigger.feature
  * Causality loop guard prevents evaluation->evaluation cycles. Pins are
  * literals to prevent silent failures.
  */
@@ -173,7 +167,7 @@ function monitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
   };
 }
 
-class Dispatch implements TraceEvaluationDispatch {
+class Dispatch {
   readonly sent: { data: ExecuteEvaluationCommandData }[] = [];
 
   constructor(private readonly behaviour: { throwsFor?: string } = {}) {}
@@ -184,10 +178,10 @@ class Dispatch implements TraceEvaluationDispatch {
   }
 }
 
-class LoopMetrics implements TraceEvaluationLoopMetrics {
-  readonly blocked: TraceEvaluationLoopBlockReason[] = [];
+class LoopMetrics implements EvaluationLoopMetrics {
+  readonly blocked: EvaluationLoopBlockReason[] = [];
 
-  loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
+  loopBlocked(reason: EvaluationLoopBlockReason): void {
     this.blocked.push(reason);
   }
 }
@@ -201,34 +195,39 @@ function subscriber(options: {
   const metrics = new LoopMetrics();
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
   const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
-  class Monitors implements TraceEvaluationMonitor {
-    getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
-      return listMonitors(projectId) as Promise<MonitorSummary[]>;
-    }
-  }
-  const built = createEvaluationTriggerSubscriber({
+  const folded: { state: TraceSummaryData | null } = { state: null };
+  const trigger = createTraceEvaluationTrigger({
+    findSummary: async () => folded.state,
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }),
-    monitors: new Monitors(),
-    evaluation: dispatch,
+    monitors: {
+      getEnabledOnMessageMonitors: (projectId) =>
+        listMonitors(projectId) as Promise<MonitorSummary[]>,
+    },
+    queueTraceEvaluation: (data) => dispatch.send(data),
     metrics,
   });
-  return { built, dispatch, metrics, isEnabled, listMonitors };
+  return { built: { trigger, folded }, dispatch, metrics, isEnabled, listMonitors };
 }
 
+/** Delivers one trace event to the trigger over the given folded summary. */
 async function run(
-  built: ReturnType<typeof createEvaluationTriggerSubscriber>,
+  built: ReturnType<typeof subscriber>["built"],
   event: TraceProcessingEvent,
   state: TraceSummaryData,
 ): Promise<void> {
-  const context: TriggerContext<TraceSummaryData> = {
-    tenantId: createTenantId("tenant-1"),
-    aggregateId: "trace-1",
-    state,
-  };
-  await built.spec.handler(event, context);
+  built.folded.state = state;
+  await built.trigger({
+    tenantId: "tenant-1",
+    traceId: "trace-1",
+    event: {
+      type: event.type,
+      occurredAt: event.occurredAt,
+      spanAttributes: isSpanReceivedEvent(event) ? event.data.span.attributes : undefined,
+    },
+  });
 }
 
-describe("createEvaluationTriggerSubscriber", () => {
+describe("createTraceEvaluationTrigger", () => {
   describe("given an evaluator's own span", () => {
     describe("when the causality depth says the span came from an evaluation", () => {
       /**
@@ -387,18 +386,11 @@ describe("createEvaluationTriggerSubscriber", () => {
        * customer for evaluating their own feedback.
        */
       it("refuses the event before it is enqueued", () => {
-        const { built } = subscriber({});
-        const context: TriggerContext<TraceSummaryData> = {
-          tenantId: createTenantId("tenant-1"),
-          aggregateId: "trace-1",
-          state: foldState(),
-        };
+        const span = (name: string) => ({ span: { name, attributes: [] } });
 
-        expect(built.spec.when?.(spanEvent({ spanName: TRACK_EVENT_SPAN_NAME }), context)).toBe(
-          false,
-        );
+        expect(isDispatchableTraceSpan(span(TRACK_EVENT_SPAN_NAME))).toBe(false);
         expect(TRACK_EVENT_SPAN_NAME).toBe("langwatch.track_event");
-        expect(built.spec.when?.(spanEvent(), context)).toBe(true);
+        expect(isDispatchableTraceSpan(span("openai.chat"))).toBe(true);
       });
     });
   });
@@ -524,23 +516,6 @@ describe("createEvaluationTriggerSubscriber", () => {
       });
     });
   });
-
-  describe("given the subscriber's registration", () => {
-    describe("when the pipeline reads it", () => {
-      /**
-       * @scenario "The subscriber keeps its registered name"
-       *
-       * The name is the queue's lane and the dedup prefix, so renaming it
-       * orphans every job already staged under the old one.
-       */
-      it("registers as evaluationTrigger on the trace summary fold", () => {
-        const { built } = subscriber({});
-
-        expect(built.name).toBe("evaluationTrigger");
-        expect(built.spec.fold).toBe("traceSummary");
-      });
-    });
-  });
 });
 
 function topicAssignedEvent(): TraceProcessingEvent {
@@ -564,7 +539,7 @@ function topicAssignedEvent(): TraceProcessingEvent {
   };
 }
 
-describe("createEvaluationTriggerSubscriber — origin, cutoff and processing-cap dispatch", () => {
+describe("createTraceEvaluationTrigger — origin, cutoff and processing-cap dispatch", () => {
   describe("when trace has explicit application origin", () => {
     /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
     it("dispatches evaluation commands", async () => {
@@ -718,7 +693,7 @@ describe("detectFoldedCausalityLoop (pure) — the deferred-origin path", () => 
   });
 });
 
-describe("createEvaluationTriggerSubscriber — the deferred-origin loop guard", () => {
+describe("createTraceEvaluationTrigger — the deferred-origin loop guard", () => {
   /** @scenario "A trace already produced by the evaluator does not start another evaluation round" */
   it("skips dispatch on origin_resolved when the fold carries a causality depth", async () => {
     const { built, dispatch, metrics } = subscriber({});
@@ -762,7 +737,7 @@ describe("createEvaluationTriggerSubscriber — the deferred-origin loop guard",
   });
 });
 
-describe("createEvaluationTriggerSubscriber — causality depth (handler-level)", () => {
+describe("createTraceEvaluationTrigger — causality depth (handler-level)", () => {
   describe("given a span carrying causality_depth", () => {
     /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
     it("dispatches when inbound span has causality_depth=0", async () => {
@@ -793,56 +768,48 @@ describe("createEvaluationTriggerSubscriber — causality depth (handler-level)"
 });
 
 /**
- * These guards used to live inside `handle`, serializing/blobbing every span
- * before the queue's dedup threw the job away. Pure and payload-only, so
- * `shouldDispatch` rejects them pre-enqueue instead (ADR-026).
+ * The origin guards read trace's fold, so they run in the handler; only the synthetic-span
+ * check reads the span alone, and runs before the job is enqueued.
  */
-describe("evaluationTrigger relevance check", () => {
+describe("traceEvaluationTrigger guards", () => {
   const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>
     foldState({ attributes: { "langwatch.origin": "application" }, ...overrides });
 
-  const shouldDispatch = ({
+  const shouldDispatch = async ({
     event,
     state,
   }: {
     event: TraceProcessingEvent;
     state: TraceSummaryData;
-  }): boolean => {
-    const { built } = subscriber({});
-    const context: TriggerContext<TraceSummaryData> = {
-      tenantId: createTenantId("tenant-1"),
-      aggregateId: "trace-1",
-      state,
-    };
-    // The subscriber always declares one.
-    return built.spec.when!(event, context);
+  }): Promise<boolean> => {
+    const { built, dispatch } = subscriber({});
+    await run(built, event, state);
+    return dispatch.sent.length > 0;
   };
 
   describe("given a trace with a resolved origin", () => {
-    /** @scenario "The origin guard admits a genuine message event before enqueue" */
-    it("agrees to react to a recent span event", () => {
-      expect(shouldDispatch({ event: spanEvent(), state: withOrigin() })).toBe(true);
+    /** @scenario "The origin guard admits a genuine message event" */
+    it("agrees to react to a recent span event", async () => {
+      expect(await shouldDispatch({ event: spanEvent(), state: withOrigin() })).toBe(true);
     });
 
-    /** @scenario "The origin guard filters a non-message event before enqueue" */
-    it("declines a topic-assigned event", () => {
-      expect(shouldDispatch({ event: topicAssignedEvent(), state: withOrigin() })).toBe(false);
+    /** @scenario "The origin guard declines a non-message event" */
+    it("declines a topic-assigned event", async () => {
+      expect(await shouldDispatch({ event: topicAssignedEvent(), state: withOrigin() })).toBe(
+        false,
+      );
     });
 
     /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
     it("declines a synthetic span", () => {
       const synthetic = spanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
-      expect(shouldDispatch({ event: synthetic, state: withOrigin() })).toBe(false);
+      if (!isSpanReceivedEvent(synthetic)) throw new Error("spanEvent builds a span event");
+      expect(isDispatchableTraceSpan(synthetic.data)).toBe(false);
     });
 
     /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
     it("dispatches no evaluation once the span count reaches the processing cap", async () => {
-      // The cap guard deliberately lives in the handler, not the pre-enqueue
-      // guard: the pre-enqueue guard runs once per event of a coalesced
-      // batch and would multiply the once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldDispatch({ event: spanEvent(), state: atCap })).toBe(true);
-
       const { built, dispatch } = subscriber({});
       await run(built, spanEvent(), atCap);
       expect(dispatch.sent).toEqual([]);
@@ -862,57 +829,11 @@ describe("evaluationTrigger relevance check", () => {
   });
 
   describe("given a trace whose origin is unresolved", () => {
-    /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
-    it("declines a span event", () => {
-      expect(shouldDispatch({ event: spanEvent(), state: foldState({ attributes: {} }) })).toBe(
-        false,
-      );
+    /** @scenario "The origin guard declines a trace with no resolved origin" */
+    it("declines a span event", async () => {
+      expect(
+        await shouldDispatch({ event: spanEvent(), state: foldState({ attributes: {} }) }),
+      ).toBe(false);
     });
-  });
-});
-
-describe("createEvaluationTriggerSubscriber — the folded depth, as the projection folds it", () => {
-  /** The trace's attributes after one span, through the real accumulation and origin services. */
-  function foldedAfter(spanAttributes: Record<string, string | number>): Record<string, string> {
-    return TraceAttributeAccumulationService.create(
-      TraceOriginService.create(),
-    ).accumulateAttributes({
-      state: createInitState(),
-      span: createTestSpan({ spanAttributes }),
-      outputSource: "span",
-      inputIsFallback: false,
-      outputIsFallback: false,
-      inputMediaRefs: null,
-      outputMediaRefs: null,
-    });
-  }
-
-  it("carries the depth from the span through accumulation into the guard", async () => {
-    const attributes = foldedAfter({
-      "langwatch.origin": "evaluation",
-      "langwatch.reserved.causality_depth": 1,
-    });
-    const { built, dispatch } = subscriber({});
-
-    await run(built, originResolvedEvent(), foldState({ attributes }));
-
-    expect(dispatch.sent).toEqual([]);
-  });
-
-  /** A span another library started inside an evaluator run carries a depth and no origin. */
-  it("guards a trace whose spans carry a depth but no origin", async () => {
-    const attributes = foldedAfter({ "langwatch.reserved.causality_depth": 1 });
-    expect(attributes["langwatch.origin"]).toBeUndefined();
-    expect(
-      needsOriginResolution({
-        event: spanEvent({ attributes: [] }),
-        foldState: foldState({ attributes }),
-      }),
-    ).toBe(true);
-    const { built, dispatch } = subscriber({});
-
-    await run(built, originResolvedEvent(), foldState({ attributes }));
-
-    expect(dispatch.sent).toEqual([]);
   });
 });

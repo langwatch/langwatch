@@ -1,10 +1,8 @@
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingParticipation } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
@@ -14,15 +12,12 @@ import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
 import { OtlpSpanTokenEstimationService } from "../services/span-token-estimation.service.ts";
-import { TraceEvaluationLoopMetricsService } from "../services/trace-evaluation-loop-metrics.service.ts";
 import { TraceIoExtractionAdapterService } from "../services/trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceService } from "../services/trace-media-reference.service.ts";
 import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
-import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
-import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
@@ -50,13 +45,8 @@ interface TraceProcessingPeers {
     DataRetentionApi,
     "getPlatformDefaultRetentionDays" | "getResolvedForProject"
   >;
-  evaluations: Pick<
-    EvaluationApi,
-    "queueTraceEvaluation" | "reportEvaluation" | "deriveEvaluatorId"
-  >;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
-  monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
 }
 
@@ -171,16 +161,6 @@ export class TraceProcessingRuntimeAdapter {
         if (summary?.attributes["langwatch.origin"]) return;
         await resolveOrigin({ id: traceId, tenantId, traceId });
       },
-      evaluationTrigger: createEvaluationTriggerSubscriber({
-        featureFlags: peers.featureFlags,
-        monitors: peers.monitors,
-        evaluation: { send: (data) => peers.evaluations.queueTraceEvaluation(data) },
-        metrics: TraceEvaluationLoopMetricsService.create(),
-      }),
-      customEvaluationSync: createCustomEvaluationSyncHandler({
-        reportEvaluation: (data) => peers.evaluations.reportEvaluation(data),
-        deriveEvaluatorId: (name) => peers.evaluations.deriveEvaluatorId(name),
-      }),
       trackedEventSync: createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,
       }),

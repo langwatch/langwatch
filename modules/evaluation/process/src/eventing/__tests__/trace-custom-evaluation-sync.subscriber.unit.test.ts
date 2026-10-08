@@ -13,10 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type CustomEvaluationSyncSubscriberDeps,
-  createCustomEvaluationSyncHandler,
   extractEvaluationsFromSpan,
   hasSyncableEvaluations,
-} from "../custom-evaluation-sync.subscriber.ts";
+} from "../trace-custom-evaluation-sync.subscriber.ts";
+import { createCustomEvaluationSyncHandler } from "./trace-span-event.fixtures.ts";
 
 function makeOtlpSpan(evalPayloads: Record<string, unknown>[]): OtlpSpan {
   return {
@@ -224,7 +224,7 @@ describe("extractEvaluationsFromSpan", () => {
   });
 });
 
-describe("customEvaluationSync subscriber", () => {
+describe("traceCustomEvaluationSync subscriber", () => {
   let deps: CustomEvaluationSyncSubscriberDeps;
 
   beforeEach(() => {
@@ -502,7 +502,7 @@ describe("customEvaluationSync subscriber", () => {
       it("returns true", () => {
         const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(true);
+        expect(hasSyncableEvaluations(createSpanReceivedEvent(span).data)).toBe(true);
       });
     });
 
@@ -510,24 +510,7 @@ describe("customEvaluationSync subscriber", () => {
       it("returns false", () => {
         const span = makeOtlpSpan([]);
 
-        expect(hasSyncableEvaluations(createSpanReceivedEvent(span))).toBe(false);
-      });
-    });
-
-    describe("when event is not a SpanReceivedEvent", () => {
-      it("returns false", () => {
-        expect(hasSyncableEvaluations(createNonSpanEvent())).toBe(false);
-      });
-    });
-
-    describe("when event is too old", () => {
-      it("returns false", () => {
-        const span = makeOtlpSpan([{ name: "quality", score: 0.9 }]);
-        const staleEvent = createSpanReceivedEvent(span, {
-          occurredAt: Date.now() - 2 * 60 * 60 * 1000,
-        });
-
-        expect(hasSyncableEvaluations(staleEvent)).toBe(false);
+        expect(hasSyncableEvaluations(createSpanReceivedEvent(span).data)).toBe(false);
       });
     });
   });

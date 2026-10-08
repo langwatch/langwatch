@@ -1,37 +1,30 @@
 /**
- * Customer-reported evaluations, read back out of spans. Counterpart to
- * {@link createTrackedEventSyncHandler}: derived ids so redelivery replaces rather than
- * duplicates, and a payload that must parse before anything is reported.
+ * Customer-reported evaluations, read back out of trace's spans: derived ids so redelivery
+ * replaces rather than duplicates, and a payload that must parse before anything is reported.
  */
 
 import crypto from "node:crypto";
 
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
-  type TraceSummaryData,
-  isSpanReceivedEvent,
-  type TraceProcessingEvent,
   type OtlpSpan,
   type SdkEvaluation,
   sdkEvaluationSchema,
+  spanSchema,
   STALE_TRACE_THRESHOLD_MS,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
-const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
+const logger = createLogger("langwatch:evaluation:trace-custom-evaluation-sync");
 
 export const CUSTOM_EVAL_SYNC_DELAY_MS = 5_000;
 export const CUSTOM_EVAL_SYNC_DEDUP_TTL_MS = 30_000;
 
 export interface CustomEvaluationSyncSubscriberDeps {
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<void>;
-  /**
-   * The evaluator id an SDK evaluation gets when it names no `evaluator_id`.
-   * Evaluation owns the slug rule, injected rather than restated here — a
-   * Trace-local copy would drift and silently re-key every derived evaluator.
-   */
+  /** The evaluator id an SDK evaluation naming no `evaluator_id` gets (the autoslug rule). */
   deriveEvaluatorId: (evaluationName: string) => string;
 }
 
@@ -83,7 +76,7 @@ function parseEvaluation(jsonPayload: string): SdkEvaluation | undefined {
  * with attacker-supplied payloads, so it only looks for an evaluation
  * event carrying a string payload; parsing stays in the handler.
  */
-function spanHasEvaluationEvents(span: OtlpSpan): boolean {
+function spanHasEvaluationEvents(span: Pick<OtlpSpan, "events">): boolean {
   return (span.events ?? []).some(
     (event) =>
       event.name === EVAL_EVENT_NAME &&
@@ -219,8 +212,18 @@ async function reportOneEvaluation({
   }
 }
 
-export function customEvaluationSyncDedupId(event: TraceProcessingEvent): string {
-  return `${event.tenantId}:${event.aggregateId}:${event.id}`;
+/** All of span_received this subscriber reads: the span's events. */
+export const traceCustomEvaluationSpanSchema = z.object({
+  span: spanSchema.pick({ events: true }),
+});
+
+/** One job per span event: two spans of a trace each carry their own evaluations. */
+export function traceCustomEvaluationSyncDedupId(event: {
+  tenantId: string;
+  aggregateId: string;
+  id: string;
+}): string {
+  return `subscriber:traceCustomEvaluationSync:${event.tenantId}:${event.aggregateId}:${event.id}`;
 }
 
 /**
@@ -228,7 +231,7 @@ export function customEvaluationSyncDedupId(event: TraceProcessingEvent): string
  * `langwatch.evaluation.custom` events from the raw span and parses each
  * `json_encoded_event` attribute.
  */
-export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
+export function extractEvaluationsFromSpan(span: Pick<OtlpSpan, "events">): SdkEvaluation[] {
   const evaluations: SdkEvaluation[] = [];
   for (const event of span.events ?? []) {
     const jsonPayload = extractEvaluationPayload(event);
@@ -239,57 +242,41 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
   return evaluations;
 }
 
-/**
- * Total, non-throwing relevance guard, evaluated both pre-enqueue and
- * again in the handler's fail-open path: only recent span events (not a
- * resync) carrying `langwatch.evaluation.custom` need this subscriber.
- */
-export function hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
-  if (!isSpanReceivedEvent(event)) return false;
-  if (event.occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return false;
-  return spanHasEvaluationEvents(event.data.span);
+/** Pre-enqueue relevance: only a span carrying `langwatch.evaluation.custom` mints a job. */
+export function hasSyncableEvaluations(
+  data: z.output<typeof traceCustomEvaluationSpanSchema>,
+): boolean {
+  return spanHasEvaluationEvents(data.span);
 }
 
-/** Syncs custom SDK evaluations to pipeline. Reads langwatch.evaluation.custom
- * from OTLP spans, dispatches reportEvaluation atomically with deterministic
- * IDs for idempotency. */
-export function createCustomEvaluationSyncHandler(
+/**
+ * Evaluation's peer reaction to trace's span_received (§9): reports the SDK evaluations a
+ * recent span carries on evaluation's own reportEvaluation command, with deterministic ids
+ * so a redelivery replaces rather than duplicates. A resync's stale span reports nothing.
+ */
+export function createTraceCustomEvaluationSync(
   deps: CustomEvaluationSyncSubscriberDeps,
-): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
-  return async (event, context) => {
-    const isSyncableSpanEvent = hasSyncableEvaluations(event) && isSpanReceivedEvent(event);
-    if (!isSyncableSpanEvent) return;
-
-    const { tenantId, aggregateId: traceId } = context;
-
-    const evaluations = extractEvaluationsFromSpan(event.data.span);
+): (input: {
+  tenantId: string;
+  traceId: string;
+  occurredAt: number;
+  span: Pick<OtlpSpan, "events">;
+}) => Promise<void> {
+  return async ({ tenantId, traceId, occurredAt, span }) => {
+    if (occurredAt < nowInstant().epochMilliseconds - STALE_TRACE_THRESHOLD_MS) return;
+    const evaluations = extractEvaluationsFromSpan(span);
     if (evaluations.length === 0) return;
 
     logger.debug(
       { tenantId, traceId, evaluationCount: evaluations.length },
       "Syncing custom SDK evaluations",
     );
-
-    const errors = await reportEvaluations({
-      deps,
-      tenantId,
-      traceId,
-      evaluations,
-      occurredAt: event.occurredAt,
-    });
-
+    const errors = await reportEvaluations({ deps, tenantId, traceId, evaluations, occurredAt });
     logger.debug(
-      {
-        tenantId,
-        traceId,
-        evaluationCount: evaluations.length,
-        failedCount: errors.length,
-      },
+      { tenantId, traceId, evaluationCount: evaluations.length, failedCount: errors.length },
       "Custom SDK evaluations synced",
     );
 
-    if (errors.length > 0) {
-      throw errors[0];
-    }
+    if (errors.length > 0) throw errors[0];
   };
 }

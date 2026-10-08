@@ -291,6 +291,37 @@ describe("the worker process installation", () => {
     }
   });
 
+  /** @scenario "The trigger's lanes are evaluation's own" */
+  it("hosts evaluation's trigger and SDK-evaluation lanes on trace's span facts, none on trace", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      const traceSubscribers = [
+        ...(byName
+          .get("trace_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ];
+      expect(traceSubscribers).not.toContain("evaluationTrigger");
+      expect(traceSubscribers).not.toContain("customEvaluationSync");
+      expect(
+        byName
+          .get("evaluation_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(
+        expect.arrayContaining([
+          "evaluation_processing.traceEvaluationTrigger",
+          "evaluation_processing.traceOriginEvaluationTrigger",
+          "evaluation_processing.traceCustomEvaluationSync",
+        ]),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("hosts suite's peer lanes on scenario's run facts, and no suite sync on scenario", async () => {
     const { runtime, eventing } = await bootWorker();
 

@@ -47,7 +47,6 @@ Anything else trace needs belongs to another module and is reached through its `
 | `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
 | `instantEvals`   | `InstantEvalApi`   | [instant-eval](../instant-eval/README.md)     |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
-| `monitors`       | `MonitorApi`       | [monitor](../monitor/README.md)               |
 | `plans`          | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
 | `presence`       | `PresenceApi`      | [presence](../presence/README.md)             |
 | `projects`       | `ProjectApi`       | [project](../project/README.md)               |

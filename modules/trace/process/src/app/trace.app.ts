@@ -37,7 +37,6 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -878,7 +877,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     featureFlags: FeatureFlagApi,
     instantEvals: InstantEvalApi,
     modelProviders: ModelProviderApi,
-    monitors: MonitorApi,
     presence: PresenceApi,
     projects: ProjectApi,
     share: ShareApi,

@@ -12,18 +12,11 @@ import {
 
 import type { TraceModule } from "../app/trace.app.ts";
 import {
-  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-  CUSTOM_EVAL_SYNC_DELAY_MS,
-  customEvaluationSyncDedupId,
-  hasSyncableEvaluations,
-} from "./custom-evaluation-sync.subscriber.ts";
-import {
   DEFERRED_ORIGIN_DEDUP,
   DEFERRED_ORIGIN_DELAY_MS,
   DEFERRED_ORIGIN_SUBSCRIBER_NAME,
   needsOriginResolution,
 } from "./deferred-origin.subscriber.ts";
-import type { TraceSummarySubscriber } from "./origin-guarded.subscriber.ts";
 import {
   PROJECT_METADATA_WINDOW_MS,
   isRealFirstIngest,
@@ -50,8 +43,6 @@ type SummaryHandler = (
 /** Every reaction main's worker hung on trace_processing, keyed by its queued name. */
 interface TraceProcessingReactions {
   resolveDeferredOrigin: (payload: { tenantId: string; traceId: string }) => Promise<void>;
-  evaluationTrigger: TraceSummarySubscriber;
-  customEvaluationSync: SummaryHandler;
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
@@ -79,16 +70,6 @@ export function buildTraceProcessingConsumer(
           tenantId: context.tenantId,
           traceId: context.aggregateId,
         }),
-    })
-    .withProjectionSubscriber(reactions.evaluationTrigger.name, reactions.evaluationTrigger.spec)
-    .withProjectionSubscriber("customEvaluationSync", {
-      fold: "traceSummary",
-      events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: (event) => hasSyncableEvaluations(event),
-      delay: CUSTOM_EVAL_SYNC_DELAY_MS,
-      ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-      dedupId: (event) => customEvaluationSyncDedupId(event),
-      handler: (event, context) => reactions.customEvaluationSync(event, context),
     })
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",

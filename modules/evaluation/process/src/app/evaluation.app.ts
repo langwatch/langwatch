@@ -53,8 +53,11 @@ import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecyc
 import {
   EvaluationProcessingPipelineAdapter,
   type EvaluationProcessingPipeline,
+  type EvaluationTraceReactions,
 } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
+import { createTraceCustomEvaluationSync } from "../eventing/trace-custom-evaluation-sync.subscriber.ts";
+import { createTraceEvaluationTrigger } from "../eventing/trace-evaluation-trigger.subscriber.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
@@ -76,6 +79,7 @@ import {
   EvaluationInputsOffloadService,
 } from "../services/evaluation-inputs-offload.service.ts";
 import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
+import { EvaluationLoopMetricsService } from "../services/evaluation-loop-metrics.service.ts";
 import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
 import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
@@ -293,6 +297,7 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #executionIntent: Pick<EvaluationExecutionIntentService, "execute">;
   readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
+  readonly #traceReactions: EvaluationTraceReactions;
 
   private constructor({
     service,
@@ -344,6 +349,19 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
+    this.#traceReactions = {
+      evaluationTrigger: createTraceEvaluationTrigger({
+        findSummary: (input) => dependencies.traces.findSummary(input),
+        featureFlags: dependencies.featureFlags,
+        monitors: dependencies.monitors,
+        queueTraceEvaluation: (data) => this.queueTraceEvaluation(data),
+        metrics: EvaluationLoopMetricsService.create(),
+      }),
+      customEvaluationSync: createTraceCustomEvaluationSync({
+        reportEvaluation: (data) => this.reportEvaluation(data),
+        deriveEvaluatorId: (name) => this.#autoslug.derive(name),
+      }),
+    };
   }
 
   /** The closed stub answers what has no port yet (see the port-evaluation-runtime handoff). */
@@ -548,6 +566,7 @@ export class EvaluationModule implements EvaluationApiContract {
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
       ...(this.#lifecycle ? { lifecycle: this.#lifecycle } : {}),
+      traceReactions: this.#traceReactions,
     });
   }
 

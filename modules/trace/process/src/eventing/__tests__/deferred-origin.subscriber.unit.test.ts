@@ -45,11 +45,6 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
   const noop = vi.fn().mockResolvedValue(undefined);
   return buildTraceProcessingConsumer(projections, {
     resolveDeferredOrigin,
-    evaluationTrigger: {
-      name: "evaluationTrigger",
-      spec: { fold: "traceSummary", handler: noop },
-    },
-    customEvaluationSync: noop,
     trackedEventSync: noop,
     traceUpdateBroadcast: noop,
     projectMetadata: noop,

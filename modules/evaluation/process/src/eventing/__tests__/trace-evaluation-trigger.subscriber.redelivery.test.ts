@@ -1,10 +1,11 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
+  isSpanReceivedEvent,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   type OtlpKeyValue,
   type OtlpSpan,
@@ -14,17 +15,13 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-  TraceEvaluationLoopMetrics,
-  TraceEvaluationLoopBlockReason,
-} from "../../services/trace-evaluation-loop-metrics.service.ts";
-import type {
-  TraceEvaluationDispatch,
-  TraceEvaluationMonitor,
-} from "../evaluation-trigger.subscriber.ts";
-import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
+  EvaluationLoopMetrics,
+  EvaluationLoopBlockReason,
+} from "../../services/evaluation-loop-metrics.service.ts";
+import { createTraceEvaluationTrigger } from "../trace-evaluation-trigger.subscriber.ts";
 
 /**
- * Spec: modules/trace/specs/evaluation-trigger.feature. REDELIVERY CONTRACT:
+ * Spec: modules/evaluation/specs/trace-evaluation-trigger.feature. REDELIVERY CONTRACT:
  * fires more than once by design, so identity must ignore the freshly minted
  * `evaluationId`, or dedup never matches and the customer gets double-billed.
  */
@@ -132,7 +129,7 @@ const monitor: MonitorSummary = {
 };
 
 /** Records what trace queued; evaluation's queue owns the dedup over these fields. */
-class Dispatch implements TraceEvaluationDispatch {
+class Dispatch {
   readonly sent: { data: ExecuteEvaluationCommandData }[] = [];
 
   async send(data: ExecuteEvaluationCommandData): Promise<void> {
@@ -140,34 +137,34 @@ class Dispatch implements TraceEvaluationDispatch {
   }
 }
 
-class LoopMetrics implements TraceEvaluationLoopMetrics {
-  loopBlocked(_reason: TraceEvaluationLoopBlockReason): void {}
-}
-
-class Monitors implements TraceEvaluationMonitor {
-  async getEnabledOnMessageMonitors(): Promise<MonitorSummary[]> {
-    return [monitor];
-  }
+class LoopMetrics implements EvaluationLoopMetrics {
+  loopBlocked(_reason: EvaluationLoopBlockReason): void {}
 }
 
 async function deliverTwice(dispatch: Dispatch): Promise<void> {
-  const built = createEvaluationTriggerSubscriber({
+  const trigger = createTraceEvaluationTrigger({
+    findSummary: async () => foldState(),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: vi.fn(async () => false) }),
-    monitors: new Monitors(),
-    evaluation: dispatch,
+    monitors: { getEnabledOnMessageMonitors: async (): Promise<MonitorSummary[]> => [monitor] },
+    queueTraceEvaluation: (data) => dispatch.send(data),
     metrics: new LoopMetrics(),
   });
-  const context: TriggerContext<TraceSummaryData> = {
-    tenantId: createTenantId("tenant-1"),
-    aggregateId: "trace-1",
-    state: foldState(),
+  const event = spanEvent();
+  const delivery = {
+    tenantId: "tenant-1",
+    traceId: "trace-1",
+    event: {
+      type: event.type,
+      occurredAt: event.occurredAt,
+      spanAttributes: isSpanReceivedEvent(event) ? event.data.span.attributes : undefined,
+    },
   };
 
-  await built.spec.handler(spanEvent(), context);
-  await built.spec.handler(spanEvent(), context);
+  await trigger(delivery);
+  await trigger(delivery);
 }
 
-describe("the evaluationTrigger subscriber under redelivery", () => {
+describe("the trace evaluation trigger under redelivery", () => {
   describe("given the same span event is handled twice", () => {
     describe("when the two dispatches reach the queue", () => {
       /** @scenario "A redelivered trace event evaluates once" */

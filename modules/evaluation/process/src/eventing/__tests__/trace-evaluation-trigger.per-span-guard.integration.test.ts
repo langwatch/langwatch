@@ -1,5 +1,5 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 /**
@@ -9,6 +9,7 @@ import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
+  isSpanReceivedEvent,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   type OtlpKeyValue,
   type OtlpSpan,
@@ -18,14 +19,10 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-  TraceEvaluationLoopMetrics,
-  TraceEvaluationLoopBlockReason,
-} from "../../services/trace-evaluation-loop-metrics.service.ts";
-import type {
-  TraceEvaluationDispatch,
-  TraceEvaluationMonitor,
-} from "../evaluation-trigger.subscriber.ts";
-import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
+  EvaluationLoopMetrics,
+  EvaluationLoopBlockReason,
+} from "../../services/evaluation-loop-metrics.service.ts";
+import { createTraceEvaluationTrigger } from "../trace-evaluation-trigger.subscriber.ts";
 
 const TRACE_ID = "trace-1";
 
@@ -129,7 +126,7 @@ const spanAtDepth = ({
   metadata: { spanId, traceId: TRACE_ID },
 });
 
-class RecordingDispatch implements TraceEvaluationDispatch {
+class RecordingDispatch {
   readonly sent: ExecuteEvaluationCommandData[] = [];
 
   async send(data: ExecuteEvaluationCommandData): Promise<void> {
@@ -137,10 +134,10 @@ class RecordingDispatch implements TraceEvaluationDispatch {
   }
 }
 
-class RecordingMetrics implements TraceEvaluationLoopMetrics {
-  readonly blocked: TraceEvaluationLoopBlockReason[] = [];
+class RecordingMetrics implements EvaluationLoopMetrics {
+  readonly blocked: EvaluationLoopBlockReason[] = [];
 
-  loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
+  loopBlocked(reason: EvaluationLoopBlockReason): void {
     this.blocked.push(reason);
   }
 }
@@ -149,33 +146,33 @@ class RecordingMetrics implements TraceEvaluationLoopMetrics {
 function trigger() {
   const dispatch = new RecordingDispatch();
   const metrics = new RecordingMetrics();
-  class Monitors implements TraceEvaluationMonitor {
-    getEnabledOnMessageMonitors(): Promise<MonitorSummary[]> {
-      return Promise.resolve([
-        {
-          id: "check-1",
-          checkType: "langevals/basic",
-          name: "Monitor One",
-          threadIdleTimeout: null,
-          evaluator: null,
-        },
-      ]);
-    }
-  }
-  const built = createEvaluationTriggerSubscriber({
+  const monitors: MonitorSummary[] = [
+    {
+      id: "check-1",
+      checkType: "langevals/basic",
+      name: "Monitor One",
+      threadIdleTimeout: null,
+      evaluator: null,
+    },
+  ];
+  const evaluate = createTraceEvaluationTrigger({
+    findSummary: async () => foldState(),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: vi.fn(async () => false) }),
-    monitors: new Monitors(),
-    evaluation: dispatch,
+    monitors: { getEnabledOnMessageMonitors: async () => monitors },
+    queueTraceEvaluation: (data) => dispatch.send(data),
     metrics,
   });
 
   const handle = async (event: TraceProcessingEvent): Promise<void> => {
-    const context: TriggerContext<TraceSummaryData> = {
-      tenantId: createTenantId("tenant-1"),
-      aggregateId: TRACE_ID,
-      state: foldState(),
-    };
-    await built.spec.handler(event, context);
+    await evaluate({
+      tenantId: "tenant-1",
+      traceId: TRACE_ID,
+      event: {
+        type: event.type,
+        occurredAt: event.occurredAt,
+        spanAttributes: isSpanReceivedEvent(event) ? event.data.span.attributes : undefined,
+      },
+    });
   };
 
   return { handle, dispatch, metrics };

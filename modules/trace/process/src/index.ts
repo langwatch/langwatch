@@ -18,19 +18,6 @@ export {
 } from "./eventing/trace-processing-projections.pipeline.ts";
 export type { TraceProjectMetadata } from "./eventing/project-metadata.subscriber.ts";
 export type { TraceModelCostCatalog } from "./services/span-cost-enrichment.service.ts";
-export type {
-  TraceEvaluationDispatch,
-  TraceEvaluationMonitor,
-} from "./eventing/evaluation-trigger.subscriber.ts";
-export type {
-  TraceEvaluationLoopBlockReason,
-  TraceEvaluationLoopMetrics,
-} from "./services/trace-evaluation-loop-metrics.service.ts";
-export {
-  CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-  CUSTOM_EVAL_SYNC_DELAY_MS,
-  createCustomEvaluationSyncHandler,
-} from "./eventing/custom-evaluation-sync.subscriber.ts";
 export {
   PROJECT_METADATA_WINDOW_MS,
   createProjectMetadataHandler,
@@ -55,4 +42,3 @@ export type {
 export type { SpanDedupClaim, SpanDedupRef } from "./repositories/trace-span-dedup.repository.ts";
 export { SpanStorageStore } from "./eventing/span-storage.store.ts";
 export { TraceSummaryStore } from "./eventing/trace-summary.store.ts";
-export { createEvaluationTriggerSubscriber } from "./eventing/evaluation-trigger.subscriber.ts";

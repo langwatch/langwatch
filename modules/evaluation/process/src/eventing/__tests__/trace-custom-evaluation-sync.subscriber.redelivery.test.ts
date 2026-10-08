@@ -6,14 +6,14 @@ import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createCustomEvaluationSyncHandler } from "../custom-evaluation-sync.subscriber.ts";
 import {
   createContext,
+  createCustomEvaluationSyncHandler,
   createFoldState,
   createOtlpSpan,
   createSpanReceivedEvent,
   OCCURRED_AT,
-} from "./trace-subscriber.fixtures.ts";
+} from "./trace-span-event.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),

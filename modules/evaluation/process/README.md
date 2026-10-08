@@ -324,26 +324,28 @@ Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:39`. Events: `evaluat
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
-Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:82`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
+Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:118`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
 
-| Kind                       | Name                                                                                           | Handles | Declared at                                                     |
-| -------------------------- | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------- |
-| command                    | –                                                                                              | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:122` |
-| command                    | `startEvaluation`                                                                              | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:135` |
-| command                    | `completeEvaluation`                                                                           | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:138` |
-| command                    | `reportEvaluation`                                                                             | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:141` |
-| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:94`  |
-| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:99`  |
-| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:104` |
-| projection subscriber      | `lifecycleCompleted`                                                                           | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:109` |
-| retention                  | `≈ retention`                                                                                  | –       | `src/eventing/evaluation-processing-definition.pipeline.ts:145` |
+| Kind                       | Name                                                                                           | Handles                                                            | Declared at                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
+| command                    | –                                                                                              | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:158` |
+| command                    | `startEvaluation`                                                                              | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:171` |
+| command                    | `completeEvaluation`                                                                           | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:174` |
+| command                    | `reportEvaluation`                                                                             | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:177` |
+| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)   | `src/eventing/evaluation-processing-definition.pipeline.ts:185` |
+| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:203` |
+| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)   | `src/eventing/evaluation-processing-definition.pipeline.ts:214` |
+| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:130` |
+| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:135` |
+| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:140` |
+| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:145` |
 
 ## Configuration
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:269`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:270`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:273`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:274`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:26` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:28` |

@@ -8,10 +8,10 @@ import {
   EVALUATOR_LOOP_BLOCKED_METRIC_DESCRIPTION,
   EVALUATOR_LOOP_BLOCKED_METRIC_NAME,
   EVALUATOR_LOOP_BLOCKED_REASON_LABEL,
-  TraceEvaluationLoopMetricsService,
-} from "../trace-evaluation-loop-metrics.service.ts";
+  EvaluationLoopMetricsService,
+} from "../evaluation-loop-metrics.service.ts";
 
-describe("TraceEvaluationLoopMetricsService", () => {
+describe("EvaluationLoopMetricsService", () => {
   let metrics: RecordingMeterProvider;
 
   beforeEach(() => {
@@ -38,7 +38,7 @@ describe("TraceEvaluationLoopMetricsService", () => {
     describe("when the refusal is recorded", () => {
       /** @scenario "A blocked evaluator dispatch is counted under its own reason" */
       it("counts it under the guard's own reason", () => {
-        const adapter = TraceEvaluationLoopMetricsService.create();
+        const adapter = EvaluationLoopMetricsService.create();
 
         adapter.loopBlocked("depth_direct");
         adapter.loopBlocked("depth_direct");
@@ -56,7 +56,7 @@ describe("TraceEvaluationLoopMetricsService", () => {
 
       /** @scenario "The loop-guard series keeps the name the application writes" */
       it("declares the help text an operator reads on the panel", () => {
-        TraceEvaluationLoopMetricsService.create().loopBlocked("depth_direct");
+        EvaluationLoopMetricsService.create().loopBlocked("depth_direct");
 
         expect(metrics.descriptionOf("langwatch_evaluator_loop_blocked_total")).toBe(
           "Number of online-evaluator dispatches blocked by the loop guards",
