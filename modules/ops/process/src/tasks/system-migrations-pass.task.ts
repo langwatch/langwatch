@@ -8,9 +8,9 @@ import { Task } from "@langwatch/task";
 const logger = createLogger("langwatch:task:system-migrations-pass");
 
 /**
- * Drives the in-place system migrations until the fleet stops moving. Main ran
- * this in the background of every worker boot (`system-migrations/boot.ts`,
- * `presets.ts:1716`); specs/migration/system-migrations-runner.feature.
+ * Bounded passes of the in-place system migrations, until nothing moves or the
+ * cap. Never a gate: held and parked tenants are reported, not waited on (plan
+ * §6.8, Alex Q7); specs/migration/system-migrations-runner.feature.
  */
 export class SystemMigrationsPassTask extends Task {
   readonly name = "system-migrations-pass";

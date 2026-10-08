@@ -712,3 +712,62 @@ describe("SystemMigrationRunnerService", () => {
     });
   });
 });
+
+describe("SystemMigrationRunnerService held tenants", () => {
+  let state: FakeStateRepository;
+
+  beforeEach(() => {
+    state = new FakeStateRepository();
+  });
+
+  function runnerOver(outcome: () => TenantMigrationOutcome): SystemMigrationRunnerService {
+    return new SystemMigrationRunnerService({
+      state,
+      lease: new FakeLeaseRepository(),
+      tenants: tenantSourceOf(["org_acme"]),
+      cohort: () => true,
+      migrations: [migrationOf("m1", async () => outcome())],
+    });
+  }
+
+  function acme(): Promise<TenantMigrationRecord> {
+    return state.getRecord({ migrationName: "m1", tenantId: "org_acme" });
+  }
+
+  describe("when the migration's own proof disagrees", () => {
+    /** @scenario "A held tenant records why it is held" */
+    it("holds the tenant with reason proof", async () => {
+      await runnerOver(() => ({ status: "migrated", report: { outstanding: 1 } })).runPass();
+
+      expect(await acme()).toMatchObject({ status: "migrated", heldReason: "proof" });
+    });
+  });
+
+  describe("when the migration's queued work has not drained", () => {
+    /** @scenario "A tenant whose queued work has not drained is held as pending" */
+    it("holds the tenant with reason pending", async () => {
+      await runnerOver(() => ({
+        status: "migrated",
+        report: null,
+        heldReason: "pending",
+      })).runPass();
+
+      expect(await acme()).toMatchObject({ status: "migrated", heldReason: "pending" });
+    });
+  });
+
+  describe("when a held tenant is finalized", () => {
+    /** @scenario "A tenant that leaves held drops its reason" */
+    it("records no held reason", async () => {
+      let outcome: TenantMigrationOutcome = { status: "migrated", report: null };
+      const runner = runnerOver(() => outcome);
+      await runner.runPass();
+      outcome = finalized;
+      await runner.runPass();
+
+      const record = await acme();
+      expect(record.status).toBe("finalized");
+      expect(record).not.toHaveProperty("heldReason");
+    });
+  });
+});

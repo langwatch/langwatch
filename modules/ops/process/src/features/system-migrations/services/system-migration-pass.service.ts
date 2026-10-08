@@ -5,7 +5,6 @@ import {
   type SystemMigration,
   SystemMigrationRunnerService,
   groupByTenantSource,
-  runSystemMigrationsAtStartup,
 } from "@langwatch/system-migrations";
 
 import type {
@@ -28,18 +27,6 @@ import type { SystemMigrationPassRequestsService } from "./system-migration-pass
 import { SystemMigrationsService } from "./system-migrations.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations:pass");
-
-export class UserStartupMigrationsUnsupportedError extends Error {
-  readonly migrationNames: readonly string[];
-
-  constructor(migrationNames: readonly string[]) {
-    super(
-      `User-rooted migrations cannot run in startup mode: ${migrationNames.join(", ")}. Run them in background mode.`,
-    );
-    this.name = "UserStartupMigrationsUnsupportedError";
-    this.migrationNames = migrationNames;
-  }
-}
 
 /** The ledger, enrollment, membership, tenant walks and lease a pass reads and writes. */
 export type SystemMigrationPassRepositories = Pick<
@@ -91,42 +78,6 @@ export class SystemMigrationPassService {
   }
 
   private constructor(private readonly options: SystemMigrationPassOptions) {}
-
-  async runStartup({
-    signal,
-    maxPasses,
-    pollDelayMs,
-  }: {
-    signal?: AbortSignal;
-    maxPasses?: number;
-    pollDelayMs?: number;
-  } = {}): Promise<void> {
-    const isSaaS = this.options.isSaaS();
-    const startupUserMigrations = this.released({
-      migrations: this.options.userMigrations(),
-      isSaaS,
-    }).filter((migration) => (migration.executionMode ?? "background") === "startup");
-    if (startupUserMigrations.length > 0) {
-      throw new UserStartupMigrationsUnsupportedError(
-        startupUserMigrations.map((migration) => migration.name),
-      );
-    }
-
-    const organization = await this.organizationRunner({
-      isSaaS,
-      executionMode: "startup",
-    });
-    await runSystemMigrationsAtStartup({
-      runPass: ({ signal: passSignal }) => organization.runner.runPass({ signal: passSignal }),
-      state: organization.state,
-      tenants: organization.tenants,
-      migrations: organization.migrations,
-      cohort: organization.cohort,
-      signal,
-      maxPasses,
-      pollDelayMs,
-    });
-  }
 
   async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
@@ -271,17 +222,12 @@ export class SystemMigrationPassService {
   private async organizationRunner({
     isSaaS,
     enrollments = this.options.repositories.migrationEnrollments,
-    executionMode,
   }: {
     isSaaS: boolean;
     enrollments?: SystemMigrationPassRepositories["migrationEnrollments"];
-    executionMode?: "background" | "startup";
   }) {
     const { migrationState: state, migrationLease: lease } = this.options.repositories;
-    const migrations = this.released({ migrations: this.options.migrations(), isSaaS }).filter(
-      (migration) =>
-        executionMode === void 0 || (migration.executionMode ?? "background") === executionMode,
-    );
+    const migrations = this.released({ migrations: this.options.migrations(), isSaaS });
     const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
     const projectTenants =
       this.options.tenantAxis === "project" ? this.options.repositories.projectTenants : null;

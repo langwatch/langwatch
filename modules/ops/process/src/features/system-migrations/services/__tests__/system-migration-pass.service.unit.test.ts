@@ -15,12 +15,10 @@ const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 function migrationOf({
   name,
   enrolledAutomatically = false,
-  executionMode,
   migrateTenant = vi.fn(async () => ({ status: "finalized" as const })),
 }: {
   name: string;
   enrolledAutomatically?: boolean;
-  executionMode?: "background" | "startup";
   // Accepted as an override so a caller that needs to assert on calls can
   // keep its own reference to the mock — SystemMigration declares this with
   // method shorthand (a package outside this lane's scope), so asserting via
@@ -28,7 +26,6 @@ function migrationOf({
   migrateTenant?: SystemMigration["migrateTenant"];
 }): SystemMigration {
   return {
-    executionMode,
     name,
     title: name,
     description: name,
@@ -350,37 +347,5 @@ describe("project-rooted migration composition", () => {
       where: { id: "project_1" },
       select: { team: { select: { organizationId: true } } },
     });
-  });
-
-  /** @scenario "Project-rooted startup migrations prove completion for projects" */
-  it("checks project-scoped startup completion instead of enumerating organizations", async () => {
-    const { database, projectFindMany, organizationFindMany } = stubDatabase({
-      enrollments: [],
-      memberships: {},
-    });
-    const adapter = SystemMigrationPassService.create({
-      repositories: passRepositoriesOver(database),
-      isSaaS: () => true,
-      tenantAxis: "project",
-      migrations: () => [
-        migrationOf({
-          name: "startup-project",
-          enrolledAutomatically: true,
-          executionMode: "startup",
-        }),
-      ],
-      userMigrations: () => [],
-      newbornSweep: async () => {},
-    });
-
-    await adapter.runStartup({ maxPasses: 1, pollDelayMs: 0 });
-
-    expect(projectFindMany).toHaveBeenCalledWith({
-      where: {},
-      orderBy: { id: "asc" },
-      select: { id: true },
-      take: 100,
-    });
-    expect(organizationFindMany).not.toHaveBeenCalled();
   });
 });

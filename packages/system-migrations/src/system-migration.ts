@@ -7,11 +7,6 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
  * `@langwatch/authz-process`); this package only drives them.
  */
 export interface SystemMigration {
-  /** Boot execution policy; omitted migrations retain the background default. */
-  readonly executionMode?: "background" | "startup";
-  /** Whether a held outcome must prevent startup. Defaults to finite. */
-  readonly startupSettlement?: "finite" | "recurring";
-
   /**
    * The tenants this migration could possibly concern, narrower than the
    * pass's own source; omitted, the pass drives it over every tenant it
