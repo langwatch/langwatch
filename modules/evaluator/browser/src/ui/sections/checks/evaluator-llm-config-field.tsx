@@ -2,8 +2,10 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import { allModelOptions } from "@langwatch/model-provider-contract";
+import { MODEL_ICON_SIZE } from "@langwatch/prompt-contract/llm-config-constants";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
@@ -44,16 +46,19 @@ export const LLM_CONFIG_KEYS = [
  */
 function InstantEvalsNotOffered({ evaluatorType }: { evaluatorType: string | undefined }) {
   return (
-    <VStack gap={0} align="start">
-      <Text fontSize="14px" fontFamily="mono" color="fg.muted">
-        {INSTANT_EVALS_BUILT_IN_MODEL.label}
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        {isInstantEvalJudgeSlot({ evaluatorType })
-          ? "Not enabled for this project"
-          : "Only LLM judges run on Instant Evals"}
-      </Text>
-    </VStack>
+    <HStack align="center" gap={2}>
+      <ProviderIconGlyph provider="langwatch" size={MODEL_ICON_SIZE} />
+      <VStack gap={0} align="start">
+        <Text fontSize="14px" fontFamily="mono" color="fg.muted">
+          {INSTANT_EVALS_BUILT_IN_MODEL.label}
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {isInstantEvalJudgeSlot({ evaluatorType })
+            ? "Not enabled for this project"
+            : "Only LLM judges run on Instant Evals"}
+        </Text>
+      </VStack>
+    </HStack>
   );
 }
 

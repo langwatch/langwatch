@@ -175,6 +175,13 @@ describe("EvaluatorLLMConfigField", () => {
         expect(within(labelled).queryByText("Instant Evals")).not.toBeNull();
         expect(offersInstantEvals()).toBe(false);
       });
+
+      /** @scenario "Instant Evals shows the LangWatch mark wherever it is named as a model" */
+      it("shows the LangWatch mark beside its name", () => {
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        expect(screen.queryByTestId("langwatch-mark")).not.toBeNull();
+      });
     });
 
     describe("when an LLM evaluator that is not a judge saved on Instant Evals opens", () => {
@@ -196,6 +203,14 @@ describe("EvaluatorLLMConfigField", () => {
         renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID, evaluatorType: "ragas/faithfulness" });
 
         expect(screen.queryByText(/only LLM judges run on Instant Evals/i)).not.toBeNull();
+      });
+
+      /** @scenario "An LLM evaluator that is not a judge saved on Instant Evals shows the LangWatch mark" */
+      it("shows the LangWatch mark beside its name", () => {
+        state.flagReleased = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID, evaluatorType: "ragas/faithfulness" });
+
+        expect(screen.queryByTestId("langwatch-mark")).not.toBeNull();
       });
     });
 

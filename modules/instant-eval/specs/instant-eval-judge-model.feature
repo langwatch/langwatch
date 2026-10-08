@@ -588,6 +588,37 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And it is never marked as needing an update
       And Instant Evals is not one of the options
 
+    @integration
+    Scenario Outline: Instant Evals shows the LangWatch mark wherever it is named as a model
+      Given a project with release_instant_evals <flag> and a model provider
+      And an LLM judge saved with Instant Evals as its model
+      When a member sees Instant Evals as <place>
+      Then it shows the LangWatch mark, as any other model shows its provider's
+      And it is never marked as needing an update
+
+      Examples:
+        | flag | place                                 |
+        | on   | an option in the judge's model picker |
+        | on   | the picker's chosen model             |
+        | on   | the judge's model field               |
+        | on   | a model chip                          |
+        | off  | the picker's chosen model             |
+        | off  | the judge's model field               |
+
+    @integration
+    Scenario: An LLM evaluator that is not a judge saved on Instant Evals shows the LangWatch mark
+      Given a project with release_instant_evals on
+      And an LLM evaluator that is not a judge saved with Instant Evals as its model
+      When a member opens its settings
+      Then its model field shows the LangWatch mark beside "Instant Evals"
+      And it is never marked as needing an update
+
+    @unit
+    Scenario: The LangWatch mark names a model, never a provider to add
+      When the mark for the Instant Evals model id is looked up
+      Then it is the LangWatch mark, sized to the icon box like any provider's
+      And LangWatch is not a model provider a member can add or configure
+
     @unit
     Scenario Outline: Only an LLM judge's model picker offers Instant Evals
       Given a project with release_instant_evals <flag>

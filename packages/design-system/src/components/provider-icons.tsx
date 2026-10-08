@@ -13,6 +13,7 @@ import { ElevenLabs } from "./icons/provider/eleven-labs.tsx";
 import { Gemini } from "./icons/provider/gemini.tsx";
 import { GoogleCloud } from "./icons/provider/google-cloud.tsx";
 import { Groq } from "./icons/provider/groq.tsx";
+import { LangWatch } from "./icons/provider/lang-watch.tsx";
 import { OpenAI } from "./icons/provider/open-ai.tsx";
 import { Twilio } from "./icons/provider/twilio.tsx";
 import { Voyage } from "./icons/provider/voyage.tsx";
@@ -38,6 +39,9 @@ export const modelProviderIcons = {
   cerebras: <Cerebras />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
+  // Not a provider: the mark of the models LangWatch serves itself, such as Instant Evals.
+  // The registry has no LangWatch row, so it is never offered to add or configure.
+  langwatch: <LangWatch />,
 };
 
 export type ProviderKey = keyof typeof modelProviderIcons;
