@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport)`, `src/data-retention.module.ts:7`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionProjectScopeEventing).withMigrations(…)`, `src/data-retention.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -189,7 +189,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: data-retention declares no pipeline, process manager, subscriber or task.
+### Pipeline `data_retention_project_scope` (aggregate `data_retention_project_scope`)
+
+Declared at `src/eventing/data-retention-project-scope.pipeline.ts:17`.
+
+| Kind                 | Name                                         | Handles | Declared at                                                |
+| -------------------- | -------------------------------------------- | ------- | ---------------------------------------------------------- |
+| peer fold projection | `≈ dataRetentionProjectScopePeerFold(store)` | –       | `src/eventing/data-retention-project-scope.pipeline.ts:22` |
 
 ## Configuration
 

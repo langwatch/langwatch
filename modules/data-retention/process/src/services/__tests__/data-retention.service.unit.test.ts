@@ -1,20 +1,21 @@
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import {
   createDataRetentionTestOrganizations,
-  createDataRetentionTestProjects,
+  createDataRetentionTestProjectScopes,
   retentionTestGraph,
+  retentionTestScopeRow,
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
 import {
   type CachedRetentionLookup,
   DataRetentionCacheRepository,
 } from "../../repositories/data-retention-cache.repository.ts";
+import { MemoryDataRetentionProjectScopeRepository } from "../../repositories/memory/memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepository } from "../../repositories/memory/memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "../../repositories/memory/memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "../../repositories/memory/memory.retroactive-retention.repository.ts";
@@ -60,7 +61,7 @@ function createService(
   input: Readonly<{
     policies?: MemoryDataRetentionRepository;
     cache?: DataRetentionCacheRepository;
-    projects?: ProjectApi;
+    projectScopes?: MemoryDataRetentionProjectScopeRepository;
     organizations?: OrganizationApi;
     retroactive?: MemoryRetroactiveRetentionRepository;
   }> = {},
@@ -68,7 +69,7 @@ function createService(
   return DataRetentionService.create({
     policies: input.policies ?? MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
-    projects: input.projects ?? createDataRetentionTestProjects(),
+    projectScopes: input.projectScopes ?? createDataRetentionTestProjectScopes(),
     organizations: input.organizations ?? createDataRetentionTestOrganizations(),
     defaultRetentionDays: DEFAULT_DAYS,
     retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
@@ -149,16 +150,35 @@ describe("DataRetentionService", () => {
     });
   });
 
-  describe("given a project with no resolvable scope", () => {
-    /** @scenario "Default a missing read target" */
-    it("keeps the platform default", async () => {
+  describe("given a project retention has not folded yet", () => {
+    /** @scenario "A project retention has not folded yet is refused, and the refusal is never cached" */
+    it("refuses it as not found, caches nothing, and resolves its rules once its fact folds", async () => {
+      const cache = new RecordingCache();
+      const projectScopes = MemoryDataRetentionProjectScopeRepository.create();
+      const policies = MemoryDataRetentionRepository.create();
+      await policies.upsertForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+        category: "traces",
+        retentionDays: 63,
+      });
+      const service = createService({ cache, projectScopes, policies });
+
+      await expect(service.getResolvedForProject({ projectId: PROJECT })).rejects.toMatchObject({
+        code: "project_not_found",
+      });
+      expect(cache.values.size).toBe(0);
+
+      await projectScopes.store(retentionTestScopeRow(PROJECT));
+      await expect(
+        service.getRetentionDays({ projectId: PROJECT, category: "traces" }),
+      ).resolves.toBe(63);
+    });
+
+    /** @scenario "Default a missing removal preview" */
+    it("previews the platform default for a project it does not know", async () => {
       const service = createService();
 
-      await expect(service.getResolvedForProject({ projectId: "missing" })).resolves.toEqual({
-        traces: DEFAULT_DAYS,
-        scenarios: DEFAULT_DAYS,
-        experiments: DEFAULT_DAYS,
-      });
       await expect(
         service.previewScopeRemoval({ scope: { scopeType: "PROJECT", scopeId: "missing" } }),
       ).resolves.toEqual({
@@ -229,7 +249,7 @@ describe("DataRetentionService", () => {
       const cache = new RecordingCache();
       const service = createService({
         cache,
-        projects: createDataRetentionTestProjects(retentionTestGraph, ["project-2"]),
+        projectScopes: createDataRetentionTestProjectScopes(retentionTestGraph, ["project-2"]),
       });
 
       await service.setForScope({
@@ -247,26 +267,14 @@ describe("DataRetentionService", () => {
   });
 
   describe("given the organization holds its hidden governance project", () => {
-    async function governanceAwareProjects(): Promise<ProjectApi> {
-      const application = await createDataRetentionTestProjects().findWithTeam(PROJECT);
-      if (!application) throw new Error("the retention fixture seeds its project");
-      const governance = { ...application, id: "project-governance", kind: "internal_governance" };
-      const visible = (includeGovernance: boolean | undefined) =>
-        includeGovernance ? [application, governance] : [application];
-
-      return createApiFixture<ProjectApi>({
-        listByTeam: async ({ includeGovernance }) => visible(includeGovernance),
-        listByOrganization: async ({ includeGovernance }) => {
-          const data = visible(includeGovernance);
-          return { data, pagination: { page: 1, limit: data.length, total: data.length } };
-        },
-      });
-    }
-
     /** @scenario "An organization or team retention rule reaches the governance project" */
     it("invalidates the governance project for organization and team rules", async () => {
       const cache = new RecordingCache();
-      const service = createService({ cache, projects: await governanceAwareProjects() });
+      // Project records a governance project's facts like any other, so the fold holds it.
+      const projectScopes = createDataRetentionTestProjectScopes(retentionTestGraph, [
+        "project-governance",
+      ]);
+      const service = createService({ cache, projectScopes });
 
       await service.setForScope({
         scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },

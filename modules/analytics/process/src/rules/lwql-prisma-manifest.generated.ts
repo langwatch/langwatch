@@ -1234,6 +1234,14 @@ export interface LwqlPrismaRows {
     readonly archivedAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
+  readonly DataRetentionProjectScope: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly teamId: "String?";
+    readonly teamRecordedAt: "DateTime?";
+    readonly archivedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
   readonly InstantEvalJudgeProject: {
     readonly projectId: "String";
     readonly organizationId: "String";

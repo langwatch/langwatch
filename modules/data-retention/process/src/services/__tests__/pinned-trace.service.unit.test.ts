@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDataRetentionTestOrganizations,
-  createDataRetentionTestProjects,
+  createDataRetentionTestProjectScopes,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { ClickHouseStorageMeterRepository } from "../../repositories/clickhouse/clickhouse.storage-meter.repository.ts";
@@ -57,7 +57,7 @@ function createService(retroactive: RetroactiveRetentionRepository = new Recordi
   return DataRetentionService.create({
     policies: MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
-    projects: createDataRetentionTestProjects(),
+    projectScopes: createDataRetentionTestProjectScopes(),
     organizations: createDataRetentionTestOrganizations(),
     defaultRetentionDays: 49,
     retroactive,

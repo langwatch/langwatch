@@ -24,9 +24,10 @@ import {
   type OrganizationApi,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
+import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
@@ -35,7 +36,8 @@ import type { StorageMeterService } from "./storage-meter.service.ts";
 type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
   pins: PinnedTraceRepository;
-  projects: ProjectApi;
+  /** Where each project sits, folded from project's facts: no project peer (Q151 Q1). */
+  projectScopes: Pick<DataRetentionProjectScopeRepository, "get" | "findProjectIds">;
   organizations: OrganizationApi;
   defaultRetentionDays: number;
   /**
@@ -69,24 +71,18 @@ export class DataRetentionService {
       return cached.value;
     }
 
-    const project = await this.options.projects.findWithTeam(input.projectId);
-    const context = project
-      ? {
-          organizationId: project.team.organizationId,
-          teamId: project.teamId,
-          projectId: project.id,
-        }
-      : null;
-    const resolved = context
-      ? resolveRetention({
-          rows: await this.options.policies.findForProjectChain({
-            organizationId: context.organizationId,
-            scopes: resolveScopeChain(context),
-          }),
-          chain: resolveScopeChain(context),
-          defaultRetentionDays: this.options.defaultRetentionDays,
-        })
-      : this.defaultRetention();
+    // A project not folded yet is refused, never cached: the job retries until its fact lands.
+    const context = await this.findProjectContext(input.projectId);
+    if (!context) throw new ProjectNotFoundError();
+    const chain = resolveScopeChain(context);
+    const resolved = resolveRetention({
+      rows: await this.options.policies.findForProjectChain({
+        organizationId: context.organizationId,
+        scopes: chain,
+      }),
+      chain,
+      defaultRetentionDays: this.options.defaultRetentionDays,
+    });
     await this.options.cache.set(input.projectId, resolved);
 
     return resolved;
@@ -257,19 +253,26 @@ export class DataRetentionService {
       };
     }
 
-    const project = await this.options.projects.findWithTeam(scope.scopeId);
-    if (!project) {
+    const context = await this.findProjectContext(scope.scopeId);
+    if (!context) {
       return null;
     }
 
-    return {
-      organizationId: project.team.organizationId,
-      chain: resolveScopeChain({
-        projectId: project.id,
-        teamId: project.teamId,
-        organizationId: project.team.organizationId,
-      }),
-    };
+    return { organizationId: context.organizationId, chain: resolveScopeChain(context) };
+  }
+
+  /** The project's chain as folded; null until a fact naming its team has folded. */
+  private async findProjectContext(projectId: string): Promise<{
+    organizationId: string;
+    teamId: string;
+    projectId: string;
+  } | null> {
+    const scope = await this.options.projectScopes.get(projectId);
+    if (scope.kind === "empty" || scope.state.teamId === null) {
+      return null;
+    }
+
+    return { organizationId: scope.state.organizationId, teamId: scope.state.teamId, projectId };
   }
 
   private async findAffectedProjectIds(scope: ScopeAssignment): Promise<string[]> {
@@ -283,23 +286,13 @@ export class DataRetentionService {
         return [];
       }
 
-      const projects = await this.options.projects.listByTeam({
+      return this.options.projectScopes.findProjectIds({
         organizationId: team.organizationId,
         teamId: scope.scopeId,
-        includeGovernance: true,
       });
-
-      return projects.map((project) => project.id);
     }
 
-    const projects = await this.options.projects.listByOrganization({
-      organizationId: scope.scopeId,
-      page: 1,
-      limit: 10_000,
-      includeGovernance: true,
-    });
-
-    return projects.data.map((project) => project.id);
+    return this.options.projectScopes.findProjectIds({ organizationId: scope.scopeId });
   }
 
   private async findTeam(teamId: string): Promise<OrganizationTeam | null> {

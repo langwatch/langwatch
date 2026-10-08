@@ -89,6 +89,7 @@ export const prismaTableCatalogue = {
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "DataPrivacyProjectScope": "DataPrivacyProjectScope",
+  "DataRetentionProjectScope": "DataRetentionProjectScope",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
   "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
@@ -1612,6 +1613,14 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "teamRecordedAt",
     "departmentRecordedAt",
+    "archivedAt",
+    "updatedAt"
+  ],
+  "DataRetentionProjectScope": [
+    "projectId",
+    "organizationId",
+    "teamId",
+    "teamRecordedAt",
     "archivedAt",
     "updatedAt"
   ],
@@ -3192,6 +3201,7 @@ export const prismaRelationCatalogue = {
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
   "DataPrivacyProjectScope": {},
+  "DataRetentionProjectScope": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
   "InstantEvalJudgeSpend": {},

@@ -1,6 +1,7 @@
 import type { DataRetentionRepositories } from "../data-retention.repositories.ts";
 import { MemoryDataRetentionCacheRepository } from "./memory.data-retention-cache.repository.ts";
 import { MemoryDataRetentionDirectoryRepository } from "./memory.data-retention-directory.repository.ts";
+import { MemoryDataRetentionProjectScopeRepository } from "./memory.data-retention-project-scope.repository.ts";
 import { MemoryDataRetentionRepository } from "./memory.data-retention.repository.ts";
 import { MemoryPinnedTraceRepository } from "./memory.pinned-trace.repository.ts";
 import { MemoryRetroactiveRetentionRepository } from "./memory.retroactive-retention.repository.ts";
@@ -15,6 +16,7 @@ export class MemoryDataRetentionRepositories {
       policies: MemoryDataRetentionRepository.create(),
       pins: MemoryPinnedTraceRepository.create(),
       directory: MemoryDataRetentionDirectoryRepository.create(),
+      projectScopes: MemoryDataRetentionProjectScopeRepository.create(),
       retroactive: MemoryRetroactiveRetentionRepository.create(),
       storageMeter: MemoryStorageMeterRepository.create(),
       cache: MemoryDataRetentionCacheRepository.create(),

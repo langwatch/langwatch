@@ -3534,6 +3534,20 @@ model DataPrivacyProjectScope {
   @@index([organizationId])
 }
 
+// Data retention's copy of where each project sits, a peer fold over project's lifecycle facts
+// (Alex, 2026-10-06, Q151 Q1); updatedAt is the newest fact's time. No relation to Project.
+model DataRetentionProjectScope {
+  projectId      String    @id
+  organizationId String
+  teamId         String?
+  teamRecordedAt DateTime?
+  archivedAt     DateTime?
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId])
+  @@index([teamId])
+}
+
 // The Instant Evals judge's copy of each project's organization, folded from project's
 // lw.project.created (ADR-174 decision 13). No relation to Project.
 model InstantEvalJudgeProject {

@@ -7518,6 +7518,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)

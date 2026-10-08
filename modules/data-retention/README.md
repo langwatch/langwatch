@@ -16,13 +16,14 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 
 ## What data-retention owns
 
-| Kind                           | Name                                                                                                       | Declared at                                                                        |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Postgres table                 | `RetentionPolicy`                                                                                          | `process/src/repositories/prisma/prisma.data-retention.repository.ts:21`           |
-| Postgres table                 | `PinnedTrace`                                                                                              | `process/src/repositories/prisma/prisma.pinned-trace.repository.ts:13`             |
-| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                          | `process/src/repositories/prisma/prisma.data-retention-directory.repository.ts:16` |
-| Stores required                | prisma, clickhouse, redis                                                                                  | `process/src/repositories/live/live.data-retention.repositories.ts:24`             |
-| Config                         | `platformDefaultDays` (LANGWATCH_DEFAULT_RETENTION_DAYS), `isSaas` (IS_SAAS), `nodeEnvironment` (NODE_ENV) | `contract/src/data-retention.config.ts:15`                                         |
+| Kind                           | Name                                                                                                       | Declared at                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Postgres table                 | `DataRetentionProjectScope`                                                                                | `process/src/repositories/prisma/prisma.data-retention-project-scope.repository.ts:19` |
+| Postgres table                 | `RetentionPolicy`                                                                                          | `process/src/repositories/prisma/prisma.data-retention.repository.ts:21`               |
+| Postgres table                 | `PinnedTrace`                                                                                              | `process/src/repositories/prisma/prisma.pinned-trace.repository.ts:13`                 |
+| Postgres, accessed not claimed | `Organization`, `Project`, `Team`                                                                          | `process/src/repositories/prisma/prisma.data-retention-directory.repository.ts:16`     |
+| Stores required                | prisma, clickhouse, redis                                                                                  | `process/src/repositories/live/live.data-retention.repositories.ts:24`                 |
+| Config                         | `platformDefaultDays` (LANGWATCH_DEFAULT_RETENTION_DAYS), `isSaas` (IS_SAAS), `nodeEnvironment` (NODE_ENV) | `contract/src/data-retention.config.ts:15`                                             |
 
 Anything else data-retention needs belongs to another module and is reached through its `*Api`.
 
@@ -33,7 +34,6 @@ Anything else data-retention needs belongs to another module and is reached thro
 | `entitlement`   | `EntitlementApi`  | [entitlement](../entitlement/README.md)   |
 | `organizations` | `OrganizationApi` | [organization](../organization/README.md) |
 | `permissions`   | `AuthzApi`        | [authz](../authz/README.md)               |
-| `projects`      | `ProjectApi`      | [project](../project/README.md)           |
 | `users`         | `UserApi`         | [user](../user/README.md)                 |
 
 ## Who depends on data-retention

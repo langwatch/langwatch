@@ -25,7 +25,6 @@ import {
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
@@ -101,7 +100,6 @@ type DataRetentionSetup = FeatureSetup<
 export class DataRetentionModule implements DataRetentionApiContract {
   static readonly contract = DataRetentionApi;
   static readonly dependencies = {
-    projects: ProjectApi,
     organizations: OrganizationApi,
     permissions: AuthzApi,
     users: UserApi,
@@ -137,7 +135,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     const retention = DataRetentionService.create({
       policies: repositories.policies,
       pins: repositories.pins,
-      projects: dependencies.projects,
+      projectScopes: repositories.projectScopes,
       organizations: dependencies.organizations,
       defaultRetentionDays: resolvePlatformDefaultRetentionDays({
         LANGWATCH_DEFAULT_RETENTION_DAYS: config.platformDefaultDays,

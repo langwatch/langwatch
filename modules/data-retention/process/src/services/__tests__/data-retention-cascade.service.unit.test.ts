@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDataRetentionTestOrganizations,
-  createDataRetentionTestProjects,
+  createDataRetentionTestProjectScopes,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { MemoryDataRetentionCacheRepository } from "../../repositories/memory/memory.data-retention-cache.repository.ts";
@@ -32,7 +32,7 @@ function acme() {
   return DataRetentionService.create({
     policies: MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
-    projects: createDataRetentionTestProjects(),
+    projectScopes: createDataRetentionTestProjectScopes(),
     organizations: createDataRetentionTestOrganizations(),
     defaultRetentionDays: DEFAULT_DAYS,
     retroactive: MemoryRetroactiveRetentionRepository.create(),
