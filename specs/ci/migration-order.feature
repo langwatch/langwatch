@@ -147,3 +147,13 @@ Feature: Migration order check
     Given a release manifest on the base branch is not valid JSON
     When the migration-order check runs
     Then it exits with the could-not-read status, naming the manifest
+
+  # A number deleted before it reached main may still be recorded in dev and CI
+  # databases, which would skip a later file reusing it.
+  @unit
+  Scenario: A PR reuses a retired goose number
+    Given the ClickHouse set retires the number 107
+    When the PR adds a ClickHouse migration numbered 107
+    Then the check fails
+    And the comment says the number is retired
+    And the comment gives the git mv that renumbers it above everything in play

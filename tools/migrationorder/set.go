@@ -33,6 +33,10 @@ type Set struct {
 	// key a release line already used is taken whether or not anything has
 	// released it yet (goose; rethink F10). Prisma records full names instead.
 	ReleaseKeysTaken bool
+	// RetiredKeys are keys whose migration was deleted before reaching main.
+	// A database already past the key would skip a file reusing it, so no
+	// later file may take it. The value is the reason, for the finding.
+	RetiredKeys map[int64]string
 }
 
 // Sets are the ordered migration directories in this repository.
@@ -69,5 +73,9 @@ var Sets = []Set{
 		Format:           "NNNNN_name.sql",
 		Render:           func(key int64) string { return fmt.Sprintf("%05d", key) },
 		ReleaseKeysTaken: true,
+		RetiredKeys: map[int64]string{
+			107: "00107_create_trace_topic_names was removed with the trace copies",
+			108: "00108 was removed with the trace copies",
+		},
 	},
 }

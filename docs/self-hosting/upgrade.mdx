@@ -224,6 +224,13 @@ A failed row an earlier run left is cleared the same way before the schema is ap
 
 An older migration, or a failed one this image does not ship, stops the run with `failed_prisma_migration`. Check what it left behind, run `prisma migrate resolve --rolled-back <migration>` if none of it remains (or `--applied <migration>` if you finished it by hand) with the app's `DATABASE_URL`, then run the upgrade again. No migration has rolled forward, so the previous version keeps serving.
 
+### Large tables: build indexes ahead of the upgrade
+
+Two schema changes touch a whole large table while the upgrade runs.
+
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
+
 ### What the upgrade does
 
 - **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. An upgrade by one release applies its schema in one pass, then its blocking steps, as before.

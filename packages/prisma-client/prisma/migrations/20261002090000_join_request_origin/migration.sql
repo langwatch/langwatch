@@ -1,4 +1,4 @@
--- ADR-171 v6: where a join request was made.
+-- ADR-143 v6: where a join request was made.
 --
 -- `web` for every request that exists today, which is also what a replay of
 -- an event written before origins existed folds to, so the projection row

@@ -173,6 +173,13 @@ func Check(in Input) []Finding {
 		})
 
 		switch {
+		case in.Set.RetiredKeys[m.key] != "":
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   m.entry,
+				Problem: fmt.Sprintf("takes key %d, which is retired (%s), and a database already past it would skip this file", m.key, in.Set.RetiredKeys[m.key]),
+				Fix:     suggest(m.entry),
+			})
 		case taken[m.key] != "":
 			findings = append(findings, Finding{
 				Set:     in.Set.Name,
