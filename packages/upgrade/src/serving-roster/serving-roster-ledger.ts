@@ -22,4 +22,6 @@ export type ServingRosterLedger = Pick<
   "writeRosterEntry" | "findLiveRoster"
 > & {
   removeRosterEntry(input: { processId: string }): Promise<void>;
+  /** Deletes entries dead for `deadForMs` (plan 2026-10-08 F-10); absent, nothing is pruned. */
+  pruneRoster?(input: { deadForMs: number }): Promise<number>;
 };

@@ -24,6 +24,9 @@ import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 export const SERVING_ROSTER_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } as const;
 
 /** A process with no database (the memory tier) has no installation to be behind. */
+/** Roster entries dead this long are deleted when a process records its own (plan F-10). */
+export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
+
 const NO_LEDGER_GATE: UpgradeGate = {
   admit: async () => ({ admitted: true, outcome: "current" }),
   release: async () => undefined,
@@ -83,11 +86,18 @@ export function upgradeGateOver({
   const runner = UpgradeRunnerRepository.create({ postgres });
   const { blockingSteps, declaredSteps } = imageGateSteps({ tree, withClickHouse });
   const roster = createServingRoster({
-    ledger,
+    ledger: {
+      writeRosterEntry: (input) => ledger.writeRosterEntry(input),
+      findLiveRoster: (input) => ledger.findLiveRoster(input),
+      removeRosterEntry: (input) => ledger.removeRosterEntry(input),
+      pruneRoster: (input) => runner.pruneServingRoster(input),
+    },
     ...SERVING_ROSTER_TIMING,
     onRefreshError: (error) =>
+    pruneDeadAfterMs: SERVING_ROSTER_PRUNE_AFTER_MS,
       warn("roster refresh failed", { processId, error: messageOf(error) }),
     onLapseChange: (lapsed) =>
+    onPruneError: (error) => warn("roster prune failed", { processId, error: messageOf(error) }),
       warn(
         lapsed
           ? `roster entry lapsed past ${SERVING_ROSTER_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +

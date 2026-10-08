@@ -232,4 +232,61 @@ describe("createServingRoster()", () => {
       expect(ledger.rows.size).toBe(0);
     });
   });
+
+  describe("when a process records its entry beside long-dead and recently dead entries", () => {
+    const PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
+    const seed = (declaration: ServingRosterDeclaration, heartbeatAt: Date) =>
+      ledger.rows.set(declaration.processId, {
+        ...declaration,
+        startedAt: heartbeatAt,
+        heartbeatAt,
+      });
+
+    /** @scenario "Roster entries dead for longer than the prune bound are deleted when a process records its own" */
+    it("deletes the long-dead entry and keeps the recently dead one", async () => {
+      seed(oldApi, new Date(Date.now() - PRUNE_AFTER_MS - 1));
+      seed({ ...oldApi, processId: "api-old-2" }, new Date(Date.now() - STALE_AFTER_MS - 1));
+      const roster = createServingRoster({
+        ledger,
+        staleAfterMs: STALE_AFTER_MS,
+        refreshEveryMs: REFRESH_EVERY_MS,
+        pruneDeadAfterMs: PRUNE_AFTER_MS,
+      });
+
+      await roster.record(newWorker);
+
+      expect([...ledger.rows.keys()].toSorted()).toEqual(["api-old-2", "worker-new-1"]);
+      await roster.stop();
+    });
+
+    /** @scenario "A failed prune never refuses the start" */
+    it("writes its own entry and reports the failed prune", async () => {
+      ledger.refusePrunes();
+      const pruneErrors: unknown[] = [];
+      const roster = createServingRoster({
+        ledger,
+        staleAfterMs: STALE_AFTER_MS,
+        refreshEveryMs: REFRESH_EVERY_MS,
+        pruneDeadAfterMs: PRUNE_AFTER_MS,
+        onPruneError: (error) => pruneErrors.push(error),
+      });
+
+      await roster.record(newWorker);
+
+      expect(ledger.rows.has("worker-new-1")).toBe(true);
+      expect(pruneErrors).toHaveLength(1);
+      await roster.stop();
+    });
+
+    it("refuses a prune bound that is not above the stale bound", () => {
+      expect(() =>
+        createServingRoster({
+          ledger,
+          staleAfterMs: STALE_AFTER_MS,
+          refreshEveryMs: REFRESH_EVERY_MS,
+          pruneDeadAfterMs: STALE_AFTER_MS,
+        }),
+      ).toThrow(RangeError);
+    });
+  });
 });

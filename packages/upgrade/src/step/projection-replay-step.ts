@@ -7,6 +7,9 @@ import {
 /** The cursor a lane's first replay starts from: the whole log. */
 export const PROJECTION_REPLAY_FROM_START = "1970-01-01T00:00:00Z";
 
+/** The report key holding a replay's cursor; a rollback reopen keeps a report that has it. */
+export const PROJECTION_REPLAY_CURSOR = "replayedThrough";
+
 /**
  * The replay a step drives, injected (record: a framework package takes module values by
  * injection): eventing's `projectionLaneReplayer` satisfies it without either package naming
@@ -92,7 +95,7 @@ function resumeCursor({
   lane: string;
   since: string;
 }): string {
-  const cursor = resumeFrom?.replayedThrough;
+  const cursor = resumeFrom?.[PROJECTION_REPLAY_CURSOR];
   if (resumeFrom?.lane !== lane || typeof cursor !== "string") return since;
   return cursor;
 }

@@ -449,6 +449,7 @@ export class UpgradeRunnerService {
     this.resolved = [];
     await this.resolveLeftFailures({ signal });
     await this.runner.registerSteps({ steps: this.shipped });
+    await this.retryFailedBackgroundSteps({ runId });
     const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
     await phases.end({ name: "preflight", outcome: "succeeded" });
@@ -717,9 +718,12 @@ export class UpgradeRunnerService {
         dryRun: false,
         signal,
       });
+      // A run that returns aborted stopped early: it stays running with its checkpoint (F-2).
+      signal.throwIfAborted();
       await this.runner.setStatus({ ids: [id], status: "done", runId, report });
       this.narrate.stepEnded({ id, error: null });
     } catch (error) {
+      if (signal.aborted) throw error;
       const lastError = describeError(error);
       this.narrate.stepEnded({ id, error: lastError });
       await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
@@ -727,6 +731,17 @@ export class UpgradeRunnerService {
         step: id,
       });
     }
+  }
+
+  /** Plan 2026-10-08 F-3: each run gives failed background steps another try on the worker. */
+  private async retryFailedBackgroundSteps({ runId }: { runId: string }): Promise<void> {
+    const ids = await this.runner.resetFailedSteps({ mode: "background", runId });
+    if (ids.length === 0) return;
+    this.narrate.warn(`failed background steps set pending again: ${ids.join(", ")}`, {
+      phase: "preflight",
+      steps: ids,
+      next: "nothing to do: the worker runs them again from their checkpoints",
+    });
   }
 
   /** Q-U5 2 (default taken): an older image's run reopens newer releases' done background steps. */

@@ -51,29 +51,68 @@ function watchLapse({
   };
 }
 
-/**
- * Which builds are serving, and whether every one declares a step (plan 3.1, D2; ADR-173).
- * `record` writes the row and refreshes it every `refreshEveryMs` until `stop`; a failed refresh
- * goes to `onRefreshError`. `onLapseChange` hears the last good write pass the stale bound.
- */
-export function createServingRoster({
-  ledger,
+/** The refresh must beat the stale bound, and the prune bound must exceed it. */
+function assertTimings({
   staleAfterMs,
   refreshEveryMs,
-  onRefreshError,
-  onLapseChange,
+  pruneDeadAfterMs,
 }: {
-  ledger: ServingRosterLedger;
   staleAfterMs: number;
   refreshEveryMs: number;
-  onRefreshError?: (error: unknown) => void;
-  onLapseChange?: (lapsed: boolean) => void;
-}): ServingRoster {
+  pruneDeadAfterMs: number | undefined;
+}): void {
   if (!(refreshEveryMs > 0 && refreshEveryMs < staleAfterMs)) {
     throw new RangeError(
       `roster refresh interval (${refreshEveryMs} ms) must be positive and below the stale bound (${staleAfterMs} ms)`,
     );
   }
+  if (pruneDeadAfterMs !== undefined && !(pruneDeadAfterMs > staleAfterMs)) {
+    throw new RangeError(
+      `roster prune bound (${pruneDeadAfterMs} ms) must be above the stale bound (${staleAfterMs} ms)`,
+    );
+  }
+}
+
+/** Plan 2026-10-08 F-10: deletes long-dead entries; a failure is reported, never thrown. */
+async function pruneDead({
+  ledger,
+  pruneDeadAfterMs,
+  onPruneError,
+}: {
+  ledger: ServingRosterLedger;
+  pruneDeadAfterMs: number | undefined;
+  onPruneError?: (error: unknown) => void;
+}): Promise<void> {
+  if (pruneDeadAfterMs === undefined || !ledger.pruneRoster) return;
+  await ledger.pruneRoster({ deadForMs: pruneDeadAfterMs }).catch((error: unknown) => {
+    onPruneError?.(error);
+  });
+}
+
+/**
+ * Which builds are serving, and whether every one declares a step (plan 3.1, D2; ADR-173).
+ * `record` writes the row, prunes long-dead ones and refreshes it every `refreshEveryMs` until
+ * `stop`. Failed refreshes and prunes are reported; `onLapseChange` hears a lapse (round 9).
+ */
+export function createServingRoster({
+  ledger,
+  staleAfterMs,
+  refreshEveryMs,
+  pruneDeadAfterMs,
+  onRefreshError,
+  onPruneError,
+  onLapseChange,
+}: {
+  ledger: ServingRosterLedger;
+  staleAfterMs: number;
+  refreshEveryMs: number;
+  /** Absent, nothing is pruned; never below the stale bound, so a live entry is never deleted. */
+  pruneDeadAfterMs?: number;
+  onRefreshError?: (error: unknown) => void;
+  onPruneError?: (error: unknown) => void;
+  onLapseChange?: (lapsed: boolean) => void;
+}): ServingRoster {
+  assertTimings({ staleAfterMs, refreshEveryMs, pruneDeadAfterMs });
 
   let current: ServingRosterDeclaration | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -107,6 +146,7 @@ export function createServingRoster({
         refresh().catch((error: unknown) => onRefreshError?.(error));
       }, refreshEveryMs);
       timer.unref?.();
+      await pruneDead({ ledger, pruneDeadAfterMs, onPruneError });
     },
     refresh,
     async stop() {

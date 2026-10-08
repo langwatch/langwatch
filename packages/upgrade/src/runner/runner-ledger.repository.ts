@@ -2,6 +2,7 @@ import { type LedgerTableNames, ledgerTables } from "../ledger-tables.ts";
 import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from "../ledger.ts";
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
+import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
@@ -172,8 +173,9 @@ export class UpgradeRunnerRepository {
   }
 
   /**
-   * Reopens done steps as pending, checkpoint cleared so the re-run is whole, and answers the ids
-   * this call reopened: one already reopened, here or concurrently, is not reopened twice.
+   * Reopens done steps as pending, checkpoint cleared so the re-run is whole, except a projection
+   * replay's cursor, which a re-run continues from. Answers the ids this call reopened: one
+   * already reopened, here or concurrently, is not reopened twice.
    */
   async reopenDoneSteps({
     ids,
@@ -186,13 +188,42 @@ export class UpgradeRunnerRepository {
     const { rows } = await this.query<{ id: string }>(
       (t) => `UPDATE ${t.step}
           SET "status" = 'pending', "last_error" = $2, "inferred" = false, "finished_at" = NULL,
-              "report" = NULL,
+              "report" = CASE WHEN "report" ? $3 THEN "report" END,
               "updated_at" = ${NOW_UTC}
         WHERE "id" = ANY($1::text[]) AND "status" = 'done'
        RETURNING "id"`,
-      [ids, reason],
+      [ids, reason, PROJECTION_REPLAY_CURSOR],
     );
     return rows.map((row) => row.id).toSorted();
+  }
+
+  /** Sets failed steps of one mode pending again, error and checkpoint kept; answers their ids. */
+  async resetFailedSteps({
+    mode,
+    runId,
+  }: {
+    mode: ManifestStep["mode"];
+    runId: string;
+  }): Promise<string[]> {
+    const { rows } = await this.query<{ id: string }>(
+      (t) => `UPDATE ${t.step}
+          SET "status" = 'pending', "run_id" = $2, "finished_at" = NULL, "updated_at" = ${NOW_UTC}
+        WHERE "mode" = $1 AND "status" = 'failed'
+       RETURNING "id"`,
+      [mode, runId],
+    );
+    return rows.map((row) => row.id).toSorted();
+  }
+
+  /** Deletes roster entries not written for `deadForMs` by the database clock; answers how many. */
+  async pruneServingRoster({ deadForMs }: { deadForMs: number }): Promise<number> {
+    const { rows } = await this.query<{ processId: string }>(
+      (t) => `DELETE FROM ${t.roster}
+        WHERE "heartbeat_at" < ${NOW_UTC} - ($1::double precision * interval '1 millisecond')
+       RETURNING "process_id" AS "processId"`,
+      [deadForMs],
+    );
+    return rows.length;
   }
 
   /** Records the release the run upgrades to and the plan it printed. */

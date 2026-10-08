@@ -559,6 +559,110 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
+  describe("when the upgrade loses its lease while a blocking step runs", () => {
+    /** @scenario "A blocking step that returns after the upgrade lost its lease stays resumable" */
+    it("records the step neither done nor failed, keeps its checkpoint and resumes it next run", async () => {
+      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
+      const resumedFrom: unknown[] = [];
+      const copyKeys = (stealLease: boolean): MigrationStep =>
+        defineMigrationStep({
+          id: "dataset:copy-keys",
+          kind: "data",
+          mode: "blocking",
+          description: "copies the keys",
+          run: async ({ checkpoint, signal }) => {
+            resumedFrom.push(checkpoint.resumeFrom);
+            if (!stealLease) return { copied: 3 };
+            await checkpoint.save({ report: { cursor: "key_7" } });
+            await scratch.postgres.query(`UPDATE "_langwatch_upgrade_lease" SET "owner" = 'pod-x'`);
+            while (!signal.aborted) await new Promise((resolve) => setTimeout(resolve, 10));
+            return { copied: 1 };
+          },
+        });
+      const lease = { ttlMs: 60_000, heartbeatMs: 20, waitMs: 2_000, pollMs: 50 };
+      const lost = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier: fakeApplier({ release: "3.21.0" }),
+          codeSteps: [copyKeys(true)],
+          lease,
+        }),
+      );
+      expect(lost.code).toBe("lease_lost");
+      const left = (await ledger().findSteps()).find((s) => s.id === "dataset:copy-keys");
+      expect(left).toMatchObject({ status: "running", report: { cursor: "key_7" } });
+
+      await scratch.postgres.query(`DELETE FROM "_langwatch_upgrade_lease"`);
+      const resumed = await run(
+        runnerFor({
+          release: "3.21.0",
+          applier: fakeApplier({ release: "3.21.0" }),
+          codeSteps: [copyKeys(false)],
+        }),
+      );
+      expect(resumed.code).toBe("done");
+      expect(resumedFrom).toEqual([null, { cursor: "key_7" }]);
+      expect(await statusOf("dataset:copy-keys")).toBe("done");
+    });
+  });
+
+  describe("when a background step failed before this run", () => {
+    /** @scenario "An upgrade run resets failed background steps to pending" */
+    it("sets it pending in the preflight with its error and checkpoint kept", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const repository = UpgradeRunnerRepository.create({ postgres: scratch.postgres });
+      await repository.saveReport({ id: "identity:backfill", report: { cursor: "org_9" } });
+      await repository.setStatus({
+        ids: ["identity:backfill"],
+        status: "failed",
+        runId: "background:worker-1",
+        lastError: "lock timeout",
+      });
+
+      const outcome = await run(
+        runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }),
+      );
+
+      expect(outcome.code).toBe("done");
+      const row = (await ledger().findSteps()).find((s) => s.id === "identity:backfill");
+      expect(row).toMatchObject({
+        status: "pending",
+        lastError: "lock timeout",
+        report: { cursor: "org_9" },
+      });
+    });
+  });
+
+  describe("when a rollback reopens a done projection replay step and a done backfill", () => {
+    /** @scenario "A rollback reopen keeps a projection replay step's cursor" */
+    it("keeps the replay's cursor and clears the backfill's checkpoint", async () => {
+      await run(runnerFor({ release: "3.22.0", applier: fakeApplier({ release: "3.22.0" }) }));
+      const repository = UpgradeRunnerRepository.create({ postgres: scratch.postgres });
+      const replayed = { lane: "trace:summary", replayedThrough: "2026-10-08T10:00:00.000Z" };
+      await repository.setStatus({
+        ids: ["trace:reindex"],
+        status: "done",
+        runId: "background:worker-1",
+        report: replayed,
+      });
+      await repository.setStatus({
+        ids: ["identity:backfill"],
+        status: "done",
+        runId: "background:worker-1",
+        report: { cursor: "org_9" },
+      });
+
+      await repository.reopenDoneSteps({
+        ids: ["trace:reindex", "identity:backfill"],
+        reason: "reopened: rollback",
+      });
+
+      const rows = new Map((await ledger().findSteps()).map((row) => [row.id, row]));
+      expect(rows.get("trace:reindex")).toMatchObject({ status: "pending", report: replayed });
+      expect(rows.get("identity:backfill")).toMatchObject({ status: "pending", report: null });
+    });
+  });
+
   describe("when a run moves through its phases", () => {
     const phasesOf = async () =>
       ((await ledger().findRuns()).at(-1)?.report?.phases ?? []) as UpgradeRunPhase[];

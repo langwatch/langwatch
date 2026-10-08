@@ -98,6 +98,7 @@ function serviceOver({
     serving: () => true,
     oldWritersGoneFor: async () => oldWritersGone,
     identity: IDENTITY,
+    retry: { attempts: 1, firstBackoffMs: 1, maxBackoffMs: 1 },
     log: (level, _message, fields) => {
       if (level === "warn") warnings.push(fields);
     },

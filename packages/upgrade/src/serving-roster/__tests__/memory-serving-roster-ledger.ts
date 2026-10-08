@@ -9,6 +9,7 @@ export class MemoryServingRosterLedger implements ServingRosterLedger {
   readonly rows = new Map<string, ServingRosterEntry>();
   private writesToRefuse = 0;
   private removesRefused = false;
+  private prunesRefused = false;
   private held: Promise<void> | null = null;
 
   refuseNextWrite(): void {
@@ -17,6 +18,10 @@ export class MemoryServingRosterLedger implements ServingRosterLedger {
 
   refuseRemoves(): void {
     this.removesRefused = true;
+  }
+
+  refusePrunes(): void {
+    this.prunesRefused = true;
   }
 
   /** Writes wait until the returned function is called. */
@@ -58,5 +63,14 @@ export class MemoryServingRosterLedger implements ServingRosterLedger {
   async removeRosterEntry({ processId }: { processId: string }): Promise<void> {
     if (this.removesRefused) throw new Error("roster delete refused");
     this.rows.delete(processId);
+  }
+
+  async pruneRoster({ deadForMs }: { deadForMs: number }): Promise<number> {
+    if (this.prunesRefused) throw new Error("roster prune refused");
+    const dead = [...this.rows.values()].filter(
+      (row) => row.heartbeatAt.getTime() < Date.now() - deadForMs,
+    );
+    for (const row of dead) this.rows.delete(row.processId);
+    return dead.length;
   }
 }

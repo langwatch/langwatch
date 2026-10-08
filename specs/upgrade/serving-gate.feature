@@ -169,3 +169,15 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given a booted runtime whose eventing host can pause its consumers
     When the runtime is told to hold its work, then to release it
     Then the eventing host pauses its consumers, then resumes them
+
+  @unit
+  Scenario: Roster entries dead for longer than the prune bound are deleted when a process records its own
+    Given a roster entry last written longer ago than the prune bound and one dead for less
+    When a process records its roster entry
+    Then the long-dead entry is deleted and the recently dead one is kept
+
+  @unit
+  Scenario: A failed prune never refuses the start
+    Given a roster whose prune is refused
+    When a process records its roster entry
+    Then its entry is written and the failure is reported
