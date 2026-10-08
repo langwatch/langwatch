@@ -1150,6 +1150,16 @@ jobs:
       # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
 
+      # After the generated files, so the REST cross-check can mount the api.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Generated READMEs are current (blocking)
+        run: pnpm check:readmes
+
       - name: Oxlint (blocking -- config errors included)
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
