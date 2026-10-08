@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type SystemMigrationEnrollmentStore,
   SystemMigrationsService,
-} from "../../features/system-migrations/services/system-migrations.service.ts";
+} from "../system-migrations.service.ts";
 
 const MIGRATION = "team-user-backfill";
 const TENANT = "org_acme";

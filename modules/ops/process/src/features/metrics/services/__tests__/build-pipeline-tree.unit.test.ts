@@ -1,7 +1,7 @@
 import type { GroupInfo, QueueInfo } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { OpsMetricsCollectorService } from "../../features/metrics/services/ops-metrics-collector.service.ts";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {

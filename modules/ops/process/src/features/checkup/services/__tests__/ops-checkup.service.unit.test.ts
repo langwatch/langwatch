@@ -12,16 +12,16 @@ import type { Project } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
-import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
-import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
+import { MemoryCheckupProbeChannel } from "../../../../channels/memory/memory.checkup-probe.channel.ts";
+import { MemoryUsageReportChannel } from "../../../../channels/memory/memory.usage-report.channel.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
-} from "../../repositories/memory/memory.datastore-health.repository.ts";
-import { ledgerOf, stepOf } from "./support/upgrade-ledger.ts";
-import { UsageReportWorld } from "./support/usage-report-peers.ts";
+} from "../../../../repositories/memory/memory.datastore-health.repository.ts";
+import { ledgerOf, stepOf } from "../../../../services/__tests__/support/upgrade-ledger.ts";
+import { UsageReportWorld } from "../../../../services/__tests__/support/usage-report-peers.ts";
+import { OpsCheckupService } from "../ops-checkup.service.ts";
 
 const CONFIG: OpsServerConfig = {
   apiKey: undefined,

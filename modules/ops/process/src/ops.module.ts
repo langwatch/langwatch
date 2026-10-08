@@ -1,5 +1,6 @@
 import { bindRestCredential, bindRestMiddleware } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { OpsModule } from "#app/ops.app";
 import { opsChannels } from "#channels/ops-channels.registry";
@@ -23,50 +24,51 @@ import { opsClickHouseExplainRest } from "#transport/ops-clickhouse-explain.rest
 import { opsUpgradeTrpcTransport } from "#transport/ops-upgrade.trpc";
 import { opsTrpcTransport } from "#transport/ops.trpc";
 
-export const opsProcessModule = defineProcessModule("ops")
-  .withRepositories(opsRepositories)
-  .withChannels(opsChannels)
-  .withApi(OpsModule)
-  .withTransports(
-    adminRest,
-    opsBugReportRest,
-    opsClickHouseExplainRest,
-    opsTrpcTransport,
-    opsUpgradeTrpcTransport,
-    opsBugReportTrpcTransport,
-    checkupTrpcTransport,
-    checkupRest,
-  )
-  // The intake is public - the reporter may be struggling because setup
-  // failed - so the credential only enriches a report, at the same
-  // precedence the project door reads a token at (Basic, Bearer,
-  // X-Auth-Token). Unverified: a bad token still files the report. The
-  // EXPLAIN door compares the operator secret before the body is read.
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof OpsModule))
-      throw new TypeError("Ops transport requires its constructed application");
-    return [
-      bindRestMiddleware(bugReportCredential, (context) =>
-        extractRequestCredential(context.req.raw),
-      ),
-      bindRestCredential("internal_secret", () => app.operatorDoor),
-    ];
-  })
-  .withEventing(usageReportEventing)
-  .withEventing(anomalyDetectionEventing)
-  .withEventing(storageStatsEventing)
-  .withEventing(projectionReplayEventing)
-  .withEventing(systemMigrationsEventing)
-  .withEventing(platformOperatorSeedEventing)
-  .withTasks(async ({ repositories, app, secrets }) => [
-    ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
-    CredentialsResealTask.create({
-      repository: () => repositories.credentialsReseal,
-      ciphers: await credentialsResealCiphers({ secrets, handles: OpsModule.secrets }),
-    }),
-    GrantPlatformOperatorTask.create({ operators: app }),
-    SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
-  ]);
+export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerConfig> =
+  defineProcessModule("ops")
+    .withRepositories(opsRepositories)
+    .withChannels(opsChannels)
+    .withApi(OpsModule)
+    .withTransports(
+      adminRest,
+      opsBugReportRest,
+      opsClickHouseExplainRest,
+      opsTrpcTransport,
+      opsUpgradeTrpcTransport,
+      opsBugReportTrpcTransport,
+      checkupTrpcTransport,
+      checkupRest,
+    )
+    // The intake is public - the reporter may be struggling because setup
+    // failed - so the credential only enriches a report, at the same
+    // precedence the project door reads a token at (Basic, Bearer,
+    // X-Auth-Token). Unverified: a bad token still files the report. The
+    // EXPLAIN door compares the operator secret before the body is read.
+    .withTransportFacts(({ app }) => {
+      if (!(app instanceof OpsModule))
+        throw new TypeError("Ops transport requires its constructed application");
+      return [
+        bindRestMiddleware(bugReportCredential, (context) =>
+          extractRequestCredential(context.req.raw),
+        ),
+        bindRestCredential("internal_secret", () => app.operatorDoor),
+      ];
+    })
+    .withEventing(usageReportEventing)
+    .withEventing(anomalyDetectionEventing)
+    .withEventing(storageStatsEventing)
+    .withEventing(projectionReplayEventing)
+    .withEventing(systemMigrationsEventing)
+    .withEventing(platformOperatorSeedEventing)
+    .withTasks(async ({ repositories, app, secrets }) => [
+      ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
+      CredentialsResealTask.create({
+        repository: () => repositories.credentialsReseal,
+        ciphers: await credentialsResealCiphers({ secrets, handles: OpsModule.secrets }),
+      }),
+      GrantPlatformOperatorTask.create({ operators: app }),
+      SystemMigrationsPassTask.create({ pass: () => app.systemMigrationPass() }),
+    ]);
 
 /** One request's presented project credential, unverified, or none at all. */
 function extractRequestCredential(

@@ -15,9 +15,13 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { CheckupService } from "../../features/checkup/services/checkup.service.ts";
-import type { CheckupConnectView, CheckupFacts } from "../../rules/checkup-facts.rules.ts";
-import { ledgerOf, statusOf, stepOf } from "./support/upgrade-ledger.ts";
+import type { CheckupConnectView, CheckupFacts } from "../../../../rules/checkup-facts.rules.ts";
+import {
+  ledgerOf,
+  statusOf,
+  stepOf,
+} from "../../../../services/__tests__/support/upgrade-ledger.ts";
+import { CheckupService } from "../checkup.service.ts";
 
 /** What the reach probe throws for a host it could not open a connection to. */
 class UnreachableHostError extends HandledError {

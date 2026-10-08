@@ -8,13 +8,13 @@ import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwa
 import IORedis from "ioredis";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../app/ops.app.ts";
-import type { ProjectionReplayRun } from "../../eventing/ops-projection-replay.events.ts";
+import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../../../app/ops.app.ts";
+import type { ProjectionReplayRun } from "../../../../eventing/ops-projection-replay.events.ts";
 import {
-  type ProjectionReplayRequestSender,
-  ReplayService,
-} from "../../features/replay/services/replay.service.ts";
-import { type ReplayLockHolder, ReplayRepository } from "../../repositories/replay.repository.ts";
+  type ReplayLockHolder,
+  ReplayRepository,
+} from "../../../../repositories/replay.repository.ts";
+import { type ProjectionReplayRequestSender, ReplayService } from "../replay.service.ts";
 
 /** Redis's replay keys in memory: the lock, the status row, the cancel flag and the history. */
 class InMemoryReplayRepository extends ReplayRepository {

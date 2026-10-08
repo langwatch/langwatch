@@ -2,8 +2,8 @@ import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { SystemMigrationsService } from "../../features/system-migrations/services/system-migrations.service.ts";
-import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
+import type { SystemMigrationsServiceDependencies } from "../../../../rules/system-migration-support.rules.ts";
+import { SystemMigrationsService } from "../system-migrations.service.ts";
 
 const PASS: MigrationPassSummary = {
   tenantsSeen: 2,

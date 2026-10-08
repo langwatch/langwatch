@@ -1,10 +1,10 @@
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { OpsMetricsCollectorService } from "../../features/metrics/services/ops-metrics-collector.service.ts";
-import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
-import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
-import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
+import { MemoryAnomalyRateTrackerRepository } from "../../../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../../../../repositories/memory/memory.ops.store.ts";
+import { RedisOpsMetricsRepository } from "../../../../repositories/redis/redis.ops-metrics.repository.ts";
+import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
 
 function createMockRedis() {

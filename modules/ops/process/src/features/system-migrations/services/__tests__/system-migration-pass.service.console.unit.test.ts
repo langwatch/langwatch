@@ -14,16 +14,16 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SystemMigrationCohortService } from "../../features/system-migrations/services/system-migration-cohort.service.ts";
+import { MemoryMigrationLeaseRepository } from "../../../../repositories/memory/memory.migration-lease.repository.ts";
+import { MemoryOpsRepositories } from "../../../../repositories/memory/memory.ops.repositories.ts";
+import { PostgresOpsRepositories } from "../../../../repositories/prisma/prisma.ops.repositories.ts";
+import { PrismaSystemMigrationEnrollmentRepository } from "../../../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+import { PrismaSystemMigrationStateRepository } from "../../../../repositories/prisma/prisma.system-migration-state.repository.ts";
+import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";
 import {
   SystemMigrationPassService,
   type SystemMigrationPassRepositories,
-} from "../../features/system-migrations/services/system-migration-pass.service.ts";
-import { MemoryMigrationLeaseRepository } from "../../repositories/memory/memory.migration-lease.repository.ts";
-import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
-import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
-import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
-import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
+} from "../system-migration-pass.service.ts";
 
 const migration = (name: string): SystemMigration => ({
   name,

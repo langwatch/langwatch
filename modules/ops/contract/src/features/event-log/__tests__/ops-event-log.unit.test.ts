@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { opsSearchAggregatesInputSchema } from "../index.ts";
+import { opsSearchAggregatesInputSchema } from "../../../index.ts";
 
 describe("opsSearchAggregatesInputSchema", () => {
   /** @scenario "An event-log search with no query and no tenant is refused as invalid input" */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminIdentitySchema, startImpersonationInputSchema } from "../index.ts";
+import { adminIdentitySchema, startImpersonationInputSchema } from "../../../index.ts";
 
 describe("admin contract", () => {
   it("accepts a nullable admin identity email", () => {

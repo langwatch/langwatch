@@ -7,7 +7,7 @@ import {
   mergeHistogramCounts,
   computePercentileFromHistogram,
   computeWindowPercentiles,
-} from "../features/dashboard/ops-latency.ts";
+} from "../ops-latency.ts";
 
 describe("latencyBucketField", () => {
   describe("when a duration is bucketed", () => {

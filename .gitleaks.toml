@@ -559,7 +559,7 @@ paths = [
   '''^modules/gateway/server/src/transport/__tests__/gateway-platform\.rest\.integration\.test\.ts$''',
   '''^modules/gateway/server/src/transport/__tests__/support/gateway-internal-rest\.harness\.ts$''',
   '''^modules/ops/process/src/app/__tests__/ops\.app\.checkup-audience\.unit\.test\.ts$''',
-  '''^modules/ops/process/src/services/__tests__/ops-checkup\.service\.unit\.test\.ts$''',
+  '''^modules/ops/process/src/features/checkup/services/__tests__/ops-checkup\.service\.unit\.test\.ts$''',
   '''^modules/ops/process/src/services/__tests__/usage-report-collection\.service\.unit\.test\.ts$''',
   '''^modules/ops/process/src/services/__tests__/usage-report\.service\.unit\.test\.ts$''',
   '''^modules/trace/process/src/transport/__tests__/otlp-ingest\.rest\.declaration\.unit\.test\.ts$''',

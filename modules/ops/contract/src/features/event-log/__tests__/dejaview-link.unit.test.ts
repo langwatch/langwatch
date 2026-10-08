@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dejaViewHref } from "../features/event-log/ops-event-log.ts";
+import { dejaViewHref } from "../ops-event-log.ts";
 
 describe("dejaViewHref", () => {
   it("addresses the aggregate and its tenant in the fragment", () => {

@@ -15,9 +15,9 @@ import {
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { OpsReplayRuntimeFactory, OpsReplayRuntime } from "../../app/ops.app.ts";
-import { ReplayService } from "../../features/replay/services/replay.service.ts";
-import { ReplayRedisRepository } from "../../repositories/redis/redis.replay.repository.ts";
+import type { OpsReplayRuntimeFactory, OpsReplayRuntime } from "../../../../app/ops.app.ts";
+import { ReplayRedisRepository } from "../../../../repositories/redis/redis.replay.repository.ts";
+import { ReplayService } from "../replay.service.ts";
 
 type ReplayRedisPipeline = {
   hset(key: string, field: string, value: string): ReplayRedisPipeline;
