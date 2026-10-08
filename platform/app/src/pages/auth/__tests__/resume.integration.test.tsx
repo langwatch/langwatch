@@ -15,6 +15,8 @@ const { mockReplaceLocation } = vi.hoisted(() => ({
 
 vi.mock("~/utils/browserNavigation", () => ({
   replaceLocation: mockReplaceLocation,
+  hardNavigate: vi.fn(),
+  reloadPage: vi.fn(),
 }));
 
 import AuthResume from "../resume";
