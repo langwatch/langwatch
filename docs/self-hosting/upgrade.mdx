@@ -253,7 +253,7 @@ To follow an upgrade:
 | --- | --- |
 | **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
 | `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
-| **Settings, Checkup**, `langwatch doctor` | A row for pending or failed PostgreSQL and ClickHouse migrations, with the fix |
+| **Settings, Checkup**, `langwatch doctor` | The **Postgres migrations** and **ClickHouse migrations** rows: Fail for a pending or failed migration, with the fix; Not checked when no upgrade is recorded yet or the ledger cannot be read |
 | `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
 
 The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).
