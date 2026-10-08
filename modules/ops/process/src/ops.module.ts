@@ -2,6 +2,7 @@ import { bindRestCredential, bindRestMiddleware } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
 
 import { OpsModule } from "#app/ops.app";
+import { opsChannels } from "#channels/ops-channels.registry";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
 import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
@@ -24,6 +25,7 @@ import { opsTrpcTransport } from "#transport/ops.trpc";
 
 export const opsProcessModule = defineProcessModule("ops")
   .withRepositories(opsRepositories)
+  .withChannels(opsChannels)
   .withApi(OpsModule)
   .withTransports(
     adminRest,

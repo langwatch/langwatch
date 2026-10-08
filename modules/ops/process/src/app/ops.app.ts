@@ -266,9 +266,8 @@ import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
-import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
 import { HttpSlackAlertChannel } from "../channels/http/http.slack-alert.channel.ts";
-import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
+import type { OpsChannels } from "../channels/ops.channels.ts";
 import { SlackBugReportNotifierChannel } from "../channels/slack/slack.bug-report-notifier.channel.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
@@ -712,7 +711,12 @@ type OpsRuntimeDependencies = Readonly<{
 type OpsAppRuntimeDependencies = OpsAppDependencies &
   Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
 
-type OpsSetup = FeatureSetup<typeof OpsModule.dependencies, OpsServerConfig, OpsRepositories>;
+type OpsSetup = FeatureSetup<
+  typeof OpsModule.dependencies,
+  OpsServerConfig,
+  OpsRepositories,
+  OpsChannels
+>;
 
 /** The badge's two integers, and when they were computed. */
 export interface OpsBadgeReading {
@@ -841,10 +845,7 @@ export class OpsModule implements OpsApi {
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
       },
-      channels: {
-        usageReport: HttpUsageReportChannel.create(),
-        probes: HttpCheckupProbeChannel.create(),
-      },
+      channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
       opsHealth: OpsHealthService.create({
         findDashboardData: () => app.findDashboardData(),
