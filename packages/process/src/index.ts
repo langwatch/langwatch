@@ -65,6 +65,7 @@ export {
   type ModuleTaskSetup,
   type ModuleTransportFacts,
   type ModuleTransportFactSetup,
+  type PublishedProcessModule,
   serverFeature,
   ServerFeatureAssembly,
   ServerFeatureBuilder,

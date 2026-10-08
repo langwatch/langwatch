@@ -390,6 +390,26 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly install: (args: FeatureInstallArguments<Members>) => Promise<InstalledFeatureState>;
 }
 
+/**
+ * A module's installer as its package publishes it (ruling PD-1): name, Api, config and members
+ * only, so its class, repositories and Prisma never reach the public `.d.ts`. `types` keeps the
+ * annotation checked against what the builder built. Record §3.2.
+ */
+export interface PublishedProcessModule<
+  Name extends string,
+  Api,
+  Config = undefined,
+  Members = object,
+> extends InstallableServerFeature<Members, Name, Config> {
+  readonly members: readonly string[];
+  readonly transports: readonly FeatureTransportDescriptor[];
+  readonly types: Readonly<{
+    config: Config;
+    provided: Api;
+    dependencies: ResolvedTokens<TokenMap>;
+  }>;
+}
+
 /** One slice per module name, as a process states the config it hands them. */
 export type ModuleConfigRecord = Readonly<Record<string, unknown>>;
 

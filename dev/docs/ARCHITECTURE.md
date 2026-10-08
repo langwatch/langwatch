@@ -273,6 +273,12 @@ installer and transport declarations, **nothing else**. The installer lives in `
 module's identity; the `<Name>Module` class lives in `app/<f>.app.ts` (Alex, 2026-10-05: the record
 follows the tree, no code moves). The class is thin forwarding (services carry the weight).
 
+The installer is annotated with the framework's opaque type, `export const gatewayProcessModule:
+PublishedProcessModule<"gateway", GatewayApi, GatewayServerConfig> = defineProcessModule("gateway")…`
+(config defaults to none), so its class, repositories and Prisma never reach the public `.d.ts`; a
+test reads the module through its Api, and `createApp` no longer sees its stores at compile time (boot
+still refuses a missing one) (Alex, 2026-10-08, round 38 PD-1).
+
 **`TraceModule`** is the implementation of `TraceApi`: `static contract`,
 `static dependencies` (peer tokens), private constructor,
 `static create(setup)`. Services and peers are `#private`; the public surface

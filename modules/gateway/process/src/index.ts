@@ -82,24 +82,8 @@ export type {
   GatewayClickHouseInstanceResolver,
 } from "./repositories/clickhouse/clickhouse.gateway-open-admissions-sweep.repository.ts";
 export type { OpenAdmission } from "./repositories/gateway-open-admissions.repository.ts";
-export * from "./eventing/gateway-spend.pipeline.ts";
 export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
 export type * from "./services/gateway.service.ts";
-
-/**
- * The feature's application: the one thing every door is given, holding every
- * service and port the seven transports reach and owning the virtual-key write
- * pre-flight both doors used to run for themselves.
- */
-export type {
-  GatewayActor,
-  GatewayAppDependencies,
-  GatewayInfrastructure,
-  GatewayRestInfrastructure,
-  GatewayApplicableBudgetTarget,
-  GatewayVirtualKeyBudgetInput,
-  GatewayVirtualKeyOperations,
-} from "./app/gateway.app.ts";
 
 /**
  * The gateway control plane: virtual keys, budgets, guardrail evaluation, realtime voice

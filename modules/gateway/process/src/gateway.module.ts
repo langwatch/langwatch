@@ -5,8 +5,12 @@ import {
   keyDoorPrincipalOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type {
+  GatewayApi,
+  GatewayRequestCredential,
+  GatewayServerConfig,
+} from "@langwatch/gateway-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayModule } from "./app/gateway.app.ts";
@@ -40,7 +44,11 @@ import { gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
-export const gatewayProcessModule = defineProcessModule("gateway")
+export const gatewayProcessModule: PublishedProcessModule<
+  "gateway",
+  GatewayApi,
+  GatewayServerConfig
+> = defineProcessModule("gateway")
   .withRepositories(gatewayRepositories)
   .withApi(GatewayModule)
   .withTransports(

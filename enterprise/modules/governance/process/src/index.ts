@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 export type { DepartmentService } from "./services/department.service.ts";
-export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
@@ -10,13 +9,6 @@ export {
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
-
-/**
- * The feature's application: the one typed thing its transports are given.
- * Every door reaches the same object, so a rule written on it is the rule
- * every door gets.
- */
-export type { GovernanceAppDependencies } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
@@ -28,10 +20,6 @@ export type * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";
-
-export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
-export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 
 export {
   COST_ROLLUP_WATCH_PROCESS_NAME,
@@ -51,7 +39,6 @@ export type {
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
 export type { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
-export type { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
 
 // The thirteen tRPC transports this feature owns are not exported: they still
 // name the deleted legacy builder, so nothing may reach them until each is

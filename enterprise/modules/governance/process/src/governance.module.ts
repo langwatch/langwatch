@@ -5,8 +5,11 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { MePersonalCredential } from "@langwatch/enterprise-governance-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type {
+  GovernanceRestApi,
+  MePersonalCredential,
+} from "@langwatch/enterprise-governance-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { GovernanceModule } from "./app/governance.app.ts";
 import { codingAssistantBillingEventing } from "./eventing/coding-assistant-billing.pipeline.ts";
@@ -40,64 +43,67 @@ import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 /**
  * The whole module, declared: one application and the families it answers.
  */
-export const governanceProcessModule = defineProcessModule("governance")
-  .withRepositories(governanceRepositories)
-  .withApi(GovernanceModule)
-  .withTransports(
-    governanceRest,
-    governanceCliRest,
-    governanceIngestRest,
-    meUsageRest,
-    departmentsTrpcTransport,
-    ingestionTemplatesTrpcTransport,
-    aiToolsTrpcTransport,
-    ingestionSourcesTrpcTransport,
-    governanceTrpcTransport,
-    anomalyRulesTrpcTransport,
-    activityMonitorTrpcTransport,
-    personalSessionsTrpcTransport,
-    ingestionKeyTrpcTransport,
-    sessionPolicyTrpcTransport,
-    governancePeopleTrpcTransport,
-    governanceAgentsTrpcTransport,
-    governanceCostTrpcTransport,
-  )
-  // The member behind the project credential, which surface asked, and the CLI token door. A
-  // legacy project key names no member, which is what the admin routes refuse.
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof GovernanceModule))
-      throw new TypeError("Governance transport requires its constructed application");
-    return [
-      bindRestMiddleware(governanceRestCaller, (context) => {
-        const credential = projectCredentialOfRequest(context.req.raw);
+export const governanceProcessModule: PublishedProcessModule<"governance", GovernanceRestApi> =
+  defineProcessModule("governance")
+    .withRepositories(governanceRepositories)
+    .withApi(GovernanceModule)
+    .withTransports(
+      governanceRest,
+      governanceCliRest,
+      governanceIngestRest,
+      meUsageRest,
+      departmentsTrpcTransport,
+      ingestionTemplatesTrpcTransport,
+      aiToolsTrpcTransport,
+      ingestionSourcesTrpcTransport,
+      governanceTrpcTransport,
+      anomalyRulesTrpcTransport,
+      activityMonitorTrpcTransport,
+      personalSessionsTrpcTransport,
+      ingestionKeyTrpcTransport,
+      sessionPolicyTrpcTransport,
+      governancePeopleTrpcTransport,
+      governanceAgentsTrpcTransport,
+      governanceCostTrpcTransport,
+    )
+    // The member behind the project credential, which surface asked, and the CLI token door. A
+    // legacy project key names no member, which is what the admin routes refuse.
+    .withTransportFacts(({ app }) => {
+      if (!(app instanceof GovernanceModule))
+        throw new TypeError("Governance transport requires its constructed application");
+      return [
+        bindRestMiddleware(governanceRestCaller, (context) => {
+          const credential = projectCredentialOfRequest(context.req.raw);
 
-        return { viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId };
-      }),
-      bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
-      // A personal-usage answer is refused for a key that is not the asking member's own,
-      // and the door's answer is the only place the key's class can be read from.
-      bindRestMiddleware(mePersonalCredential, (context): MePersonalCredential => {
-        const credential = projectCredentialOfRequest(context.req.raw);
-        if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
-        if (credential.type === "cliAccessToken") {
           return {
-            kind: "cliAccessToken",
+            viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId,
+          };
+        }),
+        bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+        // A personal-usage answer is refused for a key that is not the asking member's own,
+        // and the door's answer is the only place the key's class can be read from.
+        bindRestMiddleware(mePersonalCredential, (context): MePersonalCredential => {
+          const credential = projectCredentialOfRequest(context.req.raw);
+          if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+          if (credential.type === "cliAccessToken") {
+            return {
+              kind: "cliAccessToken",
+              userId: credential.userId,
+              organizationId: credential.organizationId,
+            };
+          }
+
+          return {
+            kind: "apiKey",
             userId: credential.userId,
             organizationId: credential.organizationId,
           };
-        }
-
-        return {
-          kind: "apiKey",
-          userId: credential.userId,
-          organizationId: credential.organizationId,
-        };
-      }),
-      bindRestCredential("cli_token", () => app.cliTokenDoor),
-    ];
-  })
-  .withEventing(pulledUsageEventing)
-  .withEventing(ingestionPullEventing)
-  .withEventing(ingestionPullReconcileEventing)
-  .withEventing(governanceActivityMonitorEventing)
-  .withEventing(codingAssistantBillingEventing);
+        }),
+        bindRestCredential("cli_token", () => app.cliTokenDoor),
+      ];
+    })
+    .withEventing(pulledUsageEventing)
+    .withEventing(ingestionPullEventing)
+    .withEventing(ingestionPullReconcileEventing)
+    .withEventing(governanceActivityMonitorEventing)
+    .withEventing(codingAssistantBillingEventing);

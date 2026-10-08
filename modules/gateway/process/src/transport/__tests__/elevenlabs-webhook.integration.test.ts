@@ -167,7 +167,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       read: (name) => (Object.hasOwn(stores, name) ? stores[name] : refuseUnsuppliedStore(name)),
     })
     .withSecrets(resolvedSecrets({}))
-    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
+    .withEncryption({ encrypt: (value: string) => value, decrypt: (value: string) => value })
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),

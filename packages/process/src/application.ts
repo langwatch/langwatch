@@ -31,6 +31,7 @@ import type {
   ModuleConfigRecord,
   ModuleOperatorReadsScope,
   ModuleSecretsScope,
+  PublishedProcessModule,
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
@@ -207,16 +208,22 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
       Trpc,
       Worker
     >,
-  ): InstalledFeature<Provided, Rest, Trpc, Worker> {
+  ): InstalledFeature<Provided, Rest, Trpc, Worker>;
+  module<Provided>(
+    declaration: PublishedProcessModule<string, Provided, unknown, never>,
+  ): InstalledFeature<Provided, never, never, never>;
+  module(
+    declaration: InstallableServerFeature<never>,
+  ): InstalledFeature<unknown, unknown, unknown, unknown> {
     const state = this.installed.get(declaration.name);
     if (!state) {
       throw new Error(`Feature "${declaration.name}" is not installed on ${this.name}.`);
     }
     return {
-      provided: state.provided as Provided,
-      rest: (state.rest ?? unavailable(declaration.name, this.role, "REST")) as () => Rest,
-      trpc: (state.trpc ?? unavailable(declaration.name, this.role, "tRPC")) as () => Trpc,
-      worker: (state.worker ?? unavailable(declaration.name, this.role, "worker")) as () => Worker,
+      provided: state.provided,
+      rest: state.rest ?? unavailable(declaration.name, this.role, "REST"),
+      trpc: state.trpc ?? unavailable(declaration.name, this.role, "tRPC"),
+      worker: state.worker ?? unavailable(declaration.name, this.role, "worker"),
     };
   }
 
