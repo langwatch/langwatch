@@ -110,6 +110,25 @@ from .create_agent_body_type_2_config_scenario_mappings_additional_property_type
     CreateAgentBodyType2ConfigScenarioMappingsAdditionalPropertyType1,
 )
 from .create_agent_body_type_2_config_versions import CreateAgentBodyType2ConfigVersions
+from .create_agent_body_type_2_config_workflow_fields import CreateAgentBodyType2ConfigWorkflowFields
+from .create_agent_body_type_2_config_workflow_fields_input_fields_item import (
+    CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItem,
+)
+from .create_agent_body_type_2_config_workflow_fields_input_fields_item_json_schema import (
+    CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItemJsonSchema,
+)
+from .create_agent_body_type_2_config_workflow_fields_input_fields_item_type import (
+    CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItemType,
+)
+from .create_agent_body_type_2_config_workflow_fields_output_fields_item import (
+    CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItem,
+)
+from .create_agent_body_type_2_config_workflow_fields_output_fields_item_json_schema import (
+    CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItemJsonSchema,
+)
+from .create_agent_body_type_2_config_workflow_fields_output_fields_item_type import (
+    CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItemType,
+)
 from .create_agent_body_type_3 import CreateAgentBodyType3
 from .create_agent_body_type_3_config import CreateAgentBodyType3Config
 from .create_agent_body_type_3_config_auth_type_0 import CreateAgentBodyType3ConfigAuthType0
@@ -7947,6 +7966,13 @@ __all__ = (
     "CreateAgentBodyType2ConfigScenarioMappingsAdditionalPropertyType0",
     "CreateAgentBodyType2ConfigScenarioMappingsAdditionalPropertyType1",
     "CreateAgentBodyType2ConfigVersions",
+    "CreateAgentBodyType2ConfigWorkflowFields",
+    "CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItem",
+    "CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItemJsonSchema",
+    "CreateAgentBodyType2ConfigWorkflowFieldsInputFieldsItemType",
+    "CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItem",
+    "CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItemJsonSchema",
+    "CreateAgentBodyType2ConfigWorkflowFieldsOutputFieldsItemType",
     "CreateAgentBodyType3",
     "CreateAgentBodyType3Config",
     "CreateAgentBodyType3ConfigAuthType0",

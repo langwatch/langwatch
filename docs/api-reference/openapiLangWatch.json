@@ -6631,6 +6631,139 @@
                             },
                             "additionalProperties": {}
                           },
+                          "workflowFields": {
+                            "type": "object",
+                            "properties": {
+                              "inputFields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "identifier": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "str",
+                                        "image",
+                                        "file",
+                                        "float",
+                                        "int",
+                                        "bool",
+                                        "list",
+                                        "list[str]",
+                                        "list[float]",
+                                        "list[int]",
+                                        "list[bool]",
+                                        "dict",
+                                        "json_schema",
+                                        "chat_messages",
+                                        "signature",
+                                        "llm",
+                                        "prompting_technique",
+                                        "dataset",
+                                        "code"
+                                      ]
+                                    },
+                                    "optional": {
+                                      "type": "boolean"
+                                    },
+                                    "value": {},
+                                    "desc": {
+                                      "type": "string"
+                                    },
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "hidden": {
+                                      "type": "boolean"
+                                    },
+                                    "json_schema": {
+                                      "type": "object",
+                                      "properties": {},
+                                      "additionalProperties": {}
+                                    }
+                                  },
+                                  "required": [
+                                    "identifier",
+                                    "type"
+                                  ]
+                                }
+                              },
+                              "outputFields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "identifier": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "str",
+                                        "image",
+                                        "file",
+                                        "float",
+                                        "int",
+                                        "bool",
+                                        "list",
+                                        "list[str]",
+                                        "list[float]",
+                                        "list[int]",
+                                        "list[bool]",
+                                        "dict",
+                                        "json_schema",
+                                        "chat_messages",
+                                        "signature",
+                                        "llm",
+                                        "prompting_technique",
+                                        "dataset",
+                                        "code"
+                                      ]
+                                    },
+                                    "optional": {
+                                      "type": "boolean"
+                                    },
+                                    "value": {},
+                                    "desc": {
+                                      "type": "string"
+                                    },
+                                    "prefix": {
+                                      "type": "string"
+                                    },
+                                    "hidden": {
+                                      "type": "boolean"
+                                    },
+                                    "json_schema": {
+                                      "type": "object",
+                                      "properties": {},
+                                      "additionalProperties": {}
+                                    }
+                                  },
+                                  "required": [
+                                    "identifier",
+                                    "type"
+                                  ]
+                                }
+                              },
+                              "fieldsResolved": {
+                                "type": "boolean"
+                              },
+                              "recordedAt": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "inputFields",
+                              "outputFields",
+                              "fieldsResolved",
+                              "recordedAt"
+                            ]
+                          },
                           "scenarioMappings": {
                             "type": "object",
                             "propertyNames": {
@@ -18758,6 +18891,229 @@
                 },
                 "required": [
                   "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "operationId": "listProjects",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Project"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing API key token",
+            "content": {}
+          },
+          "403": {
+            "description": "Insufficient permissions for this operation",
+            "content": {}
+          }
+        },
+        "description": "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
+        "summary": "List projects",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createProject",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string"
+                    },
+                    "framework": {
+                      "type": "string"
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "serviceApiKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "serviceApiKeyId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "language",
+                    "framework",
+                    "teamId",
+                    "createdAt",
+                    "updatedAt",
+                    "serviceApiKey",
+                    "serviceApiKeyId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Team does not belong to this organization",
+            "content": {}
+          },
+          "401": {
+            "description": "Invalid or missing API key token",
+            "content": {}
+          },
+          "403": {
+            "description": "Insufficient permissions (requires project:create)",
+            "content": {}
+          },
+          "409": {
+            "description": "A project with this name already exists in the team",
+            "content": {}
+          },
+          "422": {
+            "description": "Validation error (missing required fields)",
+            "content": {}
+          }
+        },
+        "description": "Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
+        "summary": "Create a project",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "project:create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Project name"
+                  },
+                  "teamId": {
+                    "description": "Id of an existing team to put the project in",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "newTeamName": {
+                    "description": "Create a team with this name and put the project in it",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "language": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Programming language, such as python or typescript"
+                  },
+                  "framework": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Framework in use, such as langchain or openai"
+                  }
+                },
+                "required": [
+                  "name",
+                  "language",
+                  "framework"
                 ]
               }
             }
@@ -37483,508 +37839,6 @@
         }
       }
     },
-    "/api/v1/evaluations/batch/log_results": {
-      "post": {
-        "operationId": "postApiEvaluationsBatchLogResults",
-        "responses": {
-          "200": {
-            "description": "The rows were recorded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "description": "Human-readable confirmation"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "description": "Set when the request was rejected before validation",
-                      "type": "string"
-                    },
-                    "error": {
-                      "description": "Set when the body parsed and then failed validation",
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "The failure, as a sentence"
-                    },
-                    "kind": {
-                      "description": "Stable failure code, on the failures that carry one",
-                      "type": "string"
-                    },
-                    "meta": {
-                      "description": "What the code needs to be acted on, such as the missing field",
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The API key lacks evaluations:manage",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "The failure, as a sentence"
-                    },
-                    "kind": {
-                      "description": "Stable failure code, on the failures that carry one",
-                      "type": "string"
-                    },
-                    "meta": {
-                      "description": "What the code needs to be acted on, such as the missing field",
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit",
-            "content": {}
-          }
-        },
-        "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.",
-        "summary": "Report batch evaluation results",
-        "tags": [
-          "Evaluations"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "run_id": {
-                    "type": "string"
-                  },
-                  "workflow_version_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "progress": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  },
-                  "total": {
-                    "type": [
-                      "number",
-                      "null"
-                    ]
-                  },
-                  "dataset": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "index": {
-                          "type": "number"
-                        },
-                        "target_id": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "entry": {
-                          "type": "object",
-                          "propertyNames": {
-                            "type": "string"
-                          },
-                          "additionalProperties": {}
-                        },
-                        "predicted": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {}
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "cost": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "duration": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "error": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "trace_id": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "index",
-                        "entry"
-                      ]
-                    }
-                  },
-                  "evaluations": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "evaluator": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "target_id": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "status": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "const": "processed"
-                            },
-                            {
-                              "type": "string",
-                              "const": "skipped"
-                            },
-                            {
-                              "type": "string",
-                              "const": "error"
-                            }
-                          ]
-                        },
-                        "index": {
-                          "type": "number"
-                        },
-                        "duration": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "inputs": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {}
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "score": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "label": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "passed": {
-                          "type": [
-                            "boolean",
-                            "null"
-                          ]
-                        },
-                        "details": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        },
-                        "cost": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "evaluator",
-                        "status",
-                        "index"
-                      ]
-                    }
-                  },
-                  "experiment_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "experiment_slug": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "workflow_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "name": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "targets": {
-                    "anyOf": [
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string"
-                            },
-                            "name": {
-                              "type": "string"
-                            },
-                            "prompt_id": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "prompt_version": {
-                              "type": [
-                                "number",
-                                "null"
-                              ]
-                            },
-                            "agent_id": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "evaluator_id": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "model": {
-                              "type": [
-                                "string",
-                                "null"
-                              ]
-                            },
-                            "metadata": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "propertyNames": {
-                                    "type": "string"
-                                  },
-                                  "additionalProperties": {
-                                    "type": [
-                                      "string",
-                                      "number",
-                                      "boolean"
-                                    ]
-                                  }
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "type": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "const": "prompt"
-                                },
-                                {
-                                  "type": "string",
-                                  "const": "agent"
-                                },
-                                {
-                                  "type": "string",
-                                  "const": "evaluator"
-                                },
-                                {
-                                  "type": "string",
-                                  "const": "workflow"
-                                },
-                                {
-                                  "type": "string",
-                                  "const": "custom"
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "name"
-                          ]
-                        }
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "timestamps": {
-                    "type": "object",
-                    "properties": {
-                      "created_at": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "finished_at": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      },
-                      "stopped_at": {
-                        "type": [
-                          "number",
-                          "null"
-                        ]
-                      }
-                    }
-                  },
-                  "expected": {
-                    "anyOf": [
-                      {
-                        "type": "object",
-                        "properties": {
-                          "dataset": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 9007199254740991
-                          },
-                          "evaluations": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 9007199254740991
-                          }
-                        },
-                        "required": [
-                          "dataset",
-                          "evaluations"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "run_id"
-                ]
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "evaluations:manage"
-          ]
-        }
-      }
-    },
     "/api/v1/evaluations/{evaluator}/evaluate": {
       "post": {
         "operationId": "postApiEvaluationsByEvaluatorEvaluate",
@@ -39030,318 +38884,6 @@
             "description": "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids."
           }
         ]
-      }
-    },
-    "/api/v1/dataset/evaluate": {
-      "post": {
-        "operationId": "postApiDatasetEvaluate",
-        "responses": {
-          "200": {
-            "description": "The evaluator ran; branch on `status`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "const": "processed"
-                        },
-                        "score": {
-                          "type": "number"
-                        },
-                        "passed": {
-                          "type": "boolean"
-                        },
-                        "label": {
-                          "type": "string"
-                        },
-                        "details": {
-                          "type": "string"
-                        },
-                        "cost": {
-                          "description": "What running the evaluator cost",
-                          "type": "object",
-                          "properties": {
-                            "currency": {
-                              "type": "string"
-                            },
-                            "amount": {
-                              "type": "number"
-                            }
-                          },
-                          "required": [
-                            "currency",
-                            "amount"
-                          ]
-                        },
-                        "raw_response": {
-                          "description": "The evaluator's own output, unprocessed"
-                        }
-                      },
-                      "required": [
-                        "status"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "const": "skipped"
-                        },
-                        "details": {
-                          "description": "Why the evaluator declined to score this input",
-                          "type": "string"
-                        },
-                        "cost": {
-                          "description": "What the attempt cost, when the evaluator spent money before declining to score",
-                          "type": "object",
-                          "properties": {
-                            "currency": {
-                              "type": "string"
-                            },
-                            "amount": {
-                              "type": "number"
-                            }
-                          },
-                          "required": [
-                            "currency",
-                            "amount"
-                          ]
-                        },
-                        "passed": {
-                          "description": "Always true in guardrail mode, so a skip does not block",
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "status"
-                      ]
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "const": "error"
-                        },
-                        "error_type": {
-                          "type": "string",
-                          "const": "EVALUATOR_ERROR",
-                          "description": "Constant: the evaluator's own type is not exposed"
-                        },
-                        "details": {
-                          "type": "string"
-                        },
-                        "passed": {
-                          "description": "Always true in guardrail mode, so a failure does not block",
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "status",
-                        "error_type",
-                        "details"
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "description": "Set when the request was rejected before validation",
-                      "type": "string"
-                    },
-                    "error": {
-                      "description": "Set when the body parsed and then failed validation",
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid API key",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "description": "Set when the request was rejected before validation",
-                      "type": "string"
-                    },
-                    "error": {
-                      "description": "Set when the body parsed and then failed validation",
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The API key lacks evaluations:manage",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "The failure, as a sentence"
-                    },
-                    "kind": {
-                      "description": "Stable failure code, on the failures that carry one",
-                      "type": "string"
-                    },
-                    "meta": {
-                      "description": "What the code needs to be acted on, such as the missing field",
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No dataset with that slug",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "description": "The failure, as a sentence"
-                    },
-                    "kind": {
-                      "description": "Stable failure code, on the failures that carry one",
-                      "type": "string"
-                    },
-                    "meta": {
-                      "description": "What the code needs to be acted on, such as the missing field",
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
-        "summary": "Evaluate a dataset",
-        "tags": [
-          "Datasets"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "evaluation": {
-                    "type": "string",
-                    "description": "Which evaluator to run, addressed the same way the evaluate endpoints address it"
-                  },
-                  "experimentSlug": {
-                    "description": "Groups the results under an experiment. Omit it and a batch id is generated instead.",
-                    "type": "string"
-                  },
-                  "batchId": {
-                    "description": "Older name for experimentSlug, used when that is absent",
-                    "type": "string"
-                  },
-                  "datasetSlug": {
-                    "type": "string",
-                    "description": "The saved dataset to evaluate"
-                  },
-                  "data": {
-                    "anyOf": [
-                      {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": {}
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "description": "Extra fields merged into every row before evaluating"
-                  },
-                  "settings": {
-                    "anyOf": [
-                      {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": {}
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ],
-                    "description": "Per-call overrides of the evaluator's settings"
-                  }
-                },
-                "required": [
-                  "evaluation",
-                  "datasetSlug"
-                ]
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "evaluations:manage"
-          ]
-        }
       }
     },
     "/api/v1/evaluators": {
@@ -42686,6 +42228,820 @@
               }
             }
           }
+        }
+      }
+    },
+    "/api/v1/evaluations/batch/log_results": {
+      "post": {
+        "operationId": "postApiEvaluationsBatchLogResults",
+        "responses": {
+          "200": {
+            "description": "The rows were recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Human-readable confirmation"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "description": "Set when the request was rejected before validation",
+                      "type": "string"
+                    },
+                    "error": {
+                      "description": "Set when the body parsed and then failed validation",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "description": "Stable failure code, on the failures that carry one",
+                      "type": "string"
+                    },
+                    "meta": {
+                      "description": "What the code needs to be acted on, such as the missing field",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "description": "Stable failure code, on the failures that carry one",
+                      "type": "string"
+                    },
+                    "meta": {
+                      "description": "What the code needs to be acted on, such as the missing field",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is larger than the organization accepts in one request; `error.code` is `evaluation_log_results_too_large` and `error.meta.maxBytes` is the limit",
+            "content": {}
+          }
+        },
+        "description": "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 267 MB are accepted, sized for one dataset row with ten 20 MB images inline. A larger body is refused with `evaluation_log_results_too_large`.",
+        "summary": "Report batch evaluation results",
+        "tags": [
+          "Evaluations"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "workflow_version_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "progress": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "total": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "dataset": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "index": {
+                          "type": "number"
+                        },
+                        "target_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "entry": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "predicted": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cost": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "duration": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "trace_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "index",
+                        "entry"
+                      ]
+                    }
+                  },
+                  "evaluations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "evaluator": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "target_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "const": "processed"
+                            },
+                            {
+                              "type": "string",
+                              "const": "skipped"
+                            },
+                            {
+                              "type": "string",
+                              "const": "error"
+                            }
+                          ]
+                        },
+                        "index": {
+                          "type": "number"
+                        },
+                        "duration": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "inputs": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {}
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "score": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "passed": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        "details": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "cost": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "evaluator",
+                        "status",
+                        "index"
+                      ]
+                    }
+                  },
+                  "experiment_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "experiment_slug": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "workflow_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "targets": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "prompt_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "prompt_version": {
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            },
+                            "agent_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "evaluator_id": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "model": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "metadata": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean"
+                                    ]
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "const": "prompt"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "agent"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "evaluator"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "workflow"
+                                },
+                                {
+                                  "type": "string",
+                                  "const": "custom"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "timestamps": {
+                    "type": "object",
+                    "properties": {
+                      "created_at": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "finished_at": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "stopped_at": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  },
+                  "expected": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "dataset": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "evaluations": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "dataset",
+                          "evaluations"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "run_id"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluations:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/dataset/evaluate": {
+      "post": {
+        "operationId": "postApiDatasetEvaluate",
+        "responses": {
+          "200": {
+            "description": "The evaluator ran; branch on `status`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "processed"
+                        },
+                        "score": {
+                          "type": "number"
+                        },
+                        "passed": {
+                          "type": "boolean"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "description": "What running the evaluator cost",
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ]
+                        },
+                        "raw_response": {
+                          "description": "The evaluator's own output, unprocessed"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "skipped"
+                        },
+                        "details": {
+                          "description": "Why the evaluator declined to score this input",
+                          "type": "string"
+                        },
+                        "cost": {
+                          "description": "What the attempt cost, when the evaluator spent money before declining to score",
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ]
+                        },
+                        "passed": {
+                          "description": "Always true in guardrail mode, so a skip does not block",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "const": "error"
+                        },
+                        "error_type": {
+                          "type": "string",
+                          "const": "EVALUATOR_ERROR",
+                          "description": "Constant: the evaluator's own type is not exposed"
+                        },
+                        "details": {
+                          "type": "string"
+                        },
+                        "passed": {
+                          "description": "Always true in guardrail mode, so a failure does not block",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "error_type",
+                        "details"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "description": "Set when the request was rejected before validation",
+                      "type": "string"
+                    },
+                    "error": {
+                      "description": "Set when the body parsed and then failed validation",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "description": "Set when the request was rejected before validation",
+                      "type": "string"
+                    },
+                    "error": {
+                      "description": "Set when the body parsed and then failed validation",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks evaluations:manage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "description": "Stable failure code, on the failures that carry one",
+                      "type": "string"
+                    },
+                    "meta": {
+                      "description": "What the code needs to be acted on, such as the missing field",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No dataset with that slug",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "The failure, as a sentence"
+                    },
+                    "kind": {
+                      "description": "Stable failure code, on the failures that carry one",
+                      "type": "string"
+                    },
+                    "meta": {
+                      "description": "What the code needs to be acted on, such as the missing field",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
+        "summary": "Evaluate a dataset",
+        "tags": [
+          "Datasets"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "evaluation": {
+                    "type": "string",
+                    "description": "Which evaluator to run, addressed the same way the evaluate endpoints address it"
+                  },
+                  "experimentSlug": {
+                    "description": "Groups the results under an experiment. Omit it and a batch id is generated instead.",
+                    "type": "string"
+                  },
+                  "batchId": {
+                    "description": "Older name for experimentSlug, used when that is absent",
+                    "type": "string"
+                  },
+                  "datasetSlug": {
+                    "type": "string",
+                    "description": "The saved dataset to evaluate"
+                  },
+                  "data": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Extra fields merged into every row before evaluating"
+                  },
+                  "settings": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Per-call overrides of the evaluator's settings"
+                  }
+                },
+                "required": [
+                  "evaluation",
+                  "datasetSlug"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "evaluations:manage"
+          ]
         }
       }
     },
@@ -64141,6 +64497,259 @@
         ]
       }
     },
+    "/api/v1/me/usage": {
+      "get": {
+        "operationId": "getApiMeUsage",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "spentUsd": {
+                          "type": "number"
+                        },
+                        "billedUsd": {
+                          "type": "number"
+                        },
+                        "requests": {
+                          "type": "number"
+                        },
+                        "promptTokens": {
+                          "type": "number"
+                        },
+                        "completionTokens": {
+                          "type": "number"
+                        },
+                        "mostUsedModel": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "usagePct": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "usagePct"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "spentUsd",
+                        "billedUsd",
+                        "requests",
+                        "promptTokens",
+                        "completionTokens",
+                        "mostUsedModel"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "dailyBuckets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "string"
+                          },
+                          "spentUsd": {
+                            "type": "number"
+                          },
+                          "billedUsd": {
+                            "type": "number"
+                          },
+                          "requests": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "spentUsd",
+                          "billedUsd",
+                          "requests"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "breakdownByModel": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "spentUsd": {
+                            "type": "number"
+                          },
+                          "billedUsd": {
+                            "type": "number"
+                          },
+                          "requests": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "spentUsd",
+                          "billedUsd",
+                          "requests"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "dailyBuckets",
+                    "breakdownByModel"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
+        "tags": [
+          "Me"
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "project:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "windowStartMs",
+            "schema": {
+              "type": "integer",
+              "minimum": -8640000000000000,
+              "maximum": 8640000000000000
+            }
+          },
+          {
+            "in": "query",
+            "name": "windowEndMs",
+            "schema": {
+              "type": "integer",
+              "minimum": -8640000000000000,
+              "maximum": 8640000000000000
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/instant-evals": {
       "post": {
         "operationId": "createInstantEvalRun",
@@ -76697,229 +77306,6 @@
             }
           }
         ]
-      }
-    },
-    "/api/projects": {
-      "get": {
-        "operationId": "listProjects",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Project"
-                      }
-                    },
-                    "pagination": {
-                      "$ref": "#/components/schemas/Pagination"
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "pagination"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or missing API key token",
-            "content": {}
-          },
-          "403": {
-            "description": "Insufficient permissions for this operation",
-            "content": {}
-          }
-        },
-        "description": "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
-        "summary": "List projects",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "organization_api_key"
-          ],
-          "permissions": []
-        },
-        "parameters": [
-          {
-            "in": "query",
-            "name": "page",
-            "schema": {
-              "default": 1,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "default": 50,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 1000
-            }
-          }
-        ]
-      },
-      "post": {
-        "operationId": "createProject",
-        "responses": {
-          "201": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "slug": {
-                      "type": "string"
-                    },
-                    "language": {
-                      "type": "string"
-                    },
-                    "framework": {
-                      "type": "string"
-                    },
-                    "teamId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "serviceApiKey": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "serviceApiKeyId": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "slug",
-                    "language",
-                    "framework",
-                    "teamId",
-                    "createdAt",
-                    "updatedAt",
-                    "serviceApiKey",
-                    "serviceApiKeyId"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Team does not belong to this organization",
-            "content": {}
-          },
-          "401": {
-            "description": "Invalid or missing API key token",
-            "content": {}
-          },
-          "403": {
-            "description": "Insufficient permissions (requires project:create)",
-            "content": {}
-          },
-          "409": {
-            "description": "A project with this name already exists in the team",
-            "content": {}
-          },
-          "422": {
-            "description": "Validation error (missing required fields)",
-            "content": {}
-          }
-        },
-        "description": "Create a new project in the organization. Returns the project with a newly minted service API key (serviceApiKey) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
-        "summary": "Create a project",
-        "security": [
-          {
-            "admin_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "organization_api_key"
-          ],
-          "permissions": [
-            "project:create"
-          ]
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "description": "Project name"
-                  },
-                  "teamId": {
-                    "description": "Id of an existing team to put the project in",
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "newTeamName": {
-                    "description": "Create a team with this name and put the project in it",
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
-                  },
-                  "language": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Programming language, such as python or typescript"
-                  },
-                  "framework": {
-                    "type": "string",
-                    "minLength": 1,
-                    "description": "Framework in use, such as langchain or openai"
-                  }
-                },
-                "required": [
-                  "name",
-                  "language",
-                  "framework"
-                ]
-              }
-            }
-          }
-        }
       }
     },
     "/api/projects/{id}": {
@@ -105540,259 +105926,6 @@
             "traces:create"
           ]
         }
-      }
-    },
-    "/api/v1/me/usage": {
-      "get": {
-        "operationId": "getApiMeUsage",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "summary": {
-                      "type": "object",
-                      "properties": {
-                        "spentUsd": {
-                          "type": "number"
-                        },
-                        "billedUsd": {
-                          "type": "number"
-                        },
-                        "requests": {
-                          "type": "number"
-                        },
-                        "promptTokens": {
-                          "type": "number"
-                        },
-                        "completionTokens": {
-                          "type": "number"
-                        },
-                        "mostUsedModel": {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "name": {
-                                  "type": "string"
-                                },
-                                "usagePct": {
-                                  "type": "number"
-                                }
-                              },
-                              "required": [
-                                "name",
-                                "usagePct"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        }
-                      },
-                      "required": [
-                        "spentUsd",
-                        "billedUsd",
-                        "requests",
-                        "promptTokens",
-                        "completionTokens",
-                        "mostUsedModel"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "dailyBuckets": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "day": {
-                            "type": "string"
-                          },
-                          "spentUsd": {
-                            "type": "number"
-                          },
-                          "billedUsd": {
-                            "type": "number"
-                          },
-                          "requests": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "day",
-                          "spentUsd",
-                          "billedUsd",
-                          "requests"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "breakdownByModel": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "label": {
-                            "type": "string"
-                          },
-                          "spentUsd": {
-                            "type": "number"
-                          },
-                          "billedUsd": {
-                            "type": "number"
-                          },
-                          "requests": {
-                            "type": "number"
-                          }
-                        },
-                        "required": [
-                          "label",
-                          "spentUsd",
-                          "billedUsd",
-                          "requests"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "summary",
-                    "dailyBuckets",
-                    "breakdownByModel"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "description": "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
-        "tags": [
-          "Me"
-        ],
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "project:view"
-          ]
-        },
-        "parameters": [
-          {
-            "in": "query",
-            "name": "windowStartMs",
-            "schema": {
-              "type": "integer",
-              "minimum": -8640000000000000,
-              "maximum": 8640000000000000
-            }
-          },
-          {
-            "in": "query",
-            "name": "windowEndMs",
-            "schema": {
-              "type": "integer",
-              "minimum": -8640000000000000,
-              "maximum": 8640000000000000
-            }
-          }
-        ]
       }
     },
     "/api/v1/me/project": {
