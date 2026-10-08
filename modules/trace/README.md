@@ -11,7 +11,7 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)     |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:936` (147 operations) |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:929` (146 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:94`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:41`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |
@@ -42,7 +42,6 @@ Anything else trace needs belongs to another module and is reached through its `
 | `dataRetention`  | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |
 | `evaluators`     | `EvaluatorApi`     | [evaluator](../evaluator/README.md)           |
-| `experiments`    | `ExperimentApi`    | [experiment](../experiment/README.md)         |
 | `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
 | `instantEvals`   | `InstantEvalApi`   | [instant-eval](../instant-eval/README.md)     |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
@@ -56,6 +55,6 @@ Anything else trace needs belongs to another module and is reached through its `
 
 ## Who depends on trace
 
-[agent](../agent/README.md), [analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+[agent](../agent/README.md), [analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
 
 <!-- readme:generated:end -->

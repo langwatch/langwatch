@@ -200,19 +200,6 @@ export const topicCountsResultSchema = z.object({
   subtopicCounts: z.array(z.object({ key: z.string(), count: z.number() })),
 });
 
-/** The named topic and subtopic counts the trace filters render. */
-export const namedTopicCountsSchema = z.object({
-  topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
-  subtopicCounts: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      count: z.number(),
-      parentId: z.string().nullable().optional(),
-    }),
-  ),
-});
-
 export const customersAndLabelsResultSchema = z.object({
   customers: z.array(z.string()),
   labels: z.array(z.string()),

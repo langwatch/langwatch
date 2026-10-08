@@ -23,7 +23,6 @@ import type {
   ExperimentDspyStepsLookup,
 } from "./experiment-dspy.ts";
 import type { DSPyRunsSummary, LogBatchEvaluationInput } from "./experiment-legacy.ts";
-import type { ComputeExperimentRunMetricsCommandData } from "./experiment-run-eventing.commands.ts";
 import type {
   CompleteExperimentRunInput,
   ExperimentRun,
@@ -128,11 +127,6 @@ export type ExperimentWorkflowCopyInput = Readonly<{
   copiedFromWorkflowId?: string;
 }>;
 
-/** A run's experiment: absent is an answer, since a run may predate its experiment's record. */
-export type ExperimentIdLookupResult =
-  | Readonly<{ kind: "recorded"; experimentId: string }>
-  | Readonly<{ kind: "not_recorded" }>;
-
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): how
  * many experiments were made, since `since` where one is given, and when the
@@ -201,10 +195,6 @@ export interface ExperimentApi {
   logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
   /** Runs one evaluator over an entry of a saved dataset and records it against an experiment. */
   evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome>;
-  /** One experiment trace's cost, sent to the run pipeline to fold into its run. */
-  computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void>;
-  /** The experiment a run was recorded against, or that no experiment recorded it. */
-  lookupExperimentId(input: { tenantId: string; runId: string }): Promise<ExperimentIdLookupResult>;
   upsertDspyStep(input: ExperimentDspyStep): Promise<void>;
   listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
   listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]>;

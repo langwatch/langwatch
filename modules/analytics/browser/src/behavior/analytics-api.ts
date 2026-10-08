@@ -293,7 +293,7 @@ type BorrowedProcedures = {
       mutation: { input: ProjectScope & { id: string }; output: { success: true } };
     };
   };
-  traces: {
+  topics: {
     getTopicCounts: {
       query: {
         input: AnalyticsReadScope;

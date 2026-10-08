@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ExperimentApi`)
 
-Peers call these through the token, declared at `../contract/src/experiment.api.ts:149`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/experiment.api.ts:143`; nothing else in this package is public.
 
 #### `getById`
 
@@ -214,22 +214,6 @@ Runs one evaluator over an entry of a saved dataset and records it against an ex
 
 ```typescript
 evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome>;
-```
-
-#### `computeRunMetrics`
-
-One experiment trace's cost, sent to the run pipeline to fold into its run.
-
-```typescript
-computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void>;
-```
-
-#### `lookupExperimentId`
-
-The experiment a run was recorded against, or that no experiment recorded it.
-
-```typescript
-lookupExperimentId(input: { tenantId: string; runId: string }): Promise<ExperimentIdLookupResult>;
 ```
 
 #### `upsertDspyStep`
@@ -949,18 +933,19 @@ Declared at `src/eventing/experiment-lifecycle.pipeline.ts:30`. Events: `experim
 
 ### Pipeline `experiment_run_processing` (aggregate `experiment_run`)
 
-Declared at `src/eventing/experiment-run-processing.pipeline.ts:120`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
+Declared at `src/eventing/experiment-run-processing.pipeline.ts:128`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
 
-| Kind                       | Name                                                                                           | Handles                                                | Declared at                                              |
-| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
-| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox) | `src/eventing/experiment-run-processing.pipeline.ts:156` |
-| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:152` |
-| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:136` |
-| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:141` |
-| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:144` |
-| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:147` |
-| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:160` |
-| retention                  | `≈ deps.retention`                                                                             | –                                                      | `src/eventing/experiment-run-processing.pipeline.ts:164` |
+| Kind                       | Name                                                                                           | Handles                                                          | Declared at                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox)           | `src/eventing/experiment-run-processing.pipeline.ts:164` |
+| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:160` |
+| peer subscriber            | `traceSpanMetricsSync`                                                                         | `lw.obs.trace.span_received` from [trace](../../trace/README.md) | `src/eventing/experiment-run-processing.pipeline.ts:169` |
+| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:144` |
+| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:149` |
+| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:152` |
+| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:155` |
+| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:168` |
+| retention                  | `≈ deps.retention`                                                                             | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:190` |
 
 ## Configuration
 

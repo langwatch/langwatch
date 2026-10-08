@@ -14762,6 +14762,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -15265,9 +15268,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../experiment/contract
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract

@@ -74,6 +74,7 @@ function build() {
         boardWriteBack: createApiFixture<ExperimentRunBoardWriteBackService>({}, "boardWriteBack"),
       }),
     },
+    traceMetricsSync: async () => undefined,
     runFrames: createExperimentRunFramesSubscriber({
       stream: MemoryExperimentRunEventStreamRepository.create(),
     }),

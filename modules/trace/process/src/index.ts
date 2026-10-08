@@ -32,12 +32,6 @@ export {
   createCustomEvaluationSyncHandler,
 } from "./eventing/custom-evaluation-sync.subscriber.ts";
 export {
-  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-  EXPERIMENT_METRICS_SYNC_DELAY_MS,
-  createExperimentMetricsSyncHandler,
-  hasExperimentCostMetrics,
-} from "./eventing/experiment-metrics-sync.subscriber.ts";
-export {
   PROJECT_METADATA_WINDOW_MS,
   createProjectMetadataHandler,
 } from "./eventing/project-metadata.subscriber.ts";

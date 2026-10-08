@@ -50,6 +50,7 @@ import {
   memoryRedisStore,
   type MemoryRedisStore,
 } from "@langwatch/test-harness/client-doubles/redis";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -303,6 +304,7 @@ function peersOf(overrides: PeerOverrides) {
       mintAgentSandboxKey: async () => "sandbox-key",
     }),
     "stored-object": createApiFixture<StoredObjectApi>({}),
+    trace: createApiFixture<TraceApi>({}),
     "model-provider": createApiFixture<ModelProviderApi>({
       listCosts: async () => [],
       estimateCost: () => 0,

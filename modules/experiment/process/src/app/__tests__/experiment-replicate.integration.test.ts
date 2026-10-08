@@ -24,6 +24,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -98,6 +99,7 @@ async function boot() {
       evaluation: createApiFixture<EvaluationApi>({}),
       "api-key": createApiFixture<ApiKeyApi>({}),
       "stored-object": createApiFixture<StoredObjectApi>({}),
+      trace: createApiFixture<TraceApi>({}),
       "model-provider": createApiFixture<ModelProviderApi>({}),
       "data-retention": createApiFixture<DataRetentionApi>({}),
     })

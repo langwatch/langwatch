@@ -685,13 +685,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     spanId: string;
     protections: unknown;
   }): Promise<unknown>;
-  readTopics(input: { projectId: string }): Promise<
-    readonly Readonly<{
-      id: string;
-      name: string;
-      parentId: string | null;
-    }>[]
-  >;
   readTraceList(params: {
     tenantId: string;
     timeRange: { from: number; to: number };

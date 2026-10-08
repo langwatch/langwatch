@@ -27,7 +27,6 @@ import {
   type FoldProjectionStore,
   createTenantId,
 } from "@langwatch/eventing";
-import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
@@ -881,7 +880,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     plans: EntitlementApi,
     evaluations: EvaluationApi,
     evaluators: EvaluatorApi,
-    experiments: ExperimentApi,
     featureFlags: FeatureFlagApi,
     instantEvals: InstantEvalApi,
     modelProviders: ModelProviderApi,
@@ -2472,17 +2470,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     protections: unknown;
   }): Promise<PromptStudioSpanResult | null> {
     return this.#dependencies.traces.read.findSpanForPromptStudio(input);
-  }
-
-  // -------------------------------------------------------------------------
-  // The project's topics, as the topic-count read labels its buckets
-  // -------------------------------------------------------------------------
-
-  /** The project's topic tree. */
-  readTopics(
-    input: Readonly<{ projectId: string }>,
-  ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]> {
-    return this.#dependencies.topics.getAll(input);
   }
 
   // -------------------------------------------------------------------------

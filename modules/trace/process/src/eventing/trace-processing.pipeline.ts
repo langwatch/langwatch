@@ -23,11 +23,6 @@ import {
   DEFERRED_ORIGIN_SUBSCRIBER_NAME,
   needsOriginResolution,
 } from "./deferred-origin.subscriber.ts";
-import {
-  EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-  EXPERIMENT_METRICS_SYNC_DELAY_MS,
-  hasExperimentCostMetrics,
-} from "./experiment-metrics-sync.subscriber.ts";
 import type { TraceSummarySubscriber } from "./origin-guarded.subscriber.ts";
 import {
   PROJECT_METADATA_WINDOW_MS,
@@ -60,7 +55,6 @@ interface TraceProcessingReactions {
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
-  experimentMetricsSync: SummaryHandler;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -125,13 +119,6 @@ export function buildTraceProcessingConsumer(
         windowMs: PROJECT_METADATA_WINDOW_MS,
       }),
       handler: (event, context) => reactions.projectMetadata(event, context),
-    })
-    .withProjectionSubscriber("experimentMetricsSync", {
-      fold: "traceSummary",
-      when: (_event, context) => hasExperimentCostMetrics(context.state),
-      delay: EXPERIMENT_METRICS_SYNC_DELAY_MS,
-      ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
-      handler: (event, context) => reactions.experimentMetricsSync(event, context),
     })
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",

@@ -17,7 +17,6 @@ import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./trace-project-milestones.even
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
-  namedTopicCountsSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
 import { traceMetadataResponseSchema, traceMetadataUpdateSchema } from "./trace-rest.schemas.ts";
@@ -183,10 +182,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   .query("getEvaluationsMultiple")
   .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()).max(TRACE_IDS_MAX) }))
   .withOutput(z.record(z.string(), evaluationSchema.array()))
-
-  .query("getTopicCounts")
-  .withInput(traceFilterInputSchema)
-  .withOutput(namedTopicCountsSchema)
 
   .query("getCustomersAndLabels")
   .withInput(traceFilterInputSchema)

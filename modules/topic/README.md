@@ -12,7 +12,7 @@ A project's conversation topics, and what the last topic-clustering run did.
 | Subjects       | topic, topic-clustering                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                     |
 | Api token      | `TopicApi` = `moduleApi<TopicApi>()("topic")`, `contract/src/topic.api.ts:22` (5 operations) |
-| Other token    | `TopicBrowserApi`, `process/src/transport/topic.trpc.ts:26`                                  |
+| Other token    | `TopicBrowserApi`, `process/src/transport/topic.trpc.ts:30`                                  |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                   |
 
 ## What topic owns

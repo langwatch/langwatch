@@ -11,7 +11,7 @@ import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 
 vi.mock("../../../behavior/analytics-api.ts", () => ({
   analyticsApi: {
-    traces: {
+    topics: {
       getTopicCounts: {
         useQuery: () => ({
           isLoading: false,

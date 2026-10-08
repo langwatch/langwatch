@@ -113,6 +113,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
       cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
     }),
     runExecution: createApiFixture<ExperimentRunExecutionEffects>({}, "runExecution"),
+    traceMetricsSync: async () => undefined,
     runFrames: createExperimentRunFramesSubscriber({
       stream: MemoryExperimentRunEventStreamRepository.create(),
     }),

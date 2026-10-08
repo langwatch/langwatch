@@ -57,6 +57,10 @@ function mount({
   const browser: TopicBrowserApi = {
     topics: () => application,
     triggerTopicClustering: (input) => trigger.trigger(input),
+    getTopicCounts: async () => ({
+      topicCounts: [{ id: "t1", name: "Billing", count: 2 }],
+      subtopicCounts: [],
+    }),
   };
   const trpc = initTRPC.context<TopicTrpcTestContext>().create();
   const router = createTrpcRuntime<TopicTrpcTestContext>({
@@ -148,6 +152,22 @@ describe("topics.triggerTopicClustering", () => {
       await expect(refusal).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
       await expect(refusal).rejects.not.toHaveProperty("cause.code");
       expect(reportFailure).toHaveBeenCalledWith(expect.any(Error), { projectId: "project_123" });
+    });
+  });
+});
+
+describe("topics.getTopicCounts", () => {
+  describe("when a member asks under a trace filter", () => {
+    /** @scenario "name the trace counts for the topic filter" */
+    it("answers the named counts the topic application read", async () => {
+      const { caller } = mount();
+
+      await expect(
+        caller.getTopicCounts({ projectId: "project_123", startDate: 1, endDate: 2 }),
+      ).resolves.toEqual({
+        topicCounts: [{ id: "t1", name: "Billing", count: 2 }],
+        subtopicCounts: [],
+      });
     });
   });
 });

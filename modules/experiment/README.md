@@ -11,7 +11,7 @@ Experiments: saved definitions, their runs, and the pages that list them.
 | Classification | core (`modules/catalogue.json`)                                                                                    |
 | Subjects       | experiment                                                                                                         |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                        |
-| Api token      | `ExperimentApi` = `moduleApi<ExperimentApi>()("experiment")`, `contract/src/experiment.api.ts:369` (67 operations) |
+| Api token      | `ExperimentApi` = `moduleApi<ExperimentApi>()("experiment")`, `contract/src/experiment.api.ts:359` (65 operations) |
 | Other token    | `ExperimentV3RestApi`, `process/src/transport/experiment-v3.rest.ts:65`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                         |
 
@@ -46,10 +46,11 @@ Anything else experiment needs belongs to another module and is reached through 
 | `prompts`        | `PromptApi`        | [prompt](../prompt/README.md)                 |
 | `retention`      | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
 | `storedObjects`  | `StoredObjectApi`  | [stored-object](../stored-object/README.md)   |
+| `traces`         | `TraceApi`         | [trace](../trace/README.md)                   |
 | `workflows`      | `WorkflowApi`      | [workflow](../workflow/README.md)             |
 
 ## Who depends on experiment
 
-[langy](../langy/README.md), [ops](../ops/README.md), [trace](../trace/README.md), [workflow](../workflow/README.md) (as a peer).
+[langy](../langy/README.md), [ops](../ops/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -11,6 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { experimentAttachmentLinkChannels } from "../channels/experiment-attachment-link-channels.registry.ts";
@@ -27,6 +28,7 @@ import {
   type ExperimentRunProcessingPipeline,
 } from "../eventing/experiment-run-processing.pipeline.ts";
 import { ExperimentRunProgressStore } from "../eventing/experiment-run-progress.store.ts";
+import { createExperimentTraceMetricsSyncHandler } from "../eventing/experiment-trace-metrics.subscriber.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunEventStreamRepository } from "../repositories/experiment-run-event-stream.repository.ts";
@@ -88,6 +90,8 @@ type ExperimentRunPeers = Readonly<{
   evaluation: EvaluationApi;
   apiKeys: ApiKeyApi;
   storedObjects: StoredObjectApi;
+  /** Reads a settled experiment trace's fold for its run's cost. */
+  traces: Pick<TraceApi, "findSummary">;
 }>;
 
 type ExperimentRunDeps = Readonly<{
@@ -276,6 +280,11 @@ function buildRunPipeline({
       complete: completeRun({ commands, boardWriteBack }),
     },
     runFrames: createExperimentRunFramesSubscriber({ stream }),
+    traceMetricsSync: createExperimentTraceMetricsSyncHandler({
+      findSummary: (input) => peers.traces.findSummary(input),
+      findExperimentId: (input) => repositories.idLookup.findExperimentId(input),
+      computeRunMetrics: (input) => commands.computeRunMetrics(input),
+    }),
     retention: {
       resolve: (tenantId) => peers.retention.getResolvedForProject({ projectId: tenantId }),
     },

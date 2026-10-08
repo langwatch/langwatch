@@ -687,12 +687,6 @@ readFieldNames(input: { projectId: string; startDate: number; endDate: number; }
 findPromptStudioSpan(input: { projectId: string; spanId: string; protections: unknown; }): Promise<unknown>;
 ```
 
-#### `readTopics`
-
-```typescript
-readTopics(input: { projectId: string }): Promise< readonly Readonly<{ id: string; name: string; parentId: string | null; }>[] >;
-```
-
 #### `readTraceList`
 
 ```typescript
@@ -1365,7 +1359,7 @@ Contract `../contract/src/export-progress.trpc.ts:20`, router `src/transport/exp
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:608`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:603`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1373,7 +1367,7 @@ Contract `../contract/src/traces.trpc.ts:608`, router `src/transport/shared-trac
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:617`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:612`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1405,7 +1399,7 @@ Contract `../contract/src/traces-instant-eval.trpc.ts:20`, router `src/transport
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:159`, router `src/transport/traces.trpc.ts:47`.
+Contract `../contract/src/traces.trpc.ts:158`, router `src/transport/traces.trpc.ts:44`.
 
 | Procedure                              | Kind         | Gate                       | Input                               | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ----------------------------------- | ---------------------------------- |
@@ -1414,7 +1408,6 @@ Contract `../contract/src/traces.trpc.ts:159`, router `src/transport/traces.trpc
 | `traces.getEvaluations`                | query        | Permission `traces:view`   | `traceScopeSchema`                  | inline                             |
 | `traces.getEvaluationInputs`           | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getEvaluationsMultiple`        | query        | Permission `traces:view`   | inline                              | inline                             |
-| `traces.getTopicCounts`                | query        | Permission `traces:view`   | `traceFilterInputSchema`            | `namedTopicCountsSchema`           |
 | `traces.getCustomersAndLabels`         | query        | Permission `traces:view`   | `traceFilterInputSchema`            | `customersAndLabelsResultSchema`   |
 | `traces.getTracesByThreadId`           | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getTracesWithSpans`            | query        | Permission `traces:view`   | inline                              | inline                             |

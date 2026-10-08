@@ -13,6 +13,7 @@ import {
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
 import type { ExperimentModule } from "../app/experiment.app.ts";
 import type {
@@ -71,6 +72,11 @@ import {
   ExperimentRunStateFoldProjection,
 } from "./experiment-run-state.projection.ts";
 import {
+  carriesExperimentRunMarker,
+  EXPERIMENT_TRACE_METRICS_SETTLE_MS,
+  experimentTraceSpanSchema,
+} from "./experiment-trace-metrics.subscriber.ts";
+import {
   createWorkflowEvaluationRequestedSubscriber,
   type WorkflowEvaluationRunner,
 } from "./experiment-workflow-evaluation.subscriber.ts";
@@ -95,6 +101,8 @@ export interface ClickhouseExperimentRunProcessingRepository {
   runExecution: ExperimentRunExecutionEffects;
   /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
+  /** Trace's settled experiment trace, read back and folded into its run's cost. */
+  traceMetricsSync: (input: { tenantId: string; traceId: string }) => Promise<void>;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -157,7 +165,25 @@ export function buildExperimentRunProcessingPipeline(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),
     )
-    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec);
+    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec)
+    .withPeerSubscriber("traceSpanMetricsSync", {
+      eventType: SPAN_RECEIVED_EVENT_TYPE,
+      data: experimentTraceSpanSchema,
+      options: {
+        delay: EXPERIMENT_TRACE_METRICS_SETTLE_MS,
+        deduplication: {
+          makeId: (event) =>
+            `subscriber:traceSpanMetricsSync:${event.tenantId}:${String(event.aggregateId)}`,
+          ttlMs: EXPERIMENT_TRACE_METRICS_SETTLE_MS,
+        },
+        enqueue: { filter: carriesExperimentRunMarker },
+      },
+      handle: (_data, context) =>
+        deps.traceMetricsSync({
+          tenantId: String(context.tenantId),
+          traceId: String(context.aggregateId),
+        }),
+    });
 
   // ADR-066 pillar 2: a row's results share one group, so a backed-up row appends them in one
   // insert. Safe to fold: each result handler derives its event from its own command alone.

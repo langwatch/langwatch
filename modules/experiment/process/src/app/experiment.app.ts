@@ -29,8 +29,6 @@ import {
   type DatasetEvaluationInput,
   type DatasetEvaluationOutcome,
   type LogBatchEvaluationInput,
-  type ComputeExperimentRunMetricsCommandData,
-  type ExperimentIdLookupResult,
   type CreateEvaluationsV3Input,
   type DSPyRunsSummary,
   type Experiment,
@@ -99,6 +97,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -231,6 +230,8 @@ export class ExperimentModule implements ExperimentApi {
     apiKeys: ApiKeyApi,
     /** Reads a row's stored attachment for the target it is dispatched to. */
     storedObjects: StoredObjectApi,
+    /** Reads a settled experiment trace's fold for its run's cost. */
+    traces: TraceApi,
   };
   static readonly config = experimentConfig;
 
@@ -577,20 +578,6 @@ export class ExperimentModule implements ExperimentApi {
     if (!batchLog) throw new Error("this experiment process composes no batch result log");
 
     return batchLog;
-  }
-
-  /** One trace's cost, folded into its run by the run pipeline. */
-  computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {
-    return this.#runProcessing().commands.computeRunMetrics(input);
-  }
-
-  /** The experiment a run was recorded against, or that no experiment recorded it. */
-  async lookupExperimentId(input: {
-    tenantId: string;
-    runId: string;
-  }): Promise<ExperimentIdLookupResult> {
-    const experimentId = await this.#runProcessing().idLookup.findExperimentId(input);
-    return experimentId ? { kind: "recorded", experimentId } : { kind: "not_recorded" };
   }
 
   /** The pipeline `experiment_run_processing` registers, built once by {@link create}. */

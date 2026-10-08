@@ -11,16 +11,13 @@ import {
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
-  type namedTopicCountsSchema,
   TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
   traceSummaryDataSchema,
   tracesEvaluationRunsSchema,
-  topicCountsResultSchema,
   tracesTrpc,
 } from "@langwatch/trace-contract";
-import type { z } from "zod";
 
 import {
   traceDerivedAttrPrefixes,
@@ -114,41 +111,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
           evaluationsSchema.parse(traceEvaluations),
         ]),
       );
-    })
-
-    .procedure("getTopicCounts")
-    .withPermission("traces:view")
-    .handle(async ({ app, input }) => {
-      const result = topicCountsResultSchema.parse(await app.readTopicCounts(input));
-
-      const topicsMap = Object.fromEntries(
-        (await app.readTopics({ projectId: input.projectId })).map((topic) => [topic.id, topic]),
-      );
-
-      const mapBuckets = (buckets: { key: string; count: number }[], includeParent = false) => {
-        return buckets.reduce<z.infer<typeof namedTopicCountsSchema>["subtopicCounts"]>(
-          (acc, bucket) => {
-            const topic = topicsMap[bucket.key];
-            if (!topic) return acc;
-
-            return [
-              ...acc,
-              {
-                id: bucket.key,
-                name: topic.name,
-                count: bucket.count,
-                ...(includeParent && { parentId: topic.parentId }),
-              },
-            ];
-          },
-          [],
-        );
-      };
-
-      return {
-        topicCounts: mapBuckets(result.topicCounts),
-        subtopicCounts: mapBuckets(result.subtopicCounts, true),
-      };
     })
 
     .procedure("getCustomersAndLabels")

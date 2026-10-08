@@ -5,6 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
+  NamedTopicCounts,
   Topic,
   TopicApi,
   TopicClusteringRunHistoryEntry,
@@ -15,7 +16,8 @@ import type {
   TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
-import { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi, type traceFilterInputSchema } from "@langwatch/trace-contract";
+import type { z } from "zod";
 
 import {
   createTopicClusteringProcessingPipeline,
@@ -35,6 +37,7 @@ import { OtelTopicClusteringMetricsService } from "../services/topic-clustering-
 import { ModelProviderTopicClusteringModelsService } from "../services/topic-clustering-models.service.ts";
 import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
 import { TopicClusteringTriggerService } from "../services/topic-clustering-trigger.service.ts";
+import { TopicCountsService } from "../services/topic-counts.service.ts";
 import { TopicService } from "../services/topic.service.ts";
 import type { TopicBrowserApi } from "../transport/topic.trpc.ts";
 
@@ -61,6 +64,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
   };
 
   readonly #topics: TopicService;
+  readonly #counts: TopicCountsService;
   readonly #commands: EventingTopicClusteringCommandsService;
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
   readonly #manualRun: TopicClusteringManualRunService;
@@ -69,6 +73,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
 
   private constructor(parts: {
     topics: TopicService;
+    counts: TopicCountsService;
     commands: EventingTopicClusteringCommandsService;
     outcomes: EventingTopicClusteringOutcomeCommandsService;
     manualRun: TopicClusteringManualRunService;
@@ -81,6 +86,7 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
       now: () => nowInstant().epochMilliseconds,
     });
     this.#topics = parts.topics;
+    this.#counts = parts.counts;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
     this.#manualRun = parts.manualRun;
@@ -113,11 +119,11 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
       observePayloadSize: (kind, sizeBytes) => metrics.observePayloadSize(kind, sizeBytes),
     });
 
+    const topics = TopicService.create({ repository: repositories.topics, schedule });
+
     return new TopicModule({
-      topics: TopicService.create({
-        repository: repositories.topics,
-        schedule,
-      }),
+      topics,
+      counts: TopicCountsService.create({ traces: dependencies.traces, topics }),
       commands,
       outcomes,
       manualRun: TopicClusteringManualRunService.create({ runner }),
@@ -150,6 +156,10 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     by: Readonly<{ id: string }>;
   }): Promise<TopicClusteringTriggerResult> {
     return this.#trigger.trigger(input);
+  }
+
+  getTopicCounts(input: z.infer<typeof traceFilterInputSchema>): Promise<NamedTopicCounts> {
+    return this.#counts.getTopicCounts(input);
   }
 
   /** The pipeline `topic_clustering_processing` registers, built once by {@link create}. */

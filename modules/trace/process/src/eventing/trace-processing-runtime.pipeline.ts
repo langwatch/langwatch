@@ -2,7 +2,6 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingParticipation } from "@langwatch/eventing";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -24,7 +23,6 @@ import { TraceSpanNormalizationAdapterService } from "../services/trace-span-nor
 import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
-import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
@@ -56,7 +54,6 @@ interface TraceProcessingPeers {
     EvaluationApi,
     "queueTraceEvaluation" | "reportEvaluation" | "deriveEvaluatorId"
   >;
-  experiments: Pick<ExperimentApi, "computeRunMetrics" | "lookupExperimentId">;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
@@ -191,13 +188,6 @@ export class TraceProcessingRuntimeAdapter {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         milestones: this.input.milestones,
-      }),
-      experimentMetricsSync: createExperimentMetricsSyncHandler({
-        computeExperimentRunMetrics: (data) => peers.experiments.computeRunMetrics(data),
-        lookupExperimentId: async (tenantId, runId) => {
-          const found = await peers.experiments.lookupExperimentId({ tenantId, runId });
-          return found.kind === "recorded" ? found.experimentId : null;
-        },
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,

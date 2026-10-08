@@ -119,11 +119,24 @@ Feature: Composing durable experiment-run processing
     When a DSPy step is recorded for that project
     Then its dspy_steps row is stamped with 91 retention days, not a fixed default
 
-  @integration
-  Scenario: A run no experiment recorded answers not recorded
-    Given a worker whose ClickHouse holds no run for the id
-    When the experiment a run was recorded against is looked up
-    Then the answer is that no experiment recorded it
+  @unit
+  Scenario: A settled trace whose run no experiment recorded folds no cost
+    Given a settled experiment trace whose run id no experiment recorded
+    When experiment reacts to the trace
+    Then no run metrics are recorded for it
+
+  @unit
+  Scenario: Experiment reacts only to spans that carry a run id
+    Given a span arrives on trace's pipeline
+    When experiment's trace metrics subscriber is offered it
+    Then a span carrying evaluation.run_id is admitted and settles per trace
+    And a span without one mints no job and no read
+
+  @unit
+  Scenario: A failed run-metrics send is retried, not dropped
+    Given a settled experiment trace with cost whose run is recorded
+    When sending its run metrics fails
+    Then the reaction throws so the queue redelivers it
 
   @integration
   Scenario: The optimizer log prices against the project's cost rules and the static catalogue

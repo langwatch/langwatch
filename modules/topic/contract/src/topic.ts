@@ -82,3 +82,17 @@ export const topicClusteringTriggerResultSchema = z.union([
   z.object({ started: z.literal(false), reason: z.literal("already_running") }).strict(),
 ]);
 export type TopicClusteringTriggerResult = z.infer<typeof topicClusteringTriggerResultSchema>;
+
+/** The named topic and subtopic counts the trace filters render. */
+export const namedTopicCountsSchema = z.object({
+  topicCounts: z.array(z.object({ id: z.string(), name: z.string(), count: z.number() })),
+  subtopicCounts: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      count: z.number(),
+      parentId: z.string().nullable().optional(),
+    }),
+  ),
+});
+export type NamedTopicCounts = z.infer<typeof namedTopicCountsSchema>;
