@@ -138,6 +138,30 @@ Contract `../contract/src/data-privacy.trpc.ts:32`, router `src/transport/data-p
 | `dataPrivacy.setForScope`    | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | inline                              | `dataPrivacyPolicySchema`   |
 | `dataPrivacy.removeForScope` | mutation | Service-authorized: SCOPE_TARGETED_PERMISSIONS; The authorized target is the organization, department, team or project named by `scope`, which the app anchors to this project's organization first — the `projectId` this input also carries is not acted on | `dataPrivacyScopeTargetInputSchema` | –                           |
 
+```typescript
+// dataPrivacy.getSnapshot
+// Input: dataPrivacyProjectScopeSchema, ../contract/src/data-privacy.trpc.ts:18
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:57
+
+// dataPrivacy.setForScope
+// Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:49)
+type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:187
+
+// dataPrivacy.removeForScope
+// Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:26
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "DEPARTMENT" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+  personalOnly: boolean;
+}
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

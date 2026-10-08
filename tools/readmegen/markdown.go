@@ -71,12 +71,16 @@ type page struct {
 	Path  string // relative to the root, slash-separated
 	Title string
 	Body  string // the generated block's content, without the markers
+	Seed  string // the paragraph a new page starts with, above the block
 }
 
 // splice puts the page's block into the existing file, keeping everything
 // outside the markers. A file without markers keeps its whole text above.
 func splice(existing string, p page) string {
 	head, tail := "# "+p.Title+"\n", ""
+	if p.Seed != "" {
+		head += "\n" + p.Seed + "\n"
+	}
 	if existing != "" {
 		head = existing
 		if start := strings.Index(existing, startPrefix); start >= 0 {

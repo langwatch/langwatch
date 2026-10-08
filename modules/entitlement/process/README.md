@@ -78,6 +78,17 @@ Contract `../contract/src/entitlement.trpc.ts:40`, router `src/transport/organiz
 | ----------------------------------------- | ----- | ------------------------------ | ---------------------------- | ------ |
 | `costs.getAggregatedCostsForOrganization` | query | Permission `organization:view` | `aggregatedCostsInputSchema` | inline |
 
+```typescript
+// costs.getAggregatedCostsForOrganization
+// Input: aggregatedCostsInputSchema, ../contract/src/entitlement.trpc.ts:34
+interface Input {
+  organizationId: string;
+  startDate: number;
+  endDate: number;
+}
+// Output: projectSpendRollupSchema.array() (inline, ../contract/src/entitlement.trpc.ts:43)
+```
+
 ### `plan`
 
 Contract `../contract/src/entitlement.trpc.ts:17`, router `src/transport/plan.trpc.ts:9`.
@@ -85,6 +96,15 @@ Contract `../contract/src/entitlement.trpc.ts:17`, router `src/transport/plan.tr
 | Procedure            | Kind  | Gate                           | Input                                | Output       |
 | -------------------- | ----- | ------------------------------ | ------------------------------------ | ------------ |
 | `plan.getActivePlan` | query | Permission `organization:view` | `entitlementOrganizationScopeSchema` | `planSchema` |
+
+```typescript
+// plan.getActivePlan
+// Input: entitlementOrganizationScopeSchema, ../contract/src/entitlement.schemas.ts:11
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof planSchema>; // ../contract/src/plan.ts:15
+```
 
 ### `limits`
 
@@ -94,6 +114,26 @@ Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-l
 | ------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | ------------------------- |
 | `limits.getUsage`                           | query    | Permission `organization:view`   | `entitlementOrganizationScopeSchema` | `usageStatsSchema`        |
 | `limits.checkAndSendUsageLimitNotification` | mutation | Permission `organization:manage` | `sendUsageLimitWarningInputSchema`   | `usageLimitWarningSchema` |
+
+```typescript
+// limits.getUsage
+type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:11
+type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:60
+
+// limits.checkAndSendUsageLimitNotification
+// Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:26
+interface Input {
+  organizationId: string;
+  currentMonthMessagesCount: number;
+  maxMonthlyUsageLimit: number;
+}
+// Output: usageLimitWarningSchema, ../contract/src/entitlement.schemas.ts:34
+interface Output {
+  sent: boolean;
+  notificationId?: string;
+  sentAt?: unknown | null;
+}
+```
 
 ## Sockets
 

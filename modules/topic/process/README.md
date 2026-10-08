@@ -66,6 +66,45 @@ Contract `../contract/src/topic.trpc.ts:23`, router `src/transport/topic.trpc.ts
 | `topics.getClusteringRunHistory` | query    | Permission `project:view`   | `topicProjectScopeSchema` | inline                               |
 | `topics.triggerTopicClustering`  | mutation | Permission `project:update` | `topicProjectScopeSchema` | `topicClusteringTriggerResultSchema` |
 
+```typescript
+// topics.getAll
+// Input: topicProjectScopeSchema, ../contract/src/topic.trpc.ts:21
+interface Input {
+  projectId: string;
+}
+// Output: inline, ../contract/src/topic.trpc.ts:26
+type Output = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  automaticallyGenerated: boolean;
+}[];
+
+// topics.getTopicCounts
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:87
+type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:88
+
+// topics.getClusteringStatus
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
+type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:37
+
+// topics.getClusteringRunHistory
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
+// Output: topicClusteringRunHistoryEntrySchema.array() (inline, ../contract/src/topic.trpc.ts:39)
+
+// topics.triggerTopicClustering
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
+// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:81
+type Output =
+  | {
+      started: true;
+    }
+  | {
+      started: false;
+      reason: "already_running";
+    };
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

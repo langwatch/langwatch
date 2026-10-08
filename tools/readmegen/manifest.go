@@ -7,6 +7,8 @@ type Manifest struct {
 	Modules  []ModuleFacts `json:"modules"`
 	Packages []PackageKind `json:"packages"`
 	Mounted  Mounted       `json:"mounted"`
+	Schemas  Schemas       `json:"schemas"`
+	UIRoutes []UIRoute     `json:"uiRoutes"`
 }
 
 // Location is a file, relative to the workspace root, and a 1-based line.
@@ -29,6 +31,7 @@ type ModuleFacts struct {
 	PrismaDelegates  []Delegate    `json:"prismaDelegates"`
 	ClickhouseWrites []TableWrite  `json:"clickhouseWrites"`
 	Process          ProcessFacts  `json:"process"`
+	Browser          *BrowserFacts `json:"browser"`
 }
 
 // Token is one `moduleApi<Type>()("module")` call and the constant it names.
@@ -123,7 +126,9 @@ func unresolvedCounts(manifest Manifest) map[string]int {
 			counts["stores"] += unresolved(stores.Resolved)
 		}
 		processUnresolved(&module.Process, counts)
+		browserUnresolved(module.Browser, counts)
 	}
+	counts["schema"] += unconvertedSchemas(manifest)
 	for kind, count := range counts {
 		if count == 0 {
 			delete(counts, kind)

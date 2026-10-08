@@ -105,6 +105,64 @@ Contract `../contract/src/pinned-trace.trpc.ts:23`, router `src/transport/pinned
 | `pinnedTrace.getPin`        | query    | Permission `traces:view`    | `pinnedTraceScopeSchema`        | inline              |
 | `pinnedTrace.listByProject` | query    | Permission `traces:view`    | `pinnedTraceProjectInputSchema` | inline              |
 
+```typescript
+// pinnedTrace.pin
+// Input: pinnedTracePinInputSchema, ../contract/src/pinned-trace.trpc.ts:16
+interface Input {
+  projectId: string;
+  traceId: string;
+  reason?: string;
+}
+// Output: pinnedTraceSchema, ../../data-retention/contract/src/data-retention.ts:55
+interface Output {
+  id: string;
+  projectId: string;
+  traceId: string;
+  userId: string | null;
+  source: "manual" | "share";
+  reason: string | null;
+  createdAt: unknown;
+}
+
+// pinnedTrace.unpin
+// Input: pinnedTraceScopeSchema, ../contract/src/pinned-trace.trpc.ts:11
+interface Input {
+  projectId: string;
+  traceId: string;
+}
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:30
+type Output = unknown;
+
+// pinnedTrace.getPin
+type Input = z.infer<typeof pinnedTraceScopeSchema>; // ../contract/src/pinned-trace.trpc.ts:11
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:34
+type Output = {
+  id: string;
+  projectId: string;
+  traceId: string;
+  userId: string | null;
+  source: "manual" | "share";
+  reason: string | null;
+  createdAt: unknown;
+} | null;
+
+// pinnedTrace.listByProject
+// Input: pinnedTraceProjectInputSchema, ../contract/src/pinned-trace.trpc.ts:21
+interface Input {
+  projectId: string;
+}
+// Output: inline, ../contract/src/pinned-trace.trpc.ts:38
+type Output = {
+  id: string;
+  projectId: string;
+  traceId: string;
+  userId: string | null;
+  source: "manual" | "share";
+  reason: string | null;
+  createdAt: unknown;
+}[];
+```
+
 ### `share`
 
 Contract `../contract/src/share.trpc.ts:35`, router `src/transport/share.trpc.ts:11`.
@@ -115,6 +173,46 @@ Contract `../contract/src/share.trpc.ts:35`, router `src/transport/share.trpc.ts
 | `share.createShare`          | mutation | Permission `traces:share`   | `shareCreateInputSchema`          | `shareLinkSchema` |
 | `share.revoke`               | mutation | Permission `traces:share`   | `shareRevokeInputSchema`          | inline            |
 | `share.revokeAllTraceShares` | mutation | Permission `project:update` | `shareProjectInputSchema`         | inline            |
+
+```typescript
+// share.listForResource
+// Input: shareListForResourceInputSchema, ../contract/src/share.trpc.ts:12
+interface Input {
+  projectId: string;
+  resourceType: "TRACE" | "THREAD";
+  resourceId: string;
+}
+// Output: shareLinkSchema.array() (inline, ../contract/src/share.trpc.ts:43)
+
+// share.createShare
+// Input: shareCreateInputSchema, ../contract/src/share.trpc.ts:22
+interface Input {
+  projectId: string;
+  resourceType: "TRACE";
+  resourceId: string;
+  visibility?: "PUBLIC" | "ORGANIZATION" | "PROJECT";
+  expiresAt?: unknown | null;
+  maxViews?: number | null;
+}
+type Output = z.infer<typeof shareLinkSchema>; // ../contract/src/share.ts:11
+
+// share.revoke
+// Input: shareRevokeInputSchema, ../contract/src/share.trpc.ts:31
+interface Input {
+  projectId: string;
+  id: string;
+}
+// Output: inline, ../contract/src/share.trpc.ts:52
+type Output = unknown;
+
+// share.revokeAllTraceShares
+// Input: shareProjectInputSchema, ../contract/src/share.trpc.ts:33
+interface Input {
+  projectId: string;
+}
+// Output: inline, ../contract/src/share.trpc.ts:56
+type Output = unknown;
+```
 
 ## Sockets
 

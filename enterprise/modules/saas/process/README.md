@@ -42,7 +42,10 @@ Answers at `/api/track_usage`.
 ```typescript
 type Body = z.infer<typeof usageReportRequestSchema>; // ../contract/src/saas.api.ts:7
 type Headers = z.infer<typeof senderAddressHeadersSchema>; // ../contract/src/saas.api.ts:13
-type Response = z.infer<typeof usageReportReceiptSchema>; // ../contract/src/saas.api.ts:21
+// Response: usageReportReceiptSchema, ../contract/src/saas.api.ts:21
+interface Response {
+  message: "Event captured";
+}
 ```
 
 #### `POST /api/connect/v1/stats` · `receiveConnectUsageReport`

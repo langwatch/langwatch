@@ -160,8 +160,14 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:projectId/:storedObjectId/:filename`, `/api/v1/files/:projectId/:storedObjectId/:filename`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectFileRouteNamedParamsSchema>; // ../contract/src/stored-object-file-route.ts:17
-// Response: "bytes" (inline, src/transport/stored-object-file.rest.ts:59)
+// Params: storedObjectFileRouteNamedParamsSchema, ../contract/src/stored-object-file-route.ts:17
+interface Params {
+  projectId: string;
+  storedObjectId: string;
+  filename: string;
+}
+// Response: inline, src/transport/stored-object-file.rest.ts:59
+type Response = unknown;
 ```
 
 #### `GET,HEAD /api/files/:projectId/:storedObjectId` · `readProjectStoredObjectBytes`
@@ -171,9 +177,17 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:projectId/:storedObjectId`, `/api/v1/files/:projectId/:storedObjectId`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectFileRouteScopedParamsSchema>; // ../contract/src/stored-object-file-route.ts:8
-type Query = z.infer<typeof storedObjectFileRouteFilenameQuerySchema>; // ../contract/src/stored-object-file-route.ts:33
-// Response: "bytes" (inline, src/transport/stored-object-file.rest.ts:77)
+// Params: storedObjectFileRouteScopedParamsSchema, ../contract/src/stored-object-file-route.ts:8
+interface Params {
+  projectId: string;
+  storedObjectId: string;
+}
+// Query: storedObjectFileRouteFilenameQuerySchema, ../contract/src/stored-object-file-route.ts:33
+interface Query {
+  filename?: string;
+}
+// Response: inline, src/transport/stored-object-file.rest.ts:77
+type Response = unknown;
 ```
 
 #### `GET,HEAD /api/files/:storedObjectId` · `readStoredObjectBytes`
@@ -183,9 +197,13 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:storedObjectId`, `/api/v1/files/:storedObjectId`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectFileRouteIdParamsSchema>; // ../contract/src/stored-object-file-route.ts:25
+// Params: storedObjectFileRouteIdParamsSchema, ../contract/src/stored-object-file-route.ts:25
+interface Params {
+  storedObjectId: string;
+}
 type Query = z.infer<typeof storedObjectFileRouteFilenameQuerySchema>; // ../contract/src/stored-object-file-route.ts:33
-// Response: "bytes" (inline, src/transport/stored-object-file.rest.ts:95)
+// Response: inline, src/transport/stored-object-file.rest.ts:95
+type Response = unknown;
 ```
 
 ### `storedObjectImageProxyRest`
@@ -204,8 +222,12 @@ Public: an <img> fires with no credential; every address is fenced by the SSRF e
 Answers at `/api/image-proxy`.
 
 ```typescript
-type Query = z.infer<typeof imageProxyQuerySchema>; // ../contract/src/stored-object-file-route.ts:41
-// Response: "forwarded" (inline, src/transport/stored-object-image-proxy.rest.ts:30)
+// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:41
+interface Query {
+  url?: string;
+}
+// Response: inline, src/transport/stored-object-image-proxy.rest.ts:30
+type Response = unknown;
 ```
 
 ### `storedObjectRest`
@@ -227,8 +249,22 @@ Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:46
 Answers at `/api/stored-objects/uploads`, `/api/v1/stored-objects/uploads`; also, undocumented, `/api/stored-objects/2026-08-22/uploads`, `/api/v1/stored-objects/2026-08-22/uploads`, `/api/stored-objects/latest/uploads`, `/api/v1/stored-objects/latest/uploads`.
 
 ```typescript
-type Body = z.infer<typeof storedObjectsCreateUploadInputSchema>; // ../contract/src/uploads.ts:13
-type Response = z.infer<typeof storedObjectsCreateUploadOutputSchema>; // ../contract/src/uploads.ts:24
+// Body: storedObjectsCreateUploadInputSchema, ../contract/src/uploads.ts:13
+interface Body {
+  projectId: string;
+  purpose: string;
+  filename: string;
+  mediaType: string;
+  byteLength: number;
+}
+// Response: storedObjectsCreateUploadOutputSchema, ../contract/src/uploads.ts:24
+interface Response {
+  objectId: string;
+  uploadUrl: string;
+  method: "PUT";
+  headers?: Record<string, string>;
+  expiresAt: string;
+}
 ```
 
 #### `POST /uploads/:storedObjectId/confirmation` · `confirmStoredObjectUpload`
@@ -240,8 +276,14 @@ Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:56
 Answers at `/api/stored-objects/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/uploads/:storedObjectId/confirmation`; also, undocumented, `/api/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/stored-objects/latest/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/latest/uploads/:storedObjectId/confirmation`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:49
-// Body: storedObjectsConfirmUploadInputSchema.pick({ projectId: true }) (inline, src/transport/stored-object.rest.ts:58)
+// Params: storedObjectParamsSchema, ../contract/src/uploads.ts:49
+interface Params {
+  storedObjectId: string;
+}
+// Body: inline, src/transport/stored-object.rest.ts:58
+interface Body {
+  projectId: string;
+}
 type Response = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:43
 ```
 
@@ -253,9 +295,15 @@ Answers at `/api/stored-objects/uploads/:storedObjectId/content`, `/api/v1/store
 
 ```typescript
 type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:49
-// Query: z.object({ sig: storedObjectUploadSignatureSchema }) (inline, src/transport/stored-object.rest.ts:71)
+// Query: inline, src/transport/stored-object.rest.ts:71
+interface Query {
+  sig: string;
+}
 // Rawbody: "stream" (inline, src/transport/stored-object.rest.ts:72)
-// Response: z.object({ ok: z.literal(true) }) (inline, src/transport/stored-object.rest.ts:74)
+// Response: inline, src/transport/stored-object.rest.ts:74
+interface Response {
+  ok: true;
+}
 ```
 
 #### `GET,HEAD /:storedObjectId/content` · `getStoredObjectContent`
@@ -266,8 +314,12 @@ Answers at `/api/stored-objects/:storedObjectId/content`, `/api/v1/stored-object
 
 ```typescript
 type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:49
-// Query: z.object({ sig: storedObjectUploadSignatureSchema }) (inline, src/transport/stored-object.rest.ts:90)
-// Response: "bytes" (inline, src/transport/stored-object.rest.ts:92)
+// Query: inline, src/transport/stored-object.rest.ts:90
+interface Query {
+  sig: string;
+}
+// Response: inline, src/transport/stored-object.rest.ts:92
+type Response = unknown;
 ```
 
 #### `GET /:storedObjectId` · `getStoredObject`
@@ -279,7 +331,10 @@ Permission `project:view`. Declared at `src/transport/stored-object.rest.ts:104`
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: z.object({ storedObjectId: storedObjectsGetInputSchema.shape.id }) (inline, src/transport/stored-object.rest.ts:105)
+// Params: inline, src/transport/stored-object.rest.ts:105
+interface Params {
+  storedObjectId: string;
+}
 // Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:106)
 type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src/stored-object.commands.ts:29
 ```
@@ -293,9 +348,21 @@ Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:11
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: z.object({ storedObjectId: storedObjectsDeleteInputSchema.shape.id }) (inline, src/transport/stored-object.rest.ts:119)
-// Body: storedObjectsDeleteInputSchema.pick({ projectId: true, idempotencyKey: true }) (inline, src/transport/stored-object.rest.ts:120)
-type Response = z.infer<typeof storedObjectsDeleteOutputSchema>; // ../contract/src/stored-object.commands.ts:46
+// Params: inline, src/transport/stored-object.rest.ts:119
+interface Params {
+  storedObjectId: string;
+}
+// Body: inline, src/transport/stored-object.rest.ts:120
+interface Body {
+  projectId: string;
+  idempotencyKey: string;
+}
+// Response: storedObjectsDeleteOutputSchema, ../contract/src/stored-object.commands.ts:46
+interface Response {
+  id: string;
+  generation: number;
+  deletedAt: string;
+}
 ```
 
 ## tRPC transport
@@ -310,6 +377,52 @@ Contract `../contract/src/stored-object.trpc.ts:45`, router `src/transport/store
 | `storedObjects.getReadUrl`    | query    | Permission `traces:view or scenarios:view or datasets:view` | `storedObjectReadUrlInputSchema`        | `storedObjectReadUrlSchema`              |
 | `storedObjects.createUpload`  | mutation | Permission `project:update`                                 | `storedObjectsCreateUploadInputSchema`  | `storedObjectsCreateUploadOutputSchema`  |
 | `storedObjects.confirmUpload` | mutation | Permission `project:update`                                 | `storedObjectsConfirmUploadInputSchema` | `storedObjectsConfirmUploadOutputSchema` |
+
+```typescript
+// storedObjects.headById
+// Input: storedObjectHeadInputSchema, ../contract/src/stored-object.trpc.ts:16
+interface Input {
+  projectId: string;
+  id: string;
+}
+// Output: storedObjectHeadSchema, ../contract/src/stored-object.trpc.ts:26
+type Output =
+  | {
+      status: "available";
+      mediaType: string;
+    }
+  | {
+      status: "missing";
+      mediaType: string;
+    }
+  | {
+      status: "not_found";
+    };
+
+// storedObjects.getReadUrl
+// Input: storedObjectReadUrlInputSchema, ../contract/src/stored-object.trpc.ts:33
+interface Input {
+  projectId: string;
+  storedObjectId: string;
+  filename?: string;
+}
+// Output: storedObjectReadUrlSchema, ../contract/src/stored-object.trpc.ts:42
+interface Output {
+  url: string;
+}
+
+// storedObjects.createUpload
+type Input = z.infer<typeof storedObjectsCreateUploadInputSchema>; // ../contract/src/uploads.ts:13
+type Output = z.infer<typeof storedObjectsCreateUploadOutputSchema>; // ../contract/src/uploads.ts:24
+
+// storedObjects.confirmUpload
+// Input: storedObjectsConfirmUploadInputSchema, ../contract/src/uploads.ts:35
+interface Input {
+  projectId: string;
+  objectId: string;
+}
+type Output = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:43
+```
 
 ## Sockets
 

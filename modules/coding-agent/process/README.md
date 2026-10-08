@@ -166,7 +166,12 @@ Authenticated: authentication is the organization key; the authorization is the 
 Answers at `/api/v1/coding-agent/pull-request-usage`.
 
 ```typescript
-type Query = z.infer<typeof pullRequestUsageQuerySchema>; // src/rules/pull-request-usage-wire.rules.ts:73
+// Query: pullRequestUsageQuerySchema, src/rules/pull-request-usage-wire.rules.ts:73
+interface Query {
+  repository: string;
+  pullRequest: number;
+  host?: string;
+}
 type Response = z.infer<typeof pullRequestUsageResponseSchema>; // src/rules/pull-request-usage-wire.rules.ts:46
 ```
 
@@ -189,8 +194,18 @@ Permission `traces:view`. Declared at `src/transport/coding-agent.rest.ts:68`.
 Answers at `/api/coding-agent/sessions/:sessionId/events`, `/api/v1/coding-agent/sessions/:sessionId/events`; also, undocumented, `/api/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/v1/coding-agent/2026-08-07/sessions/:sessionId/events`, `/api/coding-agent/latest/sessions/:sessionId/events`, `/api/v1/coding-agent/latest/sessions/:sessionId/events`.
 
 ```typescript
-type Params = z.infer<typeof codingAgentSessionEventsRestParamsSchema>; // ../contract/src/coding-agent.ts:292
-type Query = z.infer<typeof codingAgentSessionEventsRestQuerySchema>; // ../contract/src/coding-agent.ts:304
+// Params: codingAgentSessionEventsRestParamsSchema, ../contract/src/coding-agent.ts:292
+interface Params {
+  sessionId: string;
+}
+// Query: codingAgentSessionEventsRestQuerySchema, ../contract/src/coding-agent.ts:304
+interface Query {
+  limit?: number;
+  kinds?: string;
+  from?: number;
+  to?: number;
+  cursor?: string;
+}
 type Response = z.infer<typeof codingAgentSessionEventsRestResponseSchema>; // ../contract/src/coding-agent.ts:339
 ```
 
@@ -232,6 +247,79 @@ Contract `../contract/src/coding-agent.trpc.ts:25`, router `src/transport/coding
 | `codingAgents.session`           | query | Permission `traces:view` | inline                                        | inline                                                    |
 | `codingAgents.transcript`        | query | Permission `traces:view` | `codingAgentTrpcTraceScopeSchema`             | `codingAgentTranscriptSchema`                             |
 | `codingAgents.sessionGroups`     | query | Permission `traces:view` | `traceSessionGroupsInputSchema`               | `tracesSessionsPageSchema`                                |
+
+```typescript
+// codingAgents.usageTotals
+// Input: codingAgentTrpcUsageTotalsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:19
+interface Input {
+  projectId: string;
+  fromMs?: number;
+  toMs?: number;
+}
+// Output: codingAgentUsageTotalsSchema, ../contract/src/coding-agent.ts:380
+interface Output {
+  sessionCount: number;
+  costUsd: number;
+  totalTokens: number;
+  activeTimeSec: number;
+  linesAdded: number;
+  linesRemoved: number;
+  commits: number;
+  pullRequests: number;
+}
+
+// codingAgents.recentSessions
+// Input: codingAgentTrpcRecentSessionsInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:25
+interface Input {
+  projectId: string;
+  fromMs?: number;
+  toMs?: number;
+  limit?: number;
+}
+// Output: codingAgentSessionSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:35)
+
+// codingAgents.sessionsList
+// Input: codingAgentTrpcProjectScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:9
+interface Input {
+  projectId: string;
+}
+// Output: codingAgentSessionListRowSchema.array() (inline, ../contract/src/coding-agent.trpc.ts:41)
+
+// codingAgents.pullRequestUsage
+type Input = z.infer<typeof codingAgentTrpcProjectScopeSchema>; // ../contract/src/coding-agent-trpc.schemas.ts:9
+type Output = z.infer<typeof codingAgentPersonalPullRequestUsageWithConnectionSchema>; // ../contract/src/coding-agent.ts:669
+
+// codingAgents.pullRequestDetail
+// Input: codingAgentTrpcPullRequestDetailInputSchema, ../contract/src/coding-agent-trpc.schemas.ts:32
+interface Input {
+  projectId: string;
+  repositoryHost: string;
+  repositoryFullName: string;
+  prNumber: number;
+}
+type Output = z.infer<typeof codingAgentPullRequestDetailSchema>; // ../contract/src/coding-agent.ts:590
+
+// codingAgents.session
+// Input: inline, ../contract/src/coding-agent.trpc.ts:58
+interface Input {
+  projectId: string;
+  traceId: string;
+}
+// Output: codingAgentSessionSchema.nullable() (inline, ../contract/src/coding-agent.trpc.ts:59)
+
+// codingAgents.transcript
+// Input: codingAgentTrpcTraceScopeSchema, ../contract/src/coding-agent-trpc.schemas.ts:12
+interface Input {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+}
+type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:81
+
+// codingAgents.sessionGroups
+type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:132
+type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:108
+```
 
 ## Sockets
 

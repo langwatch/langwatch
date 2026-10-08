@@ -370,7 +370,11 @@ Authenticated: the listing answers exactly the projects the presented credential
 Answers at `/api/projects`.
 
 ```typescript
-type Query = z.infer<typeof projectRestPaginationQuerySchema>; // ../contract/src/api-key-rest.schemas.ts:118
+// Query: projectRestPaginationQuerySchema, ../contract/src/api-key-rest.schemas.ts:118
+interface Query {
+  page?: number;
+  limit?: number;
+}
 type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-key.rest.ts:76
 ```
 
@@ -383,8 +387,27 @@ Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts
 Answers at `/api/projects`.
 
 ```typescript
-type Body = z.infer<typeof projectRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:123
-type Response = z.infer<typeof projectRestCreatedSchema>; // ../contract/src/api-key.rest.ts:95
+// Body: projectRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:123
+interface Body {
+  name: string;
+  teamId?: string;
+  newTeamName?: string;
+  language: string;
+  framework: string;
+}
+// Response: projectRestCreatedSchema, ../contract/src/api-key.rest.ts:95
+interface Response {
+  id: string;
+  name: string;
+  slug: string;
+  language: string;
+  framework: string;
+  teamId: string;
+  createdAt: unknown;
+  updatedAt: unknown;
+  serviceApiKey: string;
+  serviceApiKeyId: string;
+}
 ```
 
 ### `apiKeyRest`
@@ -419,7 +442,15 @@ Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-ke
 
 ```typescript
 type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
+// Response: apiKeyRestMintedSchema, ../contract/src/api-key.rest.ts:52
+interface Response {
+  token: string;
+  apiKey: {
+    id: string;
+    name: string;
+    createdAt: unknown;
+  };
+}
 ```
 
 #### `GET /:id` · `getApiKey`
@@ -431,7 +462,10 @@ Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:387`.
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
+// Params: apiKeyRestParamsSchema, ../contract/src/api-key-rest.schemas.ts:40
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
 ```
 
@@ -445,7 +479,18 @@ Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-type Body = z.infer<typeof apiKeyRestUpdateSchema>; // ../contract/src/api-key-rest.schemas.ts:99
+// Body: apiKeyRestUpdateSchema, ../contract/src/api-key-rest.schemas.ts:99
+interface Body {
+  name?: string;
+  description?: string | null;
+  permissionMode?: "all" | "readonly" | "restricted";
+  permissions?: string[];
+  bindings?: {
+    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }[];
+}
 type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
 ```
 
@@ -459,7 +504,10 @@ Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-type Response = z.infer<typeof apiKeyRestRevokedSchema>; // ../contract/src/api-key.rest.ts:63
+// Response: apiKeyRestRevokedSchema, ../contract/src/api-key.rest.ts:63
+interface Response {
+  success: boolean;
+}
 ```
 
 #### `POST /ingestion` · `createIngestionApiKey`
@@ -505,6 +553,98 @@ Contract `../contract/src/api-key.trpc.ts:33`, router `src/transport/api-key.trp
 | `apiKey.orgProjects` | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself | `apiKeyTrpcOrganizationScopeSchema` | inline                |
 | `apiKey.orgTeams`    | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself | `apiKeyTrpcOrganizationScopeSchema` | inline                |
 | `apiKey.orgMembers`  | query    | No permission: personal API keys are the caller's own; the application proves organization membership and ownership itself | `apiKeyTrpcOrganizationScopeSchema` | inline                |
+
+```typescript
+// apiKey.myBindings
+// Input: apiKeyTrpcOrganizationScopeSchema, ../contract/src/api-key-trpc.schemas.ts:28
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/api-key.trpc.ts:36
+type Output = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  customRoleId: string | null;
+  id: string;
+  scopeName: string | null;
+  customRoleName: string | null;
+}[];
+
+// apiKey.nameById
+// Input: apiKeyTrpcNameByIdInputSchema, ../contract/src/api-key-trpc.schemas.ts:30
+interface Input {
+  organizationId: string;
+  apiKeyId: string;
+}
+// Output: inline, ../contract/src/api-key.trpc.ts:40
+type Output = {
+  name: string;
+  revoked: boolean;
+} | null;
+
+// apiKey.list
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+// Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:44)
+
+// apiKey.create
+type Input = z.infer<typeof apiKeyTrpcCreateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:35
+// Output: apiKeyMintedSchema, ../contract/src/api-key.responses.ts:27
+interface Output {
+  token: string;
+  apiKey: {
+    id: string;
+    name: string;
+    createdAt: unknown;
+  };
+}
+
+// apiKey.update
+type Input = z.infer<typeof apiKeyTrpcUpdateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:50
+// Output: apiKeyUpdatedSchema, ../contract/src/api-key.responses.ts:36
+interface Output {
+  id: string;
+  name: string;
+  permissionMode: string;
+}
+
+// apiKey.revoke
+// Input: apiKeyTrpcRevokeInputSchema, ../contract/src/api-key-trpc.schemas.ts:63
+interface Input {
+  organizationId: string;
+  apiKeyId: string;
+}
+// Output: apiKeyRevokedSchema, ../contract/src/api-key.responses.ts:45
+interface Output {
+  success: boolean;
+}
+
+// apiKey.orgProjects
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+// Output: inline, ../contract/src/api-key.trpc.ts:60
+type Output = {
+  id: string;
+  name: string;
+  teamId: string;
+}[];
+
+// apiKey.orgTeams
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+// Output: inline, ../contract/src/api-key.trpc.ts:64
+type Output = {
+  id: string;
+  name: string;
+}[];
+
+// apiKey.orgMembers
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+// Output: inline, ../contract/src/api-key.trpc.ts:68
+type Output = {
+  id: string;
+  name: string | null;
+  email: string | null;
+}[];
+```
 
 ## Sockets
 

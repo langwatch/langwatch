@@ -156,6 +156,48 @@ Contract `../contract/src/feature-flag.trpc.ts:30`, router `src/transport/featur
 | `featureFlag.setExperimentEnrolment`       | mutation | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `experimentEnrolmentInputSchema`      | `experimentWriteOutputSchema`       |
 | `featureFlag.setExperimentTenantPolicy`    | mutation | Service-authorized: featureFlags:manageExperiments; the feature's own resolver authorizes the exact tenant target before any flag is read or written | `experimentTenantPolicyInputSchema`   | `experimentWriteOutputSchema`       |
 
+```typescript
+// featureFlag.isEnabled
+type Input = z.infer<typeof featureFlagReadInputSchema>; // ../contract/src/feature-flag.schemas.ts:66
+// Output: enabledOutputSchema, ../contract/src/feature-flag.trpc.ts:20
+interface Output {
+  enabled: boolean;
+}
+
+// featureFlag.isEnabledForAnyOrganization
+type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:79
+type Output = z.infer<typeof enabledOutputSchema>; // ../contract/src/feature-flag.trpc.ts:20
+
+// featureFlag.isEnabledForEachOrganization
+type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:79
+// Output: enabledByOrganizationOutputSchema, ../contract/src/feature-flag.trpc.ts:21
+interface Output {
+  enabledByOrganizationId: Record<string, boolean>;
+}
+
+// featureFlag.resolve
+type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:86
+// Output: resolvedFlagsOutputSchema, ../contract/src/feature-flag.trpc.ts:24
+interface Output {
+  flags: Record<string, boolean>;
+}
+
+// featureFlag.experiments
+type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:86
+type Output = z.infer<typeof experimentsOutputSchema>; // ../contract/src/feature-flag.trpc.ts:25
+
+// featureFlag.setExperimentEnrolment
+type Input = z.infer<typeof experimentEnrolmentInputSchema>; // ../contract/src/feature-flag.schemas.ts:90
+// Output: experimentWriteOutputSchema, ../contract/src/feature-flag.trpc.ts:28
+interface Output {
+  ok: true;
+}
+
+// featureFlag.setExperimentTenantPolicy
+type Input = z.infer<typeof experimentTenantPolicyInputSchema>; // ../contract/src/feature-flag.schemas.ts:98
+type Output = z.infer<typeof experimentWriteOutputSchema>; // ../contract/src/feature-flag.trpc.ts:28
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

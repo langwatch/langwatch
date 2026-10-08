@@ -228,7 +228,8 @@ Public: static evaluator catalogue; the same list for every caller, no project d
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:186)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:186
+type Response = unknown;
 ```
 
 #### `POST /api/evaluations/:evaluator/evaluate` · `postApiEvaluationsByEvaluatorEvaluate`
@@ -240,9 +241,13 @@ Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.r
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
+// Params: evaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:8
+interface Params {
+  evaluator: string;
+}
 // Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:210)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:213)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:213
+type Response = unknown;
 ```
 
 #### `POST /api/evaluations/:evaluator/:subpath/evaluate` · `postApiEvaluationsByEvaluatorBySubpathEvaluate`
@@ -254,9 +259,14 @@ Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.r
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof namespacedEvaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:16
+// Params: namespacedEvaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:16
+interface Params {
+  evaluator: string;
+  subpath: string;
+}
 // Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:244)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:247)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:247
+type Response = unknown;
 ```
 
 #### `POST /api/guardrails/:evaluator/evaluate` · `postApiGuardrailsByEvaluatorEvaluate`
@@ -270,7 +280,8 @@ Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
 // Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:274)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:277)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:277
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -287,6 +298,65 @@ Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluati
 | `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
 | `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
 | `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
+
+```typescript
+// evaluations.availableEvaluators
+// Input: evaluationProjectScopeSchema, ../contract/src/evaluation-trpc.schemas.ts:9
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:33
+
+// evaluations.availableCustomEvaluators
+type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:9
+// Output: inline, ../contract/src/evaluation.trpc.ts:39
+type Output = {
+  id: string;
+  name: string;
+  versions: Record<string, unknown>[];
+  [key: string]: unknown;
+}[];
+
+// evaluations.runEvaluation
+type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:40
+type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:39
+
+// evaluations.warmupLambda
+// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:49
+interface Input {
+  projectId: string;
+  count?: number;
+}
+// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:49
+interface Output {
+  success: boolean;
+  count: number;
+}
+
+// evaluations.getMonitorPerformanceForProject
+// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:29
+interface Input {
+  projectId: string;
+  timeZone?: string;
+}
+// Output: inline, ../contract/src/evaluation.trpc.ts:60
+type Output = {
+  monitorId: string;
+  metric: "score" | "pass_rate";
+  points: number[];
+  current: number | null;
+  previous: number | null;
+}[];
+
+// evaluations.getEvaluationInputs
+// Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:13
+interface Input {
+  projectId: string;
+  evaluationId: string;
+}
+// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:19
+type Output = Record<string, unknown> | null;
+```
 
 ## Sockets
 

@@ -98,6 +98,33 @@ Contract `../contract/src/notification.ts:103`, router `src/transport/notificati
 | `notification.subscribeWebPush`   | mutation | No permission: acts on the session user's own browsers, so no tenant scope applies                | inline | –                        |
 | `notification.unsubscribeWebPush` | mutation | No permission: acts on the session user's own browsers, so no tenant scope applies                | inline | –                        |
 
+```typescript
+// notification.webPushPublicKey
+// Input: inline, ../contract/src/notification.ts:105
+interface Input {}
+// Output: webPushPublicKeySchema, ../contract/src/web-push.ts:106
+interface Output {
+  publicKey: string;
+}
+
+// notification.subscribeWebPush
+// Input: inline, ../contract/src/notification.ts:110
+interface Input {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  userAgent?: string;
+}
+
+// notification.unsubscribeWebPush
+// Input: inline, ../contract/src/notification.ts:114
+interface Input {
+  endpoint: string;
+}
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

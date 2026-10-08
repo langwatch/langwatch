@@ -475,7 +475,8 @@ Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/experiment-batch-log.rest.ts:92)
-// Response: "protocol" (inline, src/transport/experiment-batch-log.rest.ts:95)
+// Response: inline, src/transport/experiment-batch-log.rest.ts:95
+type Response = unknown;
 ```
 
 ### `experimentDatasetEvaluationRest`
@@ -497,7 +498,8 @@ Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/experiment-dataset-evaluation.rest.ts:87)
-// Response: "protocol" (inline, src/transport/experiment-dataset-evaluation.rest.ts:90)
+// Response: inline, src/transport/experiment-dataset-evaluation.rest.ts:90
+type Response = unknown;
 ```
 
 ### `experimentDspyStepsRest`
@@ -520,7 +522,10 @@ Answers at `/api/dspy/log_steps`, `/api/v1/dspy/log_steps`; also, undocumented, 
 
 ```typescript
 type Body = z.infer<typeof dSPyLogStepsBodySchema>; // ../contract/src/experiment-legacy.ts:101
-type Response = z.infer<typeof dSPyLogStepsResponseSchema>; // ../contract/src/experiment-legacy.ts:103
+// Response: dSPyLogStepsResponseSchema, ../contract/src/experiment-legacy.ts:103
+interface Response {
+  message: string;
+}
 ```
 
 ### `experimentInitRest`
@@ -542,8 +547,19 @@ Permission `experiments:manage`. Declared at `src/transport/experiment-init.rest
 Answers at `/api/experiment/init`, `/api/v1/experiment/init`; also, undocumented, `/api/experiment/2026-08-07/init`, `/api/v1/experiment/2026-08-07/init`, `/api/experiment/latest/init`, `/api/v1/experiment/latest/init`.
 
 ```typescript
-type Body = z.infer<typeof experimentInitBodySchema>; // ../contract/src/experiment.rest.ts:54
-type Response = z.infer<typeof experimentInitResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:471
+// Body: experimentInitBodySchema, ../contract/src/experiment.rest.ts:54
+interface Body {
+  experiment_id?: string | null;
+  experiment_slug?: string | null;
+  experiment_type: "DSPY" | "BATCH_EVALUATION" | "BATCH_EVALUATION_V2";
+  experiment_name?: string;
+  workflowId?: string;
+}
+// Response: experimentInitResponseSchema, ../contract/src/experiment-workbench-rest.ts:471
+interface Response {
+  slug: string;
+  path: string;
+}
 ```
 
 ### `experimentV3LegacyRest`
@@ -562,9 +578,13 @@ Permission `evaluations:create`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/:evaluationSlug/run`.
 
 ```typescript
-type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:39
+// Params: evaluationSlugParamsSchema, ../contract/src/experiment-workbench-rest.ts:39
+interface Params {
+  evaluationSlug: string;
+}
 // Rawbody: "text" (inline, src/transport/experiment-v3-legacy.rest.ts:53)
-// Response: "negotiated" (inline, src/transport/experiment-v3-legacy.rest.ts:56)
+// Response: inline, src/transport/experiment-v3-legacy.rest.ts:56
+type Response = unknown;
 ```
 
 #### `GET /runs` · `getApiEvaluationsV3Runs`
@@ -574,7 +594,12 @@ Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.r
 Answers at `/api/evaluations/v3/runs`.
 
 ```typescript
-type Query = z.infer<typeof listRunsQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:49
+// Query: listRunsQuerySchema, ../contract/src/experiment-workbench-rest.ts:49
+interface Query {
+  experimentSlug?: string;
+  page?: number;
+  pageSize?: number;
+}
 ```
 
 #### `GET /runs/:runId` · `getApiEvaluationsV3RunsByRunId`
@@ -584,7 +609,10 @@ Permission `evaluations:view`. Declared at `src/transport/experiment-v3-legacy.r
 Answers at `/api/evaluations/v3/runs/:runId`.
 
 ```typescript
-type Params = z.infer<typeof runIdParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:12
+// Params: runIdParamsSchema, ../contract/src/experiment-workbench-rest.ts:12
+interface Params {
+  runId: string;
+}
 type Response = z.infer<typeof runStatusResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:259
 ```
 
@@ -596,7 +624,10 @@ Answers at `/api/evaluations/v3/runs/:runId/results`.
 
 ```typescript
 type Params = z.infer<typeof runIdParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:12
-type Query = z.infer<typeof runResultsQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:55
+// Query: runResultsQuerySchema, ../contract/src/experiment-workbench-rest.ts:55
+interface Query {
+  experimentSlug?: string;
+}
 type Response = z.infer<typeof runResultsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:334
 ```
 
@@ -608,8 +639,19 @@ Answers at `/api/evaluations/v3/:evaluationSlug/workbench-state`.
 
 ```typescript
 type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:39
-type Query = z.infer<typeof workbenchStateQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:62
-type Response = z.infer<typeof workbenchStateAnswerSchema>; // ../contract/src/experiment-workbench-rest.ts:403
+// Query: workbenchStateQuerySchema, ../contract/src/experiment-workbench-rest.ts:62
+interface Query {
+  fields?: string;
+}
+// Response: workbenchStateAnswerSchema, ../contract/src/experiment-workbench-rest.ts:403
+interface Response {
+  id: string;
+  slug: string;
+  name?: string | null;
+  state?: Record<string, unknown> | null;
+  version: number;
+  updatedAt: string;
+}
 ```
 
 #### `PUT /:evaluationSlug/workbench-state` · `putApiEvaluationsV3BySlugWorkbenchState`
@@ -620,8 +662,16 @@ Answers at `/api/evaluations/v3/:evaluationSlug/workbench-state`.
 
 ```typescript
 type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:39
-type Body = z.infer<typeof saveWorkbenchStateBodySchema>; // ../contract/src/experiment-workbench-rest.ts:408
-type Response = z.infer<typeof saveWorkbenchStateResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:420
+// Body: saveWorkbenchStateBodySchema, ../contract/src/experiment-workbench-rest.ts:408
+interface Body {
+  state: Record<string, unknown>;
+  expectedVersion?: number;
+  commitMessage?: string;
+}
+// Response: saveWorkbenchStateResponseSchema, ../contract/src/experiment-workbench-rest.ts:420
+interface Response {
+  version: number;
+}
 ```
 
 #### `GET /:evaluationSlug/versions` · `getApiEvaluationsV3BySlugVersions`
@@ -632,7 +682,11 @@ Answers at `/api/evaluations/v3/:evaluationSlug/versions`.
 
 ```typescript
 type Params = z.infer<typeof evaluationSlugParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:39
-type Query = z.infer<typeof listVersionsQuerySchema>; // ../contract/src/experiment-workbench-rest.ts:69
+// Query: listVersionsQuerySchema, ../contract/src/experiment-workbench-rest.ts:69
+interface Query {
+  limit?: number;
+  cursor?: number;
+}
 type Response = z.infer<typeof listWorkbenchVersionsResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:451
 ```
 
@@ -643,9 +697,17 @@ Permission `experiments:update`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/:evaluationSlug/versions/:version/restore`.
 
 ```typescript
-type Params = z.infer<typeof evaluationSlugVersionParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:43
-type Body = z.infer<typeof restoreWorkbenchVersionBodySchema>; // ../contract/src/experiment-workbench-rest.ts:461
-type Response = z.infer<typeof restoreWorkbenchVersionResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:463
+// Params: evaluationSlugVersionParamsSchema, ../contract/src/experiment-workbench-rest.ts:43
+interface Params {
+  evaluationSlug: string;
+  version: number;
+}
+// Body: restoreWorkbenchVersionBodySchema, ../contract/src/experiment-workbench-rest.ts:461
+type Body = Record<string, unknown>;
+// Response: restoreWorkbenchVersionResponseSchema, ../contract/src/experiment-workbench-rest.ts:463
+interface Response {
+  version: number;
+}
 ```
 
 ### `experimentWorkbenchRunLegacyRest`
@@ -665,7 +727,8 @@ Answers at `/api/evaluations/v3/execute`.
 
 ```typescript
 type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:163
-// Response: "sse" (inline, src/transport/experiment-v3-legacy.rest.ts:164)
+// Response: inline, src/transport/experiment-v3-legacy.rest.ts:164
+type Response = unknown;
 ```
 
 #### `POST /abort` · `abortEvaluationsV3ExperimentRun`
@@ -675,8 +738,17 @@ Permission `evaluations:manage`. Declared at `src/transport/experiment-v3-legacy
 Answers at `/api/evaluations/v3/abort`.
 
 ```typescript
-type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:215
-type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:220
+// Body: abortExperimentRunRequestSchema, ../contract/src/workbench/execution/types.ts:215
+interface Body {
+  projectId: string;
+  runId: string;
+}
+// Response: abortExperimentRunResponseSchema, ../contract/src/workbench/execution/types.ts:220
+interface Response {
+  success: true;
+  runId: string;
+  message: "Abort requested";
+}
 ```
 
 ### `experimentV3Rest`
@@ -698,9 +770,13 @@ Permission `evaluations:create`. Declared at `src/transport/experiment-v3.rest.t
 Answers at `/api/experiments/:slug/run`, `/api/v1/experiments/:slug/run`; also, undocumented, `/api/experiments/2026-08-07/:slug/run`, `/api/v1/experiments/2026-08-07/:slug/run`, `/api/experiments/latest/:slug/run`, `/api/v1/experiments/latest/:slug/run`.
 
 ```typescript
-type Params = z.infer<typeof slugParamsSchema>; // ../contract/src/experiment.rest.ts:45
+// Params: slugParamsSchema, ../contract/src/experiment.rest.ts:45
+interface Params {
+  slug: string;
+}
 // Rawbody: "text" (inline, src/transport/experiment-v3.rest.ts:93)
-// Response: "negotiated" (inline, src/transport/experiment-v3.rest.ts:96)
+// Response: inline, src/transport/experiment-v3.rest.ts:96
+type Response = unknown;
 ```
 
 #### `GET /runs` · `getApiExperimentsRuns`
@@ -793,7 +869,11 @@ Permission `experiments:update`. Declared at `src/transport/experiment-v3.rest.t
 Answers at `/api/experiments/:slug/versions/:version/restore`, `/api/v1/experiments/:slug/versions/:version/restore`; also, undocumented, `/api/experiments/2026-08-07/:slug/versions/:version/restore`, `/api/v1/experiments/2026-08-07/:slug/versions/:version/restore`, `/api/experiments/latest/:slug/versions/:version/restore`, `/api/v1/experiments/latest/:slug/versions/:version/restore`.
 
 ```typescript
-type Params = z.infer<typeof slugVersionParamsSchema>; // ../contract/src/experiment-workbench-rest.ts:31
+// Params: slugVersionParamsSchema, ../contract/src/experiment-workbench-rest.ts:31
+interface Params {
+  slug: string;
+  version: number;
+}
 type Body = z.infer<typeof restoreWorkbenchVersionBodySchema>; // ../contract/src/experiment-workbench-rest.ts:461
 type Response = z.infer<typeof restoreWorkbenchVersionResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:463
 ```
@@ -816,7 +896,8 @@ Answers at `/api/experiments/execute`, `/api/v1/experiments/execute`; also, undo
 
 ```typescript
 type Body = z.infer<typeof executionRequestSchema>; // ../contract/src/workbench/execution/types.ts:163
-// Response: "sse" (inline, src/transport/experiment-workbench-run.rest.ts:27)
+// Response: inline, src/transport/experiment-workbench-run.rest.ts:27
+type Response = unknown;
 ```
 
 #### `POST /abort` · `abortExperimentRun`
@@ -849,9 +930,25 @@ Permission `workflows:create or evaluations:view`. Declared at `src/transport/ex
 Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof experimentWorkflowEvaluateParamsSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:8
-type Body = z.infer<typeof experimentWorkflowEvaluateSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:19
-type Response = z.infer<typeof experimentWorkflowEvaluationStartedSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:11
+// Params: experimentWorkflowEvaluateParamsSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:8
+interface Params {
+  id: string;
+}
+// Body: experimentWorkflowEvaluateSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:19
+interface Body {
+  version_id?: string;
+  data?: Record<string, unknown>[];
+  dataset_id?: string;
+  parameters?: Record<string, string | number | boolean>;
+  row_indices?: number[];
+}
+// Response: experimentWorkflowEvaluationStartedSchema, ../contract/src/experiment-workflow-evaluation-rest.ts:11
+interface Response {
+  run_id: string;
+  run_url: string;
+  workflow_version_id: string;
+  version: string;
+}
 ```
 
 ### `experimentRest`
@@ -873,7 +970,11 @@ Permission `experiments:view`. Declared at `src/transport/experiment.rest.ts:70`
 Answers at `/api/experiments`, `/api/v1/experiments`; also, undocumented, `/api/experiments/2026-08-07`, `/api/v1/experiments/2026-08-07`, `/api/experiments/latest`, `/api/v1/experiments/latest`.
 
 ```typescript
-type Query = z.infer<typeof listExperimentsQuerySchema>; // ../contract/src/experiment.rest.ts:38
+// Query: listExperimentsQuerySchema, ../contract/src/experiment.rest.ts:38
+interface Query {
+  page?: number;
+  pageSize?: number;
+}
 type Response = z.infer<typeof experimentsListResponseSchema>; // ../contract/src/experiment.rest.ts:28
 ```
 
@@ -887,7 +988,18 @@ Answers at `/api/experiments/:slug`, `/api/v1/experiments/:slug`; also, undocume
 
 ```typescript
 type Params = z.infer<typeof slugParamsSchema>; // ../contract/src/experiment.rest.ts:45
-type Response = z.infer<typeof experimentSummarySchema>; // ../contract/src/experiment.rest.ts:16
+// Response: experimentSummarySchema, ../contract/src/experiment.rest.ts:16
+interface Response {
+  id: string;
+  slug: string;
+  name: string | null;
+  type: string;
+  workflowId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  runsCount: number;
+  lastRunAt: string | null;
+}
 ```
 
 #### `POST /` · `postApiExperiments`
@@ -899,8 +1011,17 @@ Permission `experiments:create`. Declared at `src/transport/experiment.rest.ts:1
 Answers at `/api/experiments`, `/api/v1/experiments`; also, undocumented, `/api/experiments/2026-08-07`, `/api/v1/experiments/2026-08-07`, `/api/experiments/latest`, `/api/v1/experiments/latest`.
 
 ```typescript
-type Body = z.infer<typeof createExperimentBodySchema>; // ../contract/src/experiment-workbench-rest.ts:368
-type Response = z.infer<typeof createExperimentResponseSchema>; // ../contract/src/experiment-workbench-rest.ts:379
+// Body: createExperimentBodySchema, ../contract/src/experiment-workbench-rest.ts:368
+interface Body {
+  name?: string;
+  state?: Record<string, unknown>;
+}
+// Response: createExperimentResponseSchema, ../contract/src/experiment-workbench-rest.ts:379
+interface Response {
+  id: string;
+  slug: string;
+  version: number;
+}
 ```
 
 ## tRPC transport
@@ -913,6 +1034,23 @@ Contract `../contract/src/batch-record.trpc.ts:20`, router `src/transport/batch-
 | --------------------------------------- | ----- | --------------------------- | ----------------------------------------- | ------ |
 | `batchRecord.getAllByexperimentIdGroup` | query | Permission `workflows:view` | `datasetApiProjectInputSchema`            | inline |
 | `batchRecord.getAllByexperimentSlug`    | query | Permission `workflows:view` | `batchRecordApiExperimentSlugInputSchema` | inline |
+
+```typescript
+// batchRecord.getAllByexperimentIdGroup
+// Input: datasetApiProjectInputSchema, ../../dataset/contract/src/dataset.schemas.ts:46
+interface Input {
+  projectId: string;
+}
+// Output: z.array(batchEvaluationSummarySchema) (inline, ../contract/src/batch-record.trpc.ts:24)
+
+// batchRecord.getAllByexperimentSlug
+// Input: batchRecordApiExperimentSlugInputSchema, ../contract/src/batch-record.trpc.ts:15
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+}
+// Output: z.array(batchEvaluationRecordSchema) (inline, ../contract/src/batch-record.trpc.ts:29)
+```
 
 ### `experiments`
 
@@ -940,6 +1078,182 @@ Contract `../contract/src/experiment.trpc.ts:115`, router `src/transport/experim
 | `experiments.getExperimentDSPyStep`            | query        | Permission `experiments:view`   | inline                                 | `dSPyStepSchema`                        |
 | `experiments.getExperimentBatchEvaluationRuns` | query        | Permission `experiments:view`   | inline                                 | `experimentRunListSchema`               |
 | `experiments.getExperimentBatchEvaluationRun`  | query        | Permission `experiments:view`   | inline                                 | inline                                  |
+
+```typescript
+// experiments.saveExperiment
+type Input = z.infer<typeof experimentWizardSaveInputSchema>; // ../contract/src/experiment.trpc.ts:81
+type Output = z.infer<typeof experimentSchema>; // ../contract/src/experiment.ts:13
+
+// experiments.saveEvaluationsV3
+// Input: z.object({ ...projectScopeSchema.shape, experimentId: z.string().optional(), state: persi… (inline, ../contract/src/experiment.trpc.ts:128)
+type Output = z.infer<typeof experimentSavedWorkbenchSchema>; // ../contract/src/experiment.responses.ts:68
+
+// experiments.getEvaluationsV3BySlug
+// Input: inline, ../contract/src/experiment.trpc.ts:138
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+}
+type Output = z.infer<typeof experimentWorkbenchPageSchema>; // ../contract/src/experiment.responses.ts:27
+
+// experiments.getWorkbenchVersion
+// Input: inline, ../contract/src/experiment.trpc.ts:147
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+}
+// Output: experimentWorkbenchVersionProbeSchema, ../contract/src/experiment.responses.ts:57
+interface Output {
+  experimentId: string;
+  version: number;
+  updatedAt: unknown;
+  actorLabel?: "user" | "langy" | "api";
+  runId?: string;
+}
+
+// experiments.onExperimentUpdate
+// Input: projectScopeSchema, ../contract/src/experiment.trpc.ts:30
+interface Input {
+  projectId: string;
+}
+// Output: experimentUpdateFrameSchema, ../contract/src/experiment.responses.ts:127
+interface Output {
+  event: unknown;
+  timestamp?: number;
+}
+
+// experiments.listWorkbenchVersions
+// Input: inline, ../contract/src/experiment.trpc.ts:160
+interface Input {
+  projectId: string;
+  experimentId: string;
+  limit?: number;
+  cursor?: number;
+}
+type Output = z.infer<typeof experimentWorkbenchVersionsPageSchema>; // ../contract/src/experiment.responses.ts:74
+
+// experiments.commitWorkbenchVersion
+// Input: inline, ../contract/src/experiment.trpc.ts:171
+interface Input {
+  projectId: string;
+  experimentId: string;
+  commitMessage: string;
+}
+// Output: workbenchSaveResultSchema, ../contract/src/experiment-workbench-version.ts:116
+interface Output {
+  experimentId: string;
+  slug: string;
+  version: number;
+}
+
+// experiments.restoreWorkbenchVersion
+// Input: inline, ../contract/src/experiment.trpc.ts:181
+interface Input {
+  projectId: string;
+  experimentId: string;
+  version: number;
+}
+type Output = z.infer<typeof workbenchSaveResultSchema>; // ../contract/src/experiment-workbench-version.ts:116
+
+// experiments.saveAsMonitor
+// Input: inline, ../contract/src/experiment.trpc.ts:191
+interface Input {
+  projectId: string;
+  experimentId: string;
+}
+type Output = z.infer<typeof experimentPublishedMonitorSchema>; // ../contract/src/experiment.responses.ts:35
+
+// experiments.getExperimentBySlugOrId
+// Input: experimentIdOrSlugInputSchema, ../contract/src/experiment.trpc.ts:91
+interface Input {
+  projectId: string;
+  experimentId?: string;
+  experimentSlug?: string;
+}
+type Output = z.infer<typeof experimentSchema>; // ../contract/src/experiment.ts:13
+
+// experiments.getExperimentWithDSLBySlug
+// Input: inline, ../contract/src/experiment.trpc.ts:202
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+  randomSeed?: number;
+}
+type Output = z.infer<typeof experimentWithDslSchema>; // ../contract/src/experiment.responses.ts:82
+
+// experiments.getAllByProjectId
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
+// Output: z.array(experimentSchema) (inline, ../contract/src/experiment.trpc.ts:212)
+
+// experiments.getAllForEvaluationsList
+// Input: experimentEvaluationsListInputSchema, ../contract/src/experiment.trpc.ts:99
+interface Input {
+  projectId: string;
+  pageOffset?: number;
+  pageSize?: number;
+}
+type Output = z.infer<typeof experimentEvaluationsListPageSchema>; // ../contract/src/experiment.responses.ts:90
+
+// experiments.getLastExperiment
+type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/experiment.trpc.ts:30
+// Output: experimentSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:221)
+
+// experiments.deleteExperiment
+// Input: inline, ../contract/src/experiment.trpc.ts:229
+interface Input {
+  projectId: string;
+  experimentId: string;
+}
+// Output: experimentArchivedSchema, ../contract/src/experiment.responses.ts:114
+interface Output {
+  success: true;
+}
+
+// experiments.copy
+// Input: experimentCopyInputSchema, ../contract/src/experiment.trpc.ts:107
+interface Input {
+  experimentId: string;
+  projectId: string;
+  sourceProjectId: string;
+  copyDatasets?: boolean;
+}
+type Output = z.infer<typeof experimentCopiedSchema>; // ../contract/src/experiment.responses.ts:120
+
+// experiments.getExperimentDSPyRuns
+// Input: inline, ../contract/src/experiment.trpc.ts:239
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+}
+// Output: z.array(dSPyRunsSummarySchema) (inline, ../contract/src/experiment.trpc.ts:240)
+
+// experiments.getExperimentDSPyStep
+// Input: inline, ../contract/src/experiment.trpc.ts:244
+interface Input {
+  projectId: string;
+  experimentSlug: string;
+  runId: string;
+  index: string;
+}
+type Output = z.infer<typeof dSPyStepSchema>; // ../contract/src/experiment-legacy.ts:60
+
+// experiments.getExperimentBatchEvaluationRuns
+// Input: inline, ../contract/src/experiment.trpc.ts:257
+interface Input {
+  projectId: string;
+  experimentId: string;
+}
+type Output = z.infer<typeof experimentRunListSchema>; // ../contract/src/experiment.responses.ts:111
+
+// experiments.getExperimentBatchEvaluationRun
+// Input: inline, ../contract/src/experiment.trpc.ts:268
+interface Input {
+  projectId: string;
+  experimentId: string;
+  runId: string;
+}
+// Output: experimentRunWithItemsSchema.nullable() (inline, ../contract/src/experiment.trpc.ts:269)
+```
 
 ## Sockets
 

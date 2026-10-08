@@ -390,8 +390,10 @@ Permission `scenarios:create`. Hidden from the OpenAPI document. Declared at `sr
 Answers at `/api/scenario/execute-sync`.
 
 ```typescript
-type Body = z.infer<typeof executeSyncRelayEventSchema>; // ../contract/src/workflow-rest.schemas.ts:124
-// Response: "forwarded" (inline, src/transport/workflow-execute-sync.rest.ts:26)
+// Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:124
+type Body = Record<string, unknown>;
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:26
+type Response = unknown;
 ```
 
 ### `workflowRunRest`
@@ -412,9 +414,18 @@ Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:5
 Answers at `/api/optimization/:workflowId/:versionId`, `/api/v1/optimization/:workflowId/:versionId`.
 
 ```typescript
-type Params = z.infer<typeof workflowRunRestVersionedParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:76
-type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:68
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:41
+// Params: workflowRunRestVersionedParamsSchema, ../contract/src/workflow-rest.schemas.ts:76
+interface Params {
+  workflowId: string;
+  versionId: string;
+}
+// Body: workflowRunRestBodySchema, ../contract/src/workflow-rest.schemas.ts:68
+type Body = Record<string, unknown>;
+// Response: workflowRunAnswerSchema, ../contract/src/workflow.ts:41
+interface Response {
+  result?: Record<string, unknown> | null;
+  status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
+}
 ```
 
 #### `POST /api/workflows/:workflowId/run` · `postApiWorkflowsByWorkflowIdRun`
@@ -426,7 +437,10 @@ Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:8
 Answers at `/api/workflows/:workflowId/run`, `/api/v1/workflows/:workflowId/run`.
 
 ```typescript
-type Params = z.infer<typeof workflowRunRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:73
+// Params: workflowRunRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:73
+interface Params {
+  workflowId: string;
+}
 type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:68
 type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:41
 ```
@@ -461,9 +475,18 @@ Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.t
 Answers at `/api/workflows/code-completion`.
 
 ```typescript
-type Query = z.infer<typeof workflowCodeCompletionQuerySchema>; // ../contract/src/workflow-rest.schemas.ts:89
-type Body = z.infer<typeof workflowCodeCompletionBodySchema>; // ../contract/src/workflow-rest.schemas.ts:90
-type Response = z.infer<typeof workflowCodeCompletionResponseSchema>; // ../contract/src/workflow-rest.schemas.ts:105
+// Query: workflowCodeCompletionQuerySchema, ../contract/src/workflow-rest.schemas.ts:89
+interface Query {
+  projectId: string;
+}
+// Body: workflowCodeCompletionBodySchema, ../contract/src/workflow-rest.schemas.ts:90
+type Body = Record<string, unknown>;
+// Response: workflowCodeCompletionResponseSchema, ../contract/src/workflow-rest.schemas.ts:105
+interface Response {
+  completion: string | null;
+  error?: string;
+  raw?: unknown;
+}
 ```
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
@@ -474,7 +497,8 @@ Answers at `/api/workflows/post_event`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:43)
-// Response: "sse" (inline, src/transport/workflow-studio.rest.ts:46)
+// Response: inline, src/transport/workflow-studio.rest.ts:46
+type Response = unknown;
 ```
 
 ### `createWorkflowRest`
@@ -496,7 +520,18 @@ Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:69`.
 Answers at `/api/workflows`, `/api/v1/workflows`; also, undocumented, `/api/workflows/2026-08-07`, `/api/v1/workflows/2026-08-07`, `/api/workflows/latest`, `/api/v1/workflows/latest`.
 
 ```typescript
-// Response: z.array(workflowRestDetailSchema) (inline, src/transport/workflow.rest.ts:71)
+// Response: inline, src/transport/workflow.rest.ts:71
+type Response = {
+  id: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  isEvaluator: boolean;
+  isComponent: boolean;
+  createdAt: string;
+  updatedAt: string;
+  platformUrl: string;
+}[];
 ```
 
 #### `GET /:id` · `getApiWorkflowsById`
@@ -508,8 +543,22 @@ Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:84`.
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:31
-type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/workflow-rest.schemas.ts:25
+// Params: workflowRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:31
+interface Params {
+  id: string;
+}
+// Response: workflowRestDetailSchema, ../contract/src/workflow-rest.schemas.ts:25
+interface Response {
+  id: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  isEvaluator: boolean;
+  isComponent: boolean;
+  createdAt: string;
+  updatedAt: string;
+  platformUrl: string;
+}
 ```
 
 #### `PATCH /:id` · `patchApiWorkflowsById`
@@ -522,7 +571,12 @@ Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/
 
 ```typescript
 type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:31
-type Body = z.infer<typeof workflowRestUpdateSchema>; // ../contract/src/workflow-rest.schemas.ts:34
+// Body: workflowRestUpdateSchema, ../contract/src/workflow-rest.schemas.ts:34
+interface Body {
+  name?: string;
+  icon?: string;
+  description?: string;
+}
 type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/workflow-rest.schemas.ts:25
 ```
 
@@ -536,7 +590,11 @@ Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/
 
 ```typescript
 type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:31
-type Response = z.infer<typeof workflowRestArchivedSchema>; // ../contract/src/workflow-rest.schemas.ts:41
+// Response: workflowRestArchivedSchema, ../contract/src/workflow-rest.schemas.ts:41
+interface Response {
+  id: string;
+  archived: boolean;
+}
 ```
 
 ## tRPC transport
@@ -552,6 +610,50 @@ Contract `../contract/src/workflow-optimization.trpc.ts:22`, router `src/transpo
 | `optimization.disableAsComponent`    | mutation | Permission `workflows:update` | `workflowScopeSchema` | `workflowWriteAcknowledgedSchema` |
 | `optimization.toggleSaveAsComponent` | mutation | Permission `workflows:update` | inline                | `workflowWriteAcknowledgedSchema` |
 | `optimization.getComponents`         | query    | Permission `workflows:view`   | inline                | `processAnswerSchema`             |
+
+```typescript
+// optimization.chat
+// Input: inline, ../contract/src/workflow-optimization.trpc.ts:25
+interface Input {
+  workflowId: string;
+  projectId: string;
+  inputMessages: Record<string, string>[];
+}
+// Output: processAnswerSchema, ../contract/src/workflow-optimization.trpc.ts:20
+type Output = unknown;
+
+// optimization.getPublishedWorkflow
+// Input: workflowScopeSchema, ../contract/src/workflow-optimization.trpc.ts:13
+interface Input {
+  workflowId: string;
+  projectId: string;
+}
+type Output = z.infer<typeof processAnswerSchema>; // ../contract/src/workflow-optimization.trpc.ts:20
+
+// optimization.disableAsComponent
+type Input = z.infer<typeof workflowScopeSchema>; // ../contract/src/workflow-optimization.trpc.ts:13
+// Output: workflowWriteAcknowledgedSchema, ../contract/src/workflow.trpc-schemas.ts:145
+interface Output {
+  success: boolean;
+}
+
+// optimization.toggleSaveAsComponent
+// Input: inline, ../contract/src/workflow-optimization.trpc.ts:38
+interface Input {
+  workflowId: string;
+  projectId: string;
+  isComponent: boolean;
+  isEvaluator: boolean;
+}
+type Output = z.infer<typeof workflowWriteAcknowledgedSchema>; // ../contract/src/workflow.trpc-schemas.ts:145
+
+// optimization.getComponents
+// Input: inline, ../contract/src/workflow-optimization.trpc.ts:42
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof processAnswerSchema>; // ../contract/src/workflow-optimization.trpc.ts:20
+```
 
 ### `workflow`
 
@@ -578,6 +680,162 @@ Contract `../contract/src/workflow.trpc.ts:47`, router `src/transport/workflow.t
 | `workflow.archive`               | mutation | Permission `workflows:delete`   | `workflowApiArchiveInputSchema`               | `workflowSchema`                |
 | `workflow.generateCommitMessage` | mutation | Permission `workflows:update`   | `workflowApiGenerateCommitMessageInputSchema` | inline                          |
 | `workflow.copyAgent`             | mutation | Permission `evaluations:manage` | `agentApiCopyRequestSchema`                   | `agentCopyCreatedSchema`        |
+
+```typescript
+// workflow.engineMode
+// Input: workflowApiEngineModeInputSchema, ../contract/src/workflow.trpc-schemas.ts:30
+interface Input {
+  projectId: string;
+}
+// Output: workflowEngineModeSchema, ../contract/src/workflow.trpc-schemas.ts:193
+interface Output {
+  engineMode: "go";
+  optimizeEnabled: false;
+}
+
+// workflow.create
+type Input = z.infer<typeof workflowApiCreateInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:41
+type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:187
+
+// workflow.copy
+// Input: workflowApiCopyInputSchema, ../contract/src/workflow.trpc-schemas.ts:49
+interface Input {
+  workflowId: string;
+  projectId: string;
+  sourceProjectId: string;
+  copyDatasets?: boolean;
+}
+type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:187
+
+// workflow.getAll
+// Input: workflowApiProjectInputSchema, ../contract/src/workflow.trpc-schemas.ts:19
+interface Input {
+  projectId: string;
+}
+// Output: workflowListRowSchema.array() (inline, ../contract/src/workflow.trpc.ts:66)
+
+// workflow.getCopies
+// Input: workflowApiWorkflowInputSchema, ../contract/src/workflow.trpc-schemas.ts:24
+interface Input {
+  projectId: string;
+  workflowId: string;
+}
+// Output: inline, ../contract/src/workflow.trpc.ts:70
+type Output = {
+  id: string;
+  name: string;
+  projectId: string;
+  projectName: string;
+  teamName: string;
+  organizationName: string;
+  fullPath: string;
+  hasPermission: boolean;
+}[];
+
+// workflow.getById
+// Input: workflowApiGetByIdInputSchema, ../contract/src/workflow.trpc-schemas.ts:33
+interface Input {
+  projectId: string;
+  workflowId: string;
+}
+type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:113
+
+// workflow.getVersions
+// Input: workflowApiGetVersionsInputSchema, ../contract/src/workflow.trpc-schemas.ts:35
+interface Input {
+  projectId: string;
+  workflowId: string;
+  returnDSL?: boolean | "previousVersion";
+}
+// Output: workflowVersionHistoryEntrySchema.array() (inline, ../contract/src/workflow.trpc.ts:78)
+
+// workflow.restoreVersion
+// Input: workflowApiRestoreVersionInputSchema, ../contract/src/workflow.trpc-schemas.ts:56
+interface Input {
+  projectId: string;
+  versionId: string;
+}
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+
+// workflow.autosave
+type Input = z.infer<typeof workflowApiAutosaveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:61
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+
+// workflow.commitVersion
+type Input = z.infer<typeof workflowApiCommitVersionInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:68
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+
+// workflow.publish
+// Input: workflowApiPublishInputSchema, ../contract/src/workflow.trpc-schemas.ts:75
+interface Input {
+  projectId: string;
+  workflowId: string;
+  versionId: string;
+}
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+
+// workflow.unpublish
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+
+// workflow.syncFromSource
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
+// Output: syncedFromSourceSchema, ../contract/src/workflow.trpc.ts:45
+type Output = unknown;
+
+// workflow.pushToCopies
+// Input: workflowApiPushToCopiesInputSchema, ../contract/src/workflow.trpc-schemas.ts:81
+interface Input {
+  projectId: string;
+  workflowId: string;
+  copyIds?: string[];
+}
+type Output = z.infer<typeof workflowPushToCopiesSchema>; // ../contract/src/workflow.trpc-schemas.ts:199
+
+// workflow.getRelatedEntities
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
+// Output: workflowRelatedEntitiesSchema, ../contract/src/workflow.trpc-schemas.ts:209
+interface Output {
+  agents: {
+    id: string;
+    name: string;
+  }[];
+}
+
+// workflow.cascadeArchive
+// Input: workflowApiArchiveInputSchema, ../contract/src/workflow.trpc-schemas.ts:88
+interface Input {
+  projectId: string;
+  workflowId: string;
+  unarchive?: boolean;
+}
+type Output = z.infer<typeof workflowCascadeArchiveSchema>; // ../contract/src/workflow.trpc-schemas.ts:214
+
+// workflow.archive
+type Input = z.infer<typeof workflowApiArchiveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:88
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+
+// workflow.generateCommitMessage
+type Input = z.infer<typeof workflowApiGenerateCommitMessageInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:94
+// Output: inline, ../contract/src/workflow.trpc.ts:122
+type Output = string;
+
+// workflow.copyAgent
+// Input: agentApiCopyRequestSchema, ../../agent/contract/src/agent.schemas.ts:37
+interface Input {
+  agentId: string;
+  projectId: string;
+  sourceProjectId: string;
+  newAgentId?: string;
+}
+// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:145
+interface Output {
+  id: string;
+  projectId: string;
+  name: string;
+  copiedFromAgentId: string;
+}
+```
 
 ## Sockets
 

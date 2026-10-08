@@ -119,6 +119,75 @@ Contract `../contract/src/presence.trpc.ts:26`, router `src/transport/presence.t
 | `presence.onProjectReadHints`      | subscription | Permission `project:view`      | `projectReadHintsInputSchema`      | `readHintSchema`             |
 | `presence.onUpgradeReadHints`      | subscription | Platform permission `ops:view` | inline                             | `readHintSchema`             |
 
+```typescript
+// presence.update
+type Input = z.infer<typeof presenceUpdateRequestSchema>; // ../contract/src/presence.ts:121
+// Output: presenceAcknowledgedSchema, ../contract/src/presence.ts:181
+interface Output {
+  ok: true;
+}
+
+// presence.leave
+// Input: presenceLeaveRequestSchema, ../contract/src/presence.ts:130
+interface Input {
+  projectId: string;
+  sessionId: string;
+}
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:181
+
+// presence.cursor
+// Input: presenceCursorRequestSchema, ../contract/src/presence.ts:161
+interface Input {
+  projectId: string;
+  sessionId: string;
+  payload: {
+    anchor: string;
+    x: number;
+    y: number;
+  };
+}
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:181
+
+// presence.onPresenceUpdate
+// Input: presenceProjectInputSchema, ../contract/src/presence.ts:103
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof presenceEventSchema>; // ../contract/src/presence.ts:72
+
+// presence.onPresenceCursor
+// Input: presenceCursorSubscriptionSchema, ../contract/src/presence.ts:171
+interface Input {
+  projectId: string;
+  anchor: string;
+  sessionId: string;
+}
+type Output = z.infer<typeof presenceCursorEventSchema>; // ../contract/src/presence.ts:95
+
+// presence.onOrganizationReadHints
+// Input: organizationReadHintsInputSchema, ../contract/src/read-hints.ts:16
+interface Input {
+  organizationId: string;
+}
+// Output: readHintSchema, ../contract/src/read-hints.ts:12
+interface Output {
+  path: string;
+}
+
+// presence.onProjectReadHints
+// Input: projectReadHintsInputSchema, ../contract/src/read-hints.ts:22
+interface Input {
+  organizationId: string;
+  projectId: string;
+}
+type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:12
+
+// presence.onUpgradeReadHints
+// Input: inline, ../contract/src/presence.trpc.ts:64
+type Input = unknown;
+type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:12
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

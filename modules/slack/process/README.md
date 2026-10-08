@@ -111,7 +111,17 @@ Permission `project:view`. Declared at `src/transport/slack.rest.ts:44`.
 Answers at `/api/slack-connections`, `/api/v1/slack-connections`; also, undocumented, `/api/slack-connections/2026-08-07`, `/api/v1/slack-connections/2026-08-07`, `/api/slack-connections/latest`, `/api/v1/slack-connections/latest`.
 
 ```typescript
-// Response: z.array(slackConnectionRestResponseSchema) (inline, src/transport/slack.rest.ts:46)
+// Response: inline, src/transport/slack.rest.ts:46
+type Response = {
+  id: string;
+  name: string;
+  kind: "bot" | "webhook";
+  scopeType: "ORGANIZATION" | "PROJECT";
+  scopeId: string;
+  scopeName: string;
+  slackTeamName: string | null;
+  createdAt: string;
+}[];
 ```
 
 ## tRPC transport
@@ -126,6 +136,52 @@ Contract `../contract/src/slack.trpc.ts:57`, router `src/transport/slack.trpc.ts
 | `slackIntegration.create` | mutation | Permission `project:view` | `createInputSchema` | `slackManagedConnectionSchema` |
 | `slackIntegration.update` | mutation | Permission `project:view` | `updateInputSchema` | `slackManagedConnectionSchema` |
 | `slackIntegration.delete` | mutation | Permission `project:view` | `deleteInputSchema` | `slackConnectionDeletedSchema` |
+
+```typescript
+// slackIntegration.list
+// Input: listInputSchema, ../contract/src/slack.trpc.ts:27
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof slackConnectionListSchema>; // ../contract/src/slack.schemas.ts:36
+
+// slackIntegration.create
+// Input: createInputSchema, ../contract/src/slack.trpc.ts:29
+interface Input {
+  projectId: string;
+  name: string;
+  kind: "BOT" | "INCOMING_WEBHOOK";
+  scopeType: "ORGANIZATION" | "PROJECT";
+  scopeId: string;
+  secret: string;
+}
+type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:30
+
+// slackIntegration.update
+// Input: updateInputSchema, ../contract/src/slack.trpc.ts:43
+interface Input {
+  projectId: string;
+  id: string;
+  name?: string;
+  scopeType?: "ORGANIZATION" | "PROJECT";
+  scopeId?: string;
+  secret?: string;
+  force?: boolean;
+}
+type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:30
+
+// slackIntegration.delete
+// Input: deleteInputSchema, ../contract/src/slack.trpc.ts:55
+interface Input {
+  projectId: string;
+  id: string;
+}
+// Output: slackConnectionDeletedSchema, ../contract/src/slack.schemas.ts:43
+interface Output {
+  deleted: true;
+  dependentAutomations: number;
+}
+```
 
 ## Sockets
 

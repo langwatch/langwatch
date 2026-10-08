@@ -136,7 +136,10 @@ Answers at `/api/webhooks/stripe`, `/api/v1/webhooks/stripe`.
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:40)
 type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:227
-type Response = z.infer<typeof billingStripeWebhookReceiptSchema>; // ../contract/src/billing-types.ts:225
+// Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:225
+interface Response {
+  received: true;
+}
 ```
 
 ## tRPC transport
@@ -154,6 +157,61 @@ Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/c
 | `connectedBilling.completeRenewalIfDue` | mutation | Platform permission `ops:manage` | `connectedCustomerInputSchema`    | `connectedRenewalOutcomeSchema`     |
 | `connectedBilling.markPaidOutOfBand`    | mutation | Platform permission `ops:manage` | `connectedInvoiceTargetSchema`    | `connectedInvoiceTargetSchema`      |
 
+```typescript
+// connectedBilling.get
+// Input: connectedCustomerInputSchema, ../contract/src/connected-billing.schemas.ts:14
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof connectedBillingOverviewSchema>; // ../contract/src/connected-billing.schemas.ts:110
+
+// connectedBilling.onboard
+type Input = z.infer<typeof connectedOnboardRequestSchema>; // ../contract/src/connected-billing.schemas.ts:25
+type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:54
+
+// connectedBilling.addCommit
+// Input: connectedAddCommitRequestSchema, ../contract/src/connected-billing.schemas.ts:46
+interface Input {
+  organizationId: string;
+  amountUsdCents: number;
+}
+// Output: connectedCreditGrantViewSchema, ../contract/src/connected-billing.schemas.ts:72
+interface Output {
+  stripeCreditGrantId: string;
+  amountUsdCents: number;
+  kind: "commit" | "added" | "renewal";
+  termEndsAt: string;
+  expiresAt: string;
+}
+
+// connectedBilling.renew
+// Input: connectedRenewRequestSchema, ../contract/src/connected-billing.schemas.ts:40
+interface Input {
+  organizationId: string;
+  termStartsAt: string;
+  termEndsAt: string;
+  seats: number;
+  seatRateCents: number;
+  seatCurrency: "USD" | "EUR";
+  commitUsdCents: number;
+}
+type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:54
+
+// connectedBilling.completeRenewalIfDue
+type Input = z.infer<typeof connectedCustomerInputSchema>; // ../contract/src/connected-billing.schemas.ts:14
+// Output: connectedRenewalOutcomeSchema, ../contract/src/connected-billing.schemas.ts:129
+interface Output {
+  outcome: "completed" | "waiting" | "none";
+}
+
+// connectedBilling.markPaidOutOfBand
+// Input: connectedInvoiceTargetSchema, ../contract/src/connected-billing.schemas.ts:52
+interface Input {
+  stripeInvoiceId: string;
+}
+type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/connected-billing.schemas.ts:52
+```
+
 ### `currency`
 
 Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:42`.
@@ -161,6 +219,17 @@ Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.t
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |
 | `currency.detectCurrency` | query | No permission: answers which of the two currencies a reader's prices are shown in; public reference data, no scope id and no tenant read | `detectCurrencyInputSchema` | `detectedCurrencySchema` |
+
+```typescript
+// currency.detectCurrency
+// Input: detectCurrencyInputSchema, ../contract/src/currency.trpc.ts:15
+type Input = Record<string, unknown>;
+// Output: detectedCurrencySchema, ../contract/src/pricing.ts:14
+interface Output {
+  currency: "USD" | "EUR";
+  country: string | null;
+}
+```
 
 ### `subscription`
 
@@ -175,6 +244,67 @@ Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscr
 | `subscription.getLastSubscription`   | query    | Permission `organization:view`   | `organizationScopeSchema` | `providerOwnedSchema`            |
 | `subscription.prospective`           | mutation | Permission `organization:manage` | inline                    | `providerOwnedSchema`            |
 | `subscription.listInvoices`          | query    | Permission `organization:view`   | `organizationScopeSchema` | inline                           |
+
+```typescript
+// subscription.addTeamMemberOrEvents
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:37)
+// Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:223
+interface Output {
+  success: boolean;
+}
+
+// subscription.create
+// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:54)
+// Output: billingRedirectSchema, ../contract/src/billing-types.ts:217
+interface Output {
+  url: string | null;
+}
+
+// subscription.manage
+// Input: inline, ../contract/src/subscription.trpc.ts:67
+interface Input {
+  organizationId: string;
+  baseUrl: string;
+}
+// Output: billingPortalSessionSchema, ../contract/src/billing-types.ts:220
+interface Output {
+  url: string;
+}
+
+// subscription.previewProration
+// Input: inline, ../contract/src/subscription.trpc.ts:71
+interface Input {
+  organizationId: string;
+  newTotalSeats: number;
+}
+// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:32
+type Output = unknown;
+
+// subscription.getLastSubscription
+// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:18
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:32
+
+// subscription.prospective
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:80)
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:32
+
+// subscription.listInvoices
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:18
+// Output: inline, ../contract/src/subscription.trpc.ts:94
+type Output = {
+  id: string;
+  number: string | null;
+  date: number;
+  amountDue: number;
+  currency: string;
+  status: string;
+  pdfUrl: string | null;
+  hostedUrl: string | null;
+}[];
+```
 
 ## Sockets
 

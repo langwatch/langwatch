@@ -236,8 +236,16 @@ Permission `organization:manage`. Declared at `src/transport/github-install.rest
 Answers at `/api/github/install`, `/api/v1/github/install`.
 
 ```typescript
-type Query = z.infer<typeof githubInstallStartQuerySchema>; // ../contract/src/github.ts:8
-// Response: "protocol" (inline, src/transport/github-install.rest.ts:113)
+// Query: githubInstallStartQuerySchema, ../contract/src/github.ts:8
+interface Query {
+  organizationId: string;
+  account?: string;
+  installationId?: string;
+  mode?: string;
+  return?: string;
+}
+// Response: inline, src/transport/github-install.rest.ts:113
+type Response = unknown;
 ```
 
 #### `GET /api/github/setup` · `completeGithubInstallation`
@@ -247,7 +255,8 @@ Public: GitHub App Setup URL — protocol-mandated public endpoint; all sensitiv
 Answers at `/api/github/setup`, `/api/v1/github/setup`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/github-install.rest.ts:120)
+// Response: inline, src/transport/github-install.rest.ts:120
+type Response = unknown;
 ```
 
 #### `POST /api/github/webhook` · `receiveGithubWebhook`
@@ -258,7 +267,8 @@ Answers at `/api/github/webhook`, `/api/v1/github/webhook`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/github-install.rest.ts:131)
-// Response: "protocol" (inline, src/transport/github-install.rest.ts:134)
+// Response: inline, src/transport/github-install.rest.ts:134
+type Response = unknown;
 ```
 
 #### `GET /api/github-langy/setup` · `completeGithubInstallationOnLegacyPath`
@@ -268,7 +278,8 @@ Public: GitHub App Setup URL — protocol-mandated public endpoint; all sensitiv
 Answers at `/api/github-langy/setup`, `/api/v1/github-langy/setup`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/github-install.rest.ts:146)
+// Response: inline, src/transport/github-install.rest.ts:146
+type Response = unknown;
 ```
 
 #### `POST /api/github-langy/webhook` · `receiveGithubWebhookOnLegacyPath`
@@ -279,7 +290,8 @@ Answers at `/api/github-langy/webhook`, `/api/v1/github-langy/webhook`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/github-install.rest.ts:155)
-// Response: "protocol" (inline, src/transport/github-install.rest.ts:158)
+// Response: inline, src/transport/github-install.rest.ts:158
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -294,6 +306,56 @@ Contract `../contract/src/github.trpc.ts:34`, router `src/transport/github.trpc.
 | `github.listRepos`             | query    | Permission `organization:manage` | `organizationScopeSchema`          | inline                                |
 | `github.pullRequestLiveStatus` | query    | Permission `traces:view`         | `pullRequestLiveStatusInputSchema` | `githubPullRequestLiveStatusesSchema` |
 | `github.disconnect`            | mutation | Permission `organization:manage` | `disconnectInputSchema`            | `githubDisconnectResultSchema`        |
+
+```typescript
+// github.getConnectionStatus
+// Input: organizationScopeSchema, ../contract/src/github.trpc.ts:17
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof githubConnectionStatusSchema>; // ../contract/src/github.connection.ts:23
+
+// github.listRepos
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/github.trpc.ts:17
+// Output: inline, ../contract/src/github.trpc.ts:41
+type Output = {
+  id: string;
+  fullName: string;
+}[];
+
+// github.pullRequestLiveStatus
+// Input: pullRequestLiveStatusInputSchema, ../contract/src/github.trpc.ts:29
+interface Input {
+  projectId: string;
+  refs: {
+    repositoryHost: string;
+    repositoryFullName: string;
+    prNumber: number;
+  }[];
+}
+// Output: githubPullRequestLiveStatusesSchema, ../contract/src/github.connection.ts:42
+interface Output {
+  statuses: {
+    repositoryHost: string;
+    repositoryFullName: string;
+    prNumber: number;
+    status: "open" | "draft" | "merged" | "closed";
+    source: "live" | "snapshot";
+    mappedAt: unknown | null;
+  }[];
+}
+
+// github.disconnect
+// Input: disconnectInputSchema, ../contract/src/github.trpc.ts:20
+interface Input {
+  organizationId: string;
+  installationId: string;
+}
+// Output: githubDisconnectResultSchema, ../contract/src/github.connection.ts:38
+interface Output {
+  uninstallUrl: string;
+}
+```
 
 ## Sockets
 
