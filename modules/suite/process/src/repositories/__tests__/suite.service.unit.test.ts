@@ -1,6 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  InstantEvalJudgeOnlyModelError,
+} from "@langwatch/instant-eval-judge-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   ScenarioTestSuiteNotFoundError,
@@ -160,6 +164,31 @@ describe("SuiteService", () => {
 
     expect(created.id).toBe("suite_created");
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ slug: "critical-path" }));
+  });
+
+  describe("when a suite is saved with Instant Evals as a model override", () => {
+    /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+    it("refuses the create and the update, storing nothing", async () => {
+      const repo = repository({ create: vi.fn(), update: vi.fn() });
+      const service = SuiteService.create(serviceOptions(repo));
+
+      await expect(
+        service.create({
+          projectId: "project_1",
+          name: "Critical path",
+          judgeModel: INSTANT_EVAL_JUDGE_MODEL_ID,
+        }),
+      ).rejects.toThrow(InstantEvalJudgeOnlyModelError);
+      await expect(
+        service.update({
+          id: "suite_original",
+          projectId: "project_1",
+          simulatorModel: INSTANT_EVAL_JUDGE_MODEL_ID,
+        }),
+      ).rejects.toThrow(InstantEvalJudgeOnlyModelError);
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
+    });
   });
 
   /** @scenario "Read a missing suite" */

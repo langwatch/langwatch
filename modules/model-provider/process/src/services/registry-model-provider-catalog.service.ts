@@ -1,4 +1,8 @@
 import {
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+  isInstantEvalJudgeModel,
+} from "@langwatch/instant-eval-judge-contract";
+import {
   allFeatures,
   buildProviderOnboardingDefaultPlan,
   classifyRoutingHandleProblem,
@@ -122,7 +126,9 @@ export abstract class ModelProviderCatalog {
           );
       if (!allowed) {
         throw new ModelDefaultValidationError(
-          `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
+          isInstantEvalJudgeModel(value)
+            ? INSTANT_EVAL_JUDGE_ONLY_MESSAGE
+            : `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
         );
       }
 

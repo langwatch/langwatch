@@ -75,6 +75,7 @@ export class ModelProviderCommandService {
     this.assertKnownProvider(parsed.provider);
     const routingHandle = this.normalizeRoutingHandle(parsed.routingHandle);
     this.assertValidSkipPermissionsPatterns(parsed.langySkipPermissionsModels);
+    const projectDefault = this.allowedProjectDefault(parsed);
     const existing = await this.getExistingProvider(parsed);
     const scopes = this.scopesForWrite(parsed, existing);
     await this.authorizeWrite(parsed.actorId, existing?.scopes, scopes);
@@ -89,7 +90,7 @@ export class ModelProviderCommandService {
     const saved = await this.saveProvider(provider, existing, routingHandle);
 
     await this.seedOnboardingDefaults(existing, saved);
-    await this.saveProjectDefault(parsed);
+    await this.saveProjectDefault({ projectId: parsed.projectId, model: projectDefault });
 
     return this.withMaskedCredentials(saved);
   }
@@ -507,8 +508,17 @@ export class ModelProviderCommandService {
     }
   }
 
-  private async saveProjectDefault(input: ModelProviderWriteInput): Promise<void> {
-    if (input.defaultModel !== undefined && input.projectId) {
+  /** Through the same gate as the default-models settings, before anything is stored. */
+  private allowedProjectDefault(input: ModelProviderWriteInput): string | undefined {
+    if (input.defaultModel === undefined) return undefined;
+    return this.options.catalog.sanitizeDefaultConfig({ DEFAULT: input.defaultModel }).DEFAULT;
+  }
+
+  private async saveProjectDefault(input: {
+    projectId: string | undefined;
+    model: string | undefined;
+  }): Promise<void> {
+    if (input.model !== undefined && input.projectId) {
       const organizationId = await this.options.scopes.getOrganizationIdForScope({
         scopeType: "PROJECT",
         scopeId: input.projectId,
@@ -518,7 +528,7 @@ export class ModelProviderCommandService {
         organizationId,
         scope: { scopeType: "PROJECT", scopeId: input.projectId },
         key: "DEFAULT",
-        model: input.defaultModel,
+        model: input.model,
         authorId: null,
       });
     }

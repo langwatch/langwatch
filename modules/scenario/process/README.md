@@ -846,7 +846,7 @@ type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract
 
 ### `scenarios`
 
-Contract `../contract/src/scenario.trpc.ts:167`, router `src/transport/scenario.trpc.ts:40`.
+Contract `../contract/src/scenario.trpc.ts:171`, router `src/transport/scenario.trpc.ts:40`.
 
 | Procedure                               | Kind         | Gate                                                                                                                                                                                                                                | Input                               | Output                               |
 | --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------ |

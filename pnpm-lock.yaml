@@ -5028,6 +5028,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -10812,6 +10815,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -10864,6 +10870,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13131,6 +13140,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -13683,6 +13695,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -14588,6 +14603,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -14637,6 +14655,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid

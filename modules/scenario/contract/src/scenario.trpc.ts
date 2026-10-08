@@ -10,6 +10,7 @@ import {
   agentTestRunResultSchema,
   agentTestTurnResultSchema,
 } from "@langwatch/agent-contract";
+import { refuseInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -72,6 +73,9 @@ const dateRangeFields = {
 
 const scenarioIdSchema = z.object({ ...projectSchema.shape, id: z.string() });
 
+/** Any id the picker sends, custom ones with spaces included; never Instant Evals. */
+const scenarioModelOverrideSchema = z.string().refine(...refuseInstantEvalJudgeModel);
+
 export const scenarioTrpcCreateSchema = z.object({
   ...projectSchema.shape,
   name: z.string().min(1),
@@ -80,8 +84,8 @@ export const scenarioTrpcCreateSchema = z.object({
   labels: z.array(z.string()).default([]),
   // Optional per-scenario model overrides; null clears back to the project
   // default (scenarios.user_simulator / scenarios.judge).
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: scenarioModelOverrideSchema.nullish(),
+  judgeModel: scenarioModelOverrideSchema.nullish(),
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
@@ -104,8 +108,8 @@ export const scenarioTrpcUpdateSchema = z.object({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: scenarioModelOverrideSchema.nullish(),
+  judgeModel: scenarioModelOverrideSchema.nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),

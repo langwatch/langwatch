@@ -1,4 +1,5 @@
 /** Every change a caller makes to a prompt, and the permission each of them asks for first. */
+import { assertNotInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   type PromptScope,
@@ -120,6 +121,7 @@ export class PromptWriteService {
    * the version data when none is provided.
    */
   async createPrompt(params: CreatePromptParams): Promise<VersionedPrompt> {
+    assertNotInstantEvalJudgeModel({ model: params.model });
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
     // If any of the version data is provided,
@@ -289,6 +291,7 @@ export class PromptWriteService {
       ...configDataUpdates
     } = data;
 
+    assertNotInstantEvalJudgeModel({ model: configDataUpdates.model });
     this.versionService.assertNoSystemPromptConflict(configDataUpdates);
 
     // Only normalize system messages if prompt or messages are being updated

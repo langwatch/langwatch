@@ -1,4 +1,8 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
+import {
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+  isInstantEvalJudgeModel,
+} from "@langwatch/instant-eval-judge-contract";
 
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message.ts";
 import type { ModelRole } from "./catalog/model-feature-registry.ts";
@@ -169,7 +173,9 @@ export class ModelRestrictedForFeatureError extends HandledError {
     const restrictedModel = restrictedModels[0] ?? "restricted model";
     super(
       "model_restricted_for_feature",
-      `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,
+      isInstantEvalJudgeModel(restrictedModel)
+        ? INSTANT_EVAL_JUDGE_ONLY_MESSAGE
+        : `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,
       {
         httpStatus: 400,
         meta: { featureKey, role, featureDisplayName, projectId, restrictedModels },

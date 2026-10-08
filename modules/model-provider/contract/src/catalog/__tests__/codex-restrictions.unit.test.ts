@@ -1,8 +1,10 @@
 /**
  * Where codex models may run (spec:
  * specs/model-providers/codex-account-provider.feature). One gate, four
- * enforcement points; these pin the gate and two server behaviours.
+ * enforcement points; these pin the gate and two server behaviours. The gate
+ * also keeps Instant Evals on new evaluators only.
  */
+import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -142,4 +144,23 @@ describe("codexRestrictions", () => {
     );
     expect(isCodexAllowedFeature("prompt.create_default")).toBe(false);
   });
+});
+
+describe("the gate on Instant Evals", () => {
+  /** @scenario "Instant Evals is never a default model" */
+  // The scenario judge and new evaluators too: that default feeds every evaluator type,
+  // and only judges run on it.
+  it.each(allFeatures().map((f) => f.key))("refuses it for %s", (featureKey) => {
+    expect(isModelAllowedForFeature({ modelId: INSTANT_EVAL_JUDGE_MODEL_ID, featureKey })).toBe(
+      false,
+    );
+  });
+
+  /** @scenario "Instant Evals is never a default model" */
+  it.each(["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const)(
+    "refuses it as the %s role",
+    (role) => {
+      expect(isModelAllowedAsRoleDefault(INSTANT_EVAL_JUDGE_MODEL_ID, role)).toBe(false);
+    },
+  );
 });

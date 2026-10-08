@@ -3377,6 +3377,11 @@ const presentations = {
       return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
     },
   },
+  instant_eval_judge_only_model: {
+    title: "Instant Evals can't be this model",
+    describe: () =>
+      "Instant Evals works only as an evaluator judge model. Pick another model here, or use Instant Evals on an LLM judge evaluator.",
+  },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",
     describe: () =>

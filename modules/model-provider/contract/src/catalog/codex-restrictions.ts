@@ -1,4 +1,6 @@
-/** Codex surfaces: Langy + FAST assists only. */
+/** Codex surfaces: Langy + FAST assists only. Instant Evals: never a default, judges pick it. */
+
+import { isInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 
 import { featuresByRole, type ModelRole } from "./model-feature-registry.ts";
 
@@ -43,7 +45,7 @@ export const CODEX_DEFAULT_MODEL = "openai_codex/gpt-5.6-terra";
 /**
  * The one model-vs-feature gate every enforcement point calls: the cascade
  * resolver, defaults write paths, the litellm-params builder, and the
- * pickers. Codex is the only restricted provider today.
+ * pickers. Codex and Instant Evals are the restricted models today.
  */
 export function isModelAllowedForFeature({
   modelId,
@@ -52,6 +54,8 @@ export function isModelAllowedForFeature({
   modelId: string;
   featureKey: string;
 }): boolean {
+  // Never a default: even new evaluators' default reaches every evaluator type, not judges only.
+  if (isInstantEvalJudgeModel(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return isCodexAllowedFeature(featureKey);
 }
@@ -60,8 +64,10 @@ export function isModelAllowedForFeature({
  * Role-level defaults apply across every feature in the role, so a
  * restricted model may only sit on a role whose ENTIRE set is codex-allowed:
  * LANGY and FAST. DEFAULT and EMBEDDINGS carry general inference and stay closed.
+ * Instant Evals sits on no role.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
+  if (isInstantEvalJudgeModel(modelId)) return false;
   if (!isCodexModel(modelId)) return true;
   return role === "LANGY" || role === "FAST";
 }

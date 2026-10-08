@@ -3,9 +3,13 @@
  * @see specs/api-reference/suites-legacy-alias.feature
  */
 
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
-import { createSuiteInputSchema } from "../suite-rest.schemas.ts";
+import { createSuiteInputSchema, runSuiteInputSchema } from "../suite-rest.schemas.ts";
 
 const plan = {
   name: "Nightly Plan",
@@ -36,5 +40,19 @@ describe("createSuiteInputSchema", () => {
     it("accepts a test suite", () => {
       expect(createSuiteInputSchema.validate({ name: "Refunds", kind: "folder" })).toBe(true);
     });
+  });
+});
+
+describe("runSuiteInputSchema", () => {
+  /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+  it.each(["judgeModel", "simulatorModel"])("refuses Instant Evals as the run's %s", (key) => {
+    const result = runSuiteInputSchema.safeParse({ [key]: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
+  });
+
+  it("keeps any other model", () => {
+    expect(runSuiteInputSchema.safeParse({ judgeModel: "openai/gpt-5-mini" }).success).toBe(true);
   });
 });

@@ -28,6 +28,7 @@ import {
   type AgentPage,
   type WorkflowAgentConfig,
 } from "@langwatch/agent-contract";
+import { assertNotInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
@@ -98,6 +99,8 @@ export class AgentService {
     if (!result.success) throw new InvalidAgentConfigError(input.type, result.error.issues);
 
     const command = result.data;
+    if (command.type === "signature")
+      assertNotInstantEvalJudgeModel({ model: command.config.llm?.model });
     return this.#repository.create({ ...command, id: command.id ?? nextAgentId() });
   }
 
@@ -121,6 +124,10 @@ export class AgentService {
       config: parsed.data.config ?? existing.config,
     });
     if (!checked.success) throw new InvalidAgentConfigError(type, checked.error.issues);
+    // Only a config this update sends: a rename keeps whatever an older row already holds.
+    if (parsed.data.config && checked.data.type === "signature") {
+      assertNotInstantEvalJudgeModel({ model: checked.data.config.llm?.model });
+    }
     let config = checked.data.config;
     if (checked.data.type === "http" && existing.type === "http") {
       const stored = existing.config;

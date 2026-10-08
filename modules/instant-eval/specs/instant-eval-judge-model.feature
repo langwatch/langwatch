@@ -633,6 +633,54 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Then the score range fields are shown
       And they are hidden for any other model
 
+  Rule: Instant Evals is saved only as an evaluator judge's model
+
+    @unit
+    Scenario: Instant Evals is never a default model
+      When Instant Evals is checked as the default model for each feature and each role
+      Then it is refused for every one, the scenario judge and new evaluators included
+      And a new judge gets Instant Evals only when it is created with no model to run, as above
+
+    @unit
+    Scenario Outline: A default-model save naming a model its key does not allow is refused
+      When <model> is saved as the project's <key> default through <path>
+      Then it is refused as a client error
+      And no default is stored
+
+      Examples:
+        | model                    | key                      | path                        |
+        | Instant Evals            | DEFAULT                  | the default-models settings |
+        | Instant Evals            | scenarios.judge          | the default-models settings |
+        | Instant Evals            | evaluator.create_default | the default-models settings |
+        | Instant Evals            | DEFAULT                  | a model provider save       |
+        | a coding-assistant model | DEFAULT                  | a model provider save       |
+
+    @unit
+    Scenario Outline: Saving Instant Evals as the model of anything but a judge is refused
+      When <thing> is saved with Instant Evals as its model
+      Then it is refused as a client error saying "Instant Evals works only as an evaluator judge model."
+      And nothing is stored
+
+      Examples:
+        | thing                                  |
+        | a new prompt                           |
+        | a prompt update                        |
+        | a new agent                            |
+        | an agent update                        |
+        | a scenario's judge or simulator model  |
+        | a suite run's judge or simulator model |
+
+    @unit
+    Scenario: A prompt or an agent with any other model still saves
+      When a prompt and an agent are saved with a model from the project's providers
+      Then both are saved
+
+    @unit
+    Scenario: A prompt or an agent stored with Instant Evals before this rule still reads
+      Given a prompt version and an agent stored with Instant Evals as their model
+      When they are read
+      Then they read as stored
+
   Rule: An evaluator error shows its stored error text in the trace list
 
     @integration
