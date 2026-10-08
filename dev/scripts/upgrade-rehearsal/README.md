@@ -44,7 +44,7 @@ and holds `report.md`, `report.json` and every piece of evidence under `evidence
 
 | Finding | Reproduced when                                                                   |
 | ------- | --------------------------------------------------------------------------------- |
-| R01     | a seeded project does not resolve a privacy policy (`resolution.json`)           |
+| R01     | a seeded project does not resolve a privacy policy (`resolution.json`)            |
 | R02     | the head worker logs `ProjectNotFoundError`                                       |
 | F-1     | a head roster row declares no steps and a needs-old-writers-gone step is not done |
 | F-2     | a step running at SIGTERM is recorded done before the worker exits                |
