@@ -589,6 +589,25 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And Instant Evals is not one of the options
 
     @integration
+    Scenario: A new judge in a project with no model provider starts on Instant Evals when released
+      Given a project with release_instant_evals on, no model provider and no default model configured
+      When a member opens the form for a new LLM judge
+      Then the judge's model starts as Instant Evals
+      And it is never marked as needing an update
+
+    @integration
+    Scenario Outline: A new evaluator keeps the platform default model otherwise
+      Given a project with release_instant_evals <flag>, <providers> and no default model configured
+      When a member opens the form for a new <evaluator>
+      Then its model starts as the platform default
+
+      Examples:
+        | flag | providers         | evaluator                        |
+        | off  | no model provider | LLM judge                        |
+        | on   | a model provider  | LLM judge                        |
+        | on   | no model provider | LLM evaluator that is not a judge |
+
+    @integration
     Scenario: The score range shows only for Instant Evals
       Given a score judge
       When a member picks Instant Evals as its model

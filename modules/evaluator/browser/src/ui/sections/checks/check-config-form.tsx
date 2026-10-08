@@ -31,7 +31,6 @@ import {
   type EvaluatorDefinition,
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { type CheckPreconditions, checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
@@ -57,6 +56,7 @@ import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { EvaluatorTracesMapping } from "../../../behavior/lent-peers.tsx";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
+import { useEvaluatorFallbackModel } from "../../../behavior/use-evaluator-fallback-model.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import { PreconditionsField } from "../../elements/checks/preconditions-field.tsx";
 import DynamicZodForm from "./dynamic-zod-form.tsx";
@@ -170,6 +170,8 @@ export default function CheckConfigForm({
   // the picker and names the saved slug there.
   const isRetiredEvaluator = !!checkType && !!availableEvaluators && !evaluatorDefinition;
 
+  const { fallbackModel } = useEvaluatorFallbackModel({ evaluatorType: checkType });
+
   // Defaults apply when the chosen evaluator changes, reading the rest as it is then.
   const onEvaluatorChosen = useEffectEvent(() => {
     if (!availableEvaluators || !checkType) return;
@@ -184,6 +186,7 @@ export default function CheckConfigForm({
         defaultModel: resolvedDefaultModel.data?.model ?? null,
         embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
       },
+      fallbackModel,
     });
   });
 
@@ -195,6 +198,7 @@ export default function CheckConfigForm({
     defaultValues?.settings,
     resolvedDefaultModel.data?.model,
     resolvedDefaultEmbeddings.data?.model,
+    fallbackModel,
   ]);
 
   const runOn = <RunOnText sample={sample} hasPreconditions={preconditions?.length > 0} />;
@@ -607,6 +611,7 @@ function applyEvaluatorDefaults({
   nameValue,
   evaluatorDefinition,
   resolvedModels,
+  fallbackModel,
 }: {
   form: CheckForm;
   availableEvaluators: Readonly<Record<string, EvaluatorDefinition>>;
@@ -614,6 +619,7 @@ function applyEvaluatorDefaults({
   nameValue: string;
   evaluatorDefinition: EvaluatorDefinition | undefined;
   resolvedModels: { defaultModel: string | null; embeddingsModel: string | null };
+  fallbackModel: string;
 }) {
   const defaultName = findEvaluatorDefinitions(checkType)[0]?.name;
   const allDefaultNames = Object.values(availableEvaluators).map((evaluator) =>
@@ -626,7 +632,7 @@ function applyEvaluatorDefaults({
   applyDefaultSettings({
     form,
     defaults: getEvaluatorDefaultSettings(evaluatorDefinition, resolvedModels, {
-      defaultModel: DEFAULT_MODEL,
+      defaultModel: fallbackModel,
       embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
     }),
     prefix: "settings",

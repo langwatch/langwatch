@@ -1,11 +1,11 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { useEffect, useEffectEvent } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators.ts";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
+import { useEvaluatorFallbackModel } from "../../../behavior/use-evaluator-fallback-model.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 
 type SettingsForm = UseFormReturn<{ settings: Record<string, unknown> }>;
@@ -44,6 +44,7 @@ export function useEvaluatorDefaultSettings({
     projectId: project?.id,
   });
   const availableEvaluators = useAvailableEvaluators();
+  const { fallbackModel } = useEvaluatorFallbackModel({ evaluatorType });
 
   const fillDefaults = useEffectEvent(() => {
     if (!enabled || !availableEvaluators || !(evaluatorType in availableEvaluators)) return;
@@ -55,7 +56,7 @@ export function useEvaluatorDefaultSettings({
           defaultModel: resolvedDefaultModel.data?.model ?? null,
           embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
         },
-        { defaultModel: DEFAULT_MODEL, embeddingsModel: DEFAULT_EMBEDDINGS_MODEL },
+        { defaultModel: fallbackModel, embeddingsModel: DEFAULT_EMBEDDINGS_MODEL },
       ),
       prefix: "settings",
     });
@@ -63,5 +64,10 @@ export function useEvaluatorDefaultSettings({
 
   useEffect(() => {
     fillDefaults();
-  }, [evaluatorType, resolvedDefaultModel.data?.model, resolvedDefaultEmbeddings.data?.model]);
+  }, [
+    evaluatorType,
+    resolvedDefaultModel.data?.model,
+    resolvedDefaultEmbeddings.data?.model,
+    fallbackModel,
+  ]);
 }
