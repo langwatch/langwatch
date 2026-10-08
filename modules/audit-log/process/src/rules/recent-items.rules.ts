@@ -69,28 +69,3 @@ function findStringArguments(args: AuditLogJsonValue, names: readonly string[]):
     return typeof value === "string" ? [value] : [];
   });
 }
-
-export function deriveRecentItemHref({
-  type,
-  projectSlug,
-  id,
-  queueSlug,
-}: {
-  type: Exclude<RecentItemType, "simulation">;
-  projectSlug: string;
-  id: string;
-  queueSlug?: string;
-}): string {
-  switch (type) {
-    case "prompt":
-      return `/${projectSlug}/prompts?prompt=${id}`;
-    case "workflow":
-      return `/${projectSlug}/studio/${id}`;
-    case "dataset":
-      return `/${projectSlug}/datasets/${id}`;
-    case "evaluation":
-      return `/${projectSlug}/online-evaluations`;
-    case "annotation":
-      return `/${projectSlug}/annotations/${queueSlug ?? id}`;
-  }
-}

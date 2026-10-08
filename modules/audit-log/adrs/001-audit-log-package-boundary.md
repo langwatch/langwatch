@@ -46,17 +46,7 @@ The generated module list installs `auditLogServer` in every process; no app
 names it. Package imports never create database clients or read runtime
 configuration.
 
-The one-shot `agent-audit-log-ids-backfill` task (`tasks/agent-audit-log-ids.task.ts`)
-carries main's `scripts/backfill-agent-audit-log-ids.ts`. It writes by default, as the
-script did, and `--dry-run` reports without writing. It runs only when an operator
-launches it through the tasks process; no API or worker boot runs it. An entry with no
-project, or whose window matches more than one agent, is skipped and counted.
-
-Its repository is claimed on `AuditLog` alone: it reads the pre-fix entries and
-patches their arguments. The candidate agents come through
-`AgentApi.findIdsCreatedInWindow`, main's query carried across the boundary, so the
-backfill never reads the Agent table and adds no repair method to AuditLog's API.
-Once pre-fix history is repaired, the task and its repository can be removed.
+The one-shot `agent-audit-log-ids-backfill` task and its repository were retired by R6, 2026-10-08.
 
 ## Environment and configuration
 

@@ -21,25 +21,16 @@
     "test:integration": "vitest run .integration.test.ts"
   },
   "dependencies": {
-    "@langwatch/agent-contract": "workspace:*",
-    "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
-    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
-    "@langwatch/monitor-contract": "workspace:*",
-    "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/project-contract": "workspace:*",
-    "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

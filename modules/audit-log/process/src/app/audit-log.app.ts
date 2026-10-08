@@ -1,5 +1,3 @@
-import { AgentApi } from "@langwatch/agent-contract";
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   AuditLogApi,
   type AuditLogHistoryEntry,
@@ -11,12 +9,7 @@ import {
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
-import { DatasetApi } from "@langwatch/dataset-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
-import { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { type AuditLogPipeline, buildAuditLogPipeline } from "../eventing/audit-log.pipeline.ts";
 import type { AuditLogRepositories } from "../repositories/audit-log.repositories.ts";
@@ -40,15 +33,7 @@ type AuditLogSetup = FeatureSetup<
 
 export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
   static readonly contract = AuditLogApi;
-  static readonly dependencies = {
-    projects: ProjectApi,
-    prompts: PromptApi,
-    workflows: WorkflowApi,
-    datasets: DatasetApi,
-    monitors: MonitorApi,
-    annotations: AnnotationApi,
-    agents: AgentApi,
-  };
+  static readonly dependencies = {};
 
   readonly #entries: AuditLogService;
   readonly #recentItems: RecentItemsService;
@@ -64,16 +49,13 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
     this.#recentItems = recentItems;
   }
 
-  static create({ repositories, dependencies }: AuditLogSetup): AuditLogModule {
+  static create({ repositories }: AuditLogSetup): AuditLogModule {
     return new AuditLogModule({
       entries: AuditLogService.create({
         repository: repositories.entries,
         maxArgsBytes: MAX_ARGS_BYTES,
       }),
-      recentItems: RecentItemsService.create({
-        touches: repositories.recentTouches,
-        owners: dependencies,
-      }),
+      recentItems: RecentItemsService.create({ touches: repositories.recentTouches }),
     });
   }
 

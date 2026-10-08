@@ -147,7 +147,6 @@ describe("the tasks process installation", () => {
       expect(names).toEqual([
         "backfill-http-agent-credentials-to-secrets",
         "backfill-annotations-to-clickhouse",
-        "agent-audit-log-ids-backfill",
         "clear-stale-pending-sso-setup",
         "slack-alert",
         "report-schedule-backfill",
