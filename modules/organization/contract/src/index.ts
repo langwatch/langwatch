@@ -14,7 +14,6 @@ export * from "./organization-settings.events.ts";
 export * from "./organization.trpc-schemas.ts";
 export * from "./organization.errors.ts";
 export * from "./organization.config.ts";
-export * from "./organization.service.ts";
 export * from "./organization.api.ts";
 export * from "./organization-group.service.ts";
 export * from "./organization.responses.ts";

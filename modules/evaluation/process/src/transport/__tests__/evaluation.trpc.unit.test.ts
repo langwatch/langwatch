@@ -45,6 +45,7 @@ describe("given the evaluations tRPC transport", () => {
           kind: "permission-all",
           permissions: ["evaluations:view", "analytics:view"],
         },
+        "evaluations.getEvaluationInputs": { kind: "permission", permission: "traces:view" },
       });
     });
 

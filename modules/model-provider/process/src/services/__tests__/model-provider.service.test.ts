@@ -16,7 +16,7 @@ import {
   ModelProviderNotFoundError,
   ModelDefaultNotFoundError,
 } from "@langwatch/model-provider-contract";
-import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -401,7 +401,7 @@ function createProjects(): ProjectApi {
   );
 }
 
-class Organizations extends OrganizationService {
+class Organizations {
   private notUsed(): never {
     throw new Error("Organization method is not used by this test");
   }
@@ -460,9 +460,6 @@ class Organizations extends OrganizationService {
     return this.notUsed();
   }
   getOldestTeamId() {
-    return this.notUsed();
-  }
-  claimBillingCustomerId() {
     return this.notUsed();
   }
   ensurePersonalWorkspace() {

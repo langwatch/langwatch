@@ -1,6 +1,6 @@
 /**
  * The procedures this package calls. The annotation and personal-workspace-features namespaces
- * are derived from their owners' contracts; the borrowed three belong to features not split yet.
+ * are derived from their owners' contracts; the borrowed ones belong to features not split yet.
  */
 
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
@@ -52,27 +52,20 @@ type BorrowedProcedures = {
       };
     };
   };
-
-  project: {
-    /** Whether a privacy rule hides input or output from this reader; one read per project. */
-    getFieldRedactionStatus: {
-      query: {
-        input: ProjectScope;
-        output: {
-          isRedacted: { input: boolean; output: boolean };
-          visibleTo: { input: string | null; output: string | null };
-        };
-      };
-    };
-  };
 };
 
-/** The trace list page, derived from trace's contract: the filtered list walks it. */
+/**
+ * Trace's procedures, derived from its contract: the filtered list walks the list page, and the
+ * redaction read says whether a privacy rule hides input or output from this reader.
+ */
 type TraceListProcedures = {
-  traces: Pick<ContractApiMap<typeof tracesTrpc>["traces"], "getAllForProject">;
+  traces: Pick<
+    ContractApiMap<typeof tracesTrpc>["traces"],
+    "getAllForProject" | "getFieldRedactionStatus"
+  >;
 };
 
-/** Everything this family calls: the derived namespaces plus the borrowed three. */
+/** Everything this family calls: the derived namespaces plus the borrowed ones. */
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> &
   TraceListProcedures &
   ContractApiMap<typeof annotationScoreTrpc> &

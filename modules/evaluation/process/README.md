@@ -6,7 +6,7 @@ The server half of [evaluation](../README.md). Evaluations: running evaluators a
 
 ## Installation
 
-`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing)`, `src/evaluation.module.ts:13`.
+`defineProcessModule("evaluation").withRepositories(evaluationRepositories).withApi(EvaluationModule).withTransports(evaluationTrpcTransport, evaluationsLegacyRest).withEventing(evaluationProcessingEventing).withEventing(evaluationLifecycleEventing)`, `src/evaluation.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -297,7 +297,7 @@ type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluati
 
 ### `evaluations`
 
-Contract `../contract/src/evaluation.trpc.ts:24`, router `src/transport/evaluation.trpc.ts:10`.
+Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluation.trpc.ts:10`.
 
 | Procedure                                     | Kind     | Gate                                            | Input                                     | Output                       |
 | --------------------------------------------- | -------- | ----------------------------------------------- | ----------------------------------------- | ---------------------------- |
@@ -306,6 +306,7 @@ Contract `../contract/src/evaluation.trpc.ts:24`, router `src/transport/evaluati
 | `evaluations.runEvaluation`                   | mutation | Permission `evaluations:manage`                 | `runTraceEvaluationInputSchema`           | `evaluationRunOutcomeSchema` |
 | `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
 | `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
+| `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
 
 ## Sockets
 
@@ -324,21 +325,22 @@ Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:39`. Events: `evaluat
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
-Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:118`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
+Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:127`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
 
-| Kind                       | Name                                                                                           | Handles                                                            | Declared at                                                     |
-| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| command                    | –                                                                                              | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:158` |
-| command                    | `startEvaluation`                                                                              | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:171` |
-| command                    | `completeEvaluation`                                                                           | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:174` |
-| command                    | `reportEvaluation`                                                                             | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:177` |
-| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)   | `src/eventing/evaluation-processing-definition.pipeline.ts:185` |
-| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:203` |
-| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)   | `src/eventing/evaluation-processing-definition.pipeline.ts:214` |
-| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:130` |
-| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:135` |
-| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:140` |
-| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                  | `src/eventing/evaluation-processing-definition.pipeline.ts:145` |
+| Kind                       | Name                                                                                           | Handles                                                                      | Declared at                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| command                    | –                                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:167` |
+| command                    | `startEvaluation`                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:180` |
+| command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:183` |
+| command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:186` |
+| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:194` |
+| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:212` |
+| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:223` |
+| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:247` |
+| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:139` |
+| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:144` |
+| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:149` |
+| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:154` |
 
 ## Configuration
 

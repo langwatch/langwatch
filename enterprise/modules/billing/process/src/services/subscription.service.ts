@@ -9,7 +9,6 @@ import {
   PlanTypes,
   SeatBillingUnavailableError,
   stripePricesFile,
-  type SubscriptionInvite,
   type StripePriceName,
   SubscriptionCreationFailedError,
   UserEmailRequiredError,
@@ -17,7 +16,6 @@ import {
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationCaller } from "@langwatch/organization-contract";
 
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import type { StripeInvoicesChannel } from "../channels/stripe-invoices.channel.ts";
@@ -288,15 +286,14 @@ export class BillingSubscriptionService {
     });
   }
 
-  async createSubscriptionWithInvites({
+  /** A seat checkout and the pending subscription organization holds invitations against (C2 A). */
+  async createSeatCheckout({
     organizationId,
     baseUrl,
     membersToAdd,
     customerId,
     currency,
     billingInterval,
-    invites,
-    invitedBy,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -304,15 +301,11 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
-    invites: readonly SubscriptionInvite[];
-    /** Who invited them: organization refuses invitations above what they hold. */
-    invitedBy: OrganizationCaller;
-  }): Promise<{ url: string | null }> {
+  }): Promise<{ url: string | null; subscriptionId: string }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
     }
 
-    const teamId = (await this.organizationRepository.findFirstTeamId(organizationId)) ?? "";
     const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
 
     return this.seatEventService.createSeatEventCheckout({
@@ -323,14 +316,6 @@ export class BillingSubscriptionService {
       billingInterval: billingInterval ?? "monthly",
       membersToAdd,
       isUpgradeFromTiered: pricingModel === "TIERED",
-      invitations: {
-        invites: invites.map((invite) => ({
-          email: invite.email,
-          role: invite.role,
-          teamIds: teamId,
-        })),
-        by: invitedBy,
-      },
     });
   }
 

@@ -1,5 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -36,6 +37,7 @@ export function organizationModuleSetup(peers: Partial<Peers> = {}): Organizatio
       roles: peers.roles ?? createApiFixture<RoleApi>({}, "RoleApi"),
       notifications:
         peers.notifications ?? createApiFixture<NotificationService>({}, "NotificationService"),
+      billing: peers.billing ?? createApiFixture<BillingApi>({}, "BillingApi"),
     },
     config: {
       signUp: { mode: "open", allowedDomains: [], adminEmails: [] },

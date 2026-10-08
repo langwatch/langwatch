@@ -1,10 +1,10 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 import { MemoryTraceEditOverlayRepository } from "../../../../repositories/memory/memory.trace-edit-overlay.repository.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceLegacyReadRepository } from "../../../../repositories/trace-legacy-read.repository.ts";
 import { TraceEditOverlayService } from "../../../trace-edit-overlay.service.ts";
 import { TraceLegacyReadService } from "../../../trace-legacy-read.service.ts";
@@ -17,7 +17,7 @@ export function legacyReadAnswering(
     traceCanonicalisation: TraceCanonicalisationService.create(),
     traceRead: createApiFixture<TraceLegacyReadRepository>({}, "trace read store"),
     editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
-    evaluationService: createApiFixture<EvaluationApi>({}, "evaluations"),
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
   });
   vi.spyOn(service, "getAllTracesForProject").mockImplementation(getAllTracesForProject);
   return service;

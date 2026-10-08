@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withApi(TraceModule).withTransports(tracesTrpcTransport, tracesInstantEvalTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).withTransportFacts(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceIngestSourceBillingEventing).withEventing(traceLogRecordsEventing).withEventing(traceTopicNamesEventing).withEventing(traceAnnotationsEventing).withMigrations(…)`, `src/trace.module.ts:44`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).withTransportFacts(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing)`, `src/trace.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:162`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:156`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -617,12 +617,6 @@ readRecentSpansByModels(input: { projectId: string; models: string[]; fromMs: nu
 readEvaluations(input: { projectId: string; traceIds: string[]; protections: unknown; }): Promise<Record<string, unknown[]>>;
 ```
 
-#### `findEvaluationInputs`
-
-```typescript
-findEvaluationInputs(input: { projectId: string; evaluationId: string; }): Promise<Record<string, unknown> | null>;
-```
-
 #### `readTopicCounts`
 
 ```typescript
@@ -851,54 +845,6 @@ The anonymous share page's whole payload for one token (port of main's `sharedTr
 
 ```typescript
 getSharedTrace(input: { token: string; viewerUserId: string | null; clientIp: string | null; userAgent: string | null; }): Promise<SharedTraceDto>;
-```
-
-#### `estimateExplorerEvalRun`
-
-The Explorer's Instant Eval, priced. The shorthand it sends is turned into the statement a CLI caller would write, judging nothing.
-
-```typescript
-estimateExplorerEvalRun(input: { request: ExplorerInstantEvalRunInput; userId: string; }): Promise<InstantEvalEstimateWire>;
-```
-
-#### `startExplorerEvalRun`
-
-The same shorthand, accepted and queued. Answers the run's counters.
-
-```typescript
-startExplorerEvalRun(input: { request: ExplorerInstantEvalRunInput; userId: string; }): Promise<InstantEvalRunProgress>;
-```
-
-#### `cancelExplorerEvalRun`
-
-Asks a run to stop. A run that already finished is refused by name.
-
-```typescript
-cancelExplorerEvalRun(input: { projectId: string; runId: string; requestedByUserId?: string; }): Promise<InstantEvalRunProgress>;
-```
-
-#### `getExplorerEvalRun`
-
-One run's counters, which is all a chip and a progress bar read.
-
-```typescript
-getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
-```
-
-#### `getExplorerEvalAccess`
-
-Whether the Explorer may judge, and what its refusal popover offers this member.
-
-```typescript
-getExplorerEvalAccess(input: { projectId: string; userId: string; }): Promise<InstantEvalOptInAccess>;
-```
-
-#### `enableExplorerEvals`
-
-The organization's own switch, thrown from the popover; the organization is the project's.
-
-```typescript
-enableExplorerEvals(input: { projectId: string; userId: string; }): Promise<InstantEvalOptInAccess>;
 ```
 
 #### `findExplorerEvalRuns`
@@ -1367,7 +1313,7 @@ Contract `../contract/src/export-progress.trpc.ts:20`, router `src/transport/exp
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:603`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:600`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1375,7 +1321,7 @@ Contract `../contract/src/traces.trpc.ts:603`, router `src/transport/shared-trac
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:612`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:609`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1392,29 +1338,15 @@ Contract `../contract/src/trace-edit-overlay.trpc.ts:19`, router `src/transport/
 | `traceEditOverlay.upsert`       | mutation | Permission `annotations:update` | `upsertInputSchema` | `traceEditOverlayDtoSchema`    |
 | `traceEditOverlay.delete`       | mutation | Permission `annotations:update` | `traceScopeSchema`  | –                              |
 
-### `traces.instantEval`
-
-Contract `../contract/src/traces-instant-eval.trpc.ts:20`, router `src/transport/traces-instant-eval.trpc.ts:13`.
-
-| Procedure                     | Kind     | Gate                                            | Input                              | Output                              |
-| ----------------------------- | -------- | ----------------------------------------------- | ---------------------------------- | ----------------------------------- |
-| `traces.instantEval.estimate` | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunSchema`     | `instantEvalEstimateSchema`         |
-| `traces.instantEval.start`    | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunSchema`     | `explorerInstantEvalProgressSchema` |
-| `traces.instantEval.cancel`   | mutation | Permission `analytics:manage`                   | `explorerInstantEvalRunIdSchema`   | `explorerInstantEvalProgressSchema` |
-| `traces.instantEval.get`      | query    | Permission `analytics:view`                     | `explorerInstantEvalRunIdSchema`   | `explorerInstantEvalProgressSchema` |
-| `traces.instantEval.access`   | query    | Permission `analytics:view`                     | `explorerInstantEvalProjectSchema` | `instantEvalOptInAccessSchema`      |
-| `traces.instantEval.enable`   | mutation | Permission `organization:manage, via projectId` | `explorerInstantEvalProjectSchema` | `instantEvalOptInAccessSchema`      |
-
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:158`, router `src/transport/traces.trpc.ts:44`.
+Contract `../contract/src/traces.trpc.ts:159`, router `src/transport/traces.trpc.ts:44`.
 
 | Procedure                              | Kind         | Gate                       | Input                               | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ----------------------------------- | ---------------------------------- |
 | `traces.getAllForProject`              | query        | Permission `traces:view`   | `traceListInputSchema`              | `tracesForProjectResultSchema`     |
 | `traces.getById`                       | query        | Permission `traces:view`   | inline                              | `traceSchema`                      |
 | `traces.getEvaluations`                | query        | Permission `traces:view`   | `traceScopeSchema`                  | inline                             |
-| `traces.getEvaluationInputs`           | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getEvaluationsMultiple`        | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getCustomersAndLabels`         | query        | Permission `traces:view`   | `traceFilterInputSchema`            | `customersAndLabelsResultSchema`   |
 | `traces.getTracesByThreadId`           | query        | Permission `traces:view`   | inline                              | inline                             |
@@ -1424,6 +1356,7 @@ Contract `../contract/src/traces.trpc.ts:158`, router `src/transport/traces.trpc
 | `traces.getSampleTracesDataset`        | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getSampleTraces`               | query        | Permission `traces:view`   | inline                              | inline                             |
 | `traces.getFieldNames`                 | query        | Permission `traces:view`   | inline                              | `distinctFieldNamesResultSchema`   |
+| `traces.getFieldRedactionStatus`       | query        | Permission `project:view`  | inline                              | `tracesFieldRedactionStatusSchema` |
 | `traces.getAllForDownload`             | mutation     | Permission `traces:view`   | inline                              | `tracesForProjectResultSchema`     |
 | `traces.onTraceUpdate`                 | subscription | Permission `traces:view`   | inline                              | inline                             |
 | `traces.list`                          | query        | Permission `traces:view`   | inline                              | `tracesListPageSchema`             |
@@ -1460,14 +1393,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `trace_annotations` (aggregate `global`)
+### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 
-Declared at `src/eventing/trace-annotations.pipeline.ts:40`.
+Declared at `src/eventing/trace-collector-evaluations.pipeline.ts:17`. Events: `collectorEvaluationReceivedEventSchema`.
 
-| Kind                 | Name                                      | Handles | Declared at                                     |
-| -------------------- | ----------------------------------------- | ------- | ----------------------------------------------- |
-| peer fold projection | `≈ traceAnnotationsPeerFold(annotations)` | –       | `src/eventing/trace-annotations.pipeline.ts:46` |
-| peer fold projection | `≈ traceAnnotationScoresPeerFold(scores)` | –       | `src/eventing/trace-annotations.pipeline.ts:47` |
+| Kind    | Name                        | Handles | Declared at                                               |
+| ------- | --------------------------- | ------- | --------------------------------------------------------- |
+| command | `recordCollectorEvaluation` | –       | `src/eventing/trace-collector-evaluations.pipeline.ts:22` |
 
 ### Pipeline `trace_ingest_source_billing` (aggregate `global`)
 
@@ -1476,14 +1408,6 @@ Declared at `src/eventing/trace-ingest-source-billing.pipeline.ts:31`.
 | Kind            | Name                               | Handles                                                                                                        | Declared at                                               |
 | --------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | peer subscriber | `traceIngestSourceBillingRecorded` | `lw.obs.coding_assistant_billing.recorded` from [governance](../../../enterprise/modules/governance/README.md) | `src/eventing/trace-ingest-source-billing.pipeline.ts:38` |
-
-### Pipeline `trace_log_records` (aggregate `global`)
-
-Declared at `src/eventing/trace-log-records.pipeline.ts:33`.
-
-| Kind                | Name | Handles | Declared at                                     |
-| ------------------- | ---- | ------- | ----------------------------------------------- |
-| peer map projection | –    | –       | `src/eventing/trace-log-records.pipeline.ts:39` |
 
 ### Pipeline `trace_processing` (aggregate `trace`)
 
@@ -1514,14 +1438,6 @@ Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `fir
 | ------- | --------------------- | ------- | ------------------------------------------------------ |
 | command | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:26` |
 | command | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
-
-### Pipeline `trace_topic_names` (aggregate `global`)
-
-Declared at `src/eventing/trace-topic-names.pipeline.ts:29`.
-
-| Kind                 | Name                               | Handles | Declared at                                     |
-| -------------------- | ---------------------------------- | ------- | ----------------------------------------------- |
-| peer fold projection | `≈ traceTopicNamesPeerFold(store)` | –       | `src/eventing/trace-topic-names.pipeline.ts:35` |
 
 ## Configuration
 

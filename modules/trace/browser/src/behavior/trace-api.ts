@@ -112,6 +112,17 @@ export type TraceApiMap = {
       };
     };
 
+    /** Whether a privacy rule hides input or output from this reader, and who can see it. */
+    getFieldRedactionStatus: {
+      query: {
+        input: ProjectScope;
+        output: {
+          isRedacted: Record<"input" | "output", boolean>;
+          visibleTo: Record<"input" | "output", string | null>;
+        };
+      };
+    };
+
     /** Event rollups for the list's Events column, keyed by trace id. */
     listEvents: {
       query: {
@@ -260,14 +271,6 @@ export type TraceApiMap = {
     /** One trace, whole: the queue conversation's only turn when its thread answers with none. */
     getById: {
       query: { input: TraceScope; output: Trace };
-    };
-
-    /** What an evaluation was run over, for the evaluation cards. */
-    getEvaluationInputs: {
-      query: {
-        input: ProjectScope & { evaluationId: string };
-        output: Record<string, unknown> | null;
-      };
     };
 
     /** The whole trace rendered as one readable digest. */
@@ -673,14 +676,14 @@ export type TraceApiMap = {
     getHasFirstMessage: {
       query: { input: ProjectScope; output: { firstMessage: boolean } };
     };
+  };
 
-    getFieldRedactionStatus: {
+  evaluations: {
+    /** What an evaluation was run over, for the evaluation cards; evaluation serves it. */
+    getEvaluationInputs: {
       query: {
-        input: ProjectScope;
-        output: {
-          isRedacted: Record<"input" | "output", boolean>;
-          visibleTo: Record<"input" | "output", string | null>;
-        };
+        input: ProjectScope & { evaluationId: string };
+        output: Record<string, unknown> | null;
       };
     };
   };

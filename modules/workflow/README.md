@@ -19,8 +19,9 @@ Workflows: definitions, graph versions and the Studio DSL, and executing a workf
 
 | Kind            | Name                                                                                                                                                                                                                                                                                                            | Declared at                                                          |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Stores required |                                                                                                                                                                                                                                                                                                                 | `process/src/channels/http/http.workflow.channels.ts:36`             |
 | Stores required | prisma                                                                                                                                                                                                                                                                                                          | `process/src/repositories/prisma/prisma.workflow.repositories.ts:19` |
-| Secrets         | `nlpLambdaFleet` (LANGWATCH_NLP_LAMBDA_CONFIG), `nlpInternal` (LANGWATCH_NLP_INTERNAL_SECRET)                                                                                                                                                                                                                   | `process/src/app/workflow.app.ts:601`                                |
+| Secrets         | `nlpLambdaFleet` (LANGWATCH_NLP_LAMBDA_CONFIG), `nlpInternal` (LANGWATCH_NLP_INTERNAL_SECRET)                                                                                                                                                                                                                   | `process/src/app/workflow.app.ts:493`                                |
 | Config          | `nlpServiceUrl` (LANGWATCH_NLP_SERVICE), `stagingThresholdBytes` (LANGEVALS_STAGING_THRESHOLD_BYTES), `stagingTtlSeconds` (LANGEVALS_STAGING_TTL_SECONDS), `relayTurnCeilingMs` (NLP_FETCH_MAX_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST), `nlpCodeBlockTimeoutSeconds` (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS) | `contract/src/workflow.config.ts:79`                                 |
 
 Anything else workflow needs belongs to another module and is reached through its `*Api`.
@@ -34,11 +35,10 @@ Anything else workflow needs belongs to another module and is reached through it
 | `authz`          | `AuthzApi`         | [authz](../authz/README.md)                   |
 | `datasets`       | `DatasetApi`       | [dataset](../dataset/README.md)               |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
-| `monitors`       | `MonitorApi`       | [monitor](../monitor/README.md)               |
 | `secrets`        | `SecretApi`        | [secret](../secret/README.md)                 |
 
 ## Who depends on workflow
 
-[audit-log](../audit-log/README.md), [evaluation](../evaluation/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md) (as a peer).
+[evaluation](../evaluation/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md) (as a peer).
 
 <!-- readme:generated:end -->

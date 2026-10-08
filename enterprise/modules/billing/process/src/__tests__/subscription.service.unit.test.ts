@@ -3,7 +3,6 @@ import {
   PlanTypes,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
@@ -21,10 +20,7 @@ import type {
   BillingSubscriptionStatus,
 } from "../rules/billing-stripe-shapes.rules.ts";
 import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
-import {
-  type SeatCheckoutInvites,
-  SeatEventSubscriptionService,
-} from "../services/seat-event-subscription.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -105,6 +101,10 @@ const createMockOrganizationRepository = (): {
   findFirstTeamId: vi.fn(),
   findBillingProfile: vi.fn(),
   claimStripeCustomerId: vi.fn(),
+  findWithAdministrators: vi.fn(),
+  findActiveMemberIds: vi.fn(),
+  findSelfHostedCustomers: vi.fn(),
+  listIds: vi.fn(),
 });
 
 const createMockNotifier = (): BillingSubscriptionNotifier => ({
@@ -116,7 +116,6 @@ const createMockSeatEventService = () =>
     SeatEventSubscriptionService.create({
       stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
       subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
-      invites: createApiFixture<SeatCheckoutInvites>({}),
       abandoned: { seatCheckoutsAbandoned: vi.fn() },
       prices: TEST_PRICES,
       customerCurrency: StripeCustomerCurrencyService.create({
@@ -606,24 +605,22 @@ describe("BillingSubscriptionService", () => {
     });
   });
 
-  describe("createSubscriptionWithInvites()", () => {
+  describe("createSeatCheckout()", () => {
     describe("when seatEventFns is not configured", () => {
       it("raises seat_billing_unavailable", async () => {
         await expect(
-          service.createSubscriptionWithInvites({
+          service.createSeatCheckout({
             organizationId: "org_123",
             baseUrl: "https://app.test",
             membersToAdd: 3,
             customerId: "cus_123",
-            invites: [{ email: "alice@example.com", role: "MEMBER" as any }],
-            invitedBy: { id: "user_1" },
           }),
         ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
     });
 
     describe("when seatEventFns is configured", () => {
-      it("creates seat event checkout with mapped invites", async () => {
+      it("opens a seat checkout and answers its pending subscription", async () => {
         const seatEventService = createMockSeatEventService();
         const svcWithSeats = createServiceWithSeatEventFns({
           repository,
@@ -632,39 +629,32 @@ describe("BillingSubscriptionService", () => {
           seatEventService,
         });
 
-        organizationRepository.findFirstTeamId.mockResolvedValue("team_1");
-        organizationRepository.findPricingModel.mockResolvedValue("SEAT_EVENT");
+        organizationRepository.findPricingModel.mockResolvedValue("TIERED");
         (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
           url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
         });
 
-        const result = await svcWithSeats.createSubscriptionWithInvites({
-          organizationId: "org_123",
-          baseUrl: "https://app.test",
-          membersToAdd: 2,
-          customerId: "cus_123",
-          invites: [
-            { email: "alice@example.com", role: "MEMBER" as any },
-            { email: "bob@example.com", role: "ADMIN" as any },
-          ],
-          invitedBy: { id: "user_1" },
-        });
-
-        expect(result.url).toBe("https://checkout.stripe.com/seat-session");
-        expect(seatEventService.createSeatEventCheckout).toHaveBeenCalledWith(
-          expect.objectContaining({
+        await expect(
+          svcWithSeats.createSeatCheckout({
             organizationId: "org_123",
-            customerId: "cus_123",
+            baseUrl: "https://app.test",
             membersToAdd: 2,
-            invitations: {
-              invites: [
-                { email: "alice@example.com", role: "MEMBER", teamIds: "team_1" },
-                { email: "bob@example.com", role: "ADMIN", teamIds: "team_1" },
-              ],
-              by: { id: "user_1" },
-            },
+            customerId: "cus_123",
           }),
-        );
+        ).resolves.toEqual({
+          url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
+        });
+        expect(seatEventService.createSeatEventCheckout).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          customerId: "cus_123",
+          baseUrl: "https://app.test",
+          currency: "EUR",
+          billingInterval: "monthly",
+          membersToAdd: 2,
+          isUpgradeFromTiered: true,
+        });
       });
     });
   });

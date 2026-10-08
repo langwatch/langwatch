@@ -19,7 +19,7 @@ import {
 } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import {
   DEFAULT_PERSONAL_KEY_LABEL,
@@ -59,7 +59,7 @@ export class PersonalVirtualKeyService {
   private readonly keys: PersonalKeyReads;
   private readonly providers: ProviderCounts;
   private readonly issuer: PersonalVirtualKeyIssuer;
-  private readonly organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+  private readonly organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
   private readonly policies: RoutingPolicyReader;
   private readonly gatewayBaseUrl: string;
 
@@ -74,7 +74,7 @@ export class PersonalVirtualKeyService {
     keys: PersonalKeyReads;
     providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }) {
@@ -90,7 +90,7 @@ export class PersonalVirtualKeyService {
     keys: PersonalKeyReads;
     providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
+    organizations: Pick<OrganizationApi, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }): PersonalVirtualKeyService {

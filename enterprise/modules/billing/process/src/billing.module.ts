@@ -43,8 +43,8 @@ export const billingProcessModule = defineProcessModule("billing")
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
-  .withTasks(async ({ app, dependencies, secrets, config }) => [
-    UsageBillingCatchUpTask.create({ organizations: dependencies.organizations, billing: app }),
+  .withTasks(async ({ app, repositories, secrets, config }) => [
+    UsageBillingCatchUpTask.create({ organizations: repositories.organizations, billing: app }),
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
       StripePricesSyncTask.create({
         source: () => {

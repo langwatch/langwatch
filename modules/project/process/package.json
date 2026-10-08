@@ -44,7 +44,6 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",

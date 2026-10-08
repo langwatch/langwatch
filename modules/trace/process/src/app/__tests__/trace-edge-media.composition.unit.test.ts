@@ -7,7 +7,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -74,7 +73,6 @@ function compose({
       fallbackVisibilityDays: 14,
     },
     dataRetention: createApiFixture<DataRetentionApi>(),
-    evaluations: createApiFixture<EvaluationApi>(),
     modelProviders: createApiFixture<ModelProviderApi>(),
     projects: createApiFixture<ProjectApi>(),
     share: createApiFixture<ShareApi>(),

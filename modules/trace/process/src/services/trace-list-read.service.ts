@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -19,6 +18,7 @@ import type {
 
 import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
+import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceTopicNamesReadRepository } from "../repositories/trace-topic-names.repository.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -86,13 +86,14 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
 export class TraceListService {
   static create({
     repository,
-    evaluations,
+    evaluationRuns,
     topicNames,
     facets,
     discoverUpdates,
   }: {
     repository: TraceListRead;
-    evaluations: EvaluationApi;
+    /** Evaluation's shared runs, read for each page's evaluation summaries (R40). */
+    evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findSummariesByTraceIds">;
     /** Trace's fold of topic's names; facet labels read it. */
     topicNames: Pick<TraceTopicNamesReadRepository, "findNamesByIds">;
     facets: FacetCatalog;
@@ -103,7 +104,7 @@ export class TraceListService {
 
     return new TraceListService({
       repository,
-      evaluations,
+      evaluationRuns,
       discover: TraceDiscoverService.create({
         repository,
         topicNaming,
@@ -116,7 +117,10 @@ export class TraceListService {
 
   private readonly repository: TraceListRead;
 
-  private readonly evaluations: EvaluationApi;
+  private readonly evaluationRuns: Pick<
+    TraceEvaluationRunsReadRepository,
+    "findSummariesByTraceIds"
+  >;
 
   private readonly discover: TraceDiscoverService;
 
@@ -125,7 +129,7 @@ export class TraceListService {
   private constructor(deps: {
     repository: TraceListRead;
 
-    evaluations: EvaluationApi;
+    evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findSummariesByTraceIds">;
 
     discover: TraceDiscoverService;
 
@@ -133,7 +137,7 @@ export class TraceListService {
   }) {
     this.repository = deps.repository;
 
-    this.evaluations = deps.evaluations;
+    this.evaluationRuns = deps.evaluationRuns;
 
     this.discover = deps.discover;
 
@@ -211,7 +215,7 @@ export class TraceListService {
     const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
-    const evaluations = await this.evaluations.findSummariesByTraceIds({
+    const evaluations = await this.evaluationRuns.findSummariesByTraceIds({
       tenantId: params.tenantId,
       traceIds,
       since: params.timeRange.from,

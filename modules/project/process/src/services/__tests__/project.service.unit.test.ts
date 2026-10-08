@@ -1,6 +1,5 @@
 import {
   OrganizationHasNoTeamError,
-  OrganizationService as OrganizationServiceContract,
   type OrganizationApi,
   type AddOrganizationTeamMemberInput,
   type CreateOrganizationTeamInput,
@@ -156,7 +155,7 @@ class StubRepository implements ProjectRepository {
   );
 }
 
-class StubOrganizationService extends OrganizationServiceContract {
+class StubOrganizationService {
   teamId: string | null = "oldest-team";
   findActiveTeam = vi.fn<
     (input: { teamId: string; organizationId: string }) => Promise<{
@@ -213,10 +212,6 @@ class StubOrganizationService extends OrganizationServiceContract {
   }
 
   getBillingProfile(): Promise<OrganizationBillingProfile> {
-    throw new Error("not used by this test");
-  }
-
-  claimBillingCustomerId(): Promise<boolean> {
     throw new Error("not used by this test");
   }
 

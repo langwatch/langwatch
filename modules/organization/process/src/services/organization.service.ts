@@ -2,15 +2,12 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
   type OrganizationJoinSetting,
-  OrganizationService as OrganizationServiceContract,
   UserNotInOrganizationError,
-  claimOrganizationBillingCustomerInputSchema,
   getOldestTeamInputSchema,
   getOrganizationBillingProfileInputSchema,
   getOrganizationIdByTeamIdInputSchema,
   getOrganizationMembersInputSchema,
   type AddOrganizationTeamMemberInput,
-  type ClaimOrganizationBillingCustomerInput,
   type CreateOrganizationTeamInput,
   type CreateOrganizationTeamWithMembersInput,
   type EnsuredPersonalWorkspace,
@@ -91,12 +88,11 @@ export type OrganizationServiceDependencies = {
   settingsNotices?: OrganizationSettingsNotices;
 };
 
-export class OrganizationService extends OrganizationServiceContract {
+export class OrganizationService {
   private readonly repository: OrganizationRepository;
   private readonly teams: TeamRepository;
 
   private constructor(options: OrganizationServiceDependencies) {
-    super();
     this.repository = options.repository;
     this.teams = options.teams;
     this.groupService = OrganizationGroupService.create(options);
@@ -329,12 +325,6 @@ export class OrganizationService extends OrganizationServiceContract {
   ): Promise<OrganizationBillingProfile> {
     return this.repository.getBillingProfile(
       getOrganizationBillingProfileInputSchema.parse(input).organizationId,
-    );
-  }
-
-  claimBillingCustomerId(input: ClaimOrganizationBillingCustomerInput): Promise<boolean> {
-    return this.repository.claimBillingCustomerId(
-      claimOrganizationBillingCustomerInputSchema.parse(input),
     );
   }
 

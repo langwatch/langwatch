@@ -7,6 +7,7 @@ import {
   type AuthzAccessBreakdownOutput,
   type AuthzGrantCaller,
 } from "@langwatch/authz-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -120,6 +121,8 @@ import {
   type PendingInvitationsForCaller,
   type SignUpVerdict,
   type SignInSecurityPolicy,
+  type OrganizationApiSeatCheckoutInput,
+  type OrganizationSeatCheckoutRedirect,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -331,6 +334,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     roles: RoleApi,
     /** Sends the invitation mails; notification owns the gateway. */
     notifications: NotificationService,
+    /** The seat checkout the invite door opens after bounding its invitations (C2 A). */
+    billing: BillingApi,
   };
   /** Sign-up policy settings (specs/auth/sign-up-restriction.feature) and the public origin. */
   static readonly config = organizationServerConfig;
@@ -423,6 +428,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       lifecycle: infrastructure.lifecycle,
       creationThrottle: infrastructure.inviteCreationThrottle,
       ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
+      billing: setup.dependencies.billing,
+      getOldestTeamId: (input) => application.getOldestTeamId(input),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
     application.#joinRequests = infrastructure.joinRequests;
@@ -1174,18 +1181,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.membership.getAuditLogs(input);
   }
 
-  /**
-   * Claims the payment provider's customer id for this organization, once.
-   * Beside the profile read because they are the same row: the provisioning
-   * door reads one and writes the other.
-   */
-  claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    return this.#dependencies.organizations.claimBillingCustomerId(input);
-  }
-
   getWithAdministrators(input: {
     organizationId: string;
   }): Promise<OrganizationWithAdministrators> {
@@ -1589,6 +1584,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#invitationDoor.checkInvitesWithinCaller(input, by);
+  }
+
+  createSeatCheckoutWithInvites(
+    input: OrganizationApiSeatCheckoutInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationSeatCheckoutRedirect> {
+    return this.#invitationDoor.checkoutSeats(input, by);
   }
 
   async createPaymentPendingInvites(

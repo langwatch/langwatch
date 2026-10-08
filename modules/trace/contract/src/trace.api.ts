@@ -619,10 +619,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceIds: string[];
     protections: unknown;
   }): Promise<Record<string, unknown[]>>;
-  findEvaluationInputs(input: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null>;
   readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
   readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
   /**

@@ -21,20 +21,8 @@ export type ProjectPermissionScope = Readonly<{
 }>;
 
 /**
- * The viewer's content visibility for one project, as the deployment's own
- * protections resolver answers it. Only the four fields this surface renders
- * are named; the resolver returns more.
- */
-export type ProjectFieldProtections = Readonly<{
-  canSeeCapturedInput?: boolean | null | undefined;
-  canSeeCapturedOutput?: boolean | null | undefined;
-  capturedInputVisibleTo?: string | null | undefined;
-  capturedOutputVisibleTo?: string | null | undefined;
-}>;
-
-/**
  * What the project's own browser door reaches: the project application, and
- * the five deployment answers the surface needs beside it. Each is asked of the
+ * the four deployment answers the surface needs beside it. Each is asked of the
  * request the mount built this for, so the caller is the mount's to resolve.
  */
 export interface ProjectBrowserApi {
@@ -50,11 +38,6 @@ export interface ProjectBrowserApi {
     scope: ProjectPermissionScope;
     by: Readonly<{ id: string }>;
   }): Promise<boolean>;
-  /** `by`'s captured-content visibility for the project; `by` travels as in `probePermission`. */
-  getFieldProtections(input: {
-    projectId: string;
-    by: Readonly<{ id: string }>;
-  }): Promise<ProjectFieldProtections>;
   /** Archives a project other than the one the caller is in, after probing it on its own. */
   archiveOtherProject(input: {
     projectId: string;
@@ -163,26 +146,6 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       );
 
       return { success: true, projectSlug: updatedProject.slug };
-    })
-
-    .procedure("getFieldRedactionStatus")
-    .withPermission("project:view")
-    .handle(async ({ app, input, actor }) => {
-      const protections = await app.getFieldProtections({ projectId: input.projectId, by: actor });
-
-      return {
-        isRedacted: {
-          input: !protections.canSeeCapturedInput,
-          output: !protections.canSeeCapturedOutput,
-        },
-        // Human label of who CAN see a restricted field (e.g. "Admins,
-        // Security" or "no one"), so the redaction placeholder can explain why
-        // content is hidden and who to ask. Null when the field is visible.
-        visibleTo: {
-          input: protections.capturedInputVisibleTo ?? null,
-          output: protections.capturedOutputVisibleTo ?? null,
-        },
-      };
     })
 
     .procedure("archiveById")

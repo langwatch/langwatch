@@ -8050,6 +8050,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      slugify:
+        specifier: 'catalog:'
+        version: 1.6.9
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13007,9 +13010,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)

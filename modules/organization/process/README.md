@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:232`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:234`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -534,14 +534,6 @@ Main's `findWithAdmins`, for the usage-limit mails; throws `OrganizationNotFound
 getWithAdministrators(input: Readonly<{ organizationId: string }>): Promise<OrganizationWithAdministrators>;
 ```
 
-#### `updateSentPlanLimitAlert`
-
-Main's `updateSentPlanLimitAlert`.
-
-```typescript
-updateSentPlanLimitAlert(input: Readonly<{ organizationId: string; sentAt: Instant }>): Promise<void>;
-```
-
 #### `setLicense`
 
 The licence and its expiry; the mint stamps `validatedAt` null, an activation now.
@@ -564,12 +556,6 @@ The support contact set in settings, else the longest-seated enabled administrat
 
 ```typescript
 findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
-```
-
-#### `claimBillingCustomerId`
-
-```typescript
-claimBillingCustomerId(input: Readonly<{ organizationId: string; billingCustomerId: string }>): Promise<boolean>;
 ```
 
 #### `getTeam`
@@ -860,20 +846,20 @@ Refuses, writing nothing, invitations that would confer more than `by` holds: th
 checkInvitesWithinCaller(input: Readonly<{ organizationId: string; invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[]; }>, by: OrganizationCaller): Promise<void>;
 ```
 
+#### `createSeatCheckoutWithInvites`
+
+Bounds the invitations by `by`, opens billing's seat checkout, then holds them payment pending against the subscription it opened (C2 A, Round 50). Refuses `grant_exceeds_caller_permissions` before any checkout opens.
+
+```typescript
+createSeatCheckoutWithInvites(input: OrganizationApiSeatCheckoutInput, by: OrganizationCaller): Promise<OrganizationSeatCheckoutRedirect>;
+```
+
 #### `createPaymentPendingInvites`
 
 Holds a seat checkout's invitations until it is paid, as main's billing did; an address that already holds an open invitation here is skipped. `by` is who invited: nobody is invited to more than they hold (checked before storing; acceptance after payment is `system`).
 
 ```typescript
 createPaymentPendingInvites(input: Readonly<{ organizationId: string; subscriptionId: string; invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[]; }>, by: OrganizationCaller): Promise<void>;
-```
-
-#### `cancelPaymentPendingInvites`
-
-Drops the held invitations of seat checkouts that were abandoned.
-
-```typescript
-cancelPaymentPendingInvites(input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>): Promise<void>;
 ```
 
 #### `countMemberSeats`
@@ -906,14 +892,6 @@ A client pre-check refused somebody: re-checked, so a fabricated report raises n
 
 ```typescript
 reportLimitBlocked(input: Readonly<{ organizationId: string; limitType: LimitType }>, by: OrganizationCaller): Promise<void>;
-```
-
-#### `approvePaymentPendingInvites`
-
-Opens the invitations a completed seat checkout paid for, as main's billing webhook did.
-
-```typescript
-approvePaymentPendingInvites(input: Readonly<{ subscriptionId: string; organizationId: string }>): Promise<void>;
 ```
 
 #### `changeTeamMemberRole`
@@ -1540,7 +1518,7 @@ Contract `../contract/src/group.trpc.ts:29`, router `src/transport/group.trpc.ts
 
 ### `invite`
 
-Contract `../contract/src/invite.trpc.ts:21`, router `src/transport/invite.trpc.ts:14`.
+Contract `../contract/src/invite.trpc.ts:23`, router `src/transport/invite.trpc.ts:14`.
 
 | Procedure                              | Kind     | Gate                                                                                                                                  | Input                                     | Output                                          |
 | -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
@@ -1549,6 +1527,7 @@ Contract `../contract/src/invite.trpc.ts:21`, router `src/transport/invite.trpc.
 | `invite.resendInvite`                  | mutation | Permission `organization:manage`                                                                                                      | `organizationApiInviteScopeSchema`        | `organizationInviteResentSchema`                |
 | `invite.getOrganizationPendingInvites` | query    | Permission `organization:manage`                                                                                                      | `organizationApiScopeSchema`              | `organizationListedInvitesSchema`               |
 | `invite.acceptInvite`                  | mutation | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | `organizationApiAcceptInviteInputSchema`  | `organizationInviteAcceptedSchema`              |
+| `invite.upgradeWithInvites`            | mutation | Permission `organization:manage`                                                                                                      | `organizationApiSeatCheckoutInputSchema`  | `organizationSeatCheckoutRedirectSchema`        |
 | `invite.myPendingInvitation`           | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | inline                                    | `organizationPendingInvitationForCallerSchema`  |
 | `invite.pendingForMe`                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | inline                                    | `organizationPendingInvitationsForCallerSchema` |
 
@@ -1625,18 +1604,18 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:34`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:67`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationMemberDisabledEventSchema`.
 
 | Kind    | Name                                 | Handles | Declared at                                          |
 | ------- | ------------------------------------ | ------- | ---------------------------------------------------- |
-| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:48` |
-| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:49` |
-| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:50` |
-| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:51` |
-| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:52` |
-| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:53` |
-| command | `recordTraceSharingDisabled`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:54` |
-| command | `recordMemberDisabled`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:55` |
+| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:81` |
+| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:82` |
+| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:83` |
+| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:84` |
+| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:85` |
+| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:86` |
+| command | `recordTraceSharingDisabled`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:87` |
+| command | `recordMemberDisabled`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:88` |
 
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
@@ -1658,7 +1637,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:338`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:343`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

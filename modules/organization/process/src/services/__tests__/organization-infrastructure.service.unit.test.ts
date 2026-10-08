@@ -180,20 +180,6 @@ class StubRepository extends OrganizationRepository {
     return null;
   }
 
-  async claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    if (!this.billingProfile || this.billingProfile.billingCustomerId) {
-      return false;
-    }
-    this.billingProfile = {
-      ...this.billingProfile,
-      billingCustomerId: input.billingCustomerId,
-    };
-    return true;
-  }
-
   getPersonalWorkspace(): Promise<PersonalWorkspace> {
     return Promise.reject(new TeamNotFoundError());
   }
@@ -664,19 +650,10 @@ describe("OrganizationService", () => {
     ).rejects.toBeInstanceOf(OrganizationHasNoTeamError);
   });
 
-  it("returns and atomically claims the billing profile", async () => {
+  it("returns the billing profile", async () => {
     const service = createService(new StubRepository("team"));
     await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
       billingCustomerId: null,
-    });
-    await expect(
-      service.claimBillingCustomerId({
-        organizationId: "org",
-        billingCustomerId: "customer-1",
-      }),
-    ).resolves.toBe(true);
-    await expect(service.getBillingProfile({ organizationId: "org" })).resolves.toMatchObject({
-      billingCustomerId: "customer-1",
     });
   });
 

@@ -15,7 +15,6 @@ import {
   type Currency,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
-  type SubscriptionInvite,
   type CurrencyRequest,
   type DetectedCurrency,
   type ConnectedBillingAccountView,
@@ -41,7 +40,6 @@ import type {
 import { NotFoundError } from "@langwatch/handled-error";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 
@@ -79,10 +77,7 @@ import { NotificationService as BillingUsageNoticeService } from "../services/bi
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
 import { ConnectedBillingService } from "../services/connected-billing.service.ts";
-import {
-  type ConnectedCustomerPeers,
-  ConnectedCustomerFactsService,
-} from "../services/connected-customer-facts.service.ts";
+import { ConnectedCustomerFactsService } from "../services/connected-customer-facts.service.ts";
 import { ConnectedMonthlyStatementService } from "../services/connected-monthly-statement.service.ts";
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
@@ -136,7 +131,6 @@ type ConnectedLicensing = Pick<
 export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
   authorization: Pick<AuthzApi, "can">;
-  organizations: ConnectedCustomerPeers["organizations"];
 }>;
 
 /** Where the plan-limit stamp goes: billing's fact, which organization applies (R42). */
@@ -157,7 +151,6 @@ type StripeWebhookComposition = Readonly<{
 
 type SubscriptionComposition = Readonly<{
   notifier: BillingSubscriptionNotifier;
-  organizations: Pick<OrganizationApi, "checkInvitesWithinCaller" | "createPaymentPendingInvites">;
   /** Abandoned checkouts' held invitations close from billing's fact (R42). */
   facts: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
 }>;
@@ -182,8 +175,6 @@ export class BillingModule
     licensing: LicensingApi,
     /** The platform-operator grant the admin console commands are checked against. */
     authorization: AuthzApi,
-    /** Which organizations are connected customers, and their projects. */
-    organizations: OrganizationApi,
     /** Where the usage-limit warning is written down, and read back so it goes once a month. */
     notifications: NotificationApi,
   };
@@ -225,7 +216,7 @@ export class BillingModule
     const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
     const lifecycle = BillingLifecycleAnnouncerService.create({
       subscriptions: setup.repositories.webhookSubscriptions,
-      organizations: setup.dependencies.organizations,
+      organizations: setup.repositories.organizations,
       resourceLimitAlerts,
       planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
       billingOrganizations: setup.repositories.reportOrganizations,
@@ -256,7 +247,6 @@ export class BillingModule
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
-          organizations: setup.dependencies.organizations,
           facts: lifecycle,
         },
       });
@@ -314,8 +304,8 @@ export class BillingModule
     notices: BillingUsageNoticeService,
     stamps: PlanLimitStamps,
   ): UsageWarningService {
-    const { notifications, organizations } = setup.dependencies;
-    const { projects } = setup.repositories;
+    const { notifications } = setup.dependencies;
+    const { projects, organizations } = setup.repositories;
     return UsageWarningService.create({
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
@@ -330,8 +320,7 @@ export class BillingModule
     notices: BillingUsageNoticeService,
     stamps: PlanLimitStamps,
   ): ResourceLimitAlertService {
-    const { organizations } = setup.dependencies;
-    const { projects } = setup.repositories;
+    const { projects, organizations } = setup.repositories;
     const { isSaas } = setup.config;
     return ResourceLimitAlertService.create({
       isSaas,
@@ -352,8 +341,7 @@ export class BillingModule
     notices: BillingUsageNoticeService,
     stamps: PlanLimitStamps,
   ): PlanLimitAlertService {
-    const { organizations } = setup.dependencies;
-    const { projects } = setup.repositories;
+    const { projects, organizations } = setup.repositories;
     return PlanLimitAlertService.create({
       isSaas: setup.config.isSaas,
       inFlight: planLimitInFlight,
@@ -417,7 +405,7 @@ export class BillingModule
     const repository = repositories.connectedBilling;
     const facts = ConnectedCustomerFactsService.create({
       licensing: peers.licensing,
-      organizations: peers.organizations,
+      organizations: repositories.organizations,
       gateway: repositories.gatewaySpend,
       projects: repositories.projects,
     });
@@ -559,7 +547,6 @@ export class BillingModule
         seatEventService: SeatEventSubscriptionService.create({
           stripeSubscriptions,
           subscriptions: repositories.seatEventSubscriptions,
-          invites: subscription.organizations,
           abandoned: subscription.facts,
           prices,
           customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
@@ -646,17 +633,20 @@ export class BillingModule
     return this.#subscriptionDoor.subscriptions.notifyProspective(input);
   }
 
-  async createSubscriptionWithInvites(input: {
+  async createSeatCheckout(input: {
     organizationId: string;
     baseUrl: string;
     membersToAdd: number;
-    customerId: string;
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
-    invites: readonly SubscriptionInvite[];
-    invitedBy: OrganizationCaller;
-  }): Promise<{ url: string | null }> {
-    return this.#subscriptionDoor.subscriptions.createSubscriptionWithInvites(input);
+    customerEmail: string | null;
+  }): Promise<{ url: string | null; subscriptionId: string }> {
+    const { customerEmail, ...checkout } = input;
+    const customerId = await this.getOrCreateCustomerId({
+      user: { email: customerEmail },
+      organizationId: input.organizationId,
+    });
+    return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
   }
 
   async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {

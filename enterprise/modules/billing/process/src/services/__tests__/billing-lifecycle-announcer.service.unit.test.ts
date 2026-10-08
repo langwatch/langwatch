@@ -64,7 +64,7 @@ function announcerOver(input: {
   const { logger, lines } = createTestLogger();
   const service = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => (input.remaining ? { id: "sub-2" } : null) },
-    organizations: { getAllMembers: async () => [{ id: "user-1" }, { id: "user-2" }] },
+    organizations: { findActiveMemberIds: async () => ["user-1", "user-2"] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: {
@@ -177,7 +177,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null },
       organizations: {
-        getAllMembers: async () => {
+        findActiveMemberIds: async () => {
           throw new Error("member lookup failed");
         },
       },
@@ -206,7 +206,7 @@ describe("BillingLifecycleAnnouncerService", () => {
   it("never throws when its senders are not connected", async () => {
     const service = BillingLifecycleAnnouncerService.create({
       subscriptions: { findLastNonCancelled: async () => null },
-      organizations: { getAllMembers: async () => [] },
+      organizations: { findActiveMemberIds: async () => [] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
       billingOrganizations: { getOrganizationForBilling: async () => billedLookup },

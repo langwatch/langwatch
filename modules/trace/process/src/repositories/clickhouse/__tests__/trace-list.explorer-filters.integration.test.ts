@@ -7,8 +7,6 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
@@ -26,6 +24,7 @@ import {
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { TraceListService } from "../../../services/trace-list-read.service.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
@@ -390,7 +389,7 @@ async function sidebarCounts({
     discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository: repo,
-    evaluations: createApiFixture<EvaluationApi>({}),
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({

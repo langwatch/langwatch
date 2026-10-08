@@ -14,7 +14,7 @@ describe("UsageBillingCatchUpTask", () => {
       const attempted: string[] = [];
       const task = UsageBillingCatchUpTask.create({
         organizations: {
-          listAllIds: async () => ({ ids: ["org-1", "org-2", "org-3"], next: null }),
+          listIds: async () => ({ ids: ["org-1", "org-2", "org-3"], next: null }),
         },
         billing: {
           catchUpUsageBilling: async ({ organizationId }) => {

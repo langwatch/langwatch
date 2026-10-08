@@ -15,7 +15,6 @@ import { PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE } from "./project.events.ts";
 import {
   projectApiKeyRevokedSchema,
   projectArchivedSchema,
-  projectFieldRedactionStatusSchema,
   projectFirstMessageSchema,
   projectLegacyKeyStatusSchema,
   projectProvisionedSchema,
@@ -48,12 +47,6 @@ export const projectTrpc = defineTrpcContract("project")
   .mutation("update")
   .withInput(projectUpdateInputSchema)
   .withOutput(projectSettingsSavedSchema)
-
-  // Whether this viewer may read captured input and output, and who can if
-  // they may not.
-  .query("getFieldRedactionStatus")
-  .withInput(projectScopeSchema)
-  .withOutput(projectFieldRedactionStatusSchema)
 
   // Archives a DIFFERENT project than the one the caller is currently in.
   .mutation("archiveById")

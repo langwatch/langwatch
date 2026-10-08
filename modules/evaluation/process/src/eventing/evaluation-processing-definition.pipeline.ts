@@ -21,7 +21,11 @@ import {
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { ORIGIN_RESOLVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import {
+  COLLECTOR_EVALUATION_RECEIVED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 
 import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import type { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
@@ -35,6 +39,10 @@ import {
 } from "./evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
+import {
+  type createTraceCollectorEvaluationReport,
+  traceCollectorEvaluationSchema,
+} from "./trace-collector-evaluation.subscriber.ts";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
@@ -80,10 +88,11 @@ interface EvaluationProcessingPipelineDeps {
   traceReactions?: EvaluationTraceReactions;
 }
 
-/** The on-message trigger and the SDK-reported evaluation sync, as evaluation's own handlers. */
+/** The on-message trigger and the SDK- and collector-reported evaluations, as evaluation's own. */
 export interface EvaluationTraceReactions {
   evaluationTrigger: ReturnType<typeof createTraceEvaluationTrigger>;
   customEvaluationSync: ReturnType<typeof createTraceCustomEvaluationSync>;
+  collectorEvaluation: ReturnType<typeof createTraceCollectorEvaluationReport>;
 }
 
 /** One quiet window per trace and lane: main's evaluationTrigger dedup, split per event type. */
@@ -234,6 +243,12 @@ export class EvaluationProcessingPipelineAdapter {
                   occurredAt: context.occurredAt,
                   span: data.span,
                 }),
+            })
+            .withPeerSubscriber("traceCollectorEvaluation", {
+              eventType: COLLECTOR_EVALUATION_RECEIVED_EVENT_TYPE,
+              data: traceCollectorEvaluationSchema,
+              handle: (data, context) =>
+                traceReactions.collectorEvaluation({ ...data, tenantId: String(context.tenantId) }),
             });
     return (retention === undefined ? reacting : reacting.withRetention(retention)).build();
   }

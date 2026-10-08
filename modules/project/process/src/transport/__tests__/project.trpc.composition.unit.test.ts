@@ -14,7 +14,6 @@ import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -142,7 +141,6 @@ function application(
     dependencies: {
       authorization,
       organizations: createApiFixture<OrganizationApi>({}, "organizations"),
-      trace: createApiFixture<TraceApi>({}, "trace"),
       auditLog: createApiFixture<AuditLogApi>(
         { record: options.record ?? (async () => ({ id: "audit", occurredAt: 0 })) },
         "auditLog",
@@ -180,15 +178,12 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const built = application(options);
   const { app } = built;
 
-  const getFieldProtections = vi.fn(async () => ({}));
-
   const browser: ProjectBrowserApi = {
     projects: () => app.projects(),
     probePermission: (input) => app.probePermission(input),
     archiveOtherProject: (input) => app.archiveOtherProject(input),
     revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
-    getFieldProtections,
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();

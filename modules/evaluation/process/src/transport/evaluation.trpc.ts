@@ -36,4 +36,11 @@ export const evaluationTrpcTransport: TrpcRouterDeclaration<EvaluationApi, typeo
         ...(input.timeZone === undefined ? {} : { timeZone: input.timeZone }),
       }),
     )
+
+    // `traces:view`, as on `traces.getEvaluationInputs`: the path moved, not the gate.
+    .procedure("getEvaluationInputs")
+    .withPermission("traces:view")
+    .handle(({ app, input }) =>
+      app.findInputs({ tenantId: input.projectId, evaluationId: input.evaluationId }),
+    )
     .build();

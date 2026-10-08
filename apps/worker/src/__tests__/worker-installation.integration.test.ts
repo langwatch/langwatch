@@ -327,6 +327,25 @@ describe("the worker process installation", () => {
     }
   });
 
+  /** @scenario "The worker hosts trace's collector evaluation pipeline and evaluation's lane on it" */
+  it("hosts trace's collector evaluation pipeline and evaluation's report lane on it", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect(byName.has("trace_collector_evaluations")).toBe(true);
+      expect(
+        byName
+          .get("evaluation_processing")
+          ?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(expect.arrayContaining(["evaluation_processing.traceCollectorEvaluation"]));
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("hosts suite's peer lanes on scenario's run facts, and no suite sync on scenario", async () => {
     const { runtime, eventing } = await bootWorker();
 

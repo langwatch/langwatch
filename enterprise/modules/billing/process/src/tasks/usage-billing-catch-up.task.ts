@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createLogger, type Logger } from "@langwatch/observability";
-import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
+import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
 import type { BillingModule } from "../app/billing.app.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 
 const defaultLogger: Logger = createLogger("langwatch:task:usage-billing-catch-up");
 
 type UsageBillingCatchUpPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "listAllIds">;
+  /** Organization ids through organization's shared table (C2 B). */
+  organizations: Pick<BillingAccountFactsRepository, "listIds">;
   billing: Pick<BillingModule, "catchUpUsageBilling">;
   logger?: Pick<Logger, "info">;
 }>;
@@ -38,7 +40,7 @@ export class UsageBillingCatchUpTask extends Task {
     let usageBilled = 0;
     let after: string | undefined;
     do {
-      const page = await this.peers.organizations.listAllIds({
+      const page = await this.peers.organizations.listIds({
         after,
         limit: ORGANIZATION_ID_PAGE_LIMIT,
       });

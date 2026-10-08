@@ -34,7 +34,6 @@ import {
 } from "@langwatch/project-contract";
 import type * as projectContractModule from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import {
@@ -46,11 +45,7 @@ import { ProjectOperationsService } from "../services/project-operations.service
 import { ProjectRequestService } from "../services/project-request.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
-import type {
-  ProjectBrowserApi,
-  ProjectFieldProtections,
-  ProjectPermissionScope,
-} from "../transport/project.trpc.ts";
+import type { ProjectBrowserApi, ProjectPermissionScope } from "../transport/project.trpc.ts";
 
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
@@ -60,7 +55,6 @@ type ProjectDependencies = Readonly<{
    * a dependency rather than an answer the door has to carry in.
    */
   authorization: typeof AuthzApi;
-  trace: typeof TraceApi;
   auditLog: typeof AuditLogApi;
   /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
   dataPrivacy: typeof DataPrivacyApi;
@@ -99,7 +93,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   static readonly dependencies: ProjectDependencies = {
     organizations: OrganizationApi,
     authorization: AuthzApi,
-    trace: TraceApi,
     auditLog: AuditLogApi,
     dataPrivacy: DataPrivacyApi,
   };
@@ -108,7 +101,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #authorization: AuthzApi;
-  readonly #trace: TraceApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #requests = ProjectRequestService.create({
     projects: this,
@@ -119,21 +111,18 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     operations,
     lifecycle,
     authorization,
-    trace,
     dataPrivacy,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
     authorization: AuthzApi;
-    trace: TraceApi;
     dataPrivacy: DataPrivacyApi;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
     this.#authorization = authorization;
-    this.#trace = trace;
     this.#dataPrivacy = dataPrivacy;
   }
 
@@ -164,7 +153,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       operations,
       lifecycle,
       authorization: dependencies.authorization,
-      trace: dependencies.trace,
       dataPrivacy: dependencies.dataPrivacy,
     });
   }
@@ -237,17 +225,6 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
           organizationId: scope.id,
         });
     }
-  }
-
-  /** `by`'s captured-content visibility, as the trace module resolves it for a viewer. */
-  getFieldProtections(input: {
-    projectId: string;
-    by: Readonly<{ id: string }>;
-  }): Promise<ProjectFieldProtections> {
-    return this.#trace.resolveViewerProtections({
-      projectId: input.projectId,
-      userId: input.by.id,
-    });
   }
 
   archiveOtherProject(input: {

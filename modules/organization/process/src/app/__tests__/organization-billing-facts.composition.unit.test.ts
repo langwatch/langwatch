@@ -5,6 +5,7 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
+  type BillingApi,
   CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE,
   PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
   PRICING_MODEL_CHANGED_EVENT_TYPE,
@@ -39,12 +40,27 @@ const roomyPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** The application over memory repositories holding one TIERED, USD organization and its admin. */
-async function application() {
+type SeatCheckoutAsk = Parameters<BillingApi["createSeatCheckout"]>[0];
+
+/**
+ * The application over memory repositories holding one TIERED, USD organization and its admin.
+ * `beyond` is what the inviter lacks; billing's checkout asks land in `checkouts`.
+ */
+async function application({ beyond = [] }: { beyond?: string[] } = {}) {
+  const checkouts: SeatCheckoutAsk[] = [];
   const setup = organizationModuleSetup({
     permissions: createApiFixture<AuthzApi>(
-      { findPermissionsBeyondCaller: async () => [] },
+      { findPermissionsBeyondCaller: async () => beyond },
       "AuthzApi",
+    ),
+    billing: createApiFixture<BillingApi>(
+      {
+        createSeatCheckout: async (ask: SeatCheckoutAsk) => {
+          checkouts.push(ask);
+          return { url: "https://checkout.test/cs_1", subscriptionId: "sub-checkout" };
+        },
+      },
+      "BillingApi",
     ),
     entitlement: createApiFixture<EntitlementApi>(
       { getActivePlan: async () => roomyPlan, requestBound: async () => 1_000 },
@@ -66,7 +82,7 @@ async function application() {
     pricingModel: "TIERED",
   });
   const app = await OrganizationModule.create(setup);
-  return { app, deliver: deliveryTo(app) };
+  return { app, checkouts, deliver: deliveryTo(app) };
 }
 
 /** The lifecycle pipeline's peer subscribers, as the runtime's global registry receives them. */
@@ -265,6 +281,60 @@ describe("organization applying billing's organisation-row facts", () => {
           currency: "EUR",
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when an administrator upgrades with invitations through the invite door", () => {
+    const upgrade = {
+      organizationId: ORGANIZATION_ID,
+      baseUrl: "https://app.langwatch.test",
+      currency: "EUR" as const,
+      totalSeats: 3,
+      invites: [{ email: "ann@acme.test", role: "MEMBER" as const }],
+    };
+
+    /** @scenario "Organization's invite door refuses invitations above the inviter before any checkout opens" */
+    /** @scenario A seat checkout inviting past the inviter writes nothing */
+    it("refuses past the inviter before billing opens a checkout", async () => {
+      const { app, checkouts, deliver } = await application({ beyond: ["organization:manage"] });
+
+      await expect(app.createSeatCheckoutWithInvites(upgrade, CALLER)).rejects.toMatchObject({
+        code: "grant_exceeds_caller_permissions",
+      });
+      expect(checkouts).toEqual([]);
+      await deliver(SEAT_CHECKOUT_PAID_EVENT_TYPE, {
+        organizationId: ORGANIZATION_ID,
+        subscriptionId: "sub-checkout",
+      });
+      await expect(invitations(app)).resolves.toEqual([]);
+    });
+
+    /** @scenario "Organization holds the invitations against the pending subscription billing opened" */
+    /** @scenario Inviting through a seat checkout is bounded by the inviter */
+    it("opens billing's checkout, then holds the invitations on the subscription it opened", async () => {
+      const { app, checkouts, deliver } = await application();
+
+      await expect(app.createSeatCheckoutWithInvites(upgrade, CALLER)).resolves.toEqual({
+        url: "https://checkout.test/cs_1",
+      });
+      expect(checkouts).toEqual([
+        {
+          organizationId: ORGANIZATION_ID,
+          baseUrl: "https://app.langwatch.test",
+          membersToAdd: 3,
+          currency: "EUR",
+          customerEmail: "sam@acme.test",
+        },
+      ]);
+      await expect(invitations(app)).resolves.toEqual([]);
+
+      await deliver(SEAT_CHECKOUT_PAID_EVENT_TYPE, {
+        organizationId: ORGANIZATION_ID,
+        subscriptionId: "sub-checkout",
+      });
+      await expect(invitations(app)).resolves.toEqual([
+        { email: "ann@acme.test", status: "PENDING" },
+      ]);
     });
   });
 });

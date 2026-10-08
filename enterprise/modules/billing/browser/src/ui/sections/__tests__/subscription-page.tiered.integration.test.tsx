@@ -124,6 +124,9 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         },
       },
       invite: {
+        upgradeWithInvites: {
+          useMutation: () => setup.mockUpgradeWithInvites(),
+        },
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),
@@ -146,9 +149,6 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         },
         create: {
           useMutation: () => setup.mockCreateSubscription(),
-        },
-        upgradeWithInvites: {
-          useMutation: () => setup.mockUpgradeWithInvites(),
         },
         addTeamMemberOrEvents: {
           useMutation: () => setup.mockAddTeamMemberOrEvents(),

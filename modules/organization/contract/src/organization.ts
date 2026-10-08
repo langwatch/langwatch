@@ -92,16 +92,6 @@ export const organizationBillingProfileSchema = z
   .strict();
 export type OrganizationBillingProfile = z.infer<typeof organizationBillingProfileSchema>;
 
-export const claimOrganizationBillingCustomerInputSchema = z
-  .object({
-    organizationId: organizationIdSchema,
-    billingCustomerId: z.string().min(1),
-  })
-  .strict();
-export type ClaimOrganizationBillingCustomerInput = z.infer<
-  typeof claimOrganizationBillingCustomerInputSchema
->;
-
 /** Audit log row with resolved actor and project; nullable userId for system actors. */
 export type EnrichedAuditLog = {
   id: string;

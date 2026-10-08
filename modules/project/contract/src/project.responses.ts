@@ -38,18 +38,6 @@ export type ProjectLegacyKeyStatus = z.infer<typeof projectLegacyKeyStatusSchema
 export const projectApiKeyRevokedSchema = z.object({ revoked: z.literal(true) }).strict();
 export type ProjectApiKeyRevoked = z.infer<typeof projectApiKeyRevokedSchema>;
 
-/**
- * Whether this viewer may read captured input and output, and the human label
- * of who can when they may not.
- */
-export const projectFieldRedactionStatusSchema = z
-  .object({
-    isRedacted: z.object({ input: z.boolean(), output: z.boolean() }).strict(),
-    visibleTo: z.object({ input: z.string().nullable(), output: z.string().nullable() }).strict(),
-  })
-  .strict();
-export type ProjectFieldRedactionStatus = z.infer<typeof projectFieldRedactionStatusSchema>;
-
 /** Archiving is idempotent, and says which of the two happened. */
 export const projectArchivedSchema = z
   .object({ success: z.literal(true), alreadyArchived: z.boolean() })

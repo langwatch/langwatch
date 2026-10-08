@@ -19,7 +19,6 @@ import {
 } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
@@ -42,13 +41,11 @@ function unreachablePeers() {
   const apis = new LocalFeatureApis();
   apis.declare(OrganizationApi);
   apis.declare(AuthzApi);
-  apis.declare(TraceApi);
   apis.declare(AuditLogApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
     authorization: apis.reference(AuthzApi),
-    trace: apis.reference(TraceApi),
     auditLog: apis.reference(AuditLogApi),
   };
 }

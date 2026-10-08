@@ -1,4 +1,4 @@
-import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -83,8 +83,8 @@ function createSuiteProjects(): ProjectApi {
 }
 
 /** Membership and the personal workspace: the two reads the overview makes. */
-const suiteOrganizations = (): OrganizationService =>
-  createApiFixture<OrganizationService>(
+const suiteOrganizations = (): OrganizationApi =>
+  createApiFixture<OrganizationApi>(
     {
       isMember: async ({
         organizationId,
@@ -100,7 +100,7 @@ const suiteOrganizations = (): OrganizationService =>
       }: {
         userId: string;
         organizationId: string;
-      }): ReturnType<OrganizationService["getPersonalWorkspace"]> => {
+      }): ReturnType<OrganizationApi["getPersonalWorkspace"]> => {
         if (userId !== USER_ID) throw new TeamNotFoundError();
         const team = await prisma.team.findUniqueOrThrow({ where: { id: PERSONAL_TEAM_ID } });
         const project = await prisma.project.findUniqueOrThrow({

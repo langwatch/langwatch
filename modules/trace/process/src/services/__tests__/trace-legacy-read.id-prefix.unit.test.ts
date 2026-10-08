@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
@@ -39,7 +38,8 @@ const protections: Protections = {
   canSeeCapturedOutput: true,
 } as Protections;
 
-function refusingEvaluations(): EvaluationApi {
+/** Evaluation's shared runs, which this test does not read. */
+function refusingEvaluations<T extends object>(): T {
   return new Proxy(
     {},
     {
@@ -47,7 +47,7 @@ function refusingEvaluations(): EvaluationApi {
         throw new Error("this test reads no evaluation behind a trace");
       },
     },
-  ) as EvaluationApi;
+  ) as T;
 }
 
 function trace(traceId: string): Trace {
@@ -80,7 +80,7 @@ function makeService(): TraceLegacyReadService {
       findSpanForPromptStudio: vi.fn(),
     },
     editOverlay: TraceEditOverlayService.create(MemoryTraceEditOverlayRepository.create()),
-    evaluationService: refusingEvaluations(),
+    evaluationRuns: refusingEvaluations(),
   });
 }
 

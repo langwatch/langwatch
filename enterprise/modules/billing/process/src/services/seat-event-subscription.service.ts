@@ -13,13 +13,11 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi, OrganizationCaller } from "@langwatch/organization-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
 import {
-  type InviteInput,
   type SeatEventProrationQuote,
   quotedAmounts,
   resolveProrationDate,
@@ -28,24 +26,11 @@ import {
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
-/** Organization's side of a seat checkout: the invitations it holds until payment. */
-export type SeatCheckoutInvites = Pick<
-  OrganizationApi,
-  "checkInvitesWithinCaller" | "createPaymentPendingInvites"
->;
-
-/** A checkout's invitations and who sent them: organization bounds them by the sender. */
-type SeatCheckoutInvitations = Readonly<{
-  invites: InviteInput[];
-  by: OrganizationCaller;
-}>;
-
 const logger = createLogger("langwatch:billing:seatEventSubscription");
 
 export class SeatEventSubscriptionService {
   private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly subscriptions: SeatEventSubscriptionRepository;
-  private readonly invites: SeatCheckoutInvites;
   private readonly abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
@@ -53,21 +38,18 @@ export class SeatEventSubscriptionService {
   private constructor({
     stripeSubscriptions,
     subscriptions,
-    invites,
     abandoned,
     prices,
     customerCurrency,
   }: {
     stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
-    invites: SeatCheckoutInvites;
     abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }) {
     this.stripeSubscriptions = stripeSubscriptions;
     this.subscriptions = subscriptions;
-    this.invites = invites;
     this.abandoned = abandoned;
     this.prices = prices;
     this.customerCurrency = customerCurrency;
@@ -76,7 +58,6 @@ export class SeatEventSubscriptionService {
   static create(options: {
     stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
-    invites: SeatCheckoutInvites;
     abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
@@ -188,7 +169,6 @@ export class SeatEventSubscriptionService {
     billingInterval,
     membersToAdd,
     isUpgradeFromTiered = false,
-    invitations,
   }: {
     organizationId: string;
     customerId: string;
@@ -197,9 +177,7 @@ export class SeatEventSubscriptionService {
     billingInterval: BillingInterval;
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
-    /** Who this checkout pays seats for, and who invited them (bounded by what they hold). */
-    invitations?: SeatCheckoutInvitations;
-  }): Promise<{ url: string | null }> => {
+  }): Promise<{ url: string | null; subscriptionId: string }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
     // write below this point would have to be cleaned up afterwards.
@@ -210,14 +188,6 @@ export class SeatEventSubscriptionService {
         requestedCurrency: currency,
       }),
     );
-
-    // Nobody is invited past the inviter; asked before any checkout row is written.
-    if (invitations && invitations.invites.length > 0) {
-      await this.invites.checkInvitesWithinCaller(
-        { organizationId, invites: invitations.invites },
-        invitations.by,
-      );
-    }
 
     await this.cancelAbandonedCheckouts(organizationId);
 
@@ -235,10 +205,9 @@ export class SeatEventSubscriptionService {
       membersToAdd,
       checkoutCurrency,
       billingInterval,
-      invitations,
     });
 
-    return this.openCheckoutSession({
+    const { url } = await this.openCheckoutSession({
       customerId,
       baseUrl,
       checkoutCurrency,
@@ -247,6 +216,7 @@ export class SeatEventSubscriptionService {
       isUpgradeFromTiered,
       subscriptionId: subscription.id,
     });
+    return { url, subscriptionId: subscription.id };
   };
 
   /** The provider checkout session, anchored to the 1st of next month. */
@@ -313,31 +283,23 @@ export class SeatEventSubscriptionService {
     await this.abandoned.seatCheckoutsAbandoned({ organizationId, subscriptionIds: staleSubIds });
   }
 
-  /** The pending subscription and the payment-pending invites it pays for, written together. */
+  /** The pending subscription; organization holds a checkout's invites against its id (C2 A). */
   private async createPendingSubscription({
     organizationId,
     membersToAdd,
     checkoutCurrency,
     billingInterval,
-    invitations,
   }: {
     organizationId: string;
     membersToAdd: number;
     checkoutCurrency: Currency;
     billingInterval: BillingInterval;
-    invitations?: SeatCheckoutInvitations;
   }): Promise<{ id: string }> {
     const subscription = await this.subscriptions.createPendingSeatCheckout({
       organizationId,
       plan: resolveGrowthSeatPlanType({ currency: checkoutCurrency, interval: billingInterval }),
       maxMembers: membersToAdd,
     });
-    if (invitations && invitations.invites.length > 0) {
-      await this.invites.createPaymentPendingInvites(
-        { organizationId, subscriptionId: subscription.id, invites: invitations.invites },
-        invitations.by,
-      );
-    }
     return subscription;
   }
 

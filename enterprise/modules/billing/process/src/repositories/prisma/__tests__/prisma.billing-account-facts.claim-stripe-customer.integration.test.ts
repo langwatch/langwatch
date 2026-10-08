@@ -1,10 +1,11 @@
 /**
  * @vitest-environment node
  * @see specs/billing/stripe-customer.feature
- *
- * One Stripe customer per organization, against a real Postgres: a claim parked
- * on another checkout's row lock re-checks against the committed row and loses.
+ * A claim parked on another checkout's row lock re-checks the committed row and loses: billing's
+ * one admitted write on organization's shared table (round 46 D-b), against a real Postgres.
  */
+import { randomUUID } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -12,24 +13,20 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
-import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
+import { PrismaBillingOrganizationRepository } from "../prisma.billing-account-facts.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-describe.skipIf(!DB_URL)("PrismaOrganizationRepository.claimBillingCustomerId", () => {
-  const ns = `stripe-customer-${nanoid(8)}`;
+describe.skipIf(!DB_URL)("PrismaBillingOrganizationRepository.claimStripeCustomerId", () => {
+  const ns = `stripe-customer-${randomUUID().slice(0, 8)}`;
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
-    logger: createLogger("langwatch:organization:test:claim-billing-customer"),
+    logger: createLogger("langwatch:billing:test:claim-stripe-customer"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client;
-  const organizations = PrismaOrganizationRepository.create({
-    database: prisma,
-    cipher: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-  });
+  const organizations = PrismaBillingOrganizationRepository.create(prisma);
   let organizationId: string;
 
   beforeAll(async () => {
@@ -59,9 +56,9 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.claimBillingCustomerId", 
             return true;
           },
           second: () =>
-            organizations.claimBillingCustomerId({
+            organizations.claimStripeCustomerId({
               organizationId,
-              billingCustomerId: `cus_${ns}_second`,
+              stripeCustomerId: `cus_${ns}_second`,
             }),
         });
 

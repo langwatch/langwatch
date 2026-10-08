@@ -1,12 +1,13 @@
 import type { BillingUsageLimitOrganization } from "@langwatch/enterprise-billing-contract";
-import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingProjectDirectoryRepository } from "../repositories/billing-project-directory.repository.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 
 type UsageLimitOrganizationPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "getWithAdministrators">;
+  /** Organization, memberships and people through their shares (C2 B). */
+  organizations: Pick<BillingAccountFactsRepository, "findWithAdministrators">;
   projects: Pick<BillingProjectDirectoryRepository, "findProjectsWithName">;
   /** The stamp is billing's fact, which organization applies to its row (R42). */
   stamps: Pick<BillingLifecycleAnnouncerService, "planLimitAlertSent">;
@@ -23,22 +24,16 @@ export class UsageLimitOrganizationService implements BillingUsageLimitOrganizat
   async findWithAdmins(
     organizationId: string,
   ): ReturnType<BillingUsageLimitOrganization["findWithAdmins"]> {
-    try {
-      const organization = await this.peers.organizations.getWithAdministrators({
-        organizationId,
-      });
-      return {
-        id: organization.id,
-        name: organization.name,
-        sentPlanLimitAlert: organization.sentPlanLimitAlert,
-        members: organization.administrators.map((admin) => ({
-          user: { id: admin.userId, name: admin.name, email: admin.email },
-        })),
-      };
-    } catch (error) {
-      if (error instanceof OrganizationNotFoundError) return null;
-      throw error;
-    }
+    const organization = await this.peers.organizations.findWithAdministrators(organizationId);
+    if (!organization) return null;
+    return {
+      id: organization.id,
+      name: organization.name,
+      sentPlanLimitAlert: organization.sentPlanLimitAlert,
+      members: organization.administrators.map((admin) => ({
+        user: { id: admin.userId, name: admin.name, email: admin.email },
+      })),
+    };
   }
 
   updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void> {

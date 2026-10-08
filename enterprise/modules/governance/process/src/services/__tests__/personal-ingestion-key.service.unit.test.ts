@@ -6,7 +6,7 @@ import {
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   findPersonalWorkspaceInputSchema,
-  type OrganizationService,
+  type OrganizationApi,
 } from "@langwatch/organization-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
@@ -79,7 +79,7 @@ async function setup(
           return { id: `audit_${audited.length}`, occurredAt: 0 };
         }),
     },
-    organizations: createApiFixture<OrganizationService>({
+    organizations: createApiFixture<OrganizationApi>({
       getPersonalWorkspace: async (input) => {
         findPersonalWorkspaceInputSchema.parse(input);
         return {

@@ -3,6 +3,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
+  deriveEvaluatorId,
   EvaluationApi,
   evaluationBrowserConfig,
   evaluationConfig,
@@ -56,6 +57,7 @@ import {
   type EvaluationTraceReactions,
 } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
+import { createTraceCollectorEvaluationReport } from "../eventing/trace-collector-evaluation.subscriber.ts";
 import { createTraceCustomEvaluationSync } from "../eventing/trace-custom-evaluation-sync.subscriber.ts";
 import { createTraceEvaluationTrigger } from "../eventing/trace-evaluation-trigger.subscriber.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
@@ -82,7 +84,6 @@ import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.ser
 import { EvaluationLoopMetricsService } from "../services/evaluation-loop-metrics.service.ts";
 import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
 import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
-import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
 import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
@@ -281,7 +282,6 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #warmup: EvaluationWarmupProbe;
   readonly #analytics: EvaluationRunAnalytics;
   readonly #report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
-  readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
   readonly #slugs: EvaluationSlugDirectory;
   readonly #savedEvaluators: EvaluationSavedEvaluatorDirectory;
@@ -346,7 +346,6 @@ export class EvaluationModule implements EvaluationApiContract {
       ledger: members.ledger,
     });
     this.#commands = commands;
-    this.#autoslug = EvaluationNameAutoslugService.create();
     this.#filterMatching = EvaluationFilterMatchingService.create();
     this.#traceReactions = {
       evaluationTrigger: createTraceEvaluationTrigger({
@@ -358,7 +357,10 @@ export class EvaluationModule implements EvaluationApiContract {
       }),
       customEvaluationSync: createTraceCustomEvaluationSync({
         reportEvaluation: (data) => this.reportEvaluation(data),
-        deriveEvaluatorId: (name) => this.#autoslug.derive(name),
+        deriveEvaluatorId: (name) => deriveEvaluatorId({ name }),
+      }),
+      collectorEvaluation: createTraceCollectorEvaluationReport({
+        reportEvaluation: (data) => this.reportEvaluation(data),
       }),
     };
   }
@@ -629,7 +631,7 @@ export class EvaluationModule implements EvaluationApiContract {
   recordDatasetEvaluationRow: EvaluationApiContract["recordDatasetEvaluationRow"] = (input) =>
     this.#ledger.recordDatasetRow(input);
   deriveEvaluatorId: EvaluationApiContract["deriveEvaluatorId"] = (name) =>
-    this.#autoslug.derive(name);
+    deriveEvaluatorId({ name });
   matchesEvaluationFilters: EvaluationApiContract["matchesEvaluationFilters"] = (input) =>
     this.#filterMatching.matchesEvaluationFilters(input);
   requestTopicClustering: EvaluationApiContract["requestTopicClustering"] = (input) =>

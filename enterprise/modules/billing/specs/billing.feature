@@ -261,3 +261,55 @@ Feature: Enterprise billing compatibility
       When both claim a different customer id at once
       Then exactly one claim wins and the other reads the winner's id back
       And the claim is billing's one admitted write on organization's shared table
+
+  # Coordinator, 2026-10-08 (C2 B, R40): billing reads memberships and people through declared shares.
+  Rule: Billing reads organisations, memberships and people through declared shares
+
+    @unit
+    Scenario: Billing names an organisation's administrators from the shared tables
+      Given an organisation with an ADMIN and a MEMBER, and its plan-limit stamp
+      When billing reads it for a usage-limit notice
+      Then it answers the organisation's name, its stamp and only the ADMIN's name and address
+      And an organisation that is gone answers nothing
+
+    @unit
+    Scenario: Billing's lifecycle facts carry only the organisation's active members
+      Given an organisation with an active, a disabled and a deactivated member
+      When billing reads its members for a subscription fact
+      Then only the active member's id is carried
+
+    @unit
+    Scenario: Billing pages organisation ids and lists connected customers from organization's shared table
+      Given three organisations, one of them a connected self-hosted customer
+      When billing pages their ids two at a time and lists its connected customers
+      Then it reads every id once, in order, and names only the connected customer
+
+  # Coordinator, 2026-10-08 (C2 A, Round 50): organization's invite door bounds the invitations, then
+  # calls billing's checkout; organization holds the invitations against billing's pending subscription.
+  Rule: A seat checkout with invitations goes through organization's invite door
+
+    @unit
+    Scenario: Organization's invite door refuses invitations above the inviter before any checkout opens
+      Given an inviter who holds less than an invitation would grant
+      When they upgrade with that invitation through invite.upgradeWithInvites
+      Then the door refuses with grant_exceeds_caller_permissions
+      And billing opens no checkout and no invitation is held
+
+    @unit
+    Scenario: Organization holds the invitations against the pending subscription billing opened
+      Given an inviter within their ceiling
+      When they upgrade with invitations through invite.upgradeWithInvites
+      Then billing opens a seat checkout for the seats and answers its url and pending subscription
+      And organization holds each invitation, payment pending, on the organisation's oldest team, against that subscription
+      And billing's paid-checkout fact for that subscription opens them
+
+    @unit
+    Scenario: Billing's seat checkout answers the pending subscription it opened
+      When organization asks billing for a seat checkout
+      Then billing resolves the Stripe customer from the caller's address and opens the checkout
+      And it answers the checkout url and the pending subscription's id
+
+    @unit
+    Scenario: The invite checkout is organization's procedure
+      Then invite.upgradeWithInvites is declared by organization with organization:manage
+      And billing declares no subscription.upgradeWithInvites

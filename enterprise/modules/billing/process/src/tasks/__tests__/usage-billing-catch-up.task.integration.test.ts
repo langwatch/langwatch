@@ -35,7 +35,7 @@ function billingAnnouncer({ billed }: { billed: Set<string> }) {
   let nowMs = Date.UTC(2026, 9, 7, 9);
   const announcer = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => null },
-    organizations: { getAllMembers: async () => [] },
+    organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: {
@@ -66,7 +66,7 @@ function billingAnnouncer({ billed }: { billed: Set<string> }) {
   });
   const logger = { info: vi.fn() };
   const task = UsageBillingCatchUpTask.create({
-    organizations: { listAllIds: async () => ({ ids: [BILLED, NOT_BILLED], next: null }) },
+    organizations: { listIds: async () => ({ ids: [BILLED, NOT_BILLED], next: null }) },
     billing: { catchUpUsageBilling: (input) => announcer.usageBillingCaughtUp(input) },
     logger,
   });

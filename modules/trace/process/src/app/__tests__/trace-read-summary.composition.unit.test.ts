@@ -2,7 +2,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FoldProjectionStore, FoldStateRead } from "@langwatch/eventing";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis } from "@langwatch/process";
@@ -73,7 +72,6 @@ function unreachablePeers() {
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
-    EvaluationApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
@@ -86,7 +84,6 @@ function unreachablePeers() {
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
-    evaluations: apis.reference(EvaluationApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),

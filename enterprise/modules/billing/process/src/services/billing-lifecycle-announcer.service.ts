@@ -14,6 +14,7 @@ import {
   type BillingLifecyclePipeline,
   type BuildBillingLifecyclePipelineInput,
 } from "../eventing/billing-lifecycle.pipeline.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
 import { usageBilledOf } from "../rules/usage-billed.rules.ts";
 
@@ -28,10 +29,8 @@ const pauseFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resol
 type BillingLifecycleAnnouncerDeps = Readonly<{
   /** The webhook subscription repository, read only for whether a live subscription remains. */
   subscriptions: { findLastNonCancelled(organizationId: string): Promise<unknown> };
-  /** The organization's members, read only for their ids. */
-  organizations: {
-    getAllMembers(input: { organizationId: string }): Promise<readonly Readonly<{ id: string }>[]>;
-  };
+  /** The organization's active members' ids, through the shares (C2 B). */
+  organizations: Pick<BillingAccountFactsRepository, "findActiveMemberIds">;
   /** The ops alert a peer's seat-limit event ends in, subscribed on the lifecycle pipeline. */
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
   /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
@@ -99,12 +98,12 @@ export class BillingLifecycleAnnouncerService {
     });
     await this.usageBillingChanged({ organizationId });
     await this.#record(organizationId, async (commands) => {
-      const members = await this.deps.organizations.getAllMembers({ organizationId });
+      const memberUserIds = await this.deps.organizations.findActiveMemberIds(organizationId);
       await commands.recordSubscriptionStarted.send({
         tenantId: organizationId,
         occurredAt: nowInstant().epochMilliseconds,
         ...input,
-        memberUserIds: members.map((member) => member.id),
+        memberUserIds,
       });
     });
   }
@@ -282,14 +281,12 @@ export class BillingLifecycleAnnouncerService {
     hasSubscription: () => Promise<boolean>;
   }): Promise<void> {
     await this.#record(input.organizationId, async (commands) => {
-      const members = await this.deps.organizations.getAllMembers({
-        organizationId: input.organizationId,
-      });
+      const memberUserIds = await this.deps.organizations.findActiveMemberIds(input.organizationId);
       await commands.recordSubscriptionChanged.send({
         tenantId: input.organizationId,
         occurredAt: nowInstant().epochMilliseconds,
         organizationId: input.organizationId,
-        memberUserIds: members.map((member) => member.id),
+        memberUserIds,
         hasSubscription: await input.hasSubscription(),
       });
     });

@@ -85,12 +85,6 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       return evaluationSchema.array().optional().parse(evaluations[input.traceId]);
     })
 
-    .procedure("getEvaluationInputs")
-    .withPermission("traces:view")
-    .handle(({ app, input }) =>
-      app.findEvaluationInputs({ projectId: input.projectId, evaluationId: input.evaluationId }),
-    )
-
     .procedure("getEvaluationsMultiple")
     .withPermission("traces:view")
     .handle(async ({ app, input, actor }) => {
@@ -232,6 +226,27 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         }),
       ),
     )
+
+    // `project:view`, as on `project.getFieldRedactionStatus`: the path moved, not the gate.
+    .procedure("getFieldRedactionStatus")
+    .withPermission("project:view")
+    .handle(async ({ app, input, actor }) => {
+      const protections = await app.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+      });
+
+      return {
+        isRedacted: {
+          input: !protections.canSeeCapturedInput,
+          output: !protections.canSeeCapturedOutput,
+        },
+        visibleTo: {
+          input: protections.capturedInputVisibleTo ?? null,
+          output: protections.capturedOutputVisibleTo ?? null,
+        },
+      };
+    })
 
     .procedure("getAllForDownload")
     .withPermission("traces:view")

@@ -5,7 +5,7 @@ import type {
   PersonalUsageRollup,
   PersonalUsageWindow,
 } from "@langwatch/enterprise-governance-contract";
-import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
@@ -23,7 +23,7 @@ export type PersonalUsageDashboardServiceOptions = {
     "summary" | "dailyBuckets" | "breakdownByModel"
   >;
   /** The member's personal workspace, which is the tenant their traces land in. */
-  organizations: Pick<OrganizationService, "getPersonalWorkspace">;
+  organizations: Pick<OrganizationApi, "getPersonalWorkspace">;
   /** The organization's hidden governance project, which ingestion rows land in. */
   projects: Pick<ProjectApi, "findInternal">;
 };

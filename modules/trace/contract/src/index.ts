@@ -216,6 +216,7 @@ export * from "./trace-query-evaluation.types.ts";
 
 export * from "./trace-rest.schemas.ts";
 export * from "./trace-project-milestones.events.ts";
+export * from "./trace-collector-evaluations.events.ts";
 export * from "./explorer/trace-query-config.ts";
 export * from "./explorer/lens-eval-column-id.ts";
 export * from "./explorer/get-suggestion-state.ts";

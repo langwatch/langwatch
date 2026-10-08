@@ -27,7 +27,7 @@ export function useEvalInputs({
 
   const needLazy = enabled && !listInputs && !!eval_.evaluationId && !!project?.id && !isReadOnly;
 
-  const query = api.traces.getEvaluationInputs.useQuery(
+  const query = api.evaluations.getEvaluationInputs.useQuery(
     {
       projectId: project?.id ?? "",
       evaluationId: eval_.evaluationId ?? "",
