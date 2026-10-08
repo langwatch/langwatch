@@ -463,12 +463,24 @@ export const instantEvalRestCredential = defineRestMiddleware(
   instantEvalRestCredentialSchema,
 );
 
+/** Why a self-hosted install is not released, one per remedy (main #8416). */
+export const selfHostedInstantEvalOfferSchema = z.enum([
+  "not_in_license",
+  "switched_off",
+  "not_connected",
+  "ask_operator",
+]);
+export type SelfHostedInstantEvalOffer = z.infer<typeof selfHostedInstantEvalOfferSchema>;
+
 /**
  * What the refusal popover offers an organization that may not judge: its own
- * switch (`enable`), a word with an organization admin for a member who may not
- * throw it (`ask_admin`), or a word with us (`contact_us`: enterprise, self-hosted).
+ * switch (`enable`), a word with an organization admin (`ask_admin`), a word
+ * with us (`contact_us`), or the reason a self-hosted install is not released.
  */
-export const instantEvalOptInOfferSchema = z.enum(["enable", "ask_admin", "contact_us"]);
+export const instantEvalOptInOfferSchema = z.union([
+  z.enum(["enable", "ask_admin", "contact_us"]),
+  selfHostedInstantEvalOfferSchema,
+]);
 export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
 
 /** Whether the project is released, and what the popover offers when it is not. */

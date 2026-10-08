@@ -6,6 +6,7 @@
 import type {
   instantEvalEstimateSchema,
   instantEvalOptInAccessSchema,
+  selfHostedInstantEvalOfferSchema,
 } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_TARGETS,
@@ -99,6 +100,8 @@ export type ExplorerInstantEvalRuns = z.infer<typeof explorerInstantEvalRunsSche
 export type ExplorerInstantEvalEstimate = z.infer<typeof instantEvalEstimateSchema>;
 /** What `traces.instantEval.access` answers; the browser reads the offer from it. */
 export type ExplorerInstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;
+/** The self-hosted refusal reasons the Explorer's popover words one by one. */
+export type ExplorerSelfHostedInstantEvalOffer = z.infer<typeof selfHostedInstantEvalOfferSchema>;
 
 /**
  * Whether a run the Explorer is watching is still judging. Re-exported here so

@@ -53,5 +53,6 @@ Feature: Langy prompts for a model when the project has none configured
     When a page opens Langy with a question
     Then the panel shows a prompt to add a model provider
     And the question is not sent
+    And the question is shown above the prompt, with a line saying it is sent once a model is set up
     When a model resolves for the project
     Then the question is sent once
