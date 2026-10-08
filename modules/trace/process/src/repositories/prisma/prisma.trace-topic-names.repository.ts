@@ -1,13 +1,17 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { TraceTopicNamesReadRepository } from "../trace-topic-names.repository.ts";
 
-/** Topic's `Topic` rows, read through topic's share (R40); topic's own name query. */
-export class PrismaTraceTopicNamesRepository
-  extends PrismaRepository.for("Topic")
-  implements TraceTopicNamesReadRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaTraceTopicNamesRepository(prisma));
+/** Only the shared delegate this reader touches; it claims no table (R40). */
+type PrismaTraceTopicNamesDatabase = Pick<PrismaClient, "topic">;
+
+/** Topic's `Topic` rows, read through topic's share; topic's own name query. */
+export class PrismaTraceTopicNamesRepository implements TraceTopicNamesReadRepository {
+  private constructor(private readonly prisma: PrismaTraceTopicNamesDatabase) {}
+
+  static create(prisma: PrismaTraceTopicNamesDatabase): PrismaTraceTopicNamesRepository {
+    return new PrismaTraceTopicNamesRepository(prisma);
+  }
 
   async findNamesByIds({
     projectId,

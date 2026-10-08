@@ -70,15 +70,15 @@ export class PostgresTraceRepositories {
       }),
       summary: TraceSummaryClickHouseRepository.create(storage),
       logRecords: LogRecordStorageClickHouseRepository.create(traceClickHouse),
-      topicNames: PrismaTraceTopicNamesRepository.create({ prisma: members.prisma }),
+      topicNames: PrismaTraceTopicNamesRepository.create(members.prisma),
       instantEvalRuns: ClickHouseTraceInstantEvalRunsRepository.create({
         resolveClient: traceClickHouse,
       }),
       evaluationRuns: ClickHouseTraceEvaluationRunsRepository.create({
         resolveClient: traceClickHouse,
       }),
-      annotations: PrismaTraceAnnotationsRepository.create({ prisma: members.prisma }),
-      annotationScores: PrismaTraceAnnotationScoresRepository.create({ prisma: members.prisma }),
+      annotations: PrismaTraceAnnotationsRepository.create(members.prisma),
+      annotationScores: PrismaTraceAnnotationScoresRepository.create(members.prisma),
       list: TraceListClickHouseRepository.create(traceClickHouse),
       sessionGroups: SessionGroupsClickHouseRepository.create(traceClickHouse),
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create({

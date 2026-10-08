@@ -80,8 +80,14 @@ Feature: Private Prisma table ownership
   @unit @architecture
   Scenario: A module reading a Prisma table its owner shares with it passes
     Given project claims Project and shares it for reading with entitlement
-    When entitlement claims Project and reads it through a delegate and raw SQL
+    When entitlement reads Project through a delegate and raw SQL from a class that claims nothing
     Then no finding names entitlement or a second owner of Project
+
+  @unit @architecture
+  Scenario: A declared reader that claims the shared Prisma table is reported
+    Given project claims Project and shares it for reading with entitlement
+    When entitlement claims Project with .for(...) or static tables
+    Then the policy reports the claim and names the unclaimed reader class to use instead
 
   @unit @architecture
   Scenario: A module the owner did not name still may not claim a shared Prisma table

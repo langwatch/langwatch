@@ -241,7 +241,7 @@ describe("Prisma table ownership lint", () => {
     const READER = "modules/entitlement/process/src/repositories/prisma/prisma.usage.repository.ts";
     const WRITER = READER.replace("usage", "entitlement");
 
-    function world(reads: string) {
+    function world(reads: string, claimed = false) {
       const built = fixture();
       built.repository("project", "unused", {
         imports: NATIVE,
@@ -249,7 +249,7 @@ describe("Prisma table ownership lint", () => {
       });
       built.repository("entitlement", "unused", {
         imports: NATIVE,
-        declaration: `export class Repository extends PrismaRepository.for("Project") {
+        declaration: `export class Repository ${claimed ? 'extends PrismaRepository.for("Project") ' : ""}{
   list(db: any) { ${reads} }
 }`,
       });
@@ -259,7 +259,7 @@ describe("Prisma table ownership lint", () => {
       built.lint(shared).map((violation) => violation.message);
 
     /** @scenario "A module reading a Prisma table its owner shares with it passes" */
-    it("reports nothing for the named reader's claim, delegate read and SQL read", () => {
+    it("reports nothing for the named reader's unclaimed delegate read and SQL read", () => {
       const built = world('return db.project.findMany({ where: { id: "p" } });');
       built.write(
         READER.replace("usage", "usage-sql"),
@@ -267,6 +267,17 @@ describe("Prisma table ownership lint", () => {
       );
 
       expect(messages(built)).toEqual([]);
+    });
+
+    /** @scenario "A declared reader that claims the shared Prisma table is reported" */
+    it("reports a reader's claim and names the unclaimed class", () => {
+      const built = world("return db.project.findMany({});", true);
+
+      expect(messages(built)).toEqual([
+        expect.stringMatching(
+          /entitlement reads Project but does not own it.*prisma\.billing-project-directory/,
+        ),
+      ]);
     });
 
     /** @scenario "A module the owner did not name still may not claim a shared Prisma table" */

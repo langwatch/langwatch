@@ -479,7 +479,7 @@ export function featureClaims(
   });
 }
 
-/** A claim by a module the model's owner named as a reader: a read seat, not a second owner. */
+/** A claim by a module the model's owner named as a reader: a read seat is never a claim. */
 function isReaderClaim(claim: Claim, shared: readonly SharedPrismaTable[]): boolean {
   return shared.some((item) => item.table === claim.model && item.readers.includes(claim.feature));
 }
@@ -504,7 +504,16 @@ function checkOwners({
       continue;
     }
 
-    if (isReaderClaim(claim, shared)) continue;
+    if (isReaderClaim(claim, shared)) {
+      violations.push(
+        issue(
+          claim.file,
+          `${claim.feature} reads ${table} but does not own it, and a claim is ownership: boot refuses it. Read it through a plain class over the Prisma client that no .for(...) or static tables claims (see prisma.billing-project-directory.repository.ts).`,
+          claim.line,
+        ),
+      );
+      continue;
+    }
 
     const previous = owners.get(table);
 

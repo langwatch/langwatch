@@ -13,9 +13,7 @@ const PROJECT = "project-1";
 
 function repositoryOver(rows: { id: string; name: string }[]) {
   const findMany = vi.fn().mockResolvedValue(rows);
-  const repository = PrismaTraceTopicNamesRepository.create({
-    prisma: prismaDouble({ topic: { findMany } }),
-  });
+  const repository = PrismaTraceTopicNamesRepository.create(prismaDouble({ topic: { findMany } }));
   return { repository, findMany };
 }
 
