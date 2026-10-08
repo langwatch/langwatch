@@ -1,4 +1,5 @@
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import type { StoredObjectApi, StoredObjectServerConfig } from "@langwatch/stored-object-contract";
 
 import { StoredObjectModule } from "#app/stored-object.app";
 import { storedObjectChannels } from "#channels/stored-object-channels.registry";
@@ -8,7 +9,11 @@ import { storedObjectImageProxyRest } from "#transport/stored-object-image-proxy
 import { storedObjectRest } from "#transport/stored-object.rest";
 import { storedObjectTrpcTransport } from "#transport/stored-object.trpc";
 
-export const storedObjectProcessModule = defineProcessModule("stored-object")
+export const storedObjectProcessModule: PublishedProcessModule<
+  "stored-object",
+  StoredObjectApi,
+  StoredObjectServerConfig
+> = defineProcessModule("stored-object")
   .withRepositories(storedObjectRepositories)
   .withChannels(storedObjectChannels)
   .withApi(StoredObjectModule)

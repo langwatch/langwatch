@@ -1,91 +1,19 @@
-import type { Projection, StaticPipelineDefinition } from "@langwatch/eventing";
-import { defineProcessModule } from "@langwatch/process";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { GithubApi, GithubServerConfig } from "@langwatch/github-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
-import {
-  GithubModule,
-  type GithubBranchMaintenanceComposition,
-  type GithubBranchDemandComposition,
-  type GithubBranchDemand,
-} from "./app/github.app.ts";
+import { GithubModule } from "./app/github.app.ts";
 import { githubChannels } from "./channels/github-channels.registry.ts";
 import { githubLifecycleEventing } from "./eventing/github-lifecycle.pipeline.ts";
-import {
-  buildGithubMaintenancePipeline,
-  githubMaintenanceEventing,
-  type GithubMaintenancePipelineDeps,
-} from "./eventing/github-maintenance.pipeline.ts";
+import { githubMaintenanceEventing } from "./eventing/github-maintenance.pipeline.ts";
 import { githubRepositories } from "./repositories/github-repositories.registry.ts";
-import type { GithubRepositories } from "./repositories/github.repositories.ts";
-import {
-  PrismaGithubInstallationsRepository,
-  type PrismaGithubInstallationsDatabase,
-} from "./repositories/prisma/prisma.github-installations.repository.ts";
-import {
-  PrismaGithubPullRequestsRepository,
-  type PrismaGithubPullRequestsDatabase,
-} from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
-import { GithubInstallNonceRedisRepository } from "./repositories/redis/redis.github-install-nonce.repository.ts";
-import { GithubPullRequestStatusCacheRedisRepository } from "./repositories/redis/redis.github-pull-request-status-cache.repository.ts";
-import { GithubTokenCacheRedisRepository } from "./repositories/redis/redis.github-token-cache.repository.ts";
-import type { GithubBranchMaintenance } from "./services/github-branch-maintenance.service.ts";
 import { githubInstallRest } from "./transport/github-install.rest.ts";
 import { githubTrpcTransport } from "./transport/github.trpc.ts";
 
-export const githubProcessModule = defineProcessModule("github")
-  .withRepositories(githubRepositories)
-  .withChannels(githubChannels)
-  .withApi(GithubModule)
-  .withTransports(githubInstallRest, githubTrpcTransport)
-  .withEventing(githubMaintenanceEventing)
-  .withEventing(githubLifecycleEventing);
-
-/** The stores every ad-hoc GitHub composition below needs: a Prisma client and the Redis. */
-type GithubStoreConnections = {
-  prisma: PrismaGithubInstallationsDatabase & PrismaGithubPullRequestsDatabase;
-  redis: ProcessMembers["redis"];
-};
-
-function buildGithubRepositories({ prisma, redis }: GithubStoreConnections): GithubRepositories {
-  return {
-    installations: PrismaGithubInstallationsRepository.create(prisma),
-    pullRequests: PrismaGithubPullRequestsRepository.create(prisma),
-    installNonces: GithubInstallNonceRedisRepository.create(redis),
-    pullRequestStatusCache: GithubPullRequestStatusCacheRedisRepository.create(redis),
-    tokenCache: GithubTokenCacheRedisRepository.create(redis),
-  };
-}
-
-/** The fleet-wide branch sweep alone, composed from the process's own Prisma client. */
-export function composeGithubBranchMaintenance(
-  parts: Omit<GithubBranchMaintenanceComposition, "repositories"> & GithubStoreConnections,
-): GithubBranchMaintenance {
-  const { prisma, redis, ...rest } = parts;
-
-  return GithubModule.composeBranchMaintenance({
-    ...rest,
-    repositories: buildGithubRepositories({ prisma, redis }),
-  });
-}
-
-/** The demand half of pull-request linkage alone, composed the same way. */
-export function composeGithubBranchDemand(
-  parts: Omit<GithubBranchDemandComposition, "repositories"> & GithubStoreConnections,
-): GithubBranchDemand {
-  const { prisma, redis, ...rest } = parts;
-
-  return GithubModule.composeBranchDemand({
-    ...rest,
-    repositories: buildGithubRepositories({ prisma, redis }),
-  });
-}
-
-/**
- * The worker's registration pipeline for GitHub pull-request linkage
- * maintenance, over its own process store.
- */
-export function createGithubMaintenancePipeline(
-  deps: GithubMaintenancePipelineDeps,
-): StaticPipelineDefinition<never, Record<string, Projection>, never> {
-  return buildGithubMaintenancePipeline(deps);
-}
+export const githubProcessModule: PublishedProcessModule<"github", GithubApi, GithubServerConfig> =
+  defineProcessModule("github")
+    .withRepositories(githubRepositories)
+    .withChannels(githubChannels)
+    .withApi(GithubModule)
+    .withTransports(githubInstallRest, githubTrpcTransport)
+    .withEventing(githubMaintenanceEventing)
+    .withEventing(githubLifecycleEventing);

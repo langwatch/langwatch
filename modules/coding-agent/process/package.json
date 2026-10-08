@@ -19,10 +19,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/app/__tests__/coding-agent.fixture.d.ts",
-      "default": "./src/app/__tests__/coding-agent.fixture.ts"
     }
   },
   "scripts": {

@@ -14,7 +14,6 @@ function bootWithoutPeers() {
       .withConfig({
         agent: { replicaCount: 1, relayMaxPayloadMb: undefined, publicBaseUrl: undefined },
       })
-      // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no Agent peers
       .boot(),
   );
 }

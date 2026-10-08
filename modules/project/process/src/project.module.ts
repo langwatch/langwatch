@@ -1,4 +1,5 @@
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { ProjectModule } from "./app/project.app.ts";
 import { projectLifecycleEventing } from "./eventing/project-lifecycle.pipeline.ts";
@@ -9,19 +10,23 @@ import { ProjectPresenceSettingBackfillTask } from "./tasks/project-presence-set
 import { projectRest } from "./transport/project.rest.ts";
 import { projectTrpcTransport } from "./transport/project.trpc.ts";
 
-export const projectProcessModule = defineProcessModule("project")
-  .withRepositories(projectRepositories)
-  .withApi(ProjectModule)
-  .withTransports(projectRest, projectTrpcTransport)
-  .withEventing(projectLifecycleEventing)
-  .withTasks(({ app, dependencies }) => [
-    ProjectCreatedBackfillTask.create({ organizations: dependencies.organizations, projects: app }),
-    ProjectPresenceSettingBackfillTask.create({
-      organizations: dependencies.organizations,
-      projects: app,
-    }),
-    ProjectDepartmentAssignedBackfillTask.create({
-      organizations: dependencies.organizations,
-      projects: app,
-    }),
-  ]);
+export const projectProcessModule: PublishedProcessModule<"project", ProjectApi> =
+  defineProcessModule("project")
+    .withRepositories(projectRepositories)
+    .withApi(ProjectModule)
+    .withTransports(projectRest, projectTrpcTransport)
+    .withEventing(projectLifecycleEventing)
+    .withTasks(({ app, dependencies }) => [
+      ProjectCreatedBackfillTask.create({
+        organizations: dependencies.organizations,
+        projects: app,
+      }),
+      ProjectPresenceSettingBackfillTask.create({
+        organizations: dependencies.organizations,
+        projects: app,
+      }),
+      ProjectDepartmentAssignedBackfillTask.create({
+        organizations: dependencies.organizations,
+        projects: app,
+      }),
+    ]);

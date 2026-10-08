@@ -9,11 +9,11 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 import { type Cluster, Redis } from "ioredis";
 
 import { HostedMcpModule } from "../../../app/hosted-mcp.app.ts";
-import type { McpHandler } from "../../../index.ts";
 import { LiveHostedMcpRepositories } from "../../../repositories/live/live.hosted-mcp.repositories.ts";
 import type { McpSessionCipher } from "../../../repositories/mcp-session.repository.ts";
 import type { AuthzMcpSessionGrantService } from "../../../services/authz-mcp-session-grant.service.ts";
 import type { HeaderMcpClientAddressService } from "../../../services/header-mcp-client-address.service.ts";
+import type { McpHandler } from "../../../services/mcp-endpoint.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,

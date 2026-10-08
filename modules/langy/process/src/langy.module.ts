@@ -1,5 +1,6 @@
 import { bindRestCredential } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { LangyApi, LangyServerConfig } from "@langwatch/langy-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { LangyModule } from "./app/langy.app.ts";
 import { langyChannels } from "./channels/langy-channels.registry.ts";
@@ -23,32 +24,33 @@ import { langyUiActionsRest } from "./transport/langy-ui-actions.rest.ts";
 import { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
-export const langyProcessModule = defineProcessModule("langy")
-  .withRepositories(langyRepositories)
-  .withChannels(langyChannels)
-  .withApi(LangyModule)
-  .withTransports(
-    langyTurnsRest,
-    langyUiActionsRest,
-    langyInternalRest,
-    langyLocalRest,
-    langyLocalControlRest,
-    langyLocalControlConnectRest,
-    ...langyLocalControlDatedRests,
-    ...langyLocalControlConnectDatedRests,
-    createLangyLocalControlWebSocketProtocol(),
-    setupSkillsTrpcTransport,
-    langyTrpcTransport,
-    langyEgressTrpcTransport,
-  )
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof LangyModule))
-      throw new TypeError("Langy transport requires its constructed application");
-    return [
-      bindRestCredential("internal_secret", () => app.internalDoor),
-      bindRestCredential("session_key", () => app.sessionKeyDoor),
-    ];
-  })
-  .withEventing(langyConversationEventing)
-  .withEventing(langyGuidedOnboardingEventing)
-  .withEventing(langyMaintenanceEventing);
+export const langyProcessModule: PublishedProcessModule<"langy", LangyApi, LangyServerConfig> =
+  defineProcessModule("langy")
+    .withRepositories(langyRepositories)
+    .withChannels(langyChannels)
+    .withApi(LangyModule)
+    .withTransports(
+      langyTurnsRest,
+      langyUiActionsRest,
+      langyInternalRest,
+      langyLocalRest,
+      langyLocalControlRest,
+      langyLocalControlConnectRest,
+      ...langyLocalControlDatedRests,
+      ...langyLocalControlConnectDatedRests,
+      createLangyLocalControlWebSocketProtocol(),
+      setupSkillsTrpcTransport,
+      langyTrpcTransport,
+      langyEgressTrpcTransport,
+    )
+    .withTransportFacts(({ app }) => {
+      if (!(app instanceof LangyModule))
+        throw new TypeError("Langy transport requires its constructed application");
+      return [
+        bindRestCredential("internal_secret", () => app.internalDoor),
+        bindRestCredential("session_key", () => app.sessionKeyDoor),
+      ];
+    })
+    .withEventing(langyConversationEventing)
+    .withEventing(langyGuidedOnboardingEventing)
+    .withEventing(langyMaintenanceEventing);

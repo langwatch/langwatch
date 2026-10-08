@@ -1,7 +1,7 @@
 import { createTenantId } from "@langwatch/eventing";
-import { type LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
+import { type LangyAnalyticsEventProjectionRecord } from "../eventing/langy-analytics-event.projection.ts";
 import { LangyAnalyticsEventRepository } from "../repositories/langy-analytics-event.repository.ts";
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 

@@ -1,12 +1,12 @@
 import { intentAccessorOf } from "@langwatch/eventing/testing";
-import {
-  LANGY_SESSION_KEY_REAP_PROCESS_NAME,
-  langySessionKeyReapWake,
-  runLangySessionKeyReap,
-} from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
+import { runLangySessionKeyReap } from "../eventing/langy-session-key-reap.intent.ts";
+import {
+  LANGY_SESSION_KEY_REAP_PROCESS_NAME,
+  langySessionKeyReapWake,
+} from "../eventing/langy-session-key-reap.process.ts";
 import { LANGY_SESSION_KEYS_METRIC_NAME } from "../services/langy-session-key-metrics-otel.service.ts";
 
 const wakeContext = (at: number) => ({

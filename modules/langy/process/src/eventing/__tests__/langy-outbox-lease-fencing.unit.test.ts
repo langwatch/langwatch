@@ -7,10 +7,10 @@ import {
   OutboxDispatcherService,
   ProcessManagerService,
 } from "@langwatch/eventing";
-import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
+import { AGENT_DISPATCH_TIMEOUT_MS } from "../../channels/http/http.langy-worker.channel.ts";
 import type { LangyConversationProcessState } from "../langy-conversation-process.schemas.ts";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,

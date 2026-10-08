@@ -181,7 +181,6 @@ describe("given the entitlement module installed on the worker role", () => {
             licensing: createApiFixture<LicensingApi>({ resolve: async () => unlicensed }),
             organization: createApiFixture<OrganizationApi>({}),
           })
-          // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no billing
           .boot(),
       );
 

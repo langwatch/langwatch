@@ -1,29 +1,3 @@
-export type { GithubRepositories } from "./repositories/github.repositories.ts";
-export type { PrismaGithubInstallationsDatabase } from "./repositories/prisma/prisma.github-installations.repository.ts";
-export type { PrismaGithubPullRequestsDatabase } from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
-export type {
-  GithubBranchMaintenanceComposition,
-  GithubBranchDemandComposition,
-  GithubBranchDemand,
-} from "./app/github.app.ts";
-export type { GithubBranchMaintenance } from "./services/github-branch-maintenance.service.ts";
-export type { BranchMappingRequest } from "./services/github-branch-demand.service.ts";
-export {
-  GITHUB_BRANCH_RECHECK_INTERVAL_MS,
-  GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-} from "./eventing/github-branch-recheck.process.ts";
-export {
-  githubProcessModule,
-  composeGithubBranchMaintenance,
-  composeGithubBranchDemand,
-  createGithubMaintenancePipeline,
-} from "./github.module.ts";
-
-// The GitHub App installation flow's REST family: the session-gated start, the
-// protocol-mandated Setup URL and the HMAC-verified webhook, plus the two
-// `github-langy` aliases held by App registrations we do not own.
-export { githubInstallRest, type GithubInstallApi } from "./transport/github-install.rest.ts";
-
-// The `github.*` procedures: the connection, its repositories, the live
-// pull-request read and the disconnect.
-export { githubTrpcTransport, type GithubConnectionApi } from "./transport/github.trpc.ts";
+export { githubProcessModule } from "./github.module.ts";
+export { githubInstallRest } from "./transport/github-install.rest.ts";
+export { githubTrpcTransport } from "./transport/github.trpc.ts";

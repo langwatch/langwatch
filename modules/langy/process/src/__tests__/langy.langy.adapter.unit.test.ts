@@ -18,10 +18,6 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { LangyRelayConnection } from "@langwatch/langy-contract";
-import type {
-  LangyConversationCommands,
-  LangyTurnTechnicalMembers,
-} from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
@@ -50,6 +46,8 @@ import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.rep
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
+import type { LangyTurnTechnicalMembers } from "../services/langy-turn.service.ts";
+import type { LangyConversationCommands } from "../services/langy.service.ts";
 import { LangyService } from "../services/langy.service.ts";
 
 function commands(): LangyConversationCommands {

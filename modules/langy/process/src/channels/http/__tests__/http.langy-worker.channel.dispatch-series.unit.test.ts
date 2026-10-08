@@ -5,8 +5,8 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpLangyWorkerChannel } from "../../../index.ts";
 import { HttpLangyWorkerMetricsChannel } from "../http.langy-worker-metrics.channel.ts";
+import { HttpLangyWorkerChannel } from "../http.langy-worker.channel.ts";
 
 const SERIES = "langwatch_langy_dispatch_total";
 

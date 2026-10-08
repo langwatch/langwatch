@@ -1,5 +1,9 @@
-import { type EntitlementApi, USAGE_PIPELINE_NAME } from "@langwatch/entitlement-contract";
-import { defineProcessModule } from "@langwatch/process";
+import {
+  type EntitlementApi,
+  USAGE_PIPELINE_NAME,
+  type EntitlementConfig,
+} from "@langwatch/entitlement-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { EntitlementModule } from "./app/entitlement.app.ts";
@@ -12,7 +16,11 @@ import { organizationSpendTrpcTransport } from "./transport/organization-spend.t
 import { planTrpcTransport } from "./transport/plan.trpc.ts";
 import { usageLimitsTrpcTransport } from "./transport/usage-limits.trpc.ts";
 
-export const entitlementProcessModule = defineProcessModule("entitlement")
+export const entitlementProcessModule: PublishedProcessModule<
+  "entitlement",
+  EntitlementApi,
+  EntitlementConfig
+> = defineProcessModule("entitlement")
   .withRepositories(entitlementRepositories)
   .withApi(EntitlementModule)
   .withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport)

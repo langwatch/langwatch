@@ -1,4 +1,5 @@
-import { defineProcessModule } from "@langwatch/process";
+import type { DatasetApi, DatasetServerConfig } from "@langwatch/dataset-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { DatasetModule } from "#app/dataset.app";
 import { datasetNormalizationEventing } from "#eventing/dataset-normalization.pipeline";
@@ -9,7 +10,11 @@ import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
 import { createDatasetRest } from "#transport/dataset.rest";
 import { datasetTrpcTransport } from "#transport/dataset.trpc";
 
-export const datasetProcessModule = defineProcessModule("dataset")
+export const datasetProcessModule: PublishedProcessModule<
+  "dataset",
+  DatasetApi,
+  DatasetServerConfig
+> = defineProcessModule("dataset")
   .withRepositories(datasetRepositories)
   .withApi(DatasetModule)
   .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
