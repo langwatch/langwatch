@@ -3004,9 +3004,8 @@ any caller), accept a disable, and only with a reason explaining why the framewo
 disable is an error. A rule opts in through `defineRule({ escape })` in `packages/oxlint-rules`. This is for
 the new rules, not a sweep of old directives. When unsure, ask the human: the message on those few rules
 tells the agent that if the case is confusing it stops and asks the human rather than disabling.
-`langwatch/id-generation-origin` stays unsuppressible: it allows a visitor id the contract types as a UUID
-to be minted with `randomUUID` (a named, tested exception in the rule), and the disable directive in
-`modules/feature-flag/browser/src/behavior/anonymous-id.ts` is deleted (Alex, 2026-10-05).
+`langwatch/id-generation-origin` stays unsuppressible and has no named exception: the feature-flag
+anonymous id it once allowed was never mounted and is deleted (Alex, 2026-10-05).
 
 **The lint split and the CI type-aware gate** (Alex, 2026-10-05). oxlint's native rules and the langwatch
 plugin run as two parallel oxlint processes; the root `package.json` lint scripts own the split, and CI,

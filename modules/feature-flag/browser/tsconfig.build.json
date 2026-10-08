@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": ["./src/experiment-catalogue.ts", "./src/feature-flag.web.ts"],
+  "files": ["./src/feature-flag.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

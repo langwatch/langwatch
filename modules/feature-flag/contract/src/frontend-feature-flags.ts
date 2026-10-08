@@ -20,7 +20,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // default; the section flag being off still hides both.
   "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
-  "release_langy_promo_enabled",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
