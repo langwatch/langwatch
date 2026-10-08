@@ -422,6 +422,14 @@ Feature: AI Gateway — transparent upstream error forwarding
     Then the gateway responds 503 with error code "circuit_open" and fault "provider"
     And never 500 "internal_error"
 
+  @bdd @error-transparency @unit
+  Scenario: A plain-text provider error body reaches the client as a JSON error
+    Given the provider refuses a call with HTTP 402 and the plain-text body "Account balance too low."
+    And the provider sent no Content-Type of its own
+    When the gateway forwards the error
+    Then the client receives HTTP 402 with a JSON error envelope
+    And the envelope message is "Account balance too low."
+
   # ==========================================================================
   # End-to-end: the real wrapper must fail fast, not retry-loop
   # ==========================================================================

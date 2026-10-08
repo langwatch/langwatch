@@ -1961,12 +1961,20 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
-	if w.Header().Get("Content-Type") == "" {
+	upstreamContentType := w.Header().Get("Content-Type") != ""
+	if !upstreamContentType {
 		w.Header().Set("Content-Type", "application/json")
 	}
+	body, message := ue.Body, ue.Message
+	// A body without a Content-Type of its own is served as JSON, so a
+	// plain-text body (e.g. "Account balance too low.") goes inside the
+	// envelope as its message instead of reaching the client as broken JSON.
+	if len(body) > 0 && !upstreamContentType && !gjson.ValidBytes(body) {
+		body, message = nil, strings.TrimSpace(string(body))
+	}
 	w.WriteHeader(status)
-	if len(ue.Body) > 0 {
-		_, _ = w.Write(ue.Body)
+	if len(body) > 0 {
+		_, _ = w.Write(body)
 		return
 	}
 	errType := ue.ErrorType
@@ -1984,15 +1992,15 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	if ue.Provider != "" {
 		meta["provider"] = ue.Provider
 	}
-	body, _ := sonic.Marshal(map[string]any{
+	envelope, _ := sonic.Marshal(map[string]any{
 		"error": map[string]any{
 			"type":    errType,
 			"code":    errCode,
-			"message": ue.Message,
+			"message": message,
 			"meta":    meta,
 		},
 	})
-	_, _ = w.Write(body)
+	_, _ = w.Write(envelope)
 }
 
 // errorsRegisteredOnce guards a write into herr's package-level status map.

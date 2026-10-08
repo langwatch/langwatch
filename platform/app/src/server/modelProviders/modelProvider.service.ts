@@ -1157,6 +1157,7 @@ export class ModelProviderService {
       deepseek: "DeepSeek",
       xai: "xAI",
       cerebras: "Cerebras",
+      doubleword: "Doubleword",
       groq: "Groq",
       azure_safety: "Azure Safety",
       custom: "Custom (OpenAI-compatible)",

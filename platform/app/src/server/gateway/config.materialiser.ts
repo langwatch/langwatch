@@ -717,6 +717,18 @@ function geminiCredentials(
   };
 }
 
+/** Providers whose gateway credential is a single API key field. */
+const API_KEY_FIELD_BY_PROVIDER = new Map<string, string>([
+  ["anthropic", "ANTHROPIC_API_KEY"],
+  ["openai", "OPENAI_API_KEY"],
+  ["deepseek", "DEEPSEEK_API_KEY"],
+  ["xai", "XAI_API_KEY"],
+  ["cerebras", "CEREBRAS_API_KEY"],
+  ["doubleword", "DOUBLEWORD_API_KEY"],
+  ["groq", "GROQ_API_KEY"],
+  ["cloudflare", "CLOUDFLARE_API_KEY"],
+]);
+
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
   const customKeys = readCustomKeys(mp.customKeys).keys;
@@ -764,8 +776,6 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         provider_row_id: mp.id,
       };
     }
-    case "anthropic":
-      return { api_key: pick("ANTHROPIC_API_KEY") };
     case "gemini":
     case "google_gemini":
       return geminiCredentials(pick);
@@ -779,25 +789,24 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
         region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
       };
-    case "openai":
-      return { api_key: pick("OPENAI_API_KEY") };
-    case "deepseek":
-      return { api_key: pick("DEEPSEEK_API_KEY") };
-    case "xai":
-      return { api_key: pick("XAI_API_KEY") };
-    case "cerebras":
-      return { api_key: pick("CEREBRAS_API_KEY") };
-    case "groq":
-      return { api_key: pick("GROQ_API_KEY") };
-    case "cloudflare":
-      return { api_key: pick("CLOUDFLARE_API_KEY") };
-    default: {
-      const apiKey = Object.entries(customKeys).find(([k]) =>
-        /_API_KEY$/.test(k),
-      )?.[1];
-      return { api_key: typeof apiKey === "string" ? apiKey : "" };
-    }
+    default:
+      return { api_key: apiKeyCredential(provider, customKeys) };
   }
+}
+
+/**
+ * Reads the API key of a provider whose credential is a single key. A
+ * provider without a known field name takes its first `*_API_KEY` entry.
+ */
+function apiKeyCredential(
+  provider: string,
+  customKeys: Record<string, unknown>,
+): string {
+  const field = API_KEY_FIELD_BY_PROVIDER.get(provider);
+  const apiKey = field
+    ? customKeys[field]
+    : Object.entries(customKeys).find(([k]) => /_API_KEY$/.test(k))?.[1];
+  return typeof apiKey === "string" ? apiKey : "";
 }
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {

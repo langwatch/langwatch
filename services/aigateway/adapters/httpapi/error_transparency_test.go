@@ -355,3 +355,32 @@ func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
 		"a passthrough response's own headers cannot spoof the LangWatch marker")
 	assert.JSONEq(t, geminiErrBody, rec.Body.String())
 }
+
+// @scenario "A plain-text provider error body reaches the client as a JSON error"
+func TestWriteUpstreamError_PlainTextBodyIsWrappedInEnvelope(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low.\n"),
+		Provider:   "doubleword",
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.JSONEq(t,
+		`{"error":{"type":"provider_error","code":"provider_error","message":"Account balance too low.","meta":{"status":402,"provider":"doubleword"}}}`,
+		rec.Body.String())
+}
+
+func TestWriteUpstreamError_PlainTextBodyWithItsOwnContentTypeIsVerbatim(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeUpstreamError(rec, &domain.UpstreamError{
+		StatusCode: http.StatusPaymentRequired,
+		Body:       []byte("Account balance too low."),
+		Headers:    map[string]string{"Content-Type": "text/plain"},
+	})
+
+	require.Equal(t, http.StatusPaymentRequired, rec.Code)
+	assert.Equal(t, "text/plain", rec.Header().Get("Content-Type"))
+	assert.Equal(t, "Account balance too low.", rec.Body.String())
+}

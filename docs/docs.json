@@ -675,6 +675,7 @@
               "ai-gateway/providers/groq",
               "ai-gateway/providers/cerebras",
               "ai-gateway/providers/deepseek",
+              "ai-gateway/providers/doubleword",
               "ai-gateway/providers/voyage",
               "ai-gateway/providers/elevenlabs",
               "ai-gateway/providers/openai-account",

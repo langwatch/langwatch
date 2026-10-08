@@ -91,7 +91,7 @@ func imageEditParams(upload *domain.ImageEditUpload) *bfschemas.ImageEditParamet
 // answers every image call with an unsupported-operation error.
 //
 // An OpenAI credential carrying a base_url override routes there (mapProvider),
-// and so do the custom and DeepSeek credentials. A caller reaching this with a
+// and so do the custom, DeepSeek and Doubleword credentials. A caller reaching this with a
 // self-hosted endpoint needs to be told which credential does serve images
 // rather than reading the adapter's own refusal.
 func imageEndpointSupported(ctx context.Context, provider bfschemas.ModelProvider) error {

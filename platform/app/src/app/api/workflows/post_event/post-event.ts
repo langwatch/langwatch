@@ -188,6 +188,12 @@ export const studioBackendPostEvent = async ({
     const node_id =
       "node_id" in message.payload ? message.payload.node_id : undefined;
 
+    // A consumer that rethrows a node failure from inside onEvent lands here
+    // too. Keep the provider's HTTP status it carried, which is what tells an
+    // out-of-credit account from a bad key or a rate limit.
+    const upstreamStatus = (error as { upstreamStatus?: unknown })
+      .upstreamStatus;
+
     if (node_id) {
       onEvent({
         type: "component_state_change",
@@ -196,6 +202,9 @@ export const studioBackendPostEvent = async ({
           execution_state: {
             status: "error",
             error: (error as Error).message,
+            ...(typeof upstreamStatus === "number"
+              ? { upstream_status: upstreamStatus }
+              : {}),
             timestamps: { finished_at: Date.now() },
           },
         },

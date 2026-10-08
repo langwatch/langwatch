@@ -63,6 +63,8 @@ function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
       return "The model provider doesn't have the model this prompt asks for.";
     case "rate_limit":
       return "The model provider is rate-limiting this project, or the account behind it has no allowance left.";
+    case "out_of_credit":
+      return "The model provider account behind this model has no credit left. Add credit with the provider, then try again.";
     case "bad_request":
       return "The model provider rejected the request — usually a parameter this model doesn't support, or a conversation past its context limit.";
     case "connection":

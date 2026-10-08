@@ -278,6 +278,15 @@ describe("PromptPlaygroundChat ref methods", () => {
         ).toBeInTheDocument();
         expect(document.body.textContent).not.toContain("sk-proj-");
       });
+
+      it("says the provider account has no credit left for an out-of-credit failure", () => {
+        renderAssistantMessage({
+          content:
+            '[ERROR]{"type":"out_of_credit","message":"gateway returned non-2xx status 402"}',
+        });
+
+        expect(screen.getByText(/has no credit left/i)).toBeInTheDocument();
+      });
     });
 
     describe("when the message is a finished non-error reply", () => {
