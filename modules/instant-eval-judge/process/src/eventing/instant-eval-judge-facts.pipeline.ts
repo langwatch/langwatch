@@ -1,6 +1,7 @@
 /**
- * The judge folds the facts it checks before each call from their owners' side (ADR-174 decision
- * 13), so it calls no peer. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * The judge folds billing's usage-billed fact (ADR-174 decision 13), so it calls no peer;
+ * project placement is read through shares (R40).
+ * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import {
   USAGE_BILLING_CHANGED_EVENT_TYPE,
@@ -13,10 +14,6 @@ import {
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  PROJECT_CREATED_EVENT_TYPE,
-  projectCreatedEventDataSchema,
-} from "@langwatch/project-contract";
 
 import type { InstantEvalJudgeModule } from "../app/instant-eval-judge.app.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
@@ -38,13 +35,7 @@ export function buildInstantEvalJudgeFactsPipeline({
       aggregate: defineAggregate({ type: "global" }),
     })
       .withEvents([])
-      // Both folds are upserts by key, so a redelivered or late fact changes nothing.
-      .withPeerSubscriber("instantEvalJudgeProjectCreated", {
-        eventType: PROJECT_CREATED_EVENT_TYPE,
-        data: projectCreatedEventDataSchema,
-        handle: ({ projectId, organizationId, occurredAt }) =>
-          facts.projectCreated({ projectId, organizationId, occurredAt }),
-      })
+      // An upsert by key, the newest stamp winning: a redelivered or late fact changes nothing.
       .withPeerSubscriber("instantEvalJudgeUsageBillingChanged", {
         eventType: USAGE_BILLING_CHANGED_EVENT_TYPE,
         data: usageBillingChangedEventDataSchema,

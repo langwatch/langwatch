@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  * The judge's priced fact and the spend row its subscriber writes from it (ADR-174 decision 13):
- * one row per request, never rewritten. Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * one row per request, never rewritten.
+ * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
@@ -9,7 +10,10 @@ import type { InstantEvalJudgeSpendPricedEventData } from "@langwatch/instant-ev
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
+import {
+  MemoryInstantEvalJudgeProjectRepository,
+  MemoryInstantEvalJudgeRepositories,
+} from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { instantEvalJudgeSpendPricedOf } from "../../rules/instant-eval-judge-spend.rules.ts";
 import { InstantEvalJudgeFactsService } from "../../services/instant-eval-judge-facts.service.ts";
 import { InstantEvalJudgeService } from "../../services/instant-eval-judge.service.ts";
@@ -21,7 +25,12 @@ const ORGANIZATION_ID = "organization-1";
 const NOW = 1_760_000_000_000;
 
 function harness() {
-  const repositories = MemoryInstantEvalJudgeRepositories.create();
+  const repositories = {
+    ...MemoryInstantEvalJudgeRepositories.create(),
+    projects: MemoryInstantEvalJudgeProjectRepository.create({
+      rows: new Map([[PROJECT_ID, { organizationId: ORGANIZATION_ID }]]),
+    }),
+  };
   const facts = InstantEvalJudgeFactsService.create({ repositories });
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
@@ -41,11 +50,6 @@ describe("given the judge's spend pipeline", () => {
     /** @scenario "A judge call records one spend row priced for the customer" */
     it("records one spend row with the customer price, and answers that price", async () => {
       const { repositories, facts, append } = harness();
-      await repositories.projects.upsert({
-        projectId: PROJECT_ID,
-        organizationId: ORGANIZATION_ID,
-        createdAtMs: 1,
-      });
       const judge = InstantEvalJudgeService.create({
         repositories,
         classifier: {

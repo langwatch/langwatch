@@ -7,6 +7,7 @@ import {
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaTables } from "@langwatch/prisma-client/ownership";
 import { toDate, type Instant } from "@langwatch/time";
 
 import { TeamRepository } from "../team.repository.ts";
@@ -27,6 +28,8 @@ const teamSelect = {
 } as const;
 
 export class PrismaTeamRepository extends TeamRepository {
+  static readonly tables = prismaTables("Team");
+
   private constructor(private readonly database: PrismaClient) {
     super();
   }

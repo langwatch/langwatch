@@ -1,17 +1,15 @@
 /**
  * @vitest-environment node
  * The judge's own side of the catch-ups: its spend holds a request once however the ledger copy
- * and the priced fact race, and it refuses a project until project's created fact has folded
- * (ADR-174 decisions 15, 17). Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * and the priced fact race, and it places a project its owners hold with no catch-up (ADR-174
+ * decision 17, R40). Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { INSTANT_EVAL_SPEND_MODEL } from "@langwatch/instant-eval-judge-contract";
-import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { instantEvalJudgeOverMemory } from "../../__tests__/support/instant-eval-judge-over-memory.test-fakes.ts";
-import { judgeFactOwner } from "./instant-eval-judge-facts.fixture.ts";
 
 const ORGANIZATION = "org-acme";
 const OCCURRED_AT = Date.UTC(2026, 9, 6);
@@ -23,11 +21,10 @@ function judgeOnEventing() {
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),
   });
-  const append = judgeFactOwner(eventing);
   eventing.register(judge.factsPipeline());
   const spend = eventing.register(judge.spendPipeline());
   judge.connectSpend((fact) => spend.commands.recordSpendPriced.send(fact));
-  return { judge, eventing, spend, append };
+  return { judge, eventing, spend };
 }
 
 describe("the judge beside the spend and project catch-ups", () => {
@@ -103,40 +100,34 @@ describe("the judge beside the spend and project catch-ups", () => {
     );
   });
 
-  describe("given the judge was just deployed and holds no projects", () => {
-    describe("when a judge call arrives for a project created before the deploy", () => {
-      /** @scenario "The judge refuses calls until the project catch-up has run, then judges them" */
-      it("refuses it as unknown, then classifies the same call once project's created fact folds", async () => {
-        const { judge, eventing, append } = judgeOnEventing();
+  describe("given a project created before the judge was deployed, held by its owners", () => {
+    describe("when the first judge call arrives for it", () => {
+      /** @scenario "A project created before the deploy judges on the first call, with no catch-up" */
+      it("classifies it and charges its spend to the project's organization", async () => {
+        const judge = instantEvalJudgeOverMemory({
+          placed: [{ projectId: "project-old-1", organizationId: ORGANIZATION }],
+        });
+        const eventing = new EventSourcing({
+          eventStore: EventStoreMemory.createForTesting(),
+          processStore: InMemoryProcessStore.createForTesting(),
+        });
         close = () => eventing.close();
-        const call = {
+        const spend = eventing.register(judge.spendPipeline());
+        judge.connectSpend((fact) => spend.commands.recordSpendPriced.send(fact));
+
+        const answer = await judge.judges.judge({
           projectId: "project-old-1",
           text: "Thanks so much for your help!",
           questions: [{ id: "polite", kind: "boolean", instructions: "Is it polite?" }],
-        } as const;
+        });
 
-        const before = await judge.judges.judge(call);
-        expect(before).toMatchObject({ outcome: "refused", code: "instant_eval_project_unknown" });
-
-        await append(
-          {
-            type: PROJECT_CREATED_EVENT_TYPE,
-            data: {
-              tenantId: "project-old-1",
-              projectId: "project-old-1",
-              organizationId: ORGANIZATION,
-              occurredAt: 10,
-            },
-          },
-          "event-created",
-        );
-        await vi.waitFor(() => expect(judge.rows.projects.has("project-old-1")).toBe(true));
-        const after = await judge.judges.judge(call);
-
-        expect(after).toMatchObject({
+        expect(answer).toMatchObject({
           outcome: "judged",
           judgement: { verdicts: [{ questionId: "polite", probability: 1 }] },
         });
+        await vi.waitFor(async () =>
+          expect(await judge.spendNanoUsdOf({ organizationId: ORGANIZATION })).toBeGreaterThan(0n),
+        );
       });
     });
   });

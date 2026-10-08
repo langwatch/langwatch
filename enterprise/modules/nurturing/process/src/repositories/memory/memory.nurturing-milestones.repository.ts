@@ -4,21 +4,24 @@ import type {
   NurturingOrganizationState,
 } from "../nurturing-milestones.repository.ts";
 
-/** The Postgres twin's semantics over two maps. */
+/** The Postgres twin's semantics; `placed` stands in for project's and organization's tables. */
 export class MemoryNurturingMilestonesRepository implements NurturingMilestonesRepository {
-  readonly #projects = new Map<string, string>();
   readonly #organizations = new Map<string, NurturingOrganizationState>();
 
-  static create(): MemoryNurturingMilestonesRepository {
-    return new MemoryNurturingMilestonesRepository();
+  private constructor(private readonly placed: ReadonlyMap<string, string>) {}
+
+  /** `placed` maps each project its owners hold to its organization. */
+  static create({
+    placed = new Map<string, string>(),
+  }: { placed?: ReadonlyMap<string, string> } = {}): MemoryNurturingMilestonesRepository {
+    return new MemoryNurturingMilestonesRepository(placed);
   }
 
-  async recordProject({
-    projectId,
+  async recordOrganization({
     organizationId,
     adminUserId,
     seeded,
-  }: Parameters<NurturingMilestonesRepository["recordProject"]>[0]): Promise<void> {
+  }: Parameters<NurturingMilestonesRepository["recordOrganization"]>[0]): Promise<void> {
     const known = this.#organizations.get(organizationId);
     this.#organizations.set(
       organizationId,
@@ -26,13 +29,12 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
         ? { ...known, adminUserId: adminUserId ?? known.adminUserId }
         : { organizationId, adminUserId, seeded, evaluationCount: 0, simulationRunCount: 0 },
     );
-    this.#projects.set(projectId, organizationId);
   }
 
   async countEvaluation({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
+    const organization = this.#organizations.get(this.placed.get(projectId) ?? "");
     if (!organization) return [];
     const counted = { ...organization, evaluationCount: organization.evaluationCount + 1 };
     this.#organizations.set(organization.organizationId, counted);
@@ -42,7 +44,7 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
   async countSimulationRun({
     projectId,
   }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
+    const organization = this.#organizations.get(this.placed.get(projectId) ?? "");
     if (!organization) return [];
     const counted = { ...organization, simulationRunCount: organization.simulationRunCount + 1 };
     this.#organizations.set(organization.organizationId, counted);

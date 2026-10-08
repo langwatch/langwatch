@@ -14,7 +14,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { instantEvalClassifierChannels } from "../../channels/instant-eval-classifier-channels.registry.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
-import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
+import {
+  MemoryInstantEvalJudgeProjectRepository,
+  MemoryInstantEvalJudgeRepositories,
+} from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { instantEvalJudgeSpendPricedOf } from "../../rules/instant-eval-judge-spend.rules.ts";
 import { InstantEvalJudgeService } from "../instant-eval-judge.service.ts";
 
@@ -59,7 +62,13 @@ function harness({
   usageBilled?: boolean;
   spentNanoUsd?: bigint;
 } = {}) {
-  const repositories = MemoryInstantEvalJudgeRepositories.create();
+  const repositories = {
+    ...MemoryInstantEvalJudgeRepositories.create(),
+    // Project's and organization's tables, stood in: the project is placed or it is not.
+    projects: MemoryInstantEvalJudgeProjectRepository.create({
+      rows: new Map(isProjectKnown ? [[PROJECT_ID, { organizationId: ORGANIZATION_ID }]] : []),
+    }),
+  };
   const classifier = instantEvalClassifierChannels.memory.create({ answer: classify });
   vi.spyOn(classifier, "classify");
   const recorded: InstantEvalJudgeSpendPricedEventData[] = [];
@@ -84,13 +93,6 @@ function harness({
     logger,
   });
   const seed = async () => {
-    if (isProjectKnown) {
-      await repositories.projects.upsert({
-        projectId: PROJECT_ID,
-        organizationId: ORGANIZATION_ID,
-        createdAtMs: 1,
-      });
-    }
     if (usageBilled !== undefined) {
       await repositories.usageBilling.upsert({
         organizationId: ORGANIZATION_ID,
@@ -344,12 +346,12 @@ describe("given a judge call the classifier answers", () => {
 
   describe("when its priced fact cannot be appended", () => {
     it("logs it and keeps the verdict", async () => {
-      const repositories = MemoryInstantEvalJudgeRepositories.create();
-      await repositories.projects.upsert({
-        projectId: PROJECT_ID,
-        organizationId: ORGANIZATION_ID,
-        createdAtMs: 1,
-      });
+      const repositories = {
+        ...MemoryInstantEvalJudgeRepositories.create(),
+        projects: MemoryInstantEvalJudgeProjectRepository.create({
+          rows: new Map([[PROJECT_ID, { organizationId: ORGANIZATION_ID }]]),
+        }),
+      };
       const { logger, lines } = createTestLogger();
       const service = InstantEvalJudgeService.create({
         repositories,

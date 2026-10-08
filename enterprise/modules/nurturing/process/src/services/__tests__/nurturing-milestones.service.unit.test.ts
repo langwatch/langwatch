@@ -10,10 +10,13 @@ import { describe, expect, it } from "vitest";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
-function serviceOver() {
+/** `placed` stands in for project's and organization's tables (R40). */
+function serviceOver({
+  placed = new Map([["project-1", "org-1"]]),
+}: { placed?: ReadonlyMap<string, string> } = {}) {
   const claimed = new Set<string>();
   return NurturingMilestonesService.create({
-    milestones: MemoryNurturingMilestonesRepository.create(),
+    milestones: MemoryNurturingMilestonesRepository.create({ placed }),
     claims: {
       claim: async (key) => {
         if (claimed.has(key)) return false;
@@ -93,8 +96,39 @@ describe("NurturingMilestonesService", () => {
     ]);
   });
 
-  it("raises nothing for a project it has not learned", async () => {
+  it("raises nothing for a project its owners do not hold", async () => {
+    const service = serviceOver({ placed: new Map() });
+    await service.projectCreated(created());
+
+    expect(await service.evaluationCompleted(settled("eval-1"))).toEqual([]);
+  });
+
+  /** @scenario "An evaluation in an organization nurturing never learned raises nothing" */
+  it("raises nothing for a placed project whose organization it never learned", async () => {
     expect(await serviceOver().evaluationCompleted(settled("eval-1"))).toEqual([]);
+  });
+
+  /** @scenario "An evaluation in a project nurturing never saw created counts toward its organization" */
+  it("counts an evaluation in a project created before the cutover toward its organization", async () => {
+    const service = serviceOver({
+      placed: new Map([
+        ["project-1", "org-1"],
+        ["project-old", "org-1"],
+      ]),
+    });
+    await service.projectCreated(created());
+
+    const counted = await service.evaluationCompleted({
+      aggregateId: "project-old:eval-1",
+      data: {
+        tenantId: "project-old",
+        occurredAt: 2,
+        projectId: "project-old",
+        evaluationId: "eval-1",
+      },
+    });
+
+    expect(counted).toMatchObject([{ userId: "admin-1", organizationEvaluationCount: 1 }]);
   });
 });
 

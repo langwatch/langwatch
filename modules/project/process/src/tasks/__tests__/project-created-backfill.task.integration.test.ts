@@ -100,7 +100,7 @@ describe("ProjectCreatedBackfillTask", () => {
 
   describe("given projects created before the judge existed, and one whose created fact failed", () => {
     describe("when the project catch-up runs twice", () => {
-      /** @scenario "The project catch-up teaches the judge every existing project" */
+      /** @scenario "The project catch-up records every existing project's created fact" */
       it("records each project with its organization, the lost one included", async () => {
         const { eventing, recorded, runTask, loseNextCreated, logger } = projectNotice();
         close = () => eventing.close();

@@ -27,9 +27,16 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "Project",
     owner: "project",
-    readers: ["entitlement", "billing"],
+    readers: ["entitlement", "billing", "instant-eval-judge", "nurturing"],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); the Instant Evals judge and nurturing read a project's team to place it, never a fold (round 46 E1, R40)",
+  },
+  {
+    table: "Team",
+    owner: "organization",
+    readers: ["instant-eval-judge", "nurturing"],
+    reason:
+      "the Instant Evals judge and nurturing read a project's organisation through its team (round 46 E1, R40)",
   },
   {
     table: "OrganizationUser",

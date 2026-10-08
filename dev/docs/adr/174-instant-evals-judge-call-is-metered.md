@@ -309,3 +309,4 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - The open question on runs and the search bar honouring an operator-set key is closed: v17 settled it, since the leaf builds no classifier off cloud.
 - v19, 2026-10-07, after the final review. Captain: Sergio Esteban.
   - A real usage-billing fact whose send fails is retried in place, and a last failure logs the organization and `usage-billing-catch-up`, so a lost cancel cannot leave the judge uncapped unnoticed (decision 17).
+- Revision 2026-10-08 (round 46 E1): the judge reads project placement through shares of Project and Team; the project fold and its catch-up are retired.
