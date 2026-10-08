@@ -584,9 +584,7 @@ export const linkAccount = async (
   provider: string,
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const target = safeRedirectTarget(options?.callbackUrl);
-  parkReturnTo(target);
-  const callbackURL = betterAuthCallbackURL(target);
+  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
   const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
   const res = await fetch("/api/auth/link-social", {

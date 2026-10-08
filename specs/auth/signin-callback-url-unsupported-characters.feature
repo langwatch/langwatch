@@ -65,3 +65,10 @@ Feature: Signing in returns people to pages whose address better-auth would refu
     Given the address kept for the resume page points at another site
     When the resume page continues
     Then it goes to the home page instead
+
+  @integration
+  Scenario: The resume page forwards once to the parked page
+    Given the address kept for the resume page is a page with a colon in its address
+    When the resume page opens, even when it renders twice
+    Then it goes to that page exactly once
+    And nothing is kept for the resume page
