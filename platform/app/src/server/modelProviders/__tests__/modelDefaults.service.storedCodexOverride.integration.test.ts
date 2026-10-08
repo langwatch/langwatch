@@ -67,8 +67,6 @@ describe("given a config storing a Codex value for topic clustering (real DB)", 
     projectId = project.id;
   });
 
-  // The row is inserted directly: createConfig would refuse the Codex
-  // value, and the point is a value saved before the restriction existed.
   afterEach(() =>
     cleanupTestRows(prisma, [["modelDefaultConfig", { organizationId }]]),
   );
@@ -82,6 +80,8 @@ describe("given a config storing a Codex value for topic clustering (real DB)", 
     ]);
   });
 
+  // The row is inserted directly: createConfig would refuse the Codex
+  // value, and the point is a value saved before the restriction existed.
   const seedStoredCodex = async () => {
     const row = await prisma.modelDefaultConfig.create({
       data: {
