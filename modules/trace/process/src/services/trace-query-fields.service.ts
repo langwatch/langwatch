@@ -56,6 +56,23 @@ export class TraceQueryFieldsService {
     this.#catalog = catalog;
     this.#facetByKey = new Map(catalog.registry.map((d) => [d.key, d]));
     this.fieldDefs = {
+      ...this.#primaryFieldDefs(),
+      // Back-compat alias for the renamed `evaluatorVerdict` field. Any saved
+      // query/lens using the old key keeps working; the SQL + predicate are the
+      // same as `evaluatorVerdict`.
+      evaluatorPassed: this.#crossCategoricalFacet(
+        "evaluatorVerdict",
+        "evaluations",
+        evaluatorVerdictRead,
+      ),
+    } satisfies Record<KnownField, FieldDef>;
+    this.fieldDefByName = new Map(Object.entries(this.fieldDefs));
+    this.knownFields = Object.keys(this.fieldDefs);
+  }
+
+  /** Every field except the back-compat alias, in registry + meta order. */
+  #primaryFieldDefs(): Record<Exclude<KnownField, "evaluatorPassed">, FieldDef> {
+    return {
       status: this.#categoricalFacet("status"),
       origin: this.#categoricalFacet("origin"),
       service: this.#categoricalFacet("service"),
@@ -125,17 +142,7 @@ export class TraceQueryFieldsService {
       scenarioBatch: META_FIELD_DEFS.scenarioBatch,
       scenarioVerdict: META_FIELD_DEFS.scenarioVerdict,
       scenarioStatus: META_FIELD_DEFS.scenarioStatus,
-      // Back-compat alias for the renamed `evaluatorVerdict` field. Any saved
-      // query/lens using the old key keeps working; the SQL + predicate are the
-      // same as `evaluatorVerdict`.
-      evaluatorPassed: this.#crossCategoricalFacet(
-        "evaluatorVerdict",
-        "evaluations",
-        evaluatorVerdictRead,
-      ),
-    } satisfies Record<KnownField, FieldDef>;
-    this.fieldDefByName = new Map(Object.entries(this.fieldDefs));
-    this.knownFields = Object.keys(this.fieldDefs);
+    };
   }
 
   /** The registry facet `key` names, which must carry an SQL expression. */

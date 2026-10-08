@@ -2,67 +2,30 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   type ActivateConnectionCommandData,
-  APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
-  ATTEST_DOMAIN_COMMAND_TYPE,
-  WITHDRAW_DOMAIN_COMMAND_TYPE,
-  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   type AttestDomainCommandData,
   type WithdrawDomainCommandData,
-  CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
-  domainClaimRetryAfterSeconds,
-  isClaimableSsoDomain,
-  SsoDomainClaimThrottledError,
-  SsoDomainNotEligibleError,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   type CompleteTeardownCommandData,
   CONNECTION_ACTIVATED_EVENT_TYPE,
-  CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
-  DISCARD_CONNECTION_COMMAND_TYPE,
   type DiscardConnectionCommandData,
-  DOMAIN_ATTESTED_EVENT_TYPE,
-  DOMAIN_WITHDRAWN_EVENT_TYPE,
-  DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-  DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
-  DOMAIN_CLAIMED_EVENT_TYPE,
-  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
-  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
-  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
-  DOMAIN_VERIFIED_EVENT_TYPE,
   type GrandfatherConnectionCommandData,
-  normalizeDomain,
-  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
-  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   type RecordDomainProofAbsentCommandData,
   type RecordDomainProofPresentCommandData,
-  REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
-  REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
-  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type RegisterConnectionCommandData,
   type RegisterReplacementConnectionCommandData,
-  REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
-  RENAME_CONNECTION_COMMAND_TYPE,
   type RenameConnectionCommandData,
-  CONNECTION_RENAMED_EVENT_TYPE,
-  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   type UpdateConnectionIdpCommandData,
-  CONNECTION_IDP_UPDATED_EVENT_TYPE,
-  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
-  MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
-  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
   type BeginMigrationFinalizationCommandData,
-  MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
-  FINALIZE_MIGRATION_COMMAND_TYPE,
   type FinalizeMigrationCommandData,
-  MIGRATION_FINALIZED_EVENT_TYPE,
   qualifySsoDomainOwnership,
   SsoConnectionAlreadyRegisteredError,
   type RejectDomainClaimCommandData,
@@ -72,27 +35,23 @@ import {
   type ResumeConnectionCommandData,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionFactInput,
-  type SsoConnectionState,
-  type SsoDomainVerification,
   SsoConnectionActivationBlockedError,
   SsoConnectionInvalidTransitionError,
-  SsoDomainProofExpiredError,
-  SsoDomainProofNotFoundError,
-  verificationHasExpired,
   SsoConnectionTeardownStrandsUsersError,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
-  VERIFICATION_REQUESTED_EVENT_TYPE,
-  VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
 } from "@langwatch/identity-contract";
 
 import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfather-facts.rules.ts";
 import { activationRecoveryReservationId } from "../rules/sso-connection-id.rules.ts";
+import { SsoConnectionEditGuardsService } from "./sso-connection-edit-guards.service.ts";
 import {
   SsoConnectionGuardChecksService,
   type SsoConnectionGuardsDeps,
 } from "./sso-connection-guard-checks.service.ts";
+import { SsoDomainClaimGuardsService } from "./sso-domain-claim-guards.service.ts";
+import { SsoDomainProofGuardsService } from "./sso-domain-proof-guards.service.ts";
 
 /**
  * The SSO connection guards (ADR-117 §5, D04): what runs BEFORE any fact
@@ -103,9 +62,15 @@ export class SsoConnectionGuardsService {
   }
 
   private readonly checks: SsoConnectionGuardChecksService;
+  private readonly claims: SsoDomainClaimGuardsService;
+  private readonly proof: SsoDomainProofGuardsService;
+  private readonly edits: SsoConnectionEditGuardsService;
 
   private constructor(deps: SsoConnectionGuardsDeps) {
     this.checks = SsoConnectionGuardChecksService.create(deps);
+    this.claims = SsoDomainClaimGuardsService.create({ checks: this.checks });
+    this.proof = SsoDomainProofGuardsService.create({ checks: this.checks });
+    this.edits = SsoConnectionEditGuardsService.create({ checks: this.checks });
   }
 
   async registerConnection(data: RegisterConnectionCommandData): Promise<SsoConnectionFactInput[]> {
@@ -207,172 +172,33 @@ export class SsoConnectionGuardsService {
     return grandfatheredConnectionFacts(data);
   }
 
-  async claimDomain(data: ClaimDomainCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, CLAIM_DOMAIN_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    const alreadyClaimed = [
-      state.claimedDomains,
-      state.approvedDomains,
-      state.verifiedDomains,
-    ].some((domains) => domains.includes(domain));
-    if (alreadyClaimed) {
-      return [];
-    }
-    // Checked after the retry short-circuit, so a repeated claim never spends
-    // the budget its first attempt already paid for.
-    if (!isClaimableSsoDomain(domain)) {
-      throw new SsoDomainNotEligibleError(
-        `connection ${data.connectionId}: ${domain} is not a domain an organization can hold alone`,
-      );
-    }
-    const retryAfterSeconds = domainClaimRetryAfterSeconds({
-      claims: state.domainClaims,
-      nowMs: data.occurredAtMs,
-    });
-    if (retryAfterSeconds > 0) {
-      throw new SsoDomainClaimThrottledError(retryAfterSeconds);
-    }
-
-    return [
-      {
-        type: DOMAIN_CLAIMED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  claimDomain(data: ClaimDomainCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.claims.claimDomain(data);
   }
 
   /**
    * Deciding a domain claim is a LangWatch operator's act, or on a self-hosted
    * installation its licence's; a published record decides only through `verifyDomain`.
    */
-  async approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    if (state.approvedDomains.includes(domain)) {
-      return [];
-    }
-
-    // An operator's hand is what a command that says nothing means: the newer
-    // authorities have to name themselves.
-    const authority = data.authority ?? "platform-operator";
-    await this.checks.assertClaimAuthority({
-      authority,
-      actor: data.actor,
-      act: `approve the claim on ${domain}`,
-    });
-    this.checks.assertClaimed({ state, domain });
-
-    return [
-      {
-        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          authority,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.claims.approveDomainClaim(data);
   }
 
   /** The same decision with the opposite answer, so the same operator gate:
    *  a claim is decided by LangWatch or it is not decided. */
-  async rejectDomainClaim(data: RejectDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, REJECT_DOMAIN_CLAIM_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    await this.checks.assertPlatformOperator({
-      actor: data.actor,
-      act: `reject the claim on ${domain}`,
-    });
-    this.checks.assertClaimed({ state, domain });
-
-    return [
-      {
-        type: DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          note: data.note,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  rejectDomainClaim(data: RejectDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.claims.rejectDomainClaim(data);
   }
 
-  async discardConnection(data: DiscardConnectionCommandData): Promise<SsoConnectionFactInput[]> {
-    await this.checks.require(data, DISCARD_CONNECTION_COMMAND_TYPE);
-
-    return [
-      {
-        type: CONNECTION_DISCARDED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  discardConnection(data: DiscardConnectionCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.claims.discardConnection(data);
   }
 
   /**
    * The ceremony's opening move, and where first-verifier-owns is enforced.
    */
-  async requestVerification(
-    data: RequestVerificationCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    // A proof may be asked for against an approved claim, or against one still
-    // waiting: the published record, or on a self-hosted installation the
-    // licence, decides the waiting one when it lands.
-    const decided = state.approvedDomains.includes(domain);
-    const waiting = state.claimedDomains.includes(domain);
-    if (!decided && !waiting) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
-      );
-    }
-    // Asked of the port rather than the command, so a hosted organization naming the
-    // licence gets the refusal an unlicensed installation does.
-    if (data.method === "license-token") {
-      const licence = await this.checks.getLicenseAuthority();
-      if (!licence.authorizesDomainClaims) {
-        throw new SsoDomainProofNotFoundError(
-          `connection ${data.connectionId}: no license on this deployment proves ${domain}; publish the DNS record or file`,
-        );
-      }
-      await this.checks.assertLicenseSpeaksFor({
-        licence,
-        actor: data.actor,
-        act: `prove ${domain} with the installation's license`,
-      });
-    }
-    await this.checks.refuseIfDomainOwnedElsewhere({
-      domain,
-      connectionId: data.connectionId,
-    });
-
-    return [
-      {
-        type: VERIFICATION_REQUESTED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          method: data.method,
-          tokenHash: data.tokenHash,
-          expiresAtMs: data.expiresAtMs ?? null,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  requestVerification(data: RequestVerificationCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.proof.requestVerification(data);
   }
 
   /**
@@ -380,41 +206,8 @@ export class SsoConnectionGuardsService {
    * D04 amendment). One step, APPROVED straight to VERIFIED, because nothing is published and
    * so nothing is pending.
    */
-  async attestDomain(data: AttestDomainCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, ATTEST_DOMAIN_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    if (state.verifiedDomains.includes(domain)) {
-      return [];
-    }
-
-    await this.checks.assertPlatformOperator({
-      actor: data.actor,
-      act: `attest ${domain}`,
-    });
-    if (!state.approvedDomains.includes(domain)) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: domain ${domain} has no approved claim to attest`,
-      );
-    }
-
-    await this.checks.refuseIfDomainOwnedElsewhere({
-      domain,
-      connectionId: data.connectionId,
-    });
-
-    return [
-      {
-        type: DOMAIN_ATTESTED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          evidenceRef: data.evidenceRef,
-          note: data.note,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  attestDomain(data: AttestDomainCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.proof.attestDomain(data);
   }
 
   /**
@@ -422,38 +215,8 @@ export class SsoConnectionGuardsService {
    * Refused for a VERIFIED domain on a connection that is deciding sign-in:
    * that is a connection to remove, not a domain to tidy.
    */
-  async withdrawDomain(data: WithdrawDomainCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, WITHDRAW_DOMAIN_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    const known =
-      state.claimedDomains.includes(domain) ||
-      state.approvedDomains.includes(domain) ||
-      state.verifiedDomains.includes(domain) ||
-      state.pendingVerification?.domain === domain;
-    if (!known) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: domain ${domain} is not on this connection`,
-      );
-    }
-
-    const routing = state.state === "ACTIVE" || state.state === "SUSPENDED";
-    if (routing && state.verifiedDomains.includes(domain)) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: ${domain} is verified on a live connection; remove the connection instead`,
-      );
-    }
-
-    return [
-      {
-        type: DOMAIN_WITHDRAWN_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  withdrawDomain(data: WithdrawDomainCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.proof.withdrawDomain(data);
   }
 
   /**
@@ -461,111 +224,8 @@ export class SsoConnectionGuardsService {
    * instantaneous, and another organization's connection may have gone
    * ACTIVE on the same domain while this one was waiting for DNS.
    */
-  async verifyDomain(data: VerifyDomainCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, VERIFY_DOMAIN_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    if (state.verifiedDomains.includes(domain)) {
-      return [];
-    }
-
-    const pending = state.pendingVerification;
-    if (!pending || pending.domain !== domain) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: no verification is in flight for ${domain}`,
-      );
-    }
-    // A record found after its expiry proves nothing. Refused rather than
-    // swept away, so asking again costs one click and no progress.
-    if (verificationHasExpired({ pending, nowMs: data.occurredAtMs })) {
-      throw new SsoDomainProofExpiredError(
-        `connection ${data.connectionId}: the ceremony for ${domain} passed its expiry`,
-      );
-    }
-
-    await this.checks.refuseIfDomainOwnedElsewhere({
-      domain,
-      connectionId: data.connectionId,
-    });
-
-    // Which channel the caller read the token from. Only a published-proof
-    // ceremony has channels, so naming one against any other ceremony is a
-    // caller confused about what it checked.
-    if (data.channel !== undefined && pending.method !== "dns-txt") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: a ${pending.method} ceremony has no published channel to have read ${domain}'s proof from`,
-      );
-    }
-    const method = data.channel ?? pending.method;
-    // The proof decides the claim: an undecided domain is approved by the
-    // same act that proved it, and the approval says what authorized it.
-    const undecided = state.claimedDomains.includes(domain);
-    const authority = await this.authorityDecidingClaim({
-      data,
-      domain,
-      ceremony: pending.method,
-      undecided,
-    });
-
-    return [
-      ...(undecided
-        ? [
-            {
-              type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-              data: {
-                connectionId: data.connectionId,
-                domain,
-                actor: data.actor,
-                authority,
-                source: data.source,
-              },
-            },
-          ]
-        : []),
-      {
-        type: DOMAIN_VERIFIED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          method,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
-  }
-
-  /**
-   * Which authority a landing ceremony decides a waiting claim under: a published
-   * record, or a self-hosted installation's licence, asked again at the moment it
-   * decides rather than trusted from the request.
-   */
-  private async authorityDecidingClaim({
-    data,
-    domain,
-    ceremony,
-    undecided,
-  }: {
-    data: VerifyDomainCommandData;
-    domain: string;
-    ceremony: string;
-    undecided: boolean;
-  }): Promise<"license" | "dns-proof"> {
-    if (ceremony === "license-token") {
-      if (undecided) {
-        await this.checks.assertClaimAuthority({
-          authority: "license",
-          actor: data.actor,
-          act: `approve the claim on ${domain}`,
-        });
-      }
-      return "license";
-    }
-    if (undecided && ceremony !== "dns-txt") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: a ${ceremony} ceremony cannot decide the claim on ${domain}`,
-      );
-    }
-    return "dns-proof";
+  verifyDomain(data: VerifyDomainCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.proof.verifyDomain(data);
   }
 
   /**
@@ -573,23 +233,8 @@ export class SsoConnectionGuardsService {
    * state: re-stating the policy the connection already has says nothing,
    * so a screen that saves twice does not claim two decisions.
    */
-  async setArrivalPolicy(data: SetArrivalPolicyCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, SET_ARRIVAL_POLICY_COMMAND_TYPE);
-    if (state.arrivalPolicy === data.policy && state.arrivalPolicyDecidedAtMs !== null) {
-      return [];
-    }
-
-    return [
-      {
-        type: CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          policy: data.policy,
-          actor: data.actor,
-          source: "self-serve",
-        },
-      },
-    ];
+  setArrivalPolicy(data: SetArrivalPolicyCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.claims.setArrivalPolicy(data);
   }
 
   /**
@@ -597,50 +242,10 @@ export class SsoConnectionGuardsService {
    * clock; a later one lapses only once the deadline the customer was TOLD
    * has passed, and an already-lapsed domain states nothing.
    */
-  async recordDomainProofAbsent(
+  recordDomainProofAbsent(
     data: RecordDomainProofAbsentCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    const proof = this.requirePublishedProof({ state, domain });
-    if (proof.proofState === "LAPSED") {
-      return [];
-    }
-
-    if (proof.proofState === "VERIFIED") {
-      return [
-        {
-          type: DOMAIN_PROOF_WAVERED_EVENT_TYPE,
-          data: {
-            connectionId: data.connectionId,
-            domain,
-            firstAbsentAtMs: data.occurredAtMs,
-            graceEndsAtMs: data.occurredAtMs + data.graceMs,
-            actor: data.actor,
-            source: data.source,
-          },
-        },
-      ];
-    }
-
-    const firstAbsentAtMs = proof.firstAbsentAtMs ?? data.occurredAtMs;
-    const deadline = proof.graceEndsAtMs ?? firstAbsentAtMs + data.graceMs;
-    if (data.occurredAtMs < deadline) {
-      return [];
-    }
-
-    return [
-      {
-        type: DOMAIN_PROOF_LAPSED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          firstAbsentAtMs,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+    return this.proof.recordDomainProofAbsent(data);
   }
 
   /**
@@ -648,58 +253,10 @@ export class SsoConnectionGuardsService {
    * unconditional and costs nothing beyond publishing it; a domain nothing
    * was doubting states nothing, which every healthy domain does.
    */
-  async recordDomainProofPresent(
+  recordDomainProofPresent(
     data: RecordDomainProofPresentCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE);
-    const domain = normalizeDomain(data.domain);
-    const proof = this.requirePublishedProof({ state, domain });
-    if (proof.proofState === "VERIFIED") {
-      return [];
-    }
-
-    return [
-      {
-        type: DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          domain,
-          absentForMs: Math.max(
-            0,
-            data.occurredAtMs - (proof.firstAbsentAtMs ?? data.occurredAtMs),
-          ),
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
-  }
-
-  /**
-   * The proof a published answer is entitled to speak about. Everything else
-   * is refused rather than ignored, so a caller sweeping the wrong set of
-   * domains is told rather than quietly lapsing evidence never in DNS.
-   */
-  private requirePublishedProof({
-    state,
-    domain,
-  }: {
-    state: SsoConnectionState;
-    domain: string;
-  }): SsoDomainVerification {
-    const proof = state.domainVerifications.find((entry) => entry.domain === domain);
-    if (!proof) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${state.connectionId}: ${domain} has no proof to re-check`,
-      );
-    }
-    if (proof.method !== "dns-txt" && proof.method !== "https-file") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${state.connectionId}: ${domain} was proved by ${proof.method}, which no published proof can speak for`,
-      );
-    }
-
-    return proof;
+    return this.proof.recordDomainProofPresent(data);
   }
 
   /**
@@ -878,24 +435,8 @@ export class SsoConnectionGuardsService {
   /** The word on the card. Renaming to the name it already has costs no
    *  fact: unlike the arrival policy, there is no "somebody has decided" for
    *  a name to be evidence of. */
-  async renameConnection(data: RenameConnectionCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, RENAME_CONNECTION_COMMAND_TYPE);
-    const name = data.name.trim();
-    if (state.idpMetadata.providerId === name) {
-      return [];
-    }
-
-    return [
-      {
-        type: CONNECTION_RENAMED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          name,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  renameConnection(data: RenameConnectionCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.edits.renameConnection(data);
   }
 
   /**
@@ -903,36 +444,8 @@ export class SsoConnectionGuardsService {
    * and stored the values. Grandfathered connections and protocol changes are
    * refused, and identical settings cost no fact.
    */
-  async updateConnectionIdp(
-    data: UpdateConnectionIdpCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, UPDATE_CONNECTION_IDP_COMMAND_TYPE);
-    if (state.source !== "self-serve") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId} is grandfathered and has no identity provider settings to replace`,
-      );
-    }
-    const { idp } = data;
-    const fitsProtocol =
-      state.type === "oidc"
-        ? idp.issuer !== null &&
-          idp.clientIdRef !== null &&
-          idp.secretRef !== null &&
-          idp.certRefs.length === 0
-        : idp.clientIdRef === null && idp.secretRef === null && idp.certRefs.length === 1;
-    if (!fitsProtocol) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
-      );
-    }
-    if (dialsTheSame({ current: state.idpMetadata, next: idp })) return [];
-
-    return [
-      {
-        type: CONNECTION_IDP_UPDATED_EVENT_TYPE,
-        data: { connectionId: data.connectionId, idp, actor: data.actor, source: data.source },
-      },
-    ];
+  updateConnectionIdp(data: UpdateConnectionIdpCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.edits.updateConnectionIdp(data);
   }
 
   /**
@@ -940,185 +453,27 @@ export class SsoConnectionGuardsService {
    * grandfathered connection. The proofs that still qualify come with it, so
    * a customer never re-proves a domain they have already proved.
    */
-  async registerReplacementConnection(
+  registerReplacementConnection(
     data: RegisterReplacementConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    const existing = await this.checks
-      .getConnection({ connectionId: data.connectionId })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
-        throw error;
-      });
-    if (existing) {
-      // A retry of the same registration states nothing; an id held by
-      // anything else is refused rather than moved.
-      if (
-        existing.organizationId === data.organizationId &&
-        existing.replacesConnectionId === data.replacesConnectionId
-      ) {
-        return [];
-      }
-
-      throw new SsoConnectionAlreadyRegisteredError(
-        `connection ${data.connectionId} is already registered`,
-      );
-    }
-
-    const predecessor = await this.checks
-      .getConnection({ connectionId: data.replacesConnectionId })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found") return null;
-        throw error;
-      });
-    if (
-      predecessor?.organizationId !== data.organizationId ||
-      predecessor.source !== "legacy-grandfathered" ||
-      predecessor.state !== "ACTIVE"
-    ) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.replacesConnectionId} is not an active grandfathered connection for organization ${data.organizationId}`,
-      );
-    }
-    await this.checks.refuseCompetingConnection({
-      organizationId: data.organizationId,
-      connectionId: data.connectionId,
-      kind: "direct",
-      allowedConnectionId: data.replacesConnectionId,
-    });
-    await this.checks.claimRegistrationSlot({
-      organizationId: data.organizationId,
-      connectionId: data.connectionId,
-      commandId: data.commandId,
-      kind: "direct",
-      replacesConnectionId: data.replacesConnectionId,
-    });
-
-    return [
-      {
-        type: REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          organizationId: data.organizationId,
-          type: data.type,
-          idp: data.idp,
-          arrivalPolicy: data.arrivalPolicy,
-          replacesConnectionId: data.replacesConnectionId,
-          inheritedDomainVerifications: predecessor.domainVerifications.filter(
-            (proof) =>
-              qualifySsoDomainOwnership({ state: predecessor, domain: proof.domain }).status ===
-              "QUALIFIED",
-          ),
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+    return this.edits.registerReplacementConnection(data);
   }
 
   /** Which of the pair decides an ordinary sign-in. Locked once finalization
    *  has started: past that point the legacy route is being dismantled. */
-  async selectMigrationRoute(
-    data: SelectMigrationRouteCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, SELECT_MIGRATION_ROUTE_COMMAND_TYPE);
-    this.requireReplacementMigration(state);
-    if (state.migrationPhase === "FINALIZING" || state.migrationPhase === "FINALIZED") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: migration route is locked in ${state.migrationPhase}`,
-      );
-    }
-    const selected = data.route === "legacy" ? "GRACE_LEGACY" : "GRACE_DIRECT";
-    if (state.migrationPhase === selected) {
-      return [];
-    }
-
-    return [
-      {
-        type: MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          route: data.route,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  selectMigrationRoute(data: SelectMigrationRouteCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.edits.selectMigrationRoute(data);
   }
 
   /** The durable gate: it lands BEFORE any account is removed, so a process
    *  that dies mid-retirement resumes instead of pretending it finished. */
-  async beginMigrationFinalization(
+  beginMigrationFinalization(
     data: BeginMigrationFinalizationCommandData,
   ): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE);
-    this.requireReplacementMigration(state);
-    if (state.migrationPhase === "FINALIZING") {
-      return [];
-    }
-    if (state.migrationPhase !== "GRACE_DIRECT") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: finalization requires the direct migration route`,
-      );
-    }
-
-    return [
-      {
-        type: MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+    return this.edits.beginMigrationFinalization(data);
   }
 
-  async finalizeMigration(data: FinalizeMigrationCommandData): Promise<SsoConnectionFactInput[]> {
-    const state = await this.checks.require(data, FINALIZE_MIGRATION_COMMAND_TYPE);
-    this.requireReplacementMigration(state);
-    if (state.migrationPhase === "FINALIZED") {
-      return [];
-    }
-    if (state.migrationPhase !== "FINALIZING") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: migration has not entered finalization`,
-      );
-    }
-
-    return [
-      {
-        type: MIGRATION_FINALIZED_EVENT_TYPE,
-        data: {
-          connectionId: data.connectionId,
-          actor: data.actor,
-          source: data.source,
-        },
-      },
-    ];
+  finalizeMigration(data: FinalizeMigrationCommandData): Promise<SsoConnectionFactInput[]> {
+    return this.edits.finalizeMigration(data);
   }
-
-  /** A migration verb on a connection that replaces nothing is a mistake,
-   *  not a step: it would write a phase onto a connection no pair contains. */
-  private requireReplacementMigration(state: SsoConnectionState): void {
-    if (state.replacesConnectionId === null || state.migrationPhase === null) {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${state.connectionId} is not a legacy replacement`,
-      );
-    }
-  }
-}
-
-/** Whether an identity provider update would dial exactly what is stored. */
-function dialsTheSame({
-  current,
-  next,
-}: {
-  current: UpdateConnectionIdpCommandData["idp"];
-  next: UpdateConnectionIdpCommandData["idp"];
-}): boolean {
-  if (current.issuer !== next.issuer) return false;
-  if (current.clientIdRef !== next.clientIdRef) return false;
-  if (current.secretRef !== next.secretRef) return false;
-  if (current.certRefs.length !== next.certRefs.length) return false;
-  return current.certRefs.every((ref, index) => ref === next.certRefs[index]);
 }
