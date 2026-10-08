@@ -84,7 +84,7 @@ Feature: Seat subscription provisions an organization retention policy
     When the cancellation is finalized
     Then the organization-scoped retention policies are left in place
 
-  # seat-sync.service.ts, seat-event-subscription.service.ts, customer.service.ts,
+  # seat-event-subscription.service.ts, customer.service.ts,
   # currency.service.ts, stripe-customer-currency.service.ts
 
   @unit @unimplemented

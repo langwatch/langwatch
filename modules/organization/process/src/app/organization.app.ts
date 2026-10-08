@@ -91,16 +91,12 @@ import {
   type UpdateOrganizationSettingsResult,
   type UpdateOrganizationTeamInput,
   type UpdateOrganizationTeamWithMembersInput,
-  type CustomRole,
-  type Organization,
   type OrganizationAdministrator,
   type OrganizationIntent,
-  type OrganizationUser,
   type OrganizationUserRole,
-  type ProjectRow,
-  type Team,
-  type TeamUser,
   type User,
+  type FullyLoadedOrganization,
+  type OrganizationWithMembersAndTheirTeams,
   type GroupDetail,
   type GroupListItem,
   type GroupMembershipView,
@@ -201,34 +197,7 @@ import { TeamIdentityService } from "../services/team-identity.service.ts";
 import type { TeamIdentity } from "../services/team-identity.service.ts";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
 
-// ---------------------------------------------------------------------------
-// The rows this application hands back — restated from the composed service's own generated
-// Prisma models, so the shapes a transport publishes stay byte-identical to the source rows.
-// ---------------------------------------------------------------------------
-
-type TeamWithProjectsAndMembers = Team & {
-  projects: ProjectRow[];
-  members: (TeamUser & { assignedRole?: CustomRole | null })[];
-};
-
-/** One organization with every team, project and member row loaded. */
-export type FullyLoadedOrganization = Organization & {
-  members: OrganizationUser[];
-  teams: TeamWithProjectsAndMembers[];
-};
-
-type TeamMemberWithTeam = TeamUser & {
-  team: Team;
-  assignedRole?: CustomRole | null;
-};
-
-type UserWithTeams = User & { teamMemberships: TeamMemberWithTeam[] };
-
-type OrganizationMemberWithUser = OrganizationUser & { user: UserWithTeams };
-
-export type OrganizationWithMembersAndTheirTeams = Organization & {
-  members: OrganizationMemberWithUser[];
-};
+type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
 // ---------------------------------------------------------------------------
 // What the process composes this feature's application from

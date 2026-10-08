@@ -2,17 +2,15 @@
 
 import type { AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
-  CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
+  FullyLoadedOrganization,
   Organization,
   OrganizationFounding,
   OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
+  OrganizationWithMembersAndTheirTeams,
   PricingModel,
-  ProjectRow as Project,
-  Team,
-  TeamUser,
   TeamUserRole,
   User,
 } from "@langwatch/organization-contract";
@@ -20,37 +18,9 @@ import type {
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
-type TeamWithProjects = Team & {
-  projects: Project[];
-};
+export type { FullyLoadedOrganization, OrganizationWithMembersAndTheirTeams };
 
-type TeamWithProjectsAndMembers = TeamWithProjects & {
-  members: (TeamUser & {
-    assignedRole?: CustomRole | null;
-  })[];
-};
-
-export type FullyLoadedOrganization = Organization & {
-  members: OrganizationUser[];
-  teams: TeamWithProjectsAndMembers[];
-};
-
-type TeamMemberWithTeam = TeamUser & {
-  team: Team;
-  assignedRole?: CustomRole | null;
-};
-
-type UserWithTeams = User & {
-  teamMemberships: TeamMemberWithTeam[];
-};
-
-export type OrganizationMemberWithUser = OrganizationUser & {
-  user: UserWithTeams;
-};
-
-export type OrganizationWithMembersAndTheirTeams = Organization & {
-  members: OrganizationMemberWithUser[];
-};
+export type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
 /**
  * Input for creating an organization and assigning the user as admin.
