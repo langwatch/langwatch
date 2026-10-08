@@ -10,6 +10,8 @@ import {
   type DatasetImportAppended,
   type DatasetImportStarted,
   type Dataset,
+  type DatasetStorageEntry,
+  type DatasetStoragePageInput,
   type DatasetLookupInput,
   type DatasetNameInput,
   type DatasetNameResult,
@@ -130,6 +132,10 @@ export class DatasetService {
 
   findNextAvailableName(input: DatasetNameInput): Promise<string> {
     return this.naming.findNextAvailableName(input);
+  }
+
+  listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]> {
+    return this.options.repository.findStoragePage(input);
   }
 
   /** Slug only, archived rows included, as main's `dataset.findFirst({ slug, projectId })` read. */

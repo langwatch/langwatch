@@ -27,6 +27,8 @@ import type {
   DatasetRecord,
   DatasetRecordMutationResult,
   DatasetRecordPage,
+  DatasetStorageEntry,
+  DatasetStoragePageInput,
   DatasetWithRecords,
   DeleteDatasetRecordsInput,
   ListDatasetsInput,
@@ -165,6 +167,11 @@ export interface DatasetApi {
    * static with no request-scoped builder, so the app composes this link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /**
+   * One id-ordered page of the project's datasets for a storage migration's
+   * inventory, archived ones included: they remain recoverable customer data.
+   */
+  listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
   /** The usage report's figures for these projects. */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
 }

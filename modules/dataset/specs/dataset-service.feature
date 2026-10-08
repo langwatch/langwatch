@@ -129,6 +129,14 @@ Feature: Shared Dataset service
     When the browser reads that dataset
     Then the answer carries the size as a plain number the response can hold
 
+  @integration
+  Scenario: A storage migration pages one project's datasets by id, archived ones included
+    Given a project holding a live and an archived dataset, and another project holding one
+    When a storage migration reads the project's datasets a page at a time
+    Then each page continues after the id the previous page ended on
+    And both of the project's datasets appear with their layout, status and chunk count
+    And the other project's dataset never appears
+
   Rule: The Datasets pages are served from the browser application
 
     # The application keeps everything a browser module may not own: which grant each

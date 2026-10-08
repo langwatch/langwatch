@@ -22,6 +22,8 @@ import {
   type StoredDatasetAttachment,
   type CreateDatasetRecordsInput,
   type Dataset,
+  type DatasetStorageEntry,
+  type DatasetStoragePageInput,
   type DatasetColumns,
   type DatasetEntrySelection,
   type DatasetHead,
@@ -245,6 +247,10 @@ export class DatasetModule implements DatasetApi {
 
   findBySlug(input: { projectId: string; slug: string }): Promise<Dataset[]> {
     return this.#datasets.findBySlug(input);
+  }
+
+  listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]> {
+    return this.#datasets.listStoragePage(input);
   }
 
   /** Several datasets by id, for the references an evaluation names. */

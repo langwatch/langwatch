@@ -1,4 +1,5 @@
 import { DatasetNotFoundError } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 import { toDate, type Instant } from "@langwatch/time";
 
 import type {
@@ -31,7 +32,6 @@ const STORED_DEFAULTS = {
 export class MemoryDatasetContentRepository implements DatasetContentRepository {
   #database: MemoryDatasetDatabase;
   #locked: boolean;
-  #nextId = 0;
 
   private constructor(database: MemoryDatasetDatabase, locked: boolean) {
     this.#database = database;
@@ -95,12 +95,11 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
 
   async create(input: CreateDatasetInput): Promise<DatasetRow> {
     const now = toDate(this.#database.now());
-    this.#nextId += 1;
     const written = normalise(input);
     const row: DatasetRow = {
       ...STORED_DEFAULTS,
       ...written,
-      id: input.id ?? `dataset_${this.#nextId}`,
+      id: input.id ?? generate("dataset").toString(),
       projectId: input.projectId,
       name: input.name,
       slug: input.slug,
