@@ -209,11 +209,6 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
     ];
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.organization.update({
-        where: { id: input.organizationId },
-        data: { pricingModel: "SEAT_EVENT" },
-      });
-
       const oldSubs = await tx.subscription.findMany({
         where: {
           organizationId: input.organizationId,

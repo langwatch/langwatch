@@ -7,7 +7,7 @@ import { BillingAccountFactsRepository } from "../billing-account-facts.reposito
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type BillingOrganizationDatabase = Pick<PrismaClient, "organization" | "team">;
+type BillingOrganizationDatabase = Pick<PrismaClient, "organization" | "team" | "$executeRaw">;
 
 export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepository {
   private constructor(private readonly prisma: BillingOrganizationDatabase) {
@@ -48,5 +48,31 @@ export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepo
       select: { id: true },
     });
     return team?.id ?? null;
+  }
+
+  async findBillingProfile(
+    organizationId: string,
+  ): Promise<{ name: string; stripeCustomerId: string | null } | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true, stripeCustomerId: true },
+    });
+  }
+
+  async claimStripeCustomerId(input: {
+    organizationId: string;
+    stripeCustomerId: string;
+  }): Promise<boolean> {
+    // The condition sits on the table: a write parked on the row lock re-checks it against
+    // the committed row, so only one of two checkouts started together is told it won.
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: an organization is addressed by its own primary key.
+      UPDATE "Organization"
+         SET "stripeCustomerId" = ${input.stripeCustomerId},
+             "updatedAt" = now()
+       WHERE "id" = ${input.organizationId}
+         AND "stripeCustomerId" IS NULL
+    `;
+    return updated > 0;
   }
 }

@@ -198,3 +198,66 @@ Feature: Enterprise billing compatibility
       Given an organization with live, archived and governance projects
       Then its spend tenants are every live project, governance included
       And its usage warning names every project but governance ones, archived included, by name
+
+  # Alex, 2026-10-08 (R42, round 46 D-b): billing's writes to organisation rows are facts organization
+  # applies; the Stripe customer-id claim alone stays synchronous, as a named write exception.
+  Rule: Billing records its writes to organisation rows as facts, and organization applies them
+
+    @unit
+    Scenario: Organization stamps the plan-limit alert from billing's fact
+      Given billing sent an organization's plan-limit alert
+      When organization applies billing's plan-limit-alert-sent fact
+      Then the organization's sentPlanLimitAlert is the instant billing recorded
+      And billing wrote no organisation row itself
+
+    @unit
+    Scenario: Organization sets the checkout currency and the pricing model from billing's facts
+      When organization applies billing's currency-selected fact for EUR
+      And organization applies billing's pricing-model-changed fact for SEAT_EVENT
+      Then the organization's currency is EUR and its pricing model is SEAT_EVENT
+
+    @unit
+    Scenario: Organization opens a paid seat checkout's held invitations from billing's fact
+      Given an organization holds payment-pending invitations for a seat checkout
+      When organization applies billing's seat-checkout-paid fact for that checkout
+      Then those invitations are opened and the invitations of other checkouts are not
+
+    @unit
+    Scenario: Organization cancels the held invitations of abandoned seat checkouts from billing's fact
+      Given an organization holds payment-pending invitations for two abandoned checkouts
+      When organization applies billing's seat-checkouts-abandoned fact naming both
+      Then the invitations of both checkouts are cancelled
+
+    @unit
+    Scenario: A redelivered billing fact leaves the organisation as one delivery did
+      Given organization applied each of billing's organisation-row facts once
+      When every fact is delivered again
+      Then the organisation's columns and invitations are unchanged by the second delivery
+
+    @unit
+    Scenario: A plan-limit alert inside the apply window is not sent twice
+      Given billing sent an organization's plan-limit alert and recorded the fact
+      And organization has not applied the fact yet
+      When the organization reaches its plan limit again in the same process
+      Then billing's 30-day damper refuses the second alert without reading the stamp
+      # Across processes the accepted window is the seconds before organization applies the fact.
+
+    @unit
+    Scenario: A billing write whose fact cannot be recorded fails its caller
+      Given billing's lifecycle senders refuse the fact
+      When checkout completion selects a currency for the organization
+      Then the Stripe delivery fails so Stripe delivers it again
+
+    @unit
+    Scenario: The tiered free-plan move records a pricing-model fact for each organisation it moves
+      Given TIERED organisations with no subscription, more than one page of them
+      When the tiered-free-to-seat-event task runs with --execute
+      Then it records one pricing-model-changed fact for SEAT_EVENT per organisation, paging by cursor
+      And it writes no organisation row itself
+
+    @unit
+    Scenario: The Stripe customer-id claim stays a synchronous compare-and-set
+      Given two checkouts for one organization that holds no Stripe customer id
+      When both claim a different customer id at once
+      Then exactly one claim wins and the other reads the winner's id back
+      And the claim is billing's one admitted write on organization's shared table

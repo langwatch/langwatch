@@ -47,6 +47,7 @@ import {
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
   type PricingModel,
+  type OrganizationCurrency,
   type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -293,6 +294,16 @@ export class OrganizationService extends OrganizationServiceContract {
 
   updateSentPlanLimitAlert(input: { organizationId: string; sentAt: Instant }): Promise<void> {
     return this.repository.updateSentPlanLimitAlert(input);
+  }
+
+  /** Billing's checkout currency, applied from its fact (R42). */
+  updateCurrency(input: { organizationId: string; currency: OrganizationCurrency }): Promise<void> {
+    return this.repository.updateCurrency(input);
+  }
+
+  /** Billing's pricing model, applied from its fact (R42). */
+  updatePricingModel(input: { organizationId: string; pricingModel: PricingModel }): Promise<void> {
+    return this.repository.updatePricingModel(input);
   }
 
   setLicense(input: {

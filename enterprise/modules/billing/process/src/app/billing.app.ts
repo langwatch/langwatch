@@ -140,6 +140,9 @@ export type ConnectedBillingPeers = Readonly<{
   organizations: ConnectedCustomerPeers["organizations"];
 }>;
 
+/** Where the plan-limit stamp goes: billing's fact, which organization applies (R42). */
+type PlanLimitStamps = Pick<BillingLifecycleAnnouncerService, "planLimitAlertSent">;
+
 /** Billing's Stripe, built once per deployment that holds the key. */
 type BillingStripe = Readonly<{
   channels: BillingStripeChannels;
@@ -149,22 +152,15 @@ type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
-  /** Opens the invitations a seat checkout paid for; organization owns them. */
-  invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
   /** Clears a trial's licence once its subscription activates; licensing owns it. */
   licenses: Pick<LicensingApi, "removeLicense">;
 }>;
 
 type SubscriptionComposition = Readonly<{
   notifier: BillingSubscriptionNotifier;
-  organizations: Pick<
-    OrganizationApi,
-    | "getBillingProfile"
-    | "claimBillingCustomerId"
-    | "checkInvitesWithinCaller"
-    | "createPaymentPendingInvites"
-    | "cancelPaymentPendingInvites"
-  >;
+  organizations: Pick<OrganizationApi, "checkInvitesWithinCaller" | "createPaymentPendingInvites">;
+  /** Abandoned checkouts' held invitations close from billing's fact (R42). */
+  facts: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
 }>;
 
 type SubscriptionDoor = Readonly<{
@@ -223,7 +219,18 @@ export class BillingModule
         notices,
       }),
     });
-    const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices);
+    // The announcer subscribes the plan-limit alert, whose stamp is the announcer's own fact.
+    const stamps: PlanLimitStamps = {
+      planLimitAlertSent: (input) => lifecycle.planLimitAlertSent(input),
+    };
+    const resourceLimitAlerts = BillingModule.#composeResourceLimitAlerts(setup, notices, stamps);
+    const lifecycle = BillingLifecycleAnnouncerService.create({
+      subscriptions: setup.repositories.webhookSubscriptions,
+      organizations: setup.dependencies.organizations,
+      resourceLimitAlerts,
+      planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices, stamps),
+      billingOrganizations: setup.repositories.reportOrganizations,
+    });
     const { nodeEnvironment } = setup.config;
     return setup.secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) => {
       const stripe = secretKey
@@ -240,24 +247,18 @@ export class BillingModule
             nodeEnvironment,
           }).build(),
         statementMail: connectedStatementMailChannels.ses.create(mailer),
-        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices),
+        usageWarnings: BillingModule.#composeUsageWarnings(setup, notices, stamps),
         resourceLimitAlerts,
-        lifecycle: BillingLifecycleAnnouncerService.create({
-          subscriptions: setup.repositories.webhookSubscriptions,
-          organizations: setup.dependencies.organizations,
-          resourceLimitAlerts,
-          planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
-          billingOrganizations: setup.repositories.reportOrganizations,
-        }),
+        lifecycle,
         webhook: {
           host: billingWebhookHostChannels.slack.create({ notices }),
-          invites: setup.dependencies.organizations,
           licenses: setup.dependencies.licensing,
           licensePurchase,
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
           organizations: setup.dependencies.organizations,
+          facts: lifecycle,
         },
       });
     });
@@ -312,12 +313,13 @@ export class BillingModule
   static #composeUsageWarnings(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): UsageWarningService {
     const { notifications, organizations } = setup.dependencies;
     const { projects } = setup.repositories;
     return UsageWarningService.create({
       records: notifications,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       emails: notices,
       baseHost: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
     });
@@ -327,6 +329,7 @@ export class BillingModule
   static #composeResourceLimitAlerts(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): ResourceLimitAlertService {
     const { organizations } = setup.dependencies;
     const { projects } = setup.repositories;
@@ -334,7 +337,7 @@ export class BillingModule
     return ResourceLimitAlertService.create({
       isSaas,
       cooldown: resourceLimitCooldown,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       plans: SaaSPlanProviderService.create({
         subscriptions: setup.repositories.subscriptions,
         isSaas,
@@ -348,6 +351,7 @@ export class BillingModule
   static #composePlanLimitAlerts(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
   ): PlanLimitAlertService {
     const { organizations } = setup.dependencies;
     const { projects } = setup.repositories;
@@ -355,7 +359,7 @@ export class BillingModule
       isSaas: setup.config.isSaas,
       inFlight: planLimitInFlight,
       cooldown: planLimitCooldown,
-      organizations: UsageLimitOrganizationService.create({ organizations, projects }),
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
       notices,
       errors: BillingErrorReporterService.create(),
     });
@@ -546,7 +550,7 @@ export class BillingModule
     const stripeErrors = StripeErrorTranslatorService.create();
     const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
     return {
-      customers: CustomerService.create({ customers, organizations: subscription.organizations }),
+      customers: CustomerService.create({ customers, organizations: repositories.organizations }),
       subscriptions: BillingSubscriptionService.create({
         repository: repositories.subscriptions,
         organizationRepository: repositories.organizations,
@@ -557,6 +561,7 @@ export class BillingModule
           stripeSubscriptions,
           subscriptions: repositories.seatEventSubscriptions,
           invites: subscription.organizations,
+          abandoned: subscription.facts,
           prices,
           customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
         }),
@@ -688,7 +693,6 @@ export class BillingModule
       stripeSubscriptions: stripe.channels.subscriptions,
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,
-      inviteApprover: webhook.invites,
       licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,

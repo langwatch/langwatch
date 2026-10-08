@@ -51,8 +51,59 @@ const createMockOrganizationRepository = (): {
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
-  updateCurrency: vi.fn(),
 });
+
+const ORGANIZATION_ROW_COMMANDS = [
+  "recordPlanLimitAlertSent",
+  "recordCheckoutCurrencySelected",
+  "recordPricingModelChanged",
+  "recordSeatCheckoutPaid",
+  "recordSeatCheckoutsAbandoned",
+] as const;
+type OrganizationRowCommand = (typeof ORGANIZATION_ROW_COMMANDS)[number];
+
+/**
+ * A real announcer whose organisation-row facts (R42) are recorded in `sent`; `refuse` names
+ * the one sender that rejects, as a lifecycle store that cannot take the fact would.
+ */
+function recordingAnnouncer(refuse?: OrganizationRowCommand) {
+  const sent: { command: OrganizationRowCommand; payload: Record<string, unknown> }[] = [];
+  const unused = {
+    sendBatch: async () => {},
+    close: async () => {},
+    waitUntilReady: async () => {},
+  };
+  const quiet = { send: async () => {}, ...unused };
+  const rowSender = (command: OrganizationRowCommand) => ({
+    send: async (payload: Record<string, unknown>) => {
+      if (command === refuse) throw new Error(`${command} refused`);
+      sent.push({ command, payload });
+    },
+    ...unused,
+  });
+  const announcer = BillingLifecycleAnnouncerService.create({
+    subscriptions: { findLastNonCancelled: async () => null },
+    organizations: { getAllMembers: async () => [] },
+    resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+    planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    billingOrganizations: {
+      getOrganizationForBilling: async () => ({ outcome: "not_usage_billed" }),
+    },
+  });
+  announcer.connect({
+    recordSubscriptionChanged: quiet,
+    recordSubscriptionStarted: quiet,
+    recordCheckoutCompleted: quiet,
+    recordUsageBillingChanged: quiet,
+    recordAudit: quiet,
+    recordPlanLimitAlertSent: rowSender("recordPlanLimitAlertSent"),
+    recordCheckoutCurrencySelected: rowSender("recordCheckoutCurrencySelected"),
+    recordPricingModelChanged: rowSender("recordPricingModelChanged"),
+    recordSeatCheckoutPaid: rowSender("recordSeatCheckoutPaid"),
+    recordSeatCheckoutsAbandoned: rowSender("recordSeatCheckoutsAbandoned"),
+  });
+  return { announcer, sent };
+}
 
 const createMockItemCalculator = () => ({
   calculateQuantityForPrice: vi.fn().mockReturnValue(0),
@@ -271,7 +322,17 @@ describe("EEWebhookService", () => {
 
       /** @scenario Checkout succeeds even when currency persistence fails */
       /** @scenario A checkout whose follow-up fails still grants the plan and is redelivered */
-      it("still activates, then raises when the currency update fails", async () => {
+      /** @scenario "A billing write whose fact cannot be recorded fails its caller" */
+      it("still activates, then raises when the currency fact cannot be recorded", async () => {
+        service = EEWebhookService.create({
+          licenses,
+          subscriptionRepository: subRepo,
+          organizationRepository: orgRepo,
+          stripeSubscriptions,
+          itemCalculator,
+          host: host,
+          announcer: recordingAnnouncer("recordCheckoutCurrencySelected").announcer,
+        });
         subRepo.linkStripeId.mockResolvedValue({ count: 1 });
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
@@ -280,7 +341,6 @@ describe("EEWebhookService", () => {
           outcome: "activated",
           subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
         });
-        orgRepo.updateCurrency.mockRejectedValue(new Error("DB error"));
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -290,7 +350,7 @@ describe("EEWebhookService", () => {
         promise.catch(() => undefined);
 
         await vi.advanceTimersByTimeAsync(2000);
-        await expect(promise).rejects.toThrow("DB error");
+        await expect(promise).rejects.toThrow("recordCheckoutCurrencySelected refused");
 
         expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
@@ -302,8 +362,10 @@ describe("EEWebhookService", () => {
        * normalized through that proxy before it is persisted.
        */
       describe("when the service is published as the app publishes it", () => {
-        const published = () =>
-          traced(
+        let recorded: ReturnType<typeof recordingAnnouncer>;
+        const published = () => {
+          recorded = recordingAnnouncer();
+          return traced(
             EEWebhookService.create({
               licenses,
               subscriptionRepository: subRepo,
@@ -311,9 +373,13 @@ describe("EEWebhookService", () => {
               stripeSubscriptions,
               itemCalculator,
               host: host,
+              announcer: recorded.announcer,
             }),
             "EEWebhookService",
           );
+        };
+        const currencyFacts = () =>
+          recorded.sent.filter(({ command }) => command === "recordCheckoutCurrencySelected");
 
         const completeCheckout = async (selectedCurrency?: string) => {
           subRepo.linkStripeId.mockResolvedValue({ count: 1 });
@@ -334,27 +400,27 @@ describe("EEWebhookService", () => {
           await promise;
         };
 
-        it("persists the selected currency", async () => {
+        /** @scenario "A checkout in a chosen currency writes that currency onto the organization" */
+        it("records the selected currency as the fact organization applies", async () => {
           await completeCheckout("EUR");
 
-          expect(orgRepo.updateCurrency).toHaveBeenCalledWith({
-            organizationId: "org_123",
-            currency: "EUR",
-          });
+          expect(currencyFacts()).toEqual([
+            {
+              command: "recordCheckoutCurrencySelected",
+              payload: expect.objectContaining({ organizationId: "org_123", currency: "EUR" }),
+            },
+          ]);
         });
 
-        it("persists nothing for a currency it does not accept", async () => {
+        it("records nothing for a currency it does not accept", async () => {
           await completeCheckout("GBP");
 
-          expect(orgRepo.updateCurrency).not.toHaveBeenCalled();
+          expect(currencyFacts()).toEqual([]);
         });
       });
 
       /** @scenario Checkout succeeds even when invite approval fails */
-      it("still activates, then raises when invite approval fails", async () => {
-        const mockInviteApprover = {
-          approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
-        };
+      it("still activates, then raises when the paid-checkout fact cannot be recorded", async () => {
         service = EEWebhookService.create({
           licenses,
           subscriptionRepository: subRepo,
@@ -362,7 +428,7 @@ describe("EEWebhookService", () => {
           stripeSubscriptions,
           itemCalculator,
           host: host,
-          inviteApprover: mockInviteApprover,
+          announcer: recordingAnnouncer("recordSeatCheckoutPaid").announcer,
         });
 
         subRepo.linkStripeId.mockResolvedValue({ count: 1 });
@@ -381,7 +447,7 @@ describe("EEWebhookService", () => {
         promise.catch(() => undefined);
 
         await vi.advanceTimersByTimeAsync(2000);
-        await expect(promise).rejects.toThrow("invite error");
+        await expect(promise).rejects.toThrow("recordSeatCheckoutPaid refused");
 
         expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
@@ -1496,6 +1562,11 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordCheckoutCompleted: { send: async () => {}, ...unused },
       recordUsageBillingChanged: { send: async () => {}, ...unused },
       recordAudit: { send: async () => {}, ...unused },
+      recordPlanLimitAlertSent: { send: async () => {}, ...unused },
+      recordCheckoutCurrencySelected: { send: async () => {}, ...unused },
+      recordPricingModelChanged: { send: async () => {}, ...unused },
+      recordSeatCheckoutPaid: { send: async () => {}, ...unused },
+      recordSeatCheckoutsAbandoned: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,

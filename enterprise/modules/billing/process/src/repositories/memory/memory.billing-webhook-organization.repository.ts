@@ -28,9 +28,4 @@ export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOr
     const organization = this.store.organizations.get(organizationId);
     return organization ? { id: organization.id, name: organization.name } : null;
   }
-
-  async updateCurrency(input: { organizationId: string; currency: string }): Promise<void> {
-    const organization = this.store.organizations.get(input.organizationId);
-    if (organization) organization.currency = input.currency;
-  }
 }

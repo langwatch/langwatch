@@ -115,6 +115,7 @@ import {
   organizationServerConfig,
   type OrganizationServerConfig,
   type PricingModel,
+  type OrganizationCurrency,
   type PendingInvitationForCaller,
   type PendingInvitationsForCaller,
   type SignUpVerdict,
@@ -1196,6 +1197,16 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     return this.#dependencies.organizations.updateSentPlanLimitAlert(input);
   }
 
+  /** Billing's checkout currency, applied from its fact by the lifecycle subscriber (R42). */
+  updateCurrency(input: { organizationId: string; currency: OrganizationCurrency }): Promise<void> {
+    return this.#dependencies.organizations.updateCurrency(input);
+  }
+
+  /** Billing's pricing model, applied from its fact by the lifecycle subscriber (R42). */
+  updatePricingModel(input: { organizationId: string; pricingModel: PricingModel }): Promise<void> {
+    return this.#dependencies.organizations.updatePricingModel(input);
+  }
+
   setLicense(input: {
     organizationId: string;
     licenseKey: string;
@@ -1616,7 +1627,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
 
   /** organization_lifecycle: the same in every role, since its peers react from their side (§9). */
   lifecyclePipeline(): OrganizationLifecycleDefinition {
-    return buildOrganizationLifecyclePipeline();
+    return buildOrganizationLifecyclePipeline({ billingFacts: this });
   }
 
   /** Records one organization's stored presence switch, for the backfill task. */

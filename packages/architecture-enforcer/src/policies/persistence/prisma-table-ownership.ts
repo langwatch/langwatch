@@ -69,9 +69,17 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "Organization",
     owner: "organization",
-    readers: ["scim", "entitlement"],
+    readers: ["scim", "entitlement", "billing"],
     reason:
-      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40)",
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40); billing reads the name, Stripe customer, pricing model and licence it bills by, its other writes being facts organization applies (R42, round 46 D-b)",
+    writes: [
+      {
+        reader: "billing",
+        file: "enterprise/modules/billing/process/src/repositories/prisma/prisma.billing-account-facts.repository.ts",
+        reason:
+          "the Stripe customer-id claim stays a synchronous compare-and-set, so two checkouts never make two customers (round 46 D-b)",
+      },
+    ],
   },
   {
     table: "Topic",

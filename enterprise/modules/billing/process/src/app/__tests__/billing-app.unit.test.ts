@@ -101,6 +101,11 @@ function lifecycleRecording() {
     recordCheckoutCompleted: ignored(),
     recordUsageBillingChanged: ignored(),
     recordAudit: ignored(audited),
+    recordPlanLimitAlertSent: ignored(),
+    recordCheckoutCurrencySelected: ignored(),
+    recordPricingModelChanged: ignored(),
+    recordSeatCheckoutPaid: ignored(),
+    recordSeatCheckoutsAbandoned: ignored(),
   });
   return { lifecycle, audited };
 }

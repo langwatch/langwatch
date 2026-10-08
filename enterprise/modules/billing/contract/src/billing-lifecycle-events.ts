@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { z } from "zod";
 
+import { billingPricingModelSchema } from "./billing-types.ts";
+import { currencySchema } from "./pricing.ts";
+
 /** Billing's lifecycle facts, which peers react to from their own side (§9). */
 export const BILLING_LIFECYCLE_PIPELINE_NAME = "billing_lifecycle" as const;
 export const BILLING_LIFECYCLE_AGGREGATE_TYPE = "billing_lifecycle" as const;
@@ -9,6 +12,12 @@ export const SUBSCRIPTION_STARTED_EVENT_TYPE = "lw.billing.subscription_started"
 export const CHECKOUT_COMPLETED_EVENT_TYPE = "lw.billing.checkout_completed" as const;
 export const USAGE_BILLING_CHANGED_EVENT_TYPE = "lw.billing.usage_billing_changed" as const;
 export const BILLING_AUDIT_RECORDED_EVENT_TYPE = "lw.billing.audit_recorded" as const;
+export const PLAN_LIMIT_ALERT_SENT_EVENT_TYPE = "lw.billing.plan_limit_alert_sent" as const;
+export const CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE =
+  "lw.billing.checkout_currency_selected" as const;
+export const PRICING_MODEL_CHANGED_EVENT_TYPE = "lw.billing.pricing_model_changed" as const;
+export const SEAT_CHECKOUT_PAID_EVENT_TYPE = "lw.billing.seat_checkout_paid" as const;
+export const SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE = "lw.billing.seat_checkouts_abandoned" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
@@ -75,3 +84,51 @@ export const billingAuditRecordedEventDataSchema = z.object({
   targetId: z.string().min(1),
 });
 export type BillingAuditRecordedEventData = z.infer<typeof billingAuditRecordedEventDataSchema>;
+
+/**
+ * Billing's writes to organisation rows, recorded as facts organization applies (R42, round 46
+ * D-b). Each names the value it sets, so a redelivery sets it again and changes nothing.
+ * Spec: enterprise/modules/billing/specs/billing.feature
+ */
+const organizationRowFactSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  organizationId: z.string().min(1),
+});
+
+/** Billing sent the organization's plan-limit alert at `sentAt` (epoch ms). */
+export const planLimitAlertSentEventDataSchema = z.object({
+  ...organizationRowFactSchema.shape,
+  sentAt: z.number().int().nonnegative(),
+});
+export type PlanLimitAlertSentEventData = z.infer<typeof planLimitAlertSentEventDataSchema>;
+
+/** A completed checkout chose the currency the organization is billed in. */
+export const checkoutCurrencySelectedEventDataSchema = z.object({
+  ...organizationRowFactSchema.shape,
+  currency: currencySchema,
+});
+export type CheckoutCurrencySelectedEventData = z.infer<
+  typeof checkoutCurrencySelectedEventDataSchema
+>;
+
+/** The organization is now billed on `pricingModel`. */
+export const pricingModelChangedEventDataSchema = z.object({
+  ...organizationRowFactSchema.shape,
+  pricingModel: billingPricingModelSchema,
+});
+export type PricingModelChangedEventData = z.infer<typeof pricingModelChangedEventDataSchema>;
+
+/** A seat checkout was paid: the invitations held for billing's subscription row open. */
+export const seatCheckoutPaidEventDataSchema = z.object({
+  ...organizationRowFactSchema.shape,
+  subscriptionId: z.string().min(1),
+});
+export type SeatCheckoutPaidEventData = z.infer<typeof seatCheckoutPaidEventDataSchema>;
+
+/** Seat checkouts were abandoned: the invitations held for those subscription rows close. */
+export const seatCheckoutsAbandonedEventDataSchema = z.object({
+  ...organizationRowFactSchema.shape,
+  subscriptionIds: z.array(z.string().min(1)).min(1),
+});
+export type SeatCheckoutsAbandonedEventData = z.infer<typeof seatCheckoutsAbandonedEventDataSchema>;

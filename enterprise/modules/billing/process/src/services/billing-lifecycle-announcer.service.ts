@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { BillingAuditRecordedEventData } from "@langwatch/enterprise-billing-contract";
+import type {
+  BillingAuditRecordedEventData,
+  BillingPricingModel,
+  Currency,
+} from "@langwatch/enterprise-billing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -206,6 +210,71 @@ export class BillingLifecycleAnnouncerService {
         ...input,
       });
     });
+  }
+
+  /** Billing sent the plan-limit alert; organization stamps the row from the fact (R42). */
+  async planLimitAlertSent(input: { organizationId: string; sentAt: Instant }): Promise<void> {
+    await this.#connected().recordPlanLimitAlertSent.send({
+      ...this.#rowFact(input.organizationId),
+      sentAt: input.sentAt.epochMilliseconds,
+    });
+  }
+
+  /** A completed checkout chose the currency; organization sets it from the fact (R42). */
+  async checkoutCurrencySelected(input: {
+    organizationId: string;
+    currency: Currency;
+  }): Promise<void> {
+    await this.#connected().recordCheckoutCurrencySelected.send({
+      ...this.#rowFact(input.organizationId),
+      currency: input.currency,
+    });
+  }
+
+  /** The organization is billed on `pricingModel` now; organization sets it from the fact. */
+  async pricingModelChanged(input: {
+    organizationId: string;
+    pricingModel: BillingPricingModel;
+  }): Promise<void> {
+    await this.#connected().recordPricingModelChanged.send({
+      ...this.#rowFact(input.organizationId),
+      pricingModel: input.pricingModel,
+    });
+  }
+
+  /** A seat checkout was paid; organization opens the invitations it held for it. */
+  async seatCheckoutPaid(input: { organizationId: string; subscriptionId: string }): Promise<void> {
+    await this.#connected().recordSeatCheckoutPaid.send({
+      ...this.#rowFact(input.organizationId),
+      subscriptionId: input.subscriptionId,
+    });
+  }
+
+  /** Seat checkouts were abandoned; organization cancels the invitations it held for them. */
+  async seatCheckoutsAbandoned(input: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<void> {
+    await this.#connected().recordSeatCheckoutsAbandoned.send({
+      ...this.#rowFact(input.organizationId),
+      subscriptionIds: [...input.subscriptionIds],
+    });
+  }
+
+  /** A write's fact throws when it cannot be recorded, so its caller fails rather than loses it. */
+  #connected(): EventingCommands<BillingLifecyclePipeline> {
+    if (!this.#commands) {
+      throw new Error("billing_lifecycle pipeline senders are not connected yet");
+    }
+    return this.#commands;
+  }
+
+  #rowFact(organizationId: string) {
+    return {
+      tenantId: organizationId,
+      occurredAt: (this.deps.now ?? nowInstant)().epochMilliseconds,
+      organizationId,
+    };
   }
 
   async #subscriptionChanged(input: {

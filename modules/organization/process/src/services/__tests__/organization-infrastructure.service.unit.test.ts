@@ -160,6 +160,14 @@ class StubRepository extends OrganizationRepository {
     throw new OrganizationNotFoundError();
   }
 
+  async updateCurrency(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async updatePricingModel(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
   async setLicense(): Promise<void> {
     throw new OrganizationNotFoundError();
   }
