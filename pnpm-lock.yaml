@@ -7515,12 +7515,12 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../user/contract
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../../packages/upgrade
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
