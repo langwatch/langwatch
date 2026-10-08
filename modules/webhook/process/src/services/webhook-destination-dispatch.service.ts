@@ -31,6 +31,7 @@ export class WebhookDestinationDispatchService {
       case "http":
         return HttpWebhookDestinationService.create({
           url: config.url,
+          ...(config.signatureScheme ? { signatureScheme: config.signatureScheme } : {}),
           egress: this.deps.egress,
           allowInsecureLocal: this.deps.allowInsecureLocal,
         });

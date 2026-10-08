@@ -15,9 +15,30 @@ import type {
   SendBatchPayload,
   WebhookDispatchResult,
 } from "../rules/webhook-delivery-contract.rules.ts";
+import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import type { WebhookDeliveryProcessDeps } from "./webhook-delivery.service.ts";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
+
+/** The batch envelope, or on a legacy-scheme endpoint (one message per POST) the raw message. */
+function batchBody({
+  destination,
+  envelopes,
+}: {
+  destination: WebhookDestinationConfig;
+  envelopes: SendBatchPayload["envelopes"];
+}): string {
+  if (destination.kind !== "http" || destination.signatureScheme !== "legacy_sha256") {
+    return JSON.stringify({ batch: envelopes });
+  }
+  if (envelopes.length !== 1) {
+    throw new DispatchError({
+      message: `A legacy-scheme endpoint sends one message per POST; this batch holds ${envelopes.length}`,
+      retryable: false,
+    });
+  }
+  return JSON.stringify(envelopes[0]!.data);
+}
 
 export class WebhookBatchSendService {
   static create(deps: WebhookDeliveryProcessDeps): WebhookBatchSendService {
@@ -110,7 +131,7 @@ export class WebhookBatchSendService {
         destination,
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
-        body: JSON.stringify({ batch: payload.envelopes }),
+        body: batchBody({ destination, envelopes: payload.envelopes }),
         batchId: payload.batchId,
         attempt: context.attempt,
         signingSecrets: secrets,

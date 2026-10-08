@@ -5,6 +5,7 @@ import {
   webhookDestinationKindSchema,
   webhookDeliveryControlsSchema,
   webhookEnvelopeSchema,
+  webhookSignatureSchemeSchema,
 } from "./webhook.ts";
 
 export const createWebhookEndpointCommandSchema = z.object({
@@ -14,6 +15,8 @@ export const createWebhookEndpointCommandSchema = z.object({
   sqs: sqsDestinationInputSchema.optional(),
   enabledEvents: z.array(z.string()).min(1),
   ...webhookDeliveryControlsSchema.partial().shape,
+  /** Governance's migration of inline anomaly destinations only; no door accepts it. */
+  signatureScheme: webhookSignatureSchemeSchema.optional(),
 });
 export type CreateWebhookEndpointCommand = z.infer<typeof createWebhookEndpointCommandSchema>;
 

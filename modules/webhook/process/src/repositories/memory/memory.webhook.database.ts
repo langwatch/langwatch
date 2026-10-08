@@ -1,5 +1,9 @@
 import type { Instant } from "@langwatch/time";
-import type { WebhookDeliveryOutcome, WebhookDestinationKind } from "@langwatch/webhook-contract";
+import type {
+  WebhookDeliveryOutcome,
+  WebhookDestinationKind,
+  WebhookSignatureScheme,
+} from "@langwatch/webhook-contract";
 
 import type { WebhookRequestAttemptRow } from "../webhook-endpoint.repository.ts";
 
@@ -14,6 +18,7 @@ export type MemoryWebhookEndpointRow = {
   sqsAccessKeyId: string | null;
   sqsSecretAccessKeyEncrypted: string | null;
   secretEncrypted: string;
+  signatureScheme?: WebhookSignatureScheme | null;
   previousSecretEncrypted: string | null;
   previousSecretExpiresAt: Instant | null;
   enabledEvents: string[];

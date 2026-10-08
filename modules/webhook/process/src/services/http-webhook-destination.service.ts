@@ -1,3 +1,5 @@
+import type { WebhookSignatureScheme } from "@langwatch/webhook-contract";
+
 import {
   type WebhookDestination,
   type WebhookDispatchRequest,
@@ -14,6 +16,8 @@ const RESPONSE_SNIPPET_CHARS = 1000;
 
 interface HttpWebhookDestinationServiceOptions {
   url: string;
+  /** Absent: `t=,v1=`. `legacy_sha256`: main's anomaly `sha256=` (request delivery Q3). */
+  signatureScheme?: WebhookSignatureScheme;
   /**
    * The process's ONE outbound webhook sender: the SSRF fence, the TLS policy
    * and the hourly dispatch cap all live on it, so a second instance here
@@ -35,11 +39,13 @@ export class HttpWebhookDestinationService implements WebhookDestination {
   readonly kind = "http" as const;
 
   private readonly url: string;
+  private readonly signatureScheme: WebhookSignatureScheme | undefined;
   private readonly egress: Pick<WebhookEgressService, "send">;
   private readonly allowInsecureLocal: boolean;
 
   private constructor(options: HttpWebhookDestinationServiceOptions) {
     this.url = options.url;
+    this.signatureScheme = options.signatureScheme;
     this.egress = options.egress;
     this.allowInsecureLocal = options.allowInsecureLocal;
   }
@@ -61,6 +67,7 @@ export class HttpWebhookDestinationService implements WebhookDestination {
       eventId: request.batchId,
       dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
       signingSecrets: request.signingSecrets,
+      ...(this.signatureScheme ? { signatureScheme: this.signatureScheme } : {}),
       attempt: request.attempt,
       allowInsecureLocal: this.allowInsecureLocal,
     });
