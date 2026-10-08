@@ -227,6 +227,14 @@ Feature: Proving a domain by publishing a record
     Then the domain is proved
     And her approved claim was never re-decided, and nothing went back into the queue
 
+  @integration
+  Scenario: Re-checking published proof leaves a domain the installation's licence verified
+    Given a self-hosted installation verified "acme.com" with its licence
+    And no record or file for "acme.com" is published anywhere
+    When the re-proof sweep runs
+    Then "acme.com" is not read at DNS or at its file
+    And "acme.com" stays verified, and nothing is recorded about it
+
   @unit
   Scenario: Nothing schedules a re-check, and an expiry never un-proves a domain
     Given "acme.com" was proved a year ago
@@ -260,11 +268,12 @@ Feature: Proving a domain by publishing a record
     And no fact is recorded
 
   @unit
-  Scenario: Entitlement cannot stand in for domain ownership
+  Scenario: A licence that authorizes nothing cannot prove a domain
     Given "ana"'s claim on "acme.com" is waiting
-    When a valid Enterprise licence is presented without a published proof
-    Then it is refused with the code "sso_connection_invalid_transition"
-    And only customer-controlled domain evidence may decide an uncontested claim
+    And the deployment is the hosted service or holds no licence
+    When the licence is presented as the proof without a published record
+    Then it is refused with the code "sso_domain_proof_not_found"
+    And no fact is recorded, and only a published record may decide the claim
 
   # ── The one thing that still reaches a person ──────────────────────────
 

@@ -87,6 +87,15 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
+const { mockTrackServerEvent } = vi.hoisted(() => ({
+  mockTrackServerEvent: vi.fn(),
+}));
+
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
+  getPostHogInstance: () => null,
+}));
+
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
@@ -194,6 +203,29 @@ describe("onboarding.initializeOrganization", () => {
           featureUsage: "Evaluations",
           yourRole: "Engineer",
         },
+      });
+    });
+  });
+
+  describe("when the onboarding form carries attribution", () => {
+    /** @scenario "Initializing an organization through the procedure tracks organization_created" */
+    it("tracks organization_created in PostHog with the attribution", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+        signUpData: { utmSource: "newsletter", utmCampaign: "weekly" },
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user_1",
+        event: "organization_created",
+        properties: expect.objectContaining({
+          organization_id: "org_1",
+          utm_source: "newsletter",
+          utm_campaign: "weekly",
+        }),
       });
     });
   });

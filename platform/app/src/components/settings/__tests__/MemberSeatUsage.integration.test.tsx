@@ -18,7 +18,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { mockUsageData } = vi.hoisted(() => ({
   mockUsageData: {
-    current: null as { membersCount: number; membersLiteCount: number } | null,
+    current: null as {
+      membersCount: number;
+      membersLiteCount: number;
+      membersDeveloperCount: number;
+    } | null,
   },
 }));
 
@@ -61,7 +65,11 @@ describe("given an organization with a seat allowance of each kind", () => {
   describe("when an admin opens the member list", () => {
     /** @scenario The member list shows how many seats of each kind are in use */
     it("shows the full member seats in use against what the plan covers", () => {
-      mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
+      mockUsageData.current = {
+        membersCount: 12,
+        membersLiteCount: 1,
+        membersDeveloperCount: 0,
+      };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
@@ -72,7 +80,11 @@ describe("given an organization with a seat allowance of each kind", () => {
 
     /** @scenario The member list shows how many seats of each kind are in use */
     it("shows the Lite Member seats the same way", () => {
-      mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
+      mockUsageData.current = {
+        membersCount: 12,
+        membersLiteCount: 1,
+        membersDeveloperCount: 0,
+      };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
@@ -81,11 +93,31 @@ describe("given an organization with a seat allowance of each kind", () => {
       expect(screen.getByText("/ 3")).toBeInTheDocument();
     });
 
+    /** @scenario Developers are counted and never capped */
+    it("shows the Developer seats with no limit beside them", () => {
+      mockUsageData.current = {
+        membersCount: 5,
+        membersLiteCount: 5,
+        membersDeveloperCount: 10,
+      };
+
+      renderSeatUsage({ maxMembers: 5, maxMembersLite: 5 });
+
+      expect(screen.getByText("Developers")).toBeInTheDocument();
+      expect(screen.getByText("10")).toBeInTheDocument();
+      // Two metered tiles carry a limit; the Developer tile carries none.
+      expect(screen.getAllByText("/ 5").length).toBe(2);
+    });
+
     /** @scenario The member list shows how many seats of each kind are in use */
     it("says unlimited rather than a number nobody can read", () => {
       // Self-hosted with no license resolves to MAX_SAFE_INTEGER, and printing
       // 9,007,199,254,740,991 seats would be worse than saying nothing.
-      mockUsageData.current = { membersCount: 40, membersLiteCount: 0 };
+      mockUsageData.current = {
+        membersCount: 40,
+        membersLiteCount: 0,
+        membersDeveloperCount: 0,
+      };
 
       renderSeatUsage({
         maxMembers: Number.MAX_SAFE_INTEGER,

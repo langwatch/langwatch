@@ -10,6 +10,7 @@ import { APP_ERROR_CODES } from "../codes";
 import {
   explainHandledError,
   explainSerializedError,
+  PROVIDER_CONFIG_PROBLEMS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "../presentation";
 import type { HandledErrorShape } from "../readHandledError";
@@ -431,6 +432,49 @@ describe("explainHandledError", () => {
       expect(description).toContain("key or its permissions");
     });
 
+    /** @scenario "A provider's own access code reads as a refused credential" */
+    it.each([
+      "access_denied",
+      "permission_denied_error",
+      "authentication_error",
+      "permission_error",
+      "invalid_api_key",
+      "AccessDeniedException",
+      "InvalidSignatureException",
+      "UnrecognizedClientException",
+      "ExpiredTokenException",
+      "InvalidClientTokenId",
+      "SignatureDoesNotMatch",
+      "UNAUTHENTICATED",
+      "PERMISSION_DENIED",
+    ])("explains the provider's own %s code as a refused credential", (code) => {
+      const { title, description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(title).toBe("This provider rejected the API key");
+
+      expect(description).toBe(
+        "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
+      );
+    });
+
+    /** @scenario "A provider that does not know the model gets its own remediation copy" */
+    it.each([
+      "upstream_not_found",
+      "model_not_found",
+      "not_found_error",
+      "ResourceNotFoundException",
+    ])("explains a %s reason as a model the provider does not serve", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toBe(
+        "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+      );
+    });
+
     /** @scenario "A provider rate limit gets its own remediation copy" */
     it("explains an upstream_rate_limited reason as a wait-and-retry", () => {
       const { description } = explainHandledError(
@@ -721,6 +765,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // Same shape: `reason` is the sentence naming WHICH piece of the alert
+        // is missing ("State the severity this alert fires at."), which the
+        // generic line cannot do. Authored in the automations app layer, never
+        // relayed.
+        graph_alert_incomplete: new Set(["reason"]),
         // `reason` is the sentence the agent test prefetch or the type check
         // wrote for this exact agent ("Only HTTP, code, workflow and connected
         // agents can be tested"). Authored in `agent-test-run.ts` and
@@ -797,6 +846,98 @@ describe("explainHandledError", () => {
   });
 });
 
+describe("provider_config_invalid", () => {
+  const explain = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta }))
+      .description;
+  const headline = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "provider_config_invalid", meta })).title;
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("gives each gap a headline that names the same gap as its body", () => {
+    expect(headline({ problem: "api_key_missing" })).toBe(
+      "This provider has no API key saved",
+    );
+    expect(headline({ problem: "endpoint_missing" })).toBe(
+      "This provider has no endpoint URL saved",
+    );
+    expect(headline({ problem: "deployment_missing" })).toBe(
+      "This provider has no deployment for that model",
+    );
+    expect(headline({ problem: "operation_unsupported" })).toBe(
+      "This provider does not support this kind of request",
+    );
+  });
+
+  it("keeps the model headline when no gap is named or the model is not served", () => {
+    expect(headline({})).toBe(
+      "This provider is not set up to serve that model",
+    );
+    expect(headline({ problem: "model_not_served" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+    expect(headline({ problem: "sk-not-a-problem" })).toBe(
+      "This provider is not set up to serve that model",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no API key to add the key", () => {
+    expect(
+      explain({ problem: "api_key_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("tells a provider with no endpoint to add the endpoint", () => {
+    expect(explain({ problem: "endpoint_missing" })).toBe(
+      "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("names the model that has no deployment", () => {
+    expect(
+      explain({ problem: "deployment_missing", model: "gpt-5.6-terra" }),
+    ).toBe(
+      "This model provider has no deployment mapped for gpt-5.6-terra. Add the deployment mapping in Settings → Model Providers.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("says when the provider has no API for the request", () => {
+    expect(explain({ problem: "operation_unsupported" })).toBe(
+      "This model provider does not support this kind of request. Pick a model from a provider that does.",
+    );
+  });
+
+  /** @scenario "Each provider setup gap gets its own instruction" */
+  it("keeps the model sentence for the remainder and for an unknown problem", () => {
+    const remainder =
+      "No provider on this project is configured for gpt-5.6-terra. Add it to one in Settings → Model Providers.";
+
+    expect(
+      explain({ problem: "model_not_served", model: "gpt-5.6-terra" }),
+    ).toBe(remainder);
+    expect(explain({ problem: "something_new", model: "gpt-5.6-terra" })).toBe(
+      remainder,
+    );
+    expect(explain({ model: "gpt-5.6-terra" })).toBe(remainder);
+  });
+
+  it("lists every problem the gateway can name", () => {
+    expect([...PROVIDER_CONFIG_PROBLEMS].sort()).toEqual([
+      "api_key_missing",
+      "deployment_missing",
+      "endpoint_missing",
+      "model_not_served",
+      "operation_unsupported",
+    ]);
+  });
+});
+
 describe("agent_payload_too_large", () => {
   describe("when the session is what broke the cap", () => {
     /** @scenario "A session above the cap is refused with a typed error" */
@@ -826,6 +967,40 @@ describe("agent_payload_too_large", () => {
       );
 
       expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("instant_eval_opt_in_not_offered", () => {
+  describe("when a self-hosted install is refused the switch", () => {
+    it("says the license, or the operator of an install with its own judge key, is what adds Instant Evals", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "self_hosted" },
+        }),
+      );
+
+      expect(description).toBe(
+        "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+      );
+    });
+  });
+
+  describe("when an enterprise organization is refused the switch", () => {
+    it("says LangWatch switches them on for the plan", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "enterprise" },
+        }),
+      );
+
+      expect(description).toBe(
+        "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      );
     });
   });
 });

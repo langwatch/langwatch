@@ -5,6 +5,7 @@ import {
 } from "@langwatch/authz";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { resolveOrglessDestination } from "~/features/navigation/logic/resolveOrglessDestination";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { api } from "../utils/api";
@@ -292,6 +293,21 @@ export const useOrganizationTeamProject = (
       // runs in parallel without affecting the trace fan-out.
       trpc: { context: { skipBatch: true } },
     },
+  );
+
+  // Belonging to no organization has two causes: a new signup, and an
+  // administrator's own single sign-on test sign-in, which lands on the
+  // setup screen holding a session with no membership. The server tells them
+  // apart; asked only on a route that would otherwise bounce to onboarding.
+  const wouldBounceOrgless =
+    !!redirectToOnboarding &&
+    !isDemo &&
+    !isPublicRoute &&
+    !noOrgBouncerRoutes.includes(router.route) &&
+    organizations.data?.length === 0;
+  const testArrival = api.identity.myTestArrival.useQuery(
+    {},
+    { enabled: wouldBounceOrgless, staleTime: 60_000, retry: false },
   );
 
   const [localStorageOrganizationId, setLocalStorageOrganizationId] =
@@ -593,8 +609,20 @@ export const useOrganizationTeamProject = (
     // that creates one, so offering it to a member only ever produces a second
     // organization nobody asked for, and `pages/index.tsx` already draws the
     // line here.
+    // A test arrival goes to the screen that offers the way back to their own
+    // account, never to the one that creates an organization. A failed read
+    // falls through to onboarding.
     if (organizations.data.length === 0) {
-      void router.push(`/onboarding/welcome${returnTo}`);
+      const destination = resolveOrglessDestination({
+        isPending: testArrival.isPending,
+        isTestArrival: testArrival.data != null,
+      });
+      if (destination === null) return;
+      void router.push(
+        destination === "/onboarding/welcome"
+          ? `${destination}${returnTo}`
+          : destination,
+      );
       return;
     }
 
@@ -657,6 +685,8 @@ export const useOrganizationTeamProject = (
     reservedProjectSlugs,
     router,
     team,
+    testArrival.data,
+    testArrival.isPending,
   ]);
 
   // React Query derives `isLoading` as `isPending && isFetching`, so a query it

@@ -278,3 +278,45 @@ func repoRoot(t *testing.T) string {
 	t.Fatal("could not locate the repo root from the package directory")
 	return ""
 }
+
+// The generic provider_config_invalid advice says to add the model to the
+// provider. For a provider saved with no API key that sends the customer to
+// the wrong field, so a named problem brings its own list.
+// @scenario "Each provider setup gap gets its own instruction"
+func TestRemediate_ConfigProblemBringsItsOwnAdvice(t *testing.T) {
+	generic := Remediate(herr.E{Code: ErrProviderConfigInvalid, Meta: herr.M{}}).Meta["tips"]
+
+	for _, problem := range []ConfigProblem{
+		ConfigProblemAPIKeyMissing, ConfigProblemEndpointMissing,
+		ConfigProblemDeploymentMissing, ConfigProblemOperationUnsupported,
+	} {
+		t.Run(string(problem), func(t *testing.T) {
+			got := Remediate(herr.E{
+				Code: ErrProviderConfigInvalid,
+				Meta: herr.M{"problem": string(problem)},
+			})
+			tips, ok := got.Meta["tips"].([]string)
+			require.True(t, ok)
+			assert.NotEmpty(t, tips)
+			assert.LessOrEqual(t, len(tips), maxTips)
+			assert.NotEqual(t, generic, tips)
+		})
+	}
+
+	t.Run("a missing key says to enter the key", func(t *testing.T) {
+		got := Remediate(herr.E{
+			Code: ErrProviderConfigInvalid,
+			Meta: herr.M{"problem": string(ConfigProblemAPIKeyMissing)},
+		})
+		tips, _ := got.Meta["tips"].([]string)
+		assert.Contains(t, strings.Join(tips, " "), "enter its API key")
+	})
+
+	t.Run("the remainder keeps the generic advice", func(t *testing.T) {
+		got := Remediate(herr.E{
+			Code: ErrProviderConfigInvalid,
+			Meta: herr.M{"problem": string(ConfigProblemModelNotServed)},
+		})
+		assert.Equal(t, generic, got.Meta["tips"])
+	})
+}

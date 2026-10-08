@@ -309,9 +309,9 @@ describe("MetricDataPointClickHouseRepository", () => {
 
     expect(projectResolver).not.toHaveBeenCalled();
     expect(organizationResolver).toHaveBeenCalledWith("organization-1");
-    expect(query.mock.calls[0]![0].query).toContain("GROUP BY PointId");
+    expect(query.mock.calls[0]![0].query).toContain("GROUP BY u.PointId");
     expect(query.mock.calls[0]![0].query).toContain(
-      "HAVING min(AcceptedAt) >= {from:DateTime64(3)}",
+      "HAVING min(u.AcceptedAt) >= {from:DateTime64(3)}",
     );
     expect(query.mock.calls[0]![0].query).toContain(
       "uniqExact(tuple(SeriesId, AcceptedHour))",
@@ -320,7 +320,7 @@ describe("MetricDataPointClickHouseRepository", () => {
     // is organization-scoped, so OrganizationId leads the predicate and no
     // TenantId filter is applied when no tenant was asked for.
     expect(query.mock.calls[0]![0].query).toContain(
-      "WHERE OrganizationId = {organizationId:String}",
+      "WHERE u.OrganizationId = {organizationId:String}",
     );
     expect(query.mock.calls[0]![0].query).not.toContain(
       "TenantId = {tenantId:String}",

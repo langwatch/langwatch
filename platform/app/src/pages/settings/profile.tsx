@@ -98,5 +98,6 @@ export default function ProfileSettings() {
 function organizationRoleLabel(role: string): string {
   if (role === "ADMIN") return "Admin";
   if (role === "EXTERNAL") return "Guest";
+  if (role === "DEVELOPER") return "Developer";
   return "Member";
 }

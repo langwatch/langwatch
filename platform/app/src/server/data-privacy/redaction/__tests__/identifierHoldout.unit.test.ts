@@ -6,6 +6,9 @@ import {
   isIdentifierShapedValue,
   isOpaqueIdentifierValue,
   isReservedIdentifierAttributeKey,
+  MAX_MODEL_OR_TOOL_NAME_LENGTH,
+  reservesModelOrToolName,
+  reservesSpanType,
 } from "../identifierHoldout";
 
 /** A decimal trace address, the case the reserved names exist for. */
@@ -218,6 +221,139 @@ describe("given the identifier hold-out rules", () => {
           value: DECIMAL_TRACE_ADDRESS,
         }),
       ).toBe(true);
+    });
+  });
+
+  describe("when the attribute name reserves a model or tool name", () => {
+    it.each([
+      ["gen_ai.request.model", "claude-sonnet-4-6"],
+      ["ai.model.id", "us.anthropic.claude-opus-4-1"],
+      ["llm.model_name", "anthropic/claude-sonnet-4"],
+      ["llm.model_name", "bedrock/us.anthropic.claude-opus-4-1"],
+      ["gen_ai.request.model", "meta-llama/Llama-3.1-8B-Instruct"],
+      ["gen_ai.system", "anthropic"],
+      ["ai.model.provider", "anthropic.messages"],
+      [
+        "gen_ai.request.model",
+        "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+      ],
+      ["gen_ai.tool.name", "getWeatherForecast"],
+      ["ai.toolCall.name", "search_documents"],
+    ])("spares %s = %s from name detection", (key, value) => {
+      expect(reservesModelOrToolName({ key, value })).toBe(true);
+    });
+
+    /**
+     * Sparing a value name detection is not holding it back. It is still
+     * analysed for everything else, so a phone or national id written under a
+     * model name is found wherever the native pass does not reach.
+     */
+    it("does not hold a model name back from analysis altogether", () => {
+      expect(
+        isHeldOutIdentifierAttribute({
+          key: "gen_ai.request.model",
+          value: "claude-sonnet-4-6",
+        }),
+      ).toBe(false);
+    });
+
+    it("spares a name at the length cap", () => {
+      const value = "m".repeat(MAX_MODEL_OR_TOOL_NAME_LENGTH);
+      expect(
+        reservesModelOrToolName({ key: "gen_ai.request.model", value }),
+      ).toBe(true);
+    });
+
+    it("does not spare a value one character over the length cap", () => {
+      const value = "m".repeat(MAX_MODEL_OR_TOOL_NAME_LENGTH + 1);
+      expect(
+        reservesModelOrToolName({ key: "gen_ai.request.model", value }),
+      ).toBe(false);
+    });
+
+    /**
+     * Like the trace list, the name is not enough on its own: a sender can
+     * write anything under `gen_ai.request.model`, so these still get name
+     * detection.
+     */
+    it.each([
+      ["a person name", "Jane Doe"],
+      ["an email address", "jane@example.com"],
+      [
+        "a URL with a person in its path",
+        "https://acme.example.com/u/jane.doe/49386409e80a37fa22dc518583b31932",
+      ],
+      ["a scheme-less URL", "www.acme.example/u/Jane-Doe"],
+      ["an empty value", ""],
+    ])("does not spare %s under a model name", (_case, value) => {
+      expect(
+        reservesModelOrToolName({ key: "gen_ai.request.model", value }),
+      ).toBe(false);
+    });
+
+    /**
+     * The residual the rule accepts, pinned so that narrowing or widening the
+     * gate is a visible change. "jane.doe" is spared name detection here:
+     * providers write their own ids the same way (`anthropic.messages`), so
+     * shape cannot separate the two. Every other entity is still looked for.
+     */
+    it.each([
+      "jane.doe",
+      "jane_doe",
+    ])("knowingly spares the single-token name %s", (value) => {
+      expect(
+        reservesModelOrToolName({ key: "gen_ai.request.model", value }),
+      ).toBe(true);
+    });
+
+    it("does not reserve an attribute outside the list", () => {
+      expect(
+        reservesModelOrToolName({
+          key: "app.preferred_model",
+          value: "claude-sonnet-4-6",
+        }),
+      ).toBe(false);
+    });
+  });
+
+  /**
+   * Under the strict level the name/place pass read span kinds as first names,
+   * so top-level spans stored `[PERSON]` as their type. A known kind is a fixed
+   * word and is held back from every pass.
+   */
+  describe("given the span kind attribute", () => {
+    it.each([
+      "agent",
+      "workflow",
+      "llm",
+      "tool",
+      "chain",
+    ])("holds back the known kind %s", (value) => {
+      expect(
+        isHeldOutIdentifierAttribute({ key: "langwatch.span.type", value }),
+      ).toBe(true);
+      expect(reservesSpanType({ key: "langwatch.span.type", value })).toBe(
+        true,
+      );
+    });
+
+    it.each([
+      ["a person name", "Jane Doe"],
+      ["a single-token name", "jane"],
+      ["an email address", "jane@example.com"],
+      ["a known kind in the wrong case", "Agent"],
+      ["an empty value", ""],
+    ])("still analyses %s written under the kind attribute", (_case, value) => {
+      expect(reservesSpanType({ key: "langwatch.span.type", value })).toBe(
+        false,
+      );
+    });
+
+    it("does not hold back a known kind under another attribute", () => {
+      expect(reservesSpanType({ key: "app.role", value: "agent" })).toBe(false);
+      expect(
+        isHeldOutIdentifierAttribute({ key: "app.role", value: "agent" }),
+      ).toBe(false);
     });
   });
 });

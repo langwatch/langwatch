@@ -30,7 +30,11 @@ vi.mock("~/server/clickhouse/metrics", async (importOriginal) => {
       registered.instances.push(instance);
       return actual.registerClickHouseLimiter(
         instance,
-        probe as () => { inFlight: number; queued: number },
+        probe as () => Array<{
+          lane: "read" | "insert" | "all";
+          inFlight: number;
+          queued: number;
+        }>,
       );
     },
   };

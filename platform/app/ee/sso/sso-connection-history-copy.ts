@@ -31,6 +31,7 @@ import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -67,7 +68,7 @@ function selfProvedMethodWords(method: string | null): string {
     case "https-file":
       return "a file published on the domain";
     case "license-token":
-      return "your installation's licence";
+      return "your installation's license";
     case "legacy-configuration":
       return "your existing configuration";
     default:
@@ -93,7 +94,8 @@ function arrivalPolicyWords(policy: string | null): string {
 type HistoryCopyFields = Pick<
   SsoConnectionHistoryEntry,
   "domain" | "method" | "route" | "policy" | "note" | "name"
->;
+> &
+  Partial<Pick<SsoConnectionHistoryEntry, "issuer">>;
 
 /**
  * One sentence per event type, as a lookup rather than a long `switch` — each
@@ -153,6 +155,10 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
   // line above already says what it was called before.
   [CONNECTION_RENAMED_EVENT_TYPE]: ({ name }) =>
     `The connection was renamed to "${name}"`,
+  [CONNECTION_IDP_UPDATED_EVENT_TYPE]: ({ issuer }) =>
+    issuer
+      ? `The identity provider settings were changed, the issuer is now ${issuer}`
+      : "The identity provider settings were changed",
 };
 
 function forDomain(domain: string | null): string {
@@ -172,7 +178,8 @@ export function ssoConnectionHistoryCopy(
   entry: Pick<
     SsoConnectionHistoryEntry,
     "type" | "domain" | "method" | "route" | "policy" | "note" | "name"
-  >,
+  > &
+    Partial<Pick<SsoConnectionHistoryEntry, "issuer">>,
 ): string {
   const copy = HISTORY_COPY_BY_EVENT_TYPE[entry.type];
   if (!copy) {

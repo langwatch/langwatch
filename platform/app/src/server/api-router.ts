@@ -49,6 +49,7 @@ import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
@@ -92,6 +93,7 @@ import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rootDiscoveryApp } from "./routes/root-discovery";
 import { app as rumApp } from "./routes/rum";
+import { app as scenarioExecuteSyncApp } from "./routes/scenario-execute-sync";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -198,6 +200,7 @@ export function createApiRouter() {
   api.route("/", gatewaySpendApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", slackConnectionsApp);
   api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
@@ -216,6 +219,7 @@ export function createApiRouter() {
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
+  api.route("/", scenarioExecuteSyncApp); // /api/scenario/execute-sync (internal: scenario child -> this project's engine)
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 

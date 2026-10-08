@@ -13,6 +13,7 @@ vi.mock("@langwatch/observability", () => ({
 import {
   EmailProviderConfigurationError,
   hasEmailProvider,
+  isEmailUnconfigured,
   resolveEmailProvider,
 } from "../index";
 
@@ -162,6 +163,36 @@ describe("hasEmailProvider", () => {
       setEnv({ EMAIL_PROVIDER: "carrier-pigeon" });
 
       expect(hasEmailProvider()).toBe(false);
+    });
+  });
+});
+
+describe("isEmailUnconfigured", () => {
+  beforeEach(() => {
+    setEnv({});
+  });
+
+  describe("given no configuration", () => {
+    it("reports the installation as having no email", () => {
+      expect(isEmailUnconfigured()).toBe(true);
+    });
+  });
+
+  describe("given a usable gateway", () => {
+    it("reports email as configured", () => {
+      setEnv({ EMAIL_PROVIDER: "smtp", SMTP_URL: "smtp://localhost:1025" });
+
+      expect(isEmailUnconfigured()).toBe(false);
+    });
+  });
+
+  describe("given a misconfigured gateway", () => {
+    /** @scenario "A misconfigured email provider keeps sign-up on the mailed link" */
+    it("does not report the installation as having no email", () => {
+      setEnv({ EMAIL_PROVIDER: "smtp" });
+
+      expect(hasEmailProvider()).toBe(false);
+      expect(isEmailUnconfigured()).toBe(false);
     });
   });
 });

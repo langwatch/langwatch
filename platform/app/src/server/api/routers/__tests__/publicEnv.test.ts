@@ -17,6 +17,7 @@ vi.mock("~/env.mjs", () => ({
     LANGWATCH_NLP_LAMBDA_CONFIG: undefined,
     LANGEVALS_ENDPOINT: undefined,
     STRIPE_LICENSE_PAYMENT_LINK_URL: undefined,
+    SIGN_UP_MODE: "invite_only",
   },
 }));
 
@@ -71,6 +72,16 @@ describe("publicEnvRouter", () => {
       // The env above configures no social provider keys, so the policy's
       // answer is exactly the NEXTAUTH_PROVIDER method and nothing invented.
       expect(result.SIGNIN_FEDERATED_PROVIDERS).toEqual(["auth0"]);
+    });
+
+    /** @scenario "The sign-in screen learns the installation is invite-only" */
+    it("reports the sign-up mode, so the screens hide the create-account links", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(false);
+      vi.mocked(resolveAuthProvider).mockResolvedValue("email");
+
+      const result = await callPublicEnv();
+
+      expect(result.SIGN_UP_MODE).toBe("invite_only");
     });
 
     it("reports whether passkeys are mounted, same contract as MFA_ENROLLMENT_OPEN", async () => {

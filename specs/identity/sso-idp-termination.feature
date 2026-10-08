@@ -571,10 +571,17 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   Scenario: LangWatch's own details are shown before the identity provider's are asked for
     When an administrator with no connection opens single sign-on setup
     Then LangWatch's addresses for the chosen protocol are shown and can be copied
-    And choosing OpenID Connect shows the redirect address alone
+    And choosing OpenID Connect shows the redirect address
     And choosing SAML shows the assertion address, the entity id and the
     published metadata address
     And they appear above the fields the administrator has to fill in
+
+  @integration
+  Scenario: The deployment's own sign-in redirect address is named beside the connection's
+    Given the deployment configures its own Microsoft sign-in
+    When an administrator opens single sign-on setup and chooses OpenID Connect
+    Then the connection's redirect address is shown
+    And the deployment's Microsoft sign-in is named with its own redirect address
 
   @integration
   Scenario: A grandfathered connection remains active until an explicit replacement is ready

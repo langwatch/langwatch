@@ -370,12 +370,21 @@ export class ProjectService {
 
   /**
    * Best-effort: inserts this project's key-map row immediately, so it can
-   * authenticate to LangWatchQL without waiting for the next scheduled
-   * provisioning backfill (`src/tasks/provisionLwql.ts`). Never throws — a
-   * failure here must not block project creation; the backfill task picks up
-   * any row this misses on its next run. No-ops when LWQL is not configured.
+   * authenticate to LangWatchQL at once. Every LangWatchQL view's row policy
+   * resolves the tenant through this table, so a project without a row reads
+   * zero rows.
+   *
+   * The only other writer is the provisioning backfill
+   * (`src/tasks/provisionLwql.ts`), which runs once per deploy at boot, not on
+   * a schedule. So every path that creates a project calls this: `create`
+   * above, the tRPC project router (onboarding included) and the personal
+   * workspace provisioning. Never throws: a failure here must not block
+   * project creation, and the next deploy's backfill writes any row this
+   * misses. No-ops when LangWatchQL is not configured.
    */
-  private async syncLwqlKeyMapRow(project: Project): Promise<void> {
+  async syncLwqlKeyMapRow(
+    project: Pick<Project, "id" | "lwqlKey">,
+  ): Promise<void> {
     const connection = lwqlConnectionFromEnv();
     if (!connection) return;
 
@@ -413,7 +422,7 @@ export class ProjectService {
     } catch (error) {
       logger.error(
         { projectId: project.id, error },
-        "failed to sync lwql key-map row for new project; continuing — the scheduled provisioning backfill will pick it up",
+        "failed to sync lwql key-map row for new project; continuing, the next deploy's provisioning backfill writes it",
       );
       captureException(new Error("Failed to sync lwql key-map row"), {
         extra: { projectId: project.id, error },

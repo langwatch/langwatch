@@ -267,6 +267,11 @@ function botRow(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  // The fixture rows are dated 2026-08-25 and a first run only asks for the
+  // last thirty days, so a real clock turns every row into one the filter
+  // excludes once that date is a month old. Pin the clock to the day after.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-08-26T12:00:00Z"));
   capturedCalls = [];
   responseQueue = [];
   warnings = [];
@@ -312,6 +317,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.resetModules();
   vi.clearAllMocks();
 });

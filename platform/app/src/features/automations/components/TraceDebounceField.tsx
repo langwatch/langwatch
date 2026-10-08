@@ -79,8 +79,10 @@ export function TraceDebounceField() {
         </Text>
       </HStack>
       <Text textStyle="xs" color="fg.muted" mt={1}>
-        How long to wait for late spans before evaluating a trace. Higher
-        absorbs late spans, lower cuts latency.
+        A trace counts as settled once no new spans have arrived for this long.
+        Messages wait for it, so even per-trace delivery arrives about this many
+        seconds after the trace finishes. Raise it to absorb late spans, lower
+        it to cut the wait.
       </Text>
     </Field.Root>
   );

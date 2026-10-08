@@ -235,11 +235,3 @@ Feature: The test suites rail
     Then the last-result cells reload for the shorter period
     And the runs sidebar reloads for the shorter period
     And the address names the new period
-
-  # --- The new-simulations announcement ---
-
-  @integration
-  Scenario: The rail carries the new-simulations announcement
-    Given the Agent Testing page is open
-    When the rail is read
-    Then the announcement offering the way back to the previous screens is shown

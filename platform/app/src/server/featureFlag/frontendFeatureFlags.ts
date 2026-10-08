@@ -100,7 +100,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
-  "release_webhook_automations",
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so the frontend never asks.
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
   // NOT registered — it resolves false server-side (unknown flag) and is
@@ -120,6 +121,10 @@ export const FRONTEND_FEATURE_FLAGS = [
   // keeps a project on the Simulations pages, which are untouched while it
   // is off. The backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
+  // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
+  // bar shows a contact-us popover instead of starting a run. See
+  // specs/traces-v2/instant-eval-search.feature.
+  "release_instant_evals",
   // The guided onboarding variant (spec:
   // specs/features/onboarding/guided-onboarding-variant.feature). Read on the
   // welcome flow with the user's id, which is what the percentage rollout

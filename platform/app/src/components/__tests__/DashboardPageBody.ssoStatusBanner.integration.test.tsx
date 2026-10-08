@@ -75,9 +75,6 @@ vi.mock("../../utils/api", () => ({
     user: {
       getSsoStatus: { useQuery: () => ssoStatus },
     },
-    checkup: {
-      startupNotice: { useQuery: () => ({ data: undefined }) },
-    },
     twoStepVerification: {
       standing: { useQuery: () => ({ data: undefined, refetch: vi.fn() }) },
     },
@@ -93,6 +90,15 @@ vi.mock("../../utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      admitAutomatically: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ isPending: true, data: undefined }) },
+      acceptInvite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     useUtils: () => ({}),
   },

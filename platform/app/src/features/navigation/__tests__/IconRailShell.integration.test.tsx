@@ -188,9 +188,6 @@ vi.mock("~/utils/crispBubblePolicy", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    checkup: {
-      startupNotice: { useQuery: () => ({ data: undefined }) },
-    },
     limits: {
       getUsage: { useQuery: () => ({ data: undefined }) },
     },
@@ -218,6 +215,11 @@ vi.mock("~/utils/api", () => ({
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
+      admitAutomatically: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     useUtils: () => ({
       user: { secureAccountNudge: { invalidate: vi.fn() } },

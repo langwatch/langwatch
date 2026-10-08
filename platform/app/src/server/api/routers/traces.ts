@@ -16,7 +16,12 @@ import {
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
 import { getUserProtectionsForProject } from "../utils";
-import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
+import {
+  getAllForDownloadInput,
+  getAllForProjectInput,
+  MAX_TRACE_DOWNLOAD_PAGE_SIZE,
+  tracesFilterInput,
+} from "./traces.schemas";
 
 export { getAllForProjectInput };
 
@@ -480,11 +485,7 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getAllForDownload: protectedProcedure
-    .input(
-      getAllForProjectInput.extend({
-        includeSpans: z.boolean(),
-      }),
-    )
+    .input(getAllForDownloadInput)
     .permission("traces:view")
     .mutation(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -504,7 +505,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageSize: input.pageSize ?? 10_000,
+          pageSize: input.pageSize ?? MAX_TRACE_DOWNLOAD_PAGE_SIZE,
         },
         protections,
         {

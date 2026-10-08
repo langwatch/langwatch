@@ -35,9 +35,10 @@ function harness(options?: {
       .mockResolvedValue(
         options?.email === undefined ? "sam@acme.com" : options.email,
       ),
-    // The ceremonies never ask it — the collision guard does, one layer
-    // down — but the double is the whole port.
+    // The ceremonies never ask these — the collision guard and the join
+    // door do, one layer down — but the double is the whole port.
     findUserIdByEmail: vi.fn().mockResolvedValue(null),
+    findVerifiedLegacyEmail: vi.fn().mockResolvedValue(null),
   };
   const identity = {
     attachIdentifier: vi.fn(options?.attach ?? (async () => [])),

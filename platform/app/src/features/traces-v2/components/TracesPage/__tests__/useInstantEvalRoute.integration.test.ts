@@ -25,6 +25,12 @@ const mutations = vi.hoisted(() => ({
     mutate: vi.fn<(input: unknown, options: MutateOptions<unknown>) => void>(),
     isPending: false,
   },
+  enable: {
+    mutate: vi.fn<(input: unknown, options: MutateOptions<unknown>) => void>(),
+    isPending: false,
+  },
+  invalidateAccess: vi.fn(),
+  setAccess: vi.fn(),
   toast: vi.fn(),
 }));
 
@@ -34,8 +40,19 @@ vi.mock("~/utils/api", () => ({
       instantEval: {
         estimate: { useMutation: () => mutations.estimate },
         start: { useMutation: () => mutations.start },
+        enable: { useMutation: () => mutations.enable },
       },
     },
+    useUtils: () => ({
+      tracesV2: {
+        instantEval: {
+          access: {
+            invalidate: mutations.invalidateAccess,
+            setData: mutations.setAccess,
+          },
+        },
+      },
+    }),
   },
 }));
 
@@ -98,6 +115,9 @@ function handledError(code: string, meta: Record<string, unknown> = {}) {
 beforeEach(() => {
   mutations.estimate.mutate.mockClear();
   mutations.start.mutate.mockClear();
+  mutations.enable.mutate.mockClear();
+  mutations.invalidateAccess.mockClear();
+  mutations.setAccess.mockClear();
   mutations.toast.mockClear();
   useExplorerStore.getState().clearAll();
   useExplorerStore.setState({
@@ -119,7 +139,9 @@ describe("given the router handed over a question", () => {
     /** @scenario "An estimate under half a dollar starts the run" */
     /** @scenario "An Instant Eval route starts a run" */
     it("starts the run, applies the chip beside the other terms and registers the run", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
 
       const estimate = lastCall(mutations.estimate);
@@ -148,7 +170,9 @@ describe("given the router handed over a question", () => {
 
     /** @scenario "The start binds the exact window" */
     it("sends the exact window, the other chips and one boolean question", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -164,7 +188,9 @@ describe("given the router handed over a question", () => {
   describe("when no model could write the question", () => {
     /** @scenario "A judge question no model could write is judged as typed" */
     it("runs the sentence as the question and says so under the bar", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() =>
         result.current.onInstantEvalRoute({
           ...payload,
@@ -204,7 +230,9 @@ describe("given the router handed over a question", () => {
     });
 
     it("says nothing under the bar when a model wrote the question", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -222,7 +250,9 @@ describe("given the router handed over a question", () => {
   describe("when the bar already carries an eval chip", () => {
     /** @scenario "A second question judges the same rows as the first" */
     it("judges the scope without the first chip and keeps both chips in the bar", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() =>
         result.current.onInstantEvalRoute({
           ...payload,
@@ -269,7 +299,9 @@ describe("given the router handed over a question", () => {
   describe("when the estimate is half a dollar or more", () => {
     /** @scenario "An estimate of half a dollar or more asks first" */
     it("opens the dialog, and Run starts while the other button searches the words", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(2.4)),
@@ -300,7 +332,9 @@ describe("given the router handed over a question", () => {
     /** @scenario "A target that differs from the lens default is written on the chip" */
     it("writes the forcing spelling on the chip", () => {
       useExplorerStore.setState({ activeLensId: "conversations" });
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -323,7 +357,9 @@ describe("given the router handed over a question", () => {
       useExplorerStore
         .getState()
         .registerEvalRun({ key: expectedKey(), runId: "run-9" });
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       expect(mutations.estimate.mutate).not.toHaveBeenCalled();
       expect(useExplorerStore.getState().queryText).toBe(
@@ -337,7 +373,9 @@ describe("given the organization has spent its free budget", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "A spent free budget opens the budget popover and the phrase search runs" */
     it("opens the budget popover, and dismissing it applies the phrase search", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onError?.(
@@ -361,23 +399,23 @@ describe("given the organization has spent its free budget", () => {
 describe("given the deployment has no classifier", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
-    it("opens the model popover for either code, and closing it applies the phrase search", () => {
-      for (const code of [
-        "instant_eval_not_enabled",
-        "instant_eval_classifier_unavailable",
-      ]) {
-        const { result } = renderHook(() => useInstantEvalRoute());
-        act(() => result.current.onInstantEvalRoute(payload));
-        act(() =>
-          lastCall(mutations.estimate).options.onError?.(handledError(code)),
-        );
-        expect(result.current.refusal).toEqual({ kind: "model" });
-        act(() => result.current.dismissRefusal());
-        expect(useExplorerStore.getState().queryText).toBe(
-          'service:api AND "annoyed users"',
-        );
-        useExplorerStore.getState().clearAll();
-      }
+    it.each([
+      "instant_eval_classifier_unavailable",
+      "instant_eval_classifier_not_configured",
+      "instant_eval_not_enabled",
+    ] as const)("opens the model popover, and closing it applies the phrase search (%s)", (code) => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() =>
+        lastCall(mutations.estimate).options.onError?.(handledError(code)),
+      );
+      expect(result.current.refusal).toEqual({ kind: "model" });
+      act(() => result.current.dismissRefusal());
+      expect(useExplorerStore.getState().queryText).toBe(
+        'service:api AND "annoyed users"',
+      );
     });
   });
 });
@@ -386,7 +424,9 @@ describe("given the estimate fails for a reason the registry names", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "Any other refusal falls back to the phrase search" */
     it("shows the registry's copy and applies the phrase search", () => {
-      const { result } = renderHook(() => useInstantEvalRoute());
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onError?.(
@@ -408,6 +448,205 @@ describe("given the estimate fails for a reason the registry names", () => {
       expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND "annoyed users"',
       );
+    });
+  });
+});
+
+describe("given Instant Evals are off for an enterprise organization", () => {
+  describe("when the Explorer receives the payload", () => {
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+    it("opens the unreleased popover with no estimate, and dismissing it leaves the typed query alone", () => {
+      const queryBefore = useExplorerStore.getState().queryText;
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "contact_us",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: "unreleased" });
+
+      act(() => result.current.dismissRefusal());
+      expect(result.current.refusal).toBeNull();
+      expect(useExplorerStore.getState().queryText).toBe(queryBefore);
+    });
+
+    /** @scenario "A member who may not throw the switch is told to ask an admin" */
+    it("opens the ask-admin popover for a member who may not switch, and Enable sends nothing", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "ask_admin",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: "ask_admin" });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+    it("opens the contact-us popover while the offer is still unknown", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: false }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      expect(result.current.refusal).toEqual({ kind: "unreleased" });
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an eval chip refused on a self-hosted install", () => {
+  describe("when the Explorer receives the payload", () => {
+    /** @scenario "Each self-hosted refusal says what to do about it" */
+    it.each([
+      "not_in_license",
+      "switched_off",
+      "not_connected",
+      "ask_operator",
+    ] as const)("opens the %s popover, with no estimate and no switch", (offer) => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: offer,
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: offer });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given Instant Evals are off for a self-serve organization", () => {
+  describe("when the Explorer receives the payload", () => {
+    /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+    it("opens the opt-in popover with no estimate, and dismissing it leaves the typed query alone", () => {
+      const queryBefore = useExplorerStore.getState().queryText;
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: "opt_in" });
+
+      act(() => result.current.dismissRefusal());
+      expect(result.current.refusal).toBeNull();
+      expect(useExplorerStore.getState().queryText).toBe(queryBefore);
+    });
+  });
+
+  describe("when the reader clicks Enable", () => {
+    /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+    it("throws the switch for the project, refreshes the access read, closes the popover and estimates the held payload", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() => result.current.enableInstantEvals());
+
+      const enable = lastCall<unknown>(mutations.enable);
+      expect(enable.input).toEqual({ projectId: "project-1" });
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+
+      act(() =>
+        enable.options.onSuccess?.({ released: true, offer: "enable" }),
+      );
+
+      expect(mutations.setAccess).toHaveBeenCalledWith(
+        { projectId: "project-1" },
+        { released: true, offer: "enable" },
+      );
+      expect(mutations.invalidateAccess).toHaveBeenCalledTimes(1);
+      expect(result.current.refusal).toBeNull();
+      expect(mutations.estimate.mutate).toHaveBeenCalledTimes(1);
+      expect(lastCall(mutations.estimate).input).toMatchObject({
+        projectId: "project-1",
+        question: { instructions: "the user is annoyed" },
+      });
+    });
+
+    /** @scenario "A refused switch is a warning and the popover stays" */
+    it("shows the registry's words when the server refuses the switch, and sends no estimate", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() => result.current.enableInstantEvals());
+
+      const enable = lastCall<unknown>(mutations.enable);
+      act(() =>
+        enable.options.onError?.(
+          handledError("instant_eval_opt_in_not_offered"),
+        ),
+      );
+
+      expect(mutations.toast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "warning" }),
+      );
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: "opt_in" });
+    });
+
+    /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+    it("drops a switch answered after the reader closed the popover, but still records the access", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() => result.current.enableInstantEvals());
+      const enable = lastCall<unknown>(mutations.enable);
+      act(() => result.current.dismissRefusal());
+      expect(result.current.refusal).toBeNull();
+
+      act(() =>
+        enable.options.onSuccess?.({ released: true, offer: "enable" }),
+      );
+      expect(mutations.setAccess).toHaveBeenCalledTimes(1);
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+    it("drops a switch answered after a later submit superseded it", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() => result.current.enableInstantEvals());
+      const enable = lastCall<unknown>(mutations.enable);
+      act(() => result.current.abandonPendingRun());
+
+      act(() =>
+        enable.options.onSuccess?.({ released: true, offer: "enable" }),
+      );
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
     });
   });
 });

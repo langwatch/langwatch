@@ -21,6 +21,7 @@ import {
   addressRoutesToConnection,
   credentialAccounts,
   localSignUpDecision,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -39,6 +40,7 @@ import { Auth0ApiError } from "~/server/auth0/passwordService";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
+import { isEmailUnconfigured } from "~/server/mailer/providers";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
@@ -49,6 +51,7 @@ import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import type { Session } from "../../auth";
 import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
+import { assertAllowedAuthOrigin } from "../../better-auth/originGate";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
@@ -185,6 +188,26 @@ const DAY_MS = 24 * 60 * 60_000;
  */
 export const PROFILE_NAME_SCHEMA = z.string().trim().min(1).max(120);
 
+/**
+ * Spends the sign-up proof and answers whether it confirmed the address. An
+ * unconfirmed proof is accepted only while the installation cannot send email
+ * (ADR-117, revision 2026-09-25); anything else is refused as expired.
+ */
+async function claimSignUpProof(proof: {
+  token: string;
+  email: string;
+}): Promise<boolean> {
+  const verification = signUpVerification();
+  if (await verification.claimAddressProof(proof)) return true;
+  if (
+    isEmailUnconfigured() &&
+    (await verification.claimUnconfirmedAddressProof(proof))
+  ) {
+    return false;
+  }
+  throw new IdentityVerificationExpiredError();
+}
+
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
     .input(z.object({}))
@@ -262,6 +285,11 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
+      // Before anything is claimed or written: the sign-in that follows is
+      // refused on a foreign origin, and an account created here first would
+      // be left behind with nobody signed in to it.
+      assertAllowedAuthOrigin({ req: ctx.req, baseUrl: env.NEXTAUTH_URL });
+
       const { name, password } = input;
 
       // The same rules the form ran, from the same module, so the two cannot
@@ -318,17 +346,19 @@ export const userRouter = createTRPCRouter({
         });
       }
 
+      // Who may create an account at all on this installation
+      // (SIGN_UP_MODE, SIGN_UP_ALLOWED_DOMAINS). After the rate limit, so
+      // probing addresses spends the same budget, and before the address
+      // proof is spent, so a refused visitor keeps it.
+      await signUpPolicy().assertSignUp({ email });
+
       // The mailbox proof is the authority to enrol a credential. It is spent
       // before hashing or writing anything, and is bound to this exact
       // normalised address by the token repository's conditional delete.
-      const verification = signUpVerification();
-      const proofClaimed = await verification.claimAddressProof({
+      const addressConfirmed = await claimSignUpProof({
         token: input.addressProof,
         email,
       });
-      if (!proofClaimed) {
-        throw new IdentityVerificationExpiredError();
-      }
 
       // Refuses an address somebody already holds, hashes the password and
       // states the credential identifier the front door routes on — all of it
@@ -338,6 +368,7 @@ export const userRouter = createTRPCRouter({
         name: name ?? null,
         email,
         password,
+        addressConfirmed,
       });
 
       return { id: newUser.id };

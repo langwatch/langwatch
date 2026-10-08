@@ -211,7 +211,9 @@ func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
 			// untouched; a clean end clears the capture, an error event
-			// captures and latches (see llmStreamSniffer).
+			// captures and latches (see llmStreamSniffer). An answered
+			// stream is not a 429, so it ends a run of them.
+			entry.resetRateLimitStrikes()
 			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
 			return nil
 		}
@@ -547,7 +549,22 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 		// top-level error codes and do not belong in the generated code list.
 		e.Reasons = []error{herr.E{Code: code}}
 	}
+	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
+		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	}
 	return e
+}
+
+// credentialRefusalReason names a 401 or 403 next to the provider's own
+// discriminant. Every provider has its own vocabulary for a refused key
+// (Bedrock alone answers with a dozen exception names), and a client that
+// knows only some of them would read the rest as a failure worth retrying.
+// The status says "refused credential" in every dialect.
+func credentialRefusalReason(status int) (herr.Code, bool) {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return "", false
+	}
+	return upstreamReasonCodes[status], true
 }
 
 func providerErrorCode(body []byte) herr.Code {
@@ -588,7 +605,7 @@ func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
 // body carries no discriminant of its own (see providerErrorCode for that
 // case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
 // it for the SSE lane, where a terminal in-stream event has no status at all,
-// so every capture still carries exactly one reason.
+// so every capture still carries a reason.
 var upstreamReasonCodes = map[int]herr.Code{
 	0:                              "upstream_stream_error",
 	http.StatusBadRequest:          "upstream_bad_request",

@@ -1,13 +1,9 @@
 import {
   Box,
   Button,
-  Code,
   Combobox,
-  createListCollection,
   Field,
   HStack,
-  Input,
-  List,
   Portal,
   Spinner,
   Text,
@@ -16,7 +12,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  SLACK_BOT_TOKEN_KEPT,
   type SlackActionParams,
   type SlackDeliveryMethod,
   type SlackPreview,
@@ -26,12 +21,10 @@ import {
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
-import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
-import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
-import { Select } from "~/components/ui/select";
+import { ReceiveCadenceField } from "~/features/automations/components/ReceiveCadenceField";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
 import { SLACK_BLOCK_KIT_JSON_SCHEMA } from "~/features/automations/editors/monacoSchemas";
@@ -39,7 +32,6 @@ import {
   CompactSlackPreview,
   FieldHeader,
   LiquidEditor,
-  TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
@@ -49,6 +41,7 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
+import { SlackConnectionPicker } from "./SlackConnectionPicker";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
@@ -60,35 +53,27 @@ import { SlackBlockKitTemplatePicker } from "./templates/TemplatePicker";
 /** A template field. `usingDefault` means "the author has not customised this"
  *  — it is what the Reset affordance and the default badge read. `value` is the
  *  template that will actually be sent: empty while the framework default
- *  applies, and pre-filled for a report (whose layout follows its content
- *  source, so the draft carries the matching layout from the start). */
+ *  applies, and pre-filled for a report. */
 interface FieldDraft {
   value: string;
   usingDefault: boolean;
 }
 
 export interface SlackSlice {
-  /** How the message reaches Slack: a legacy incoming webhook, or a Slack app
-   *  bot token posting via the Web API. Drives which destination fields and
-   *  which templates are offered. */
+  /** The Slack connection this automation delivers through (ADR-093 §5a).
+   *  Empty until one is picked. */
+  slackIntegrationId: string;
+  /** The picked connection's name, for the summary line only. The drawer
+   *  fills it for a saved row; never written into `actionParams`. */
+  connectionName?: string;
+  /** Follows the picked connection's kind: a bot posts to a channel and
+   *  renders every block, a webhook posts to its own channel. */
   deliveryMethod: SlackDeliveryMethod;
-  /** Webhook destination (used when `deliveryMethod` is "webhook"). */
-  webhook: string;
-  /** A newly typed bot token. Empty means "unchanged": on an edit the server
-   *  keeps the stored token; on a fresh draft an empty token is incomplete.
-   *  The stored token is never read back into the form (see `botTokenAlreadySet`). */
-  botToken: string;
   /** Bot destination channel (id like C0123, or #name). */
   channelId: string;
-  /** True when the row already has a stored bot token (echoed by the server as
-   *  a flag, never the token itself), so the form can show "token set" and let
-   *  the author keep it without retyping. */
-  botTokenAlreadySet: boolean;
-  /** True only when editing an automation that was saved with a webhook. New
-   *  automations are bot-only (a webhook can't render the modern templates), so
-   *  the webhook option is offered ONLY to keep existing webhook automations
-   *  editable — they can stay on the webhook or upgrade to a Slack app. */
-  isLegacyWebhook: boolean;
+  /** A saved row that still carries a secret of its own and no connection.
+   *  Written back untouched until the author picks a connection. */
+  legacyParams: Partial<SlackActionParams> | null;
   templateType: SlackTemplateType;
   template: FieldDraft;
 }
@@ -96,60 +81,59 @@ export interface SlackSlice {
 const EMPTY_FIELD: FieldDraft = { value: "", usingDefault: true };
 
 function initialSlice(): SlackSlice {
-  // Block Kit is the default for new Slack automations — the framework
-  // ships pre-built layouts the user can pick from, and it renders much
-  // better in Slack than the plain-text fallback. Existing rows whose
-  // `slackTemplateType` is null are read as plain text upstream
-  // (`fromTriggerRow`) so we don't accidentally retype historical configs.
+  // Block Kit by default: the gallery's layouts render far better in Slack
+  // than plain text. Rows with a null template type read as plain text in
+  // `fromTriggerRow`, so historical configs are not retyped.
   return {
-    // New Slack automations use a bot connection — it renders the modern
-    // templates (charts, tables, alerts) that a webhook can't. Webhooks are
-    // kept only for editing automations that already have one.
+    slackIntegrationId: "",
     deliveryMethod: "bot",
-    webhook: "",
-    botToken: "",
     channelId: "",
-    botTokenAlreadySet: false,
-    isLegacyWebhook: false,
+    legacyParams: null,
     templateType: "block_kit",
     template: EMPTY_FIELD,
   };
 }
 
-function isComplete(slice: SlackSlice): boolean {
-  if (slice.deliveryMethod === "bot") {
-    return (
-      slice.channelId.trim().length > 0 &&
-      (slice.botToken.trim().length > 0 || slice.botTokenAlreadySet)
-    );
-  }
-  return slice.webhook.trim().length > 0;
+/** A row with no connection that still delivers with a secret of its own. */
+function usesLegacySecret(slice: SlackSlice): boolean {
+  return !slice.slackIntegrationId && slice.legacyParams !== null;
 }
 
-function summary(slice: SlackSlice, identity: SummaryIdentity): string {
-  const name = identity.name || "(unnamed)";
-  if (slice.deliveryMethod === "bot") {
-    const channel = slice.channelId.trim();
-    return `${name} → Slack app${channel ? ` ${channel}` : " (channel not set)"}`;
-  }
-  return `${name} → Slack webhook${slice.webhook ? " set" : " (not set)"}`;
+/** A connection is chosen, plus a channel for a bot. A row still on its own
+ *  secret keeps delivering, so it stays complete until a connection is picked. */
+function isComplete(slice: SlackSlice): boolean {
+  if (usesLegacySecret(slice)) return true;
+  if (!slice.slackIntegrationId) return false;
+  return slice.deliveryMethod !== "bot" || slice.channelId.trim().length > 0;
+}
+
+/** Names where it posts: the connection, and for a bot the channel. */
+function summary(slice: SlackSlice, _identity: SummaryIdentity): string {
+  if (usesLegacySecret(slice)) return "Slack (own secret)";
+  if (!slice.slackIntegrationId) return "Slack (no connection)";
+  const connection = slice.connectionName
+    ? `Slack → ${slice.connectionName}`
+    : "Slack connection";
+  if (slice.deliveryMethod === "webhook") return connection;
+  const channel = slice.channelId.trim().replace(/^#/, "");
+  return channel
+    ? `${connection} #${channel}`
+    : `${connection} (channel not set)`;
 }
 
 function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
-  const deliveryMethod = slackDeliveryMethodOf(params);
+  const slackIntegrationId =
+    typeof params.slackIntegrationId === "string"
+      ? params.slackIntegrationId
+      : "";
   return {
-    deliveryMethod,
-    // A saved webhook automation stays editable as a webhook (backward compat);
-    // this flag unlocks the webhook UI + the upgrade banner for it.
-    isLegacyWebhook: deliveryMethod === "webhook",
-    webhook: typeof params.slackWebhook === "string" ? params.slackWebhook : "",
-    // The token is never sent to the browser — start blank and rely on
-    // `botTokenAlreadySet` to keep the stored one.
-    botToken: "",
+    slackIntegrationId,
+    deliveryMethod: slackDeliveryMethodOf(params),
     channelId:
       typeof params.slackChannelId === "string" ? params.slackChannelId : "",
-    botTokenAlreadySet: params.slackBotTokenSet === true,
+    legacyParams:
+      !slackIntegrationId && Object.keys(params).length > 0 ? params : null,
     templateType:
       row.slackTemplateType === "block_kit" ? "block_kit" : "string",
     template: {
@@ -159,99 +143,47 @@ function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   };
 }
 
-function toActionParams(slice: SlackSlice): SlackActionParams {
-  if (slice.deliveryMethod === "bot") {
-    const typed = slice.botToken.trim();
-    // A typed token is sent as-is. A blank field on a row that already has a
-    // stored token sends the sentinel so the server keeps it; a blank field on
-    // a fresh draft sends blank (the server rejects it with a clear error).
-    const slackBotToken =
-      typed.length > 0
-        ? typed
-        : slice.botTokenAlreadySet
-          ? SLACK_BOT_TOKEN_KEPT
-          : "";
-    return {
-      slackDelivery: "bot",
-      slackChannelId: slice.channelId,
-      slackBotToken,
-    };
+/** The legacy row as it was read: the server moves the secret it still
+ *  stores into a connection on save (ADR-093 §5a). */
+function legacyWriteBack(
+  params: Partial<SlackActionParams>,
+): Partial<SlackActionParams> {
+  const {
+    slackBotTokenSet: _set,
+    slackBotToken: _token,
+    slackWebhook: _webhook,
+    ...rest
+  } = params;
+  return rest;
+}
+
+function toActionParams(slice: SlackSlice): Partial<SlackActionParams> {
+  if (slice.slackIntegrationId) {
+    return slice.deliveryMethod === "bot"
+      ? {
+          slackIntegrationId: slice.slackIntegrationId,
+          slackDelivery: "bot",
+          slackChannelId: slice.channelId,
+        }
+      : {
+          slackIntegrationId: slice.slackIntegrationId,
+          slackDelivery: "webhook",
+        };
   }
-  return { slackDelivery: "webhook", slackWebhook: slice.webhook };
+  if (slice.legacyParams) return legacyWriteBack(slice.legacyParams);
+  return { slackDelivery: slice.deliveryMethod };
 }
 
 function testFireTarget(slice: SlackSlice) {
-  // Bot mode test-fires via the Web API: hand the channel + the freshly-typed
-  // token (null when kept — the server loads the saved one by automation id).
-  if (slice.deliveryMethod === "bot") {
-    return {
-      webhook: null,
-      botDestination: {
-        channelId: slice.channelId,
-        botToken: slice.botToken.trim() || null,
-      },
-    };
-  }
-  return { webhook: slice.webhook || null, botDestination: null };
-}
-
-const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
-  { value: "webhook", label: "Incoming webhook" },
-  { value: "bot", label: "Slack app (bot)" },
-];
-
-/**
- * Slack app manifest an author pastes into "Create app → From a manifest" to
- * skip manual scope setup. One app serves the whole workspace (not per
- * automation), so the name is generic. It grants:
- *   - `chat:write` — post messages to channels the bot is a member of
- *   - `chat:write.public` — post to ANY public channel without being invited
- *     first; without it Slack rejects the post with `not_in_channel` until the
- *     bot is manually `/invite`d, which is the #1 setup snag
- *   - `channels:read` / `groups:read` — populate the channel picker
- * `features.bot_user` is required alongside `oauth_config.scopes.bot` —
- * Slack rejects the manifest with "OAuth requires bot_user" without it.
- */
-export const SLACK_APP_MANIFEST = `display_information:
-  name: LangWatch
-features:
-  bot_user:
-    display_name: LangWatch
-    always_online: false
-oauth_config:
-  scopes:
-    bot:
-      - chat:write
-      - chat:write.public
-      - channels:read
-      - groups:read`;
-
-/** Shown on a legacy webhook automation: nudges the author to move to a Slack
- *  app, which unlocks the richer templates a webhook can't render. */
-function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      bg="bg.subtle"
-      padding={3}
-    >
-      <HStack justify="space-between" gap={3} align="center">
-        <VStack align="start" gap={0}>
-          <Text textStyle="xs" fontWeight="medium" color="fg">
-            Get charts, tables, and alert banners
-          </Text>
-          <Text textStyle="xs" color="fg.muted">
-            Move this automation to a Slack app to unlock the richer templates.
-          </Text>
-        </VStack>
-        <Button size="xs" variant="outline" flexShrink={0} onClick={onUpgrade}>
-          Switch to a Slack app
-        </Button>
-      </HStack>
-    </Box>
-  );
+  const legacy = usesLegacySecret(slice) ? slice.legacyParams : null;
+  return {
+    webhook: legacy?.slackWebhook ?? null,
+    botDestination:
+      slice.deliveryMethod === "bot"
+        ? { channelId: slice.channelId, botToken: null }
+        : null,
+    slackIntegrationId: slice.slackIntegrationId || null,
+  };
 }
 
 /** One channel as the picker shows it: the ID is stored, the name is read. */
@@ -278,63 +210,43 @@ function endWithStop(sentence: string): string {
 }
 
 /**
- * Channel field: a typeable combobox. Manual entry always works (type a name or
- * paste an ID); once a token is present the channel list is fetched
- * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
- * stores the channel ID (what `chat.postMessage` wants), while free typing is
- * kept verbatim so a custom / not-yet-listed channel still works — committed
- * on blur or Enter, not on every keystroke. A missing scope degrades to a
- * hint, never a hard error.
+ * Channel field: a typeable combobox. The picked bot connection's channels
+ * drop in as filterable suggestions; picking one stores its ID, while free
+ * typing is kept verbatim (committed on blur or Enter) so an unlisted channel
+ * still works. A missing scope degrades to a hint, never a hard error.
  */
 function SlackChannelField({
   projectId,
-  automationId,
   slice,
   onChange,
 }: {
   projectId: string;
-  automationId?: string;
   slice: SlackSlice;
   onChange: (next: SlackSlice) => void;
 }) {
   const list = api.automation.listSlackChannels.useMutation();
-  const typedToken = slice.botToken.trim();
   // Read the STABLE reference react-query hands back — `?? []` would mint a fresh
   // array every render and turn the "sync the collection" effect below into an
   // infinite render loop.
   const channelData = list.data?.channels;
   const channels = channelData ?? [];
 
-  const fetchChannels = (key: string) => {
-    lastFetched.current = key;
+  const fetchChannels = () =>
     list.mutate(
-      { projectId, botToken: typedToken || null, automationId },
+      { projectId, slackIntegrationId: slice.slackIntegrationId },
       {
         onError: (error) =>
+          // The hint below reads `list.isError`; this is a dev echo only.
           // eslint-disable-next-line no-console
           console.error("[slack] listSlackChannels failed", error),
       },
     );
-  };
 
-  // Fetch as soon as a usable token exists — a freshly typed one (debounced so
-  // we don't fire mid-type) or the stored token of a saved automation (loaded
-  // server-side by id). No button to click; the list just appears.
-  const fetchKey = typedToken
-    ? /^xoxb-/.test(typedToken)
-      ? `typed:${typedToken}`
-      : null
-    : slice.botTokenAlreadySet || automationId
-      ? "stored"
-      : null;
-  const lastFetched = useRef<string | null>(null);
+  // One listing per connection: the field is keyed on it, so this runs on mount.
   useEffect(() => {
-    if (!fetchKey || lastFetched.current === fetchKey) return;
-    const delay = fetchKey.startsWith("typed:") ? 600 : 0;
-    const timer = setTimeout(() => fetchChannels(fetchKey), delay);
-    return () => clearTimeout(timer);
+    if (slice.slackIntegrationId) fetchChannels();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchKey]);
+  }, [slice.slackIntegrationId]);
 
   // Filterable collection, refreshed whenever a fetch lands.
   // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -406,8 +318,6 @@ function SlackChannelField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelData, slice.channelId]);
 
-  const canLoad =
-    typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
     list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
@@ -420,7 +330,7 @@ function SlackChannelField({
   const gaps = list.data?.gaps ?? [];
   const gapHints = [
     gaps.includes("private_channels_hidden")
-      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest above."
+      ? "Private channels aren't listed: your Slack app needs the groups:read permission. Reinstall it with the manifest from the Slack connection settings."
       : null,
     gaps.includes("page_cap")
       ? "This workspace has more channels than we can list here, so some are missing."
@@ -429,6 +339,8 @@ function SlackChannelField({
   const gapHint = gapHints.length
     ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
     : null;
+  // `no_token` means the connection had nothing to list with; say so rather
+  // than showing a load that silently did nothing.
   const hint = list.isError
     ? `${endWithStop(
         describeError({
@@ -436,30 +348,34 @@ function SlackChannelField({
           fallbackTitle: "Couldn't load channels",
         }),
       )} You can still type the channel above.`
-    : returnedError === "missing_scope"
-      ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
-      : returnedError
-        ? "Couldn't load channels from Slack. Check the token, or type the channel above."
-        : gapHint;
+    : list.data?.error === "no_token"
+      ? "This connection can't list channels. Type the channel above."
+      : returnedError === "missing_scope"
+        ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list. You can still type the channel above."
+        : returnedError
+          ? "Couldn't load channels from Slack. Check the connection's token, or type the channel above."
+          : gapHint;
+
+  // A connection that failed to list (scopes not yet granted) can start working
+  // without the draft changing, so Reload asks again on demand.
+  const handleReload = () => fetchChannels();
 
   return (
     <Field.Root>
       <HStack justify="space-between" align="center" width="full">
         <Field.Label>Channel</Field.Label>
-        {canLoad ? (
-          <Button
-            variant="plain"
-            size="xs"
-            height="auto"
-            paddingX={0}
-            color="fg.muted"
-            _hover={{ color: "fg" }}
-            disabled={list.isPending}
-            onClick={() => fetchChannels(fetchKey ?? `manual:${Date.now()}`)}
-          >
-            {list.isPending ? "Loading…" : "Reload"}
-          </Button>
-        ) : null}
+        <Button
+          variant="plain"
+          size="xs"
+          height="auto"
+          paddingX={0}
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+          disabled={list.isPending}
+          onClick={handleReload}
+        >
+          {list.isPending ? "Loading…" : "Reload"}
+        </Button>
       </HStack>
       <Combobox.Root
         collection={collection}
@@ -514,7 +430,7 @@ function SlackChannelField({
                   ? "Loading channels…"
                   : channels.length === 0
                     ? "Type a channel name or ID"
-                    : "No match — press Enter to use what you typed"}
+                    : "No match. Press Enter to use what you typed"}
               </Combobox.Empty>
               {collection.items.map((item) => (
                 <Combobox.Item item={item} key={item.value}>
@@ -559,14 +475,19 @@ function templatesFromSlice(slice: SlackSlice) {
 }
 
 /**
- * The preview must render under the SAME rules delivery will. A webhook strips
- * the modern blocks (chart / table / alert banner) and the message degrades to
- * its fallback; a bot connection renders them. Previewing a chart the webhook
- * is about to strip — or hiding one the bot will happily send — is the fastest
- * way to make the editor feel like it is lying.
+ * The preview renders under the rules delivery will: a webhook strips the
+ * chart, table and banner blocks, a bot renders them. A slice with nothing to
+ * deliver through yet previews the stripped message.
  */
-function previewOptions(slice: SlackSlice) {
-  return { allowGatedBlocks: slice.deliveryMethod === "bot" };
+function previewOptions({ slice }: { slice: SlackSlice }): {
+  allowGatedBlocks: boolean;
+} {
+  const hasLegacyBotToken = usesLegacySecret(slice);
+  return {
+    allowGatedBlocks:
+      slice.deliveryMethod === "bot" &&
+      (!!slice.slackIntegrationId || hasLegacyBotToken),
+  };
 }
 
 function SlackConfigForm({
@@ -673,71 +594,31 @@ function SlackConfigForm({
 
   return (
     <VStack align="stretch" gap={4}>
-      {/* New Slack automations are bot-only, so no chooser is shown. The
-          chooser appears ONLY when editing a saved webhook automation, letting
-          it stay on the webhook or upgrade to a Slack app. */}
-      {slice.isLegacyWebhook ? (
-        <Field.Root>
-          <Field.Label>Connection</Field.Label>
-          <SegmentedControl
-            size="sm"
-            value={slice.deliveryMethod}
-            onValueChange={({ value }) => {
-              if (value)
-                onChange({
-                  ...slice,
-                  deliveryMethod: value as SlackDeliveryMethod,
-                });
-            }}
-            items={DELIVERY_ITEMS}
-          />
-          <Field.HelperText>
-            {slice.deliveryMethod === "webhook"
-              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and alert banners."
-              : "Renders charts, tables, and alert banners."}
-          </Field.HelperText>
-        </Field.Root>
-      ) : null}
-      {slice.deliveryMethod === "bot" ? (
-        <SlackBotFields
+      <SlackConnectionPicker
+        projectId={ctx.projectId}
+        slice={slice}
+        onChange={onChange}
+      />
+      {slice.slackIntegrationId && slice.deliveryMethod === "bot" ? (
+        // Keyed on the connection: another workspace's channel list and pick
+        // must not carry over.
+        <SlackChannelField
+          key={slice.slackIntegrationId}
+          projectId={ctx.projectId}
           slice={slice}
           onChange={onChange}
-          projectId={ctx.projectId}
-          automationId={ctx.automationId}
         />
-      ) : (
-        <VStack align="stretch" gap={3}>
-          <UpgradeToBotBanner
-            onUpgrade={() => onChange({ ...slice, deliveryMethod: "bot" })}
-          />
-          <Field.Root>
-            <Field.Label>Slack webhook URL</Field.Label>
-            <Input
-              value={slice.webhook}
-              onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
-              placeholder="https://hooks.slack.com/services/..."
-            />
-            <ReuseSlackWebhook
-              projectId={ctx.projectId}
-              currentWebhook={slice.webhook}
-              onPick={(webhook) => onChange({ ...slice, webhook })}
-            />
-          </Field.Root>
-        </VStack>
-      )}
-      {/* Try the real message straight from the destination section. */}
-      <TestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={
-          isComplete(slice)
-            ? undefined
-            : slice.deliveryMethod === "bot"
-              ? "Add a token and channel first"
-              : "Add a webhook URL first"
-        }
-      />
+      ) : null}
+      {/* The receive choice lives here, beside the layouts it filters — one
+          decision drives both the cadence and which templates are offered
+          (`hasOwnReceiveChooser`). Only a trace automation has the choice: the
+          server pins alerts and reports to their own timing. */}
+      {ctx.sourceKind === "trace" ? (
+        <ReceiveCadenceField
+          value={ctx.notificationCadence}
+          onChange={ctx.setNotificationCadence}
+        />
+      ) : null}
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -783,22 +664,6 @@ function SlackConfigForm({
                     template: { value: option.source, usingDefault: false },
                   })
                 }
-                onSelectOtherCadence={(option) => {
-                  // Cross-cadence pick: switch the cadence alongside the template
-                  // so the author doesn't have to round-trip via the Cadence
-                  // section. Both land in the same batch, so the cadence-mismatch
-                  // reset effect above sees a consistent pair and leaves it
-                  // alone.
-                  ctx.setNotificationCadence(
-                    option.cadenceFit === "digest"
-                      ? "5min_digest"
-                      : "immediate",
-                  );
-                  onChange({
-                    ...slice,
-                    template: { value: option.source, usingDefault: false },
-                  });
-                }}
               />
             )
           ) : (
@@ -809,7 +674,7 @@ function SlackConfigForm({
             <VStack align="stretch" gap={2}>
               <Text textStyle="xs" color="fg.muted">
                 Write the layout yourself in Block Kit. Values in braces fill in
-                from your trace or alert when the message sends.
+                from your trace or metric when the message sends.
               </Text>
               <Box data-testid="slack-code-editor">
                 <LiquidEditor
@@ -881,227 +746,30 @@ function SlackConfigForm({
           </Button>
         </VStack>
       )}
-    </VStack>
-  );
-}
-
-/**
- * Bot-connection destination: the channel to post in plus the app's bot token.
- * The token is write-only from the browser's side — once stored, the server
- * echoes a "set" flag (`botTokenAlreadySet`) instead of the secret, so the
- * field stays blank and the author keeps the stored token unless they type a
- * new one. A short setup callout points at where to create the Slack app.
- */
-function SlackBotFields({
-  slice,
-  onChange,
-  projectId,
-  automationId,
-}: {
-  slice: SlackSlice;
-  onChange: (next: SlackSlice) => void;
-  projectId: string;
-  automationId?: string;
-}) {
-  const tokenRef = useRef<HTMLInputElement>(null);
-  const [stepsOpen, setStepsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const tokenKept = slice.botTokenAlreadySet && slice.botToken.length === 0;
-
-  const copyManifest = () => {
-    void navigator.clipboard?.writeText(SLACK_APP_MANIFEST);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <VStack align="stretch" gap={3}>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        bg="bg.subtle"
-        padding={3}
-      >
-        <VStack align="stretch" gap={2}>
-          <Text textStyle="xs" color="fg">
-            Post to your Slack workspace with a bot token. Create a Slack app,
-            then paste its token below.
-          </Text>
-          <HStack gap={3}>
-            <Link
-              href="https://api.slack.com/apps"
-              isExternal
-              textStyle="xs"
-              fontWeight="medium"
-              display="inline-flex"
-              alignItems="center"
-              gap={1}
-            >
-              Create a Slack app <ExternalLink size={12} />
-            </Link>
-            <Button
-              variant="plain"
-              size="xs"
-              height="auto"
-              paddingX={0}
-              color="fg.muted"
-              _hover={{ color: "fg" }}
-              onClick={copyManifest}
-            >
-              {copied ? "Manifest copied" : "Copy app manifest"}
-            </Button>
-          </HStack>
-          <TemplateDisclosure
-            triggerLabel="Setup steps"
-            open={stepsOpen}
-            onToggle={() => setStepsOpen((prev) => !prev)}
-          >
-            <List.Root as="ol" gap={1} paddingLeft={4}>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste
-                  the copied manifest — it sets the permissions for you.
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Install it to your workspace and copy the Bot User OAuth Token
-                  (<Code size="sm">xoxb-</Code>).
-                </Text>
-              </List.Item>
-              <List.Item>
-                <Text textStyle="xs" color="fg.muted">
-                  Public channels work straight away. To post to a private
-                  channel, add the app to that channel first.
-                </Text>
-              </List.Item>
-            </List.Root>
-          </TemplateDisclosure>
-        </VStack>
-      </Box>
-      <Field.Root>
-        <Field.Label>Bot User OAuth Token</Field.Label>
-        <Input
-          ref={tokenRef}
-          type="password"
-          autoComplete="off"
-          value={slice.botToken}
-          onChange={(e) => onChange({ ...slice, botToken: e.target.value })}
-          placeholder={
-            slice.botTokenAlreadySet
-              ? "•••••••• (unchanged, leave blank to keep)"
-              : "xoxb-…"
-          }
-        />
-        {tokenKept ? (
-          <HStack gap={1} pt={1}>
-            <Text textStyle="xs" color="fg.muted">
-              A token is already saved.
-            </Text>
-            <Button
-              variant="plain"
-              size="xs"
-              height="auto"
-              paddingX={0}
-              color="fg.muted"
-              _hover={{ color: "fg" }}
-              onClick={() => tokenRef.current?.focus()}
-            >
-              Replace token
-            </Button>
-          </HStack>
-        ) : null}
-      </Field.Root>
-      <SlackChannelField
-        projectId={projectId}
-        automationId={automationId}
-        slice={slice}
-        onChange={onChange}
+      {/* Sits after the layout choice — a test fire renders whatever is
+          configured above, so it belongs after there is something to try. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={
+          isComplete(slice)
+            ? undefined
+            : slice.slackIntegrationId
+              ? "Pick a channel first"
+              : "Pick a Slack connection first"
+        }
       />
     </VStack>
-  );
-}
-
-/**
- * Picks an existing Slack webhook off another automation in the same
- * project. Most teams share a single Slack channel for alerts, and forcing
- * the operator to copy the URL out of one automation row and paste it into
- * the next is friction with no upside — the URL is the same secret across
- * triggers. Hidden when no other Slack automation exists so it doesn't
- * advertise an empty menu.
- */
-function ReuseSlackWebhook({
-  projectId,
-  currentWebhook,
-  onPick,
-}: {
-  projectId: string;
-  currentWebhook: string;
-  onPick: (webhook: string) => void;
-}) {
-  const triggersQuery = api.automation.getTriggers.useQuery(
-    { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  );
-
-  const options = useMemo(() => {
-    const seen = new Set<string>();
-    const out: { value: string; label: string }[] = [];
-    for (const t of triggersQuery.data ?? []) {
-      if (t.action !== "SEND_SLACK_MESSAGE") continue;
-      const params = (t.actionParams ?? {}) as { slackWebhook?: string };
-      const url = params.slackWebhook;
-      if (!url) continue;
-      if (url === currentWebhook) continue;
-      if (seen.has(url)) continue;
-      seen.add(url);
-      out.push({
-        value: url,
-        // The owning trigger's name is the only thing that distinguishes
-        // webhooks without leaking the full URL (the hostname is always
-        // hooks.slack.com).
-        label: t.name,
-      });
-    }
-    return out;
-  }, [triggersQuery.data, currentWebhook]);
-
-  const collection = useMemo(
-    () => createListCollection({ items: options }),
-    [options],
-  );
-
-  if (triggersQuery.isLoading) return null;
-  if (options.length === 0) return null;
-
-  return (
-    <Select.Root
-      collection={collection}
-      value={[]}
-      onValueChange={({ value }) => {
-        const next = value[0];
-        if (next) onPick(next);
-      }}
-      mt={2}
-    >
-      <Select.Trigger>
-        <Select.ValueText placeholder="Reuse webhook from another automation…" />
-      </Select.Trigger>
-      <Select.Content>
-        {options.map((opt) => (
-          <Select.Item key={opt.value} item={opt}>
-            <Text>{opt.label}</Text>
-          </Select.Item>
-        ))}
-      </Select.Content>
-    </Select.Root>
   );
 }
 
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
   Icon: FaSlack,
   channel: "slack",
+  // The layout gallery depends on the receive choice, so the chooser renders
+  // beside it (in SlackConfigForm) and the cadence facet stands down.
+  hasOwnReceiveChooser: true,
   initialSlice,
   isComplete,
   summary,

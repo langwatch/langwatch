@@ -12,6 +12,9 @@
  * rejects it. Before the fix the second half of that sequence wins and the
  * request comes back 403 INVALID_ORIGIN.
  */
+
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
 import dotenv from "dotenv";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -90,6 +93,7 @@ const post = async (
 
 describe("given a dev checkout running on a non-default port", () => {
   let app: HonoTestApp;
+  let trpc: typeof import("~/server/routes/trpc").app;
   let env: { NEXTAUTH_URL: string; BASE_HOST: string };
   let prisma: typeof import("~/server/db").prisma;
   let userId: string;
@@ -101,6 +105,7 @@ describe("given a dev checkout running on a non-default port", () => {
     vi.resetModules();
     ({ env } = await import("~/env.mjs"));
     ({ app } = await import("~/server/routes/auth"));
+    ({ app: trpc } = await import("~/server/routes/trpc"));
     ({ prisma } = await import("~/server/db"));
 
     const { hash } = await import("bcrypt");
@@ -216,6 +221,51 @@ describe("given a dev checkout running on a non-default port", () => {
         expect.stringContaining("origin"),
       );
       warn.mockRestore();
+    });
+  });
+
+  describe("when the sign-up screen creates an account from somewhere else", () => {
+    const SIGNUP_EMAIL = `origin-gate-signup-${Date.now()}@example.com`;
+
+    const register = async (origin: string) => {
+      // The Node adapter supplies `incoming`; `app.request()` does not, so it
+      // is handed one the way the server would.
+      return trpc.request(
+        "/api/trpc/user.register",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", origin },
+          body: JSON.stringify({
+            json: {
+              email: SIGNUP_EMAIL,
+              password: "correct horse battery staple",
+              addressProof: "a-proof-nobody-issued",
+            },
+          }),
+        },
+        { incoming: new IncomingMessage(new Socket()) },
+      );
+    };
+
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("is refused with the invalid origin code and writes no account", async () => {
+      const response = await register("http://localhost:18560");
+
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(await response.json())).toContain(
+        "auth_invalid_origin",
+      );
+      expect(
+        await prisma.user.findUnique({ where: { email: SIGNUP_EMAIL } }),
+      ).toBeNull();
+    });
+
+    it("lets the same call from the configured address past the gate", async () => {
+      const response = await register(`http://localhost:${APP_PORT}`);
+
+      expect(JSON.stringify(await response.json())).not.toContain(
+        "auth_invalid_origin",
+      );
     });
   });
 
