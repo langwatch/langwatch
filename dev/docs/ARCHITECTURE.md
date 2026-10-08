@@ -469,6 +469,8 @@ way, `process/src/features/<concern>/` holding that concern's services, rules an
 
 **Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package groups its files into plain folders behind unchanged `package.json` export subpaths.
 
+The fragment-file budget never reports a module contract's `<id>.config.ts` (§6) or a file its own `package.json` publishes through `exports` (Alex, 2026-10-08).
+
 **A browser package exports `./declaration` and nothing else** (ruled
 2026-09-18):
 

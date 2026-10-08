@@ -36,3 +36,19 @@ Feature: A folder is one concept and a file is one readable part
     When architecture lint checks the workspace
     Then it reports nothing, because the record says an application is a main.ts and a config.ts
     And any other small file beside main.ts is still reported
+
+  @unit @architecture
+  Scenario: A module contract's config file is never a fragment
+    Given a module contract's src/<id>.config.ts is shorter than the fragment floor
+    And only its own folder reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because the record puts a module's config slice in that file
+    And any other small file in the contract is still reported
+
+  @unit @architecture
+  Scenario: A file its package publishes as a subpath is never a fragment
+    Given a source file shorter than the fragment floor is the target of an exports entry in its own package.json
+    And only its own folder reads it
+    When architecture lint checks the workspace
+    Then it reports nothing, because other packages read it by its published name
+    And an unexported small file beside it is still reported

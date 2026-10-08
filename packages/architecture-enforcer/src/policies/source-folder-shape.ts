@@ -2,7 +2,12 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 
 import type { ArchitectureViolation } from "../types.ts";
 import { PACKAGE_SOURCE_ROOTS, listFiles } from "../workspace/layout.ts";
-import { sourceText, valueImports } from "../workspace/module-graph.ts";
+import {
+  sourceText,
+  valueImports,
+  workspaceModuleResolver,
+  type WorkspaceModuleResolver,
+} from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 
 /**
@@ -26,6 +31,9 @@ const GRAMMAR_REQUIRED_SUFFIXES = [".module.ts", ".mount.ts"];
 
 /** An application is a `main.ts` and a `config.ts` (ARCHITECTURE.md §1). */
 const APPLICATION_CONFIG = /^apps\/[^/]+\/src\/config\.ts$/;
+
+/** A module's contract holds its config slice in `<id>.config.ts` (ARCHITECTURE.md §6). */
+const MODULE_CONTRACT_CONFIG = /^(?:enterprise\/)?modules\/([^/]+)\/contract\/src\/\1\.config\.ts$/;
 
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 
@@ -158,18 +166,38 @@ function fragmentFileFinding(
   };
 }
 
+function exportTargets(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+
+  if (value === null || typeof value !== "object") return [];
+
+  return Object.values(value).flatMap(exportTargets);
+}
+
+/** A file its own package.json publishes as a subpath is an entry, read by name. */
+function isPackageExport(file: string, resolver: WorkspaceModuleResolver): boolean {
+  const manifest = resolver.owningPackage({ file });
+  if (!manifest) return false;
+
+  return exportTargets(manifest.exports).some(
+    (target) => resolve(manifest.directory, target) === file,
+  );
+}
+
 function fragmentFindingOf({
   file,
   root,
   importers,
+  resolver,
 }: {
   file: string;
   root: string;
   importers: ReadonlyMap<string, ReadonlySet<string>>;
+  resolver: WorkspaceModuleResolver;
 }): SourceFolderShapeFinding | null {
   const path = relative(root, file);
   if (basename(file).startsWith("index.")) return null;
-  if (APPLICATION_CONFIG.test(path)) return null;
+  if (APPLICATION_CONFIG.test(path) || MODULE_CONTRACT_CONFIG.test(path)) return null;
 
   const grammarRequired = GRAMMAR_REQUIRED_SUFFIXES.some((suffix) => file.endsWith(suffix));
   if (grammarRequired) return null;
@@ -181,7 +209,9 @@ function fragmentFindingOf({
   if (!readers.every((reader) => dirname(reader) === folder)) return null;
 
   const lines = lineCount(file);
-  return lines >= FRAGMENT_FLOOR ? null : fragmentFileFinding(path, lines, readers);
+  if (lines >= FRAGMENT_FLOOR || isPackageExport(file, resolver)) return null;
+
+  return fragmentFileFinding(path, lines, readers);
 }
 
 export function collectSourceFolderShapeFindings(root: string): SourceFolderShapeFinding[] {
@@ -202,9 +232,10 @@ export function collectSourceFolderShapeFindings(root: string): SourceFolderShap
   }
 
   const importers = importersOf(files);
+  const resolver = workspaceModuleResolver({ root });
 
   for (const file of files) {
-    const finding = fragmentFindingOf({ file, root, importers });
+    const finding = fragmentFindingOf({ file, root, importers, resolver });
     if (finding) findings.push(finding);
   }
 

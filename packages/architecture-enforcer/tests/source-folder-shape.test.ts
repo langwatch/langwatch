@@ -173,4 +173,46 @@ describe("source folder shape", () => {
       expect(collectSourceFolderShapeFindings(root)).toEqual([]);
     });
   });
+
+  describe("given a module contract's <id>.config.ts that only its neighbours read", () => {
+    /** @scenario A module contract's config file is never a fragment */
+    it("leaves the module's config slice alone but still reports any other small config file", () => {
+      write("modules/widget/contract/src/widget.config.ts", "export const widgetConfig = 1;\n");
+      write("modules/widget/contract/src/other.config.ts", "export const otherConfig = 1;\n");
+      write(
+        "modules/widget/contract/src/widget.api.ts",
+        'import { widgetConfig } from "./widget.config.ts";\nimport { otherConfig } from "./other.config.ts";\nexport const api = [widgetConfig, otherConfig];\n',
+      );
+
+      expect(collectSourceFolderShapeFindings(root).map((finding) => finding.path)).toEqual([
+        "modules/widget/contract/src/other.config.ts",
+      ]);
+    });
+  });
+
+  describe("given a small file its own package.json publishes through exports", () => {
+    /** @scenario A file its package publishes as a subpath is never a fragment */
+    it("leaves the exported file alone but still reports an unexported neighbour", () => {
+      write(
+        "packages/widget/package.json",
+        JSON.stringify({
+          name: "@fixture/widget",
+          exports: {
+            ".": "./src/index.ts",
+            "./anchor": { types: "./dist/anchor.d.ts", default: "./src/overlays/anchor.tsx" },
+          },
+        }),
+      );
+      write("packages/widget/src/overlays/anchor.tsx", "export const anchor = 1;\n");
+      write("packages/widget/src/overlays/gap.ts", "export const gap = 1;\n");
+      write(
+        "packages/widget/src/overlays/menu.tsx",
+        'import { anchor } from "./anchor.tsx";\nimport { gap } from "./gap.ts";\nexport const menu = [anchor, gap];\n',
+      );
+
+      expect(collectSourceFolderShapeFindings(root).map((finding) => finding.path)).toEqual([
+        "packages/widget/src/overlays/gap.ts",
+      ]);
+    });
+  });
 });
