@@ -56,6 +56,6 @@ Anything else trace needs belongs to another module and is reached through its `
 
 ## Who depends on trace
 
-[agent](../agent/README.md), [analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
 
 <!-- readme:generated:end -->
