@@ -34,6 +34,24 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
     describe: () => "Check the address and try again.",
   },
 
+  auth_direct_registration_unavailable: {
+    title: "Accounts here are created by your identity provider",
+    describe: () =>
+      "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+  },
+
+  auth_rate_limited: {
+    title: "Too many attempts",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Wait a few minutes, then try again.";
+      const minutes = Math.ceil(seconds / 60);
+      return minutes <= 1
+        ? "Wait a minute, then try again."
+        : `Wait ${minutes} minutes, then try again.`;
+    },
+  },
+
   auth_sign_up_restricted: {
     title: "Sign-up on this installation is by invitation",
     describe: () =>

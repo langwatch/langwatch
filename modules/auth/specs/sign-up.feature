@@ -74,3 +74,10 @@ Feature: Sign-up
     When it submits the sign-up form again
     Then the refusal is "auth_rate_limited" and names the seconds to wait
     And the address proof is not spent
+
+  @unit
+  Scenario: The sign-up form explains a refused registration and a rate limit in its own words
+    Given the front door receives "auth_direct_registration_unavailable" or "auth_rate_limited"
+    When the sign-up form renders the refusal
+    Then the first names the identity provider as the way to sign in
+    And the second counts the minutes to wait from the seconds the refusal carries
