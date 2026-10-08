@@ -4,6 +4,7 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi, UserServerConfig } from "@langwatch/user-contract";
 
 import { UserModule } from "./app/user.app.ts";
+import { userChannels } from "./channels/user-channels.registry.ts";
 import { userLifecycleEventing } from "./eventing/user-lifecycle.pipeline.ts";
 import { userRepositories } from "./repositories/user-repositories.registry.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
@@ -14,6 +15,7 @@ import { signUpOriginFact, userTrpcTransport } from "./transport/user.trpc.ts";
 export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServerConfig> =
   defineProcessModule("user")
     .withRepositories(userRepositories)
+    .withChannels(userChannels)
     .withApi(UserModule)
     .withTransports(meRest, userAvatarRest, userTrpcTransport)
     .withEventing(userLifecycleEventing)

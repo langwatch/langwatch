@@ -16,9 +16,12 @@ Presence: who else is looking at this project, where they are, and where their c
 
 ## What presence owns
 
-| Kind            | Name  | Declared at                                                        |
-| --------------- | ----- | ------------------------------------------------------------------ |
-| Stores required | redis | `process/src/repositories/redis/redis.presence.repositories.ts:10` |
+| Kind            | Name           | Declared at                                                                 |
+| --------------- | -------------- | --------------------------------------------------------------------------- |
+| Postgres table  | `Project`      | `process/src/repositories/prisma/prisma.presence-settings.repository.ts:10` |
+| Postgres table  | `Team`         | `process/src/repositories/prisma/prisma.presence-settings.repository.ts:10` |
+| Postgres table  | `Organization` | `process/src/repositories/prisma/prisma.presence-settings.repository.ts:10` |
+| Stores required | prisma, redis  | `process/src/repositories/live/live.presence.repositories.ts:11`            |
 
 Anything else presence needs belongs to another module and is reached through its `*Api`.
 

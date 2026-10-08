@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * Nurturing places a project through project's and organization's shares (round 46 E1, R40).
+ * Nurturing counts against its own organizations; placement is the directory's (R40).
  * Spec: enterprise/modules/nurturing/specs/nurturing.feature
  */
 import { randomUUID } from "node:crypto";
@@ -18,93 +18,41 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaNurturingMilestonesRepository } from "../prisma.nurturing-milestones.repository.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
-const namespace = `test-nurturing-placement-${randomUUID()}`;
-const organizationId = `${namespace}-organization`;
-const teamId = `${namespace}-team`;
-const projectId = `${namespace}-project`;
-const archivedProjectId = `${namespace}-archived`;
-const earliest = new Date("2020-01-01T00:00:00.000Z");
+const organizationId = `test-nurturing-milestones-${randomUUID()}`;
 
-describe.skipIf(!databaseUrl)("given project's and organization's tables", () => {
+describe.skipIf(!databaseUrl)("given nurturing's organizations table", () => {
   let connection: PrismaConnection;
   let repository: PrismaNurturingMilestonesRepository;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     if (!databaseUrl) throw new Error("LANGWATCH_TEST_DATABASE_URL is required here");
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
-      logger: createLogger("langwatch:nurturing:test:placement"),
+      logger: createLogger("langwatch:nurturing:test:milestones"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
-    const prisma = connection.client;
-    repository = PrismaNurturingMilestonesRepository.create({ prisma });
-    await prisma.organization.create({
-      data: { id: organizationId, name: namespace, slug: namespace },
-    });
-    await prisma.team.create({
-      data: { id: teamId, organizationId, name: namespace, slug: namespace },
-    });
-    await prisma.project.create({
-      data: {
-        id: projectId,
-        teamId,
-        name: projectId,
-        slug: projectId,
-        apiKey: projectId,
-        language: "typescript",
-        framework: "test",
-      },
-    });
-    await prisma.project.create({
-      data: {
-        id: archivedProjectId,
-        teamId,
-        name: archivedProjectId,
-        slug: archivedProjectId,
-        apiKey: archivedProjectId,
-        language: "typescript",
-        framework: "test",
-        createdAt: earliest,
-        archivedAt: new Date(),
-      },
-    });
+    repository = PrismaNurturingMilestonesRepository.create({ prisma: connection.client });
   });
 
   afterAll(async () => {
     if (!connection) return;
-    const prisma = connection.client;
-    await prisma.nurturingOrganization.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { id: { in: [projectId, archivedProjectId] } } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await connection.client.nurturingOrganization.deleteMany({ where: { organizationId } });
     await connection.closeOnce();
   });
 
-  describe("when an evaluation in a project of an organization nurturing learned is counted", () => {
-    /** @scenario "Nurturing reads a project's organization through its team" */
+  describe("when an evaluation is counted for an organization nurturing learned", () => {
     it("raises the organization's evaluation count by one", async () => {
       await repository.recordOrganization({ organizationId, adminUserId: null, seeded: false });
 
-      await expect(repository.countEvaluation({ projectId })).resolves.toMatchObject([
-        { organizationId, evaluationCount: 1 },
+      await expect(repository.countEvaluation({ organizationId })).resolves.toMatchObject([
+        { organizationId, seeded: false, evaluationCount: 1 },
       ]);
     });
   });
 
-  describe("when an evaluation is counted in an organization holding an archived older project", () => {
-    /** @scenario "Nurturing reads an organization's earliest project through its teams" */
-    it("carries the earliest project's creation, archived included", async () => {
-      await repository.recordOrganization({ organizationId, adminUserId: null, seeded: false });
-
-      await expect(repository.countEvaluation({ projectId })).resolves.toMatchObject([
-        { organizationId, seeded: false, firstProjectCreatedAt: earliest.getTime() },
-      ]);
-    });
-  });
-
-  describe("when the project is one its owners do not hold", () => {
+  describe("when the organization is one nurturing never learned", () => {
     it("counts nothing", async () => {
       await expect(
-        repository.countEvaluation({ projectId: `${namespace}-absent` }),
+        repository.countEvaluation({ organizationId: `${organizationId}-absent` }),
       ).resolves.toEqual([]);
     });
   });

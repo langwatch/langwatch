@@ -453,6 +453,7 @@ export class AuthModule implements AuthApiContract {
         route: (input) => dependencies.identity.routeSignIn(input),
         checkSignUp: (input) => dependencies.organizations.checkSignUp(input),
         isWithinBudget: (input) => app.isWithinBudget(input),
+        revokeAllBrowserSessions: (input) => app.revokeAllBrowserSessions(input),
         isEmailUnconfigured: async () => {
           const view = await dependencies.notifications.getMailDelivery();
           return view.provider === undefined && !view.misconfigured;
@@ -1109,6 +1110,7 @@ function buildSignUpVerification({
   route,
   checkSignUp,
   isWithinBudget,
+  revokeAllBrowserSessions,
   isEmailUnconfigured,
 }: {
   publicBaseUrl: string | undefined;
@@ -1119,6 +1121,7 @@ function buildSignUpVerification({
   route: SignUpVerificationDeps["route"];
   checkSignUp: SignUpVerificationDeps["checkSignUp"];
   isWithinBudget: SignUpVerificationDeps["isWithinBudget"];
+  revokeAllBrowserSessions: SignUpVerificationDeps["revokeAllBrowserSessions"];
   isEmailUnconfigured: SignUpVerificationDeps["isEmailUnconfigured"];
 }): SignUpVerificationService | null {
   if (!publicBaseUrl) return null;
@@ -1130,6 +1133,7 @@ function buildSignUpVerification({
     route,
     checkSignUp,
     isWithinBudget,
+    revokeAllBrowserSessions,
     buildVerificationUrl: ({ token, callbackUrl }) =>
       buildSignUpVerificationUrl({ baseUrl: publicBaseUrl, token, callbackUrl }),
     isEmailUnconfigured,

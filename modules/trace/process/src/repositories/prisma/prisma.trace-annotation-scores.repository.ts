@@ -1,15 +1,19 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { TraceAnnotationScoresReadRepository } from "../trace-annotation-scores.repository.ts";
 
-/** Annotation's `AnnotationScore` rows, read through annotation's share (R40). */
-export class PrismaTraceAnnotationScoresRepository
-  extends PrismaRepository.for("AnnotationScore")
-  implements TraceAnnotationScoresReadRepository
-{
-  static readonly create = this.factory(
-    (prisma) => new PrismaTraceAnnotationScoresRepository(prisma),
-  );
+/** Only the shared delegate this reader touches; it claims no table (R40). */
+type PrismaTraceAnnotationScoresDatabase = Pick<PrismaClient, "annotationScore">;
+
+/** Annotation's `AnnotationScore` rows, read through annotation's share. */
+export class PrismaTraceAnnotationScoresRepository implements TraceAnnotationScoresReadRepository {
+  private constructor(private readonly prisma: PrismaTraceAnnotationScoresDatabase) {}
+
+  static create(
+    prisma: PrismaTraceAnnotationScoresDatabase,
+  ): PrismaTraceAnnotationScoresRepository {
+    return new PrismaTraceAnnotationScoresRepository(prisma);
+  }
 
   async findScoreNames({
     projectId,

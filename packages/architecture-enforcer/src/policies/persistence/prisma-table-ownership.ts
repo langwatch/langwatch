@@ -34,9 +34,10 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "data-privacy",
       "instant-eval-judge",
       "nurturing",
+      "presence",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40)",
   },
   {
     table: "Team",
@@ -478,7 +479,7 @@ export function featureClaims(
   });
 }
 
-/** A claim by a module the model's owner named as a reader: a read seat, not a second owner. */
+/** A claim by a module the model's owner named as a reader: a read seat is never a claim. */
 function isReaderClaim(claim: Claim, shared: readonly SharedPrismaTable[]): boolean {
   return shared.some((item) => item.table === claim.model && item.readers.includes(claim.feature));
 }
@@ -503,7 +504,16 @@ function checkOwners({
       continue;
     }
 
-    if (isReaderClaim(claim, shared)) continue;
+    if (isReaderClaim(claim, shared)) {
+      violations.push(
+        issue(
+          claim.file,
+          `${claim.feature} reads ${table} but does not own it, and a claim is ownership: boot refuses it. Read it through a plain class over the Prisma client that no .for(...) or static tables claims (see prisma.billing-project-directory.repository.ts).`,
+          claim.line,
+        ),
+      );
+      continue;
+    }
 
     const previous = owners.get(table);
 

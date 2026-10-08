@@ -5,6 +5,7 @@ import { nowInstant } from "@langwatch/time";
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
+import { MemoryNurturingProjectDirectoryRepository } from "./memory.nurturing-project-directory.repository.ts";
 
 /** One claim per key, lapsing when its window does, as the Redis key expires. */
 export class MemoryNurturingClaimRepository implements NurturingClaimRepository {
@@ -29,6 +30,7 @@ export class MemoryNurturingRepositories {
   static create(): NurturingRepositories {
     return {
       milestones: MemoryNurturingMilestonesRepository.create(),
+      projects: MemoryNurturingProjectDirectoryRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
     };
   }

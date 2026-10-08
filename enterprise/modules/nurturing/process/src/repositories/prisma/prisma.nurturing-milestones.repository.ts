@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { PrismaRepository } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   NurturingMilestonesRepository,
-  NurturingOrganizationState,
+  NurturingOrganizationCounts,
 } from "../nurturing-milestones.repository.ts";
 
 const ORGANIZATION_STATE = {
@@ -15,24 +14,14 @@ const ORGANIZATION_STATE = {
   simulationRunCount: true,
 } as const;
 
-/** Only the shared delegates the placement read touches; it claims no table (R40). */
-type NurturingProjectShare = Pick<PrismaClient, "project" | "team">;
-
-/** Nurturing's organizations; a project's organization is read through its owners' shares (R40). */
+/** Nurturing's organizations, the one table it claims; the owners' rows are read elsewhere (R40). */
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingOrganization")
   implements NurturingMilestonesRepository
 {
-  static create({ prisma }: { prisma: PrismaClient }): PrismaNurturingMilestonesRepository {
-    return new PrismaNurturingMilestonesRepository(prisma, prisma);
-  }
-
-  private constructor(
-    prisma: PrismaClient,
-    private readonly projects: NurturingProjectShare,
-  ) {
-    super(prisma);
-  }
+  static readonly create = this.factory(
+    (prisma) => new PrismaNurturingMilestonesRepository(prisma),
+  );
 
   async recordOrganization({
     organizationId,
@@ -47,27 +36,25 @@ export class PrismaNurturingMilestonesRepository
   }
 
   countEvaluation({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    return this.count({ projectId, data: { evaluationCount: { increment: 1 } } });
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { evaluationCount: { increment: 1 } } });
   }
 
   countSimulationRun({
-    projectId,
-  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
-    return this.count({ projectId, data: { simulationRunCount: { increment: 1 } } });
+    organizationId,
+  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { simulationRunCount: { increment: 1 } } });
   }
 
-  /** Empty when the owners hold no such project or nurturing never learned its organization. */
+  /** Empty when nurturing never learned the organization. */
   private async count({
-    projectId,
+    organizationId,
     data,
   }: {
-    projectId: string;
+    organizationId: string;
     data: { evaluationCount: { increment: 1 } } | { simulationRunCount: { increment: 1 } };
-  }): Promise<NurturingOrganizationState[]> {
-    const organizationId = await this.organizationOf({ projectId });
-    if (!organizationId) return [];
+  }): Promise<NurturingOrganizationCounts[]> {
     const { count } = await this.prisma.nurturingOrganization.updateMany({
       where: { organizationId },
       data,
@@ -77,39 +64,6 @@ export class PrismaNurturingMilestonesRepository
       where: { organizationId },
       select: ORGANIZATION_STATE,
     });
-    if (!organization) return [];
-    const firstProjectCreatedAt = await this.firstProjectCreatedAt({ organizationId });
-    return [{ ...organization, firstProjectCreatedAt }];
-  }
-
-  /** The organization's earliest project, archived ones included, through its teams. */
-  private async firstProjectCreatedAt({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<number | null> {
-    const teams = await this.projects.team.findMany({
-      where: { organizationId },
-      select: { id: true },
-    });
-    if (teams.length === 0) return null;
-    const { _min } = await this.projects.project.aggregate({
-      where: { teamId: { in: teams.map(({ id }) => id) } },
-      _min: { createdAt: true },
-    });
-    return _min.createdAt ? _min.createdAt.getTime() : null;
-  }
-
-  private async organizationOf({ projectId }: { projectId: string }): Promise<string | undefined> {
-    const project = await this.projects.project.findUnique({
-      where: { id: projectId },
-      select: { teamId: true },
-    });
-    if (!project) return void 0;
-    const team = await this.projects.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    return team?.organizationId;
+    return organization ? [organization] : [];
   }
 }

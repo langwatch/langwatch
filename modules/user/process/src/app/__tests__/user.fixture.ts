@@ -31,23 +31,18 @@ export const REFUSED_ADDRESS_PROOF = "refused-address-proof";
 export const UNCONFIRMED_ADDRESS_PROOF = "unconfirmed-address-proof";
 
 /**
- * The auth peer a suite runs against; `provider` is what ADR-027 resolved,
- * `issuesOwnPasswords` the D09 switch, and `governedDomain` a domain an
- * organization routes through its own connection.
+ * The auth peer a suite runs against; `provider` is what ADR-027 resolved and
+ * `governedDomain` a domain an organization routes through its own connection.
  */
 export function createUserTestAuth(
   provider = "email",
-  {
-    issuesOwnPasswords = false,
-    governedDomain,
-  }: { issuesOwnPasswords?: boolean; governedDomain?: string } = {},
+  { governedDomain }: { governedDomain?: string } = {},
 ) {
   return Object.assign(createApiFixture<AuthApi>(), {
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
     revokeAllBrowserSessions: vi.fn(async () => undefined),
     revokeCliTokens: vi.fn(async () => ({ revokedCount: 0 })),
     resolveAuthProvider: vi.fn(async () => provider),
-    issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
     assertSignUpOrigin: vi.fn(async () => undefined),
     claimSignUpAddressProof: vi.fn(
       async ({ token }: { token: string; email: string }) =>
@@ -192,8 +187,12 @@ export class TestPasswordHasher {
   }
 }
 
-/** The deployment a suite runs against: no passkeys. */
-export const TEST_USER_CONFIG: UserFacts = { passkeysEnabled: false };
+/** The deployment a suite runs against: no passkeys, no two-step offer, no own passwords. */
+export const TEST_USER_CONFIG: UserFacts = {
+  passkeysEnabled: false,
+  mfaEnrollmentOpen: false,
+  localPasswords: false,
+};
 
 /** The whole application over memory repositories, recorded mail and a test's own peers. */
 export function createUserTestApp(
@@ -206,20 +205,22 @@ export function createUserTestApp(
       projects: ProjectApi;
       storedObjects: StoredObjectApi;
     }>;
-    facts?: UserFacts;
+    facts?: Partial<UserFacts>;
     lifecycle?: UserLifecycleSenders;
     budgetRequests?: UserBudgetRequestMailChannel;
     now?: () => Instant;
   }> = {},
 ): UserModule {
+  const auth = input.dependencies?.auth ?? createUserTestAuth();
   const app = UserModule.createForTesting({
     repositories: input.repositories ?? MemoryUserRepositories.create(),
-    facts: input.facts ?? TEST_USER_CONFIG,
+    channels: { authReads: auth },
+    facts: { ...TEST_USER_CONFIG, ...input.facts },
     budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
     passwords: new TestPasswordHasher(),
     ...(input.now ? { now: input.now } : {}),
     dependencies: {
-      auth: input.dependencies?.auth ?? createUserTestAuth(),
+      auth,
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       projects: input.dependencies?.projects ?? createUserTestProjects(),

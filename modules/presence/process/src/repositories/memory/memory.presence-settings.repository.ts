@@ -1,84 +1,47 @@
 import {
-  type FoldedProject,
-  type FoldedSetting,
+  type PresenceProjectSettings,
   PresenceSettingsRepository,
-  type RecordedSetting,
 } from "../presence-settings.repository.ts";
 
-type ProjectRow = { organizationId: string; setting: RecordedSetting | null };
+export type MemoryPresenceProjectRow = { teamId: string; presenceEnabled: boolean };
+export type MemoryPresenceTeamRow = { organizationId: string };
+export type MemoryPresenceOrganizationRow = { presenceEnabled: boolean };
 
+/** In-memory twin of the rows project and organization hold; a test hands them in. */
 export class MemoryPresenceSettingsRepository extends PresenceSettingsRepository {
-  readonly #projects = new Map<string, ProjectRow>();
-  readonly #organizations = new Map<string, RecordedSetting>();
-
-  private constructor() {
+  private constructor(
+    private readonly rows: Readonly<{
+      projects: Map<string, MemoryPresenceProjectRow>;
+      teams: Map<string, MemoryPresenceTeamRow>;
+      organizations: Map<string, MemoryPresenceOrganizationRow>;
+    }>,
+  ) {
     super();
   }
 
-  static create(): MemoryPresenceSettingsRepository {
-    return new MemoryPresenceSettingsRepository();
-  }
-
-  async recordProject({
-    projectId,
-    organizationId,
+  static create({
+    projects = new Map<string, MemoryPresenceProjectRow>(),
+    teams = new Map<string, MemoryPresenceTeamRow>(),
+    organizations = new Map<string, MemoryPresenceOrganizationRow>(),
   }: {
-    projectId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const row = this.#projects.get(projectId);
-    this.#projects.set(projectId, { organizationId, setting: row?.setting ?? null });
+    projects?: Map<string, MemoryPresenceProjectRow>;
+    teams?: Map<string, MemoryPresenceTeamRow>;
+    organizations?: Map<string, MemoryPresenceOrganizationRow>;
+  } = {}): MemoryPresenceSettingsRepository {
+    return new MemoryPresenceSettingsRepository({ projects, teams, organizations });
   }
 
-  async recordProjectSetting({
-    projectId,
-    organizationId,
-    presenceEnabled,
-    occurredAt,
-  }: { projectId: string; organizationId: string } & RecordedSetting): Promise<void> {
-    const stored = this.#projects.get(projectId)?.setting ?? null;
-    const setting = newer({ stored, given: { presenceEnabled, occurredAt } });
-    this.#projects.set(projectId, { organizationId, setting });
+  async getSettings({ projectId }: { projectId: string }): Promise<PresenceProjectSettings> {
+    const project = this.rows.projects.get(projectId);
+    if (!project) return { outcome: "unknown" };
+    const team = this.rows.teams.get(project.teamId);
+    if (!team) return { outcome: "unknown" };
+    const organization = this.rows.organizations.get(team.organizationId);
+    if (!organization) return { outcome: "unknown" };
+    return {
+      outcome: "known",
+      projectEnabled: project.presenceEnabled,
+      organizationEnabled: organization.presenceEnabled,
+    };
   }
-
-  async recordOrganizationSetting({
-    organizationId,
-    presenceEnabled,
-    occurredAt,
-  }: { organizationId: string } & RecordedSetting): Promise<void> {
-    const stored = this.#organizations.get(organizationId) ?? null;
-    this.#organizations.set(
-      organizationId,
-      newer({ stored, given: { presenceEnabled, occurredAt } }),
-    );
-  }
-
-  async getProject({ projectId }: { projectId: string }): Promise<FoldedProject> {
-    const row = this.#projects.get(projectId);
-    if (!row) return { kind: "unfolded" };
-    return { kind: "folded", organizationId: row.organizationId, setting: settingOf(row.setting) };
-  }
-
-  async getOrganizationSetting({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<FoldedSetting> {
-    return settingOf(this.#organizations.get(organizationId) ?? null);
-  }
-}
-
-function settingOf(recorded: RecordedSetting | null): FoldedSetting {
-  if (recorded === null) return "unrecorded";
-  return recorded.presenceEnabled ? "on" : "off";
-}
-
-function newer({
-  stored,
-  given,
-}: {
-  stored: RecordedSetting | null;
-  given: RecordedSetting;
-}): RecordedSetting {
-  return stored !== null && stored.occurredAt > given.occurredAt ? stored : given;
 }

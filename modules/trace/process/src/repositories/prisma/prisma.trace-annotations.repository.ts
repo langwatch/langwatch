@@ -2,7 +2,7 @@ import {
   type ProjectionAnnotation,
   projectionAnnotationSchema,
 } from "@langwatch/annotation-contract";
-import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { TraceAnnotationsReadRepository } from "../trace-annotations.repository.ts";
 
@@ -20,12 +20,16 @@ const projectionAnnotationSelect = {
   anchorPath: true,
 } as const;
 
-/** Annotation's `Annotation` rows, read through annotation's share (R40). */
-export class PrismaTraceAnnotationsRepository
-  extends PrismaRepository.for("Annotation")
-  implements TraceAnnotationsReadRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaTraceAnnotationsRepository(prisma));
+/** Only the shared delegate this reader touches; it claims no table (R40). */
+type PrismaTraceAnnotationsDatabase = Pick<PrismaClient, "annotation">;
+
+/** Annotation's `Annotation` rows, read through annotation's share. */
+export class PrismaTraceAnnotationsRepository implements TraceAnnotationsReadRepository {
+  private constructor(private readonly prisma: PrismaTraceAnnotationsDatabase) {}
+
+  static create(prisma: PrismaTraceAnnotationsDatabase): PrismaTraceAnnotationsRepository {
+    return new PrismaTraceAnnotationsRepository(prisma);
+  }
 
   async findForTraces({
     projectId,

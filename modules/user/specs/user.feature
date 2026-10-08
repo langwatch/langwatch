@@ -164,13 +164,6 @@ Feature: Canonical user lifecycle
     When an address proof asks to adopt it
     Then the answer names why, and nothing about the account changes
 
-  @unit
-  Scenario: Adopting an account ends every session it held before the proof
-    Given an account awaiting confirmation
-    When an address proof adopts it
-    Then every browser session on that account is ended
-    And a refused adoption ends none
-
   Rule: Every backend the feature stores accounts in answers the same way
 
     @unit
@@ -263,3 +256,19 @@ Feature: Canonical user lifecycle
       When the same fact is delivered again
       Then both deliveries share one deduplication key
       And ending the sessions again leaves the account with none
+
+  # Round 48 (A1-a): the switches are shared deployment facts, so user asks no peer for them.
+  Rule: User reads the sign-in capability switches from the deployment facts auth reads
+
+    @unit
+    Scenario: User reads the passkey, two-step and own-password switches as auth does
+      Given a deployment that sets PASSKEYS_ENABLED, MFA_ENROLLMENT_OPEN and LOCAL_PASSWORDS_ENABLED
+      When user's configuration is parsed beside another reader of the same switches
+      Then user reads the same values that reader does
+      And no switch is claimed twice
+
+    @unit
+    Scenario: A capability switch written a way nothing reads refuses the boot
+      Given a deployment that sets one of the switches to a value outside "on" and "off"
+      When user's configuration is parsed
+      Then the boot is refused rather than the surface left quietly off

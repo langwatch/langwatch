@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Adoption by an address proof over the memory twins: what goes, what stays, and the sessions.
+ * Adoption by an address proof over the memory twins: what goes and what stays. Auth ends the
+ * adopted account's sessions (modules/auth/specs/sign-up.feature).
  * @see modules/user/specs/user.feature
  */
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -23,15 +24,10 @@ async function unfinishedAccount({ signedIn = false }: { signedIn?: boolean } = 
   const database = MemoryUserDatabase.create();
   const users = MemoryUserRepository.create({ database });
   const credentials = MemoryUserCredentialRepository.create({ database });
-  const revoked: string[] = [];
   const service = UserService.create({
     repository: users,
     organizations: createApiFixture<OrganizationApi>({}),
-    auth: createApiFixture<AuthApi>({
-      revokeAllBrowserSessions: async ({ userId }) => {
-        revoked.push(userId);
-      },
-    }),
+    auth: createApiFixture<AuthApi>({}),
     avatarStorage: createApiFixture<UserAvatarStorage>({}),
     credentialIssuer: "credential",
     platformOperators: createApiFixture<AuthzApi>({}),
@@ -47,27 +43,25 @@ async function unfinishedAccount({ signedIn = false }: { signedIn?: boolean } = 
   database.writePasskey({ id: "passkey-1", userId: id });
   if (signedIn) await users.setLastLoginAt({ id, lastLoginAt: fromDate(new Date(1)) });
 
-  return { id, users, credentials, revoked, service };
+  return { id, users, credentials, service };
 }
 
 describe("given an account awaiting confirmation", () => {
   describe("when an address proof adopts it", () => {
-    /** @scenario "Adopting an account ends every session it held before the proof" */
-    it("confirms it, drops its password and passkey, and ends its sessions", async () => {
-      const { id, users, credentials, revoked, service } = await unfinishedAccount();
+    it("confirms it and drops its password and passkey", async () => {
+      const { id, users, credentials, service } = await unfinishedAccount();
 
       await expect(service.adoptUnconfirmedAccount({ email: EMAIL })).resolves.toBe("adopted");
 
       expect((await users.findById(id))?.emailVerified).toBe(true);
       await expect(credentials.findLinkedAccounts({ userId: id })).resolves.toEqual([]);
       await expect(users.findPasskeyNudgeStatus(id)).resolves.toMatchObject({ hasPasskey: false });
-      expect(revoked).toEqual([id]);
     });
   });
 
   describe("when it has been signed into", () => {
-    it("refuses as signed_in, keeps every method and ends no session", async () => {
-      const { id, users, credentials, revoked, service } = await unfinishedAccount({
+    it("refuses as signed_in and keeps every method", async () => {
+      const { id, users, credentials, service } = await unfinishedAccount({
         signedIn: true,
       });
 
@@ -76,30 +70,27 @@ describe("given an account awaiting confirmation", () => {
       expect((await users.findById(id))?.emailVerified).toBe(false);
       await expect(credentials.findLinkedAccounts({ userId: id })).resolves.toHaveLength(1);
       await expect(users.findPasskeyNudgeStatus(id)).resolves.toMatchObject({ hasPasskey: true });
-      expect(revoked).toEqual([]);
     });
   });
 
   describe("when it was adopted once already", () => {
     it("refuses the second adoption as already_confirmed", async () => {
-      const { revoked, service } = await unfinishedAccount();
+      const { service } = await unfinishedAccount();
       await service.adoptUnconfirmedAccount({ email: EMAIL });
 
       await expect(service.adoptUnconfirmedAccount({ email: EMAIL })).resolves.toBe(
         "already_confirmed",
       );
-      expect(revoked).toHaveLength(1);
     });
   });
 });
 
 describe("given an address nobody holds", () => {
   it("answers no_account and touches nothing", async () => {
-    const { revoked, service } = await unfinishedAccount();
+    const { service } = await unfinishedAccount();
 
     await expect(service.adoptUnconfirmedAccount({ email: "eve@acme.com" })).resolves.toBe(
       "no_account",
     );
-    expect(revoked).toEqual([]);
   });
 });

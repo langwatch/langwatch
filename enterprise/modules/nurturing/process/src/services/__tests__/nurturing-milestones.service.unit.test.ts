@@ -8,6 +8,7 @@ import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
+import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
@@ -18,7 +19,8 @@ function serviceOver({
 }: { placed?: ReadonlyMap<string, string>; created?: ReadonlyMap<string, number> } = {}) {
   const claimed = new Set<string>();
   return NurturingMilestonesService.create({
-    milestones: MemoryNurturingMilestonesRepository.create({ placed, created }),
+    milestones: MemoryNurturingMilestonesRepository.create(),
+    projects: MemoryNurturingProjectDirectoryRepository.create({ placed, created }),
     claims: {
       claim: async (key) => {
         if (claimed.has(key)) return false;

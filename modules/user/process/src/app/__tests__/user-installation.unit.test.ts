@@ -34,7 +34,14 @@ function process(
         processManagerMode: "producer-only",
       }),
     )
-    .withConfig({ user: { publicBaseUrl: undefined } })
+    .withConfig({
+      user: {
+        publicBaseUrl: undefined,
+        passkeysEnabled: false,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      },
+    })
     .provide({
       auth: createUserTestAuth(),
       authz: peers.authz ?? createApiFixture<AuthzApi>(),

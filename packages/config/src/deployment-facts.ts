@@ -303,6 +303,44 @@ export const { signUpMode, signUpAllowedDomains } = Config.define((c) => ({
   ),
 }));
 
+/**
+ * The sign-in capability switches (round 48, A1-a): auth builds the surfaces, identity and user
+ * read the same leaves. Passkeys are offered unless "off"; two-step enrolment opens only on "on";
+ * own passwords beside a federated provider (D09) only on "on". Any other value refuses the boot.
+ */
+export const { passkeysEnabled, mfaEnrollmentOpen, localPasswords } = Config.define((c) => ({
+  passkeysEnabled: c.env(
+    "PASSKEYS_ENABLED",
+    z
+      .enum(["off", "on"])
+      .optional()
+      .transform((value) => value !== "off"),
+  ),
+  mfaEnrollmentOpen: c.env(
+    "MFA_ENROLLMENT_OPEN",
+    z
+      .union([z.literal("on"), z.literal("")])
+      .optional()
+      .transform((value) => value === "on"),
+  ),
+  localPasswords: c.env(
+    "LOCAL_PASSWORDS_ENABLED",
+    z
+      .enum(["off", "on"])
+      .optional()
+      .transform((value) => value === "on"),
+  ),
+}));
+
+/**
+ * Identity providers this operator trusts outright (commas or spaces; honoured in production too),
+ * and the worktree's identity-provider simulator, trusted outside production only.
+ */
+export const { trustedIdpOrigins, idpSimulatorUrl } = Config.define((c) => ({
+  trustedIdpOrigins: c.env("SSO_TRUSTED_IDP_ORIGINS", z.string().optional()),
+  idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
+}));
+
 /** Where server-side product analytics goes: shared config no module owns (Alex, 2026-09-29). */
 export const { posthogKey, posthogHost } = Config.define((c) => ({
   posthogKey: c.env("POSTHOG_KEY", z.string().optional()),

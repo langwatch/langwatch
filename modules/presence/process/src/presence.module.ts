@@ -2,7 +2,6 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { PresenceModule } from "./app/presence.app.ts";
-import { presenceSettingsEventing } from "./eventing/presence-settings.pipeline.ts";
 import { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 import { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 
@@ -10,5 +9,4 @@ export const presenceProcessModule: PublishedProcessModule<"presence", PresenceA
   defineProcessModule("presence")
     .withRepositories(presenceRepositories)
     .withApi(PresenceModule)
-    .withTransports(presenceTrpcTransport)
-    .withEventing(presenceSettingsEventing);
+    .withTransports(presenceTrpcTransport);

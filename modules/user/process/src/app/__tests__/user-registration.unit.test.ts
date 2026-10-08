@@ -274,7 +274,8 @@ describe("registering a credential account", () => {
     /** @scenario "Sign-up offers a password where the deployment issues its own" */
     it("registers an ordinary address with a password", async () => {
       const app = createUserTestApp({
-        dependencies: { auth: createUserTestAuth("auth0", { issuesOwnPasswords: true }) },
+        dependencies: { auth: createUserTestAuth("auth0") },
+        facts: { localPasswords: true },
       });
 
       await expect(register(app, "sam@home.net")).resolves.toMatchObject({
@@ -286,11 +287,9 @@ describe("registering a credential account", () => {
     it("still hands an address whose domain routes to a connection to that provider", async () => {
       const app = createUserTestApp({
         dependencies: {
-          auth: createUserTestAuth("auth0", {
-            issuesOwnPasswords: true,
-            governedDomain: "acme.com",
-          }),
+          auth: createUserTestAuth("auth0", { governedDomain: "acme.com" }),
         },
+        facts: { localPasswords: true },
       });
 
       await expect(register(app, "jo@acme.com")).rejects.toBeInstanceOf(

@@ -42,9 +42,9 @@ describe("given annotation's shared Annotation table", () => {
     /** @scenario "Trace reads every annotation on a page's traces, oldest first, whatever its anchor" */
     it("asks that project's rows on those traces oldest first, and keeps scores keyed by id", async () => {
       const findMany = vi.fn().mockResolvedValue([traceAnchored, spanAnchored]);
-      const repository = PrismaTraceAnnotationsRepository.create({
-        prisma: prismaDouble({ annotation: { findMany } }),
-      });
+      const repository = PrismaTraceAnnotationsRepository.create(
+        prismaDouble({ annotation: { findMany } }),
+      );
 
       const rows = await repository.findForTraces({
         projectId: PROJECT,
@@ -70,9 +70,9 @@ describe("given annotation's shared AnnotationScore table", () => {
         { id: QUALITY, name: "quality" },
         { id: "score-retired", name: "retired" },
       ]);
-      const repository = PrismaTraceAnnotationScoresRepository.create({
-        prisma: prismaDouble({ annotationScore: { findMany } }),
-      });
+      const repository = PrismaTraceAnnotationScoresRepository.create(
+        prismaDouble({ annotationScore: { findMany } }),
+      );
 
       const names = await repository.findScoreNames({ projectId: PROJECT });
 

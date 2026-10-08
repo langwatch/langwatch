@@ -73,6 +73,7 @@ function makeService({
   const budgets: string[] = [];
   const lookups: string[] = [];
   const adoptions: string[] = [];
+  const revoked: string[] = [];
   let clock = NOW;
   let minted = 0;
   let current = holder;
@@ -92,6 +93,9 @@ function makeService({
       },
     }),
     route: async () => decision,
+    revokeAllBrowserSessions: async ({ userId }) => {
+      revoked.push(userId);
+    },
     checkSignUp: async () =>
       signUpRefused ? { allowed: false, reason: "invite_only" } : { allowed: true, via: "open" },
     isWithinBudget: async ({ key }) => {
@@ -114,6 +118,7 @@ function makeService({
     budgets,
     lookups,
     adoptions,
+    revoked,
     advance: (milliseconds: number) => {
       clock = clock.add({ milliseconds });
     },
@@ -273,6 +278,18 @@ describe("given a sign-up address to confirm", () => {
       });
       expect(harness.adoptions).toEqual(["sam@acme.com"]);
     });
+
+    /** @scenario "Adopting an account ends every session it held before the proof" */
+    it("ends every browser session the adopted account held before the proof", async () => {
+      const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+      const unfinished = account({ emailVerified: false });
+      harness.hold(unfinished);
+
+      await harness.service.completeVerification({ token: "token-1" });
+
+      expect(harness.revoked).toEqual([unfinished.id]);
+    });
   });
 
   describe.each(["already_confirmed", "signed_in", "no_account"] as const)(
@@ -290,6 +307,17 @@ describe("given a sign-up address to confirm", () => {
         expect(harness.memory.db.VerificationToken.some((row) => row.token === "token-2")).toBe(
           false,
         );
+      });
+
+      /** @scenario "Adopting an account ends every session it held before the proof" */
+      it("ends no session when the adoption is refused", async () => {
+        const harness = makeService({ adoption });
+        await harness.service.requestVerification({ email: "sam@acme.com" });
+        harness.hold(account({ emailVerified: adoption === "already_confirmed" }));
+
+        await harness.service.completeVerification({ token: "token-1" }).catch(() => undefined);
+
+        expect(harness.revoked).toEqual([]);
       });
     },
   );

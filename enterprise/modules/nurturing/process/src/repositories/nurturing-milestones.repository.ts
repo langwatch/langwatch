@@ -11,9 +11,12 @@ export type NurturingOrganizationState = Readonly<{
   firstProjectCreatedAt: number | null;
 }>;
 
+/** An organization as nurturing's own table holds it, without the owners' project facts. */
+export type NurturingOrganizationCounts = Omit<NurturingOrganizationState, "firstProjectCreatedAt">;
+
 /**
  * Nurturing's own read model, written by its peer subscribers (§9). A project's organization is
- * read through project's and organization's shares, never a copy (round 46 E1, R40).
+ * read by the service through `NurturingProjectDirectoryRepository`, never here (R40).
  */
 export interface NurturingMilestonesRepository {
   /** Learns the project's organization; idempotent, `seeded` is set only when first learned. */
@@ -24,8 +27,12 @@ export interface NurturingMilestonesRepository {
       seeded: boolean;
     }>,
   ): Promise<void>;
-  /** Counts one more evaluation for the project's organization; empty when it is not learned. */
-  countEvaluation(input: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]>;
+  /** Counts one more evaluation for the organization; empty when it is not learned. */
+  countEvaluation(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationCounts[]>;
   /** Counts one more finished simulation run; empty when the organization is not learned. */
-  countSimulationRun(input: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]>;
+  countSimulationRun(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<NurturingOrganizationCounts[]>;
 }

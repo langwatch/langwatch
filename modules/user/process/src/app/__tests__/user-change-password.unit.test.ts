@@ -106,8 +106,8 @@ describe("changing an existing password", () => {
   describe("given a deployment that brokers through Auth0 and issues its own passwords", () => {
     /** @scenario "A change targets the password the person actually signs in with" */
     it("changes this deployment's own stored password for somebody holding one", async () => {
-      const auth = createUserTestAuth("auth0", { issuesOwnPasswords: true });
-      const app = createUserTestApp({ dependencies: { auth } });
+      const auth = createUserTestAuth("auth0");
+      const app = createUserTestApp({ dependencies: { auth }, facts: { localPasswords: true } });
       const created = await app.createCredentialUser({
         name: "Sam",
         email: SELF.email,

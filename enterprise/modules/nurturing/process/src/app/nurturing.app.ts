@@ -58,6 +58,7 @@ export class NurturingModule implements NurturingApi {
     });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
+      projects: repositories.projects,
       claims: repositories.claims,
     });
     return new NurturingModule(

@@ -94,6 +94,7 @@ import {
 
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
+import type { UserChannels } from "../channels/user.channels.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
@@ -149,15 +150,24 @@ interface UserAppDependencies {
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
 
-/** `PASSKEYS_ENABLED` is auth's, asked of that peer. */
-export type UserFacts = Readonly<{ passkeysEnabled: boolean }>;
+/** The sign-in capability switches, read from the deployment facts auth reads (round 48, A1-a). */
+export type UserFacts = Pick<
+  UserServerConfig,
+  "passkeysEnabled" | "mfaEnrollmentOpen" | "localPasswords"
+>;
 
-type UserSetup = FeatureSetup<typeof UserModule.dependencies, UserServerConfig, UserRepositories>;
+type UserSetup = FeatureSetup<
+  typeof UserModule.dependencies,
+  UserServerConfig,
+  UserRepositories,
+  UserChannels
+>;
 
 /** What `createForTesting` builds the module from; clock and hasher default to the real ones. */
 type UserTestSetup = Readonly<{
   repositories: UserRepositories;
   dependencies: UserAppDependencies;
+  channels: UserChannels;
   facts: UserFacts;
   budgetRequests: UserBudgetRequestMailChannel;
   passwords?: UserPasswordHasher;
@@ -190,16 +200,16 @@ export class UserModule implements UserApi {
 
     return UserModule.#build({
       dependencies: setup.dependencies,
+      channels: setup.channels,
       repositories: setup.repositories,
       budgetRequests: userBudgetRequestMailChannels.ses.create({
         mailer,
         baseUrl: setup.config.publicBaseUrl,
       }),
       facts: {
-        // Stored now, asked on first read: a peer API refuses during construction.
-        get passkeysEnabled() {
-          return setup.dependencies.auth.offersPasskeys();
-        },
+        passkeysEnabled: setup.config.passkeysEnabled,
+        mfaEnrollmentOpen: setup.config.mfaEnrollmentOpen,
+        localPasswords: setup.config.localPasswords,
       },
     });
   }
@@ -214,6 +224,7 @@ export class UserModule implements UserApi {
 
   static #build({
     dependencies,
+    channels,
     repositories,
     facts,
     budgetRequests,
@@ -229,7 +240,11 @@ export class UserModule implements UserApi {
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
-        auth: dependencies.auth,
+        auth: {
+          revokeAllBrowserSessions: (input) => dependencies.auth.revokeAllBrowserSessions(input),
+          revokeCliTokens: (input) => dependencies.auth.revokeCliTokens(input),
+          getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input),
+        },
         avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
         now,
@@ -254,6 +269,7 @@ export class UserModule implements UserApi {
       passwords,
       now,
       dependencies,
+      channels,
       facts,
     });
   }
@@ -264,6 +280,7 @@ export class UserModule implements UserApi {
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
+  readonly #authReads: UserChannels["authReads"];
   readonly #directory: UserOrganizationDirectoryService;
   readonly #avatarObjects: UserAvatarObjectService;
   readonly #rateLimits: UserRateLimitRepository;
@@ -284,6 +301,7 @@ export class UserModule implements UserApi {
     passwords: UserPasswordHasher;
     now: () => Instant;
     dependencies: UserAppDependencies;
+    channels: UserChannels;
     facts: UserFacts;
   }) {
     this.#users = input.users;
@@ -292,6 +310,7 @@ export class UserModule implements UserApi {
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create(input.dependencies);
     this.#peers = input.dependencies;
+    this.#authReads = input.channels.authReads;
     this.#directory = input.directory;
     this.#avatarObjects = input.avatarObjects;
     this.#rateLimits = input.rateLimits;
@@ -441,9 +460,9 @@ export class UserModule implements UserApi {
 
     // D09: a deployment issuing its own passwords beside its provider passes
     // too, except for an address an organization routes to its own connection.
-    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
+    const emailMode = (await this.#authReads.resolveAuthProvider()) === "email";
 
-    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
+    if (!emailMode && !this.#facts.localPasswords) {
       throw new UserRegistrationNotAvailableError();
     }
     if (!emailMode && (await this.#addressRoutesToConnection(email))) {
@@ -523,9 +542,9 @@ export class UserModule implements UserApi {
     // Under a broker the password lives in the broker's tenant - unless the
     // deployment issues its own (D09). Either way an address an organization
     // routes through its own provider may not take a local password.
-    const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
+    const emailMode = (await this.#authReads.resolveAuthProvider()) === "email";
 
-    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
+    if (!emailMode && !this.#facts.localPasswords) {
       throw new UserPasswordAuthUnavailableError();
     }
     const address = (await this.#users.findById({ id: input.userId }))?.email;
@@ -560,13 +579,13 @@ export class UserModule implements UserApi {
     // to replace, and a replacement outlives the impersonation session.
     if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
 
-    const provider = await this.#peers.auth.resolveAuthProvider();
+    const provider = await this.#authReads.resolveAuthProvider();
 
     // A denied SSO deployment is coerced to email mode (ADR-027), and a person
     // who recovered through the password-reset path owns a credential account
     // they must be able to change. `changeOwnPassword` demands the current
     // password, so this is no takeover vector.
-    if (provider !== "email" && provider !== "auth0" && !this.#peers.auth.issuesOwnPasswords()) {
+    if (provider !== "email" && provider !== "auth0" && !this.#facts.localPasswords) {
       throw new UserPasswordAuthUnavailableError();
     }
 
@@ -606,7 +625,7 @@ export class UserModule implements UserApi {
    */
   async #addressRoutesToConnection(email: string): Promise<boolean> {
     return routesToOrganizationConnection(
-      await this.#peers.auth.route({ identifier: email, breakGlass: false }),
+      await this.#authReads.route({ identifier: email, breakGlass: false }),
     );
   }
 
@@ -623,13 +642,12 @@ export class UserModule implements UserApi {
   async getPasskeyOffer(
     input: UserIdInput & { sessionId: string | null },
   ): Promise<UserSecureAccountOffer> {
-    const auth = this.#peers.auth;
     const signedInWith = input.sessionId
-      ? await auth.getSignedInWith({ userId: input.id, sessionId: input.sessionId })
+      ? await this.#authReads.getSignedInWith({ userId: input.id, sessionId: input.sessionId })
       : "unknown";
     const nudge = await this.#users.getPasskeyNudgeStatus({ id: input.id });
     const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
-    const twoStep = auth.offersTwoStepVerification() && !nudge.twoStepEnabled;
+    const twoStep = this.#facts.mfaEnrollmentOpen && !nudge.twoStepEnabled;
     if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
 
     const askAgainAfter = nudge.dismissedAt

@@ -30,3 +30,11 @@ Feature: Sign-up
     Given a pending invite addressed to an unverified sign-up's address
     When the user is created
     Then the invite stays unapplied and nothing is granted
+
+  # Round 48 (A1-d): auth asks user to adopt, then ends the sessions itself; user calls no auth.
+  @unit
+  Scenario: Adopting an account ends every session it held before the proof
+    Given an account awaiting confirmation
+    When an address proof adopts it
+    Then every browser session on that account is ended
+    And a refused adoption ends none

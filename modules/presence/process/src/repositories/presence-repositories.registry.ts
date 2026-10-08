@@ -1,14 +1,13 @@
 import { defineRepositories } from "@langwatch/process";
 
+import { LivePresenceRepositories } from "./live/live.presence.repositories.ts";
 import { MemoryPresenceRepositories } from "./memory/memory.presence.repositories.ts";
-import { RedisPresenceRepositories } from "./redis/redis.presence.repositories.ts";
 
 /**
- * Presence sessions live for a TTL, not forever, so the durable backend is the
- * process's Redis rather than its database. A process with no Redis selects
- * `memory` and serves the sessions its own instance can see.
+ * Sessions live for a TTL, so they sit in the process's Redis; the settings presence answers from
+ * are its owners' Postgres rows, read through their shares (R40). Memory serves tests only (§7).
  */
 export const presenceRepositories = defineRepositories({
-  live: RedisPresenceRepositories,
+  live: LivePresenceRepositories,
   memory: MemoryPresenceRepositories,
 });
