@@ -541,6 +541,15 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly ScimSsoConnectionView: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly folded: "Json";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
   readonly Project: {
     readonly id: "String";
     readonly name: "String";

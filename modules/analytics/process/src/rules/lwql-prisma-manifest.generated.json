@@ -5938,6 +5938,79 @@
       ]
     },
     {
+      "name": "ScimSsoConnectionView",
+      "tableName": "ScimSsoConnectionView",
+      "documentation": "SCIM's own copy of an organization's SSO connections: a peer fold over\nidentity's connection facts (ARCHITECTURE §9), folded with identity-contract's\nreducer, one row per connection. SCIM reads this instead of asking identity.\nRebuilt from identity's event log by a projection replay, so no relation:\na foreign key would make a replay depend on state the log does not carry.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The aggregate: identity's connection id."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "folded",
+          "columnName": "folded",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The connection as the reducer folded it (SsoConnectionState + LastEventOccurredAt)."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version reads as undecodable and is re-folded from the log."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Event-derived, so a replayed row equals the row it rebuilds."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "Project",
       "tableName": "Project",
       "documentation": "",
