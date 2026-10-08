@@ -263,7 +263,7 @@ async function harness({
     bearers: () => identity,
     audit: { record: async () => {} },
   });
-  for (const transport of experimentProcessModule.transports) {
+  for (const transport of experimentProcessModule.transports ?? []) {
     if (transport.protocol !== "rest") continue;
     host.mount(transport.router(), () => app, {
       facts: [

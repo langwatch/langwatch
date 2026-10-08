@@ -1,5 +1,6 @@
 import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
-import { defineProcessModule } from "@langwatch/process";
+import type { IdentityApi, IdentityServerConfig } from "@langwatch/identity-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { IdentityModule } from "./app/identity.app.ts";
@@ -16,7 +17,11 @@ import {
   twoStepVerificationTrpcTransport,
 } from "./transport/two-step-verification.trpc.ts";
 
-export const identityProcessModule = defineProcessModule("identity")
+export const identityProcessModule: PublishedProcessModule<
+  "identity",
+  IdentityApi,
+  IdentityServerConfig
+> = defineProcessModule("identity")
   .withRepositories(identityRepositories)
   .withApi(IdentityModule)
   .withTransports(

@@ -3,8 +3,12 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { WorkbenchCredential } from "@langwatch/experiment-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type {
+  ExperimentApi,
+  ExperimentServerConfig,
+  WorkbenchCredential,
+} from "@langwatch/experiment-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { ExperimentModule } from "#app/experiment.app";
 
@@ -26,7 +30,11 @@ import { experimentWorkflowEvaluationRest } from "./transport/experiment-workflo
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
-export const experimentProcessModule = defineProcessModule("experiment")
+export const experimentProcessModule: PublishedProcessModule<
+  "experiment",
+  ExperimentApi,
+  ExperimentServerConfig
+> = defineProcessModule("experiment")
   .withRepositories(experimentRepositories)
   .withApi(ExperimentModule)
   .withTransports(

@@ -1,6 +1,10 @@
-import { langWatchQLKeyReach } from "@langwatch/analytics-contract";
+import {
+  type AnalyticsApi,
+  type AnalyticsServerConfig,
+  langWatchQLKeyReach,
+} from "@langwatch/analytics-contract";
 import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { AnalyticsModule } from "./app/analytics.app.ts";
 import { analyticsChannels } from "./channels/analytics-channels.registry.ts";
@@ -13,7 +17,11 @@ import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 import { queryRest } from "./transport/query.rest.ts";
 
-export const analyticsProcessModule = defineProcessModule("analytics")
+export const analyticsProcessModule: PublishedProcessModule<
+  "analytics",
+  AnalyticsApi,
+  AnalyticsServerConfig
+> = defineProcessModule("analytics")
   .withRepositories(analyticsRepositories)
   .withChannels(analyticsChannels)
   .withApi(AnalyticsModule)

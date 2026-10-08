@@ -13,36 +13,12 @@ export {
   type AnalyticsLwqlApi,
   analyticsLwqlTrpcTransport,
 } from "./transport/analytics-lwql.trpc.ts";
-export type {
-  AnalyticsInfrastructure,
-  AnalyticsAppDependencies,
-  AnalyticsFilterOptionsLookup,
-  AnalyticsFilterOptionsRequest,
-} from "./app/analytics.app.ts";
 
-/**
- * The LangWatchQL workbench: the refusals a caller can act on, and the shapes
- * its dependencies are named by. The services themselves stay private to this
- * package and are reached through the composition seam above.
- */
-export type { LangWatchQLServiceDependencies } from "./services/langwatch-ql.service.ts";
 export {
   LangWatchQLNotEnabledError,
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
 } from "@langwatch/analytics-contract";
-export type {
-  LangWatchQLConnection,
-  LangWatchQLExecutorRepository,
-  LangWatchQLResultLimits,
-} from "./repositories/langwatch-ql-executor.repository.ts";
-
-/** The filter picker: the values one field can offer. */
-export type { GetFilterOptionsInput } from "./services/filter.service.ts";
-export type {
-  FilterOption,
-  FindFilterOptionsInput,
-} from "./repositories/filter-options.repository.ts";
 
 /** The shared analytics read input every charted door and the REST body parse. */
 export {
@@ -63,14 +39,6 @@ export {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
-
-// The LangWatchQL key map: the names a project's access is granted through,
-// and the rows the deploy backfill repairs.
-export type { LangWatchQLNames } from "./services/langwatch-ql-access-model.service.ts";
-export type {
-  LwqlKeyMapBackfillPlan,
-  LwqlKeyMapRow,
-} from "./services/langwatch-ql-production-provisioning.service.ts";
 
 export { LwqlProvisionTask } from "./tasks/lwql-provision.task.ts";
 export { LwqlRenderAccessConfigTask } from "./tasks/lwql-render-access-config.task.ts";
