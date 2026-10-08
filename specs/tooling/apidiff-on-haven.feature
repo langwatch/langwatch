@@ -307,6 +307,20 @@ Feature: apidiff boots its instances through haven
       Then it drops only its own databases and leaves the stack up
       And the next run finds the stack on the same ports, or starts it on fresh ones if those fail
 
+    @unit
+    Scenario: A -no-haven run keeps Postgres on haven's host server
+      Given a -no-haven run without -compose-postgres
+      When it provisions its infrastructure
+      Then compose starts only ClickHouse and Redis
+      And each side gets its own run-scoped apidiff_<run>_<side> database on 127.0.0.1:5432, created and dropped by the run
+      And no database it names can be one haven gives a dev stack (lw_<slug>)
+
+    @unit
+    Scenario: -compose-postgres keeps the fully isolated compose stack
+      Given a -no-haven run with -compose-postgres
+      When it provisions its infrastructure
+      Then Postgres runs in the apidiff compose project and is administered through compose exec
+
   Rule: A run proves effects, not only shapes
 
     @unit

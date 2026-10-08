@@ -13,7 +13,7 @@ state never produces false diffs.
 ```text
 apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
               [-keep] [-reuse-worktrees] [-skip-install] [-branch-head] [-boot-timeout DUR]
-              [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+              [-dry-run] [-no-haven [-compose-postgres]] [-pg-url URL -ch-url URL -redis-url URL]
               [-compose-project NAME] [-parity-only] [probe flags...]
 
 apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
@@ -118,6 +118,19 @@ deterministic summary, or the machine report with `-json` (optionally to
   relies on node's `--env-file` not overriding an already-set variable; that
   is now an assertion rather than a comment. A URL that will not parse is an
   error too — never a silent fall back to the developer's own environment.
+- **Postgres lives on haven's host server by default.** Without
+  `-compose-postgres` (or external URLs), a `-no-haven` run creates its two
+  databases, `apidiff_<runid>_branch` and `apidiff_<runid>_main`, on
+  `postgres://prisma@127.0.0.1:5432/postgres` (haven's role and port), and
+  drops exactly those on teardown. The `apidiff_` prefix can never name a
+  database haven gives a dev stack (`lw_<slug>`). Preflight dials the server
+  before any install and refuses with a pointer to `haven up` or
+  `-compose-postgres`; host administration needs `psql` on PATH. Only
+  ClickHouse and Redis start in compose, so no `apidiff-postgres-1`
+  container runs. `-compose-postgres` restores full isolation (Postgres in
+  the compose project too); it defaults on when `CI` is set, since a CI
+  runner has no host Postgres. A container left by an earlier run is not
+  removed: `docker compose -p apidiff rm -sf postgres` when no kept run needs it.
 - Infrastructure comes from `dev/compose.dev.yml` under the `apidiff` compose
   project with a generated ports/volumes override (`!override` requires
   docker compose v2.24+), so the tool's stack never collides with a running

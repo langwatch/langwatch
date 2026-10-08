@@ -37,6 +37,11 @@ const (
 	pgPass    = "prisma"
 	pgAdminDB = "mydb"
 
+	// hostPostgresURL is the server haven runs on the host: its role and port
+	// (tools/thuishaven/domain/postgres.go). A run only ever creates and drops
+	// its own apidiff_<run>_<side> databases there, never haven's lw_* ones.
+	hostPostgresURL = "postgres://" + pgUser + ":" + pgPass + "@127.0.0.1:5432/postgres"
+
 	chUser = "default"
 	chPass = "langwatch"
 
@@ -93,6 +98,9 @@ type BootConfig struct {
 	CHURL          string
 	RedisURL       string
 	ComposeProject string
+	// ComposePostgres runs Postgres in the compose project too (full
+	// isolation); otherwise the managed path uses haven's host server.
+	ComposePostgres bool
 	// UseHaven boots each instance as a haven stack under its own run-scoped
 	// slug instead of provisioning infrastructure here. Default wherever haven
 	// is installed; see haven.go for why.
@@ -478,6 +486,9 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 		plan.Commands = append(plan.Commands,
 			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
 			"drop the run's databases; the compose project stays up for the next run", release)
+		if !cfg.ComposePostgres && cfg.PGURL == "" {
+			plan.Commands = append(plan.Commands, "postgres: haven's host server "+redactURL(hostPostgresURL)+", databases "+DatabaseName(runID, "branch")+" and "+DatabaseName(runID, "main"))
+		}
 		return plan, nil
 	}
 	plan.MainSlug = HavenSlug(runID, "main")
@@ -542,6 +553,9 @@ type bootState struct {
 	// detach starts a command that outlives the run; nil is detachCommand.
 	detach   func(spec commandSpec, log string) error
 	override string
+	// hostPostgres says the managed path keeps Postgres on the host server
+	// while ClickHouse and Redis stay in compose.
+	hostPostgres bool
 	// reusedPorts says override came from an earlier run, whose stack may
 	// still be up on its ports; startInfra falls back to fresh ones.
 	reusedPorts bool
@@ -921,6 +935,7 @@ func (state *bootState) resolveInfra() error {
 		return nil
 	}
 	state.override = composeOverridePath(state.cfg.BranchDir, state.cfg.ComposeProject)
+	state.hostPostgres = !state.cfg.ComposePostgres
 	if ports, ok := readOverridePorts(state.override); ok {
 		state.infra.pgPort, state.infra.chPort, state.infra.redisPort = ports[0], ports[1], ports[2]
 		state.reusedPorts = true
@@ -954,6 +969,22 @@ func (state *bootState) setComposeURLs() {
 	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
 	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
 	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
+	if state.hostPostgres {
+		state.infra.pgServer = hostPostgresURL
+	}
+}
+
+// pgInCompose says Postgres is administered by `docker compose exec`.
+func (state *bootState) pgInCompose() bool {
+	return state.override != "" && !state.hostPostgres
+}
+
+// composeServices are the services the managed stack starts.
+func composeServices(hostPostgres bool) []string {
+	if hostPostgres {
+		return []string{"redis", "clickhouse"}
+	}
+	return []string{"postgres", "redis", "clickhouse"}
 }
 
 // preflight validates external infrastructure BEFORE the two pnpm installs.
@@ -962,6 +993,13 @@ func (state *bootState) setComposeURLs() {
 // (which falls back to $USER) and dies at prisma with P1010, and an admin
 // database that does not exist dies at the first CREATE DATABASE.
 func (state *bootState) preflight(ctx context.Context) error {
+	if state.hostPostgres {
+		state.logf("preflight: checking haven's host postgres at %s is reachable", redactURL(state.infra.pgServer))
+		if _, err := state.pgQuery(ctx, "SELECT 1"); err != nil {
+			return fmt.Errorf("preflight host postgres %s (start it with `haven up`, or pass -compose-postgres): %w", redactURL(state.infra.pgServer), err)
+		}
+		return nil
+	}
 	if state.override != "" {
 		state.logf("preflight: managed compose stack, no external endpoints to validate")
 		return nil
@@ -1045,8 +1083,8 @@ func (state *bootState) startInfra(ctx context.Context) error {
 
 // composeUp starts the stack, or finds it already up from an earlier run.
 func (state *bootState) composeUp(ctx context.Context) error {
-	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
-	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
+	state.logf("infra: docker compose up %v (clickhouse :%d, redis :%d)", composeServices(state.hostPostgres), state.infra.chPort, state.infra.redisPort)
+	args := composeArgs(state.compose(), append(append([]string{"up", "-d"}, composeServices(state.hostPostgres)...), "--wait")...)
 	if err := state.runHost(ctx, "docker", args...); err != nil {
 		return fmt.Errorf("compose up: %w", err)
 	}
@@ -1093,7 +1131,7 @@ func (state *bootState) pgAdmin(ctx context.Context, sql string) error {
 // external run fail at the first CREATE DATABASE with 'database "mydb" does
 // not exist'.
 func (state *bootState) adminDatabase() string {
-	if state.override != "" {
+	if state.pgInCompose() {
 		return pgAdminDB
 	}
 	parsed, err := url.Parse(state.infra.pgServer)
@@ -1109,7 +1147,7 @@ func (state *bootState) adminDatabase() string {
 // pgQuery runs one SQL statement and returns its stdout (psql -tA).
 func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error) {
 	var output bytes.Buffer
-	if state.override != "" {
+	if state.pgInCompose() {
 		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", state.adminDatabase(), "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
 		return strings.TrimSpace(output.String()), err
@@ -1129,7 +1167,7 @@ func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error)
 // stdout (psql -tA).
 func (state *bootState) pgQueryDB(ctx context.Context, database, sql string) (string, error) {
 	var output bytes.Buffer
-	if state.override != "" {
+	if state.pgInCompose() {
 		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", database, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
 		return strings.TrimSpace(output.String()), err
@@ -1191,7 +1229,7 @@ func (state *bootState) bootTimeout() time.Duration {
 
 // pgAdminDB runs one SQL statement against a specific database.
 func (state *bootState) pgAdminDB(ctx context.Context, database, sql string) error {
-	if state.override != "" {
+	if state.pgInCompose() {
 		return state.runHost(ctx, "docker", pgAdminArgs(state.compose(), database, sql)...)
 	}
 	if _, err := exec.LookPath("psql"); err != nil {

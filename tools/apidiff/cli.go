@@ -373,6 +373,7 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
 	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
 	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	flags.BoolVar(&boot.ComposePostgres, "compose-postgres", os.Getenv("CI") != "", "-no-haven: run Postgres in the compose project too, for full isolation (default on CI, which has no host Postgres); otherwise each side gets its own run-scoped database on haven's host Postgres at 127.0.0.1:5432")
 	flags.BoolVar(&boot.DryRun, "dry-run", false, "print the plan (refs, worktree paths, slugs, commands) and start nothing")
 	noHaven := false
 	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
