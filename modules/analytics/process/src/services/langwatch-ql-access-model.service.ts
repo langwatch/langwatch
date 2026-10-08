@@ -61,7 +61,9 @@ export interface LangWatchQLTable {
  * fails a conflicting hash closed without starving the rest.
  */
 const LWQL_TENANT_PREDICATE_TEMPLATE =
-  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
+  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} " +
+  "WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) " +
+  "GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
 
 /**
  * The key map's self-policy, a set membership too (`lwqlKeyMapSelfFilter.sql`): ClickHouse applies

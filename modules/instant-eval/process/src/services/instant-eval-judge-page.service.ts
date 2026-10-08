@@ -27,6 +27,7 @@ import {
   cutPageAtStop,
   INSTANT_EVAL_CANCEL_POLL_MS,
   pageDeadlineMs,
+  pageStopFor,
   pageStopReason,
   type InstantEvalPageStop,
 } from "../rules/instant-eval-page-stop.rules.ts";
@@ -489,13 +490,4 @@ function outcomeFor({
     cursorSpanId: cursor.spanId,
     hasNextPage: stop === "cancelled" ? false : hasRowsLeft,
   };
-}
-
-/** Which stop reached the page, if any. A cancel outranks the deadline. */
-function pageStopFor({ watch, deadline }: { watch: AbortSignal; deadline: AbortSignal | null }): {
-  stop: InstantEvalPageStop | null;
-} {
-  if (watch.aborted) return { stop: "cancelled" };
-
-  return { stop: deadline?.aborted ? "deadline" : null };
 }

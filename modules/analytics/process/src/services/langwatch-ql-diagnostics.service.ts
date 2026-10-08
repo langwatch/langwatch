@@ -65,7 +65,8 @@ function appFunctionDiagnostics({
     diagnostics.push({
       code: "APP_FUNCTION_RESULT_TRUNCATED",
       message:
-        "Trailing rows were dropped because the extracted values reached this API's response ceiling. Ask for a smaller token budget per call, or narrow the query, to see the whole answer.",
+        "Trailing rows were dropped because the extracted values reached this API's response ceiling. " +
+        "Ask for a smaller token budget per call, or narrow the query, to see the whole answer.",
       meta: {
         maxHydratedBytes: appFunctions.maxHydratedBytes,
         rowsReturned: appFunctions.rowsReturned,
@@ -86,7 +87,8 @@ function appFunctionDiagnostics({
     diagnostics.push({
       code: "INSTANT_EVAL_SKIPPED",
       message:
-        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, or check that judging is switched on for this project.",
+        "Some rows are null because their text could not be judged. Run the query again, ask for less text per row, " +
+        "or check that judging is switched on for this project.",
       meta: { texts: skippedTexts, reasons: skipped },
     });
   }
