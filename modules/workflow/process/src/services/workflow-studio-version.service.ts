@@ -17,7 +17,7 @@ import type { WorkflowService } from "./workflow.service.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
 
-export type WorkflowStudioVersionServiceOptions = {
+type WorkflowStudioVersionServiceOptions = {
   workflows: WorkflowService;
   studioDsl: WorkflowStudioDsl;
   httpSecrets: WorkflowHttpSecrets;

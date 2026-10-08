@@ -30,7 +30,7 @@ const logger = createLogger("langwatch:workflow:studio-lambda-stream");
 /** The Go engine's streaming studio route; it is what reads the staged header. */
 const STUDIO_EXECUTE_PATH = "/go/studio/execute";
 
-export type LambdaWorkflowStudioStreamOptions = Readonly<{
+type LambdaWorkflowStudioStreamOptions = Readonly<{
   functions: NlpLambdaFunctionReader;
   invoke: NlpLambdaStreamInvoke;
   /**

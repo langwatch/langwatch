@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/instant-eval-judge-contract";
 import { SEARCH_FIELDS, type KnownProjectSignals } from "@langwatch/trace-contract";
 
-export const ROUTE_QUESTION_ID = "route";
+const ROUTE_QUESTION_ID = "route";
 
 /** Evaluator and event names read per facet for the context line. */
 export const KNOWN_SIGNALS_LIMIT = 20;
@@ -96,7 +96,7 @@ export function buildRouteContext({
 }
 
 /** Whether the classifier picked one of the options it was offered. */
-export type InstantEvalRouteAnswer = { kind: "routed"; route: string } | { kind: "unrouted" };
+type InstantEvalRouteAnswer = { kind: "routed"; route: string } | { kind: "unrouted" };
 
 /** The option the classifier picked; unrouted when it skipped or named one not offered. */
 export function routeAnswerOf({

@@ -121,7 +121,7 @@ export type NlpInvokeStagingConfig = Readonly<{
   maxPayloadBytes: number;
 }>;
 
-export type NlpInvokeRequest = Readonly<{
+type NlpInvokeRequest = Readonly<{
   path: string;
   method?: string;
   headers?: Record<string, string>;
@@ -134,7 +134,7 @@ export type NlpInvokeRequest = Readonly<{
   signal?: AbortSignal;
 }>;
 
-export type NlpInvokeResponse = Readonly<{
+type NlpInvokeResponse = Readonly<{
   ok: boolean;
   status: number;
   statusText: string;

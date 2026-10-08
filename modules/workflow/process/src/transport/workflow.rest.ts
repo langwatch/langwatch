@@ -52,7 +52,7 @@ function wireOf(params: {
   };
 }
 
-export type WorkflowRestDeclaration = Readonly<{
+type WorkflowRestDeclaration = Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<WorkflowApi>;

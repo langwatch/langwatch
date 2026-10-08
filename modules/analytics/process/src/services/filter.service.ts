@@ -9,7 +9,7 @@ import type {
   FindFilterOptionsInput,
 } from "../repositories/filter-options.repository.ts";
 
-export type GetFilterOptionsInput = {
+type GetFilterOptionsInput = {
   projectId: string;
   field: FilterField;
   query?: string;

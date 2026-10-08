@@ -47,7 +47,7 @@ export interface LwqlKeyMapRow {
 }
 
 /** What a backfill run against the current key-map table needs to do. */
-export interface LwqlKeyMapBackfillPlan {
+interface LwqlKeyMapBackfillPlan {
   rowsToInsert: LwqlKeyMapRow[];
   /**
    * Project ids whose `lwqlKey` was empty/blank. Never silently dropped: an empty key means

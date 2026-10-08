@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * The analytics feature's application: what both doors call, holding every service and
  * port as the one typed thing a transport is given. A caller is always an argument,
@@ -129,7 +128,7 @@ const ANALYTICS_READ_TRIPWIRE_FLAG = "release_event_sourced_analytics_read_tripw
  * as the one method it calls, since which fields exist and what a stored filter means
  * is the host's catalogue, not Analytics' own.
  */
-export type AnalyticsFilterOptionsLookup = Readonly<{
+type AnalyticsFilterOptionsLookup = Readonly<{
   getFilterOptions(
     input: Readonly<{
       projectId: string;
@@ -145,7 +144,7 @@ export type AnalyticsFilterOptionsLookup = Readonly<{
 }>;
 
 /** What one filter picker is asking for, before the narrowing rule is applied. */
-export type AnalyticsFilterOptionsRequest = Readonly<{
+type AnalyticsFilterOptionsRequest = Readonly<{
   projectId: string;
   field: string;
   startDate: number;
@@ -158,7 +157,7 @@ export type AnalyticsFilterOptionsRequest = Readonly<{
 }>;
 
 /** What the process composes this feature's application from. */
-export interface AnalyticsAppDependencies {
+interface AnalyticsAppDependencies {
   analytics: AnalyticsServiceClass;
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
@@ -184,12 +183,6 @@ export interface AnalyticsAppDependencies {
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
 }
-
-export type AnalyticsInfrastructure = Readonly<{
-  resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient | null>) | null;
-  clickhouseEnabled?: boolean;
-  defaultRetentionDays?: () => number;
-}>;
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
 type AnalyticsDependencies = Readonly<{
