@@ -1115,6 +1115,13 @@ const presentations = {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  prompt_author_unknown: {
+    // The body named an author the project does not let write prompts, so the
+    // fix is to name someone else.
+    title: "That author can't write prompts here",
+    describe: () =>
+      "The author named for this prompt cannot write prompts in this project. Choose a different author.",
+  },
   prompt_not_a_copy: {
     // Refused on "sync from source". This prompt was written here rather than
     // copied from somewhere, so there is nothing to sync from and no retry to
