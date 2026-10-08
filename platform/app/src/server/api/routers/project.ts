@@ -347,6 +347,27 @@ export const projectRouter = createTRPCRouter({
       }
     }),
   /**
+   * ADR-144: the projects an organisation admin may pick for a new
+   * aggregate's explicit rule. Unlike `organization.getAll`, which carries the
+   * teams the caller can see, this lists every member's personal workspace
+   * and names its owner, so it is gated the same way creating the aggregate
+   * is: organisation admins only.
+   */
+  aggregateMemberCandidates: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .permission("organization:manage")
+    .query(async ({ input, ctx }) => {
+      assertCanOpenAggregates(
+        await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        }),
+      );
+      return getApp().projects.aggregateMemberCandidates({
+        organizationId: input.organizationId,
+      });
+    }),
+  /**
    * The base key grants full access to one project. Revealing it is therefore
    * an administrator action, just like rotating it.
    */

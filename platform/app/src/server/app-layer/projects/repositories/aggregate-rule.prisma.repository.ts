@@ -5,6 +5,7 @@ import {
   NON_DESTINATION_PROJECT_KINDS,
 } from "../project-kinds";
 import type {
+  AggregateMemberCandidate,
   AggregateProjectRepository,
   AggregateRuleRepository,
   StoredAggregateProject,
@@ -67,6 +68,36 @@ export class PrismaAggregateRuleRepository
       orderBy: { id: "asc" },
     });
     return rows.map((row) => row.id);
+  }
+
+  async findCandidateMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
+        team: { organizationId, archivedAt: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        isPersonal: true,
+        ownerUser: { select: { name: true, email: true } },
+      },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      isPersonal: row.isPersonal,
+      owner:
+        row.isPersonal && row.ownerUser
+          ? { name: row.ownerUser.name, email: row.ownerUser.email }
+          : null,
+    }));
   }
 
   async departmentBelongsTo({

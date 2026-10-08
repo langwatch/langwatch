@@ -19,12 +19,31 @@ export interface AggregateRuleRepository {
     organizationId: string;
     projectIds: readonly string[];
   }): Promise<string[]>;
+  /**
+   * Every project an explicit rule of this organisation may name, by the same
+   * filter as {@link findReadableProjectIds}, with what the new-project form
+   * shows of it: its name, whether it is a personal workspace, and whose.
+   * Ordered by name.
+   */
+  findCandidateMembers(params: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]>;
   /** Whether the department belongs to this organisation and is live. */
   departmentBelongsTo(params: {
     organizationId: string;
     departmentId: string;
   }): Promise<boolean>;
 }
+
+/** A project an aggregate may read, as the new-project form lists it. */
+export type AggregateMemberCandidate = {
+  id: string;
+  name: string;
+  /** `Project.isPersonal`, the flag the all-personal rule resolves by. */
+  isPersonal: boolean;
+  /** The personal workspace's owner; null for a project that is not personal. */
+  owner: { name: string | null; email: string | null } | null;
+};
 
 /** An aggregate project as the reconciler needs it: where it lives, and its rule. */
 export type StoredAggregateProject = {

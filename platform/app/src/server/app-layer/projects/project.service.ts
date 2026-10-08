@@ -30,6 +30,7 @@ import {
   isAggregateProjectKind,
 } from "./project-kinds";
 import { mintProjectSlug } from "./projectSlug";
+import type { AggregateMemberCandidate } from "./repositories/aggregate-rule.repository";
 import type {
   PaginatedResult,
   PresenceConfig,
@@ -478,6 +479,24 @@ export class ProjectService {
       return;
     }
     await this.aggregateReconciler.start({ aggregateProjectId });
+  }
+
+  /**
+   * ADR-144: the projects an organisation admin may pick for an aggregate's
+   * explicit rule, every member's personal workspace included. The caller has
+   * decided the actor is an organisation admin.
+   */
+  async aggregateMemberCandidates({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    if (!this.aggregateRules) {
+      throw new Error(
+        "No aggregate rule service is wired; aggregate members cannot be listed here",
+      );
+    }
+    return this.aggregateRules.candidateMembers({ organizationId });
   }
 
   /**

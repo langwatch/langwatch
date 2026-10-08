@@ -67,6 +67,16 @@ const memoryRepository: AggregateRuleRepository = {
         project.organizationId === organizationId &&
         project.readable !== false,
     ).map((project) => project.id),
+  findCandidateMembers: async ({ organizationId }) =>
+    PROJECTS.filter(
+      (project) =>
+        project.organizationId === organizationId && project.readable !== false,
+    ).map((project) => ({
+      id: project.id,
+      name: project.id,
+      isPersonal: project.isPersonal,
+      owner: null,
+    })),
   departmentBelongsTo: async ({ organizationId, departmentId }) =>
     DEPARTMENTS.some(
       (department) =>

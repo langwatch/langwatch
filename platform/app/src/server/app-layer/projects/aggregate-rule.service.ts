@@ -1,6 +1,9 @@
 import type { AggregateRule } from "./aggregate-rule";
 import { AggregateRuleOutsideOrganizationError } from "./errors";
-import type { AggregateRuleRepository } from "./repositories/aggregate-rule.repository";
+import type {
+  AggregateMemberCandidate,
+  AggregateRuleRepository,
+} from "./repositories/aggregate-rule.repository";
 
 /**
  * ADR-144 block D: what an aggregate project's rule means.
@@ -50,6 +53,21 @@ export class AggregateRuleService {
         return;
       }
     }
+  }
+
+  /**
+   * The projects an explicit rule of this organisation may name, which is
+   * exactly what {@link assertValid} accepts: every live project of any
+   * ordinary kind, personal workspaces of every member included. The
+   * new-project form offers these and nothing else, so a pick it offers is
+   * never refused as outside the organisation.
+   */
+  async candidateMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AggregateMemberCandidate[]> {
+    return this.repository.findCandidateMembers({ organizationId });
   }
 
   /**
