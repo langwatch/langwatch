@@ -13,7 +13,21 @@ export const traceConfig = Config.define((c) => ({
       "TIKTOKEN_FETCH_TIMEOUT_MS",
       z.union([z.string(), z.number()]).optional(),
     ),
+    disabled: c.env(
+      "DISABLE_TOKENIZATION",
+      z
+        .string()
+        .optional()
+        .transform((value) => value === "true"),
+    ),
   },
+  disableCodingAgentSpanFilter: c.env(
+    "LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "true"),
+  ),
   publicBaseUrl,
 }));
 
