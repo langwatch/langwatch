@@ -413,6 +413,13 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly OrganizationLicense: {
+    readonly organizationId: "String";
+    readonly licenseKey: "String?";
+    readonly expiresAt: "DateTime?";
+    readonly validatedAt: "DateTime?";
+    readonly updatedAt: "DateTime";
+  };
   readonly ActivationCode: {
     readonly id: "String";
     readonly codeHash: "String";

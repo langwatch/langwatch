@@ -1,6 +1,5 @@
-import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
+import type { ContractTerms, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -152,7 +151,7 @@ function billingApp({
     usageReporting: () => createApiFixture<UsageReportingService>({}, "usage meter"),
     webhook: {
       host: MemoryBillingWebhookHostChannel.create(),
-      licenses: createApiFixture<OrganizationApi>({}),
+      licenses: createApiFixture<LicensingApi>({}),
     },
   });
   return { app, asked: registry.asked, audited, repositories, stripe };

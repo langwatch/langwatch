@@ -6,9 +6,13 @@ import type {
   OrganizationLicenseReads,
   OrganizationLicenseRepository,
 } from "../repositories/organization-license.repository.ts";
+import { OrganizationLicenseWriterService } from "./organization-license-writer.service.ts";
 
-/** The licence writes, which organization owns (`licenseLastValidatedAt` stamped by the caller). */
+/** Organization's licence columns, still written beside licensing's rows (round 37 D6). */
 type LicenseWrites = Pick<OrganizationApi, "setLicense" | "clearLicense">;
+
+type LicenseRows = OrganizationLicenseReads &
+  Pick<OrganizationLicenseRepository, "organizationExists" | "saveLicense" | "clearLicense">;
 
 type SeatCounts = Readonly<{
   getMemberCount: (organizationId: string) => Promise<number>;
@@ -39,6 +43,8 @@ export class LicensingInfrastructureService {
           options.licenses.getOrganizationLicense(organizationId),
         findOrganizationsWithLicense: () => options.licenses.findOrganizationsWithLicense(),
         organizationExists: () => Promise.reject(unavailable()),
+        saveLicense: () => Promise.reject(unavailable()),
+        clearLicense: () => Promise.reject(unavailable()),
       },
       organizations: {
         setLicense: () => Promise.reject(unavailable()),
@@ -47,20 +53,19 @@ export class LicensingInfrastructureService {
     });
   }
 
-  /** The licence rows read here and written through organization, with its seat counts. */
+  /** The licence rows read and written here, mirrored onto organization, with its seat counts. */
   withStorage(
-    options: Readonly<{ licenses: OrganizationLicenseRepository; organizations: LicenseWrites }> &
-      SeatCounts,
+    options: Readonly<{ licenses: LicenseRows; organizations: LicenseWrites }> & SeatCounts,
   ): LicensingInfrastructure {
     const { licenses, organizations } = options;
+    const writer = OrganizationLicenseWriterService.create({ licenses, organizations });
     return {
       repository: {
         getOrganizationLicense: (organizationId) => licenses.getOrganizationLicense(organizationId),
         findOrganizationsWithLicense: () => licenses.findOrganizationsWithLicense(),
         organizationExists: (organizationId) => licenses.organizationExists(organizationId),
-        storeLicense: (organizationId, { licenseKey, expiresAt, validatedAt }) =>
-          organizations.setLicense({ organizationId, licenseKey, expiresAt, validatedAt }),
-        removeLicense: (organizationId) => organizations.clearLicense({ organizationId }),
+        storeLicense: (organizationId, license) => writer.store({ organizationId, license }),
+        removeLicense: (organizationId) => writer.remove({ organizationId }),
         getMemberCount: (organizationId) => options.getMemberCount(organizationId),
         getMembersLiteCount: (organizationId) => options.getMembersLiteCount(organizationId),
       },

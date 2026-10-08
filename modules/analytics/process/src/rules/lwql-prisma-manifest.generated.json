@@ -4774,6 +4774,61 @@
       ]
     },
     {
+      "name": "OrganizationLicense",
+      "tableName": "OrganizationLicense",
+      "documentation": "The licence an organization activated and its dates, owned by licensing\n(round 37 D6). A row whose key is null is a cleared licence. An organization\nwith no row is read from its Organization columns until the copy step runs.",
+      "primaryKey": [
+        "organizationId"
+      ],
+      "fields": [
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "licenseKey",
+          "columnName": "licenseKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "expiresAt",
+          "columnName": "expiresAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "validatedAt",
+          "columnName": "validatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "ActivationCode",
       "tableName": "ActivationCode",
       "documentation": "A short code a fresh install pastes instead of a license blob (ADR-139,\nsection 5). Redeeming it mints the license the code describes and returns\nit signed, which is what identifies a new customer without anybody emailing\na license key around.\n\nThe row holds a hash of the code, never the code. Every lookup hashes what\nthe caller presented first, so the stored value is a step away from anything\nthat could be presented: read access to this table is not credential access.",

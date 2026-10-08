@@ -23,6 +23,10 @@ function recordingLicenses(rows: MemoryOrganizationLicenseRepository): {
       },
       findOrganizationsWithLicense: () => rows.findOrganizationsWithLicense(),
       organizationExists: (organizationId) => rows.organizationExists(organizationId),
+      saveLicense: (input) => rows.saveLicense(input),
+      clearLicense: (input) => rows.clearLicense(input),
+      findLicensePairs: (input) => rows.findLicensePairs(input),
+      overwriteLicenses: (input) => rows.overwriteLicenses(input),
     },
   };
 }

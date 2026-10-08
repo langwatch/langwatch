@@ -1,6 +1,6 @@
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { traced } from "@langwatch/observability/node";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
@@ -149,11 +149,12 @@ const subscriptionsTwin = (...held: BillingSubscription[]) => {
   return twin;
 };
 
-/** The trial licences the lifecycle asked organization to clear, in order. */
+/** The trial licences the lifecycle asked licensing to remove, in order. */
 const clearedLicenses: { organizationId: string }[] = [];
-const licenses = createApiFixture<OrganizationApi>({
-  clearLicense: async (input) => {
-    clearedLicenses.push(input);
+const licenses = createApiFixture<LicensingApi>({
+  removeLicense: async (organizationId) => {
+    clearedLicenses.push({ organizationId });
+    return { removed: true };
   },
 });
 
@@ -626,7 +627,7 @@ describe("EEWebhookService", () => {
       });
 
       /** @scenario "A paid subscription asks organization to retire the trial licence" */
-      it("asks organization to clear only that organization's licence", async () => {
+      it("asks licensing to remove only that organization's licence", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );

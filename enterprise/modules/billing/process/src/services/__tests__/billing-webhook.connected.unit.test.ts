@@ -3,7 +3,7 @@ import { ConnectedBillingNotOnboardedError } from "@langwatch/enterprise-billing
  * The `invoice.finalized` branch for a connected self-hosted customer (ADR-156,
  * section 7): whose invoices it acts on, and whose it leaves.
  */
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
@@ -33,7 +33,7 @@ function buildService(events: ConnectedBillingInvoiceEvents): EEWebhookService {
   return EEWebhookService.create({
     subscriptionRepository: createApiFixture<BillingWebhookSubscriptionRepository>(),
     organizationRepository: createApiFixture<BillingWebhookOrganizationRepository>(),
-    licenses: createApiFixture<OrganizationApi>(),
+    licenses: createApiFixture<LicensingApi>(),
     stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
     itemCalculator: createApiFixture<WebhookOptions["itemCalculator"]>(),
     host: createApiFixture<BillingWebhookHost>(),

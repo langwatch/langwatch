@@ -154,8 +154,8 @@ type StripeWebhookComposition = Readonly<{
   licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
   invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
-  /** Clears a trial's licence once its subscription activates; organization owns the row. */
-  licenses: Pick<OrganizationApi, "clearLicense">;
+  /** Clears a trial's licence once its subscription activates; licensing owns it. */
+  licenses: Pick<LicensingApi, "removeLicense">;
 }>;
 
 type SubscriptionComposition = Readonly<{
@@ -259,7 +259,7 @@ export class BillingModule
         webhook: {
           host: billingWebhookHostChannels.slack.create({ notices }),
           invites: setup.dependencies.organizations,
-          licenses: setup.dependencies.organizations,
+          licenses: setup.dependencies.licensing,
           licensePurchase,
         },
         subscription: {

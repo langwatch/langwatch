@@ -6,7 +6,7 @@ The server half of [licensing](../README.md). Licences: validating and storing a
 
 ## Installation
 
-`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withTasks(…)`, `src/licensing.module.ts:14`.
+`defineProcessModule("licensing").withRepositories(licensingRepositories).withApi(LicensingModule).withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest).withTransportFacts(…).withEventing(licenseSyncEventing).withTasks(…).withMigrations(…)`, `src/licensing.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

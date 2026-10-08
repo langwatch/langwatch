@@ -102,6 +102,9 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     }
   ]

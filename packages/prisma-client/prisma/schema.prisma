@@ -1380,6 +1380,17 @@ model IssuedLicense {
   @@index([seatsRaisedFrom])
 }
 
+/// The licence an organization activated and its dates, owned by licensing
+/// (round 37 D6). A row whose key is null is a cleared licence. An organization
+/// with no row is read from its Organization columns until the copy step runs.
+model OrganizationLicense {
+  organizationId String    @id
+  licenseKey     String?   @db.Text
+  expiresAt      DateTime?
+  validatedAt    DateTime?
+  updatedAt      DateTime  @default(now()) @updatedAt
+}
+
 /// A short code a fresh install pastes instead of a license blob (ADR-139,
 /// section 5). Redeeming it mints the license the code describes and returns
 /// it signed, which is what identifies a new customer without anybody emailing

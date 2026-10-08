@@ -28,6 +28,7 @@ export const prismaTableCatalogue = {
   "Team": "Team",
   "Organization": "Organization",
   "IssuedLicense": "IssuedLicense",
+  "OrganizationLicense": "OrganizationLicense",
   "ActivationCode": "ActivationCode",
   "ConnectedBillingAccount": "ConnectedBillingAccount",
   "ConnectedCreditGrant": "ConnectedCreditGrant",
@@ -674,6 +675,13 @@ export const prismaModelFieldCatalogue = {
     "virtualKeyId",
     "seatsRaisedFrom",
     "createdAt",
+    "updatedAt"
+  ],
+  "OrganizationLicense": [
+    "organizationId",
+    "licenseKey",
+    "expiresAt",
+    "validatedAt",
     "updatedAt"
   ],
   "ActivationCode": [
@@ -2979,6 +2987,7 @@ export const prismaRelationCatalogue = {
   "IssuedLicense": {
     "organization": "Organization"
   },
+  "OrganizationLicense": {},
   "ActivationCode": {},
   "ConnectedBillingAccount": {
     "organization": "Organization"

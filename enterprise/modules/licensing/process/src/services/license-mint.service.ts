@@ -6,6 +6,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
+import type { OrganizationLicenseWriterService } from "./organization-license-writer.service.ts";
 
 /** What an operator asks the mint for; everything left off comes from the plan template. */
 export type LicenseMintRequest = Readonly<{
@@ -28,7 +29,8 @@ export type LicenseMintResult = Readonly<{
 
 type LicenseMintPeers = Readonly<{
   licenses: Pick<LicensingApi, "generateLicenseKey" | "recordIssuedLicense">;
-  organizations: Pick<OrganizationApi, "findProvisioningSummary" | "setLicense">;
+  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+  storage: Pick<OrganizationLicenseWriterService, "store">;
   registry: Pick<IssuedLicenseRepository, "delete">;
 }>;
 
@@ -37,8 +39,8 @@ const DEFAULT_MAX_MEMBERS = 50;
 
 /**
  * Main's generate-license script: mints a license for an organization, records it in the
- * registry and writes it onto the organization. The two writes are two owners', so a failed
- * organization write is compensated by deleting the registry row (license-registry.feature).
+ * registry and stores it for the organization. A failed licence write, organization's columns
+ * included, is compensated by deleting the registry row (license-registry.feature).
  */
 export class LicenseMintService {
   static create(peers: LicenseMintPeers): LicenseMintService {
@@ -71,11 +73,13 @@ export class LicenseMintService {
       organizationId: organization.id,
     });
     try {
-      await this.peers.organizations.setLicense({
+      await this.peers.storage.store({
         organizationId: organization.id,
-        licenseKey,
-        expiresAt: Temporal.Instant.from(licenseData.expiresAt),
-        validatedAt: null,
+        license: {
+          licenseKey,
+          expiresAt: Temporal.Instant.from(licenseData.expiresAt),
+          validatedAt: null,
+        },
       });
     } catch (error) {
       // A registry row the organization never got would read as an active license, and the

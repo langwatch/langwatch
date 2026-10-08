@@ -445,7 +445,10 @@ export interface LicenseUsage {
  * apps, except the reads, inherited from `OrganizationLicenseReads` so a
  * plan-resolution-only process can compose those alone, without seats.
  */
-export interface LicenseStorage extends OrganizationLicenseRepository {
+export interface LicenseStorage extends Pick<
+  OrganizationLicenseRepository,
+  "getOrganizationLicense" | "findOrganizationsWithLicense" | "organizationExists"
+> {
   storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
   removeLicense(organizationId: string): Promise<void>;
   getMemberCount(organizationId: string): Promise<number>;

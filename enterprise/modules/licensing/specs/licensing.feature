@@ -85,6 +85,72 @@ Feature: Enterprise licensing lifecycle
       When that process inspects platform access
       Then the stored key is accepted and only the mutation ports refuse
 
+  Rule: Licensing keeps each organization's licence in its own table
+
+    Round 37 (D6) moved the licence and its dates from organization's columns
+    to a table licensing owns. Until organization reads the licence through
+    LicensingApi, every write also lands on organization's columns, and an
+    organization licensing holds no row for is read from those columns. Once
+    no old image is still writing, a background step copies the rest and
+    overwrites any row that differs from organization's columns (R42).
+
+    @unit
+    Scenario: A stored licence lands on licensing's own row and on organization's columns
+      Given an organization with no licence
+      When licensing stores a licence for it and later removes it
+      Then licensing's own row holds the key, and then a cleared licence
+      And organization is told each write, before licensing keeps it
+
+    @unit
+    Scenario: A cleared licence is never read back from organization's columns
+      Given an organization whose columns still hold a key
+      When licensing removes its licence
+      Then licensing reads no key for it and leaves it out of the platform-access scan
+
+    @unit
+    Scenario: A licence activated before the move is read from organization's columns until it is copied
+      Given an organization whose licence is only on organization's columns
+      When licensing reads its licence or scans for licensed organizations
+      Then it answers the key from organization's columns
+
+    @unit
+    Scenario: The worker brings licensing's licence rows level with organization's columns
+      Given organizations whose licences are only on organization's columns
+      And one whose row differs from its columns and one whose row matches them
+      When the licence copy runs twice
+      Then the first run copies each missing licence with its dates and overwrites the row that differs
+      And the second run copies nothing and organization's columns are as they were
+
+    @unit
+    Scenario: A licence cleared on organization's columns alone is cleared on licensing's row
+      Given an organization whose row holds a key its columns no longer hold
+      When the licence copy runs
+      Then licensing reads no key for it and leaves it out of the platform-access scan
+
+    @unit
+    Scenario: The licence copy keeps a row written after it read
+      Given a licence copy that has read an organization's row
+      When licensing writes that organization's licence before the copy overwrites it
+      Then the copy leaves the row licensing wrote
+
+    @unit
+    Scenario: A dry run of the licence copy writes nothing
+      Given organizations whose licences are only on organization's columns
+      When the licence copy runs as a dry run
+      Then it reports how many it would copy, saves no checkpoint and copies nothing
+
+    @unit
+    Scenario: An interrupted licence copy resumes after the last organization it saved
+      Given a licence copy that saved its checkpoint after the first batch
+      When the copy runs again from that checkpoint
+      Then it copies only the organizations after the saved one
+
+    @unit
+    Scenario: The worker collects licensing's licence copy as a background step
+      Given the licensing module installed on a worker
+      When the worker collects its migration steps
+      Then the licence copy is a background data step that waits for old writers to go
+
   Rule: Every deployment composes the self-hosted instance registry from its own stores
 
     Main built the instance registry from Postgres on every deployment. The

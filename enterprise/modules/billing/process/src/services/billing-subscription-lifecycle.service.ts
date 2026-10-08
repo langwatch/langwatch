@@ -12,8 +12,8 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
@@ -55,8 +55,8 @@ type BillingSubscriptionLifecycleOptions = {
   >;
 };
 
-/** The one organization operation a subscription activation needs for a trial's licence. */
-export type LicenseClearer = Pick<OrganizationApi, "clearLicense">;
+/** The one licensing operation a subscription activation needs for a trial's licence. */
+export type LicenseClearer = Pick<LicensingApi, "removeLicense">;
 
 export class BillingSubscriptionLifecycleService {
   static create(options: BillingSubscriptionLifecycleOptions): BillingSubscriptionLifecycleService {
@@ -417,6 +417,6 @@ export class BillingSubscriptionLifecycleService {
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,
     );
-    await this.licenses.clearLicense({ organizationId: updatedSubscription.organizationId });
+    await this.licenses.removeLicense(updatedSubscription.organizationId);
   }
 }

@@ -20,8 +20,10 @@ import {
   TEST_PUBLIC_KEY,
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
+import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
 import { LicenseMintService } from "../license-mint.service.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
+import { OrganizationLicenseWriterService } from "../organization-license-writer.service.ts";
 
 /** A collaborator the mint must never reach; any call fails the test. */
 function untouched<T extends object>(): T {
@@ -33,7 +35,10 @@ function untouched<T extends object>(): T {
 }
 
 /** Organizations as a store: a write to one that is gone fails as the real one does. */
-class OrganizationStore implements Pick<OrganizationApi, "findProvisioningSummary" | "setLicense"> {
+class OrganizationStore implements Pick<
+  OrganizationApi,
+  "findProvisioningSummary" | "setLicense" | "clearLicense"
+> {
   readonly licenses = new Map<string, { licenseKey: string; expiresAt: Instant }>();
   readonly #rows = new Map<string, OrganizationProvisioningSummary>();
 
@@ -66,6 +71,10 @@ class OrganizationStore implements Pick<OrganizationApi, "findProvisioningSummar
     if (!this.#rows.has(organizationId)) throw new OrganizationNotFoundError();
     this.licenses.set(organizationId, { licenseKey, expiresAt });
   }
+
+  async clearLicense({ organizationId }: { organizationId: string }): Promise<void> {
+    this.licenses.delete(organizationId);
+  }
 }
 
 function harness({ goneBeforeWrite }: { goneBeforeWrite: boolean }) {
@@ -83,6 +92,7 @@ function harness({ goneBeforeWrite }: { goneBeforeWrite: boolean }) {
     now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
   });
   const organizations = new OrganizationStore(goneBeforeWrite);
+  const licenseRows = MemoryOrganizationLicenseRepository.create(new Map([["org-acme", null]]));
   const mint = LicenseMintService.create({
     licenses: {
       generateLicenseKey: async (input) =>
@@ -90,9 +100,10 @@ function harness({ goneBeforeWrite }: { goneBeforeWrite: boolean }) {
       recordIssuedLicense: (input) => registry.record(input),
     },
     organizations,
+    storage: OrganizationLicenseWriterService.create({ licenses: licenseRows, organizations }),
     registry: repository,
   });
-  return { mint, repository, organizations };
+  return { mint, repository, organizations, licenseRows };
 }
 
 async function registryRows(repository: MemoryIssuedLicenseRepository) {
@@ -103,7 +114,9 @@ describe("LicenseMintService", () => {
   describe("given the license is minted for an organization", () => {
     /** @scenario "A license minted by the command line script is recorded" */
     it("records the registry row and writes the license onto the organization", async () => {
-      const { mint, repository, organizations } = harness({ goneBeforeWrite: false });
+      const { mint, repository, organizations, licenseRows } = harness({
+        goneBeforeWrite: false,
+      });
 
       const result = await mint.applyToOrganization({
         organizationId: "org-acme",
@@ -122,13 +135,16 @@ describe("LicenseMintService", () => {
       expect(organizations.licenses.get("org-acme")?.expiresAt.toString()).toBe(
         Temporal.Instant.from(result.expiresAt).toString(),
       );
+      expect((await licenseRows.getOrganizationLicense("org-acme")).licenseKey).toBe(
+        organizations.licenses.get("org-acme")?.licenseKey,
+      );
     });
   });
 
   describe("given writing the license onto the organization fails", () => {
     /** @scenario "A minted license whose organization write fails leaves no registry row" */
     it("deletes the registry row it wrote and fails the mint", async () => {
-      const { mint, repository, organizations } = harness({ goneBeforeWrite: true });
+      const { mint, repository, organizations, licenseRows } = harness({ goneBeforeWrite: true });
 
       await expect(
         mint.applyToOrganization({ organizationId: "org-acme", planType: "ENTERPRISE" }),
@@ -136,6 +152,9 @@ describe("LicenseMintService", () => {
 
       expect(await registryRows(repository)).toEqual([]);
       expect(organizations.licenses.size).toBe(0);
+      await expect(licenseRows.getOrganizationLicense("org-acme")).resolves.toEqual({
+        licenseKey: null,
+      });
     });
   });
 });
