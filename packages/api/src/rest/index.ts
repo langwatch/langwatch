@@ -288,16 +288,6 @@ export {
   undeclaredRoutes,
 } from "./security.ts";
 
-import type { Hono } from "hono";
-import { handle } from "hono/vercel";
-
-/** Converts a built app into per-file route handlers, for legacy Next-style hosts. */
-export function routeHandlers(app: Hono) {
-  const h = handle(app);
-
-  return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
-}
-
 export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
 
 export { bindRestCredential, type RestCredentialBinding, type RestDoor } from "./request.ts";
