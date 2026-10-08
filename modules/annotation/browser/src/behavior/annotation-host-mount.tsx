@@ -14,6 +14,7 @@ import {
   type UiSession,
   type UiTraceFilters,
 } from "@langwatch/browser-host/capabilities";
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
@@ -35,6 +36,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     private readonly deps: {
       organizationId: string | undefined;
       project: AnnotationHostProject | undefined;
+      scopeStatus: UiScopeStatus;
       isLiteMember: boolean;
       isOwnPersonalWorkspace: boolean;
       session: UiSession;
@@ -54,6 +56,10 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
 
   project(): AnnotationHostProject | undefined {
     return this.deps.project;
+  }
+
+  scopeStatus(): UiScopeStatus {
+    return this.deps.scopeStatus;
   }
 
   organizationId(): string | undefined {
@@ -133,6 +139,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
   const scopeHost = uiScope.scopeHost();
   const hostProject = scopeHost?.project();
   const isLiteMember = scopeHost?.organizationRole() === "EXTERNAL";
+  const scopeStatus = session.snapshot().scope.status;
   const { openDrawer, drawerOpen } = useDrawer();
   const userId = session.currentUser()?.id;
   const scopeGraph = annotationApi.organization.getScopeGraph.useQuery({}, { enabled: !!userId });
@@ -149,6 +156,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
         project: hostProject
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }
           : void 0,
+        scopeStatus,
         isLiteMember,
         isOwnPersonalWorkspace: ownPersonal,
         session,
@@ -161,6 +169,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
     [
       organizationId,
       hostProject,
+      scopeStatus,
       isLiteMember,
       ownPersonal,
       session,

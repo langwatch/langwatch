@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
- * One step of the queue walk. Keeping the item the reviewer left on screen while
- * the next one is read is react-query's placeholder behaviour; what this hook
- * owns is asking for it and saying when the item in hand is the one left behind.
+ * One step of the queue walk: asking for it, keeping the item left behind as a
+ * placeholder, and never reading an unanswered or failed read as finished.
+ * Spec: specs/ui/shared-scope-host.feature
  */
 
 import { renderHook } from "@testing-library/react";
@@ -16,6 +16,7 @@ import { useAnnotationQueueWalk } from "../use-annotation-queue-walk.ts";
 type StepRead = {
   data?: Record<string, unknown>;
   isLoading: boolean;
+  isError?: boolean;
   isPlaceholderData: boolean;
 };
 
@@ -91,6 +92,45 @@ describe("given a reviewer reading an item of their queue", () => {
     it("does not read", () => {
       renderWalk(undefined, new StubAnnotationHost({ project: undefined }));
 
+      expect(mocks.calls.at(-1)?.options.enabled).toBe(false);
+    });
+  });
+
+  describe("when the active scope is still resolving", () => {
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("reads as loading although the disabled read is not, and never as finished", () => {
+      const { result } = renderWalk(
+        undefined,
+        new StubAnnotationHost({ project: undefined, scopeStatus: "loading" }),
+      );
+
+      expect(result.current.queueLoading).toBe(true);
+      expect(result.current.queueFinished).toBe(false);
+      expect(result.current.scopeUnavailable).toBe(false);
+    });
+  });
+
+  describe("when the queue read fails", () => {
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("reads as failed, never as finished", () => {
+      mocks.read = { isLoading: false, isError: true, isPlaceholderData: false };
+      const { result } = renderWalk();
+
+      expect(result.current.queueFailed).toBe(true);
+      expect(result.current.queueFinished).toBe(false);
+    });
+  });
+
+  describe("when the active scope is unavailable", () => {
+    /** @scenario "Annotation queue completion requires a successful read" */
+    it("reads the scope as unavailable and does not read", () => {
+      const { result } = renderWalk(
+        undefined,
+        new StubAnnotationHost({ project: undefined, scopeStatus: "unavailable" }),
+      );
+
+      expect(result.current.scopeUnavailable).toBe(true);
+      expect(result.current.queueLoading).toBe(false);
       expect(mocks.calls.at(-1)?.options.enabled).toBe(false);
     });
   });

@@ -4,7 +4,7 @@
  * Behaviour is main's my-queue page; see modules/annotation/specs.
  */
 
-import { Box, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
@@ -35,6 +35,8 @@ export function AnnotationQueueWalker() {
     nextItemId,
     queueFinished: nothingLeftToReview,
     queueLoading,
+    queueFailed,
+    scopeUnavailable,
     stepIsStale,
   } = useAnnotationQueueWalk({ queueItemId: queueItem });
   const project = host.project();
@@ -64,7 +66,7 @@ export function AnnotationQueueWalker() {
   useEffect(() => () => setSessionActive(false), [setSessionActive]);
 
   // An item whose trace no longer resolves is walkable but is not work.
-  const queueFinished = !queueLoading && nothingLeftToReview;
+  const queueFinished = !queueLoading && !queueFailed && !scopeUnavailable && nothingLeftToReview;
 
   useEffect(() => {
     if (!queueFinished) setSessionActive(true);
@@ -145,7 +147,29 @@ export function AnnotationQueueWalker() {
     showErrorToast,
   ]);
 
-  if (queueLoading) return <AnnotationsLayout />;
+  if (scopeUnavailable) {
+    return (
+      <AnnotationsLayout>
+        <ScopeUnavailableState />
+      </AnnotationsLayout>
+    );
+  }
+
+  if (queueLoading) {
+    return (
+      <AnnotationsLayout>
+        <QueueLoadingState />
+      </AnnotationsLayout>
+    );
+  }
+
+  if (queueFailed) {
+    return (
+      <AnnotationsLayout>
+        <QueueReadFailedState />
+      </AnnotationsLayout>
+    );
+  }
 
   if (ending === "done" || queueFinished) {
     return (
@@ -272,6 +296,48 @@ function WalkedItemBody({
     >
       {traceId && <AnnotationQueueConversation traceId={traceId} conversationId={conversationId} />}
     </Box>
+  );
+}
+
+/** The scope is resolving or the first step is in flight: nothing is said of the queue yet. */
+function QueueLoadingState() {
+  return (
+    <VStack height="100%" width="full" justify="center" gap={3} aria-busy>
+      <Spinner />
+      <Text color="fg.muted">Loading your queue</Text>
+    </VStack>
+  );
+}
+
+/** The step could not be read, so whether anything is left is unknown. */
+function QueueReadFailedState() {
+  return (
+    <VStack height="100%" width="full" justify="center" paddingX={6}>
+      <Alert.Root status="error" maxWidth="480px">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Couldn't load your queue</Alert.Title>
+          <Alert.Description>
+            Something went wrong while loading your queue. Reload the page to try again.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    </VStack>
+  );
+}
+
+/** No project could be opened, so there is no queue to read. */
+function ScopeUnavailableState() {
+  return (
+    <VStack height="100%" width="full" justify="center" gap={2} paddingX={6} textAlign="center">
+      <Text fontSize="lg" fontWeight="500">
+        This project is not available
+      </Text>
+      <Text color="fg.muted" maxWidth="480px">
+        Your queue cannot be opened because this project could not be loaded. Check that you still
+        have access to it, or choose another project.
+      </Text>
+    </VStack>
   );
 }
 

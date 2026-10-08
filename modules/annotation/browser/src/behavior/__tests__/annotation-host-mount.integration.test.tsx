@@ -12,6 +12,7 @@ import {
   type UiCapabilities,
   type UiTraceFilterReading,
 } from "@langwatch/browser-host/capabilities";
+import type { UiScopeStatus, UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -40,6 +41,23 @@ class TestScope extends UiScope {
 }
 
 class SignedOutSession extends UiSession {
+  constructor(private readonly scopeStatus: UiScopeStatus = "ready") {
+    super();
+  }
+
+  snapshot(): UiSessionSnapshot {
+    return {
+      session: { status: "anonymous", user: null },
+      scope: { status: this.scopeStatus, organization: void 0, team: void 0, project: void 0 },
+      permissions: {
+        status: "ready",
+        isLoading: false,
+        can: () => false,
+        canInOrganization: () => false,
+      },
+    };
+  }
+
   currentUser() {
     return null;
   }
@@ -63,14 +81,20 @@ class LentTraceFilters extends UiTraceFilters {
   }
 }
 
-function traceFiltersUnder(traceFilters: UiTraceFilters | undefined) {
+function hostUnder({
+  traceFilters,
+  scopeStatus,
+}: {
+  traceFilters?: UiTraceFilters | undefined;
+  scopeStatus?: UiScopeStatus;
+}) {
   const capabilities: UiCapabilities = {
     ...createUiCapabilitiesFromHost(
       {
         route: () => ({ params: {}, query: {} }),
         navigate: () => void 0,
       },
-      new SignedOutSession(),
+      new SignedOutSession(scopeStatus),
     ),
     scope: new TestScope(),
     ...(traceFilters ? { traceFilters } : {}),
@@ -80,21 +104,33 @@ function traceFiltersUnder(traceFilters: UiTraceFilters | undefined) {
       <AnnotationHostMount>{children}</AnnotationHostMount>
     </UiCapabilityContextProvider>
   );
-  return renderHook(() => useAnnotationHost().traceFilters(), { wrapper }).result.current;
+  return renderHook(() => useAnnotationHost(), { wrapper }).result.current;
 }
 
 describe("the annotation host's trace filters", () => {
   describe("given analytics lent the applied filters", () => {
     /** @scenario "The filtered annotations list reads the filters analytics lends" */
     it("answers them as lent", () => {
-      expect(traceFiltersUnder(new LentTraceFilters())).toBe(READING);
+      expect(hostUnder({ traceFilters: new LentTraceFilters() }).traceFilters()).toBe(READING);
     });
   });
 
   describe("given no module lent them", () => {
     /** @scenario "A composition with no trace filters lender reads as unfiltered" */
     it("answers no filters", () => {
-      expect(traceFiltersUnder(void 0)).toBeUndefined();
+      expect(hostUnder({}).traceFilters()).toBeUndefined();
     });
   });
+});
+
+describe("the annotation host's scope status", () => {
+  describe.each<UiScopeStatus>(["loading", "ready", "unavailable"])(
+    "given the session reads the active scope as %s",
+    (status) => {
+      /** @scenario "Annotation queue completion requires a successful read" */
+      it("answers that status to the queue walk", () => {
+        expect(hostUnder({ scopeStatus: status }).scopeStatus()).toBe(status);
+      });
+    },
+  );
 });

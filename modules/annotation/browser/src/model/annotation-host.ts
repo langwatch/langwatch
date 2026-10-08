@@ -4,6 +4,7 @@
  * `annotation-view.ts`; the queue slug is a route parameter).
  */
 
+import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import type { traceListInputSchema } from "@langwatch/trace-contract";
 import { createContext, useContext } from "react";
 import type { z } from "zod";
@@ -63,6 +64,9 @@ export type AnnotationFailureNotice = {
 export abstract class AnnotationHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): AnnotationHostProject | undefined;
+
+  /** Whether the active scope is still resolving, resolved, or could not be resolved. */
+  abstract scopeStatus(): UiScopeStatus;
 
   /** The organization the participants picker reads its members from. */
   abstract organizationId(): string | undefined;
