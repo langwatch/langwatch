@@ -164,34 +164,42 @@ Feature: An aggregate project reads its member projects
     Then exactly those two projects are members
     And the list may include projects that are not personal
 
-  # The drawer asks "What do you want to govern?" and takes exactly one answer:
-  # personal projects (optionally one department's) or specific projects. Each
-  # answer is one rule kind; a rule never mixes them.
+  # The drawer asks "What do you want to govern?" with one select whose answer
+  # is exactly one rule kind: personal projects (all, or one department's) or
+  # specific projects. A rule never mixes them. Picking specific projects opens
+  # a second select to name them.
 
   @integration
   Scenario: Governance covers every personal project by default
     When ana opens "Create New Project" and checks "Governance"
-    Then "Personal projects (coding agents)" is chosen
+    Then "What do you want to govern?" reads "All personal projects (coding agents)"
+    And she reads that it covers everyone's personal project, including people who join later
+    And no project select is shown
     When she creates the project
     Then the new project is an aggregate whose rule is "all personal projects"
 
   @integration
   Scenario: An admin narrows personal projects to one department
-    Given the organisation has the department Engineering
-    When ana checks "Governance" and picks Engineering in place of "All departments"
-    And she creates the project
+    Given the organisation has the departments Engineering and Sales
+    When ana checks "Governance" and opens "What do you want to govern?"
+    Then "Personal projects (coding agents)" offers "All departments", Engineering and Sales
+    And "Projects" offers "Specific projects"
+    When she picks Engineering
+    Then the select reads "Personal projects in Engineering"
+    And she reads that it covers everyone in Engineering, including people who join later
+    When she creates the project
     Then the new project is an aggregate whose rule is "personal projects in department Engineering"
 
   @integration
   Scenario: An organisation without departments is not offered a department choice
     Given the organisation has no departments
-    When ana checks "Governance"
-    Then there is no department choice under "Personal projects (coding agents)"
+    When ana checks "Governance" and opens "What do you want to govern?"
+    Then "Personal projects (coding agents)" offers only "All personal projects"
 
   @integration
   Scenario: An admin picks specific projects from a dropdown
-    When ana checks "Governance" and chooses "Specific projects"
-    Then the dropdown lists the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
+    When ana checks "Governance" and picks "Specific projects"
+    Then a second select lists the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
     When she picks two projects and creates the project
     Then the new project is an aggregate whose explicit rule names exactly those two projects
 
@@ -211,7 +219,7 @@ Feature: An aggregate project reads its member projects
 
   @integration
   Scenario: Create stays disabled until a project is picked
-    When ana checks "Governance", chooses "Specific projects" and has picked no project
+    When ana checks "Governance", picks "Specific projects" and has picked no project
     Then the "Create" button is disabled
     And she reads that she must pick at least one project
     When she picks one project
@@ -230,7 +238,7 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: A project list that fails to load never shows the server's own words
     Given listing the projects ana may pick fails for a reason we cannot name
-    When ana checks "Governance" and chooses "Specific projects"
+    When ana checks "Governance" and picks "Specific projects"
     Then she reads that the projects could not be listed and to try again
     And she can copy the error ID
     And the server's own message, which names the request it made, is not shown

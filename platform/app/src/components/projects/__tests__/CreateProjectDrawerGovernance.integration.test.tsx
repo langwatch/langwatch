@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  *
  * ADR-144: an organisation admin creates an aggregate project from the
- * "Create New Project" drawer by checking Governance, then answering what it
- * governs: personal projects (all, or one department's) or specific projects
- * picked from a dropdown. The API is mocked at its boundary; the claims are
+ * "Create New Project" drawer by checking Governance, then picking what it
+ * governs from one select: personal projects (all, or one department's) or
+ * specific projects, which a second select names. The API is mocked at its boundary; the claims are
  * about what the drawer offers and what it sends.
  *
  * @see specs/governance/aggregate-project.feature
@@ -131,20 +131,22 @@ const renderDrawer = () =>
   });
 
 const createButton = () => screen.getByRole("button", { name: "Create" });
-const personalRadio = () =>
-  screen.getByRole("radio", { name: "Personal projects (coding agents)" });
-const specificRadio = () =>
-  screen.getByRole("radio", { name: "Specific projects" });
+const ruleTrigger = () =>
+  screen.getByRole("combobox", { name: "What do you want to govern?" });
 const projectsTrigger = () =>
   screen.getByRole("combobox", { name: "Projects" });
-const departmentTrigger = () =>
-  screen.getByRole("combobox", { name: "Department" });
 const PICK_ONE = "Pick at least one project.";
+const EVERYONE =
+  "Everyone's personal project, including people who join later.";
 
 type User = ReturnType<typeof userEvent.setup>;
 const checkGovernance = (user: User) =>
   user.click(screen.getByRole("checkbox", { name: "Governance" }));
 const openProjects = (user: User) => user.click(projectsTrigger());
+const chooseRule = async (user: User, name: string) => {
+  await user.click(ruleTrigger());
+  await user.click(screen.getByRole("option", { name }));
+};
 
 describe("<CreateProjectDrawer/> Governance", () => {
   beforeEach(() => {
@@ -161,16 +163,20 @@ describe("<CreateProjectDrawer/> Governance", () => {
   describe("given an organisation admin", () => {
     describe("when she checks Governance and creates straight away", () => {
       /** @scenario "Governance covers every personal project by default" */
-      it("has Personal projects chosen and sends the all-personal rule", async () => {
+      it("reads All personal projects, says who it covers and sends the all-personal rule", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
 
-        expect(personalRadio()).toBeChecked();
-        expect(specificRadio()).not.toBeChecked();
-        expect(screen.queryByRole("combobox", { name: "Projects" })).toBeNull();
+        expect(ruleTrigger()).toHaveTextContent(
+          "All personal projects (coding agents)",
+        );
+        expect(screen.getByText(EVERYONE)).toBeVisible();
+        expect(
+          screen.queryByRole("combobox", { name: "Projects" }),
+        ).not.toBeInTheDocument();
 
         expect(createButton()).toBeEnabled();
         await user.click(createButton());
@@ -187,19 +193,41 @@ describe("<CreateProjectDrawer/> Governance", () => {
 
     describe("when the organisation has departments and she picks one", () => {
       /** @scenario "An admin narrows personal projects to one department" */
-      it("defaults to All departments and sends the by-department rule", async () => {
+      it("offers each department under personal projects and sends the by-department rule", async () => {
         departmentsQuery = { data: DEPARTMENTS };
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
+        await user.click(ruleTrigger());
 
-        expect(departmentTrigger()).toHaveTextContent("All departments");
-        await user.click(departmentTrigger());
+        const personal = screen.getByRole("group", {
+          name: "Personal projects (coding agents)",
+        });
+        expect(
+          within(personal)
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["All departments", "Engineering", "Sales"]);
+        const projects = screen.getByRole("group", { name: "Projects" });
+        expect(
+          within(projects)
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["Specific projects"]);
+
         await user.click(screen.getByRole("option", { name: "Engineering" }));
-        expect(departmentTrigger()).toHaveTextContent("Engineering");
 
+        expect(ruleTrigger()).toHaveTextContent(
+          "Personal projects in Engineering",
+        );
+        expect(
+          screen.getByText(
+            "Personal projects of everyone in Engineering, including people who join later.",
+          ),
+        ).toBeVisible();
+        expect(screen.queryByText(EVERYONE)).not.toBeInTheDocument();
         await user.click(createButton());
 
         await waitFor(() => expect(mutateCalls).toHaveLength(1));
@@ -215,33 +243,37 @@ describe("<CreateProjectDrawer/> Governance", () => {
 
     describe("when the organisation has no departments", () => {
       /** @scenario "An organisation without departments is not offered a department choice" */
-      it("shows no department choice", async () => {
+      it("offers only All personal projects under personal projects", async () => {
         departmentsQuery = { data: [] };
         const user = userEvent.setup();
         renderDrawer();
 
         await checkGovernance(user);
+        await user.click(ruleTrigger());
 
-        expect(personalRadio()).toBeChecked();
+        const personal = screen.getByRole("group", {
+          name: "Personal projects (coding agents)",
+        });
         expect(
-          screen.queryByRole("combobox", { name: "Department" }),
-        ).not.toBeInTheDocument();
+          within(personal)
+            .getAllByRole("option")
+            .map((option) => option.textContent),
+        ).toEqual(["All personal projects"]);
       });
     });
 
-    describe("when she chooses Specific projects, picks two and creates", () => {
+    describe("when she picks Specific projects, then two projects, and creates", () => {
       /** @scenario "An admin picks specific projects from a dropdown" */
-      it("offers both groups with each owner's email and sends an explicit rule over the two", async () => {
-        departmentsQuery = { data: DEPARTMENTS };
+      it("opens a second select with both groups and each owner's email, and sends an explicit rule over the two", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
-        await user.click(specificRadio());
-        expect(
-          screen.queryByRole("combobox", { name: "Department" }),
-        ).not.toBeInTheDocument();
+        await chooseRule(user, "Specific projects");
+
+        expect(ruleTrigger()).toHaveTextContent("Specific projects");
+        expect(screen.queryByText(EVERYONE)).not.toBeInTheDocument();
         await openProjects(user);
 
         const personal = screen.getByRole("group", {
@@ -290,7 +322,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         renderDrawer();
 
         await checkGovernance(user);
-        await user.click(specificRadio());
+        await chooseRule(user, "Specific projects");
         await openProjects(user);
         for (const name of [
           /Eve's workspace/,
@@ -305,20 +337,22 @@ describe("<CreateProjectDrawer/> Governance", () => {
       });
     });
 
-    describe("when she picks a department, then specific projects, then personal again", () => {
-      it("starts over from every personal project", async () => {
+    describe("when she picks a department, then specific projects, then All departments", () => {
+      it("hides the project select again and sends the all-personal rule", async () => {
         departmentsQuery = { data: DEPARTMENTS };
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
-        await user.click(departmentTrigger());
-        await user.click(screen.getByRole("option", { name: "Engineering" }));
-        await user.click(specificRadio());
-        await user.click(personalRadio());
+        await chooseRule(user, "Engineering");
+        await chooseRule(user, "Specific projects");
+        expect(projectsTrigger()).toBeInTheDocument();
+        await chooseRule(user, "All departments");
 
-        expect(departmentTrigger()).toHaveTextContent("All departments");
+        expect(
+          screen.queryByRole("combobox", { name: "Projects" }),
+        ).not.toBeInTheDocument();
         await user.click(createButton());
 
         await waitFor(() => expect(mutateCalls).toHaveLength(1));
@@ -328,7 +362,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
       });
     });
 
-    describe("when she chooses Specific projects and picks nothing", () => {
+    describe("when she picks Specific projects and no project", () => {
       /** @scenario "Create stays disabled until a project is picked" */
       it("keeps Create disabled and says why until one project is picked", async () => {
         const user = userEvent.setup();
@@ -338,7 +372,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         await checkGovernance(user);
         expect(createButton()).toBeEnabled();
 
-        await user.click(specificRadio());
+        await chooseRule(user, "Specific projects");
         expect(createButton()).toBeDisabled();
         expect(screen.getByText(PICK_ONE)).toBeVisible();
 
@@ -398,7 +432,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         renderDrawer();
 
         await checkGovernance(user);
-        await user.click(specificRadio());
+        await chooseRule(user, "Specific projects");
 
         const alert = screen.getByRole("alert");
         expect(
@@ -447,7 +481,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         renderDrawer();
 
         await checkGovernance(user);
-        await user.click(specificRadio());
+        await chooseRule(user, "Specific projects");
 
         const alert = screen.getByRole("alert");
         expect(

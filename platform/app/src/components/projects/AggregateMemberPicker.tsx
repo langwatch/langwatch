@@ -3,7 +3,6 @@ import {
   Field,
   HStack,
   Spinner,
-  Stack,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -13,7 +12,6 @@ import { HandledErrorAlert } from "~/features/errors";
 import type { AggregateRule } from "~/server/app-layer/projects/aggregate-rule";
 import { api } from "../../utils/api";
 import { ProjectAvatar } from "../ProjectAvatar";
-import { Radio, RadioGroup } from "../ui/radio";
 import { Select } from "../ui/select";
 
 type Candidate = {
@@ -64,14 +62,63 @@ function summariseSelectedProjects(names: readonly string[]): string {
   return `${names.length} projects`;
 }
 
-/** The department select's value for "every department". */
-const ALL_DEPARTMENTS = "all";
+const GOVERN_LABEL = "What do you want to govern?";
+const ALL_PERSONAL = "all-personal";
+const SPECIFIC = "specific";
+const DEPARTMENT_PREFIX = "department:";
+
+type Department = { id: string; name: string };
 
 /**
- * "What do you want to govern?" for a new aggregate (ADR-144). Personal
- * projects is the default: it follows people as they join and leave. An
- * organisation with departments may narrow it to one. Specific projects is a
- * fixed list picked from a dropdown.
+ * One choice of the rule select. `label` is the line in the list; `summary`
+ * is what the trigger shows once it is picked, which names the rule in full
+ * where the list leans on its group label.
+ */
+type RuleItem = {
+  value: string;
+  label: string;
+  summary: string;
+  group: "personal" | "projects";
+};
+
+function ruleItemsOf(departments: readonly Department[]): RuleItem[] {
+  const allPersonal: RuleItem = {
+    value: ALL_PERSONAL,
+    label: departments.length > 0 ? "All departments" : "All personal projects",
+    summary: "All personal projects (coding agents)",
+    group: "personal",
+  };
+  return [
+    allPersonal,
+    ...departments.map(
+      (department): RuleItem => ({
+        value: `${DEPARTMENT_PREFIX}${department.id}`,
+        label: department.name,
+        summary: `Personal projects in ${department.name}`,
+        group: "personal",
+      }),
+    ),
+    {
+      value: SPECIFIC,
+      label: "Specific projects",
+      summary: "Specific projects",
+      group: "projects",
+    },
+  ];
+}
+
+function ruleValueOf(selection: AggregateMemberSelection): string {
+  if (selection.mode === "specific") return SPECIFIC;
+  return selection.departmentId
+    ? `${DEPARTMENT_PREFIX}${selection.departmentId}`
+    : ALL_PERSONAL;
+}
+
+/**
+ * "What do you want to govern?" for a new aggregate (ADR-144): one select
+ * picks the rule. Everyone's personal project is the default, and follows
+ * people as they join and leave; an organisation with departments may narrow
+ * it to one. "Specific projects" opens a second select to pick them.
  */
 export function AggregateMemberPicker({
   organizationId,
@@ -82,109 +129,85 @@ export function AggregateMemberPicker({
   value: AggregateMemberSelection;
   onChange: (selection: AggregateMemberSelection) => void;
 }): React.ReactElement {
-  return (
-    <Field.Root>
-      <Field.Label>What do you want to govern?</Field.Label>
-      <RadioGroup
-        value={value.mode}
-        onValueChange={({ value: mode }) => {
-          if (mode === value.mode) return;
-          onChange(
-            mode === "specific"
-              ? { mode: "specific", projectIds: [] }
-              : AGGREGATE_DEFAULT_SELECTION,
-          );
-        }}
-      >
-        <Stack gap={3} align="stretch">
-          <VStack align="stretch" gap={2}>
-            <Radio value="personal">Personal projects (coding agents)</Radio>
-            <Text fontSize="sm" color="fg.muted" paddingStart={6}>
-              Everyone's personal project, including people who join later.
-            </Text>
-            {value.mode === "personal" && (
-              <DepartmentSelect
-                organizationId={organizationId}
-                value={value.departmentId}
-                onChange={(departmentId) =>
-                  onChange({ mode: "personal", departmentId })
-                }
-              />
-            )}
-          </VStack>
-          <VStack align="stretch" gap={2}>
-            <Radio value="specific">Specific projects</Radio>
-            {value.mode === "specific" && (
-              <SpecificProjects
-                organizationId={organizationId}
-                value={value.projectIds}
-                onChange={(projectIds) =>
-                  onChange({ mode: "specific", projectIds })
-                }
-              />
-            )}
-          </VStack>
-        </Stack>
-      </RadioGroup>
-    </Field.Root>
-  );
-}
-
-/**
- * Narrows the personal rule to one department. Shown only when the
- * organisation has departments: with none there is nothing to narrow to, and
- * a list that cannot load leaves the default, every department, in place.
- */
-function DepartmentSelect({
-  organizationId,
-  value,
-  onChange,
-}: {
-  organizationId: string;
-  value: string | null;
-  onChange: (departmentId: string | null) => void;
-}): React.ReactElement | null {
+  // A department list that is loading or cannot load leaves only the
+  // organisation-wide choice, which is always valid.
   const departments = api.departments.list.useQuery(
     { organizationId },
     { enabled: !!organizationId, refetchOnWindowFocus: false },
   );
-  const collection = useMemo(
-    () =>
-      createListCollection({
-        items: [
-          { value: ALL_DEPARTMENTS, label: "All departments" },
-          ...(departments.data ?? []).map((department) => ({
-            value: department.id,
-            label: department.name,
-          })),
-        ],
-      }),
+  const items = useMemo(
+    () => ruleItemsOf(departments.data ?? []),
     [departments.data],
   );
+  const collection = useMemo(() => createListCollection({ items }), [items]);
+  const department =
+    value.mode === "personal" && value.departmentId
+      ? departments.data?.find((d) => d.id === value.departmentId)
+      : undefined;
 
-  if (!departments.data || departments.data.length === 0) return null;
+  const choose = (next: string | undefined) => {
+    if (!next || next === ruleValueOf(value)) return;
+    if (next === SPECIFIC)
+      return onChange({ mode: "specific", projectIds: [] });
+    onChange({
+      mode: "personal",
+      departmentId: next.startsWith(DEPARTMENT_PREFIX)
+        ? next.slice(DEPARTMENT_PREFIX.length)
+        : null,
+    });
+  };
 
   return (
-    <Field.Root paddingStart={6}>
-      <Select.Root
-        collection={collection}
-        value={[value ?? ALL_DEPARTMENTS]}
-        onValueChange={({ value: [next] }) =>
-          onChange(!next || next === ALL_DEPARTMENTS ? null : next)
-        }
-      >
-        <Select.Trigger aria-label="Department">
-          <Select.ValueText placeholder="All departments" />
-        </Select.Trigger>
-        <Select.Content>
-          {collection.items.map((item) => (
-            <Select.Item key={item.value} item={item}>
-              {item.label}
-            </Select.Item>
-          ))}
-        </Select.Content>
-      </Select.Root>
-    </Field.Root>
+    <VStack align="stretch" gap={3}>
+      <Field.Root>
+        <Field.Label>{GOVERN_LABEL}</Field.Label>
+        <Select.Root
+          collection={collection}
+          value={[ruleValueOf(value)]}
+          onValueChange={({ value: [next] }) => choose(next)}
+        >
+          <Select.Trigger aria-label={GOVERN_LABEL}>
+            <Select.ValueText placeholder="All personal projects (coding agents)">
+              {(chosen) => (chosen[0] as RuleItem | undefined)?.summary ?? ""}
+            </Select.ValueText>
+          </Select.Trigger>
+          <Select.Content>
+            <Select.ItemGroup label="Personal projects (coding agents)">
+              {items
+                .filter((item) => item.group === "personal")
+                .map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+            </Select.ItemGroup>
+            <Select.ItemGroup label="Projects">
+              {items
+                .filter((item) => item.group === "projects")
+                .map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+            </Select.ItemGroup>
+          </Select.Content>
+        </Select.Root>
+        {value.mode === "personal" && (
+          <Field.HelperText>
+            {department
+              ? `Personal projects of everyone in ${department.name}, including people who join later.`
+              : "Everyone's personal project, including people who join later."}
+          </Field.HelperText>
+        )}
+      </Field.Root>
+      {value.mode === "specific" && (
+        <SpecificProjects
+          organizationId={organizationId}
+          value={value.projectIds}
+          onChange={(projectIds) => onChange({ mode: "specific", projectIds })}
+        />
+      )}
+    </VStack>
   );
 }
 
@@ -246,7 +269,7 @@ function SpecificProjects({
   if (!candidates.data) return <Spinner size="sm" />;
 
   return (
-    <Field.Root paddingStart={6}>
+    <Field.Root>
       <Select.Root
         collection={collection}
         multiple
