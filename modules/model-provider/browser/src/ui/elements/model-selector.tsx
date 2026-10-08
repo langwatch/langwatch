@@ -61,7 +61,7 @@ export const useModelSelectionOptions = ({
   // `useMemo` keyed on them recomputed too — the langy composer's model pill
   // rebuilt its whole combobox collection per parent render because of it.
   const providers = modelProviders.data;
-  const { selectOptions, groupedByProvider } = useMemo(
+  const { selectOptions, groupedByProvider, labelledOptions } = useMemo(
     () =>
       modelSelectionFrom({
         providers: providers ?? [],
@@ -74,6 +74,7 @@ export const useModelSelectionOptions = ({
   );
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
+  const labelledOption = labelledOptions.find((opt) => opt.value === model);
 
   // THE LOCAL DEV ESCAPE HATCH DID NOT TRAVEL. It read `import.meta.env.PROD`,
   // and a reusable package may not read the environment (ADR-101) — the same
@@ -84,6 +85,8 @@ export const useModelSelectionOptions = ({
 
   return {
     modelOption,
+    /** The chosen model when it is labelled but not offered: it reads by its label, never as missing. */
+    labelledOption,
     selectOptions,
     groupedByProvider,
     /** True while the providers query is in flight. Callers that
@@ -367,12 +370,13 @@ export const ModelSelector = React.memo(function ModelSelector({
   /** Models LangWatch serves itself, listed first even with no provider configured. */
   builtInModels?: readonly BuiltInModel[];
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
-    options,
-    model,
-    mode,
-    builtInModels,
-  });
+  const { selectOptions, groupedByProvider, labelledOption, isEmpty, isLoading } =
+    useModelSelectionOptions({
+      options,
+      model,
+      mode,
+      builtInModels,
+    });
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules
@@ -399,13 +403,16 @@ export const ModelSelector = React.memo(function ModelSelector({
   // treatment ModelChip renders in the Default Models table.
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
-    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
+    !!model &&
+    !!providerKey &&
+    !labelledOption &&
+    !groupedByProvider.some((group) => group.provider === providerKey);
 
   const selectValueText = (
     <SelectedModelValue
       isProviderMissing={isProviderMissing}
       isUnknown={isUnknown}
-      label={selectedItem?.label ?? model}
+      label={selectedItem?.label ?? labelledOption?.label ?? model}
       providerKey={providerKey}
       size={size}
     />

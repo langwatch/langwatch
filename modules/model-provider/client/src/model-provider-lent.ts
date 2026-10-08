@@ -17,8 +17,11 @@ export type EditModelProviderFormProps = {
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
 
-/** A model LangWatch serves itself, offered without a provider of the project's own. */
-export type LentBuiltInModel = { value: string; label: string };
+/**
+ * A model LangWatch serves itself, offered without a provider of the project's own.
+ * `isOffered: false` keeps it out of the options while a saved choice still reads by its label.
+ */
+export type LentBuiltInModel = { value: string; label: string; isOffered?: boolean };
 
 /** What a screen hands model-provider's display of one chosen model. */
 export type ModelDisplayProps = {

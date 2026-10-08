@@ -580,6 +580,15 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And below it the settings say no models are configured, as for any judge in such a project
 
     @integration
+    Scenario: The model picker names a saved Instant Evals judge it does not offer
+      Given a project with release_instant_evals off, in an organization that has not opted in
+      And an LLM judge saved with Instant Evals as its model
+      When a member opens the judge's model picker
+      Then the picker's chosen model reads "Instant Evals", never the model id
+      And it is never marked as needing an update
+      And Instant Evals is not one of the options
+
+    @integration
     Scenario: The score range shows only for Instant Evals
       Given a score judge
       When a member picks Instant Evals as its model

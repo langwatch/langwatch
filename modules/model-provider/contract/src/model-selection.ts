@@ -12,8 +12,11 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-/** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
-export type BuiltInModel = { value: string; label: string };
+/**
+ * A model LangWatch serves itself, so a project needs no provider of its own to pick it.
+ * `isOffered: false` keeps it out of the options while a saved choice still reads by its label.
+ */
+export type BuiltInModel = { value: string; label: string; isOffered?: boolean };
 
 /** The heading built-in models are listed under. */
 export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
@@ -210,7 +213,11 @@ export function modelSelectionFrom({
   mode: "chat" | "embedding";
   featureKey: string | undefined;
   builtInModels?: readonly BuiltInModel[];
-}): { selectOptions: ModelOption[]; groupedByProvider: GroupedModelOptions } {
+}): {
+  selectOptions: ModelOption[];
+  groupedByProvider: GroupedModelOptions;
+  labelledOptions: ModelOption[];
+} {
   const providersByKey = mergeProviderRowsByKey(providers);
   const customModelIdSet = allCustomModelIds(providersByKey, mode);
   // Gemini's Agent Platform door serves chat but not embeddings (404 on :batchEmbedContents),
@@ -230,12 +237,14 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
+  const toOption = ({ value, label }: BuiltInModel): ModelOption => ({
     label,
     value,
     isDisabled: false,
     mode,
-  }));
+  });
+  const builtInOptions = builtInModels.filter((model) => model.isOffered !== false).map(toOption);
+  const labelledOptions = builtInModels.filter((model) => model.isOffered === false).map(toOption);
   const builtInGroups: GroupedModelOptions = builtInOptions.map((option) => ({
     provider: option.value.split("/")[0]!,
     label: BUILT_IN_MODELS_GROUP_LABEL,
@@ -244,6 +253,7 @@ export function modelSelectionFrom({
   return {
     selectOptions: [...builtInOptions, ...selectOptions],
     groupedByProvider: [...mergeGroups(builtInGroups), ...groupOptionsByProvider(selectOptions)],
+    labelledOptions,
   };
 }
 

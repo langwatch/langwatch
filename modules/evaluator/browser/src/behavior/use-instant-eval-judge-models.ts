@@ -1,6 +1,7 @@
 /**
  * The built-in judge models a project may pick: Instant Evals, when the release
  * flag or the organization's own opt-in releases it (ADR-174 decision 11).
+ * Not released, it is labelled but not offered, so a saved judge still reads by its name.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
@@ -17,7 +18,9 @@ export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
 };
 
 const RELEASED: readonly BuiltInModel[] = [INSTANT_EVALS_BUILT_IN_MODEL];
-const NONE: readonly BuiltInModel[] = [];
+const NOT_RELEASED: readonly BuiltInModel[] = [
+  { ...INSTANT_EVALS_BUILT_IN_MODEL, isOffered: false },
+];
 
 export function useInstantEvalJudgeModels({
   projectId,
@@ -38,7 +41,7 @@ export function useInstantEvalJudgeModels({
   const released = flag.enabled || !!access.data?.released;
 
   return {
-    builtInModels: released ? RELEASED : NONE,
+    builtInModels: released ? RELEASED : NOT_RELEASED,
     released,
     isLoading: !released && (flag.isLoading || access.isLoading),
   };

@@ -60,12 +60,27 @@ vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
 }));
 
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
-  LLMConfigPopover: ({ builtInModels }: { builtInModels?: { label: string }[] }) => (
-    <ul aria-label="model options">
-      {builtInModels?.map((model) => (
-        <li key={model.label}>{model.label}</li>
-      ))}
-    </ul>
+  LLMConfigPopover: ({
+    builtInModels,
+  }: {
+    builtInModels?: { label: string; isOffered?: boolean }[];
+  }) => (
+    <>
+      <ul aria-label="model options">
+        {builtInModels
+          ?.filter((model) => model.isOffered !== false)
+          .map((model) => (
+            <li key={model.label}>{model.label}</li>
+          ))}
+      </ul>
+      <ul aria-label="labelled models">
+        {builtInModels
+          ?.filter((model) => model.isOffered === false)
+          .map((model) => (
+            <li key={model.label}>{model.label}</li>
+          ))}
+      </ul>
+    </>
   ),
 }));
 
@@ -143,10 +158,19 @@ describe("EvaluatorLLMConfigField", () => {
       it("reads Instant Evals, not enabled, and the picker does not offer it", () => {
         renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
 
-        expect(screen.queryByText("Instant Evals")).not.toBeNull();
+        expect(screen.queryAllByText("Instant Evals").length).toBeGreaterThan(0);
         expect(screen.queryByText(/not enabled for this project/i)).not.toBeNull();
         expect(screen.queryByText(INSTANT_EVAL_JUDGE_MODEL_ID, { exact: false })).toBeNull();
         expect(screen.queryByText(/update needed/i)).toBeNull();
+        expect(offersInstantEvals()).toBe(false);
+      });
+
+      /** @scenario "The model picker names a saved Instant Evals judge it does not offer" */
+      it("hands the picker Instant Evals to name, not to offer", () => {
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        const labelled = screen.getByLabelText("labelled models");
+        expect(within(labelled).queryByText("Instant Evals")).not.toBeNull();
         expect(offersInstantEvals()).toBe(false);
       });
     });
