@@ -131,3 +131,17 @@ Feature: The clickhouse-table-ownership lint rule
     Given a materialised view over a table no module writes
     When the clickhouse-table-ownership rule runs over the workspace
     Then it reports the view's target as having no module owner
+
+  @unit
+  Scenario: A write qualified with a database and a declared table constant is still a write
+    Given the analytics module declares a constant naming a table
+    And it inserts into "<database>.<constant>" built in a template
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the analytics module owns the table
+    And no finding reports the table as having no module owner
+
+  @unit
+  Scenario: A qualified write naming a table through an undeclared value is not guessed
+    Given the analytics module inserts into "<database>.<value>" where the value is not a declared constant
+    When the clickhouse-table-ownership rule runs over the workspace
+    Then the rule resolves no table from that insert

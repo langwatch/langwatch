@@ -76,7 +76,7 @@ class RecordingKeyMapRepository extends LwqlKeyMapRepository {
   readonly rows: LwqlKeyMapRow[] = [];
   failWith: Error | undefined;
 
-  async insertRow({ row }: { table: string; row: LwqlKeyMapRow }): Promise<void> {
+  async insertRow({ row }: { row: LwqlKeyMapRow; sourceDatabase: string }): Promise<void> {
     if (this.failWith) throw this.failWith;
     this.rows.push(row);
   }

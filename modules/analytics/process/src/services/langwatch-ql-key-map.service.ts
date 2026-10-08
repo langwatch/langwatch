@@ -4,12 +4,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlKeyMapRepository } from "../repositories/langwatch-ql-key-map.repository.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
-import {
-  LangWatchQLProductionProvisioningService,
-  type LwqlKeyMapRow,
-} from "./langwatch-ql-production-provisioning.service.ts";
-
-const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
+import type { LwqlKeyMapRow } from "./langwatch-ql-production-provisioning.service.ts";
 
 const lwqlCapability = LangWatchQLCapabilityService.create();
 
@@ -64,12 +59,6 @@ export class LwqlKeyMapService {
       KeyHash: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
       TenantId: project.id,
     };
-    await repository.insertRow({
-      table: lwqlProvisioning.keyMapTableQualifiedName({
-        names: lwqlProvisioning.names({ connection: target.connection }),
-        sourceDatabase: target.sourceDatabase,
-      }),
-      row,
-    });
+    await repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
   }
 }

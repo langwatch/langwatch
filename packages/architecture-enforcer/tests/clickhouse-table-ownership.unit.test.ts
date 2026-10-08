@@ -302,6 +302,35 @@ GROUP BY TenantId;
       expect(workspace.messages()).toEqual(["analytics reads trace_rollup, owned by trace."]);
     });
 
+    /** @scenario "A write qualified with a database and a declared table constant is still a write" */
+    it("resolves a database-qualified insert naming a declared constant", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/summary.repository.ts",
+        `const TABLE = "trace_summaries";
+export async function store(client: { insert: (options: unknown) => Promise<void> }, database: string) {
+  await client.insert({ table: \`\${database}.\${TABLE}\`, values: [], format: "JSONEachRow" });
+}
+`,
+      );
+
+      expect(workspace.messages()).toEqual([]);
+    });
+
+    /** @scenario "A qualified write naming a table through an undeclared value is not guessed" */
+    it("resolves nothing from a qualified insert whose value is not a declared constant", () => {
+      const workspace = fixture();
+      workspace.write(
+        "modules/analytics/process/src/repositories/clickhouse/summary.repository.ts",
+        `export async function store(client: { insert: (options: unknown) => Promise<void> }, database: string, name: string) {
+  await client.insert({ table: \`\${database}.\${name}\`, values: [], format: "JSONEachRow" });
+}
+`,
+      );
+
+      expect(workspace.messages().join("\n")).toMatch(/trace_summaries.*no module owner/);
+    });
+
     /** @scenario "A view-fed table a module also inserts into keeps that writer as owner" */
     it("keeps a direct writer as the owner over the view's source", () => {
       const workspace = workspaceWithView();
