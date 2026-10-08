@@ -26,6 +26,8 @@ export class TestUserApi implements UserApi {
 
   updateProfile: UserApi["updateProfile"] = (input) =>
     this.overrides.updateProfile?.(input) ?? this.unimplemented("updateProfile");
+  updateEmail: UserApi["updateEmail"] = (input) =>
+    this.overrides.updateEmail?.(input) ?? this.unimplemented("updateEmail");
 
   personalCallerFor: UserApi["personalCallerFor"] = (input) =>
     this.overrides.personalCallerFor?.(input) ?? this.refuse("personalCallerFor");
@@ -156,8 +158,8 @@ export class TestUserApi implements UserApi {
   reactivate: UserApi["reactivate"] = (input) =>
     this.overrides.reactivate?.(input) ?? this.unimplemented("reactivate");
 
-  deactivateAccount: UserApi["deactivateAccount"] = (input) =>
-    this.overrides.deactivateAccount?.(input) ?? this.unimplemented("deactivateAccount");
+  recordDeactivated: UserApi["recordDeactivated"] = (input) =>
+    this.overrides.recordDeactivated?.(input) ?? this.unimplemented("recordDeactivated");
 
   reactivateAccount: UserApi["reactivateAccount"] = (input) =>
     this.overrides.reactivateAccount?.(input) ?? this.unimplemented("reactivateAccount");

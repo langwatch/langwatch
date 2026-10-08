@@ -20,7 +20,6 @@ describe("the user tRPC surface", () => {
       expect(Object.keys(userTrpc.members).toSorted()).toEqual([
         "browserSessions",
         "changePassword",
-        "deactivate",
         "dismissSecureAccountNudge",
         "dismissTraceExplorerTour",
         "endBrowserSession",
@@ -70,7 +69,6 @@ describe("the user tRPC surface", () => {
         dismissSecureAccountNudge: "mutation",
         updateName: "mutation",
         changePassword: "mutation",
-        deactivate: "mutation",
         register: "mutation",
         setAvatar: "mutation",
         setPassword: "mutation",

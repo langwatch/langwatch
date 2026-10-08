@@ -1,6 +1,6 @@
 /**
- * What a module reads and the refusal a process gets when it cannot supply it.
- * Boot builds the union of every module's member declaration, failing eagerly.
+ * The store clients a module's registries require, and the refusal a process gets when it
+ * cannot supply one. Boot builds the union of every module's claim, failing eagerly.
  */
 import type { StoresMemberSource } from "@langwatch/process-stores";
 
@@ -61,14 +61,4 @@ export function buildClaimedMembers(options: {
   }
 
   return Object.freeze(members);
-}
-
-/** The view one module gets: the members it declared, and nothing else. */
-export function membersFor(
-  members: Readonly<Record<string, unknown>>,
-  names: readonly string[],
-): Readonly<Record<string, unknown>> {
-  const view: Record<string, unknown> = {};
-  for (const name of names) view[name] = members[name];
-  return Object.freeze(view);
 }

@@ -302,19 +302,26 @@ Feature: Automation ownership
     When a report-schedule step runs
     Then the step fails with the refusal, and the next run configures the reports still missing
 
-  @unit @unimplemented
+  @unit
   Scenario: The Slack claim step claims every active Slack automation's connection
     Given an active Slack automation on a connection it does not claim
     When the background step "automation:reconcile-slack-claims" runs
     Then the automation claims its connection, labelled with the automation's name
     And a second run claims nothing new
 
-  @unit @unimplemented
+  @unit
   Scenario: The Slack claim step releases what no active automation holds
     Given a claim held by a Slack automation that is now paused or deleted
     When the Slack claim step runs
     Then the claim is released
     And a claim held by an active automation on that connection stays
+
+  @unit
+  Scenario: The Slack claim step skips an automation whose connection it can no longer use
+    Given an active Slack automation whose connection its project can no longer use
+    When the Slack claim step runs
+    Then that automation is skipped and counted as skipped in the step's report
+    And the step goes on to claim the other automations' connections
 
   @integration @unimplemented
   Scenario: A connection an existing automation uses refuses deletion after the claim step
@@ -323,8 +330,8 @@ Feature: Automation ownership
     And a member deletes the automation's connection
     Then the deletion is refused as a connection in use, naming the automation
 
-  @unit @unimplemented
-  Scenario: The Slack claim step resumes after the last organisation it finished
-    Given the step stopped after finishing some organisations
+  @unit
+  Scenario: The Slack claim step resumes after the last page it finished
+    Given the step stopped after finishing some pages of claims
     When it runs again from its checkpoint
-    Then it starts after the last organisation it finished and pages the rest by cursor
+    Then it starts after the last claim it finished and pages the rest by cursor

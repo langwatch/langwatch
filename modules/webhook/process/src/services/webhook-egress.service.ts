@@ -5,6 +5,7 @@ import {
   sanitizeWebhookHeaders,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
+  type WebhookSignatureScheme,
 } from "@langwatch/webhook-contract";
 
 import type { HttpWebhookSender } from "../channels/webhook-destination.channel.ts";
@@ -14,7 +15,11 @@ import {
   WEBHOOK_TEST_FIRE_HEADER,
   type WebhookSendResult,
 } from "../rules/webhook-delivery-classification.rules.ts";
-import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../rules/webhook-signature.rules.ts";
+import {
+  signLegacyWebhookPayload,
+  signWebhookPayload,
+  WEBHOOK_SIGNATURE_HEADER,
+} from "../rules/webhook-signature.rules.ts";
 import { describeTransportFailure } from "../rules/webhook-transport-failure.rules.ts";
 import { judgeWebhookUrl, webhookUrlValidator } from "../rules/webhook-url-policy.rules.ts";
 import type { WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
@@ -66,6 +71,8 @@ export interface WebhookSendInput {
    * secret, so a rotation window verifies under either.
    */
   signingSecrets?: readonly string[];
+  /** `legacy_sha256` signs `sha256=` with the newest secret, as main's anomaly dispatcher did. */
+  signatureScheme?: WebhookSignatureScheme;
   /** 1-based delivery attempt, sent as `X-LangWatch-Delivery-Attempt`. */
   attempt?: number;
   /**
@@ -87,6 +94,7 @@ function buildWebhookHeaders({
   eventId,
   dispatchIdHeader,
   signingSecrets,
+  signatureScheme,
   attempt,
   testFire,
   timestampSeconds,
@@ -97,6 +105,7 @@ function buildWebhookHeaders({
   eventId: string;
   dispatchIdHeader: string;
   signingSecrets?: readonly string[];
+  signatureScheme?: WebhookSignatureScheme;
   attempt?: number;
   testFire: boolean;
   timestampSeconds: number;
@@ -113,11 +122,10 @@ function buildWebhookHeaders({
     [dispatchIdHeader]: eventId,
     ...(signingSecrets && signingSecrets.length > 0
       ? {
-          [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
-            secrets: signingSecrets,
-            body,
-            timestampSeconds,
-          }),
+          [WEBHOOK_SIGNATURE_HEADER]:
+            signatureScheme === "legacy_sha256"
+              ? signLegacyWebhookPayload({ secret: signingSecrets[0] ?? "", body })
+              : signWebhookPayload({ secrets: signingSecrets, body, timestampSeconds }),
         }
       : {}),
     ...(attempt !== undefined ? { [WEBHOOK_DELIVERY_ATTEMPT_HEADER]: String(attempt) } : {}),
@@ -165,6 +173,7 @@ export class WebhookEgressService {
     eventId,
     dispatchIdHeader = WEBHOOK_EVENT_ID_HEADER,
     signingSecrets,
+    signatureScheme,
     attempt,
     contextLabel,
     allowInsecureLocal = false,
@@ -196,6 +205,7 @@ export class WebhookEgressService {
           eventId: resolvedEventId,
           dispatchIdHeader,
           signingSecrets,
+          ...(signatureScheme ? { signatureScheme } : {}),
           attempt,
           testFire,
           timestampSeconds: Math.floor(this.now() / 1000),

@@ -5,9 +5,9 @@ import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { IdentityModule } from "./app/identity.app.ts";
 import { identityEventing } from "./eventing/identity.pipeline.ts";
-import { joinRequestEventing } from "./eventing/join-request.pipeline.ts";
-import { ssoConnectionEventing } from "./eventing/sso-connection.pipeline.ts";
 import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
+import { joinRequestEventing } from "./features/join-request/eventing/join-request.pipeline.ts";
+import { ssoConnectionEventing } from "./features/sso-connection/eventing/sso-connection.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";

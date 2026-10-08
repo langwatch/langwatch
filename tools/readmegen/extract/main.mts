@@ -15,6 +15,7 @@ import {
   type FeatureCatalogueEntry,
 } from "@langwatch/architecture-enforcer";
 
+import { type BrowserFacts, readBrowser, readUiRoutes } from "./browser-facts.mts";
 import { type At, type Reading } from "./fold.mts";
 import {
   type ApiInterface,
@@ -33,6 +34,7 @@ import {
   type Token,
 } from "./module-facts.mts";
 import { type ProcessFacts, readProcess } from "./process-facts.mts";
+import { readSchemas } from "./schemas.mts";
 
 type ModuleFacts = {
   id: string;
@@ -46,6 +48,7 @@ type ModuleFacts = {
   prismaDelegates: Delegate[];
   clickhouseWrites: { table: string; at: At }[];
   process: ProcessFacts;
+  browser: BrowserFacts | null;
 };
 
 const [outFile, rootArgument] = process.argv.slice(2);
@@ -120,6 +123,7 @@ function factsOf(entry: FeatureCatalogueEntry): ModuleFacts {
     prismaDelegates: readPrismaDelegates({ files: processFiles, reading }),
     clickhouseWrites: [...writes.values()],
     process: readProcess({ files: processFiles, reading, moduleOfFile }),
+    browser: readBrowser({ files: halfFiles({ entry, kind: "browser" }), reading }),
   };
 }
 
@@ -155,6 +159,8 @@ async function mountedRoutes(): Promise<{ routes: MountedRoute[]; error: string 
 const manifest = {
   modules: catalogue.map(factsOf),
   mounted: await mountedRoutes(),
+  schemas: await readSchemas({ root }),
+  uiRoutes: readUiRoutes({ file: join(root, "apps/ui/src/shell/ui-route-table.ts"), reading }),
   packages: packages.map((pkg) => ({
     name: pkg.name,
     root: relative(root, pkg.root),

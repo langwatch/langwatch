@@ -135,10 +135,6 @@ export const userTrpc = defineTrpcContract("user")
   .withInput(userApiChangePasswordInputSchema)
   .withOutput(userApiSuccessSchema)
 
-  .mutation("deactivate")
-  .withInput(userApiUserInputSchema)
-  .withOutput(userApiSuccessSchema)
-
   .mutation("reactivate")
   .withInput(userApiUserInputSchema)
   .withOutput(userApiSuccessSchema)

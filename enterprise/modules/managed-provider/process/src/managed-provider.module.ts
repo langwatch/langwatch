@@ -6,6 +6,5 @@ import { ManagedProviderModule } from "./app/managed-provider.app.ts";
 export const managedProviderProcessModule: PublishedProcessModule<
   "managed-provider",
   ManagedProviderApi,
-  undefined,
-  unknown
+  undefined
 > = defineProcessModule("managed-provider").withApi(ManagedProviderModule).build();

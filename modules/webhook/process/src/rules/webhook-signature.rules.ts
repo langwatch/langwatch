@@ -35,6 +35,17 @@ export function signWebhookPayload({
   return [`t=${timestampSeconds}`, ...signatures].join(",");
 }
 
+/** Main's anomaly-alert signature, `sha256=<hex hmac of the body>`, for legacy-scheme endpoints. */
+export function signLegacyWebhookPayload({
+  secret,
+  body,
+}: {
+  secret: string;
+  body: string;
+}): string {
+  return `sha256=${hmacHex(secret, body)}`;
+}
+
 /** Constant-time equality over the hex digests, length-safe. */
 function digestsMatch(expected: string, candidate: string): boolean {
   const a = Buffer.from(expected, "utf8");

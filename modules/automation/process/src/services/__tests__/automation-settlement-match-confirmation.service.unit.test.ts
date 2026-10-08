@@ -47,12 +47,6 @@ class TestEvaluations {
     this.lookups.push(input);
     return Promise.resolve(this.runs);
   }
-  findSummariesByTraceIds(): never {
-    return unavailable();
-  }
-  findTraceEvaluations(): never {
-    return unavailable();
-  }
   findInputs(): never {
     return unavailable();
   }

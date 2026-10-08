@@ -823,6 +823,7 @@ export interface LwqlPrismaRows {
     readonly sqsAccessKeyId: "String?";
     readonly sqsSecretAccessKeyEncrypted: "String?";
     readonly secretEncrypted: "String";
+    readonly signatureScheme: "String?";
     readonly previousSecretEncrypted: "String?";
     readonly previousSecretExpiresAt: "DateTime?";
     readonly enabledEvents: "String[]";

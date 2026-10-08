@@ -183,6 +183,117 @@ Contract `../contract/src/data-retention.trpc.ts:51`, router `src/transport/data
 | `dataRetention.killMutation`             | mutation | Permission `project:update` | `killRetroactiveMutationInputSchema`     | –                                        |
 | `dataRetention.getScopeStorageUsage`     | query    | Permission `traces:view`    | `retentionScopeTargetInputSchema`        | `retentionStorageUsageSchema`            |
 
+```typescript
+// dataRetention.getRules
+// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:27
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:44
+
+// dataRetention.setForScope
+// Input: inline, ../contract/src/data-retention.trpc.ts:67
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+  organizationId: string;
+  category: "traces" | "scenarios" | "experiments";
+  retentionDays: 0 | number;
+}
+// Output: retentionPolicySchema, ../contract/src/data-retention.ts:165
+interface Output {
+  id: string;
+  organizationId: string;
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+  category: "traces" | "scenarios" | "experiments";
+  retentionDays: 0 | number;
+  createdAt: unknown;
+  updatedAt: unknown;
+}
+
+// dataRetention.previewScopeRemoval
+// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:41
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+  organizationId: string;
+}
+// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:189
+interface Output {
+  traces: number;
+  scenarios: number;
+  experiments: number;
+}
+
+// dataRetention.removeForScope
+// Input: inline, ../contract/src/data-retention.trpc.ts:87
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+  organizationId: string;
+  category: "traces" | "scenarios" | "experiments";
+}
+
+// dataRetention.triggerRetroactiveUpdate
+// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:46
+interface Input {
+  projectId: string;
+  category: "traces" | "scenarios" | "experiments";
+}
+// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:249
+interface Output {
+  tables: string[];
+  appliedRetentionDays: number;
+}
+
+// dataRetention.getMutationProgress
+// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:144
+interface Input {
+  projectId: string;
+}
+// Output: inline, ../contract/src/data-retention.trpc.ts:97
+type Output = {
+  mutationId: string;
+  table: string;
+  isDone: boolean;
+  partsToDo: number;
+  createTime: string;
+  category: "traces" | "scenarios" | "experiments" | null;
+}[];
+
+// dataRetention.killMutation
+// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:157
+interface Input {
+  projectId: string;
+  mutationId: string;
+}
+
+// dataRetention.getScopeStorageUsage
+// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:35
+interface Input {
+  projectId: string;
+  scope: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+}
+// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:67
+interface Output {
+  totalBytes: number;
+  projectCount: number;
+}
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

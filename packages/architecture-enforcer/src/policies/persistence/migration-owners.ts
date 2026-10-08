@@ -44,7 +44,7 @@ export type MigrationOwners = { file: string; owners: Map<string, string[]> };
 type Source = { files: string[]; touch: RegExp; owners: ReadonlyMap<string, string> };
 
 /** Table name to owning module, read from each module's Prisma claims. */
-function postgresOwners(root: string, catalogue: readonly FeatureCatalogueEntry[]) {
+export function postgresOwners(root: string, catalogue: readonly FeatureCatalogueEntry[]) {
   const models = prismaModelNames({ root, policy: POLICY });
   const owners = new Map<string, string>();
 

@@ -294,6 +294,7 @@ import {
   type ImpersonationSessions,
 } from "../services/impersonation.service.ts";
 import {
+  type InstanceAdminAccounts,
   InstanceAdminService,
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
@@ -2303,6 +2304,7 @@ function buildOpsInfrastructure(input: {
         sessions: dependencies.auth,
         auditLog: dependencies.auditLog,
         users: dependencies.users,
+        accounts: dependencies.auth,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -2394,6 +2396,7 @@ export interface OpsOperationsOptions {
   access?: AdminAccess | undefined;
   now?: (() => Instant) | undefined;
   users: UserApi;
+  accounts: InstanceAdminAccounts;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -2431,6 +2434,7 @@ export class OpsOperations {
       instanceAdmin: InstanceAdminService.create({
         repository: repositories.instanceAdmin,
         users: this.options.users,
+        accounts: this.options.accounts,
         audit: this.options.audit,
         ssoRouting: this.options.ssoRouting,
       }),

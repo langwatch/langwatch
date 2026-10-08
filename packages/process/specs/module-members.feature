@@ -1,6 +1,6 @@
 Feature: What a process hands its modules
 
-  A process composes modules from the members it holds, the peers it hands in
+  A process composes modules from the store clients it holds, the peers it hands in
   and the repository tier it chooses in code.
 
   @unit
@@ -22,7 +22,6 @@ Feature: What a process hands its modules
     Given a caller asks for a module's memory repositories in code
     When the process boots
     Then the module's memory tier is built and no store client is asked for
-    And a module that declares no repositories has no memory tier to ask for, and says so
 
   @unit
   Scenario: A task binder is handed its module's parsed config

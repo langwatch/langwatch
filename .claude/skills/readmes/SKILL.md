@@ -21,8 +21,12 @@ and hands Go a manifest. For which page answers which question, load `ownership`
 | `go test ./tools/readmegen/`                          | the golden tests; add `-update` to rewrite `tools/readmegen/testdata/golden/` after a change |
 
 The extractor runs under `node` from `packages/architecture-enforcer`, so it needs an installed
-workspace (`pnpm install`). It also mounts the api describe-only for the REST cross-check; when that
-mount fails the check is skipped with "REST cross-check skipped", and the pages still settle.
+and prepared workspace (`pnpm install`, `pnpm start:prepare:files`, `pnpm ensure:built`). It mounts
+the api describe-only for the REST cross-check; when that mount fails the check is skipped with
+"REST cross-check skipped". It also imports the installed REST declarations and every
+`defineTrpcContract` file to convert their zod schemas, as `tools/apidiff` does; when one of those
+imports fails the run stops with "the zod schemas could not be read", so a page never loses its
+contracts because the checkout was unprepared.
 
 ## A page
 
@@ -35,9 +39,20 @@ markers and rewrites only what is between them.
 | `<!-- readme:generated:start ... -->` to `:end -->` | the generator | never edited by hand; fix the code, then regenerate                                                 |
 
 Pages today: the indexes (`modules/`, `enterprise/modules/`, `enterprise/`, `packages/`,
-`enterprise/packages/`, `apps/`), one page per module and one per process half. Contract and client
-halves get no page; the contract is printed on the process page (plan §9, Q2). Browser-half and
-per-app pages are planned (plan §2) but not generated yet.
+`enterprise/packages/`, `apps/`), one page per module, one per process half and one per browser
+half. Contract and client halves get no page; the contract is printed on the process page (plan §9,
+Q2). Per-app pages are planned (plan §2) but not generated yet.
+
+| Section                                  | Read from                                                                                                                                                                         |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| browser page: declaration, Screens       | the `defineBrowserModule(...)` chain (`extract/browser-facts.mts`); a screen without `path` takes its URL from `uiRouteTable`, marked "(route table)"                             |
+| browser page: Drawers, "Opened from"     | `withDrawers` keys and `.drawer(Token, …)`; other modules whose browser source has a literal `…Drawer("<name>")`, `?drawer.open=<name>` or the token (a constant is not followed) |
+| browser page: Calls                      | `withApi(x, { contracts })`, `-client` dependencies in package.json, `lends`, `withHosts` requires, capabilities, config slices                                                   |
+| process page: REST and tRPC `typescript` | JSON Schema from zod (`extract/schemas.mts`), printed by `tsschema.go`; over `maxPrintedLines`, or already printed on the page, it links to `file:line` instead                   |
+| `packages/README.md` group column (W-22) | `"langwatch": { "group" }` against `packageGroups` in `groups.go`; empty until the list is ruled, so the index keeps its Kind column                                              |
+
+A new page starts with a seeded paragraph ("The browser half of …" plus the declaration's own doc
+comment); edit it like any hand-written head.
 
 ## Fixing a wrong page
 
@@ -46,6 +61,7 @@ per-app pages are planned (plan §2) but not generated yet.
 | a stale diff in `check:readmes`                                         | the code changed and the page did not                  | run `pnpm generate:readmes`; commit the page with the code                     |
 | `≈` before a value                                                      | the extractor found the declaration but not its value  | make the value static in the code, or teach the extractor the shape (below)    |
 | "unresolved values (shown with ≈): ..."                                 | the run's count of `≈` values, by kind                 | informational; it does not fail the check                                      |
+| `schema` in that count                                                  | a declared zod schema with no converted JSON Schema    | the page links to the schema's source; fix the conversion or the join          |
 | `REST "<family>": mounted but not read: ...; read but not mounted: ...` | the routes read and the routes the api serves disagree | teach the extractor the router shape; this one does fail the check             |
 | a fact that is wrong, not `≈`                                           | a bug in an extractor or a page renderer               | fix it in `tools/readmegen`, with a fixture row and a golden page that show it |
 
@@ -53,11 +69,11 @@ per-app pages are planned (plan §2) but not generated yet.
 
 1. Add the field to the manifest types on both sides: `tools/readmegen/manifest.go` or
    `process_manifest.go`, and the extractor module that fills it (`extract/module-facts.mts`,
-   `extract/process-facts.mts`).
+   `extract/process-facts.mts`, `extract/browser-facts.mts`, `extract/schemas.mts`).
 2. Read it syntactically. A value the extractor cannot fold is a `Scalar` with its source text,
    printed with `≈`; never guess.
 3. Render it in the page file that owns the section (`module_page.go`, `process_page.go`,
-   `workers_page.go`, `pages.go` for the indexes). Pages are tables; link to `file:line` rather than
+   `workers_page.go`, `browser_page.go`, `pages.go` for the indexes). Pages are tables; link to `file:line` rather than
    inlining a long schema.
 4. Add the case to `tools/readmegen/testdata/manifest.json`, run `go test ./tools/readmegen/ -update`,
    and read the golden diff as the review.

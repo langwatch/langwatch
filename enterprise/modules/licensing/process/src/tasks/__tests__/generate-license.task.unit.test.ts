@@ -18,7 +18,6 @@ describe("given the licensing module installed in the tasks role", () => {
     const state = await licensingProcessModule.install({
       resources: new ResourceScope(),
       config: TEST_LICENSING_CONFIG,
-      members: {},
       repositorySelection: { tier: "memory", members: {} },
       role: "tasks",
       secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

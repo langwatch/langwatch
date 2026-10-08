@@ -136,16 +136,14 @@ describe("process-owned feature references", () => {
   });
 });
 
-/**
- * The members these two modules read. Every one is always supplied, because a
- * module is handed exactly what it declared and boot refuses a name this
- * process cannot answer - which is the behaviour, not an inconvenience.
- */
-interface DeclaredMembers {
+/** What one run tells the two modules below; set by the harness before each boot. */
+interface RunState {
   events: string[];
   inspectPeer: boolean;
   failOrganization: Error | null;
 }
+
+let run: RunState = { events: [], inspectPeer: false, failOrganization: null };
 
 /** What one test states about the run, before the harness completes it. */
 type Harness = Readonly<{
@@ -157,7 +155,6 @@ type Harness = Readonly<{
 class ProjectModule implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = { organizations: OrganizationApi };
-  static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
   readonly #label = "project";
 
   readonly #organizations: OrganizationApi;
@@ -168,10 +165,9 @@ class ProjectModule implements ProjectApi {
 
   static create({
     dependencies,
-    members,
     resources,
-  }: FeatureSetup<typeof ProjectModule.dependencies, undefined> &
-    Readonly<{ members: DeclaredMembers }>) {
+  }: FeatureSetup<typeof ProjectModule.dependencies, undefined>) {
+    const members = run;
     members.events.push("create:project");
     resources.own("project", () => {
       members.events.push("close:project");
@@ -199,7 +195,6 @@ class ProjectModule implements ProjectApi {
 class OrganizationApp implements OrganizationApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = { projects: ProjectApi };
-  static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
   readonly #projects: ProjectApi;
 
   private constructor(projects: ProjectApi) {
@@ -208,10 +203,9 @@ class OrganizationApp implements OrganizationApi {
 
   static create({
     dependencies,
-    members,
     resources,
-  }: FeatureSetup<typeof OrganizationApp.dependencies, undefined> &
-    Readonly<{ members: DeclaredMembers }>) {
+  }: FeatureSetup<typeof OrganizationApp.dependencies, undefined>) {
+    const members = run;
     members.events.push("create:organization");
     resources.own("organization", () => {
       members.events.push("close:organization");
@@ -234,13 +228,14 @@ class OrganizationApp implements OrganizationApi {
 const project = defineProcessModule("project").withApi(ProjectModule).build();
 const organization = defineProcessModule("organization").withApi(OrganizationApp).build();
 
-/** Every member these modules declared, so the process can answer all of them. */
+/** Sets this run's state for the modules, and answers the stores with nothing. */
 function processMembers(harness: Harness = { events: [] }) {
-  return memberSourceOf({
+  run = {
     events: harness.events,
     inspectPeer: harness.inspectPeer ?? false,
     failOrganization: harness.failOrganization ?? null,
-  });
+  };
+  return memberSourceOf({});
 }
 
 function graph(harness: Harness, reversed = false, role: ServerRole = "api") {
@@ -444,7 +439,6 @@ describe("feature APIs", () => {
     class GrantedOrganizationApp implements OrganizationApi {
       static readonly contract = OrganizationApi;
       static readonly dependencies = { projects: ProjectApi, grant: ProjectGrant };
-      static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
       readonly #projects: ProjectApi;
       readonly #grant: ProjectGrant;
 
@@ -455,8 +449,7 @@ describe("feature APIs", () => {
 
       static create({
         dependencies,
-      }: FeatureSetup<typeof GrantedOrganizationApp.dependencies, undefined> &
-        Readonly<{ members: DeclaredMembers }>) {
+      }: FeatureSetup<typeof GrantedOrganizationApp.dependencies, undefined>) {
         return new GrantedOrganizationApp(dependencies.projects, dependencies.grant);
       }
 

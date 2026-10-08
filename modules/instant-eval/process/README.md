@@ -190,7 +190,16 @@ Answers at `/api/v1/instant-evals/estimate`.
 
 ```typescript
 type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:152
-type Response = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:364
+// Response: instantEvalEstimateSchema, ../contract/src/instant-eval.schemas.ts:364
+interface Response {
+  rows: number;
+  isRowsCapped: boolean;
+  avgTokens: number;
+  totalTokens: number;
+  requests: number;
+  priceUsd: number;
+  freeBudgetRemainingUsd?: number;
+}
 ```
 
 #### `GET /` · `listInstantEvalRuns`
@@ -202,7 +211,12 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:110
 Answers at `/api/v1/instant-evals`.
 
 ```typescript
-type Query = z.infer<typeof instantEvalListQuerySchema>; // ../contract/src/instant-eval.schemas.ts:218
+// Query: instantEvalListQuerySchema, ../contract/src/instant-eval.schemas.ts:218
+interface Query {
+  limit?: number;
+  before?: string;
+  beforeId?: string;
+}
 type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/instant-eval.schemas.ts:408
 ```
 
@@ -215,7 +229,10 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:127
 Answers at `/api/v1/instant-evals/:id`.
 
 ```typescript
-type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
+// Params: instantEvalIdParamsSchema, ../contract/src/instant-eval.schemas.ts:214
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:318
 ```
 
@@ -229,7 +246,8 @@ Answers at `/api/v1/instant-evals/:id/cancel`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Body = z.infer<typeof cancelInstantEvalRunBodySchema>; // ../contract/src/instant-eval.schemas.ts:212
+// Body: cancelInstantEvalRunBodySchema, ../contract/src/instant-eval.schemas.ts:212
+type Body = Record<string, unknown>;
 type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:318
 ```
 
@@ -243,7 +261,14 @@ Answers at `/api/v1/instant-evals/:id/results`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Query = z.infer<typeof instantEvalResultsQuerySchema>; // ../contract/src/instant-eval.schemas.ts:257
+// Query: instantEvalResultsQuerySchema, ../contract/src/instant-eval.schemas.ts:257
+interface Query {
+  questionId?: string;
+  matched?: "0" | "1" | "true" | "yes" | "false" | "no";
+  status?: "judged" | "skipped" | "failed";
+  limit?: number;
+  cursor?: string;
+}
 type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/instant-eval.schemas.ts:412
 ```
 
@@ -257,7 +282,10 @@ Answers at `/api/v1/instant-evals/:id/sample`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Query = z.infer<typeof instantEvalSampleQuerySchema>; // ../contract/src/instant-eval.schemas.ts:282
+// Query: instantEvalSampleQuerySchema, ../contract/src/instant-eval.schemas.ts:282
+interface Query {
+  n?: number;
+}
 type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/instant-eval.schemas.ts:420
 ```
 
@@ -276,6 +304,82 @@ Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instan
 | `instantEval.access`         | query    | Permission `analytics:view`                     | `explorerInstantEvalProjectSchema`        | `instantEvalOptInAccessSchema`       |
 | `instantEval.enable`         | mutation | Permission `organization:manage, via projectId` | `explorerInstantEvalProjectSchema`        | `instantEvalOptInAccessSchema`       |
 | `instantEval.classifySearch` | mutation | Permission `analytics:view`                     | `explorerSearchClassificationInputSchema` | `explorerSearchClassificationSchema` |
+
+```typescript
+// instantEval.estimate
+type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:19
+type Output = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:364
+
+// instantEval.start
+type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:19
+// Output: explorerInstantEvalProgressSchema, ../contract/src/instant-eval-explorer.schemas.ts:47
+interface Output {
+  id: string;
+  status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+  total: number | null;
+  progress: number;
+  matched: number | null;
+  failed: number;
+  skipped: number;
+  error: string | null;
+  priceUsd: number;
+  finishedAtMs: number | null;
+}
+
+// instantEval.cancel
+// Input: explorerInstantEvalRunIdSchema, ../contract/src/instant-eval-explorer.schemas.ts:41
+interface Input {
+  projectId: string;
+  runId: string;
+}
+type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:47
+
+// instantEval.get
+type Input = z.infer<typeof explorerInstantEvalRunIdSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:41
+type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:47
+
+// instantEval.access
+// Input: explorerInstantEvalProjectSchema, ../contract/src/instant-eval-explorer.schemas.ts:38
+interface Input {
+  projectId: string;
+}
+// Output: instantEvalOptInAccessSchema, ../contract/src/instant-eval.schemas.ts:491
+interface Output {
+  released: boolean;
+  offer:
+    | "enable"
+    | "ask_admin"
+    | "contact_us"
+    | "not_in_license"
+    | "switched_off"
+    | "not_connected"
+    | "ask_operator";
+  viaConnect: boolean;
+}
+
+// instantEval.enable
+type Input = z.infer<typeof explorerInstantEvalProjectSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:38
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:491
+
+// instantEval.classifySearch
+// Input: explorerSearchClassificationInputSchema, ../contract/src/instant-eval-explorer.schemas.ts:71
+interface Input {
+  projectId: string;
+  text: string;
+  timeRange: {
+    from: number;
+    to: number;
+  };
+  activeQuery?: string;
+  lensId?: string;
+  isLangyAvailable?: boolean;
+}
+// Output: explorerSearchClassificationSchema, ../contract/src/instant-eval-explorer.schemas.ts:88
+interface Output {
+  classified: string | null;
+  isInstantEvalAvailable: boolean;
+}
+```
 
 ## Sockets
 

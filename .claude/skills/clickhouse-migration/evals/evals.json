@@ -1,0 +1,29 @@
+{
+  "skill_name": "clickhouse-migration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a Tags Array(String) column to trace_summaries, and add a comment telling operators to run MATERIALIZE COLUMN for old rows.",
+      "expected_output": "A goose file numbered above origin/main's highest, with -- +goose Up, -- +goose ENVSUB ON, one statement per StatementBegin/StatementEnd: ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries ADD COLUMN IF NOT EXISTS Tags Array(String) DEFAULT [] (a variable-size column without DEFAULT gives Code 173 at read and Code 241 at merge), and a commented-out down migration. No operator comment: historic values are a background data step in the owning module's .withMigrations that starts the mutation and watches system.mutations.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "TotalCost on trace_summaries should be Decimal(18, 9) instead of Float64. Write the MODIFY COLUMN.",
+      "expected_output": "Refuses MODIFY COLUMN to a new type (modify-column-type): it rewrites every part while older releases decode the old type. Expand with a new column of the new type with a DEFAULT, dual-write from release A, backfill history with a background step, switch readers in A, and drop the old column only once the floor is at or above A with `-- contract: retired in <release>`. A MODIFY COLUMN that only sets CODEC, TTL or a comment is fine without restating the type.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The trace_overview view needs two new columns and one removed. Drop and recreate it in a migration.",
+      "expected_output": "Never drop-and-create (view-replaced-in-place): a view with different columns is created under a new name, readers switch in release A, the old view is dropped later under the floor rule with the retirement note. Also updates LWQL_VIEW_CATALOG in modules/analytics/process/src/rules/lwql-view-catalog.rules.ts, pinned by lwql-clickhouse-catalogue.unit.test.ts, so the new view is queryable and its row filter declared.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "The migration-order check says my goose number 00121 is taken: main merged its own 00121 while my PR was open. Can I just edit their file to include my statement?",
+      "expected_output": "No: a merged migration is never edited (the check refuses any change to one). Renames its own file with the git mv the check prints to a number above origin/main's newest, because goose runs only above the version a database is on. Notes stepping does not refuse a later release's version sorting below an earlier one, so the main-relative number is the only protection, and checks one owner per file (pnpm lint:architecture --policies migration-owners).",
+      "files": []
+    }
+  ]
+}

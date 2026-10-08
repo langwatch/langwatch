@@ -135,7 +135,6 @@ type Exact<Left, Right> = [Left] extends [Right]
     : never
   : never;
 type CheckedModule<Module extends SupplyModule> = Module extends {
-  readonly members: readonly string[];
   readonly types: { readonly dependencies: infer Dependencies };
 }
   ? Exact<ResolvedTokens<Module["dependencies"]>, Dependencies> extends never
@@ -316,16 +315,6 @@ export class ProcessSupply<
     return this.#withMembers({ encryption });
   }
 
-  withRelational<Value extends MemberValueFrom<RequiredMemberSet, "relational">>(
-    relational: Value,
-  ) {
-    return this.#withMembers({ relational });
-  }
-
-  withKeyvalue<Value extends MemberValueFrom<RequiredMemberSet, "keyvalue">>(keyvalue: Value) {
-    return this.#withMembers({ keyvalue });
-  }
-
   withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
     return this.#withMembers({ eventing });
   }
@@ -488,7 +477,7 @@ export class ProcessSupply<
         )
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
     for (const service of state.services) builder.withService(service);
-    const modules = state.modules as readonly InstallableServerFeature<SupplyRecord>[];
+    const modules = state.modules as readonly InstallableServerFeature[];
     const selectedModules = modules.map((module) =>
       state.stores?.tier && module.repositoryRegistry
         ? { ...module, tier: state.stores.tier }

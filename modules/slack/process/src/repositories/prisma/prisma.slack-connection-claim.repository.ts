@@ -3,6 +3,7 @@ import { prismaTables } from "@langwatch/prisma-client/ownership";
 
 import {
   SlackConnectionClaimRepository,
+  type SlackConnectionClaimKey,
   type SlackConnectionClaimRow,
 } from "../slack-connection-claim.repository.ts";
 
@@ -72,6 +73,28 @@ export class PrismaSlackConnectionClaimRepository extends SlackConnectionClaimRe
         ...(exceptProjectId === undefined ? {} : { projectId: { not: exceptProjectId } }),
       },
       orderBy: [{ createdAt: "asc" }, { claimantId: "asc" }],
+      select: claimSelect,
+    });
+  }
+
+  async findPage({
+    after,
+    limit,
+  }: {
+    after?: SlackConnectionClaimKey;
+    limit: number;
+  }): Promise<SlackConnectionClaimRow[]> {
+    return this.prisma.slackConnectionClaim.findMany({
+      where: after
+        ? {
+            OR: [
+              { connectionId: { gt: after.connectionId } },
+              { connectionId: after.connectionId, claimantId: { gt: after.claimantId } },
+            ],
+          }
+        : {},
+      orderBy: [{ connectionId: "asc" }, { claimantId: "asc" }],
+      take: limit,
       select: claimSelect,
     });
   }

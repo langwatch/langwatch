@@ -123,6 +123,11 @@ import { AutomationSettlementBreachLoggedService } from "../services/automation-
 import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
 import { AutomationSettlementMatchConfirmationService } from "../services/automation-settlement-match-confirmation.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
+import {
+  AutomationSlackClaimReconcileService,
+  type SlackClaimReconcileCounts,
+  type SlackClaimReconcileInput,
+} from "../services/automation-slack-claim-reconcile.service.ts";
 import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
 import { AutomationSlackDirectoryUnavailableService } from "../services/automation-slack-directory-unavailable.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
@@ -458,6 +463,11 @@ export class AutomationModule implements AutomationApi {
           slackConnections,
         }),
       });
+      automation.#slackClaims = AutomationSlackClaimReconcileService.create({
+        slack,
+        triggers,
+        slackConnections,
+      });
       return automation;
     });
   }
@@ -783,6 +793,7 @@ export class AutomationModule implements AutomationApi {
   readonly #evaluations: AutomationEvaluationSubscriberService;
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
   readonly #reportSchedules: ReportScheduleService;
+  #slackClaims: AutomationSlackClaimReconcileService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
   #reportInstances: Pick<ProcessStore, "findByRef"> | undefined;
@@ -834,6 +845,17 @@ export class AutomationModule implements AutomationApi {
   /** Configures every active report that has no schedule process yet (the tasks backfill). */
   reconcileReportSchedules(): Promise<{ repaired: number }> {
     return this.#reportSchedules.reconcile();
+  }
+
+  /** Claims every active Slack automation's connection, then releases what none holds. */
+  reconcileSlackClaims(input: SlackClaimReconcileInput): Promise<SlackClaimReconcileCounts> {
+    if (!this.#slackClaims) {
+      throw new Error(
+        "This AutomationModule was composed from already-built services, so it holds no Slack " +
+          "claim reconcile: compose it through AutomationModule.create to run that step.",
+      );
+    }
+    return this.#slackClaims.reconcile(input);
   }
 
   // -- reads -----------------------------------------------------------------

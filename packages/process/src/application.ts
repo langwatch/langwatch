@@ -47,7 +47,7 @@ import {
   eventingConsumers,
   type EventingHost,
 } from "./module-eventing.ts";
-import { buildClaimedMembers, membersFor } from "./module-members.ts";
+import { buildClaimedMembers } from "./module-members.ts";
 import { processProjectionReplayer } from "./projection-replayer.ts";
 import {
   assertRepositoryOwnership,
@@ -195,11 +195,9 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     Rest,
     Trpc,
     Worker,
-    FeatureMembers,
   >(
     declaration: ServerFeatureDeclaration<
       Config,
-      FeatureMembers,
       Dependencies,
       TransportDependencies,
       Provided,
@@ -210,10 +208,10 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     >,
   ): InstalledFeature<Provided, Rest, Trpc, Worker>;
   module<Provided>(
-    declaration: PublishedProcessModule<string, Provided, unknown, never>,
+    declaration: PublishedProcessModule<string, Provided, unknown>,
   ): InstalledFeature<Provided, never, never, never>;
   module(
-    declaration: InstallableServerFeature<never>,
+    declaration: InstallableServerFeature,
   ): InstalledFeature<unknown, unknown, unknown, unknown> {
     const state = this.installed.get(declaration.name);
     if (!state) {
@@ -270,15 +268,13 @@ interface DeclaredFeature {
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
   readonly contributesWorkerWork: boolean;
-  /** What this module's App declared it reads, built before any create runs. */
-  readonly requiredMembers: readonly string[];
-  /** Repository tier: live or memory (withMemoryRepositories). */
+  /** Repository tier: live or memory, as the supplied stores state it. */
   readonly tier: Tier;
   /** The handles this module declared, for the root to scope its resolver to. */
   readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
   /** The operator-read handles this module declared, scoped the same way (§7). */
   readonly operatorReads?: Readonly<Record<string, unknown>>;
-  readonly install: (args: FeatureInstallArguments<unknown>) => Promise<InstalledFeatureState>;
+  readonly install: (args: FeatureInstallArguments) => Promise<InstalledFeatureState>;
 }
 
 /** One instance the process itself answers for, by the token that names it. */
@@ -383,16 +379,16 @@ export class ApplicationBuilder<
   }
 
   /** Modules to install; guards ensure members and config align. */
-  withModules<const Modules extends readonly InstallableServerFeature<Members>[]>(
+  withModules<const Modules extends readonly InstallableServerFeature[]>(
     modules: Modules & ModuleConfigGuard<Modules, Config>,
   ): this {
-    for (const module of modules as readonly InstallableServerFeature<Members>[]) {
+    for (const module of modules as readonly InstallableServerFeature[]) {
       this.addFeature(module);
     }
     return this;
   }
 
-  private addFeature(declaration: InstallableServerFeature<Members>): this {
+  private addFeature(declaration: InstallableServerFeature): this {
     this.state.features.push({
       name: declaration.name,
       transports: declaration.transports ?? [],
@@ -404,7 +400,6 @@ export class ApplicationBuilder<
       transportDependencies: declaration.transportDependencies,
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
-      requiredMembers: declaration.members ?? [],
       tier: declaration.tier ?? this.stores.tier,
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
@@ -414,7 +409,7 @@ export class ApplicationBuilder<
       // module's resolver to nothing and every declared handle reads undeclared.
       ...(declaration.secrets ? { secrets: declaration.secrets } : {}),
       ...(declaration.operatorReads ? { operatorReads: declaration.operatorReads } : {}),
-      install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
+      install: (args) => declaration.install(args as FeatureInstallArguments),
     });
     return this;
   }
@@ -492,11 +487,10 @@ export class ApplicationBuilder<
     this.assertEveryDependencyProvided(declarations, providerOf, role);
     const order = orderByDependency(declarations, providerOf, role);
 
-    // Exactly the union of what every installed module declared it reads and
-    // what its chosen repository tier requires, built eagerly and in the
-    // source's own construction order. A member this process cannot supply
-    // refuses HERE, naming the module and the member, rather than on the first
-    // request that reaches it.
+    // Exactly the union of what every installed module's repository and channel
+    // tiers require, built eagerly in the source's own construction order. A store
+    // client this process cannot supply refuses HERE, naming the module and the
+    // client, rather than on the first request that reaches it.
     const members = buildClaimedMembers({
       source: this.stores,
       claims: declarations.map((declaration) => ({
@@ -533,9 +527,6 @@ export class ApplicationBuilder<
           resources,
           config: config[declaration.name],
           ...this.secretsFor(declaration),
-          // Each module is handed the members it declared and nothing else, so
-          // one that never named a client cannot reach for one.
-          members: membersFor(members, declaration.requiredMembers) as Members,
           repositorySelection: selections.get(declaration.name),
           role,
           replayer,
@@ -775,11 +766,7 @@ function claimedBy(declaration: DeclaredFeature): readonly string[] {
   const channels = declaration.channelRegistry;
   const channelTier = channels === void 0 ? [] : channelsRequire(channels, declaration.tier);
   // The root hands `operatorReads` to the live tier itself; no store answers it.
-  return [
-    ...declaration.requiredMembers,
-    ...tier.filter((member) => member !== "operatorReads"),
-    ...channelTier,
-  ];
+  return [...tier.filter((member) => member !== "operatorReads"), ...channelTier];
 }
 
 /** Install module's eventing pipeline if runtime exists. */

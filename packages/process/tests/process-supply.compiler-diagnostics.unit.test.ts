@@ -91,8 +91,6 @@ const statements = {
     'function installNameEvidenceErased(module: Omit<typeof clockModule, "name"> & { readonly name: string }) { return createApp({ role: "api" }).withModules([module]); }',
   broadSchema:
     'function installBroadSchema(module: Omit<typeof clockModule, "configSchema"> & Pick<SupplyModule, "configSchema">) { return createApp({ role: "api" }).withModules([module]); }',
-  membersEvidenceErased:
-    'function installMembersEvidenceErased(module: Omit<typeof clockModule, "members">) { return createApp({ role: "api" }).withModules([module]); }',
   unionArray:
     'const unionArray: (typeof peerModule | typeof projectModule)[] = [peerModule]; createApp({ role: "api" }).withModules(unionArray);',
   unionTuples:
@@ -234,7 +232,6 @@ describe("compiler checked process supply", () => {
     "namedWidenedModuleParameter",
     "nameEvidenceErased",
     "broadSchema",
-    "membersEvidenceErased",
     "unionArray",
     "unionTuples",
     "indexedPeer",

@@ -127,6 +127,9 @@
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/contract/tsconfig.build.json"
     }
   ]
 }

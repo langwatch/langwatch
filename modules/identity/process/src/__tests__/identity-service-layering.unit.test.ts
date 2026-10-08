@@ -13,8 +13,8 @@ const PRISMA_CLIENTS = new Set(["@prisma/client", "@langwatch/prisma-client"]);
  *  a new entry is a regression, and a fixed one must leave the list. */
 const COMPOSITION_RESIDUALS = new Set([
   "modules/identity/process/src/services/identity-write-gate.service.ts",
-  "modules/identity/process/src/services/join-requests.service.ts",
-  "modules/identity/process/src/services/sso-connection-guards.service.ts",
+  "modules/identity/process/src/features/join-request/services/join-requests.service.ts",
+  "modules/identity/process/src/features/sso-connection/services/sso-connection-guards.service.ts",
 ]);
 
 function sourcesUnder(dir: string): { path: string; source: string }[] {

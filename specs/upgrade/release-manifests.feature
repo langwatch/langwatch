@@ -41,6 +41,13 @@ Feature: Release manifests order every migration step release by release
     Then the step's owner is empty
 
   @unit
+  Scenario: The release workflow reads each table's owner from the architecture enforcer
+    Given a Prisma table and a ClickHouse table each written by one module, and a table no module writes
+    When the architecture enforcer prints the table-to-owner map
+    Then each owned table appears under the name its migrations use, with its module
+    And the table no module writes is absent, so a step touching it has no owner
+
+  @unit
   Scenario: A step id named by two manifests is refused when the manifests load
     Given two manifests that both name the same Prisma folder
     When the manifests are loaded

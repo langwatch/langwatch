@@ -37,20 +37,13 @@ import type {
   EvaluationInputsQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
-  EvaluationSummariesByTraceIdsQuery,
-  TraceEvaluationsQuery,
 } from "./evaluation.queries.ts";
 import type {
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
 } from "./evaluation.responses.ts";
-import type {
-  EvaluationExecutionResult,
-  EvaluationRunData,
-  EvaluationSummary,
-  TraceEvaluationData,
-} from "./evaluation.ts";
+import type { EvaluationExecutionResult, EvaluationRunData } from "./evaluation.ts";
 import type { TopicClusteringOutcome, TopicClusteringRequest } from "./langevals-clustering.ts";
 import type { PiiDetectionOutcome, PiiDetectionRequest } from "./langevals-pii-detection.ts";
 
@@ -73,12 +66,6 @@ export interface EvaluationApi {
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
-  findSummariesByTraceIds(
-    input: EvaluationSummariesByTraceIdsQuery,
-  ): Promise<Record<string, EvaluationSummary[]>>;
-  findTraceEvaluations(
-    input: TraceEvaluationsQuery,
-  ): Promise<Record<string, TraceEvaluationData[]>>;
   findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
   /** The seven-day trend of every monitor the project has; none when it has no monitors. */
@@ -109,8 +96,6 @@ export interface EvaluationApi {
   reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
   /** Queues a trace's online evaluation with the trigger's delay and dedup. */
   queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
-  /** The evaluator-id slug rule for an evaluation that names no evaluator. */
-  deriveEvaluatorId(name: string): string;
   /** The evaluation half of a trigger's legacy filters against a trace's runs. */
   matchesEvaluationFilters(input: {
     filters: Readonly<Record<string, unknown>>;

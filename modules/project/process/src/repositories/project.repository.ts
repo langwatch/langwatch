@@ -15,6 +15,8 @@ import type {
   TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
+  ProjectIdPage,
+  ProjectIdPageInput,
   ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -127,4 +129,6 @@ export interface ProjectRepository {
     memberUserId?: string;
     limit: number;
   }): Promise<string[]>;
+  /** Every project id, archived included, ordered by id and paged by cursor. */
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
 }

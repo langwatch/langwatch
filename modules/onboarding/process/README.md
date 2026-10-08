@@ -6,7 +6,7 @@ The server half of [onboarding](../README.md). Onboarding: the guided paths a ne
 
 ## Installation
 
-`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).withTransportFacts(…)`, `src/onboarding.module.ts:10`.
+`defineProcessModule("onboarding").withApi(OnboardingModule).withTransports(onboardingTrpcTransport, integrationsChecksTrpcTransport, onboardingRest).withEventing(guidedOnboardingLifecycleEventing).withTransportFacts(…)`, `src/onboarding.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -125,8 +125,12 @@ Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/tr
 Answers at `/api/onboarding/guided/paths/:path/complete`, `/api/v1/onboarding/guided/paths/:path/complete`; also, undocumented, `/api/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/v1/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/onboarding/latest/guided/paths/:path/complete`, `/api/v1/onboarding/latest/guided/paths/:path/complete`.
 
 ```typescript
-type Params = z.infer<typeof guidedPathRestParamsSchema>; // ../contract/src/onboarding-schemas.ts:111
-type Body = z.infer<typeof guidedPathCompleteRestInputSchema>; // ../contract/src/onboarding-schemas.ts:116
+// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:111
+interface Params {
+  path: string;
+}
+// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:116
+type Body = Record<string, unknown>;
 type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
 ```
 
@@ -139,6 +143,15 @@ Contract `../contract/src/onboarding.trpc.ts:147`, router `src/transport/integra
 | Procedure                           | Kind  | Gate                        | Input  | Output                          |
 | ----------------------------------- | ----- | --------------------------- | ------ | ------------------------------- |
 | `integrationsChecks.getCheckStatus` | query | Permission `project:update` | inline | `integrationsCheckStatusSchema` |
+
+```typescript
+// integrationsChecks.getCheckStatus
+// Input: inline, ../contract/src/onboarding.trpc.ts:149
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/onboarding.responses.ts:45
+```
 
 ### `onboarding`
 
@@ -157,6 +170,96 @@ Contract `../contract/src/onboarding.trpc.ts:91`, router `src/transport/onboardi
 | `onboarding.attachConversation`     | mutation | Service-authorized: organization:view; guided-onboarding state is the organization's own; the app authorizes the exact organizationId before any read or write | `attachConversationInputSchema`               | `guidedStateOutputSchema`             |
 | `onboarding.initializeOrganization` | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `onboardingInitializeOrganizationInputSchema` | `organizationInitializedSchema`       |
 | `onboarding.setIntegrationMethod`   | mutation | No permission: onboarding runs before the user belongs to any organization                                                                                     | `setIntegrationMethodInputSchema`             | `onboardingWriteAckSchema`            |
+
+```typescript
+// onboarding.getGuidedState
+// Input: organizationIdInputSchema, ../contract/src/onboarding.trpc.ts:21
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contract/src/onboarding.trpc.ts:48
+
+// onboarding.recordPaths
+// Input: recordPathsInputSchema, ../contract/src/onboarding.trpc.ts:23
+interface Input {
+  organizationId: string;
+  paths: string[];
+}
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.recordProvider
+// Input: recordProviderInputSchema, ../contract/src/onboarding.trpc.ts:26
+interface Input {
+  organizationId: string;
+  provider: string;
+  model: string;
+}
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.recordProviderSkipped
+type Input = z.infer<typeof organizationIdInputSchema>; // ../contract/src/onboarding.trpc.ts:21
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.recordVirtualKeyReveal
+// Input: recordVirtualKeyRevealInputSchema, ../contract/src/onboarding.trpc.ts:30
+interface Input {
+  organizationId: string;
+  name: string;
+  preview: string;
+  revealId: string;
+}
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.recordTour
+// Input: recordTourInputSchema, ../contract/src/onboarding.trpc.ts:35
+interface Input {
+  organizationId: string;
+  status: "completed" | "skipped" | "replayed";
+}
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.beginPath
+// Input: guidedPathInputSchema, ../contract/src/onboarding.trpc.ts:38
+interface Input {
+  organizationId: string;
+  path: string;
+}
+type Output = z.infer<typeof guidedStateWithInstanceOutputSchema>; // ../contract/src/onboarding.trpc.ts:44
+
+// onboarding.completePath
+type Input = z.infer<typeof guidedPathInputSchema>; // ../contract/src/onboarding.trpc.ts:38
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.attachConversation
+// Input: attachConversationInputSchema, ../contract/src/onboarding.trpc.ts:39
+interface Input {
+  organizationId: string;
+  conversationId: string;
+}
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+
+// onboarding.initializeOrganization
+type Input = z.infer<typeof onboardingInitializeOrganizationInputSchema>; // ../contract/src/onboarding.trpc.ts:71
+// Output: organizationInitializedSchema, ../contract/src/onboarding.responses.ts:12
+interface Output {
+  success: true;
+  teamSlug: string;
+  teamName: string;
+  teamId: string;
+  organizationId: string;
+  projectSlug: string | null;
+}
+
+// onboarding.setIntegrationMethod
+// Input: setIntegrationMethodInputSchema, ../contract/src/onboarding.trpc.ts:87
+interface Input {
+  integrationMethod: "via-claude-code" | "via-platform" | "via-claude-desktop" | "manually";
+}
+// Output: onboardingWriteAckSchema, ../contract/src/onboarding.responses.ts:25
+interface Output {
+  success: true;
+}
+```
 
 ## Sockets
 

@@ -30,17 +30,17 @@ import type {
 import type {
   SsoConnectionRegistrationRepository,
   SsoConnectionRegistrationSlot,
-} from "../repositories/sso-connection-registration.repository.ts";
+} from "../features/sso-connection/repositories/sso-connection-registration.repository.ts";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
-} from "../repositories/sso-connection.repository.ts";
+} from "../features/sso-connection/repositories/sso-connection.repository.ts";
+import type { SsoConnectionLedger } from "../features/sso-connection/rules/sso-connection-ledger.rules.ts";
+import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
+import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-domain-ceremony.service.ts";
 import { sha256Hex } from "../rules/pkce.rules.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionService } from "../services/sso-connection.service.ts";
-import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
 import { licensingFixture, StubPlatformOperators } from "./support/in-memory-connections.ts";
 
 /**

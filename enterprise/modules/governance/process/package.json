@@ -64,6 +64,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "@langwatch/webhook-contract": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",

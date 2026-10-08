@@ -41,7 +41,12 @@ Permission `alpha:view`. Declared at `src/transport/alpha.rest.ts:22`.
 Answers at `/api/alpha-items`, `/api/v1/alpha-items`; also, undocumented, `/api/alpha-items/2026-08-07`, `/api/v1/alpha-items/2026-08-07`, `/api/alpha-items/latest`, `/api/v1/alpha-items/latest`.
 
 ```typescript
-// Response: z.array(alphaItemSchema) (inline, src/transport/alpha.rest.ts:24)
+// Response: inline, src/transport/alpha.rest.ts:24
+type Response = {
+  id: string;
+  label?: string | null;
+  state: "open" | "closed";
+}[];
 ```
 
 #### `GET /:id` · `getAlphaItem`
@@ -64,6 +69,20 @@ Contract `../contract/src/alpha.trpc.ts:5`, router `src/transport/alpha.trpc.ts:
 | -------------- | -------- | --------------------------------- | ----------- | ------ |
 | `alpha.list`   | query    | No permission: every member lists | `listInput` | –      |
 | `alpha.remove` | mutation | ≈ not implemented by this router  | –           | –      |
+
+```typescript
+// alpha.list
+// Input: listInput, ../contract/src/alpha.trpc.ts:3
+interface Input {
+  projectId: string;
+  filter?: InputSchema0;
+  tags?: (string | number)[];
+  meta?: Record<string, boolean>;
+}
+type InputSchema0 = {
+  and?: InputSchema0[];
+};
+```
 
 ## Sockets
 

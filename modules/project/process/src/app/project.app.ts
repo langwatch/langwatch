@@ -369,6 +369,12 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#projectService.countWithTraces(input);
   }
 
+  listAllIds(
+    input?: projectContractModule.ProjectIdPageInput,
+  ): Promise<projectContractModule.ProjectIdPage> {
+    return this.#projectService.listAllIds(input);
+  }
+
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;

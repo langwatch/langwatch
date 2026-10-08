@@ -8,7 +8,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   combineQueries,
-  isRouteKind,
   parse,
   quoteAsPhrase,
   splitBareWords,
@@ -25,43 +24,9 @@ import {
   CONVERSATIONS_LENS_ID,
 } from "@langwatch/trace-contract";
 
-import {
-  buildRouteContext,
-  buildRouteQuestion,
-  ROUTE_QUESTION_ID,
-  type TraceSearchRouteQuestion,
-} from "../rules/trace-search-classifier-context.rules.ts";
-
 const logger = createLogger("langwatch:traces:search-router");
 
-/** One question's answer, as the router reads it. */
-interface TraceSearchVerdict {
-  readonly questionId: string;
-  readonly label?: string;
-}
-
-/** What one classification answered, whether or not it answered. */
-export interface TraceSearchClassification {
-  readonly verdicts: readonly TraceSearchVerdict[];
-  readonly skippedReason?: string;
-}
-
-/** One text, judged against the questions asked about it. */
-export interface TraceSearchClassifyRequest {
-  projectId: string;
-  text: string;
-  questions: readonly TraceSearchRouteQuestion[];
-}
-
-/**
- * The judge the router asks, declared here rather than imported: the
- * classifier is another module's, and the composition supplies it.
- */
-interface TraceSearchClassifier {
-  classify(request: TraceSearchClassifyRequest): Promise<TraceSearchClassification>;
-}
-
-/** Where a sentence goes when the classifier is not there to say. */
+/** Where a sentence goes when the browser brought no classification. */
 export type SearchRouteDecision =
   | { route: "filter"; query: string }
   | { route: "instant_eval"; instructions: string; criteria: [string, string] }
@@ -69,8 +34,6 @@ export type SearchRouteDecision =
   | { route: "langy" };
 
 export interface TraceSearchRouterDeps {
-  /** The classifier, or null when the deployment has none. */
-  classifier: TraceSearchClassifier | null;
   /** Builds a filter from a sentence (the Ask AI composer's own builder). */
   buildFilter: (input: {
     projectId: string;
@@ -84,7 +47,7 @@ export interface TraceSearchRouterDeps {
     target: InstantEvalSearchTarget;
     known: KnownProjectSignals;
   }) => Promise<InstantEvalQuestionResult>;
-  /** Decides and builds in one model call, when there is no classifier. */
+  /** Decides and builds in one model call, when there is no classification. */
   routeWithModel: (input: {
     projectId: string;
     text: string;
@@ -99,8 +62,6 @@ export interface TraceSearchRouterDeps {
     projectId: string;
     timeRange: { from: number; to: number };
   }) => Promise<KnownProjectSignals>;
-  /** Whether Instant Evals are released for the project (the flag alone). */
-  isInstantEvalReleased: (input: { projectId: string }) => Promise<boolean>;
   /** Counts a decision. Never metered. */
   recordDecision: (decision: { route: SearchRouteKind; decidedBy: SearchRouteDecidedBy }) => void;
 }
@@ -174,60 +135,27 @@ export class TraceSearchRouterService {
       this.deps.recordDecision({ route: "filter", decidedBy: "fallback" });
       return { kind: "filter", query: explicitQuery, decidedBy: "fallback" };
     }
-    const [known, isInstantEvalAvailable] = await Promise.all([
-      this.knownSignals(input),
-      input.isInstantEvalAvailable ?? this.instantEvalReleased(input),
-    ]);
+    const known = await this.knownSignals(input);
     const context: RouteContext = {
       input,
       sentence,
       explicitQuery,
       target: input.lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces",
       known,
-      available: { isLangyAvailable: input.isLangyAvailable ?? true, isInstantEvalAvailable },
+      // Instant Eval's door answers availability; absent, the judgement route stays closed.
+      available: {
+        isLangyAvailable: input.isLangyAvailable ?? true,
+        isInstantEvalAvailable: input.isInstantEvalAvailable ?? false,
+      },
     };
-    const classified = input.classified ?? (await this.classify(context));
-    if (classified) {
-      return this.applyClassified({ context, classified, decidedBy: "classifier" });
+    if (input.classified) {
+      return this.applyClassified({
+        context,
+        classified: input.classified,
+        decidedBy: "classifier",
+      });
     }
     return this.routeWithModel(context);
-  }
-
-  /** The classifier's answer, or null when it had none and the model decides. */
-  private async classify(context: RouteContext): Promise<SearchRouteKind | null> {
-    const { input } = context;
-    if (!this.deps.classifier) return null;
-    try {
-      const judgement = await this.deps.classifier.classify({
-        projectId: input.projectId,
-        text: buildRouteContext({
-          sentence: context.sentence,
-          explicitQuery: context.explicitQuery,
-          activeQuery: input.activeQuery,
-          ...(input.lensId === void 0 ? {} : { lensId: input.lensId }),
-          timeRange: input.timeRange,
-          known: context.known,
-        }),
-        questions: [buildRouteQuestion(context.available)],
-      });
-      const label = judgement.verdicts.find(
-        (candidate) => candidate.questionId === ROUTE_QUESTION_ID,
-      )?.label;
-      if (judgement.skippedReason !== void 0 || !isRouteKind(label)) {
-        logger.info(
-          { projectId: input.projectId, skippedReason: judgement.skippedReason },
-          "Classifier did not route the search; the model decides",
-        );
-        return null;
-      }
-      return label;
-    } catch (error) {
-      logger.warn(
-        { projectId: input.projectId, err: error },
-        "Classifier failed to route the search; the model decides",
-      );
-      return null;
-    }
   }
 
   private async applyClassified({
@@ -256,7 +184,7 @@ export class TraceSearchRouterService {
     }
   }
 
-  /** The model both decides and builds when the classifier had no answer. */
+  /** The model both decides and builds when the browser brought no classification. */
   private async routeWithModel(context: RouteContext): Promise<RouteSearchResult> {
     const { input } = context;
     let decision: SearchRouteDecision;
@@ -449,19 +377,6 @@ export class TraceSearchRouterService {
       question: { instructions: built.instructions, criteria: built.criteria },
       decidedBy,
     });
-  }
-
-  /** The flag read, failing closed: an unreadable flag offers no judgement. */
-  private async instantEvalReleased(input: RouteSearchInput): Promise<boolean> {
-    try {
-      return await this.deps.isInstantEvalReleased({ projectId: input.projectId });
-    } catch (error) {
-      logger.warn(
-        { projectId: input.projectId, err: error },
-        "Instant Evals release could not be read; routing without the judgement route",
-      );
-      return false;
-    }
   }
 
   private async knownSignals(input: RouteSearchInput): Promise<KnownProjectSignals> {

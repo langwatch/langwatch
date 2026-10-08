@@ -16,10 +16,11 @@ The demo agents a caller runs to see its own project fill with traces.
 
 ## What sample-agents owns
 
-| Kind    | Name                        | Declared at                               |
-| ------- | --------------------------- | ----------------------------------------- |
-| Secrets | `openAi` (OPENAI_API_KEY)   | `process/src/app/sample-agents.app.ts:30` |
-| Config  | `publicBaseUrl` (BASE_HOST) | `contract/src/sample-agents.config.ts:5`  |
+| Kind            | Name                        | Declared at                                                   |
+| --------------- | --------------------------- | ------------------------------------------------------------- |
+| Stores required |                             | `process/src/channels/http/http.sample-agents.channels.ts:10` |
+| Secrets         | `openAi` (OPENAI_API_KEY)   | `process/src/app/sample-agents.app.ts:30`                     |
+| Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/sample-agents.config.ts:5`                      |
 
 Anything else sample-agents needs belongs to another module and is reached through its `*Api`.
 

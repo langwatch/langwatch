@@ -13,8 +13,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotificationMail } from "../channels/join-request-notification-mail.channel.ts";
+import { JoinRequestNotifierService } from "../features/join-request/services/join-request-notifier.service.ts";
 import { PrismaJoinRequestAudienceRepository } from "../repositories/prisma/prisma.join-request-audience.repository.ts";
-import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
 
 type SendJoinedAutomatically = JoinRequestNotificationMail["sendJoinedAutomatically"];
 

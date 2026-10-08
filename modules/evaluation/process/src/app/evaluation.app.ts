@@ -604,10 +604,6 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#service.findRunByEvaluationId(input);
   findRunsByTraceId: EvaluationApiContract["findRunsByTraceId"] = (input) =>
     this.#service.findRunsByTraceId(input);
-  findSummariesByTraceIds: EvaluationApiContract["findSummariesByTraceIds"] = (input) =>
-    this.#service.findSummariesByTraceIds(input);
-  findTraceEvaluations: EvaluationApiContract["findTraceEvaluations"] = (input) =>
-    this.#service.findTraceEvaluations(input);
   findInputs: EvaluationApiContract["findInputs"] = (input) => this.#service.findInputs(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
@@ -630,8 +626,6 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#ledger.recordCost(input);
   recordDatasetEvaluationRow: EvaluationApiContract["recordDatasetEvaluationRow"] = (input) =>
     this.#ledger.recordDatasetRow(input);
-  deriveEvaluatorId: EvaluationApiContract["deriveEvaluatorId"] = (name) =>
-    deriveEvaluatorId({ name });
   matchesEvaluationFilters: EvaluationApiContract["matchesEvaluationFilters"] = (input) =>
     this.#filterMatching.matchesEvaluationFilters(input);
   requestTopicClustering: EvaluationApiContract["requestTopicClustering"] = (input) =>

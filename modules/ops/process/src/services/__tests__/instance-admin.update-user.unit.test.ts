@@ -42,15 +42,17 @@ async function updateUser(data: Record<string, unknown>) {
         log.push(["users.reactivate", id, actor]);
         return { ...adminOperator, id };
       },
-      deactivate: async ({ id, actor }) => {
-        log.push(["users.deactivate", id, actor]);
+    }),
+    accounts: {
+      deactivateUser: async ({ id, actor }) => {
+        log.push(["accounts.deactivateUser", id, actor]);
         return { ...adminOperator, id };
       },
-      updateProfile: async ({ id, email }) => {
-        log.push(["users.updateProfile", id, email]);
-        return { ...adminOperator, id, email: email ?? null };
+      changeUserEmail: async ({ id, email }) => {
+        log.push(["accounts.changeUserEmail", id, email]);
+        return { ...adminOperator, id, email };
       },
-    }),
+    },
     audit: new RecordingAudit(log),
   });
   const result = await service.execute({
@@ -86,6 +88,10 @@ describe("InstanceAdminService user update", () => {
   it("refuses an unrecognised deactivation value with validation_error and writes nothing", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -114,6 +120,10 @@ describe("InstanceAdminService user writes past the user module", () => {
   ])("refuses %s with validation_error and writes nothing", async (method, params) => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -133,6 +143,10 @@ describe("InstanceAdminService user create", () => {
     async (deactivatedAt) => {
       const log: unknown[] = [];
       const service = InstanceAdminService.create({
+        accounts: {
+          deactivateUser: () => Promise.reject(new Error("unreached")),
+          changeUserEmail: () => Promise.reject(new Error("unreached")),
+        },
         repository: new RecordingRepository(log),
         users: new TestUserApi({}),
         audit: new RecordingAudit(log),
@@ -191,9 +205,11 @@ describe("InstanceAdminService audit before write", () => {
         repository: new RecordingRepository(log),
         users: new TestUserApi({
           reactivate: record("users.reactivate"),
-          deactivate: record("users.deactivate"),
-          updateProfile: record("users.updateProfile"),
         }),
+        accounts: {
+          deactivateUser: record("accounts.deactivateUser"),
+          changeUserEmail: record("accounts.changeUserEmail"),
+        },
         audit: new FailingAudit(),
       });
 
@@ -207,6 +223,10 @@ describe("InstanceAdminService audit before write", () => {
   it("records every row of a bulk write before writing any of them", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -234,6 +254,10 @@ describe("InstanceAdminService audit before write", () => {
   ])("records only the changed fields' prior values for %s", async (_label, resource) => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),
@@ -261,6 +285,10 @@ describe("InstanceAdminService audit before write", () => {
   it("records a create's intended data before the row exists", async () => {
     const log: unknown[] = [];
     const service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
       audit: new RecordingAudit(log),

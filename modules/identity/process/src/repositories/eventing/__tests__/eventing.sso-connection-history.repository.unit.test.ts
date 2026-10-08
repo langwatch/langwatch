@@ -13,8 +13,8 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import type { SsoConnectionEvent } from "../../../eventing/sso-connection-state.projection.ts";
-import { EventingSsoConnectionHistoryRepository } from "../eventing.sso-connection-history.repository.ts";
+import type { SsoConnectionEvent } from "../../../features/sso-connection/eventing/sso-connection-state.projection.ts";
+import { EventingSsoConnectionHistoryRepository } from "../../../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
 
 const ACME = "org_acme";
 const CONNECTION = "ssoc_acme";

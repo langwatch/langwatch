@@ -1,6 +1,6 @@
 ---
 name: migration-data-step
-description: "Write a data, tenant or procedure step with defineMigrationStep and .withMigrations: the id `<module>:<kebab-name>`, kind, mode (blocking frozen SQL, background on the worker, operator), the required one-line description, needsOldWritersGone, and the run function with its checkpoint `{ resumeFrom, save({ report }) }`, dry-run flag and abort signal. Covers the four properties every step has (idempotent and checkpointed, level-triggered, copy never move, archive-or-fail), tenant steps (SystemMigration, the proof, per-owner state), procedure steps (storage moves), where the step's SQL may live, and how to test one. Use when someone says 'backfill', 'data migration', 'migrate the data', 'move rows', 'copy to the new column', 'fill the new column', 'migrate to object storage', 'tenant migration', 'system migration', 'held tenant', 'blocking step', 'background step', 'withMigrations', 'defineMigrationStep', 'checkpoint', 'resumeFrom', 'frozen SQL', 'level-triggered', 'idempotent backfill', 'dry run', 'archive-or-fail', or a one-shot backfill task needs converting."
+description: "Write a data, tenant or procedure step with defineMigrationStep and .withMigrations: the id `<module>:<kebab-name>`, kind, mode (blocking frozen SQL, background on the worker, operator), the required one-line description, needsOldWritersGone, and the run function with its checkpoint `{ resumeFrom, save({ report }) }`, dry-run flag and abort signal. Covers the four properties every step has (idempotent and checkpointed, level-triggered, copy never move, archive-or-fail), tenant steps (SystemMigration, the proof, per-owner state), procedure steps (storage moves), projection replay steps (defineProjectionReplayStep, the binder's replayer), where the step's SQL may live, and how to test one. Use when someone says 'backfill', 'data migration', 'migrate the data', 'move rows', 'copy to the new column', 'fill the new column', 'migrate to object storage', 'tenant migration', 'system migration', 'held tenant', 'blocking step', 'background step', 'withMigrations', 'defineMigrationStep', 'checkpoint', 'resumeFrom', 'frozen SQL', 'level-triggered', 'idempotent backfill', 'dry run', 'archive-or-fail', 'defineProjectionReplayStep', 'fill a new projection at deploy', or a one-shot backfill task needs converting."
 user-invocable: true
 argument-hint: "<what data moves, from where to where, and whether the next schema needs it done first>"
 ---
@@ -32,8 +32,10 @@ until the serving roster says every live api and worker declares this step (ADR-
 Exemplars, both declared in the module file: `modules/suite/process/src/suite.module.ts`
 (`suite:replay-scenario-facts-for-open-runs`, background, `needsOldWritersGone`, per-tenant checkpoint)
 and `modules/identity/process/src/identity.module.ts` (`identity:reopen-unproven-accounts`, blocking,
-one repository call, dry run reports `wouldReopen`). The binder gets the module's own `repositories`,
-`dependencies` (peer `*Api`s) and `app`, never another module's tables.
+one call to `repositories.migration`, dry run reports `wouldReopen`). The binder
+(`ModuleMigrationSetup`, `packages/process/src/feature-installer.ts`) gets the module's own
+`repositories`, `dependencies` (peer `*Api`s), `app` and the process's projection `replayer`, never
+another module's tables.
 
 ```ts
 // modules/suite/process/src/suite.module.ts (abridged)
@@ -69,8 +71,10 @@ the module class). `run` is the whole loop: read where `resumeFrom` left off, do
 What each field must be (`packages/upgrade/src/step/migration-step.ts`; spec
 `packages/process/specs/module-migrations.feature`):
 
-- **`id`**: `<module>:<kebab-name>`, the declaring module first. A foreign prefix, a duplicate across
-  the installed list or another shape is refused by name at collection. Never reuse an id.
+- **`id`**: `<module>:<kebab-name>`, the declaring module first. `defineMigrationStep` throws
+  `migration_step_declaration_refused` (`malformed_id`, `missing_description`, `blocking_not_data`);
+  collection throws `migration_step_collection_refused` (`foreign_prefix`, `duplicate_id`,
+  `not_a_step`; `packages/process/src/migration-steps.ts`). Never reuse an id.
 - **`description`**: one line, required, shown on the Upgrades page and in `upgrade status` before
   the step runs. Say what it does to the data in operator words, not how.
 - **`run({ checkpoint, dryRun, signal })`** returns a report (a JSON object) the ledger keeps.
@@ -95,8 +99,8 @@ the schema is at N+1 and the N+3 Prisma client names fields that do not exist ye
 - imports no service, no peer `*Api`, no model client;
 - is **immutable once released**, like a merged migration.
 
-`modules/identity/process/src/repositories/prisma/prisma.identity-backfill.repository.ts` is the
-seam's shape. A step that calls the typed client is background, never blocking.
+`modules/identity/process/src/repositories/prisma/prisma.identity-migration.repository.ts` is the
+seam's shape (raw `$queryRaw` / `$executeRaw`, called by `identity:reopen-unproven-accounts`). A step that calls the typed client is background, never blocking.
 
 ## 4. Four properties every step has
 
@@ -176,18 +180,23 @@ lane on your own pipeline) is filled at deploy by `defineProjectionReplayStep` (
 never by asking an operator to run a replay. It is a `data` step in `background` mode on the worker:
 
 ```ts
-.withMigrations(({ repositories }) => [
+// modules/trace/process/src/trace.module.ts (abridged)
+.withMigrations(({ replayer }) => [
   defineProjectionReplayStep({
-    id: "<module>:replay-<lane>",
-    description: "Fills <lane> from <owner>'s log.",
-    lane: "<lane>",                       // the projection name, local or peer
-    replayer,                             // eventing's projectionLaneReplayer({ service, projections })
+    id: "trace:fold-topic-names",
+    description: "Folds every topic model topic has recorded into trace's trace_topic_names.",
+    lane: TRACE_TOPIC_NAMES_LANE, // the projection name, local or peer
+    needsOldWritersGone: true, // an old worker does not know the new lane
+    replayer, // handed to the binder by the process
   }),
 ])
 ```
 
-- **Where `replayer` comes from is not yet ruled** (handoff `replay-step`, Risks); ops builds the
-  same engine in `modules/ops/process/src/repositories/live/live.replay-runtime.repository.ts`.
+- **`replayer` comes from the binder**, never built by the module: the process composes it
+  (`processProjectionReplayer`, `packages/process/src/projection-replayer.ts`); a process with none
+  refuses the step.
+- **`since`** (optional, default the start of the log, `PROJECTION_REPLAY_FROM_START`) is the instant
+  a first run replays from; a handed-over fold sets it to refold only the deploy overlap (record §9).
 - **Cursor checkpoint.** The report carries `replayedThrough`, the instant taken before discovery; a
   re-run (a rollback reopening the step) passes it back as `since`, so only aggregates touched after
   it are rebuilt, each from its whole history. Nothing new: nothing written. Batch saves keep the

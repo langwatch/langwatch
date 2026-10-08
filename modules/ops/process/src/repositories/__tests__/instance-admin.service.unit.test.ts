@@ -1,5 +1,6 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
-import type { UserApi, UserProfile } from "@langwatch/user-contract";
+import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
@@ -20,7 +21,7 @@ const user: UserProfile = {
   deactivatedAt: null,
 };
 
-/** The one operation an operator's email edit reaches; user ends the sessions on a real change. */
+/** The one operation an operator's email edit reaches; auth ends the sessions on a real change. */
 const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
@@ -43,17 +44,21 @@ function input(email: string): AdminOperationInput {
   };
 }
 
-function serviceWith(updateProfile: UserApi["updateProfile"]) {
+function serviceWith(changeUserEmail: AuthApi["changeUserEmail"]) {
   return InstanceAdminService.create({
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail,
+    },
     repository: new RepositoryFake(),
-    users: new TestUserApi({ updateProfile }),
+    users: new TestUserApi({}),
     audit: new AuditFake(),
   });
 }
 
 describe("InstanceAdminService user email updates", () => {
   /** @scenario "An operator changing a user's email revokes their browser sessions" */
-  it("hands the normalised email to user, which revokes on a real change", async () => {
+  it("hands the normalised email to user, which auth revokes after on a real change", async () => {
     const updateProfile = updateProfileFake("new@example.com");
 
     await serviceWith(updateProfile).execute(input(" NEW@example.com "));
@@ -71,7 +76,7 @@ describe("InstanceAdminService user email updates", () => {
   });
 
   /** @scenario "A failed revocation still leaves the new admin email in place" */
-  it("surfaces a revocation failure from user, which saved the email first", async () => {
+  it("surfaces a revocation failure from auth's door, which saved the email first", async () => {
     const updateProfile = vi.fn(async (): Promise<UserProfile> => {
       throw new Error("redis unavailable");
     });

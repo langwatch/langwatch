@@ -27,7 +27,7 @@ import {
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import { InstantEvalApi, type InstantEvalRunReference } from "@langwatch/instant-eval-contract";
+import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -684,11 +684,6 @@ export interface TraceAppDependencies {
   spanCostSuggestions: TraceSpanCostSuggestion;
   /** Evaluation's shared runs (R40), which `readEvaluationRuns` answers from. */
   evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findRunsByTraceId">;
-  /**
-   * The Instant Eval peer the search router classifies a sentence and reads
-   * the release through. Absent, the router decides with the model alone.
-   */
-  instantEvals?: Pick<InstantEvalApi, "classify" | "isReleased">;
   /** Dates eval chips' runs from instant-eval's shared table; absent, chips stay pending. */
   explorerEvalRuns?: TraceInstantEvalRunService;
   /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
@@ -800,8 +795,6 @@ type TraceReaderCompositionOptions = {
    * drops. Defaults to the coding-agent contract's pure rule; tests swap it.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
-  /** The Instant Eval peer the search router classifies a sentence through. */
-  instantEvals?: TraceAppDependencies["instantEvals"];
   storedObjects: TraceAppDependencies["storedObjects"];
   /**
    * Gates the edge media hook (`release_trace_media_extraction`). Absent, the
@@ -863,7 +856,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     plans: EntitlementApi,
     evaluators: EvaluatorApi,
     featureFlags: FeatureFlagApi,
-    instantEvals: InstantEvalApi,
     modelProviders: ModelProviderApi,
     presence: PresenceApi,
     projects: ProjectApi,
@@ -1111,7 +1103,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         modelProviders: options.modelProviders,
       }),
       evaluationRuns: options.repositories.evaluationRuns,
-      ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
       explorerEvalRuns: TraceInstantEvalRunService.create({
         runs: options.repositories.instantEvalRuns,
       }),
@@ -1326,17 +1317,13 @@ export class TraceModule implements TraceApi, CollectorApp {
     const ai = dependencies.models
       ? TraceAiQueryService.create({ models: dependencies.models, facets: this })
       : null;
-    const instantEvals = dependencies.instantEvals;
     this.#aiQuery = ai;
     this.#searchRouter = ai
       ? TraceSearchRouterService.create({
-          classifier: instantEvals ?? null,
           buildFilter: (input) => ai.generateTraceAction(input),
           buildQuestion: (input) => ai.generateInstantEvalQuestion(input),
           routeWithModel: (input) => ai.generateSearchRoute(input),
           listKnownSignals: (input) => this.#listKnownSignals(input),
-          isInstantEvalReleased: async ({ projectId }) =>
-            instantEvals ? instantEvals.isReleased({ projectId }) : false,
           // Main counted langwatch.trace_search.routes; the Prometheus name is pending a ruling.
           recordDecision: () => {},
         })

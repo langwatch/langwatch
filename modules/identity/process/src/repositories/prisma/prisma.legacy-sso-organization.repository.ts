@@ -4,7 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type LegacySsoOrganization,
   LegacySsoOrganizationRepository,
-} from "../legacy-sso-organization.repository.ts";
+} from "../../features/sso-arrival/repositories/legacy-sso-organization.repository.ts";
 
 /**
  * The two string columns the grandfather migration reads

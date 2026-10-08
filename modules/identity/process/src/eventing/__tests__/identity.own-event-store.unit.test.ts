@@ -24,11 +24,11 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { AppendingJoinRequestLedgerStore } from "../../features/join-request/eventing/join-request-appending-ledger.store.ts";
+import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
 import { EventingIdentityHistoryRepository } from "../../repositories/eventing/eventing.identity-history.repository.ts";
 import { ConnectedIdentityEventing } from "../identity-command-senders.store.ts";
 import { IdentityEventStores } from "../identity-event-stores.store.ts";
-import { AppendingJoinRequestLedgerStore } from "../join-request-appending-ledger.store.ts";
-import type { JoinRequestFoldState } from "../join-request-state.projection.ts";
 
 const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";

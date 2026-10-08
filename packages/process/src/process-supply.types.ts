@@ -3,7 +3,7 @@ import type { ModuleApiToken } from "@langwatch/module";
 import type { InstallableServerFeature, ModuleConfigFor } from "./feature-installer.ts";
 
 export type Simplify<T> = { [K in keyof T]: T[K] } & {};
-export type SupplyModule = InstallableServerFeature<never>;
+export type SupplyModule = InstallableServerFeature;
 export type Merge<Left, Right> = Simplify<Omit<Left, keyof Right> & Right>;
 type Intersection<Union> = [Union] extends [never]
   ? Record<never, never>
@@ -12,9 +12,9 @@ type Intersection<Union> = [Union] extends [never]
     : never;
 
 /**
- * Derived members (rateLimiter, cache, idempotency) keep their own names:
- * aliasing them to a base store let `withKeyvalue` satisfy the type while
- * boot refused at runtime — only the stores supply builds them.
+ * Derived store clients (rateLimiter, cache, idempotency) keep their own names:
+ * aliasing them to a base store let a per-store supply call satisfy the type
+ * while boot refused at runtime; only the stores supply builds them.
  */
 export interface MemberNames {
   prisma: "relational";
@@ -24,16 +24,8 @@ export interface MemberNames {
   logger: "logging";
   telemetry: "metrics";
 }
-type MemberName<Name> = Name extends keyof MemberNames ? MemberNames[Name] : Name;
+type SupplyNameOf<Name> = Name extends keyof MemberNames ? MemberNames[Name] : Name;
 
-type ReadMembers<Module> =
-  Module extends InstallableServerFeature<infer Members>
-    ? Module extends { readonly members: readonly (infer Name)[] }
-      ? string extends Name
-        ? Members
-        : Pick<Members, Extract<Name, keyof Members>>
-      : Members
-    : never;
 type ProviderMembers<Provider> = Provider extends {
   readonly create: (...arguments_: infer Arguments) => unknown;
 }
@@ -56,14 +48,14 @@ type RepositoryMembers<Module> = Module extends {
     >
   : Record<never, never>;
 type Normalise<Members> = {
-  readonly [Name in keyof Members as MemberName<Name>]: Name extends
+  readonly [Name in keyof Members as SupplyNameOf<Name>]: Name extends
     | "cache"
     | "rateLimiter"
     | "idempotency"
     ? unknown
     : Members[Name];
 };
-type ModuleMembers<Module> = Normalise<ReadMembers<Module> & RepositoryMembers<Module>>;
+type ModuleMembers<Module> = Normalise<RepositoryMembers<Module>>;
 export type RequiredMembers<Modules extends readonly SupplyModule[]> = Simplify<
   Intersection<
     Modules[number] extends infer Module

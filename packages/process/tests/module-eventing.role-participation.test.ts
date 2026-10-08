@@ -75,15 +75,12 @@ abstract class TraceModule {
 class ComposedTraceApp extends TraceModule {
   static readonly contract = TraceModule;
   static readonly dependencies = {};
-  /** The member this process's role decides the half of. */
-  static readonly reads = ["eventing"] as const;
 
   /** A send on the sender this process's own registration answered with. */
   record: ((note: string) => Promise<void>) | undefined;
 
   static create(
-    _setup: FeatureSetup<typeof ComposedTraceApp.dependencies, undefined> &
-      Readonly<{ members: Readonly<{ eventing: EventSourcing }> }>,
+    _setup: FeatureSetup<typeof ComposedTraceApp.dependencies, undefined>,
   ): ComposedTraceApp {
     return new ComposedTraceApp();
   }
@@ -92,6 +89,11 @@ class ComposedTraceApp extends TraceModule {
     if (!this.record) throw new Error("This process registered no record command.");
     await this.record(note);
   }
+}
+
+/** The stores of one process, answering only its eventing. */
+function eventingStores(eventing: EventSourcing) {
+  return { order: ["eventing"], read: () => eventing };
 }
 
 /** What each process was handed when it installed the declaration. */
@@ -193,11 +195,11 @@ describe("given one module declaration installed by an api process and a worker"
         queueFactory: queue.factoryFor(false),
       });
       const workerRuntime = await createApp({ role: "worker" })
-        .withEventing(worker)
+        .withStores(eventingStores(worker))
         .withModules([module])
         .boot();
       const apiRuntime = await createApp({ role: "api" })
-        .withEventing(api)
+        .withStores(eventingStores(api))
         .withModules([module])
         .boot();
 
@@ -241,7 +243,7 @@ describe("given one module declaration installed by an api process and a worker"
       });
 
       const apiRuntime = await createApp({ role: "api" })
-        .withEventing(api)
+        .withStores(eventingStores(api))
         .withModules([module])
         .boot();
 
@@ -272,7 +274,7 @@ describe("given a process whose shape is not its role's", () => {
       });
 
       const runtime = await createApp({ role: "api" })
-        .withEventing(stated)
+        .withStores(eventingStores(stated))
         .withModules([module])
         .boot();
 

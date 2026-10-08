@@ -2,11 +2,7 @@ import { RetentionFloorService } from "@langwatch/clickhouse-client";
 import {
   evaluationRunDataSchema,
   EvaluationNotFoundError,
-  evaluationSummarySchema,
-  traceEvaluationDataSchema,
   type EvaluationRunData,
-  type EvaluationSummary,
-  type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -25,33 +21,7 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
-/**
- * Load-bearing.
- */
 const RUNS = "runs" as const;
-const TRACE_EVALUATION_COLUMNS_LIGHT = [
-  "ProjectionId",
-  "TenantId",
-  "EvaluationId",
-  "Version",
-  "EvaluatorId",
-  "EvaluatorType",
-  "EvaluatorName",
-  "TraceId",
-  "IsGuardrail",
-  "Status",
-  "Score",
-  "Passed",
-  "Label",
-  "Details",
-  "Error",
-  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
-  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
-  `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
-  "LastProcessedEventId",
-  `toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAt`,
-].join(", ");
-const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
 
 function validateTenant(tenantId: string, operation: string): void {
@@ -219,102 +189,6 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
-  async findSummariesByTraceIds(input: {
-    tenantId: string;
-    traceIds: string[];
-    since: number;
-  }): Promise<Record<string, EvaluationSummary[]>> {
-    if (input.traceIds.length === 0) return {};
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.findSummariesByTraceIds");
-    try {
-      const client = await this.options.resolveClient(input.tenantId);
-      const result = await client.query({
-        query: `
-          SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
-            TraceId, IsGuardrail, Status, Score, Passed, Label
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
-            AND TraceId IN ({traceIds:Array(String)})
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
-              SELECT TenantId, EvaluationId, max(UpdatedAt)
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, EvaluationId
-            )
-          ORDER BY UpdatedAt DESC
-        `,
-        query_params: {
-          tenantId: input.tenantId,
-          traceIds: input.traceIds,
-          since: input.since,
-        },
-        format: "JSONEachRow",
-      });
-      const output: Record<string, EvaluationSummary[]> = {};
-      for (const row of await result.json<ClickHouseEvaluationRunRecord>()) {
-        if (!row.TraceId) continue;
-        const summary = evaluationSummarySchema.parse({
-          evaluationId: row.EvaluationId,
-          evaluatorId: row.EvaluatorId,
-          evaluatorType: row.EvaluatorType,
-          evaluatorName: row.EvaluatorName,
-          traceId: row.TraceId,
-          isGuardrail: Boolean(row.IsGuardrail),
-          status: row.Status,
-          score: row.Score,
-          passed: row.Passed === null ? null : Boolean(row.Passed),
-          label: row.Label,
-        });
-        (output[row.TraceId] ??= []).push(summary);
-      }
-      return output;
-    } catch (error) {
-      logger.warn(
-        { tenantId: input.tenantId, traceIdCount: input.traceIds.length, error },
-        "Failed to find evaluation summaries by trace IDs in ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  async findTraceEvaluations(input: {
-    tenantId: string;
-    traceIds: string[];
-  }): Promise<Record<string, TraceEvaluationData[]>> {
-    if (input.traceIds.length === 0) return {};
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.findTraceEvaluations");
-    const client = await this.options.resolveClient(input.tenantId);
-    try {
-      return await this.queryTraceEvaluations({
-        client,
-        tenantId: input.tenantId,
-        traceIds: input.traceIds,
-        columns: TRACE_EVALUATION_COLUMNS_WITH_INPUTS,
-      });
-    } catch (error) {
-      if (!isMemoryLimitError(error)) {
-        logger.error(
-          { tenantId: input.tenantId, traceIdCount: input.traceIds.length, error },
-          "Failed to fetch trace evaluations from ClickHouse",
-        );
-        throw error;
-      }
-      logger.warn(
-        { tenantId: input.tenantId, traceIdCount: input.traceIds.length },
-        "Trace evaluation read hit the ClickHouse memory limit; retrying without inputs",
-      );
-      return this.queryTraceEvaluations({
-        client,
-        tenantId: input.tenantId,
-        traceIds: input.traceIds,
-        columns: TRACE_EVALUATION_COLUMNS_LIGHT,
-      });
-    }
-  }
-
   async findInputs(input: {
     tenantId: string;
     evaluationId: string;
@@ -360,61 +234,6 @@ export class EvaluationRunClickHouseReadRepository {
       );
       throw error;
     }
-  }
-
-  private async queryTraceEvaluations(input: {
-    client: EvaluationClickHouseClient;
-    tenantId: string;
-    traceIds: string[];
-    columns: string;
-  }): Promise<Record<string, TraceEvaluationData[]>> {
-    const result = await input.client.query({
-      query: `
-        SELECT ${input.columns}
-        FROM ${TABLE_NAME} AS ${RUNS}
-        WHERE ${RUNS}.TenantId = {tenantId:String}
-          AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
-          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
-            SELECT TenantId, EvaluationId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId IN ({traceIds:Array(String)})
-            GROUP BY TenantId, EvaluationId
-          )
-      `,
-      query_params: { tenantId: input.tenantId, traceIds: input.traceIds },
-      format: "JSONEachRow",
-    });
-    const output = Object.fromEntries(
-      input.traceIds.map((traceId) => [traceId, [] as TraceEvaluationData[]]),
-    );
-    for (const row of await result.json<ClickHouseEvaluationRunRecord>()) {
-      if (!row.TraceId) continue;
-      const traceEvaluation = traceEvaluationDataSchema.parse({
-        evaluationId: row.EvaluationId,
-        evaluatorId: row.EvaluatorId,
-        evaluatorType: row.EvaluatorType,
-        evaluatorName: row.EvaluatorName,
-        traceId: row.TraceId,
-        isGuardrail: Boolean(row.IsGuardrail),
-        status: row.Status,
-        score: row.Score,
-        passed: row.Passed === null ? null : Boolean(row.Passed),
-        label: row.Label,
-        details: row.Details,
-        error: row.Error,
-        ...(Object.prototype.hasOwnProperty.call(row, "Inputs")
-          ? { inputs: parseObject(row.Inputs) }
-          : {}),
-        timestamps: {
-          scheduledAt: toNumberOrNull(row.ScheduledAt),
-          startedAt: toNumberOrNull(row.StartedAt),
-          completedAt: toNumberOrNull(row.CompletedAt),
-        },
-      });
-      (output[row.TraceId] ??= []).push(traceEvaluation);
-    }
-    return output;
   }
 
   private async resolveScheduledAtRange(input: EvaluationRunFloorLookup): Promise<{

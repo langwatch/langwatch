@@ -37,6 +37,19 @@ export interface ProjectUsageCount {
   readonly firstProjectAt?: number;
 }
 
+export interface ProjectIdPageInput {
+  after?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface ProjectIdPage {
+  ids: string[];
+  next: string | null;
+}
+
+/** The page size fleet scans pass to `listAllIds`. */
+export const PROJECT_ID_PAGE_LIMIT = 500;
+
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
   /** Every non-governance project with its department (main `department.service.ts:126-133`). */
@@ -179,6 +192,11 @@ export interface ProjectApi {
     memberUserId?: string;
     limit: number;
   }): Promise<string[]>;
+  /**
+   * Project ids on this install ordered by id, archived included, a page at a time
+   * for fleet-wide scans. No limit reads them all; `next` is null on the last page.
+   */
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

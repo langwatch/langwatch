@@ -57,6 +57,10 @@ describe.skipIf(!DB_URL)("the back office's max dataset file size on Postgres", 
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     service = InstanceAdminService.create({
+      accounts: {
+        deactivateUser: () => Promise.reject(new Error("unreached")),
+        changeUserEmail: () => Promise.reject(new Error("unreached")),
+      },
       repository: PrismaInstanceAdminRepository.create(prisma),
       users: new TestUserApi(),
       audit: new SilentAudit(),

@@ -18,8 +18,9 @@ The platform's own browser telemetry, proxied to its collector (ADR-058).
 
 | Kind            | Name                                                                                                                                                       | Declared at                                                  |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Stores required |                                                                                                                                                            | `process/src/channels/http/http.rum.channels.ts:17`          |
 | Stores required | redis                                                                                                                                                      | `process/src/repositories/redis/redis.rum.repositories.ts:7` |
-| Secrets         | RUM_COLLECTOR_HEADERS                                                                                                                                      | `process/src/app/rum.app.ts:34`                              |
+| Secrets         | RUM_COLLECTOR_HEADERS                                                                                                                                      | `process/src/app/rum.app.ts:29`                              |
 | Config          | `enabled` (RUM_ENABLED), `sampleRatio` (RUM_SAMPLE_RATIO), `collectorEndpoint` (RUM_COLLECTOR_ENDPOINT), `telemetryEndpoint` (OTEL_EXPORTER_OTLP_ENDPOINT) | `contract/src/rum.config.ts:14`                              |
 
 Anything else rum needs belongs to another module and is reached through its `*Api`.

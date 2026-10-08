@@ -9,8 +9,8 @@ import {
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
-import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
+import type { JoinRequestReadRepository } from "../features/join-request/repositories/join-request.repository.ts";
+import { JoinRequestGuardsService } from "../features/join-request/services/join-request-guards.service.ts";
 
 /**
  * What a guard refuses before any fact exists.

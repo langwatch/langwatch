@@ -16,10 +16,9 @@ Feature: Evaluation service boundary
 
   @unit
   Scenario: Per-trace evaluation reads use the same capability
-    Given trace evaluation cards need evaluation state or deferred inputs
+    Given evaluation cards need deferred inputs
     When the Evaluation service reads them
     Then it uses its private repository
-    And a memory-limited trace read retries without the heavy Inputs column
     And durable input markers are resolved before the value leaves the service
 
   @unit

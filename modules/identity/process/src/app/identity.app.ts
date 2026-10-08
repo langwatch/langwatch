@@ -72,39 +72,100 @@ import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-cha
 import { ConnectedIdentityEventing } from "../eventing/identity-command-senders.store.ts";
 import { IdentityEventStores } from "../eventing/identity-event-stores.store.ts";
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
-import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
-import {
-  composeJoinRequestPipeline,
-  type JoinRequestPipeline,
-} from "../eventing/join-request.pipeline.ts";
-import {
-  composeSsoConnectionGraph,
-  type SsoConnectionPipeline,
-} from "../eventing/sso-connection.pipeline.ts";
 import {
   composeIdentityPipeline,
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
-import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
-import { EventingSsoConnectionHistoryRepository } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
-import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
-import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import { JoinRequestLedgerStore } from "../features/join-request/eventing/join-request-ledger.store.ts";
 import {
-  breakGlassHolderEligibility,
-  passwordDoorMounted,
-} from "../rules/break-glass-eligibility.rules.ts";
-import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
+  composeJoinRequestPipeline,
+  type JoinRequestPipeline,
+} from "../features/join-request/eventing/join-request.pipeline.ts";
 import type {
   JoinMembership,
   JoinOfferDismissals,
   JoinRequestsServiceDeps,
   JoinSetting,
   JoinSettingAudit,
-} from "../rules/join-requests-contract.rules.ts";
-import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
-import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
-import { ssoMethodDialWith } from "../rules/sso-method-dial.rules.ts";
+} from "../features/join-request/rules/join-requests-contract.rules.ts";
+import { JoinAdmissionsService } from "../features/join-request/services/join-admissions.service.ts";
+import { JoinRequestDoorService } from "../features/join-request/services/join-request-door.service.ts";
+import { JoinRequestGuardsService } from "../features/join-request/services/join-request-guards.service.ts";
+import { JoinRequestNotifierService } from "../features/join-request/services/join-request-notifier.service.ts";
+import { JoinRequestService } from "../features/join-request/services/join-request.service.ts";
+import { JoinRequestsService } from "../features/join-request/services/join-requests.service.ts";
+import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
+import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
+import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
+import { TwoStepAccountService } from "../features/mfa/services/two-step-account.service.ts";
+import { SignUpIdentifierService } from "../features/signin/services/sign-up-identifier.service.ts";
+import { SignInAccountLookupService } from "../features/signin/services/signin-account-lookup.service.ts";
+import { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
+import { SignupAnnouncementService } from "../features/signin/services/signup-announcement.service.ts";
+import {
+  breakGlassHolderEligibility,
+  passwordDoorMounted,
+} from "../features/sso-arrival/rules/break-glass-eligibility.rules.ts";
+import type { SsoArrivalMemberships } from "../features/sso-arrival/rules/sso-arrival-contract.rules.ts";
+import { ssoMethodDialWith } from "../features/sso-arrival/rules/sso-method-dial.rules.ts";
+import { InProcessBreakGlassLimiterService } from "../features/sso-arrival/services/in-process-break-glass-limiter.service.ts";
+import { LegacySsoDomainRoutingService } from "../features/sso-arrival/services/legacy-sso-domain-routing.service.ts";
+import { SsoArrivalAdoptionService } from "../features/sso-arrival/services/sso-arrival-adoption.service.ts";
+import { SsoArrivalService } from "../features/sso-arrival/services/sso-arrival.service.ts";
+import { SsoAssertionService } from "../features/sso-arrival/services/sso-assertion.service.ts";
+import { SsoAuthenticationActivityService } from "../features/sso-arrival/services/sso-authentication-activity.service.ts";
+import { SsoBreakGlassRecoveryService } from "../features/sso-arrival/services/sso-break-glass-recovery.service.ts";
+import {
+  RequiresLocalDoorAndBinding,
+  SsoBreakGlassService,
+  type SsoBreakGlassDirectory,
+} from "../features/sso-arrival/services/sso-break-glass.service.ts";
+import { SsoIssuerDirectoryService } from "../features/sso-arrival/services/sso-issuer-directory.service.ts";
+import { SsoIssuerEndpointOriginsService } from "../features/sso-arrival/services/sso-issuer-endpoint-origins.service.ts";
+import {
+  SsoLegacyIdentityRetirementService,
+  type SsoLegacyAccessRetirement,
+  type SsoRetirementMemberships,
+} from "../features/sso-arrival/services/sso-legacy-identity-retirement.service.ts";
+import { SsoMigrationCallbackService } from "../features/sso-arrival/services/sso-migration-callback.service.ts";
+import { SsoMigrationFinalizationService } from "../features/sso-arrival/services/sso-migration-finalization.service.ts";
+import { SsoMigrationProgressService } from "../features/sso-arrival/services/sso-migration-progress.service.ts";
+import {
+  SsoTestArrivalService,
+  type SsoTestArrivalAccounts,
+  type SsoTestArrivalMemberships,
+} from "../features/sso-arrival/services/sso-test-arrival.service.ts";
+import { SsoUserResolutionService } from "../features/sso-arrival/services/sso-user-resolution.service.ts";
+import {
+  composeSsoConnectionGraph,
+  type SsoConnectionPipeline,
+} from "../features/sso-connection/eventing/sso-connection.pipeline.ts";
+import { EventingSsoConnectionHistoryRepository } from "../features/sso-connection/repositories/eventing/eventing.sso-connection-history.repository.ts";
+import { newSsoBreakGlassBindingId } from "../features/sso-connection/rules/sso-connection-id.rules.ts";
+import { OrganizationSsoConnectionsService } from "../features/sso-connection/services/organization-sso-connections.service.ts";
+import { SsoConnectionAdminService } from "../features/sso-connection/services/sso-connection-admin.service.ts";
+import { SsoConnectionDirectoryMoveService } from "../features/sso-connection/services/sso-connection-directory-move.service.ts";
+import { SsoConnectionGrandfatherService } from "../features/sso-connection/services/sso-connection-grandfather.service.ts";
+import type { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
+import { SsoConnectionHistoryService } from "../features/sso-connection/services/sso-connection-history.service.ts";
+import { SsoConnectionRoutingService } from "../features/sso-connection/services/sso-connection-routing.service.ts";
+import type { SsoConnectionService } from "../features/sso-connection/services/sso-connection.service.ts";
+import { SsoEngineProviderService } from "../features/sso-connection/services/sso-engine-provider.service.ts";
+import { SsoIdpCredentialsService } from "../features/sso-connection/services/sso-idp-credentials.service.ts";
+import { SsoIdpRegistrationService } from "../features/sso-connection/services/sso-idp-registration.service.ts";
+import { SsoRegistrantReadsService } from "../features/sso-connection/services/sso-registrant-reads.service.ts";
+import { SsoSetupCommandsService } from "../features/sso-connection/services/sso-setup-commands.service.ts";
+import { SsoSetupService } from "../features/sso-connection/services/sso-setup.service.ts";
+import { IdentityConnectionGrandfatherMigrationService } from "../features/sso-connection/services/system-migration-identity-connection-grandfather.service.ts";
+import { SsoDomainCeremonyService } from "../features/sso-domain/services/sso-domain-ceremony.service.ts";
+import { SsoDomainOwnershipBackfillService } from "../features/sso-domain/services/sso-domain-ownership-backfill.service.ts";
+import { SsoDomainReproofService } from "../features/sso-domain/services/sso-domain-reproof.service.ts";
+import { SsoDomainOwnershipMigrationService } from "../features/sso-domain/services/system-migration-sso-domain-ownership.service.ts";
+import { EventingIdentityHistoryRepository } from "../repositories/eventing/eventing.identity-history.repository.ts";
+import type { IdentityRateLimitRepository } from "../repositories/identity-rate-limit.repository.ts";
+import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
+import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
 import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
@@ -119,78 +180,17 @@ import {
 } from "../services/identity-newborn-reconciliation.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
-import { InProcessBreakGlassLimiterService } from "../services/in-process-break-glass-limiter.service.ts";
-import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
-import { JoinRequestDoorService } from "../services/join-request-door.service.ts";
-import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
-import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
-import { JoinRequestService } from "../services/join-request.service.ts";
-import { JoinRequestsService } from "../services/join-requests.service.ts";
-import { LegacySsoDomainRoutingService } from "../services/legacy-sso-domain-routing.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { MicrosoftAccountRekeyService } from "../services/microsoft-account-rekey.service.ts";
-import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
-import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
-import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import {
   CachedIdentityLatchService,
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
 import { SessionClaimsService } from "../services/session-claims.service.ts";
-import { SignUpIdentifierService } from "../services/sign-up-identifier.service.ts";
-import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
-import { SignInRouterService } from "../services/signin-router.service.ts";
-import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
-import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
-import { SsoArrivalService } from "../services/sso-arrival.service.ts";
-import { SsoAssertionService } from "../services/sso-assertion.service.ts";
-import { SsoAuthenticationActivityService } from "../services/sso-authentication-activity.service.ts";
-import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
-import {
-  RequiresLocalDoorAndBinding,
-  SsoBreakGlassService,
-  type SsoBreakGlassDirectory,
-} from "../services/sso-break-glass.service.ts";
-import { SsoConnectionAdminService } from "../services/sso-connection-admin.service.ts";
-import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
-import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
-import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
-import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
-import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
-import type { SsoConnectionService } from "../services/sso-connection.service.ts";
-import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
-import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
-import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
-import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
-import { SsoIdpCredentialsService } from "../services/sso-idp-credentials.service.ts";
-import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
-import { SsoIssuerDirectoryService } from "../services/sso-issuer-directory.service.ts";
-import { SsoIssuerEndpointOriginsService } from "../services/sso-issuer-endpoint-origins.service.ts";
-import {
-  SsoLegacyIdentityRetirementService,
-  type SsoLegacyAccessRetirement,
-  type SsoRetirementMemberships,
-} from "../services/sso-legacy-identity-retirement.service.ts";
-import { SsoMigrationCallbackService } from "../services/sso-migration-callback.service.ts";
-import { SsoMigrationFinalizationService } from "../services/sso-migration-finalization.service.ts";
-import { SsoMigrationProgressService } from "../services/sso-migration-progress.service.ts";
-import { SsoRegistrantReadsService } from "../services/sso-registrant-reads.service.ts";
-import { SsoSetupCommandsService } from "../services/sso-setup-commands.service.ts";
-import { SsoSetupService } from "../services/sso-setup.service.ts";
-import {
-  SsoTestArrivalService,
-  type SsoTestArrivalAccounts,
-  type SsoTestArrivalMemberships,
-} from "../services/sso-test-arrival.service.ts";
-import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
-import { IdentityConnectionGrandfatherMigrationService } from "../services/system-migration-identity-connection-grandfather.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
-import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
-import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
 import type { JoinRequestDoorApi } from "../transport/join-request.trpc.ts";
 /**

@@ -14,7 +14,7 @@ import type { TestPeer } from "./testing.ts";
 /** Runtime translation after process composition has resolved its declared supplies. */
 export async function bootInstalledProcess(options: {
   role: ServerRole;
-  modules: readonly InstallableServerFeature<never>[];
+  modules: readonly InstallableServerFeature[];
   config: Readonly<Record<string, unknown>>;
   /** The stores this process opened; an installation test hands `memoryStores()`. */
   stores: StoresMemberSource;
@@ -38,8 +38,6 @@ export async function bootInstalledProcess(options: {
         () => surface?.serve(),
       )
     : builder;
-  // Each declaration validates its config and named members before constructing its App.
-  return mounted
-    .withModules(options.modules as readonly InstallableServerFeature<Record<string, unknown>>[])
-    .boot();
+  // Each declaration validates its config before constructing its App.
+  return mounted.withModules(options.modules as readonly InstallableServerFeature[]).boot();
 }

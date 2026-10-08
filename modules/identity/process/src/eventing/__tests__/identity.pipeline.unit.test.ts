@@ -16,18 +16,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { identityProcessModule } from "../../identity.module.ts";
-import { SsoBreakGlassService } from "../../services/sso-break-glass.service.ts";
-import { SsoDomainReproofService } from "../../services/sso-domain-reproof.service.ts";
 import {
   BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS,
   BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
-} from "../break-glass-expiry-warn.process.ts";
-import { IDENTITY_MAINTENANCE_PIPELINE_NAME, identityEventing } from "../identity.pipeline.ts";
+} from "../../features/sso-arrival/eventing/break-glass-expiry-warn.process.ts";
+import { SsoBreakGlassService } from "../../features/sso-arrival/services/sso-break-glass.service.ts";
 import {
   SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS,
   SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
-} from "../sso-domain-reproof-sweep.process.ts";
+} from "../../features/sso-domain/eventing/sso-domain-reproof-sweep.process.ts";
+import { SsoDomainReproofService } from "../../features/sso-domain/services/sso-domain-reproof.service.ts";
+import { identityProcessModule } from "../../identity.module.ts";
+import { IDENTITY_MAINTENANCE_PIPELINE_NAME, identityEventing } from "../identity.pipeline.ts";
 
 /** An empty secrets chain: every optional handle, the sign-ups webhook included, reads as unset. */
 const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));

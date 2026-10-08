@@ -6,7 +6,7 @@ The server half of [log](../README.md). Logs: receiving OTLP logs, canonicalisin
 
 ## Installation
 
-`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing)`, `src/log.module.ts:8`.
+`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing)`, `src/log.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -65,7 +65,8 @@ Answers at `/api/otel/v1/logs`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:36)
-// Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:39)
+// Response: inline, src/transport/otlp-logs.rest.ts:39
+type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/logs` · `ingestOtlpLogsAlias`
@@ -75,9 +76,13 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/logs`.
 
 ```typescript
-type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
+// Params: otlpLogAliasParamsSchema, ../contract/src/log.api.ts:24
+interface Params {
+  otlpBase: string;
+}
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:57)
-// Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:60)
+// Response: inline, src/transport/otlp-logs.rest.ts:60
+type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/logs/` · `ingestOtlpLogsAliasSlash`
@@ -89,7 +94,8 @@ Answers at `/:otlpBase{.+}/v1/logs/`.
 ```typescript
 type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:76)
-// Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:79)
+// Response: inline, src/transport/otlp-logs.rest.ts:79
+type Response = unknown;
 ```
 
 #### `POST /v1/logs` · `ingestOtlpLogsRootV1`
@@ -100,7 +106,8 @@ Answers at `/v1/logs`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:94)
-// Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:97)
+// Response: inline, src/transport/otlp-logs.rest.ts:97
+type Response = unknown;
 ```
 
 #### `POST /v1/logs/` · `ingestOtlpLogsRootV1Slash`
@@ -111,7 +118,8 @@ Answers at `/v1/logs/`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:112)
-// Response: "protocol" (inline, src/transport/otlp-logs.rest.ts:115)
+// Response: inline, src/transport/otlp-logs.rest.ts:115
+type Response = unknown;
 ```
 
 ## tRPC transport

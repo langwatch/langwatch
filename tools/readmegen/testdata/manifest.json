@@ -155,7 +155,7 @@
       ],
       "process": {
         "installation": {
-          "text": "defineProcessModule(\"alpha\").withApi(AlphaModule).withTransports(alphaRest, alphaTrpc).withEventing(alphaEventing).withTasks(\u2026)",
+          "text": "defineProcessModule(\"alpha\").withApi(AlphaModule).withTransports(alphaRest, alphaTrpc).withEventing(alphaEventing).withTasks(…)",
           "at": {
             "file": "modules/alpha/process/src/alpha.module.ts",
             "line": 9
@@ -424,7 +424,7 @@
                   "sweep"
                 ],
                 "outbox": true,
-                "applier": "(pm) => \u2026",
+                "applier": "(pm) => …",
                 "read": true,
                 "gated": true,
                 "at": {
@@ -501,6 +501,117 @@
             }
           }
         ]
+      },
+      "browser": {
+        "name": {
+          "value": "alpha",
+          "text": "\"alpha\"",
+          "resolved": true,
+          "file": ""
+        },
+        "exportName": "alphaWeb",
+        "doc": "What a browser installs for alpha: its item screens and drawer.",
+        "at": {
+          "file": "modules/alpha/browser/src/alpha.web.ts",
+          "line": 4
+        },
+        "screens": [
+          {
+            "key": "pages/[project]/alpha",
+            "path": {
+              "value": "/:project/alpha",
+              "text": "\"/:project/alpha\"",
+              "resolved": true,
+              "file": ""
+            },
+            "within": {
+              "value": "project",
+              "text": "\"project\"",
+              "resolved": true,
+              "file": ""
+            },
+            "label": {
+              "value": "Alpha",
+              "text": "\"Alpha\"",
+              "resolved": true,
+              "file": ""
+            },
+            "requires": {
+              "value": "alpha:view",
+              "text": "\"alpha:view\"",
+              "resolved": true,
+              "file": ""
+            },
+            "flags": [],
+            "at": {
+              "file": "modules/alpha/browser/src/alpha.web.ts",
+              "line": 7
+            }
+          },
+          {
+            "key": "pages/[project]/alpha/archive",
+            "path": null,
+            "within": null,
+            "label": null,
+            "requires": null,
+            "flags": [
+              {
+                "value": "",
+                "text": "ALPHA_ARCHIVE_FLAG",
+                "resolved": false,
+                "file": ""
+              }
+            ],
+            "at": {
+              "file": "modules/alpha/browser/src/alpha.web.ts",
+              "line": 13
+            }
+          }
+        ],
+        "drawers": [
+          {
+            "name": {
+              "value": "alphaItem",
+              "text": "\"alphaItem\"",
+              "resolved": true,
+              "file": ""
+            },
+            "opens": "modules/alpha/browser/src/ui/sections/alpha-item-drawer.tsx",
+            "token": "",
+            "at": {
+              "file": "modules/alpha/browser/src/alpha.web.ts",
+              "line": 18
+            }
+          }
+        ],
+        "lends": [
+          {
+            "token": "AlphaBodyToken",
+            "at": {
+              "file": "modules/alpha/browser/src/alpha.web.ts",
+              "line": 24
+            }
+          }
+        ],
+        "hosts": [
+          {
+            "value": "AlphaHostApi",
+            "text": "\"AlphaHostApi\"",
+            "resolved": true,
+            "file": ""
+          }
+        ],
+        "capabilities": [],
+        "api": "alphaApi",
+        "contracts": [
+          {
+            "value": "alpha",
+            "text": "\"alpha\"",
+            "resolved": true,
+            "file": ""
+          }
+        ],
+        "config": []
       }
     },
     {
@@ -702,5 +813,113 @@
       }
     ],
     "error": ""
+  },
+  "uiRoutes": [
+    {
+      "page": "pages/[project]/alpha/archive",
+      "path": "/:project/alpha/archive"
+    }
+  ],
+  "schemas": {
+    "rest": [
+      {
+        "namespace": "alpha-items",
+        "operation": "listAlphaItems",
+        "schemas": {
+          "response": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      {
+        "namespace": "alpha-items",
+        "operation": "getAlphaItem",
+        "schemas": {
+          "params": {
+            "unconverted": "Transforms cannot be represented in JSON Schema"
+          }
+        }
+      }
+    ],
+    "trpc": [
+      {
+        "path": "alpha.list",
+        "input": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "filter": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "meta": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "boolean"
+              }
+            }
+          },
+          "required": [
+            "projectId"
+          ],
+          "$defs": {
+            "__schema0": {
+              "type": "object",
+              "properties": {
+                "and": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "output": null
+      }
+    ],
+    "errors": []
   }
 }

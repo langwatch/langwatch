@@ -76,8 +76,8 @@ function runOutcomeToast({ status, waiting }: { status: string | null; waiting: 
   };
 }
 
-type MigrationListing = RouterOutputs["ops"]["listSystemMigrations"][number];
-type EnrollmentListing = RouterOutputs["ops"]["listMigrationEnrollments"];
+type MigrationListing = RouterOutputs["ops"]["upgrade"]["listSystemMigrations"][number];
+type EnrollmentListing = RouterOutputs["ops"]["upgrade"]["listMigrationEnrollments"];
 type EnrollmentRecord = EnrollmentListing["enrollments"][number];
 type PickedOrganization = { id: string; name: string };
 
@@ -87,10 +87,10 @@ export function MigrationsContent() {
   const { scope } = useOpsPermission();
   const canManage = scope?.kind === "platform";
 
-  const query = api.ops.listSystemMigrations.useQuery(undefined, {});
-  const enrollmentsQuery = api.ops.listMigrationEnrollments.useQuery(undefined, {});
+  const query = api.ops.upgrade.listSystemMigrations.useQuery(undefined, {});
+  const enrollmentsQuery = api.ops.upgrade.listMigrationEnrollments.useQuery(undefined, {});
   const utils = api.useUtils();
-  const runPass = api.ops.runSystemMigrationPass.useMutation({
+  const runPass = api.ops.upgrade.runSystemMigrationPass.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Migration pass started",
@@ -98,7 +98,7 @@ export function MigrationsContent() {
           "The pass runs in the background, several organizations at a time. This page refreshes as organizations move.",
         type: "success",
       });
-      await utils.ops.listSystemMigrations.invalidate();
+      await utils.ops.upgrade.listSystemMigrations.invalidate();
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't start the pass" }),
   });
@@ -334,7 +334,7 @@ function OrganizationPicker({
     return () => clearTimeout(timer);
   }, [query]);
 
-  const search = api.ops.searchMigrationOrganizations.useQuery(
+  const search = api.ops.upgrade.searchMigrationOrganizations.useQuery(
     { query: debouncedQuery },
     { enabled: debouncedQuery.trim().length >= 2 },
   );
@@ -412,7 +412,7 @@ function EnrollAction({
   const [open, setOpen] = useState(false);
   const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
-  const enroll = api.ops.enrollMigrationTenant.useMutation({
+  const enroll = api.ops.upgrade.enrollMigrationTenant.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Organization enrolled",
@@ -422,8 +422,8 @@ function EnrollAction({
       setOpen(false);
       setOrganization(null);
       await Promise.all([
-        utils.ops.listMigrationEnrollments.invalidate(),
-        utils.ops.listSystemMigrations.invalidate(),
+        utils.ops.upgrade.listMigrationEnrollments.invalidate(),
+        utils.ops.upgrade.listSystemMigrations.invalidate(),
       ]);
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't enroll" }),
@@ -595,7 +595,7 @@ function useEnrollCohort({
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const utils = api.useUtils();
-  return api.ops.enrollMigrationCohort.useMutation({
+  return api.ops.upgrade.enrollMigrationCohort.useMutation({
     onSuccess: async (result) => {
       toaster.create(
         result.enrolled.length === 0
@@ -618,8 +618,8 @@ function useEnrollCohort({
       );
       onEnrolled();
       await Promise.all([
-        utils.ops.listMigrationEnrollments.invalidate(),
-        utils.ops.listSystemMigrations.invalidate(),
+        utils.ops.upgrade.listMigrationEnrollments.invalidate(),
+        utils.ops.upgrade.listSystemMigrations.invalidate(),
       ]);
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't enroll the cohort" }),
@@ -713,12 +713,12 @@ function RunForOrganizationAction({
   const [open, setOpen] = useState(false);
   const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
-  const run = api.ops.runSystemMigrationForOrganization.useMutation({
+  const run = api.ops.upgrade.runSystemMigrationForOrganization.useMutation({
     onSuccess: async ({ status, waiting }) => {
       toaster.create(runOutcomeToast({ status, waiting }));
       setOpen(false);
       setOrganization(null);
-      await utils.ops.listSystemMigrations.invalidate();
+      await utils.ops.upgrade.listSystemMigrations.invalidate();
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't run the migration" }),
   });
@@ -774,7 +774,7 @@ function RollBackAction({
   const [open, setOpen] = useState(false);
   const [organization, setOrganization] = useState<PickedOrganization | null>(null);
   const utils = api.useUtils();
-  const rollBack = api.ops.rollBackSystemMigrationTenant.useMutation({
+  const rollBack = api.ops.upgrade.rollBackSystemMigrationTenant.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Organization rolled back",
@@ -784,7 +784,7 @@ function RollBackAction({
       });
       setOpen(false);
       setOrganization(null);
-      await utils.ops.listSystemMigrations.invalidate();
+      await utils.ops.upgrade.listSystemMigrations.invalidate();
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't roll back" }),
   });
@@ -888,7 +888,7 @@ function EnrollmentRow({
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const utils = api.useUtils();
-  const withdraw = api.ops.withdrawMigrationTenant.useMutation({
+  const withdraw = api.ops.upgrade.withdrawMigrationTenant.useMutation({
     onSuccess: async () => {
       toaster.create({
         title: "Enrollment withdrawn",
@@ -897,8 +897,8 @@ function EnrollmentRow({
         type: "success",
       });
       await Promise.all([
-        utils.ops.listMigrationEnrollments.invalidate(),
-        utils.ops.listSystemMigrations.invalidate(),
+        utils.ops.upgrade.listMigrationEnrollments.invalidate(),
+        utils.ops.upgrade.listSystemMigrations.invalidate(),
       ]);
     },
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't withdraw" }),

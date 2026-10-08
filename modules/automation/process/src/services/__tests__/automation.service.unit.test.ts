@@ -156,6 +156,9 @@ class Triggers extends TriggerRepository {
   findSlackTriggers(): Promise<Trigger[]> {
     return Promise.resolve([]);
   }
+  findActiveSlackTriggerPage(): Promise<Trigger[]> {
+    return Promise.resolve([]);
+  }
   replaceActionParamsIfUnchanged(): Promise<boolean> {
     return Promise.resolve(false);
   }

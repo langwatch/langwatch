@@ -1,5 +1,5 @@
 /**
- * The router with no classifier, and with a route the caller already knows.
+ * The router when the browser brought no classification: the model decides.
  * Spec: specs/traces-v2/search.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +12,7 @@ import { deps, input, NoModel, ProviderDisabled, RANGE } from "./trace-search-ro
 
 const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(deps);
 
-describe("given no classifier", () => {
+describe("given no classification", () => {
   describe("when the model routes", () => {
     /** @scenario "Without the classifier the model decides and builds in one call" */
     it("uses the model's decision and merges explicit terms into its filter", async () => {
@@ -23,7 +23,9 @@ describe("given no classifier", () => {
         })),
       });
 
-      const result = await router(d).route(input({ text: "failing calls model:gpt-5-mini" }));
+      const result = await router(d).route(
+        input({ text: "failing calls model:gpt-5-mini", isInstantEvalAvailable: true }),
+      );
 
       expect(result).toEqual({
         kind: "filter",
@@ -50,7 +52,7 @@ describe("given no classifier", () => {
         })),
       });
 
-      const result = await router(d).route(input());
+      const result = await router(d).route(input({ isInstantEvalAvailable: true }));
 
       expect(result).toMatchObject({
         kind: "instant_eval",

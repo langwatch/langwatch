@@ -22,9 +22,9 @@ const OWN_ACCOUNT = "operates on the session user's own account, so no tenant sc
 const ANY_SIGNED_IN =
   "a photo shows wherever a person is shown, across organizations; the object's purpose and owner kind gate it";
 
-/** Why the two lifecycle procedures decide standing in the application. */
+/** Why reactivation decides standing in the application. */
 const SELF_OR_OPERATOR =
-  "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
+  "operator-only for the named account; the application enforces operator standing itself, against the platform operator list rather than a tenant";
 
 /**
  * Who is asking. The outer id is the SUBJECT — the account being read and
@@ -209,14 +209,6 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
       keepSessionId: deriveKeptSession({ actor, browserSession }),
       caller: callerOf(actor),
     });
-
-    return { success: true as const };
-  })
-
-  .procedure("deactivate")
-  .noPermission({ reason: SELF_OR_OPERATOR })
-  .handle(async ({ app, actor, input }) => {
-    await app.deactivateAccount({ userId: input.userId, caller: callerOf(actor) });
 
     return { success: true as const };
   })

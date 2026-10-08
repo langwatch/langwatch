@@ -26,8 +26,6 @@ abstract class DirectoryService {
   abstract nameOf(id: string): string;
 }
 
-type TestMembers = Readonly<{ prefix: string }>;
-
 class Greeting extends GreetingService {
   constructor(private readonly prefix: string) {
     super();
@@ -45,11 +43,10 @@ class Directory extends DirectoryService {
 }
 
 function greetingFeature(setup = vi.fn()) {
-  return serverFeature<TestMembers>("greeting")
-    .withMembers("prefix")
-    .withSetup(({ members }) => {
+  return serverFeature("greeting")
+    .withSetup(() => {
       setup();
-      return { greeting: new Greeting(members.prefix) };
+      return { greeting: new Greeting("one") };
     })
     .provides(GreetingApp)
     .withTransport(({ provided }) => ({ door: { greeting: provided.greeting } }))
@@ -76,31 +73,13 @@ describe("the server feature container", () => {
       await application.boot();
       expect(setup).toHaveBeenCalledOnce();
     });
-
-    it("hands a module the members it named and nothing else", async () => {
-      const declaration = serverFeature<TestMembers>("isolated")
-        .withMembers("prefix")
-        .withSetup(({ members }) => ({ value: members.prefix }))
-        .build();
-
-      const booted = await new ApplicationBuilder({
-        role: "worker",
-        stores: memberSourceOf({ prefix: "process", unread: "never built" }),
-      })
-        .withModules([declaration])
-        .boot();
-
-      // The process could build `unread`, and does not: nothing asked for it.
-      expect(booted.members).toEqual({ prefix: "process" });
-      expect(booted.module(declaration).provided.value).toBe("process");
-    });
   });
 
   /** @scenario "The provided app is the setup result" */
   it("hands the setup's own app to the provider and the transport without constructing it again", async () => {
     const app = { greeting: new Greeting("exact") };
     const setup = vi.fn(() => app);
-    const declaration = serverFeature<object>("greeting")
+    const declaration = serverFeature("greeting")
       .withSetup(setup)
       .provides(GreetingApp)
       .withTransport(({ provided }) => ({ received: provided }))
@@ -119,7 +98,7 @@ describe("the server feature container", () => {
 
   /** @scenario "A feature cannot publish a second provider" */
   it("rejects a second provider instead of replacing the public app", () => {
-    const declaration = serverFeature<TestMembers>("greeting")
+    const declaration = serverFeature("greeting")
       .withSetup(() => ({ greeting: new Greeting("one") }))
       .provides(GreetingApp);
 
@@ -133,7 +112,7 @@ describe("the server feature container", () => {
     const transport = vi.fn();
     const worker = vi.fn();
     const setup = vi.fn(() => ({ greeting: new Greeting("task") }));
-    const declaration = serverFeature<TestMembers>("greeting")
+    const declaration = serverFeature("greeting")
       .withTransportDependencies({ directory: DirectoryApp })
       .withSetup(setup)
       .provides(GreetingApp)
@@ -179,7 +158,7 @@ describe("the server feature container", () => {
     /** @scenario "A feature whose dependency nobody provides never serves" */
     it("fails the boot naming the feature, the dependency key and the token, and serves nothing", async () => {
       const setup = vi.fn();
-      const declaration = serverFeature<TestMembers>("queue")
+      const declaration = serverFeature("queue")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(({ dependencies }) => {
           setup();
@@ -204,12 +183,12 @@ describe("the server feature container", () => {
 
   describe("when features depend on each other", () => {
     it("refuses the boot naming the cycle", async () => {
-      const first = serverFeature<TestMembers>("first")
+      const first = serverFeature("first")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => ({ greeting: new Greeting("first") }))
         .provides(GreetingApp)
         .build();
-      const second = serverFeature<TestMembers>("second")
+      const second = serverFeature("second")
         .withDependencies({ greeting: GreetingApp })
         .withSetup(() => ({ directory: new Directory() }))
         .provides(DirectoryApp)
@@ -229,14 +208,14 @@ describe("the server feature container", () => {
 
     it("constructs a provider before the feature that depends on it", async () => {
       const order: string[] = [];
-      const directory = serverFeature<TestMembers>("directory")
+      const directory = serverFeature("directory")
         .withSetup(() => {
           order.push("directory");
           return { directory: new Directory() };
         })
         .provides(DirectoryApp)
         .build();
-      const queue = serverFeature<TestMembers>("queue")
+      const queue = serverFeature("queue")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => {
           order.push("queue");
@@ -256,7 +235,7 @@ describe("the server feature container", () => {
     /** @scenario "One declaration contributes to API and worker roles" */
     it("selects API contributions from a shared API and worker declaration", async () => {
       const worker = vi.fn(() => ({ consumers: ["index-traces"] }));
-      const declaration = serverFeature<TestMembers>("indexing")
+      const declaration = serverFeature("indexing")
         .withSetup(() => ({}))
         .withRest(() => ({ route: "/index" }))
         .withWorker(worker)
@@ -274,7 +253,7 @@ describe("the server feature container", () => {
     });
 
     it("installs the same feature in the worker role without its transport dependencies", async () => {
-      const declaration = serverFeature<TestMembers>("indexing")
+      const declaration = serverFeature("indexing")
         .withTransportDependencies({ directory: DirectoryApp })
         .withSetup(() => ({ indexed: true }))
         .withWorker(() => ({ consumers: ["index-traces"] }))
@@ -294,14 +273,14 @@ describe("the server feature container", () => {
   describe("when a boot fails part way", () => {
     it("closes what it already constructed, in reverse order", async () => {
       const closed: string[] = [];
-      const directory = serverFeature<TestMembers>("directory")
+      const directory = serverFeature("directory")
         .withSetup(() => ({ directory: new Directory() }))
         .provides(DirectoryApp)
         .withClose(() => {
           closed.push("directory");
         })
         .build();
-      const failing = serverFeature<TestMembers>("failing")
+      const failing = serverFeature("failing")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => {
           throw new Error("no index storage");
@@ -322,7 +301,7 @@ describe("the server feature container", () => {
   describe("when the runtime stops", () => {
     it("stops its services before releasing the features they used", async () => {
       const phases: string[] = [];
-      const declaration = serverFeature<TestMembers>("directory")
+      const declaration = serverFeature("directory")
         .withSetup(() => ({ directory: new Directory() }))
         .withClose(() => {
           phases.push("feature closed");
@@ -381,7 +360,7 @@ describe("runtime failure ownership", () => {
    */
   it("constructs a worker contribution once and rejects unavailable transports", async () => {
     const worker = vi.fn(() => ({ consumer: {} }));
-    const feature = serverFeature<object>("jobs")
+    const feature = serverFeature("jobs")
       .withSetup(() => ({}))
       .withWorker(worker)
       .build();
@@ -400,14 +379,14 @@ describe("runtime failure ownership", () => {
     async (phase) => {
       const closed: string[] = [];
       const failure = new Error("construction failed");
-      const first = serverFeature<object>("first")
+      const first = serverFeature("first")
         .withSetup(() => ({}))
         .withClose(async () => {
           await Promise.resolve();
           closed.push("first");
         })
         .build();
-      const failing = serverFeature<object>("failing")
+      const failing = serverFeature("failing")
         .withSetup(({ resources }) => {
           resources.own("partial connection", async () => {
             await Promise.resolve();
@@ -443,7 +422,7 @@ describe("runtime failure ownership", () => {
     const failure = new Error("setup");
     const cleanup = new Error("cleanup");
     const closed = vi.fn();
-    const feature = serverFeature<object>("failure")
+    const feature = serverFeature("failure")
       .withSetup(({ resources }) => {
         resources.own("first", closed);
         resources.own("second", () => {
@@ -490,7 +469,7 @@ describe("runtime failure ownership", () => {
   it("rolls back a partial start in reverse order and preserves its failure", async () => {
     const phases: string[] = [];
     const failure = new Error("listener failed");
-    const feature = serverFeature<object>("owned")
+    const feature = serverFeature("owned")
       .withSetup(() => ({}))
       .withClose(() => {
         phases.push("resources");
@@ -535,7 +514,7 @@ describe("runtime failure ownership", () => {
    */
   it("continues shutdown after service failures and aggregates them with resource failures", async () => {
     const stopped: string[] = [];
-    const feature = serverFeature<object>("owned")
+    const feature = serverFeature("owned")
       .withSetup(() => ({}))
       .withClose(() => {
         stopped.push("resource");

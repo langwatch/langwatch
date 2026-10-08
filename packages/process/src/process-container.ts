@@ -12,7 +12,7 @@ import type { BootedRuntime } from "./application.ts";
 import type { InstallableServerFeature } from "./feature-installer.ts";
 import type { ServedApplication } from "./server.ts";
 
-export type ProcessModule = InstallableServerFeature<never> & {
+export type ProcessModule = InstallableServerFeature & {
   readonly publicConfig?: (config: unknown, api: unknown) => unknown;
 };
 /** An owner the server's config named that is also an installable module. */

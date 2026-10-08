@@ -6,7 +6,7 @@ The server half of [sample-agents](../README.md). The demo agents a caller runs 
 
 ## Installation
 
-`defineProcessModule("sample-agents").withApi(SampleAgentsModule).withTransports(hotelBotRest)`, `src/sample-agents.module.ts:7`.
+`defineProcessModule("sample-agents").withChannels(sampleAgentsChannels).withApi(SampleAgentsModule).withTransports(hotelBotRest)`, `src/sample-agents.module.ts:8`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -40,9 +40,14 @@ Platform permission `ops:manage`. Credential `browser`. Hidden from the OpenAPI 
 Answers at `/api/demo/hotel_bot`.
 
 ```typescript
-type Body = z.infer<typeof hotelBotRequestSchema>; // ../contract/src/sample-agents.api.ts:13
+// Body: hotelBotRequestSchema, ../contract/src/sample-agents.api.ts:13
+type Body = Record<string, unknown>;
 type Headers = z.infer<typeof hotelBotHeadersSchema>; // ../contract/src/sample-agents.api.ts:16
-type Response = z.infer<typeof hotelBotReplySchema>; // ../contract/src/sample-agents.api.ts:27
+// Response: hotelBotReplySchema, ../contract/src/sample-agents.api.ts:27
+interface Response {
+  message: "Sent to LangWatch";
+  ragResponse?: string | null;
+}
 ```
 
 ## tRPC transport

@@ -37,6 +37,6 @@ Anything else entitlement needs belongs to another module and is reached through
 
 ## Who depends on entitlement
 
-[analytics](../analytics/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [data-retention](../data-retention/README.md), [dataset](../dataset/README.md), [experiment](../experiment/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [organization](../organization/README.md), [prompt](../prompt/README.md), [role](../role/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [data-retention](../data-retention/README.md), [dataset](../dataset/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [instant-eval](../instant-eval/README.md), [langy](../langy/README.md), [organization](../organization/README.md), [prompt](../prompt/README.md), [role](../role/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [trace](../trace/README.md), [webhook](../webhook/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -11,13 +11,34 @@ import {
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 import type { IdentityModule } from "../app/identity.app.ts";
+import {
+  MfaEnrollmentStateFoldProjection,
+  type MfaEvent,
+  type MfaFoldState,
+  mfaEnrolledEventSchema,
+  mfaConfirmedEventSchema,
+  mfaEnrollmentExpiredEventSchema,
+  mfaDisabledEventSchema,
+  backupCodeConsumedEventSchema,
+  backupCodesRegeneratedEventSchema,
+  mfaVerificationFailedEventSchema,
+} from "../features/mfa/eventing/mfa-enrollment-state.projection.ts";
+import {
+  ConfirmMfaCommand,
+  ConsumeBackupCodeCommand,
+  DisableMfaCommand,
+  EnrollMfaCommand,
+  ExpireMfaEnrollmentCommand,
+  RecordMfaVerificationFailureCommand,
+  RegenerateBackupCodesCommand,
+} from "../features/mfa/eventing/mfa.intent.ts";
+import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
 import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { AttachIdentifierCommand } from "./attach-identifier.intent.ts";
 import { ConfirmLinkCommand, RejectLinkCommand } from "./decide-link.intent.ts";
 import { DetachIdentifierCommand } from "./detach-identifier.intent.ts";
@@ -37,27 +58,6 @@ import {
   linkRejectedEventSchema,
 } from "./identity-state.projection.ts";
 import { MarkPrimaryCommand } from "./mark-primary.intent.ts";
-import {
-  MfaEnrollmentStateFoldProjection,
-  type MfaEvent,
-  type MfaFoldState,
-  mfaEnrolledEventSchema,
-  mfaConfirmedEventSchema,
-  mfaEnrollmentExpiredEventSchema,
-  mfaDisabledEventSchema,
-  backupCodeConsumedEventSchema,
-  backupCodesRegeneratedEventSchema,
-  mfaVerificationFailedEventSchema,
-} from "./mfa-enrollment-state.projection.ts";
-import {
-  ConfirmMfaCommand,
-  ConsumeBackupCodeCommand,
-  DisableMfaCommand,
-  EnrollMfaCommand,
-  ExpireMfaEnrollmentCommand,
-  RecordMfaVerificationFailureCommand,
-  RegenerateBackupCodesCommand,
-} from "./mfa.intent.ts";
 import { ProposeLinkCommand } from "./propose-link.intent.ts";
 import { VerifyIdentifierCommand } from "./verify-identifier.intent.ts";
 

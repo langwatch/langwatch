@@ -15,10 +15,7 @@ describe("given a worker process with one feature installer", () => {
       const setup = vi.fn(() => ({}));
       const consumers = vi.fn(() => ({ consumers: ["index-traces"] }));
       const started = vi.fn();
-      const feature = serverFeature<object>("indexing")
-        .withSetup(setup)
-        .withWorker(consumers)
-        .build();
+      const feature = serverFeature("indexing").withSetup(setup).withWorker(consumers).build();
       const runtime = await new ApplicationBuilder({ role: "worker", stores: memberSourceOf({}) })
         .withService({ name: "consumers", start: started, stop: () => undefined })
         .withModules([feature])
@@ -44,13 +41,13 @@ describe("given a worker process with two feature installers", () => {
     /** @scenario "A failed installation closes what was already installed" */
     it("refuses to start and closes the feature installed first", async () => {
       const closed: string[] = [];
-      const first = serverFeature<object>("first")
+      const first = serverFeature("first")
         .withSetup(() => ({}))
         .withClose(() => {
           closed.push("first");
         })
         .build();
-      const second = serverFeature<object>("second")
+      const second = serverFeature("second")
         .withSetup(() => {
           throw new Error("second failed to install");
         })

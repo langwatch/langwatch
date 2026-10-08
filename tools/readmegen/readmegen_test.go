@@ -19,9 +19,12 @@ var readmeFixture = map[string]string{
 		`{"id":"alpha","root":"modules/alpha","classification":"core","subjects":["alpha","alpha-item"]},` +
 		`{"id":"gamma","root":"modules/gamma","classification":"core","subjects":["gamma"]},` +
 		`{"id":"beta","root":"enterprise/modules/beta","classification":"enterprise","subjects":["beta"]}]}`,
-	"modules/alpha/contract/package.json":                     `{"name":"@lw/alpha-contract"}`,
-	"modules/alpha/process/package.json":                      `{"name":"@lw/alpha-process","dependencies":{"@lw/core":"workspace:*"}}`,
-	"modules/alpha/browser/package.json":                      `{"name":"@lw/alpha-browser"}`,
+	"modules/alpha/contract/package.json": `{"name":"@lw/alpha-contract"}`,
+	"modules/alpha/process/package.json":  `{"name":"@lw/alpha-process","dependencies":{"@lw/core":"workspace:*"}}`,
+	"modules/alpha/browser/package.json": `{"name":"@lw/alpha-browser","dependencies":{"@lw/alpha-client":"workspace:*"},` +
+		`"exports":{"./declaration":{"default":"./src/alpha.web.ts"}}}`,
+	"modules/gamma/browser/src/open-alpha.ts":                 "openDrawer(\"alphaItem\", {});\n",
+	"apps/ui/src/links.ts":                                    "export const href = \"?drawer.open=alphaItem\";\n",
 	"modules/alpha/process/node_modules/ignored/package.json": `{"name":"@lw/never-read"}`,
 	"modules/alpha/process/dist/package.json":                 `{"name":"@lw/never-read-either"}`,
 	"modules/gamma/process/package.json":                      `{"name":"@lw/gamma-process","dependencies":{"@lw/core":"workspace:*"}}`,
@@ -94,7 +97,7 @@ func TestWriteMatchesGoldenPages(t *testing.T) {
 	if !strings.Contains(stdout, "Wrote modules/alpha/README.md\n") {
 		t.Errorf("stdout does not report the alpha page:\n%s", stdout)
 	}
-	if !strings.Contains(stderr, "unresolved values (shown with ≈): 1 config, 1 peer") {
+	if !strings.Contains(stderr, "unresolved values (shown with ≈): 1 browser, 1 config, 1 peer, 2 process manager, 1 schema") {
 		t.Errorf("stderr does not count the unresolved values:\n%s", stderr)
 	}
 	for _, page := range generatedPages(t, root) {

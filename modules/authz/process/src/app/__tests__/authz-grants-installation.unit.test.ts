@@ -90,7 +90,6 @@ describe("given a process with dispatch and no database", () => {
       authzProcessModule.install({
         resources,
         config: undefined,
-        members: {},
         repositorySelection: { tier: "live", members: { redis: redisDouble() } },
         role: "api",
         secrets: createApiFixture<InstallSecrets>(),

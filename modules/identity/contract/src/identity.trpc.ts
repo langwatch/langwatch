@@ -9,7 +9,7 @@ import {
   identifierCodeChallengeSchema,
   methodsLastUsedSchema,
 } from "./account-identifiers.ts";
-import { ssoTestArrivalStandingSchema } from "./sso-admission.ts";
+import { ssoTestArrivalStandingSchema } from "./features/sso-arrival/sso-admission.ts";
 
 const emptyInputSchema = z.object({});
 

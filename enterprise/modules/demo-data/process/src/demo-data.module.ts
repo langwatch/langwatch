@@ -9,8 +9,7 @@ import { DemoDataTask } from "./tasks/demo-data.task.ts";
 export const demoDataProcessModule: PublishedProcessModule<
   "demo-data",
   DemoDataApi,
-  DemoDataConfig,
-  unknown
+  DemoDataConfig
 > = defineProcessModule("demo-data")
   .withApi(DemoDataModule)
   .withEventing(demoDataEventing)

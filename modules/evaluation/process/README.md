@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:58`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:51`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -82,18 +82,6 @@ findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | n
 
 ```typescript
 findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
-```
-
-#### `findSummariesByTraceIds`
-
-```typescript
-findSummariesByTraceIds(input: EvaluationSummariesByTraceIdsQuery): Promise<Record<string, EvaluationSummary[]>>;
-```
-
-#### `findTraceEvaluations`
-
-```typescript
-findTraceEvaluations(input: TraceEvaluationsQuery): Promise<Record<string, TraceEvaluationData[]>>;
 ```
 
 #### `findInputs`
@@ -196,14 +184,6 @@ Queues a trace's online evaluation with the trigger's delay and dedup.
 queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
 ```
 
-#### `deriveEvaluatorId`
-
-The evaluator-id slug rule for an evaluation that names no evaluator.
-
-```typescript
-deriveEvaluatorId(name: string): string;
-```
-
 #### `matchesEvaluationFilters`
 
 The evaluation half of a trigger's legacy filters against a trace's runs.
@@ -234,7 +214,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:170` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:171` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -243,54 +223,65 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:178`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:179`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:185)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:186
+type Response = unknown;
 ```
 
 #### `POST /api/evaluations/:evaluator/evaluate` · `postApiEvaluationsByEvaluatorEvaluate`
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:206`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:207`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:209)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:212)
+// Params: evaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:8
+interface Params {
+  evaluator: string;
+}
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:210)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:213
+type Response = unknown;
 ```
 
 #### `POST /api/evaluations/:evaluator/:subpath/evaluate` · `postApiEvaluationsByEvaluatorBySubpathEvaluate`
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:237`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:238`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof namespacedEvaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:16
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:243)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:246)
+// Params: namespacedEvaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:16
+interface Params {
+  evaluator: string;
+  subpath: string;
+}
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:244)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:247
+type Response = unknown;
 ```
 
 #### `POST /api/guardrails/:evaluator/evaluate` · `postApiGuardrailsByEvaluatorEvaluate`
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:271`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:272`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:273)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:276)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:274)
+// Response: inline, src/transport/evaluations-legacy.rest.ts:277
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -307,6 +298,65 @@ Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluati
 | `evaluations.warmupLambda`                    | mutation | Permission `evaluations:view`                   | `warmupEvaluatorsInputSchema`             | `evaluationWarmupSchema`     |
 | `evaluations.getMonitorPerformanceForProject` | query    | Permission `evaluations:view or analytics:view` | `monitorPerformanceForProjectInputSchema` | inline                       |
 | `evaluations.getEvaluationInputs`             | query    | Permission `traces:view`                        | `evaluationInputsInputSchema`             | `evaluationInputsSchema`     |
+
+```typescript
+// evaluations.availableEvaluators
+// Input: evaluationProjectScopeSchema, ../contract/src/evaluation-trpc.schemas.ts:9
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:33
+
+// evaluations.availableCustomEvaluators
+type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:9
+// Output: inline, ../contract/src/evaluation.trpc.ts:39
+type Output = {
+  id: string;
+  name: string;
+  versions: Record<string, unknown>[];
+  [key: string]: unknown;
+}[];
+
+// evaluations.runEvaluation
+type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:40
+type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:39
+
+// evaluations.warmupLambda
+// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:49
+interface Input {
+  projectId: string;
+  count?: number;
+}
+// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:49
+interface Output {
+  success: boolean;
+  count: number;
+}
+
+// evaluations.getMonitorPerformanceForProject
+// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:29
+interface Input {
+  projectId: string;
+  timeZone?: string;
+}
+// Output: inline, ../contract/src/evaluation.trpc.ts:60
+type Output = {
+  monitorId: string;
+  metric: "score" | "pass_rate";
+  points: number[];
+  current: number | null;
+  previous: number | null;
+}[];
+
+// evaluations.getEvaluationInputs
+// Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:13
+interface Input {
+  projectId: string;
+  evaluationId: string;
+}
+// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:19
+type Output = Record<string, unknown> | null;
+```
 
 ## Sockets
 

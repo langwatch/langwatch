@@ -2475,6 +2475,10 @@ model WebhookEndpoint {
   sqsAccessKeyId              String?
   sqsSecretAccessKeyEncrypted String?
   secretEncrypted             String
+  /// How deliveries are formatted and signed. Null: the batch envelope signed
+  /// `t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept
+  /// only for endpoints migrated from governance anomaly destinations.
+  signatureScheme             String?
   /// The secret this endpoint signed with before the last roll. Deliveries
   /// carry a second `v1=` computed from it until it expires, so a receiver
   /// swaps secrets on its own schedule instead of dropping deliveries in the

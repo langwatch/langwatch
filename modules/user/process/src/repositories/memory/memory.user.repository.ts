@@ -14,7 +14,6 @@ import {
   type CreateUserInput,
   type CreatedUser,
   type SetFirstUserPasswordResult,
-  type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
@@ -34,6 +33,7 @@ import type {
   UserCreatedRow,
   UserDeactivationOutcome,
   UserRepository,
+  StoredProfileChange,
 } from "../user.repository.ts";
 import { type MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.ts";
 
@@ -217,7 +217,7 @@ export class MemoryUserRepository implements UserRepository {
     });
   }
 
-  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+  async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
     const row = this.#require(input.id);
     const updated: MemoryUserRow = {
       ...row,

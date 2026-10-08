@@ -20,6 +20,7 @@ Prompts: versioned prompt configurations, their tags and handles, syncing from t
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Postgres, accessed not claimed | `LlmPromptConfig`, `LlmPromptConfigVersion`, `Project`, `PromptTag`, `PromptTagAssignment` | `process/src/repositories/prisma/prisma.prompt-version.repository.ts:31` |
 | Stores required                | prisma, rateLimiter                                                                        | `process/src/repositories/prisma/prisma.prompt.repositories.ts:22`       |
+| Config                         | `publicBaseUrl` (BASE_HOST)                                                                | `contract/src/prompt.config.ts:5`                                        |
 
 Anything else prompt needs belongs to another module and is reached through its `*Api`.
 
@@ -35,6 +36,6 @@ Anything else prompt needs belongs to another module and is reached through its 
 
 ## Who depends on prompt
 
-[audit-log](../audit-log/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md) (as a peer).
+[experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [suite](../suite/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -30,6 +30,7 @@ const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
 const getMyAddressConfirmation = vi.fn<AuthApi["getMyAddressConfirmation"]>();
 const getPriorSession = vi.fn<AuthApi["getPriorSession"]>();
+const deactivateAccount = vi.fn<AuthApi["deactivateAccount"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -84,6 +85,9 @@ const door: AuthApi = {
   saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
   releaseHeldAccount: () => unreached("releaseHeldAccount"),
   changeFederatedPassword: () => unreached("changeFederatedPassword"),
+  deactivateUser: () => unreached("deactivateUser"),
+  deactivateAccount,
+  changeUserEmail: () => unreached("changeUserEmail"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */
@@ -116,6 +120,7 @@ describe("the signed-out front door", () => {
   describe("given the mounted router", () => {
     it("publishes exactly the procedure names the signed-out screens call", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "deactivate",
         "inviteLanding",
         "myAddressConfirmation",
         "priorSession",
@@ -144,6 +149,21 @@ describe("the signed-out front door", () => {
         myAddressConfirmation: "query",
         signUpEnrollment: "mutation",
         priorSession: "query",
+        deactivate: "mutation",
+      });
+    });
+  });
+
+  describe("when a signed-in person deactivates their own account", () => {
+    /** @scenario "The deactivate procedure answers on auth's namespace" */
+    it("hands auth the caller as themselves and answers success, as user.deactivate did", async () => {
+      deactivateAccount.mockResolvedValue(undefined);
+      const person = router.createCaller({ actor: { id: "user-1" } });
+
+      await expect(person.deactivate({ userId: "user-1" })).resolves.toEqual({ success: true });
+      expect(deactivateAccount).toHaveBeenCalledWith({
+        userId: "user-1",
+        caller: { id: "user-1", operatorId: "user-1", impersonated: false },
       });
     });
   });

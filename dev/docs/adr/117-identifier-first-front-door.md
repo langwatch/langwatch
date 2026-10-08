@@ -365,7 +365,7 @@ domain redirects to its identity provider whether or not an account exists,
 because just-in-time provisioning is what makes that correct.
 
 **The full sequence**, in order, supersedes §1's table above
-(`routeSignIn` in `modules/identity/contract/src/signin-routing.ts`):
+(`routeSignIn` in `modules/identity/contract/src/features/signin/signin-routing.ts`):
 
 ```
 break-glass                → local method set     break_glass

@@ -9376,6 +9376,15 @@
           "documentation": ""
         },
         {
+          "name": "signatureScheme",
+          "columnName": "signatureScheme",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "How deliveries are formatted and signed. Null: the batch envelope signed\n`t=,v1=`. `legacy_sha256`: one raw message per POST signed `sha256=`, kept\nonly for endpoints migrated from governance anomaly destinations."
+        },
+        {
           "name": "previousSecretEncrypted",
           "columnName": "previousSecretEncrypted",
           "type": "String",

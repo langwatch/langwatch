@@ -396,7 +396,7 @@ Feature: Instant Evals inside the Trace Explorer
       Then trace routes the search with Instant Evals unavailable
       And the route is a filter or the phrase search, never an Instant Eval
 
-    @integration @unimplemented
+    @integration
     Scenario: A missing classification falls back as it does today
       Given Instant Eval's classifier skips, fails, or is not composed
       When the user submits "frustrated users"
