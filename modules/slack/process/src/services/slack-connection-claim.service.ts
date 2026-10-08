@@ -1,6 +1,10 @@
-import type { SlackConnectionClaimant } from "@langwatch/slack-contract";
+import type { SlackConnectionClaimant, SlackConnectionClaimPage } from "@langwatch/slack-contract";
+import { z } from "zod";
 
-import type { SlackConnectionClaimRepository } from "../repositories/slack-connection-claim.repository.ts";
+import type {
+  SlackConnectionClaimKey,
+  SlackConnectionClaimRepository,
+} from "../repositories/slack-connection-claim.repository.ts";
 import type { SlackConnectionService } from "./slack-connection.service.ts";
 
 /**
@@ -54,4 +58,51 @@ export class SlackConnectionClaimService {
   }): Promise<void> {
     await this.deps.claims.delete(input);
   }
+
+  /** One page of every claim by claim id; a cursor no page handed out fails. */
+  async listSlackConnectionClaims({
+    after,
+    limit = CLAIM_PAGE_LIMIT,
+  }: {
+    after?: string;
+    limit?: number;
+  }): Promise<SlackConnectionClaimPage> {
+    const size = Math.min(Math.max(Math.trunc(limit), 1), CLAIM_PAGE_LIMIT);
+    const rows = await this.deps.claims.findPage({
+      after: after === undefined ? undefined : claimKeyOf(after),
+      limit: size,
+    });
+    const last = rows.at(-1);
+    return {
+      claims: rows.map((row) => ({
+        connectionId: row.connectionId,
+        projectId: row.projectId,
+        claimant: { id: row.claimantId, label: row.claimantLabel },
+      })),
+      next: last && rows.length === size ? cursorOf(last) : null,
+    };
+  }
+}
+
+/** The most claims one page reads. */
+const CLAIM_PAGE_LIMIT = 500;
+
+const claimCursorSchema = z.tuple([z.string().min(1), z.string().min(1)]);
+
+function cursorOf({ connectionId, claimantId }: SlackConnectionClaimKey): string {
+  return JSON.stringify([connectionId, claimantId]);
+}
+
+/** A cursor only a page hands out; anything else is a caller's bug, so a plain error. */
+function claimKeyOf(cursor: string): SlackConnectionClaimKey {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cursor);
+  } catch {
+    parsed = undefined;
+  }
+  const key = claimCursorSchema.safeParse(parsed);
+  if (!key.success) throw new Error("The claim page cursor was not handed out by a page.");
+  const [connectionId, claimantId] = key.data;
+  return { connectionId, claimantId };
 }

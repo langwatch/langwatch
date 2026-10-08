@@ -7,6 +7,7 @@ import {
   SlackApi,
   type SlackApi as SlackApiContract,
   type SlackConnectionClaimant,
+  type SlackConnectionClaimPage,
   type SlackConnectionDeleted,
   type SlackConnectionKind,
   type SlackConnectionList,
@@ -159,5 +160,12 @@ export class SlackModule implements SlackApiContract {
     claimantId: string;
   }): Promise<void> {
     return this.#claims.releaseConnection(input);
+  }
+
+  listSlackConnectionClaims(input: {
+    after?: string;
+    limit?: number;
+  }): Promise<SlackConnectionClaimPage> {
+    return this.#claims.listSlackConnectionClaims(input);
   }
 }

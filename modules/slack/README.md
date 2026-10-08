@@ -6,20 +6,21 @@ A project's Slack connections: the bot tokens automations post with, and the cla
 
 ## At a glance
 
-|                |                                                                                              |
-| -------------- | -------------------------------------------------------------------------------------------- |
-| Classification | core (`modules/catalogue.json`)                                                              |
-| Subjects       | slack, slack-integration                                                                     |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                     |
-| Api token      | `SlackApi` = `moduleApi<SlackApi>()("slack")`, `contract/src/slack.api.ts:71` (9 operations) |
-| Installed by   | api, worker, tasks (process); ui (browser)                                                   |
+|                |                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                               |
+| Subjects       | slack, slack-integration                                                                      |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                      |
+| Api token      | `SlackApi` = `moduleApi<SlackApi>()("slack")`, `contract/src/slack.api.ts:77` (10 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                    |
 
 ## What slack owns
 
 | Kind            | Name                                                                                                                                      | Declared at                                                                      |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Postgres table  | `SlackConnectionClaim` (`slack_connection_claim`)                                                                                         | `process/src/repositories/prisma/prisma.slack-connection-claim.repository.ts:21` |
+| Postgres table  | `SlackConnectionClaim` (`slack_connection_claim`)                                                                                         | `process/src/repositories/prisma/prisma.slack-connection-claim.repository.ts:22` |
 | Postgres table  | `SlackIntegration`                                                                                                                        | `process/src/repositories/prisma/prisma.slack-connection.repository.ts:59`       |
+| Stores required |                                                                                                                                           | `process/src/channels/http/http.slack.channels.ts:6`                             |
 | Stores required | prisma, encryption                                                                                                                        | `process/src/repositories/prisma/prisma.slack.repositories.ts:17`                |
 | Secrets         | `fingerprintKey` (CREDENTIALS_SECRET), `fingerprintKeyFallback` (NEXTAUTH_SECRET), `fingerprintKeyPrevious` (CREDENTIALS_SECRET_PREVIOUS) | `process/src/app/slack.app.ts:42`                                                |
 

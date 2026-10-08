@@ -7,6 +7,9 @@ export interface SlackConnectionClaimRow {
   projectId: string;
 }
 
+/** A claim's primary key, the order claims are paged in. */
+export type SlackConnectionClaimKey = Pick<SlackConnectionClaimRow, "connectionId" | "claimantId">;
+
 /** Slack's own record of who uses a connection; slack never reads automation's triggers. */
 export abstract class SlackConnectionClaimRepository {
   /** Idempotent on (connectionId, claimantId); a repeat refreshes the label. */
@@ -24,5 +27,11 @@ export abstract class SlackConnectionClaimRepository {
     organizationId: string;
     ids: string[];
     exceptProjectId?: string;
+  }): Promise<SlackConnectionClaimRow[]>;
+
+  /** Up to `limit` claims by (connectionId, claimantId), after `after` when given. */
+  abstract findPage(input: {
+    after?: SlackConnectionClaimKey;
+    limit: number;
   }): Promise<SlackConnectionClaimRow[]>;
 }

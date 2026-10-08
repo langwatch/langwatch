@@ -22,6 +22,7 @@ import {
   type TriggerDatabase,
 } from "./repositories/prisma/prisma.trigger.repository.ts";
 import type { TriggerRepository, TriggerSecretCipher } from "./repositories/trigger.repository.ts";
+import { slackClaimReconcileCursorSchema } from "./services/automation-slack-claim-reconcile.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "./services/automation-trace-trigger-catalogue.service.ts";
 import { ReportScheduleBackfillTask } from "./tasks/report-schedule-backfill.task.ts";
 import { SlackAlertTask } from "./tasks/slack-alert.task.ts";
@@ -67,6 +68,26 @@ export const automationProcessModule = defineProcessModule("automation")
         // An older image creates reports without a schedule process: run again once none serves.
         needsOldWritersGone: true,
         run,
+      }),
+      defineMigrationStep({
+        id: "automation:reconcile-slack-claims",
+        kind: "data",
+        mode: "background",
+        description:
+          "Claims each active Slack automation's connection and releases claims no active automation holds.",
+        // An older image saves Slack automations without claiming: run once none serves.
+        needsOldWritersGone: true,
+        run: async ({ checkpoint, dryRun, signal }) => {
+          const resumed = slackClaimReconcileCursorSchema.safeParse(checkpoint.resumeFrom);
+          const counts = await app.reconcileSlackClaims({
+            from: resumed.success ? resumed.data : undefined,
+            dryRun,
+            signal,
+            onPage: ({ cursor }) =>
+              dryRun ? Promise.resolve() : checkpoint.save({ report: cursor }),
+          });
+          return { ...counts, dryRun };
+        },
       }),
     ];
   })

@@ -195,6 +195,27 @@ export class PrismaTriggerRepository extends TriggerRepository {
     });
     return rows.map((row: unknown) => mapTriggerRow(row));
   }
+  async findActiveSlackTriggerPage({
+    after,
+    limit,
+  }: {
+    after?: string;
+    limit: number;
+  }): Promise<Trigger[]> {
+    const rows = await this.database.$queryRaw<unknown[]>`
+			SELECT *
+			FROM "Trigger"
+			WHERE "action" = 'SEND_SLACK_MESSAGE'
+			  AND "active" = true
+			  AND "deleted" = false
+			  AND (${after ?? null}::text IS NULL OR "id" > ${after ?? null}::text)
+			ORDER BY "id" ASC
+			LIMIT ${limit}
+			-- @tenancy: Slack claim reconcile cross-tenant sweep (upgrade step, worker)
+		`;
+    return rows.map((row: unknown) => mapTriggerRow(row));
+  }
+
   async replaceActionParamsIfUnchanged(input: {
     triggerId: string;
     projectId: string;

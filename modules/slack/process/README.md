@@ -6,7 +6,7 @@ The server half of [slack](../README.md). A project's Slack connections: the bot
 
 ## Installation
 
-`defineProcessModule("slack").withRepositories(slackRepositories).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:8`.
+`defineProcessModule("slack").withRepositories(slackRepositories).withChannels(slackChannels).withApi(SlackModule).withTransports(slackIntegrationTrpcTransport, slackRest)`, `src/slack.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 A project's Slack connections and the claims automations hold on them (ARCHITECTURE.md §3).
 
-Peers call these through the token, declared at `../contract/src/slack.api.ts:15`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/slack.api.ts:16`; nothing else in this package is public.
 
 #### `listSlackConnections`
 
@@ -80,6 +80,14 @@ Idempotent: releasing nothing is fine.
 
 ```typescript
 releaseConnection(input: { connectionId: string; projectId: string; claimantId: string; }): Promise<void>;
+```
+
+#### `listSlackConnectionClaims`
+
+Every claim in the install, a page at a time by claim id: a claimant releases stale ones.
+
+```typescript
+listSlackConnectionClaims(input: { after?: string; limit?: number; }): Promise<SlackConnectionClaimPage>;
 ```
 
 ## REST transport

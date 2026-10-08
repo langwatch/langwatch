@@ -102,6 +102,7 @@ export function composeSlackApi() {
       service.findOrCreateSlackConnectionForSecret(input),
     claimConnection: (input) => claims.claimConnection(input),
     releaseConnection: (input) => claims.releaseConnection(input),
+    listSlackConnectionClaims: (input) => claims.listSlackConnectionClaims(input),
   });
   return { ...slack, api };
 }
