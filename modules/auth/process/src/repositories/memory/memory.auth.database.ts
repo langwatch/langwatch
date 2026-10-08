@@ -55,7 +55,7 @@ export type MemoryAccountRow = {
 };
 
 /** Better Auth's tables by the model names the channel maps them to. */
-export type MemoryAuthTables = {
+type MemoryAuthTables = {
   User: Record<string, unknown>[];
   Account: Record<string, unknown>[];
   Session: MemorySessionRow[];

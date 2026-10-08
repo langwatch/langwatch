@@ -6,7 +6,7 @@ import type {
 } from "../pending-sso-setup.repository.ts";
 
 /** The client a cleanup run is handed: the flag and the accounts on auth's own User rows. */
-export type PrismaPendingSsoSetupDatabase = Pick<PrismaClient, "user">;
+type PrismaPendingSsoSetupDatabase = Pick<PrismaClient, "user">;
 
 /** The Prisma-backed {@link PendingSsoSetupRepository}. */
 export class PrismaPendingSsoSetupRepository implements PendingSsoSetupRepository {

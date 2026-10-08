@@ -11,9 +11,9 @@ import type { CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 /** Redis key prefix for device-code records. */
-export const DEVICE_CODE_PREFIX = "lwcli:device:";
+const DEVICE_CODE_PREFIX = "lwcli:device:";
 /** Redis key prefix for the per-device-code poll window. */
-export const POLL_RATE_PREFIX = "lwcli:poll:";
+const POLL_RATE_PREFIX = "lwcli:poll:";
 
 /** Lifetime of an unredeemed device_code, in seconds. */
 export const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
@@ -34,7 +34,7 @@ export const EXCHANGE_CLAIM_SECONDS = 30;
  */
 export const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
 
-export type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
+type CliDeviceCodeStatus = "pending" | "approved" | "denied" | "expired";
 
 /**
  * What the CLI is asking the browser to mint on approval.
@@ -154,7 +154,7 @@ export type CliMintedSession = Readonly<{
 /**
  * The one grammar for a CLI bearer access token.
  */
-export const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_-]+)$/;
+const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_-]+)$/;
 
 /**
  * Generate an RFC 8628 user_code: 8 characters, dashed in the middle for readability, on a

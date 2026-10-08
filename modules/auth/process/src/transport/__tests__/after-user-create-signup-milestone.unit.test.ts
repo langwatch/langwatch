@@ -37,7 +37,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { LoggedBetterAuthAnnouncements } from "../../app/auth-composition.build.ts";
+import { LoggedBetterAuthAnnouncements } from "../../app/auth.app.ts";
 import type { BetterAuthFederation } from "../../channels/better-auth.channel.ts";
 import {
   afterAccountCreate,
