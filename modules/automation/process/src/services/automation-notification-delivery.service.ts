@@ -21,8 +21,11 @@ import {
 } from "../channels/automation-notification-channels.registry.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../channels/automation-test-fire.channel.ts";
+import {
+  TriggerNoReplyService,
+  TriggerNoReplyWarning,
+} from "../features/settlement/services/trigger-no-reply.service.ts";
 import { injectFooterIntoBody } from "../rules/automation-notification-footer.rules.ts";
-import { TriggerNoReplyService, TriggerNoReplyWarning } from "./trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "./unsubscribe-token.service.ts";
 
 /** One settled match, as the digest renders it. */

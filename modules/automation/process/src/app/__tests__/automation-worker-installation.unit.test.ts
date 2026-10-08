@@ -38,7 +38,7 @@ import {
   settlementTrace,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { automationProcessModule } from "../../automation.module.ts";
-import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
+import { AutomationPersistCapService } from "../../features/runaway/services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {
   emailHourlyCap: 100,

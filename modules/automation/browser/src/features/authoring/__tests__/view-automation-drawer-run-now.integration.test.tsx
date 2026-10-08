@@ -31,12 +31,7 @@ vi.mock("../../../ui/elements/filter-display.tsx", () => ({
 
 vi.mock("../../../behavior/automation-api.ts", async () => {
   const fixture = await vi.importActual<typeof ViewDrawerFixture>("./view-drawer.fixture.ts");
-  return { api: fixture.viewDrawerApi() };
-});
-
-vi.mock("../../../behavior/slack-api.ts", async () => {
-  const fixture = await vi.importActual<typeof ViewDrawerFixture>("./view-drawer.fixture.ts");
-  return { slackApi: fixture.viewDrawerSlackApi() };
+  return { api: fixture.viewDrawerApi(), slackApi: fixture.viewDrawerSlackApi() };
 });
 
 const onClose = vi.fn();

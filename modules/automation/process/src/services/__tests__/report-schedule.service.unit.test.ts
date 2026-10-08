@@ -18,9 +18,9 @@ import {
   reportScheduleResumed,
   type ReportScheduleState,
 } from "../../eventing/report-schedule.process.ts";
+import { ReportScheduleService } from "../../features/report/services/report-schedule.service.ts";
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
-import { ReportScheduleService } from "../report-schedule.service.ts";
 
 const NOW = Temporal.Instant.from("2026-01-01T08:00:00Z");
 

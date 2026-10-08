@@ -6,7 +6,7 @@ import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useAutomationStore } from "../ui/sections/automation-store.ts";
+import { useAutomationStore } from "../ui/sections/automation-selectors.ts";
 import { CadenceSection } from "../ui/sections/cadence-section-adapter.tsx";
 import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 

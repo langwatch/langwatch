@@ -3,9 +3,15 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import {
+  createModuleApi,
+  type ContractApiMap,
+  type ModuleApi,
+  type OutputsFromMap,
+} from "@langwatch/api/web";
 import type { automationTrpc, emailSuppressionTrpc } from "@langwatch/automation-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
+import type { slackIntegrationTrpc } from "@langwatch/slack-contract";
 
 /** The project every automation procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -163,3 +169,8 @@ export type RouterOutputs = OutputsFromMap<AutomationApiMap>;
 
 /** The name the screen calls it by. */
 export const api = automationApi;
+
+/** Slack's connection procedures, derived from its contract; the kit fetches nothing (§3.4). */
+export type SlackApiMap = ContractApiMap<typeof slackIntegrationTrpc>;
+
+export const slackApi: ModuleApi<SlackApiMap> = createModuleApi<SlackApiMap>();

@@ -9,7 +9,6 @@ export * from "./report-schedule.events.ts";
 export * from "./automation.commands.ts";
 export * from "./automation.errors.ts";
 export * from "./automation-filters.ts";
-export * from "./automation.queries.ts";
 export * from "./automation.api.ts";
 export * from "./automation-evaluation-subscriber.ts";
 export {
@@ -28,14 +27,28 @@ export * from "./trigger.queries.ts";
 export * from "./trigger-policies.ts";
 export * from "./cadences.ts";
 export * from "./providers.ts";
-export * from "./email-suppression.ts";
-export * from "./custom-graph.ts";
 export * from "./graph-alert.ts";
-export * from "./pause-reasons.ts";
 export * from "./runaway.ts";
 export * from "./persist-cap.ts";
 export * from "./test-fire.ts";
 export * from "./webhook-delivery.ts";
 export * from "./report.ts";
-export * from "./templating.ts";
+export * from "./templating/banner.ts";
+export * from "./templating/block-kit-allowlist.ts";
+export * from "./templating/defaults.ts";
+export * from "./templating/engine.ts";
+export * from "./templating/example-context.ts";
+export * from "./templating/markdown.ts";
+export * from "./templating/render-email.ts";
+export type {
+  SlackPayload,
+  SlackRenderDefaults,
+  RenderedSlack,
+} from "./templating/render-slack.ts";
+export { renderTriggerSlack, resolveSlackTemplateType } from "./templating/render-slack.ts";
+export * from "./templating/render-webhook-body.ts";
+export * from "./templating/render-with-fallback.ts";
+export * from "./templating/sandboxed-liquid.ts";
+export * from "./templating/template-context.ts";
+export * from "./templating/validate.ts";
 export * from "./automation.config.ts";

@@ -7,10 +7,10 @@ import {
 } from "@langwatch/system-migrations";
 
 import { sealWith } from "../../__tests__/fixtures/trigger-secrets.fixture.ts";
+import { AutomationSlackConnectionService } from "../../features/slack/services/automation-slack-connection.service.ts";
+import { SlackConnectionMigrationService } from "../../features/slack/services/slack-connection-migration.service.ts";
 import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
 import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
-import { AutomationSlackConnectionService } from "../../services/automation-slack-connection.service.ts";
-import { SlackConnectionMigrationService } from "../../services/slack-connection-migration.service.ts";
 import { SlackConnectionMigration } from "../legacy-import.slack-connection.migration.ts";
 
 export const ORGANIZATION_ID = "org-slack";

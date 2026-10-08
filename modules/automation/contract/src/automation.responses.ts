@@ -6,9 +6,20 @@
 import { monitorSchema } from "@langwatch/monitor-contract";
 import { z } from "zod";
 
-import { customGraphNameRefSchema } from "./custom-graph.ts";
 import { automationPersistCapCountSchema } from "./persist-cap.ts";
 import { triggerSchema } from "./trigger.ts";
+
+/** The graph fields automation evaluation and list enrichment need. */
+export type CustomGraph = {
+  id: string;
+  projectId: string;
+  name: string;
+  graph: unknown;
+  filters: unknown;
+};
+
+export const customGraphNameRefSchema = z.object({ id: z.string(), name: z.string() });
+export type CustomGraphNameRef = z.infer<typeof customGraphNameRefSchema>;
 
 /**
  * One automation as the list renders it: the row, the monitors its conditions

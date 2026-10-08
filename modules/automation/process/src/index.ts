@@ -51,7 +51,7 @@ export type {
   AutomationEvaluationTriggerFilter,
 } from "./services/automation-evaluation-trigger-filter.service.ts";
 export type { AutomationEvaluationTraceSummary } from "./services/automation-evaluation-subscriber.service.ts";
-export type { AutomationTriggerMatchRecorder } from "./services/automation-trigger-match-dispatcher.service.ts";
+export type { AutomationTriggerMatchRecorder } from "./features/settlement/services/automation-trigger-match-dispatcher.service.ts";
 export type {
   LogOverflowIntent,
   NotifyDigestIntent,
@@ -66,20 +66,20 @@ export type {
   PersistCapDecision,
   PersistCapDependencies,
   ReadPersistCapCountsInput,
-} from "./services/persist-cap.service.ts";
+} from "./features/runaway/services/persist-cap.service.ts";
 export type { AutomationPersistCapRepository } from "./repositories/automation-persist-cap.repository.ts";
 export { AutomationGraphNotifier } from "./channels/automation-graph-alert.channel.ts";
 export type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
 } from "./channels/automation-graph-alert.channel.ts";
-export type { AutomationGraphDelivery } from "./services/automation-graph-delivery.service.ts";
+export type { AutomationGraphDelivery } from "./features/graph-alert/services/automation-graph-delivery.service.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
-export type { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-match-confirmation.service.ts";
+export type { AutomationSettlementMatchConfirmation } from "./features/settlement/services/automation-settlement-match-confirmation.service.ts";
 export type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
 export type { AutomationClock } from "./repositories/automation.repositories.ts";
-export type { AutomationGraphActivity } from "./services/automation-graph-activity.service.ts";
+export type { AutomationGraphActivity } from "./features/graph-alert/services/automation-graph-activity.service.ts";
 export type { AutomationProjectDirectory } from "./services/automation.service.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
 export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
@@ -119,6 +119,6 @@ export { automationCallerEmailFact, automationTrpcTransport } from "./transport/
 export { emailSuppressionTrpcTransport } from "./transport/email-suppression.trpc.ts";
 
 /** The ledger a late-built containment collaborator filters its notice through. */
-export type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";
+export type { AutomationSettlementLedgerService } from "./features/settlement/services/automation-settlement-ledger.service.ts";
 
 export { SlackAlertTask } from "./tasks/slack-alert.task.ts";

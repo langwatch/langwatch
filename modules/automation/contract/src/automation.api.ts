@@ -9,6 +9,7 @@ import type {
 } from "./automation-rest.schemas.ts";
 import type {
   AutomationListRow,
+  CustomGraphNameRef,
   AutomationPersistCapStatus,
   SlackChannelListing,
 } from "./automation.responses.ts";
@@ -26,7 +27,6 @@ import type {
   TriggerLatestEvaluation,
 } from "./automation.trpc-schemas.ts";
 import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
-import type { CustomGraphNameRef } from "./custom-graph.ts";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
 import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";

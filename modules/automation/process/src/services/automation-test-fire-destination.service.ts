@@ -16,10 +16,10 @@ import type {
   AutomationProviderSecrets,
   AutomationWebhookStoredParams,
 } from "../app/automation.app.ts";
+import type { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import { resolveKeptWebhookHeaders } from "../rules/automation-authoring.rules.ts";
 import { buildRetryAfterMessage } from "../rules/retry-after-message.rules.ts";
 import type { AutomationService } from "./automation.service.ts";
-import type { SlackDestinationService } from "./slack-destination.service.ts";
 
 /** How often one person may press the test-fire button, and over what window. */
 const TEST_FIRE_WINDOW_SECONDS = 60;

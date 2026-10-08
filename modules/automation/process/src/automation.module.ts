@@ -4,6 +4,7 @@ import { defineMigrationStep, type MigrationStepRun } from "@langwatch/upgrade/s
 import { AutomationModule } from "./app/automation.app.ts";
 import { automationChannels } from "./channels/automation-channels.registry.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
+import { slackClaimReconcileCursorSchema } from "./features/slack/services/automation-slack-claim-reconcile.service.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationClock } from "./repositories/automation.repositories.ts";
@@ -22,7 +23,6 @@ import {
   type TriggerDatabase,
 } from "./repositories/prisma/prisma.trigger.repository.ts";
 import type { TriggerRepository, TriggerSecretCipher } from "./repositories/trigger.repository.ts";
-import { slackClaimReconcileCursorSchema } from "./services/automation-slack-claim-reconcile.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "./services/automation-trace-trigger-catalogue.service.ts";
 import { ReportScheduleBackfillTask } from "./tasks/report-schedule-backfill.task.ts";
 import { SlackAlertTask } from "./tasks/slack-alert.task.ts";

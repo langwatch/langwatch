@@ -88,6 +88,42 @@ import {
 import type { AutomationScheduledIntent } from "../eventing/graph-alert-sweep.intent.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import type { AutomationSettlementExecutor } from "../eventing/trigger-settlement.intent.ts";
+import type { AutomationDispatchError } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import { AutomationGraphAlertNotifierService } from "../features/graph-alert/services/automation-graph-alert-notifier.service.ts";
+import { GraphTriggerHeartbeatService } from "../features/graph-alert/services/graph-trigger-heartbeat.service.ts";
+import { AutomationGraphService } from "../features/graph-alert/services/trigger-graph.service.ts";
+import { ReportDispatcherService } from "../features/report/services/report-dispatcher.service.ts";
+import { ReportScheduleService } from "../features/report/services/report-schedule.service.ts";
+import { AutomationMatchRecordMetricsService } from "../features/runaway/services/automation-match-record-metrics.service.ts";
+import { AutomationNextStepService } from "../features/runaway/services/automation-next-step.service.ts";
+import { AutomationRunawayMetricsOtelService } from "../features/runaway/services/automation-runaway-metrics-otel.service.ts";
+import { AutomationRunawayUncontainedService } from "../features/runaway/services/automation-runaway-uncontained.service.ts";
+import { AutomationRunawayService } from "../features/runaway/services/automation-runaway.service.ts";
+import { AutomationEmailCapService } from "../features/runaway/services/email-cap.service.ts";
+import { PersistActionWriterService } from "../features/runaway/services/persist-action-writer.service.ts";
+import { AutomationPersistActionService } from "../features/runaway/services/persist-action.service.ts";
+import { AutomationPersistCapService } from "../features/runaway/services/persist-cap.service.ts";
+import {
+  RunawayContainmentService,
+  type AutomationRunawaySignals,
+} from "../features/runaway/services/runaway-containment.service.ts";
+import { AutomationDispatchErrorsTerminalService } from "../features/settlement/services/automation-dispatch-errors-terminal.service.ts";
+import { AutomationSettlementBreachLateService } from "../features/settlement/services/automation-settlement-breach-late.service.ts";
+import { AutomationSettlementBreachLoggedService } from "../features/settlement/services/automation-settlement-breach-logged.service.ts";
+import { AutomationSettlementLedgerService } from "../features/settlement/services/automation-settlement-ledger.service.ts";
+import { AutomationSettlementMatchConfirmationService } from "../features/settlement/services/automation-settlement-match-confirmation.service.ts";
+import { AutomationSettlementObservabilityService } from "../features/settlement/services/automation-settlement-observability.service.ts";
+import { AutomationTriggerMatchDispatcherService } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
+import { AutomationSettlementDispatchService } from "../features/settlement/services/trigger-settlement-dispatch.service.ts";
+import {
+  AutomationSlackClaimReconcileService,
+  type SlackClaimReconcileCounts,
+  type SlackClaimReconcileInput,
+} from "../features/slack/services/automation-slack-claim-reconcile.service.ts";
+import { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import { AutomationSlackDirectoryUnavailableService } from "../features/slack/services/automation-slack-directory-unavailable.service.ts";
+import { SlackConnectionMigrationService } from "../features/slack/services/slack-connection-migration.service.ts";
+import { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import { SlackConnectionMigration } from "../migrations/legacy-import.slack-connection.migration.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
@@ -99,13 +135,8 @@ import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memor
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 import { AutomationAuditSinkService } from "../services/automation-audit-sink.service.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
-import { AutomationDispatchErrorsTerminalService } from "../services/automation-dispatch-errors-terminal.service.ts";
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
-import type { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
-import { AutomationGraphAlertNotifierService } from "../services/automation-graph-alert-notifier.service.ts";
-import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
-import { AutomationNextStepService } from "../services/automation-next-step.service.ts";
 import { AutomationNotificationDeliveryUnavailableService } from "../services/automation-notification-delivery-unavailable.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -114,50 +145,19 @@ import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
-import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
-import { AutomationRunawayUncontainedService } from "../services/automation-runaway-uncontained.service.ts";
-import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
 import { AutomationScheduledIntentsService } from "../services/automation-scheduled-intents.service.ts";
-import { AutomationSettlementBreachLateService } from "../services/automation-settlement-breach-late.service.ts";
-import { AutomationSettlementBreachLoggedService } from "../services/automation-settlement-breach-logged.service.ts";
-import { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
-import { AutomationSettlementMatchConfirmationService } from "../services/automation-settlement-match-confirmation.service.ts";
-import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
-import {
-  AutomationSlackClaimReconcileService,
-  type SlackClaimReconcileCounts,
-  type SlackClaimReconcileInput,
-} from "../services/automation-slack-claim-reconcile.service.ts";
-import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
-import { AutomationSlackDirectoryUnavailableService } from "../services/automation-slack-directory-unavailable.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTestFireService } from "../services/automation-test-fire.service.ts";
 import { AutomationTraceFilterCompilerService } from "../services/automation-trace-filter-compiler.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
-import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
 import {
   type AutomationWebhookStoredParams,
   AutomationWebhookSecretsService,
 } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationService, type AutomationLogger } from "../services/automation.service.ts";
 import { DatasetTraceMapperService } from "../services/dataset-trace-mapper.service.ts";
-import { AutomationEmailCapService } from "../services/email-cap.service.ts";
-import { GraphTriggerHeartbeatService } from "../services/graph-trigger-heartbeat.service.ts";
-import { PersistActionWriterService } from "../services/persist-action-writer.service.ts";
-import { AutomationPersistActionService } from "../services/persist-action.service.ts";
-import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
-import { ReportDispatcherService } from "../services/report-dispatcher.service.ts";
-import { ReportScheduleService } from "../services/report-schedule.service.ts";
-import {
-  RunawayContainmentService,
-  type AutomationRunawaySignals,
-} from "../services/runaway-containment.service.ts";
-import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
-import { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
-import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
-import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
   type UnsubscribeTokenVerifier,

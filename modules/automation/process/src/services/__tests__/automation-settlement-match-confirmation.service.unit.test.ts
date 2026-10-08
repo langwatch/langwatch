@@ -7,12 +7,12 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { AutomationSettlementTraceRepository } from "../../repositories/automation-settlement-read.repository.ts";
 import {
   AutomationSettlementMatchConfirmationService,
   type AutomationSettlementEvaluationFilters,
   type AutomationSettlementTraceFilters,
-} from "../automation-settlement-match-confirmation.service.ts";
+} from "../../features/settlement/services/automation-settlement-match-confirmation.service.ts";
+import { AutomationSettlementTraceRepository } from "../../repositories/automation-settlement-read.repository.ts";
 
 function unavailable(): never {
   throw new Error("not used by this test");

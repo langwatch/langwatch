@@ -12,7 +12,7 @@ import type { AutomationToast } from "../../../behavior/automation-feedback.ts";
 import { AutomationHostProvider } from "../../../model/automation-host.ts";
 import { fakeAutomationHost } from "../../../testing.tsx";
 import { AutomationDrawer, RegisteredAutomationDrawer } from "../ui/sections/automation-drawer.tsx";
-import { useAutomationStore } from "../ui/sections/automation-store.ts";
+import { useAutomationStore } from "../ui/sections/automation-selectors.ts";
 import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 
 // The saved row the edit-mode query resolves to. Mutable so a test can
@@ -127,6 +127,22 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
       },
     }),
   },
+  slackApi: {
+    slackIntegration: {
+      list: {
+        useQuery: () => ({
+          data: mockSlackConnections
+            ? {
+                connections: mockSlackConnections,
+                canManageProject: false,
+                canManageOrganization: false,
+              }
+            : undefined,
+          refetch: vi.fn(),
+        }),
+      },
+    },
+  },
 }));
 vi.mock("@langwatch/dataset-client", () => ({
   datasetClient: {
@@ -148,25 +164,6 @@ vi.mock("@langwatch/dataset-client", () => ({
 
 // ADR-093 §5a: the connections the project lists; read at render, so a test sets it first.
 let mockSlackConnections: { id: string; name: string }[] | undefined;
-
-vi.mock("../../../behavior/slack-api.ts", () => ({
-  slackApi: {
-    slackIntegration: {
-      list: {
-        useQuery: () => ({
-          data: mockSlackConnections
-            ? {
-                connections: mockSlackConnections,
-                canManageProject: false,
-                canManageOrganization: false,
-              }
-            : undefined,
-          refetch: vi.fn(),
-        }),
-      },
-    },
-  },
-}));
 
 let host = fakeAutomationHost();
 

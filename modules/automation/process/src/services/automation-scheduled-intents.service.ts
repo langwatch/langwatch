@@ -7,8 +7,8 @@ import { DispatchError } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 
 import { AutomationScheduledIntent } from "../eventing/graph-alert-sweep.intent.ts";
-import type { AutomationGraphActivity } from "./automation-graph-activity.service.ts";
-import type { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
+import type { AutomationGraphActivity } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import type { GraphTriggerHeartbeatService } from "../features/graph-alert/services/graph-trigger-heartbeat.service.ts";
 
 /** The two schedules, and the graph re-check one of them drives. */
 export class AutomationScheduledIntentsService extends AutomationScheduledIntent {

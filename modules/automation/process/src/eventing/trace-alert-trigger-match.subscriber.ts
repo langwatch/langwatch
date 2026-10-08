@@ -5,9 +5,9 @@ import {
   type AutomationTraceSubscriberContext,
 } from "@langwatch/automation-contract";
 
+import type { AutomationMatchRecordMetricsSink } from "../features/runaway/services/automation-match-record-metrics.service.ts";
+import type { AutomationTriggerMatchRecorder } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
-import type { AutomationMatchRecordMetricsSink } from "../services/automation-match-record-metrics.service.ts";
-import type { AutomationTriggerMatchRecorder } from "../services/automation-trigger-match-dispatcher.service.ts";
 
 /** Port of main's trace `triggerMatch` subscriber; trace applies its origin guard first. */
 export async function handleTraceAlertTriggerMatch(

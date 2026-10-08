@@ -1,13 +1,13 @@
+import { AutomationDispatchError } from "../features/graph-alert/services/automation-graph-activity.service.ts";
+import { AutomationEmailCapService } from "../features/runaway/services/email-cap.service.ts";
+import type { AutomationRunawaySignals } from "../features/runaway/services/runaway-containment.service.ts";
+import { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
+import { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
 import type { AutomationGraphNotifier, AutomationRunawayNotice } from "../index.ts";
 import { AutomationTestFire } from "../index.ts";
 import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
-import { AutomationDispatchError } from "../services/automation-graph-activity.service.ts";
-import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
 import { AutomationLogger } from "../services/automation.service.ts";
-import { AutomationEmailCapService } from "../services/email-cap.service.ts";
-import type { AutomationRunawaySignals } from "../services/runaway-containment.service.ts";
-import { SlackDestinationService } from "../services/slack-destination.service.ts";
 
 /** Stores secrets as given, as the memory trigger repository does, for fixtures that read none. */
 const PLAIN_SECRETS: TriggerSecretSeal = {

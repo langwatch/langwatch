@@ -22,12 +22,7 @@ vi.mock("../../../behavior/automation-session.ts", () => ({
 
 vi.mock("../../../behavior/automation-api.ts", async () => {
   const fixture = await vi.importActual<typeof ListPagesFixture>("./list-pages.fixture.ts");
-  return { api: fixture.listPagesApi() };
-});
-
-vi.mock("../../../behavior/slack-api.ts", async () => {
-  const fixture = await vi.importActual<typeof ListPagesFixture>("./list-pages.fixture.ts");
-  return { slackApi: fixture.listPagesSlackApi() };
+  return { api: fixture.listPagesApi(), slackApi: fixture.listPagesSlackApi() };
 });
 
 function renderPage(section: AutomationSection) {

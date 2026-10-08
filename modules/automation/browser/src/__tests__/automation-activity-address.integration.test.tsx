@@ -8,10 +8,6 @@ import { cleanup, screen } from "@testing-library/react";
 import type { ComponentType } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../behavior/slack-api.ts", () => ({
-  slackApi: { slackIntegration: { list: { useQuery: () => ({ data: undefined }) } } },
-}));
-
 vi.mock("../behavior/automation-api.ts", () => {
   const emptyQuery = { data: undefined, isLoading: false, isFetching: false, error: null };
   const node = (): unknown =>
@@ -35,7 +31,8 @@ vi.mock("../behavior/automation-api.ts", () => {
       },
     },
   );
-  return { api, automationApi: api };
+  const slackApi = { slackIntegration: { list: { useQuery: () => ({ data: undefined }) } } };
+  return { api, automationApi: api, slackApi };
 });
 
 import { automationWeb } from "../automation.web.ts";

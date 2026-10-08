@@ -16,7 +16,7 @@ import type { TriggerSummary } from "@langwatch/automation-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
-import { TriggerSettlementPersistenceService } from "../trigger-settlement-persistence.service.ts";
+import { TriggerSettlementPersistenceService } from "../../features/settlement/services/trigger-settlement-persistence.service.ts";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",

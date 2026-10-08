@@ -47,8 +47,7 @@ import { ConditionBuilder } from "../blocks/condition-builder.tsx";
 import { DailyCapAdviceAlert } from "../blocks/daily-cap-advice-alert.tsx";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
 import { QueryFilterInput } from "../elements/query-filter-input.tsx";
-import { useConfigComplete, useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useConfigComplete, useDraft, useAutomationStore } from "./automation-selectors.ts";
 import {
   type AutomationDraft,
   filterQueryIsSet,

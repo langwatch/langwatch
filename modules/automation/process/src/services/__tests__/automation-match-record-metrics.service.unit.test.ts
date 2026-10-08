@@ -9,7 +9,7 @@ import {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
   AUTOMATION_MATCH_RECORDS_METRIC_NAME,
   AutomationMatchRecordMetricsService,
-} from "../automation-match-record-metrics.service.ts";
+} from "../../features/runaway/services/automation-match-record-metrics.service.ts";
 
 describe("AutomationMatchRecordMetricsService", () => {
   let metrics: RecordingMeterProvider;

@@ -1,7 +1,7 @@
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 
+import type { SlackConnectionMigrationService } from "../features/slack/services/slack-connection-migration.service.ts";
 import { slackMigrationReport } from "../rules/slack-connection-migration-report.rules.ts";
-import type { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
 
 /**
  * Moves each organization's legacy Slack secrets onto connections and claims

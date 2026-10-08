@@ -1,7 +1,6 @@
 import { VStack } from "@langwatch/design-system/primitives";
 
-import { useDraft } from "./automation-selectors.ts";
-import { useAutomationStore } from "./automation-store.ts";
+import { useDraft, useAutomationStore } from "./automation-selectors.ts";
 import { CadenceSection } from "./cadence-section-adapter.tsx";
 import { DeliveryPicker } from "./delivery-picker.tsx";
 

@@ -2,7 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AutomationProjectDirectory } from "../../services/automation.service.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { AutomationDispatchError } from "../../services/automation-graph-activity.service.ts";
+import { AutomationDispatchError } from "../../features/graph-alert/services/automation-graph-activity.service.ts";
 import { AutomationLogger } from "../../services/automation.service.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { Temporal, toDate } from "@langwatch/time";

@@ -2,15 +2,15 @@ import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  AutomationEmailCapService,
+  type ConsumeDailyEmailCapInput,
+  type ConsumeHourlyEmailCapInput,
+} from "../../features/runaway/services/email-cap.service.ts";
+import {
   AutomationEmailCapRepository,
   type EmailCapClaim,
 } from "../../repositories/automation-email-cap.repository.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
-import {
-  AutomationEmailCapService,
-  type ConsumeDailyEmailCapInput,
-  type ConsumeHourlyEmailCapInput,
-} from "../../services/email-cap.service.ts";
 
 /** The fleet's shared counters during an outage: every operation refuses. */
 class UnreachableEmailCapRepository extends AutomationEmailCapRepository {

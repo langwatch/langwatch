@@ -1,7 +1,10 @@
 import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import { TriggerNoReplyService, TriggerNoReplyWarning } from "../trigger-no-reply.service.ts";
+import {
+  TriggerNoReplyService,
+  TriggerNoReplyWarning,
+} from "../../features/settlement/services/trigger-no-reply.service.ts";
 import { UnsubscribeTokenService } from "../unsubscribe-token.service.ts";
 
 // Spec: modules/automation/specs/unsubscribe-token-twin.feature

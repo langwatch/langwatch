@@ -62,3 +62,9 @@ export const triggerFireRowSchema = z.object({
   resolvedAt: z.date().nullable(),
 });
 export type TriggerFire = z.infer<typeof triggerFireRowSchema>;
+
+export type AutomationFireStats = {
+  triggerId: string;
+  lastFiredAt: TriggerFireStats["lastFiredAt"];
+  recentFireCount: number;
+};

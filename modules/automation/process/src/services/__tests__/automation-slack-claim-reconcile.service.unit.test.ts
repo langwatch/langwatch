@@ -7,12 +7,12 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
-import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
 import {
   AutomationSlackClaimReconcileService,
   type SlackClaimReconcileCursor,
-} from "../automation-slack-claim-reconcile.service.ts";
+} from "../../features/slack/services/automation-slack-claim-reconcile.service.ts";
+import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
+import { MemoryTriggerRepository } from "../../repositories/memory/memory.trigger.repository.ts";
 
 const PROJECT = "project-1";
 const UNUSABLE = "c-gone";

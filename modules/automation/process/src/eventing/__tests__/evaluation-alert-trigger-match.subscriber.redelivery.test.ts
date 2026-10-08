@@ -15,13 +15,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { AutomationGraphActivity } from "../../features/graph-alert/services/automation-graph-activity.service.ts";
 import { type AutomationTriggerMatchRecorder } from "../../index.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationEvaluationTraceSummary } from "../../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationSubscriberService } from "../../services/automation-evaluation-subscriber.service.ts";
 import type { AutomationEvaluationQueryClassification } from "../../services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../../services/automation-evaluation-trigger-filter.service.ts";
-import type { AutomationGraphActivity } from "../../services/automation-graph-activity.service.ts";
 
 function trigger(): TriggerSummary {
   return {

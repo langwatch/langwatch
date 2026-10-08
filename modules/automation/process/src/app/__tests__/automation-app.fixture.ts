@@ -21,12 +21,12 @@ import {
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
+import type { AutomationRunawaySignals } from "../../features/runaway/services/runaway-containment.service.ts";
 import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
 import type { AutomationClock } from "../../repositories/automation.repositories.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { AutomationLogger } from "../../services/automation.service.ts";
-import type { AutomationRunawaySignals } from "../../services/runaway-containment.service.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
 
