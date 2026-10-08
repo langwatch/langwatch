@@ -1085,3 +1085,34 @@ describe("UNKNOWN_ERROR_PRESENTATION", () => {
     );
   });
 });
+
+describe("explainHandledError on instant_eval_judge_only_model", () => {
+  describe("given the refusal names where Instant Evals sits", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
+    it("tells the reader which node or target to change", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_judge_only_model",
+          httpStatus: 422,
+          meta: { places: ['node "Answer"', "target 2"] },
+        }),
+      );
+
+      expect(description).toBe(
+        'Instant Evals works only as an evaluator judge model. Pick another model for node "Answer", target 2, or use Instant Evals on an LLM judge evaluator.',
+      );
+    });
+  });
+
+  describe("given it names no place", () => {
+    it("keeps the general copy", () => {
+      const { description } = explainHandledError(
+        shape({ code: "instant_eval_judge_only_model", httpStatus: 422 }),
+      );
+
+      expect(description).toBe(
+        "Instant Evals works only as an evaluator judge model. Pick another model here, or use Instant Evals on an LLM judge evaluator.",
+      );
+    });
+  });
+});

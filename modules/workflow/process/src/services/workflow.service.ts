@@ -2,6 +2,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import {
   archiveWorkflowCommandSchema,
+  assertNoInstantEvalJudgeModelNodes,
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
   dslWithoutHttpAgentSecrets,
@@ -236,6 +237,7 @@ export class WorkflowService {
     input: workflowContractModule.CreateWorkflowCommand,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     const command = this.parse(createWorkflowCommandSchema, input);
+    assertNoInstantEvalJudgeModelNodes({ dsl: command.dsl });
     const id = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
     await this.options.repository.createWorkflow({
       id,
@@ -284,6 +286,7 @@ export class WorkflowService {
     input: workflowContractModule.SaveWorkflowVersionCommand,
   ): Promise<WorkflowVersion> {
     const command = this.parse(saveWorkflowVersionCommandSchema, input);
+    assertNoInstantEvalJudgeModelNodes({ dsl: command.dsl });
     const workflow = await this.getById({
       id: command.workflowId,
       projectId: command.projectId,
@@ -378,6 +381,8 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
+    // A copy of a graph that would be refused on save fails here, before any row is written.
+    assertNoInstantEvalJudgeModelNodes({ dsl: sourceVersion.dsl });
     const cloned = this.dsl.copy(sourceVersion.dsl);
     // A copy into another project arrives with every HTTP credential blank.
     const sourceDsl =
@@ -444,6 +449,7 @@ export class WorkflowService {
     });
     const sourceVersion =
       source.latestVersion ?? (await this.latestVersion(source.id, input.projectId));
+    assertNoInstantEvalJudgeModelNodes({ dsl: sourceVersion.dsl });
     const copies = await this.options.repository.findCopies(input);
     const selected = copies.filter(
       (copy) =>

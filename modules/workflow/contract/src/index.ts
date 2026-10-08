@@ -25,4 +25,5 @@ export { normalizeReasoningFromProviderFields } from "./reasoning-parameters.ts"
 export * from "./studio-field-mapping.ts";
 export * from "./workflow-host-slice.ts";
 export * from "./http-agent-node-secrets.ts";
+export * from "./instant-eval-judge-model-nodes.ts";
 export * from "./workflow-run-permissions.ts";

@@ -8712,6 +8712,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8879,6 +8882,9 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/prompt-process':
         specifier: workspace:*
         version: link:../../prompt/process
@@ -16107,6 +16113,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -16241,6 +16250,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

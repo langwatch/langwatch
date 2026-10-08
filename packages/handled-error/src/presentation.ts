@@ -3379,8 +3379,11 @@ const presentations = {
   },
   instant_eval_judge_only_model: {
     title: "Instant Evals can't be this model",
-    describe: () =>
-      "Instant Evals works only as an evaluator judge model. Pick another model here, or use Instant Evals on an LLM judge evaluator.",
+    describe: (error) => {
+      const places = strList(error, "places");
+      const where = places.length > 0 ? `for ${places.join(", ")}` : "here";
+      return `Instant Evals works only as an evaluator judge model. Pick another model ${where}, or use Instant Evals on an LLM judge evaluator.`;
+    },
   },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",

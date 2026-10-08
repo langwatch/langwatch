@@ -1,4 +1,5 @@
 import type { Dataset } from "@langwatch/dataset-contract";
+import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import {
   WorkflowVersionRequiredError,
   type WorkflowStudioCopySource,
@@ -239,6 +240,37 @@ describe("WorkflowStudioCopyService", () => {
         });
 
         expect(rows.created[0]?.copiedFromWorkflowId).toBe("wf-original");
+      });
+    });
+  });
+});
+
+describe("WorkflowStudioCopyService and Instant Evals", () => {
+  describe("given a graph whose LLM node is on Instant Evals", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
+    it("refuses the copy before copying a dataset or creating a row", async () => {
+      const { service, rows, datasets } = build();
+      const dsl = graphWithDatasets();
+      (dsl.nodes[1]!.data.parameters as unknown[]).push({
+        identifier: "llm",
+        type: "llm",
+        value: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
+      });
+
+      await expect(
+        service.copyWithDatasets({
+          workflow: source(dsl),
+          sourceProjectId: "project-source",
+          targetProjectId: "project-target",
+          copyDatasets: true,
+        }),
+      ).rejects.toMatchObject({
+        code: "instant_eval_judge_only_model",
+        meta: { places: ['node "Prompt"'] },
+      });
+      expect({ rows: rows.created, datasets: datasets.datasetCopies }).toEqual({
+        rows: [],
+        datasets: [],
       });
     });
   });

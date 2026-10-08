@@ -681,6 +681,38 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When they are read
       Then they read as stored
 
+    @unit
+    Scenario Outline: A workflow or a workbench naming Instant Evals outside a judge is refused where it sits
+      When <save> holds Instant Evals as the model of <place>
+      Then it is refused as a client error that names <place>
+      And nothing is stored
+
+      Examples:
+        | save                               | place                                   |
+        | a workflow save                    | an LLM node                             |
+        | a workflow save                    | an LLM node's unsaved prompt draft      |
+        | a workflow save                    | an LLM node's legacy model slot         |
+        | a new workflow                     | an LLM node                             |
+        | a workflow copy                    | an LLM node                             |
+        | a push of a workflow to its copies | an LLM node                             |
+        | a workbench save                   | a prompt target's unsaved prompt draft  |
+        | a new workbench                    | a prompt target's unsaved prompt draft  |
+        | a workbench version restore        | a prompt target's unsaved prompt draft  |
+        | a workbench copy                   | a prompt target's unsaved prompt draft  |
+
+    @unit
+    Scenario: A workflow whose evaluator node judges on Instant Evals still saves, copies and pushes
+      Given a workflow with an LLM judge evaluator node on Instant Evals and an LLM node on another model
+      When it is saved, copied and pushed to its copies
+      Then each is stored
+
+    @unit
+    Scenario: A workbench whose evaluators judge on Instant Evals still saves
+      Given a workbench with an evaluator column and an evaluator target on Instant Evals
+      And a prompt target on another model
+      When it is saved and copied
+      Then both are stored
+
   Rule: An evaluator error shows its stored error text in the trace list
 
     @integration

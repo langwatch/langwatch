@@ -6,6 +6,7 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import {
+  assertNoInstantEvalJudgeModelNodes,
   WorkflowVersionRequiredError,
   type CopyStudioWorkflowCommand,
   type StudioWorkflow,
@@ -56,6 +57,7 @@ export class WorkflowStudioCopyService {
     if (!sourceDsl) {
       throw new WorkflowVersionRequiredError();
     }
+    assertNoInstantEvalJudgeModelNodes({ dsl: sourceDsl });
 
     // A clone the caller may mutate; into another project, every HTTP credential is blank.
     const dsl = cloneDslForCopy({

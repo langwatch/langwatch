@@ -73,6 +73,7 @@
   "devDependencies": {
     "@langwatch/authorization": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/prompt-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
