@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
+ * @see specs/evaluations/category-evaluator-performance.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -75,6 +76,24 @@ const rows: OnlineEvaluationRow[] = [
     },
   },
 ];
+
+const categoryRow: OnlineEvaluationRow = {
+  id: "monitor-category",
+  name: "Conversation outcome",
+  checkType: "langevals/llm_category",
+  enabled: true,
+  executionMode: "ON_MESSAGE",
+  performance: {
+    metric: "label",
+    labels: [
+      { label: "resolved", count: 60, share: 0.6 },
+      { label: "escalated", count: 25, share: 0.25 },
+      { label: "abandoned", count: 15, share: 0.15 },
+    ],
+    current: 0.6,
+    previous: 0.48,
+  },
+};
 
 const defaultProps = {
   projectSlug: "demo",
@@ -194,6 +213,112 @@ describe("<OnlineEvaluationsTable />", () => {
 
     expect(screen.getByText("Performance unavailable")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  describe("when a monitor classifies instead of scoring", () => {
+    /** @scenario "The row shows the labels instead of an empty state" */
+    it("shows the label distribution and the leading label", () => {
+      render(
+        <OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByRole("group", {
+          name: "Label distribution for Conversation outcome",
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("resolved")).toBeInTheDocument();
+      expect(screen.getByText("60%, ↑ 12 pp")).toHaveAttribute(
+        "data-trend",
+        "up",
+      );
+      expect(screen.queryByText("No data yet")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The distribution names every label it drew" */
+    it("names every label with its share", () => {
+      render(
+        <OnlineEvaluationsTable {...defaultProps} rows={[categoryRow]} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByRole("img", { name: "resolved, 60%" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("img", { name: "escalated, 25%" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("img", { name: "abandoned, 15%" }),
+      ).toBeInTheDocument();
+    });
+
+    it("says how much of the period the leading label held when there is nothing to compare", () => {
+      render(
+        <OnlineEvaluationsTable
+          {...defaultProps}
+          rows={[
+            {
+              ...categoryRow,
+              performance: {
+                metric: "label",
+                labels: [{ label: "resolved", count: 3, share: 1 }],
+                current: 1,
+                previous: null,
+              },
+            },
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("100% of results")).toBeInTheDocument();
+    });
+
+    /** @scenario "A row with no results still says there is no data" */
+    it("still says there is no data when the classifier produced none", () => {
+      render(
+        <OnlineEvaluationsTable
+          {...defaultProps}
+          rows={[
+            {
+              ...categoryRow,
+              performance: {
+                metric: "label",
+                labels: [],
+                current: null,
+                previous: null,
+              },
+            },
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("No data yet")).toHaveAttribute(
+        "data-trend",
+        "neutral",
+      );
+    });
+  });
+
+  /** @scenario "A scoring row is unchanged" */
+  it("keeps showing a scoring monitor as a sparkline and a score", () => {
+    render(<OnlineEvaluationsTable {...defaultProps} rows={[rows[0]!]} />, {
+      wrapper: Wrapper,
+    });
+
+    expect(
+      screen.getByRole("img", { name: "Performance trend for Answer quality" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("0.86")).toBeInTheDocument();
+    expect(screen.getByText("↑ 0.12")).toHaveAttribute("data-trend", "up");
+    expect(
+      screen.queryByRole("group", {
+        name: "Label distribution for Answer quality",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("centers a flat performance trend", () => {
