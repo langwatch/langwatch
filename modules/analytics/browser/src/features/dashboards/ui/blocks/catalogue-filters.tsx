@@ -6,7 +6,7 @@
 
 import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
-import { Activity, DollarSign, type LucideIcon, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Activity, BadgeCheck, DollarSign, type LucideIcon, ShieldCheck } from "lucide-react";
 import type { ReactNode, Ref } from "react";
 
 import {
@@ -29,8 +29,8 @@ export const TRUNK_PALETTES: Readonly<Record<Trunk, string>> = {
 export const TRUNK_ICONS: Readonly<Record<Trunk, LucideIcon>> = {
   Profit: DollarSign,
   Grow: Activity,
-  Protect: TriangleAlert,
-  Trust: ShieldCheck,
+  Protect: ShieldCheck,
+  Trust: BadgeCheck,
 };
 
 /** The agent types a chip row offers; coding-agent boards and widgets live elsewhere. */
