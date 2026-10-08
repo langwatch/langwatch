@@ -26,8 +26,6 @@ vi.mock("#repositories/azure/azure.blob-token.store", () => ({
 }));
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
-import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
-import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.
@@ -81,22 +79,6 @@ function newTokenModeDriver(
   });
 }
 
-/** Stub for non-Azure registry slots; tests assert routing only. */
-class NeverCalledDriver implements StoredObjectBlobRepository {
-  get(): Promise<Readable> {
-    throw new Error("not expected to be called in this suite");
-  }
-  put(): Promise<void> {
-    throw new Error("not expected to be called in this suite");
-  }
-  delete(): Promise<void> {
-    throw new Error("not expected to be called in this suite");
-  }
-  exists(): Promise<boolean> {
-    throw new Error("not expected to be called in this suite");
-  }
-}
-
 describe("AzureStoredObjectBlobRepository", () => {
   // Restored in a hook, never inline: a rejected assertion between
   // useFakeTimers() and an inline restore would leave every subsequent test
@@ -107,7 +89,7 @@ describe("AzureStoredObjectBlobRepository", () => {
 
   describe("when registered alongside the existing drivers", () => {
     /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
-    it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
+    it("uses an azure-blob scheme distinct from s3/file and the driver round-trips existing azure-blob URIs", async () => {
       // Scheme is in the supported set and is NOT s3/file.
       const uri = mintAzureBlobStoredObjectUri({
         accountName: ACCOUNT_NAME,
@@ -120,8 +102,6 @@ describe("AzureStoredObjectBlobRepository", () => {
       expect(scheme).not.toBe("s3");
       expect(scheme).not.toBe("file");
 
-      // The registry dispatches the URI to the Azure driver — verified by
-      // the fact that the driver's fetch call is the one that runs.
       const azure = newDriver();
       const payload = Buffer.from("round-trip bytes", "utf8");
 
@@ -130,20 +110,13 @@ describe("AzureStoredObjectBlobRepository", () => {
       // GET — same bytes come back.
       fetchSpy.mockResolvedValueOnce(new Response(payload, { status: 200 }));
 
-      const registry = StoredObjectStorageRegistryService.create({
-        s3: new NeverCalledDriver(),
-        file: new NeverCalledDriver(),
-        "azure-blob": azure,
-      });
-
-      await registry.put(uri, payload, "application/octet-stream");
-      const stream = await registry.get(uri);
+      await azure.put(uri, payload, "application/octet-stream");
+      const stream = await azure.get(uri);
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(chunk as Buffer);
       expect(Buffer.concat(chunks).toString("utf8")).toBe("round-trip bytes");
 
-      // Both PUT and GET hit the azure-blob endpoint (proves the registry
-      // routed to the Azure driver and didn't sneak through S3 / file).
+      // Both PUT and GET hit the azure-blob endpoint.
       const [putUrl] = callOf(0);
       const [getUrl] = callOf(1);
       expect(putUrl).toContain(".blob.core.windows.net");

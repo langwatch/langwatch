@@ -14652,6 +14652,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1

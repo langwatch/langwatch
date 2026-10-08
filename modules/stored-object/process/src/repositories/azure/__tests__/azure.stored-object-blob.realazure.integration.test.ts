@@ -11,7 +11,6 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
-import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;
@@ -143,28 +142,6 @@ describeRealAzure(
 
         expect(await driver.exists(uri)).toBe(false);
         await expect(driver.get(uri)).rejects.toBeInstanceOf(ObjectNotFoundError);
-      });
-    });
-
-    describe("when dispatched through the storage registry", () => {
-      it("routes an azure-blob URI to the Azure driver on read", async () => {
-        const bytes = Buffer.from(`registry dispatch ${RUN_ID}`, "utf8");
-        const uri = uriFor(bytes);
-        await driver.put(uri, bytes, "text/plain");
-
-        const registry = StoredObjectStorageRegistryService.create({
-          // s3/file are mandatory on the registry but unused here — any
-          // StoredObjectBlobRepository satisfies the type; azure-blob does the
-          // real work.
-          s3: driver,
-          file: driver,
-          "azure-blob": driver,
-        });
-
-        const stream = await registry.get(uri);
-        const chunks: Buffer[] = [];
-        for await (const chunk of stream) chunks.push(chunk as Buffer);
-        expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
       });
     });
   },

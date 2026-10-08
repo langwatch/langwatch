@@ -59,6 +59,8 @@ function recordedOn(projectId: string, bucket: string) {
 describe("given organizations on their own S3 accounts beside a shared bucket", () => {
   describe("when an object recorded on the project's own account is signed for download", () => {
     /** @scenario "A recorded location resolves to the project's own backend or the shared one" */
+    /** @scenario "Storage registry dispatches by URI scheme" */
+    /** @scenario "An S3 address is still read as bucket and key" */
     it("signs it on the project's own bucket", async () => {
       const url = await multiTenantStorage().signDownload(
         recordedOn("project-1", "organization-1-objects"),
@@ -139,6 +141,7 @@ describe("given object storage on the local filesystem", () => {
 
   describe("when an object recorded at the configured root is read", () => {
     /** @scenario "A recorded location resolves to the project's own backend or the shared one" */
+    /** @scenario "Storage registry dispatches by URI scheme" */
     it("reads, digests and removes it there", async () => {
       const at = { projectId: "project-1", key: "project-1/object-1" };
       const written = await storage().write(at, body("kept"), {
@@ -183,6 +186,7 @@ describe("given object storage on the local filesystem", () => {
 
 describe("given an object recorded on an Azure container this deployment is not configured for", () => {
   describe("when it is read", () => {
+    /** @scenario "The S3 driver refuses an Azure address" */
     it("refuses by the location's kind rather than reading the current backend", async () => {
       const storage = buildObjectStorage({
         config: { backend: "s3", s3: { bucket: "shared" } },
@@ -197,6 +201,26 @@ describe("given an object recorded on an Azure container this deployment is not 
           location: { kind: "azure", accountName: "old", container: "objects" },
         }),
       ).rejects.toBeInstanceOf(UnreachableStorageLocationError);
+    });
+
+    /** @scenario "The S3 driver refuses an Azure address on every byte operation" */
+    it("refuses its digest, removal and download signing alike", async () => {
+      const storage = buildObjectStorage({
+        config: { backend: "s3", s3: { bucket: "shared" } },
+        clock,
+        directory,
+      }).value;
+      const at = {
+        projectId: "project-1",
+        key: "project-1/object-1",
+        location: { kind: "azure", accountName: "old", container: "objects" },
+      } as const;
+
+      await expect(storage.digest(at)).rejects.toBeInstanceOf(UnreachableStorageLocationError);
+      await expect(storage.remove(at)).rejects.toBeInstanceOf(UnreachableStorageLocationError);
+      await expect(storage.signDownload(at, { expiresAt })).rejects.toBeInstanceOf(
+        UnreachableStorageLocationError,
+      );
     });
   });
 });
