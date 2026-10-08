@@ -49,7 +49,7 @@ function compareParsed({ left, right }: { left: ParsedRelease; right: ParsedRele
  * Orders two releases by version. A build that is not a version (a cloud `git-<sha>`) is never
  * ordered against anything: only equal strings are `same`, every other pairing is `unknown`.
  */
-export function compareReleases({ left, right }: { left: string; right: string }): ReleaseOrder {
+export function orderReleases({ left, right }: { left: string; right: string }): ReleaseOrder {
   const parsedLeft = parseRelease({ release: left });
   const parsedRight = parseRelease({ release: right });
   if (!parsedLeft || !parsedRight) return left === right ? "same" : "unknown";
@@ -63,7 +63,7 @@ export function pickHighestRelease({ releases }: { releases: readonly string[] }
   let highest: string | null = null;
   for (const release of releases) {
     if (!parseRelease({ release })) continue;
-    if (highest === null || compareReleases({ left: release, right: highest }) === "newer") {
+    if (highest === null || orderReleases({ left: release, right: highest }) === "newer") {
       highest = release;
     }
   }

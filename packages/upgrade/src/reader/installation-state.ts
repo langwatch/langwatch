@@ -1,6 +1,6 @@
 import { INSTALLATION_STATES } from "./labels.ts";
 import type { InstallationReason, InstallationState } from "./reader.schema.ts";
-import { compareReleases } from "./release.ts";
+import { orderReleases } from "./release.ts";
 
 export interface InstallationFacts {
   imageRelease: string;
@@ -28,14 +28,14 @@ function plural({ count, one, many }: { count: number; one: string; many: string
 
 function checkUnsupported(facts: InstallationFacts): InstallationVerdict | null {
   const { imageRelease, installed, floor, ledgerFloor } = facts;
-  if (floor && installed && compareReleases({ left: installed, right: floor }) === "older") {
+  if (floor && installed && orderReleases({ left: installed, right: floor }) === "older") {
     return {
       state: "unsupported",
       reason: "installed-below-floor",
       summary: `Installed release ${installed} is below the supported floor ${floor}. Upgrade to ${floor} first.`,
     };
   }
-  if (ledgerFloor && compareReleases({ left: imageRelease, right: ledgerFloor }) === "older") {
+  if (ledgerFloor && orderReleases({ left: imageRelease, right: ledgerFloor }) === "older") {
     return {
       state: "unsupported",
       reason: "image-below-ledger-floor",
@@ -75,7 +75,7 @@ function checkNeverUpgraded(facts: InstallationFacts): InstallationVerdict | nul
 
 function checkBehind(facts: InstallationFacts): InstallationVerdict | null {
   const { imageRelease, installed } = facts;
-  if (installed && compareReleases({ left: imageRelease, right: installed }) === "newer") {
+  if (installed && orderReleases({ left: imageRelease, right: installed }) === "newer") {
     return {
       state: "behind",
       reason: "image-newer",
@@ -97,7 +97,7 @@ function checkBehind(facts: InstallationFacts): InstallationVerdict | null {
 
 function checkRolledBack(facts: InstallationFacts): InstallationVerdict | null {
   const { imageRelease, installed } = facts;
-  if (!installed || compareReleases({ left: imageRelease, right: installed }) !== "older") {
+  if (!installed || orderReleases({ left: imageRelease, right: installed }) !== "older") {
     return null;
   }
   return {

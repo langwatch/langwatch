@@ -4,8 +4,6 @@ import { prismaErrorCode, redactOutput, runPrisma, type SteppingTools } from "./
 import { SteppingError, writeReleaseDirectory } from "./release-directory.ts";
 import { runTool, type ToolRun } from "./tool-run.ts";
 
-export type { SteppingTools } from "./prisma-tool.ts";
-
 /** One ClickHouse database goose steps; `table` is `<db>.goose_db_version`. */
 export interface ClickHouseStepTarget {
   name: string;

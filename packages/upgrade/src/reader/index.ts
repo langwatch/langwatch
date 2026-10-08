@@ -9,9 +9,4 @@ export { UpgradeReadError, type UpgradeReadErrorCode } from "./reader.service.ts
 export * from "./reader.schema.ts";
 export { type UpgradeReader, createUpgradeReader } from "./reader.service.ts";
 export { parseRunPhases } from "./run-phase-view.ts";
-export {
-  type ReleaseOrder,
-  compareReleases,
-  compareReleasesNewestFirst,
-  pickHighestRelease,
-} from "./release.ts";
+export { type ReleaseOrder, compareReleasesNewestFirst, pickHighestRelease } from "./release.ts";
