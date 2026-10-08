@@ -88,12 +88,12 @@ export class PrismaNurturingMilestonesRepository
   }: {
     organizationId: string;
   }): Promise<number | null> {
-    const teams = await this.prisma.team.findMany({
+    const teams = await this.projects.team.findMany({
       where: { organizationId },
       select: { id: true },
     });
     if (teams.length === 0) return null;
-    const { _min } = await this.prisma.project.aggregate({
+    const { _min } = await this.projects.project.aggregate({
       where: { teamId: { in: teams.map(({ id }) => id) } },
       _min: { createdAt: true },
     });
