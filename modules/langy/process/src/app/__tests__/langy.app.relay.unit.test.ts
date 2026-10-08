@@ -38,6 +38,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { mintRunToken, signFrame } from "../../rules/langy-frame-auth.rules.ts";
 import { LangyModule } from "../langy.app.ts";
@@ -128,6 +129,7 @@ async function composedRelay() {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
+    channels: MemoryLangyChannels.create(),
   });
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),

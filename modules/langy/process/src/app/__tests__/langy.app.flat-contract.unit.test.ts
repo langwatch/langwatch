@@ -33,6 +33,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyConversationUpdateService } from "../../services/langy-conversation-update.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
@@ -265,6 +266,7 @@ async function createApp({
     resources,
     secrets,
     repositories,
+    channels: MemoryLangyChannels.create(),
   });
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),

@@ -112,9 +112,8 @@ import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { z } from "zod";
 
-import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangyWorker } from "../channels/langy-worker.channel.ts";
-import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
+import type { LangyChannels } from "../channels/langy.channels.ts";
 import { RedisLangyConversationProducerRepository } from "../eventing/langy-conversation-producer.pipeline.ts";
 import { EventingLangyConversationAdapter } from "../eventing/langy-conversation-runtime.pipeline.ts";
 import { LangyConversationCommandSenders } from "../eventing/langy-conversation.commands.ts";
@@ -179,7 +178,6 @@ import { LangyUiActionSurfaceService } from "../services/langy-ui-action-surface
 import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
 import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
-import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 
@@ -239,7 +237,8 @@ type LangySetup = FeatureSetup<
   typeof LangyModule.dependencies,
   never,
   LangyServerConfig,
-  LangyRepositories
+  LangyRepositories,
+  LangyChannels
 >;
 
 export class LangyModule implements LangyApiContract {
@@ -286,22 +285,14 @@ export class LangyModule implements LangyApiContract {
   static readonly secrets = langySecrets;
 
   static async create(setup: LangySetup): Promise<LangyModule> {
-    const { channel, door, configured } = await setup.secrets.into(
+    const channel = setup.channels.worker;
+    const { door, configured } = await setup.secrets.into(
       langySecrets.internal,
       (internalSecret) => {
         assertLangyServerConfig(setup.config, internalSecret);
-        const metrics = LangyWorkerMetricsOtelService.create();
         const configured = Boolean(setup.config.agentUrl && internalSecret);
-        const channel =
-          setup.config.agentUrl && internalSecret
-            ? HttpLangyWorkerChannel.create({
-                agentUrl: setup.config.agentUrl,
-                internalSecret,
-                metrics,
-              })
-            : UnavailableLangyWorkerChannel.create(metrics);
         const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
-        return { channel, door, configured };
+        return { door, configured };
       },
     );
     const adapter = LangyPostgresService.create({

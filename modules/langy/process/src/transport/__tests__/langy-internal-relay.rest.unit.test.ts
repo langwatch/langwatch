@@ -33,6 +33,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { LangyModule } from "../../app/langy.app.ts";
+import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { langyInternalRest } from "../langy-internal.rest.ts";
 
@@ -97,6 +98,7 @@ async function relayRoute() {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: deploymentSecrets,
     repositories: MemoryLangyRepositories.create(),
+    channels: MemoryLangyChannels.create(),
   });
   const hono = createRestRuntime({
     identity: app.internalDoor,

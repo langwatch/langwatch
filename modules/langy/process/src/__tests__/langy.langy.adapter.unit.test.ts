@@ -42,6 +42,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
+import { MemoryLangyChannels } from "../channels/memory/memory.langy.channels.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
@@ -341,6 +342,7 @@ async function createApp(): Promise<LangyModule> {
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,
     repositories: MemoryLangyRepositories.create(),
+    channels: MemoryLangyChannels.create(),
   });
   connectProducer(app);
   return app;
