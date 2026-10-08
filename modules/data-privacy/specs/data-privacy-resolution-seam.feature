@@ -2,7 +2,7 @@ Feature: A project's privacy policy resolves without the write graph
   Every span LangWatch folds asks which content categories the customer wanted
   dropped and which redacted, and the answer is inherited down organization,
   team, department and project. Data privacy reads where each project sits from
-  project's `Project` table and organization's `Team` table through the shares
+  project's `Project` table, organization's `Team` and `OrganizationUser` tables through the shares
   their owners declare (R40, round 46 E1), so resolving a policy asks no other
   module anything (record §5) and keeps no copy to fill at deploy (plan R01).
 
@@ -53,10 +53,23 @@ Feature: A project's privacy policy resolves without the write graph
       Then the resolution is refused with project_not_found
 
     @unit
-    Scenario: An archived project no longer resolves
+    Scenario: An archived project resolves its privacy policy as on main
       Given a project whose row is archived
       When its policy is resolved
-      Then its policy resolution is refused with project_not_found
+      Then it resolves through its organization, team and department, as a live project does
+
+    @unit
+    Scenario: A personal project takes its department from its owner's membership
+      Given a personal project whose owner's membership in the organisation names department "risk"
+      When its policy is resolved
+      Then the project's policy resolves through department "risk"
+      And the project's own department column is ignored
+
+    @unit
+    Scenario: A personal project whose owner has no department resolves with none
+      Given a personal project whose owner has no membership department, or has no owner
+      When its policy is resolved
+      Then the project's policy resolves with no department
 
     @unit
     Scenario: Data privacy keeps no project peer and no project-scope fold
@@ -66,7 +79,7 @@ Feature: A project's privacy policy resolves without the write graph
 
     @unit
     Scenario: The memory and Postgres placement readers answer alike
-      Given an organisation with a team holding a live project in a department and an archived one
+      Given an organisation with a team holding a live project in a department, an archived one and a personal one
       When each placement reader is asked for those projects
-      Then both answer the same team, organisation, department and archive state
+      Then both answer the same team, organisation and department, the personal project's from its owner's membership
       And neither knows a project that has no row

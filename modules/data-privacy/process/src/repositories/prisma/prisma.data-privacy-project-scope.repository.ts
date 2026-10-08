@@ -6,9 +6,9 @@ import type {
 } from "../data-privacy-project-scope.repository.ts";
 
 /** Only the shared delegate this reader touches; it claims no table (R40). */
-type DataPrivacyProjectScopeDatabase = Pick<PrismaClient, "project">;
+type DataPrivacyProjectScopeDatabase = Pick<PrismaClient, "project" | "organizationUser">;
 
-/** Project's `Project` row and its team's organisation, through their shares, in one read. */
+/** Project's row, its team's organisation and a personal owner's membership, through shares. */
 export class PrismaDataPrivacyProjectScopeRepository implements DataPrivacyProjectScopeRepository {
   static create(prisma: DataPrivacyProjectScopeDatabase): PrismaDataPrivacyProjectScopeRepository {
     return new PrismaDataPrivacyProjectScopeRepository(prisma);
@@ -23,19 +23,38 @@ export class PrismaDataPrivacyProjectScopeRepository implements DataPrivacyProje
         teamId: true,
         isPersonal: true,
         departmentId: true,
-        archivedAt: true,
+        ownerUserId: true,
         team: { select: { organizationId: true } },
       },
     });
     if (!project?.team) return null;
 
+    const organizationId = project.team.organizationId;
+    const departmentId = project.isPersonal
+      ? await this.findOwnerDepartmentId({ ownerUserId: project.ownerUserId, organizationId })
+      : project.departmentId;
+
     return {
       projectId,
-      organizationId: project.team.organizationId,
+      organizationId,
       teamId: project.teamId,
       isPersonal: project.isPersonal,
-      departmentId: project.departmentId,
-      archived: project.archivedAt !== null,
+      departmentId,
     };
+  }
+
+  private async findOwnerDepartmentId({
+    ownerUserId,
+    organizationId,
+  }: {
+    ownerUserId: string | null;
+    organizationId: string;
+  }): Promise<string | null> {
+    if (!ownerUserId) return null;
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId: ownerUserId, organizationId } },
+      select: { departmentId: true },
+    });
+    return membership?.departmentId ?? null;
   }
 }

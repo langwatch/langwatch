@@ -48,9 +48,9 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz"],
+    readers: ["authz", "data-privacy"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53)",
     writes: [
       {
         reader: "authz",
