@@ -6,7 +6,6 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import type { LangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
 import { resolveLangyActivityOwnership } from "../../../../model/langy-activity-ownership.ts";
 import { langyPlan } from "../../../../model/langy-plan.ts";
-import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
 import { latestCodeAccessCallId } from "../../../tools/model/langy-code-access-tool.ts";
 import {
   questionToolCallIdsIn,
@@ -20,6 +19,7 @@ import {
   runningTool,
   settledTool,
 } from "../../../transcript/model/langy-thinking-line.ts";
+import { deriveWaveActivity } from "../../../transcript/model/langy-wave-activity.ts";
 import { toEngineMessage } from "../../model/langy-engine-parts.ts";
 import type { LangyMessagesResult } from "../data/use-langy-messages.ts";
 import {

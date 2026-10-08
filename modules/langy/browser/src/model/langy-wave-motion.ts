@@ -1,10 +1,3 @@
-import {
-  currentTurnAssistant,
-  hasTokens,
-  runningTool,
-  type ThinkingMessage,
-} from "../features/transcript/model/langy-thinking-line.ts";
-
 /**
  * Maps observable Langy activity to low-amplitude fold motion. The fold never follows
  * the pointer or claims unobserved work.
@@ -78,32 +71,6 @@ export const WAVE_GLITTER_TRAVEL_S = 2.4;
 export const WAVE_GLITTER_RISE_TAU_S = 0.35;
 /** …and OUT this slow when it clears, so the fibre never snaps dark. */
 export const WAVE_GLITTER_FALL_TAU_S = 0.9;
-
-/**
- * Map Langy's live turn signals to the fold's activity state.
- */
-export function deriveWaveActivity({
-  turnInFlight,
-  isSettling,
-  hasLiveReasoning,
-  messages,
-}: {
-  /** A turn is live (transport busy OR the durable running-turn signal). */
-  turnInFlight: boolean;
-  /** The turn failed, or a quiet auto-recovery is pending. */
-  isSettling: boolean;
-  /** Reasoning deltas are on the wire right now. */
-  hasLiveReasoning: boolean;
-  messages: ThinkingMessage[];
-}): LangyWaveActivity {
-  if (isSettling) return "settling";
-  if (!turnInFlight) return "idle";
-  const last = currentTurnAssistant(messages);
-  if (runningTool(last)) return "tool";
-  if (hasTokens(last)) return "streaming";
-  if (hasLiveReasoning) return "thinking";
-  return "waiting";
-}
 
 /** Exponential approach with a real time constant — frame-rate independent. */
 function approach({
