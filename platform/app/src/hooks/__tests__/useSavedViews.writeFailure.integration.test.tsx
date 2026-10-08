@@ -10,6 +10,7 @@
  * @see specs/traces/saved-views.feature
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
+import { TRPCError } from "@trpc/server";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +28,6 @@ type MutateOptions = { onError?: (error: unknown) => void };
 
 const { mutationFor, invalidate, setData, toast, cache, filterParams } =
   vi.hoisted(() => {
-    const refusal = new Error("aggregate_project_is_read_only");
     const options: Partial<Record<string, MutateOptions>> = {};
     // The server refuses every write: the hook's own handler runs first, then
     // the one passed to the single call, as react-query orders them.
@@ -79,8 +79,19 @@ vi.mock("../useFilterParams", () => ({
   useFilterParams: () => filterParams,
 }));
 
+/**
+ * The aggregate's refusal as the server raises it: FORBIDDEN, with the
+ * read-only message. Read at call time by the mocked mutations above.
+ */
+const refusal = new TRPCError({
+  code: "FORBIDDEN",
+  message:
+    "This project reads traces from other projects, so no data can be added to it",
+});
+
 // The toast goes through the real `showErrorToast`, so the title asserted is
-// the one the user reads: a refusal with no code falls back to the change's own.
+// the one the user reads: the refusal carries no handled payload the client
+// can read, so it falls back to the change's own title.
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create: toast } }));
 
 vi.mock("../../utils/api", () => ({
