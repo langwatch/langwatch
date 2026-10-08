@@ -34,7 +34,8 @@ const CATALOGUE: FeatureCatalogueEntry[] = [
   },
 ];
 
-const SUBQUERY_FILE = "modules/trace/process/src/rules/trace-query-subquery.rules.ts";
+const SUBQUERY_FILE =
+  "modules/trace/process/src/features/query/rules/trace-query-subquery.rules.ts";
 
 const DECLARED: DeclaredOwnership = {
   records: [

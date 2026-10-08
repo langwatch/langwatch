@@ -8,7 +8,7 @@ import {
   KEY_DISCOVERY_SETTINGS,
 } from "./clickhouse.trace-facet-query.repository.ts";
 
-export class ClickHouseTraceFacetEventAttributeKeysRepository {
+class ClickHouseTraceFacetEventAttributeKeysRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
 
   static create(): ClickHouseTraceFacetEventAttributeKeysRepository {

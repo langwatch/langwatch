@@ -5,7 +5,7 @@ import type {
 } from "../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 
-export class ClickHouseTraceFacetLabelRepository {
+class ClickHouseTraceFacetLabelRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
 
   static create(): ClickHouseTraceFacetLabelRepository {

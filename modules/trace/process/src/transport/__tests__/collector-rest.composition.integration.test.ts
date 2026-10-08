@@ -20,10 +20,10 @@ import { describe, expect, it } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
@@ -185,7 +185,7 @@ function deployment(access: CollectorAccess = {}) {
   // Whether the MODULE declares the collector among its transports — the
   // point of the file: dropping it from `trace.module.ts` turns every
   // request below into the 404 a customer's SDK was getting.
-  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports;
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports ?? [];
   const servesCollector = declaredRest.includes(collectorRest);
 
   const mounted = servesCollector

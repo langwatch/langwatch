@@ -22,10 +22,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceBlobStoreService } from "../../features/media/services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import type { TraceProcessingCommands } from "../../services/trace-processing-commands.service.ts";
 import { traceProcessModule } from "../../trace.module.ts";
 import { otlpIngestRest } from "../otlp-ingest.rest.ts";
@@ -209,7 +209,7 @@ function deployment(access: OtlpAccess = {}) {
   // point of the file: the door is mounted here only if `trace.module.ts` still
   // mounts it, so dropping it there turns every request below into the 404 an
   // OTLP exporter was getting.
-  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports;
+  const declaredRest: readonly FeatureTransportDescriptor[] = traceProcessModule.transports ?? [];
   const servesOtlp = declaredRest.includes(otlpIngestRest);
 
   const mounted = servesOtlp
