@@ -92,6 +92,16 @@ var acceptedProcedureMoves = map[string]string{
 	"ops.runSystemMigrationPass":            "ops.upgrade.runSystemMigrationPass",
 	"ops.rollBackSystemMigrationTenant":     "ops.upgrade.rollBackSystemMigrationTenant",
 	"monitors.getPerformanceForProject":     "evaluations.getMonitorPerformanceForProject",
+	// AD-1 / CD-11 and agent ADR-001:67: scenario and workflow serve these.
+	"agents.copy":       "workflow.copyAgent",
+	"agents.testTurn":   "scenarios.testAgentTurn",
+	"agents.testRun":    "scenarios.testAgentRun",
+	"httpProxy.execute": "scenarios.testHttpAgent",
+	// D4 (rulings-2026-10-07.md:255): instant evaluation is its own module.
+	"tracesV2.instantEval.estimate": "instantEval.estimate",
+	"tracesV2.instantEval.start":    "instantEval.start",
+	"tracesV2.instantEval.cancel":   "instantEval.cancel",
+	"tracesV2.instantEval.get":      "instantEval.get",
 }
 
 // retiredProcedures are main procedures ruled out of the branch: publicEnv
@@ -105,6 +115,8 @@ var retiredProcedures = map[string]bool{
 	"roleBinding.getMyAccessBreakdown": true,
 	// EF-3 (rulings-2026-10-07.md:164): the browser composes member provenance.
 	"organization.getMemberProvenance": true,
+	// linked-workflow-and-history.feature:34: the browser composes related entities.
+	"agents.getRelatedEntities": true,
 }
 
 // movedPath is where an accepted namespace move put a main procedure path.
