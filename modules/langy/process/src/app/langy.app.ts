@@ -125,59 +125,59 @@ import {
 } from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
+import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
+import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
+import {
+  LANGY_GITHUB_PRS_PER_DAY,
+  LangyGithubPrQuotaService,
+} from "../features/github/services/langy-github-pr-quota.service.ts";
+import { LangyGithubTurnTokenService } from "../features/github/services/langy-github-turn-token.service.ts";
+import { LocalControlConnectionService } from "../features/local-control/services/langy-local-control-connection.service.ts";
+import { LocalControlLongPollService } from "../features/local-control/services/langy-local-control-long-poll.service.ts";
+import { LangyLocalControlRuntimeService } from "../features/local-control/services/langy-local-control-runtime.service.ts";
+import type { LocalControlRuntime } from "../features/local-control/services/langy-local-control-runtime.service.ts";
+import { LangyLocalControlTerminalService } from "../features/local-control/services/langy-local-control-terminal.service.ts";
+import { LocalControlSessionCoreService } from "../features/local-control/services/langy-local-session.service.ts";
+import { LangyLocalWorkerService } from "../features/local-control/services/langy-local-worker.service.ts";
+import { LangyLocalWorkspaceService } from "../features/local-control/services/langy-local-workspace.service.ts";
+import { LangyPanelAccessService } from "../features/panel/services/langy-panel-access.service.ts";
+import { LangyPanelConversationService } from "../features/panel/services/langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../features/panel/services/langy-panel-egress.service.ts";
+import { LangyPanelLocalService } from "../features/panel/services/langy-panel-local.service.ts";
+import { LangySessionKeyMetricsOtelService } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
+import { LangySessionKeyReapService } from "../features/session-key/services/langy-session-key-reap.service.ts";
+import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
+import { LangyVirtualKeyGatewayService } from "../features/session-key/services/langy-virtual-key-gateway.service.ts";
+import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
+import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
+import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
+import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
+import { LangyUiActionCatalogService } from "../features/ui-action/services/langy-ui-action-catalog.service.ts";
+import { LangyUiActionDoorService } from "../features/ui-action/services/langy-ui-action-door.service.ts";
+import { LangyUiActionExperimentBackendService } from "../features/ui-action/services/langy-ui-action-experiment-backend.service.ts";
+import { LangyUiActionPageService } from "../features/ui-action/services/langy-ui-action-page.service.ts";
+import { LangyUiActionSurfaceService } from "../features/ui-action/services/langy-ui-action-surface.service.ts";
+import { LangyUiActionService } from "../features/ui-action/services/langy-ui-action.service.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { RedisLangyTurnRelayRepository } from "../repositories/redis/redis.langy-turn-relay.repository.ts";
 import { readSessionKeyCredential } from "../rules/langy-local-control-connect.rules.ts";
 import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
-import { LangyConversationUpdateService } from "../services/langy-conversation-update.service.ts";
-import { LangyGithubPrPermitService } from "../services/langy-github-pr-permit.service.ts";
-import {
-  LANGY_GITHUB_PRS_PER_DAY,
-  LangyGithubPrQuotaService,
-} from "../services/langy-github-pr-quota.service.ts";
-import { LangyGithubTurnTokenService } from "../services/langy-github-turn-token.service.ts";
 import { LangyGuidedKickoffService } from "../services/langy-guided-kickoff.service.ts";
 import { LangyGuidedOnboardingService } from "../services/langy-guided-onboarding.service.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
-import { LocalControlConnectionService } from "../services/langy-local-control-connection.service.ts";
-import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
-import { LangyLocalControlRuntimeService } from "../services/langy-local-control-runtime.service.ts";
-import type { LocalControlRuntime } from "../services/langy-local-control-runtime.service.ts";
-import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
-import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
-import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
-import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyNavigateFallbackService } from "../services/langy-navigate-fallback.service.ts";
 import { LangyNavigateResourceLocatorService } from "../services/langy-navigate-resource-locator.service.ts";
-import { LangyPanelAccessService } from "../services/langy-panel-access.service.ts";
-import { LangyPanelConversationService } from "../services/langy-panel-conversation.service.ts";
-import { LangyPanelEgressService } from "../services/langy-panel-egress.service.ts";
-import { LangyPanelLocalService } from "../services/langy-panel-local.service.ts";
 import {
   LangyPostgresService,
   type LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
-import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
-import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
-import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
-import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
-import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
-import { LangyUiActionBackendService } from "../services/langy-ui-action-backend.service.ts";
-import { LangyUiActionCatalogService } from "../services/langy-ui-action-catalog.service.ts";
-import { LangyUiActionDoorService } from "../services/langy-ui-action-door.service.ts";
-import { LangyUiActionExperimentBackendService } from "../services/langy-ui-action-experiment-backend.service.ts";
-import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
-import { LangyUiActionSurfaceService } from "../services/langy-ui-action-surface.service.ts";
-import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
-import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
-import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 

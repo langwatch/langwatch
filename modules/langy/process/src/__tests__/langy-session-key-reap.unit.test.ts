@@ -7,7 +7,7 @@ import {
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   langySessionKeyReapWake,
 } from "../eventing/langy-session-key-reap.process.ts";
-import { LANGY_SESSION_KEYS_METRIC_NAME } from "../services/langy-session-key-metrics-otel.service.ts";
+import { LANGY_SESSION_KEYS_METRIC_NAME } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
 
 const wakeContext = (at: number) => ({
   at,

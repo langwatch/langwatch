@@ -18,16 +18,6 @@ import { Fragment, memo, type ReactNode, useMemo } from "react";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
-  hasLangyBlockParts,
-  type LangyAnswerSegment,
-  langyAnswerSegments,
-  langyAnswerSegmentsFromText,
-} from "../../../../model/langy-answer-segments.ts";
-import {
-  codeAccessCallId,
-  codeAccessOffersDescribe,
-} from "../../../../model/langy-code-access-tool.ts";
-import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../../../../model/langy-feedback-directive.ts";
@@ -38,23 +28,6 @@ import {
 } from "../../../../model/langy-local-waits.ts";
 import { offerNotificationsCallId } from "../../../../model/langy-notifications.ts";
 import { langyPlan } from "../../../../model/langy-plan.ts";
-import {
-  linkPullRequestReferences,
-  pullRequestLinksFromToolParts,
-} from "../../../../model/langy-pull-request-links.ts";
-import { questionToolCardParts } from "../../../../model/langy-question-tool.ts";
-import {
-  foldReasoningTitles,
-  stripReasoningTitles,
-} from "../../../../model/langy-reasoning-titles.ts";
-import { sayToolText } from "../../../../model/langy-say-tool.ts";
-import { secretSnippetCalls } from "../../../../model/langy-secret-snippet-tool.ts";
-import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
-import {
-  langyRunText,
-  type LangyTranscriptRun,
-  langyTranscriptRuns,
-} from "../../../../model/langy-transcript.ts";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
@@ -66,6 +39,33 @@ import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
 } from "../../../guided-onboarding/model/guided-conversation.ts";
+import {
+  codeAccessCallId,
+  codeAccessOffersDescribe,
+} from "../../../tools/model/langy-code-access-tool.ts";
+import { questionToolCardParts } from "../../../tools/model/langy-question-tool.ts";
+import { sayToolText } from "../../../tools/model/langy-say-tool.ts";
+import { secretSnippetCalls } from "../../../tools/model/langy-secret-snippet-tool.ts";
+import {
+  hasLangyBlockParts,
+  type LangyAnswerSegment,
+  langyAnswerSegments,
+  langyAnswerSegmentsFromText,
+} from "../../../transcript/model/langy-answer-segments.ts";
+import {
+  linkPullRequestReferences,
+  pullRequestLinksFromToolParts,
+} from "../../../transcript/model/langy-pull-request-links.ts";
+import {
+  foldReasoningTitles,
+  stripReasoningTitles,
+} from "../../../transcript/model/langy-reasoning-titles.ts";
+import { stripToolNarration } from "../../../transcript/model/langy-tool-narration.ts";
+import {
+  langyRunText,
+  type LangyTranscriptRun,
+  langyTranscriptRuns,
+} from "../../../transcript/model/langy-transcript.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";

@@ -37,8 +37,6 @@ import {
 } from "lucide-react";
 import { Profiler, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
-import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
 import {
   attachedContextToChip,
   type LangyPanelEffect,
@@ -46,7 +44,6 @@ import {
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
-import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import { useLangyOrbProximity } from "../../../../behavior/use-langy-orb-proximity.ts";
 import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
@@ -56,6 +53,9 @@ import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.t
 import { LANGY_DODGE_STAGGER_MS } from "../../../../model/langy-panel-layout.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
+import { mergeContextChips } from "../../../context-target/behavior/langy-context-chips.ts";
+import { removeContextChip } from "../../../context-target/behavior/langy-context-target.store.ts";
+import { useLangyContextDropZone } from "../../../context-target/behavior/use-langy-context-drop-zone.ts";
 import {
   guidedPathInProgress,
   guidedPullRequestFromMessages,

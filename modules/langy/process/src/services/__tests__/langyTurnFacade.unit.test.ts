@@ -6,7 +6,10 @@ import {
   workerCredentials,
   conversationDetail,
 } from "../../__tests__/support/langy-turn-deps.ts";
-import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
+import {
+  LangyTurnService,
+  type StartConversationTurnInput,
+} from "../../features/turn/services/langy-turn.service.ts";
 
 function makeFixture() {
   const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));

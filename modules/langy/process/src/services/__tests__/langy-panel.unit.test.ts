@@ -6,18 +6,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
+import { LangyPanelAccessService } from "../../features/panel/services/langy-panel-access.service.ts";
 import {
   LangyPanelConversationService,
   type LangyPanelConversationMembers,
-} from "../langy-panel-conversation.service.ts";
-import { LangyPanelEgressService } from "../langy-panel-egress.service.ts";
+} from "../../features/panel/services/langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../../features/panel/services/langy-panel-egress.service.ts";
 import {
   LangyPanelLocalService,
   type LangyPanelLocalMembers,
-} from "../langy-panel-local.service.ts";
-import { LangyUiActionPageService } from "../langy-ui-action-page.service.ts";
+} from "../../features/panel/services/langy-panel-local.service.ts";
+import { LangyUiActionPageService } from "../../features/ui-action/services/langy-ui-action-page.service.ts";
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import type { LangyService } from "../langy.service.ts";
 
 type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;

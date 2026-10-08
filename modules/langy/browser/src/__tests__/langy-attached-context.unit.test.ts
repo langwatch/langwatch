@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { mergeContextChips, traceContextChip } from "../behavior/langy-context-chips.ts";
 import {
   attachedContextToChip,
   type LangyAttachedContext,
   useLangyStore,
 } from "../behavior/langy.store.ts";
+import {
+  mergeContextChips,
+  traceContextChip,
+} from "../features/context-target/behavior/langy-context-chips.ts";
 
 /**
  * The surface-driven context-attach API (task #21a): the clean, typed entry

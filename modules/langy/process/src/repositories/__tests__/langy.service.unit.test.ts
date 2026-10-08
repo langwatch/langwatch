@@ -7,11 +7,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
  */
 import { describe, expect, it } from "vitest";
 
-import type { LangyConversationService } from "../../services/langy-conversation.service.ts";
+import type { LangyConversationService } from "../../features/conversation/services/langy-conversation.service.ts";
+import type { LangyTurnService } from "../../features/turn/services/langy-turn.service.ts";
 import type { LangyCredentialService } from "../../services/langy-credential.service.ts";
 import { LangyFeedbackPromptService } from "../../services/langy-feedback-prompt.service.ts";
 import type { LangyMessageService } from "../../services/langy-message.service.ts";
-import type { LangyTurnService } from "../../services/langy-turn.service.ts";
 import { LangyService } from "../../services/langy.service.ts";
 import { LangyFeedbackPromptRedisRepository } from "../redis/redis.langy-feedback-prompt.repository.ts";
 

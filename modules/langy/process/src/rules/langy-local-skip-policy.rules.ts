@@ -7,7 +7,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import type { LocalControlRuntime } from "../services/langy-local-control-runtime.service.ts";
+import type { LocalControlRuntime } from "../features/local-control/services/langy-local-control-runtime.service.ts";
 import type { WorkspaceNudge } from "./langy-local-call-record.rules.ts";
 import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 

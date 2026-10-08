@@ -10,11 +10,11 @@ import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { LangyVirtualKeyGatewayService } from "../../features/session-key/services/langy-virtual-key-gateway.service.ts";
 import type { LangyCredentialRepository } from "../../repositories/langy-credential.repository.ts";
 import { langyWorkerRuntimeOf } from "../../rules/langy-worker-runtime.rules.ts";
 import { LangyCredentialService } from "../langy-credential.service.ts";
 import type { LangySessionKeyMintingService } from "../langy-credential.service.ts";
-import { LangyVirtualKeyGatewayService } from "../langy-virtual-key-gateway.service.ts";
 
 const NO_ADDRESSES: LangyServerConfig = {
   agentUrl: undefined,

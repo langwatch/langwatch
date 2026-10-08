@@ -1,6 +1,7 @@
 /**
- * `LANGY_UI_ACTIONS_FLAG` lives in `services/langy-ui-action-surface.service.ts`, beside
- * `LangyUiActionSurface` — its adapter may not import this transport file.
+ * `LANGY_UI_ACTIONS_FLAG` lives in
+ * `features/ui-action/services/langy-ui-action-surface.service.ts`, beside
+ * `LangyUiActionSurface`; its adapter may not import this transport file.
  */
 
 /** `/api/langy/conversations` — the project-API-key turn surface. */

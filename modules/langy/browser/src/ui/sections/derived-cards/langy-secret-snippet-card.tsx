@@ -14,7 +14,7 @@ import {
   type LangySecretSnippetCall,
   maskedSecretValue,
   renderSecretSnippet,
-} from "../../../model/langy-secret-snippet-tool.ts";
+} from "../../../features/tools/model/langy-secret-snippet-tool.ts";
 import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
 
 /** The line over a snippet whose value is on screen. */

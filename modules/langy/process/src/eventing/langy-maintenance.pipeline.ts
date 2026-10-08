@@ -16,8 +16,8 @@ import {
 } from "@langwatch/project-contract";
 
 import type { LangyModule } from "../app/langy.app.ts";
+import type { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
-import type { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import {
   type LangySessionKeyReapDeps,
   runLangySessionKeyReap,

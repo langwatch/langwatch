@@ -9,8 +9,8 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
 
+import type { LangyTurnSegment } from "../features/turn/services/langy-turn-order.service.ts";
 import { normalizeToolFrame } from "../rules/langy-cli-envelope.rules.ts";
-import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 export type LangyBlockCounter = (reason: string) => void;
 

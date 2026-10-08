@@ -72,8 +72,8 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
-import { writeLocalFolderPick } from "../../../../../model/langy-code-access-pick.ts";
 import { LangyCodeAccessCard } from "../../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { writeLocalFolderPick } from "../../../../tools/model/langy-code-access-pick.ts";
 
 afterEach(cleanup);
 

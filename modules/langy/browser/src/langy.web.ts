@@ -10,7 +10,7 @@ import { GuidedOnboardingToken } from "@langwatch/langy-client";
 import { langyApi } from "./behavior/langy-api.ts";
 import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
 // Declares the `langy:` slices at install, so other modules read them from first paint.
-import "./behavior/langy-context-target.store.ts";
+import "./features/context-target/behavior/langy-context-target.store.ts";
 import "./behavior/langy-page-context.store.ts";
 import "./behavior/langy-registrations.store.ts";
 

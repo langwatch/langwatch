@@ -5,11 +5,11 @@
 import {
   buildAutomationHref,
   readTraceSearchQuery,
-} from "../../../../model/langy-trace-explorer-link.ts";
+} from "../../../transcript/model/langy-trace-explorer-link.ts";
 import type {
   TraceSearchQuery,
   UnstatedWindow,
-} from "../../../../model/langy-trace-explorer-link.ts";
+} from "../../../transcript/model/langy-trace-explorer-link.ts";
 import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry.ts";
 import { followUpsForResult } from "./cli-follow-ups.ts";
 

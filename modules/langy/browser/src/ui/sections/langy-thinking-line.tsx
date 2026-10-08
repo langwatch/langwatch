@@ -9,8 +9,8 @@ import type {
   LangyThinkingTone,
   LangyToolNarrator,
   ThinkingMessage,
-} from "../../model/langy-thinking-line.ts";
-import { langyThinkingLine } from "../../model/langy-thinking-line.ts";
+} from "../../features/transcript/model/langy-thinking-line.ts";
+import { langyThinkingLine } from "../../features/transcript/model/langy-thinking-line.ts";
 import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
 import { LANGY_THINKING_VERBS } from "../../model/values/langy-thinking-verbs.ts";
 import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line.tsx";

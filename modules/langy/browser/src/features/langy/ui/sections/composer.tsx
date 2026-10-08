@@ -30,11 +30,11 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
-import { describeChipContext } from "../../../../behavior/langy-chip-context.ts";
-import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store.ts";
 import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../../../../model/langy-local-waits.ts";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+import { describeChipContext } from "../../../context-target/behavior/langy-chip-context.ts";
+import { useLangyContextTargetStore } from "../../../context-target/behavior/langy-context-target.store.ts";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette.tsx";
 import { LangyModelPill } from "../elements/langy-model-pill.tsx";
 

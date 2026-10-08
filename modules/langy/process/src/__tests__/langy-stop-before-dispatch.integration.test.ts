@@ -9,10 +9,10 @@ import IORedis from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { LangyWorker } from "../channels/langy-worker.channel.ts";
+import { LangyTurnService } from "../features/turn/services/langy-turn.service.ts";
 import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
-import { LangyTurnService } from "../services/langy-turn.service.ts";
 import { conversationDetail, langyTurnDeps } from "./support/langy-turn-deps.ts";
 import { testRedisUrl } from "./support/test-redis-url.ts";
 

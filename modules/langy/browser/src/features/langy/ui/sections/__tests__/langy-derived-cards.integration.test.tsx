@@ -9,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
+import { langyChoicesTimeline } from "../../../../transcript/model/langy-choices-timeline.ts";
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),

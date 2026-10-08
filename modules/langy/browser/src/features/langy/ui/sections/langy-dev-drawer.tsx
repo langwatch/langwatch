@@ -16,7 +16,7 @@ import {
  * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
  * panel.
  */
-import { readableDate } from "../../../../model/langy-row-format.ts";
+import { readableDate } from "../../../transcript/model/langy-row-format.ts";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,

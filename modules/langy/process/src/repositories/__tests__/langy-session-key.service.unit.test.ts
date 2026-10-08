@@ -9,11 +9,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangySessionKeyMetrics } from "../../services/langy-session-key.service.ts";
+import type { LangySessionKeyMetrics } from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
-} from "../../services/langy-session-key.service.ts";
+} from "../../features/session-key/services/langy-session-key.service.ts";
 import {
   LangySessionKeyRepository,
   type LangySessionKeyRecord,

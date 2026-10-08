@@ -13,11 +13,11 @@ import {
   collectionOf,
   textValue,
   totalOf,
-} from "../../../../../model/langy-cli-result-document.ts";
+} from "../../../../tools/model/langy-cli-result-document.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link.ts";
+} from "../../../../transcript/model/langy-trace-explorer-link.ts";
 import {
   buildSurfaceHref,
   type CapabilityCardInput,

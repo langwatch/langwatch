@@ -25,7 +25,7 @@ import {
   RecordAgentResponseCommand,
   SucceedToolCallCommand,
 } from "../../eventing/langy-conversation.intent.ts";
-import { LangyConversationTurnService } from "../langy-conversation-turn.service.ts";
+import { LangyConversationTurnService } from "../../features/conversation/services/langy-conversation-turn.service.ts";
 import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
 
 const PROJECT = "project-1";

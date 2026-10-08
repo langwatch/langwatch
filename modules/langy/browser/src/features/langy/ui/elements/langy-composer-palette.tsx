@@ -13,14 +13,14 @@ import { disabledLangySkillIds, LANGY_SKILL_GATE_FLAG } from "@langwatch/langy-c
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 import {
   absorbContextTarget,
   type LangyContextTargetDescriptor,
   useLangyContextTargetStore,
-} from "../../../../behavior/langy-context-target.store.ts";
-import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+} from "../../../context-target/behavior/langy-context-target.store.ts";
 
 /**
  * The composer's command palette — `/` for skills, `#` for context.

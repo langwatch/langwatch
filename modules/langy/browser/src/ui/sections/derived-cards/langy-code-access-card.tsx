@@ -29,7 +29,7 @@ import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/gith
 import {
   readLocalFolderPick,
   writeLocalFolderPick,
-} from "../../../model/langy-code-access-pick.ts";
+} from "../../../features/tools/model/langy-code-access-pick.ts";
 import {
   type LangyLocalWorkspaceRead,
   parseLangyLocalWorkspace,

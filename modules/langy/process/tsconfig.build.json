@@ -16,7 +16,7 @@
     "./src/services/langy-final-parts.service.ts",
     "./src/services/langy-message.service.ts",
     "./src/services/langy-rest-caller.service.ts",
-    "./src/services/langy-turn.service.ts",
+    "./src/features/turn/services/langy-turn.service.ts",
     "./src/transport/langy-turns.rest.ts",
     "./src/eventing/langy-conversation.subscriber.ts"
   ],

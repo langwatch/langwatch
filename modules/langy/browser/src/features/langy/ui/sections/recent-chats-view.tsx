@@ -30,8 +30,8 @@ import {
   useState,
 } from "react";
 
-import { formatLangyConversationDate } from "../../../../model/langy-conversation-date.ts";
-import { readableDate } from "../../../../model/langy-row-format.ts";
+import { formatLangyConversationDate } from "../../../transcript/model/langy-conversation-date.ts";
+import { readableDate } from "../../../transcript/model/langy-row-format.ts";
 import { useLangyConversationListQuery } from "../../behavior/data/use-langy-conversation-list-query.ts";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */

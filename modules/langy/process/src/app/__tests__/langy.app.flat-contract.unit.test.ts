@@ -34,9 +34,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryLangyChannels } from "../../channels/memory/memory.langy.channels.ts";
+import { LangyConversationUpdateService } from "../../features/conversation/services/langy-conversation-update.service.ts";
+import { LocalControlLongPollService } from "../../features/local-control/services/langy-local-control-long-poll.service.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyConversationUpdateService } from "../../services/langy-conversation-update.service.ts";
-import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LangyModule } from "../langy.app.ts";
 
 const CONVERSATION = {

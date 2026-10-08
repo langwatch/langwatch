@@ -2,13 +2,13 @@ import { ArrowUpRight } from "lucide-react";
 import type { ComponentProps } from "react";
 
 import {
-  buildTraceExplorerHref,
-  readTraceSearchQuery,
-} from "../../../../../model/langy-trace-explorer-link.ts";
-import {
   LangyDerivedCardView as LangyDerivedCardViewPresentation,
   type LangyExploreLinkProps,
 } from "../../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import {
+  buildTraceExplorerHref,
+  readTraceSearchQuery,
+} from "../../../../transcript/model/langy-trace-explorer-link.ts";
 import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows.ts";
 import { TimeseriesPlot } from "../capabilities/langy-timeseries-card.tsx";
 import { LangySpaAnchor } from "../langy-spa-anchor.tsx";

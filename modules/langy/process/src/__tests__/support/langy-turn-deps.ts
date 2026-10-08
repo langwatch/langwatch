@@ -2,12 +2,12 @@ import type { LangyWorkerCredentials } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
-import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import type { ConversationDetail } from "../../rules/langy-conversation-shape.rules.ts";
 import type {
   LangyTurnServiceDependencies,
   LangyTurnServiceDeps,
-} from "../../services/langy-turn-shared.service.ts";
+} from "../../features/turn/services/langy-turn-shared.service.ts";
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
+import type { ConversationDetail } from "../../rules/langy-conversation-shape.rules.ts";
 
 type Slot<T> = T extends object ? Partial<T> : T;
 

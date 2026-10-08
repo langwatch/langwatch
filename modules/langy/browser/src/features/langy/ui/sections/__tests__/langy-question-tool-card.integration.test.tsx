@@ -23,7 +23,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   api: { useUtils: () => ({}) },
 }));
 
-import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
+import { langyChoicesTimeline } from "../../../../transcript/model/langy-choices-timeline.ts";
 import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);

@@ -39,6 +39,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { LangyModule } from "../app/langy.app.ts";
 import { MemoryLangyChannels } from "../channels/memory/memory.langy.channels.ts";
+import type { LangyTurnTechnicalMembers } from "../features/turn/services/langy-turn.service.ts";
 import type { LangyFeedbackPromptRepository } from "../repositories/langy-feedback-prompt.repository.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
@@ -46,7 +47,6 @@ import { PrismaLangyRepositories } from "../repositories/prisma/prisma.langy.rep
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
-import type { LangyTurnTechnicalMembers } from "../services/langy-turn.service.ts";
 import type { LangyConversationCommands } from "../services/langy.service.ts";
 import { LangyService } from "../services/langy.service.ts";
 
