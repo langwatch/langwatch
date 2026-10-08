@@ -1,11 +1,13 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LogClickHouseClient } from "../clickhouse.canonical-log-record-append.repository.ts";
-import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse.canonical-log-record.repository.ts";
+import {
+  ClickHouseCanonicalLogRecordAppendRepository,
+  type LogClickHouseClient,
+} from "../clickhouse.canonical-log-record-append.repository.ts";
 
 function createRepository(resolveClient: () => Promise<LogClickHouseClient>) {
-  return ClickHouseCanonicalLogRecordRepository.create({
+  return ClickHouseCanonicalLogRecordAppendRepository.create({
     resolveClient,
     defaultRetentionDays: 30,
   });
@@ -67,7 +69,7 @@ function record(): CanonicalLogRecord {
   };
 }
 
-describe("ClickHouseCanonicalLogRecordRepository", () => {
+describe("ClickHouseCanonicalLogRecordAppendRepository", () => {
   /** @scenario "Valid OTLP logs become canonical durable events" */
   it("writes the authoritative row before the payload-free usage estimate", async () => {
     const insert = vi.fn<(args: { table: string; values: unknown[] }) => Promise<void>>(

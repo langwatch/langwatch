@@ -22,7 +22,6 @@ import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/lo
 import type { LogRepositories } from "../repositories/log.repositories.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogRequestCollectionService } from "../services/log-request-collection.service.ts";
-import { LogService } from "../services/log.service.ts";
 import { OtlpLogReceiverService } from "../services/otlp-log-receiver.service.ts";
 
 type LogDependencies = Readonly<{
@@ -43,14 +42,14 @@ export class LogModule implements LogApiContract {
     retention: DataRetentionApi,
   };
 
-  readonly #service: LogService;
+  readonly #service: CanonicalLogService;
   readonly #pipeline: LogProcessingPipeline;
   readonly #receiver: OtlpLogReceiverService;
   readonly #collection: LogRequestCollectionService;
   #commands: EventingCommands<LogProcessingPipeline> | undefined;
 
   private constructor(parts: {
-    service: LogService;
+    service: CanonicalLogService;
     pipeline: LogProcessingPipeline;
     receiver: OtlpLogReceiverService;
     collection: LogRequestCollectionService;
@@ -63,9 +62,7 @@ export class LogModule implements LogApiContract {
 
   static create({ dependencies, repositories, config }: LogSetup): LogModule {
     const repository = repositories.logRecords;
-    const service = LogService.create({
-      preparation: CanonicalLogService.create({ redaction: dependencies.dataPrivacy }),
-    });
+    const service = CanonicalLogService.create({ redaction: dependencies.dataPrivacy });
     const pipeline = LogProcessingAdapter.create({
       repository,
       defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,

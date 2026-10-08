@@ -8,7 +8,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "../../eventing/metric-projection.store.ts";
-import type { MetricDataPointRepository } from "../metric-data-point.repository.ts";
+import type { MetricDataPointAppendRepository } from "../metric-data-point-append.repository.ts";
 
 function makeRepository() {
   const calls = {
@@ -18,9 +18,7 @@ function makeRepository() {
     upsertSeriesMany: vi.fn(async () => {}),
     recomputeAffectedRollups: vi.fn(async () => {}),
     recomputeAffectedRollupsMany: vi.fn(async () => {}),
-    queryUsageEstimates: vi.fn(async () => []),
-    findSeriesTotalsByPointAttribute: vi.fn(async () => []),
-  } satisfies MetricDataPointRepository;
+  } satisfies MetricDataPointAppendRepository;
   return calls;
 }
 

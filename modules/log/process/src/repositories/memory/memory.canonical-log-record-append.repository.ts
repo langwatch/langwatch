@@ -1,17 +1,17 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 
-import { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
+import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
 
 /** Canonical logs held in memory: one row per tenant and record id, newest acceptance wins. */
-export class MemoryCanonicalLogRecordRepository extends CanonicalLogRecordRepository {
+export class MemoryCanonicalLogRecordAppendRepository extends CanonicalLogRecordAppendRepository {
   readonly #records = new Map<string, CanonicalLogRecord>();
 
   private constructor() {
     super();
   }
 
-  static create(): MemoryCanonicalLogRecordRepository {
-    return new MemoryCanonicalLogRecordRepository();
+  static create(): MemoryCanonicalLogRecordAppendRepository {
+    return new MemoryCanonicalLogRecordAppendRepository();
   }
 
   /** Every record held, one per tenant and record id. */

@@ -52,26 +52,26 @@ recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/otlp-logs.rest.ts:30`   |
+| Declared at | `src/transport/otlp-logs.rest.ts:25`   |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
 
 #### `POST /api/otel/v1/logs` · `ingestOtlpLogs`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:35`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:30`.
 
 Answers at `/api/otel/v1/logs`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:36)
-// Response: inline, src/transport/otlp-logs.rest.ts:39
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:31)
+// Response: inline, src/transport/otlp-logs.rest.ts:34
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/logs` · `ingestOtlpLogsAlias`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:55`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:50`.
 
 Answers at `/:otlpBase{.+}/v1/logs`.
 
@@ -80,45 +80,45 @@ Answers at `/:otlpBase{.+}/v1/logs`.
 interface Params {
   otlpBase: string;
 }
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:57)
-// Response: inline, src/transport/otlp-logs.rest.ts:60
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:52)
+// Response: inline, src/transport/otlp-logs.rest.ts:55
 type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/logs/` · `ingestOtlpLogsAliasSlash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:74`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:69`.
 
 Answers at `/:otlpBase{.+}/v1/logs/`.
 
 ```typescript
 type Params = z.infer<typeof otlpLogAliasParamsSchema>; // ../contract/src/log.api.ts:24
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:76)
-// Response: inline, src/transport/otlp-logs.rest.ts:79
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:71)
+// Response: inline, src/transport/otlp-logs.rest.ts:74
 type Response = unknown;
 ```
 
 #### `POST /v1/logs` · `ingestOtlpLogsRootV1`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:93`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:88`.
 
 Answers at `/v1/logs`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:94)
-// Response: inline, src/transport/otlp-logs.rest.ts:97
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:89)
+// Response: inline, src/transport/otlp-logs.rest.ts:92
 type Response = unknown;
 ```
 
 #### `POST /v1/logs/` · `ingestOtlpLogsRootV1Slash`
 
-Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:111`.
+Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:106`.
 
 Answers at `/v1/logs/`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:112)
-// Response: inline, src/transport/otlp-logs.rest.ts:115
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:107)
+// Response: inline, src/transport/otlp-logs.rest.ts:110
 type Response = unknown;
 ```
 

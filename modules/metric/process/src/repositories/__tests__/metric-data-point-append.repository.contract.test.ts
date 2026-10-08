@@ -7,8 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import { point } from "../../app/__tests__/metric.fixture.ts";
-import type { MetricClickHouseClient } from "../clickhouse/clickhouse.metric-data-point-append.repository.ts";
-import { MetricDataPointClickHouseRepository } from "../clickhouse/clickhouse.metric-data-point.repository.ts";
+import {
+  ClickHouseMetricDataPointAppendRepository,
+  type MetricClickHouseClient,
+} from "../clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { MemoryMetricDataPointAppendRepository } from "../memory/memory.metric-data-point-append.repository.ts";
 import type { MetricDataPointAppendRepository } from "../metric-data-point-append.repository.ts";
 
@@ -61,9 +63,8 @@ describe("given the metric ClickHouse repository over a recording client", () =>
       },
       query: async () => ({ json: async () => [] }),
     };
-    const repository = MetricDataPointClickHouseRepository.create({
+    const repository = ClickHouseMetricDataPointAppendRepository.create({
       resolveClient: async () => client,
-      resolveOrganizationClient: async () => client,
       defaultRetentionDays: 30,
     });
     return { repository, held: () => rows };

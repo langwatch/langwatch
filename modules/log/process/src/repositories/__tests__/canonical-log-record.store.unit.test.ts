@@ -3,7 +3,7 @@ import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { CanonicalLogRecordStore } from "../../eventing/canonical-log-record.store.ts";
-import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
+import type { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
 
 describe("CanonicalLogRecordStore", () => {
   it("delegates a projection batch as one repository operation", async () => {
@@ -12,7 +12,7 @@ describe("CanonicalLogRecordStore", () => {
     const repository = {
       ensureLogRecord,
       ensureLogRecords,
-    } satisfies CanonicalLogRecordRepository;
+    } satisfies CanonicalLogRecordAppendRepository;
     const records = [
       { recordId: "a".repeat(64) },
       { recordId: "b".repeat(64) },

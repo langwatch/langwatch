@@ -17,12 +17,6 @@ Feature: Composing durable log processing
     Then the pipeline is built without a trace read cap
     And it registers the same command and projection the App registers
 
-  @unit
-  Scenario: Both graphs append through one implementation
-    Given the full canonical-log repository and the append-only one
-    When each is asked to store the same canonical record
-    Then the same append path runs for both
-
   @integration
   Scenario: The api process serves every OTLP signal at its own module's door
     Given the api process installed over memory stores

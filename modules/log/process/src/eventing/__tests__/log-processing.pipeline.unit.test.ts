@@ -1,10 +1,11 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LogProcessingAdapter } from "../../../eventing/log.pipeline.ts";
-import { ClickHouseCanonicalLogRecordAppendRepository } from "../clickhouse.canonical-log-record-append.repository.ts";
-import type { LogClickHouseClient } from "../clickhouse.canonical-log-record-append.repository.ts";
-import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse.canonical-log-record.repository.ts";
+import {
+  ClickHouseCanonicalLogRecordAppendRepository,
+  type LogClickHouseClient,
+} from "../../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { LogProcessingAdapter } from "../log.pipeline.ts";
 
 function client(overrides: Partial<LogClickHouseClient> = {}): LogClickHouseClient {
   return {
@@ -99,28 +100,6 @@ describe("ClickHouseLogProcessingAdapter", () => {
         "log_records",
         "log_usage_estimates",
       ]);
-    });
-  });
-
-  describe("given the full repository and the append-only one", () => {
-    /** @scenario "Both graphs append through one implementation" */
-    it("runs the same append path for both", async () => {
-      const wideInsert = vi.fn<LogClickHouseClient["insert"]>(async () => undefined);
-      const narrowInsert = vi.fn<LogClickHouseClient["insert"]>(async () => undefined);
-      const one = sample();
-
-      await ClickHouseCanonicalLogRecordRepository.create({
-        resolveClient: async () => client({ insert: wideInsert }),
-        defaultRetentionDays: 49,
-      }).ensureLogRecord(one);
-      await ClickHouseCanonicalLogRecordAppendRepository.create({
-        resolveClient: async () => client({ insert: narrowInsert }),
-        defaultRetentionDays: 49,
-      }).ensureLogRecord(one);
-
-      expect(narrowInsert.mock.calls.map(([call]) => call)).toEqual(
-        wideInsert.mock.calls.map(([call]) => call),
-      );
     });
   });
 });

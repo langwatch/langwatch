@@ -21,7 +21,6 @@ import {
   stableStringify,
   type UnknownRecord,
 } from "../rules/canonical-log-value.rules.ts";
-import type { LogPreparationInput, LogPreparer } from "./log.service.ts";
 
 export interface LogRedaction {
   redactLog(
@@ -37,7 +36,13 @@ export interface LogRedaction {
 }
 
 type PIIRedactionLevel = LogPiiRedactionLevel;
-type CanonicalLogPreparationInput = LogPreparationInput;
+export type LogPreparationInput = {
+  tenantId: string;
+  organizationId: string;
+  request: unknown;
+  piiRedactionLevel: LogPiiRedactionLevel;
+  acceptedAt?: number;
+};
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const exportLogsRequestSchema = z
   .object({ resourceLogs: z.array(z.unknown()).optional() })
@@ -52,26 +57,26 @@ type PreparationTally = {
 };
 
 type PreparationContext = Readonly<{
-  args: CanonicalLogPreparationInput;
+  args: LogPreparationInput;
   redaction: LogRedaction;
   acceptedAt: number;
 }>;
 
 type PreparedCanonicalLogRecord = LogPreparation["accepted"][number];
 
-export class CanonicalLogService implements LogPreparer {
+export class CanonicalLogService {
   private constructor(private readonly redaction: LogRedaction) {}
 
   static create(options: { redaction: LogRedaction }): CanonicalLogService {
     return new CanonicalLogService(options.redaction);
   }
 
-  prepare(input: LogPreparationInput): Promise<LogPreparation> {
+  prepareCanonicalLogRecords(input: LogPreparationInput): Promise<LogPreparation> {
     return CanonicalLogService.prepareCanonicalLogRecords(input, this.redaction);
   }
 
   static async prepareCanonicalLogRecords(
-    args: CanonicalLogPreparationInput,
+    args: LogPreparationInput,
     redaction: LogRedaction,
   ): Promise<LogPreparation> {
     const tally: PreparationTally = { accepted: [], errors: [], rejectedLogRecords: 0 };

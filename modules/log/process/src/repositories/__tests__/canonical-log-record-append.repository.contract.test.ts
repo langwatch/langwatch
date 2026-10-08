@@ -7,12 +7,12 @@
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { describe, expect, it } from "vitest";
 
-import type { CanonicalLogRecordRepository } from "../canonical-log-record.repository.ts";
-import { ClickHouseCanonicalLogRecordRepository } from "../clickhouse/clickhouse.canonical-log-record.repository.ts";
-import { MemoryCanonicalLogRecordRepository } from "../memory/memory.canonical-log-record.repository.ts";
+import type { CanonicalLogRecordAppendRepository } from "../canonical-log-record-append.repository.ts";
+import { ClickHouseCanonicalLogRecordAppendRepository } from "../clickhouse/clickhouse.canonical-log-record-append.repository.ts";
+import { MemoryCanonicalLogRecordAppendRepository } from "../memory/memory.canonical-log-record-append.repository.ts";
 
 type Backend = Readonly<{
-  repository: CanonicalLogRecordRepository;
+  repository: CanonicalLogRecordAppendRepository;
   held: () => number;
 }>;
 
@@ -96,7 +96,7 @@ function contractCases(makeBackend: () => Backend): void {
 
 describe("given the canonical-log memory repository", () => {
   contractCases(() => {
-    const repository = MemoryCanonicalLogRecordRepository.create();
+    const repository = MemoryCanonicalLogRecordAppendRepository.create();
     return { repository, held: () => repository.records().length };
   });
 });
@@ -104,7 +104,7 @@ describe("given the canonical-log memory repository", () => {
 describe("given the canonical-log ClickHouse repository over a recording client", () => {
   contractCases(() => {
     let rows = 0;
-    const repository = ClickHouseCanonicalLogRecordRepository.create({
+    const repository = ClickHouseCanonicalLogRecordAppendRepository.create({
       defaultRetentionDays: 30,
       resolveClient: async () => ({
         insert: async ({ table, values }) => {

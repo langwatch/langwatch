@@ -206,10 +206,7 @@ function toUsageEstimateRow(record: CanonicalLogRecord): {
   };
 }
 
-/**
- * Tenant-scoped append persistence; trace reads remain on
- * {@link ClickHouseCanonicalLogRecordRepository}.
- */
+/** Tenant-scoped append persistence for canonical log records. */
 export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRecordAppendRepository {
   private constructor(
     private readonly resolveClient: LogClickHouseClientResolver,
