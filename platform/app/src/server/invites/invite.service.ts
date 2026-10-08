@@ -81,7 +81,7 @@ import {
   LiteMemberViewerOnlyError,
 } from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
-import { AGGREGATE_PROJECT_KIND } from "../app-layer/projects/project-kinds";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "../app-layer/projects/project-kinds";
 import type {
   PlanProvider,
   PlanProviderUser,
@@ -1495,8 +1495,8 @@ export class InviteService {
    * Finds the best project slug to redirect to after accepting an invite.
    * Tries the first assigned team first, then falls back to any non-archived
    * project in the org so the client can land directly in the app rather than
-   * hitting the onboarding flow. Never an aggregate: one is opened on
-   * purpose, never landed on (ADR-144 block F).
+   * hitting the onboarding flow. Never an aggregate, opened on purpose
+   * (ADR-144 block F), nor the governance project, which no one sees.
    */
   async findLandingProjectSlug(
     invite: OrganizationInvite,
@@ -1520,7 +1520,7 @@ export class InviteService {
             where: {
               teamId: { in: invitedTeamIds },
               archivedAt: null,
-              kind: { not: AGGREGATE_PROJECT_KIND },
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
             },
             select: { slug: true },
           })
@@ -1532,7 +1532,7 @@ export class InviteService {
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },
               archivedAt: null,
-              kind: { not: AGGREGATE_PROJECT_KIND },
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
             },
             select: { slug: true },
           })

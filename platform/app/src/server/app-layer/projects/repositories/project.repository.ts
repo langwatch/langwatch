@@ -156,8 +156,8 @@ export interface ProjectRepository {
   }): Promise<Project | null>;
   /**
    * The slug of the project the app lands a member of an organisation on
-   * when they chose none: their oldest unarchived project in it that is not
-   * an aggregate (ADR-144 block F). Null when they have none.
+   * when they chose none: their oldest unarchived project in it whose kind
+   * is not in `NEVER_LANDED_ON_PROJECT_KINDS`. Null when they have none.
    */
   findLandingProjectSlug(params: {
     organizationId: string;

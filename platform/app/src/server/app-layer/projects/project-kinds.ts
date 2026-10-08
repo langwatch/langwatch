@@ -40,15 +40,28 @@ export function isAggregateProjectKind(
 }
 
 /**
- * The project the app lands on when nobody chose one (ADR-144 block F): the
- * first that is not an aggregate. An aggregate owns no traces and reads other
- * people's projects, so an admin opens it on purpose, from the project
- * switcher, and never by default. Undefined when every project is one.
+ * The kinds the app never lands on when nobody chose a project. An aggregate
+ * owns no traces and reads other people's projects, so an admin opens it on
+ * purpose, from the project switcher, and never by default (ADR-144 block F).
+ * The governance project is never user-visible at all. Meant for a Prisma
+ * `kind: { notIn }` filter.
+ */
+export const NEVER_LANDED_ON_PROJECT_KINDS: readonly string[] = [
+  AGGREGATE_PROJECT_KIND,
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+];
+
+/**
+ * The project the app lands on when nobody chose one: the first whose kind is
+ * not in {@link NEVER_LANDED_ON_PROJECT_KINDS}. Undefined when none is.
  */
 export function landingProjectOf<P extends { kind?: string | null }>(
   projects: readonly P[],
 ): P | undefined {
-  return projects.find((project) => !isAggregateProjectKind(project.kind));
+  return projects.find(
+    (project) =>
+      !project.kind || !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind),
+  );
 }
 
 /**

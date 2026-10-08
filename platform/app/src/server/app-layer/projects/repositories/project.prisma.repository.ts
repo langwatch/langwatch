@@ -12,6 +12,7 @@ import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import type { AggregateRule } from "../aggregate-rule";
 import {
   AGGREGATE_PROJECT_KIND,
+  NEVER_LANDED_ON_PROJECT_KINDS,
   projectKindsHiddenFrom,
 } from "../project-kinds";
 import type {
@@ -267,9 +268,9 @@ export class PrismaProjectRepository implements ProjectRepository {
       where: {
         team: { organizationId, members: { some: { userId } } },
         archivedAt: null,
-        // An aggregate is opened on purpose, never landed on (ADR-144
-        // block F).
-        kind: { not: AGGREGATE_PROJECT_KIND },
+        // An aggregate is opened on purpose (ADR-144 block F) and the
+        // governance project is never user-visible: neither is landed on.
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
       },
       orderBy: { createdAt: "asc" },
       select: { slug: true },

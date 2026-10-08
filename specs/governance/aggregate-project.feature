@@ -335,11 +335,14 @@ Feature: An aggregate project reads its member projects
     # behind the baseline is listed by name with its owner and reason.
 
   @integration
-  Scenario: An aggregate is never the project the app lands on
+  Scenario: Neither an aggregate nor the governance project is ever the project the app lands on
     Given ana belongs to an aggregate project and an ordinary project
+    And her organisation has its internal governance project
     When the app picks a project for ana because none was chosen
     Then it picks the ordinary project
     # An admin opens the aggregate on purpose, from the project switcher.
+    # The governance project is never shown to anyone, so it is never landed
+    # on either, even when it is the oldest project on her team.
 
   # ── G. Privacy and audit ─────────────────────────────────────────────────
 

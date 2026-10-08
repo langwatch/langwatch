@@ -4,7 +4,8 @@
  * ADR-144 block F: an aggregate is never the project the app lands on. An
  * admin opens it on purpose from the project switcher; when the app picks a
  * project because none was chosen, it skips every aggregate, even one older
- * than everything else the admin can open.
+ * than everything else the admin can open. The internal governance project is
+ * never user-visible, so it is skipped the same way.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -19,7 +20,11 @@ import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
 import { InviteService } from "~/server/invites/invite.service";
-import { AGGREGATE_PROJECT_KIND, landingProjectOf } from "../project-kinds";
+import {
+  AGGREGATE_PROJECT_KIND,
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  landingProjectOf,
+} from "../project-kinds";
 import {
   type AggregateFixture,
   realOrganizationService,
@@ -29,6 +34,7 @@ import {
 describe("Feature: an aggregate is never the default landing project", () => {
   let fixture: AggregateFixture;
   let aggregate: Project;
+  let governance: Project;
   let admin: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
@@ -44,6 +50,19 @@ describe("Feature: an aggregate is never the default landing project", () => {
       where: { id: (await fixture.makeAggregate("company-view")).id },
       data: { createdAt: new Date("2000-01-01T00:00:00Z") },
     });
+    // Older still, and on the same team, so only its kind keeps it out.
+    governance = await prisma.project.create({
+      data: {
+        name: "Governance",
+        slug: `--test-project-governance-${fixture.organizationId}`,
+        apiKey: `test-key-governance-${fixture.organizationId}`,
+        teamId: fixture.team.id,
+        language: "other",
+        framework: "other",
+        kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
+        createdAt: new Date("1999-01-01T00:00:00Z"),
+      },
+    });
     admin = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: fixture.admin.id }, expires: "1" },
@@ -56,9 +75,9 @@ describe("Feature: an aggregate is never the default landing project", () => {
     await fixture?.cleanup();
   });
 
-  describe("given ana belongs to an aggregate project and an ordinary project", () => {
+  describe("given ana belongs to an aggregate project, the governance project and an ordinary project", () => {
     describe("when the app picks a project for ana because none was chosen", () => {
-      /** @scenario "An aggregate is never the project the app lands on" */
+      /** @scenario "Neither an aggregate nor the governance project is ever the project the app lands on" */
       it("picks the ordinary project for the home page", async () => {
         const state = await admin.user.homePagePickerState({
           organizationId: fixture.organizationId,
@@ -66,9 +85,10 @@ describe("Feature: an aggregate is never the default landing project", () => {
 
         expect(state.firstProjectSlug).toBe(fixture.shared.slug);
         expect(state.firstProjectSlug).not.toBe(aggregate.slug);
+        expect(state.firstProjectSlug).not.toBe(governance.slug);
       });
 
-      /** @scenario "An aggregate is never the project the app lands on" */
+      /** @scenario "Neither an aggregate nor the governance project is ever the project the app lands on" */
       it("picks the ordinary project as the ambient one", async () => {
         const organizations = await admin.organization.getAll({});
         const organization = organizations.find(
@@ -91,12 +111,16 @@ describe("Feature: an aggregate is never the default landing project", () => {
         expect(landingProjectOf([...sharedTeamProjects].reverse())?.id).toBe(
           fixture.shared.id,
         );
+        // Even handed a list that holds the governance project first.
+        expect(landingProjectOf([governance, ...sharedTeamProjects])?.id).toBe(
+          fixture.shared.id,
+        );
       });
     });
   });
-  describe("given an admin is invited to a team whose only project is an aggregate", () => {
+  describe("given an admin is invited to a team whose only projects are an aggregate and the governance project", () => {
     describe("when the invite is accepted and the app picks where to land", () => {
-      /** @scenario "An aggregate is never the project the app lands on" */
+      /** @scenario "Neither an aggregate nor the governance project is ever the project the app lands on" */
       it("lands on an ordinary project elsewhere in the organisation", async () => {
         const viewTeam = await prisma.team.create({
           data: {
@@ -116,6 +140,17 @@ describe("Feature: an aggregate is never the default landing project", () => {
             kind: AGGREGATE_PROJECT_KIND,
           },
         });
+        const onlyGovernance = await prisma.project.create({
+          data: {
+            name: "Team governance",
+            slug: `--test-project-team-governance-${fixture.organizationId}`,
+            apiKey: `test-key-team-governance-${fixture.organizationId}`,
+            teamId: viewTeam.id,
+            language: "other",
+            framework: "other",
+            kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
+          },
+        });
         const invite = await prisma.organizationInvite.create({
           data: {
             email: `invited-admin-${fixture.organizationId}@example.com`,
@@ -133,6 +168,7 @@ describe("Feature: an aggregate is never the default landing project", () => {
 
           expect(slug).not.toBeNull();
           expect(slug).not.toBe(onlyAggregate.slug);
+          expect(slug).not.toBe(onlyGovernance.slug);
           const landed = await prisma.project.findFirstOrThrow({
             where: {
               slug: slug ?? "",
@@ -140,6 +176,7 @@ describe("Feature: an aggregate is never the default landing project", () => {
             },
           });
           expect(landed.kind).not.toBe(AGGREGATE_PROJECT_KIND);
+          expect(landed.kind).not.toBe(INTERNAL_GOVERNANCE_PROJECT_KIND);
         } finally {
           await prisma.organizationInvite.delete({ where: { id: invite.id } });
         }
