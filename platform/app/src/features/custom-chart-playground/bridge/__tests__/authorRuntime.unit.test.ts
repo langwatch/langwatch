@@ -185,6 +185,36 @@ describe("authorRuntime", () => {
       });
     });
 
+    describe("when the runtime reports a compile error", () => {
+      /** @scenario "A widget that fails to compile or throws reports an error receipt" */
+      it("stamps the render receipt as an error through __lwReportRender", () => {
+        const { win, activateAuthor } = evaluateAuthorRuntime();
+        const reportRender = vi.fn();
+        win.__lwReportRender = reportRender;
+        win.LW = { error: vi.fn() };
+        win.React = {};
+        win.ReactDOM = { createRoot: () => ({ render: vi.fn() }) };
+        win.Recharts = {};
+        win.Babel = {
+          transform: () => {
+            throw new Error("unexpected token");
+          },
+        };
+        win.__LW_AUTHOR_SOURCE__ = "export default () => (";
+
+        activateAuthor?.();
+
+        expect(reportRender).toHaveBeenCalledWith(
+          "error",
+          "Compile error: unexpected token",
+        );
+        // The detail also reaches the log panel, unchanged by the receipt.
+        expect(win.LW?.error).toHaveBeenCalledWith(
+          "Compile error: unexpected token",
+        );
+      });
+    });
+
     describe("when a widget exports a memoized or forwardRef component", () => {
       /** @scenario "A widget exporting a memoized or forwardRef component mounts" */
       it("accepts object component types (memo/forwardRef/lazy) in the mount guard", () => {

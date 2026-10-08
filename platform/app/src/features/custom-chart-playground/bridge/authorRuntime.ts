@@ -46,6 +46,11 @@ export function buildAuthorRuntimeScript(): string {
       // with no stack text, and the useful part stays trapped in the iframe.
       window.LW.error(detail ? title + ": " + detail : title);
     }
+    // Also stamp the render receipt as an error, so the parent's receipt (what
+    // an off-screen agent reads) carries the failure, not just the log panel.
+    if (typeof window.__lwReportRender === "function") {
+      window.__lwReportRender("error", detail ? title + ": " + detail : title);
+    }
   }
 
   // A class error boundary: render-phase throws in author code do NOT surface
@@ -86,6 +91,12 @@ export function buildAuthorRuntimeScript(): string {
           window.React.createElement(Component)
         )
       );
+      // Mounted and handed to React. A render-phase throw is caught by the
+      // boundary above (which routes through showError -> "error"), so a
+      // successful createRoot().render() is the "ok" signal for the receipt.
+      if (typeof window.__lwReportRender === "function") {
+        window.__lwReportRender("ok");
+      }
     } catch (renderError) {
       showError("Render error", renderError.message);
     }
