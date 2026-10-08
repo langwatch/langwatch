@@ -25,18 +25,14 @@ const mutations = vi.hoisted(() => ({
 }));
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    traces: {
-      instantEval: {
-        estimate: { useMutation: () => mutations.estimate },
-        start: { useMutation: () => mutations.start },
-        enable: { useMutation: () => mutations.enable },
-      },
+    instantEval: {
+      estimate: { useMutation: () => mutations.estimate },
+      start: { useMutation: () => mutations.start },
+      enable: { useMutation: () => mutations.enable },
     },
     useUtils: () => ({
-      traces: {
-        instantEval: {
-          access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
-        },
+      instantEval: {
+        access: { setData: mutations.setAccess, invalidate: mutations.invalidateAccess },
       },
     }),
   },
