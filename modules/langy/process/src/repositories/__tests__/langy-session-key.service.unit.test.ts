@@ -58,6 +58,7 @@ function createService(input: {
 }
 
 describe("LangySessionKeyService", () => {
+  /** @scenario "The Langy key is scoped to only its own project" */
   it("mints only the holder's Langy permissions at the project scope", async () => {
     const repository = new SessionKeyRepository();
     const apiKeyCreate: ApiKeyApi["create"] = vi.fn(async () => {

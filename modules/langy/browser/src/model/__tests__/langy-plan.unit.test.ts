@@ -106,6 +106,35 @@ describe("langyPlan", () => {
     });
   });
 
+  describe("given a turn that failed while its third step was in progress", () => {
+    /** @scenario "A failure freezes the checklist honestly" */
+    it("keeps the finished steps done, never reads as complete and invents no step", () => {
+      const message = {
+        parts: [
+          todo([
+            { content: "Find slow traces", status: "completed" },
+            { content: "Group them by model", status: "completed" },
+            { content: "Summarise them", status: "in_progress" },
+            { content: "Open a fix", status: "pending" },
+          ]),
+          tool("bash", "c1"),
+          { type: "text", text: "Langy hit an error." },
+        ],
+      };
+
+      const plan = langyPlan(message)!;
+      expect(plan.items.map((i) => i.status)).toEqual([
+        "completed",
+        "completed",
+        "in_progress",
+        "pending",
+      ]);
+      expect(plan.completedCount).toBe(2);
+      expect(plan.completedCount).toBeLessThan(plan.totalCount);
+      expect(plan.totalCount).toBe(4);
+    });
+  });
+
   describe("given malformed or partial todo input", () => {
     it("removes redundant machine statuses from customer-facing step text", () => {
       expect(cleanPlanContent("Create the dataset (in_progress)")).toBe("Create the dataset");
