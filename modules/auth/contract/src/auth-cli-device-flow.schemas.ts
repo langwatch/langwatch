@@ -62,3 +62,15 @@ export const lookupQuerySchema = z.object({ user_code: z.string().optional() });
 
 /** The approval stream the CLI waits on: its device code is the whole credential. */
 export const deviceApprovalQuerySchema = z.object({ device_code: z.string().min(1) });
+
+export function cliUserTokensIndexKey(userId: string): string {
+  return `lwcli:user:${userId}:tokens`;
+}
+
+export function cliAccessTokenKey(token: string): string {
+  return `lwcli:access:${token}`;
+}
+
+export function cliRefreshTokenKey(token: string): string {
+  return `lwcli:refresh:${token}`;
+}

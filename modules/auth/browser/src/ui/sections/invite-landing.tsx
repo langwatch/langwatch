@@ -7,7 +7,7 @@ import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
-import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
+import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import {

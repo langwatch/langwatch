@@ -18,6 +18,7 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { signUpHref } from "../../model/carried-email.ts";
 import type { FrontDoorDepth } from "../../model/ground-palette.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
+import { JOIN_BEFORE_CREATE_PATH } from "../../model/join-before-create.ts";
 import {
   promotePendingMethod,
   readLastUsedMethodId,
@@ -28,7 +29,6 @@ import { shouldStartPasskeyOnArrival } from "../../model/method-ranking.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { signInGreeting } from "../../model/sign-in-greeting.ts";
-import { JOIN_BEFORE_CREATE_PATH } from "../../model/sign-up-destination.ts";
 import {
   rememberSoleConnectionAutoDial,
   soleConnectionAutoDialAllowed,

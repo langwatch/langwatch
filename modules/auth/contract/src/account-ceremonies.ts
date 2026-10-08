@@ -47,3 +47,22 @@ export const TwoStepCeremoniesToken =
   uiTokens("auth").operations<UiTwoStepCeremonies>("twoStepVerification");
 export const SignInMethodLinkingToken =
   uiTokens("auth").operations<UiSignInMethodLinking>("signInMethodLinking");
+
+/** What refused a sign-in before the browser left: the provider's or the engine's answer. */
+export type SignInStartRefusal = {
+  code?: string;
+  message?: string;
+  statusText?: string;
+  status?: number;
+};
+
+export type SsoTestSignInOperations = {
+  /** Resolves once the browser is leaving, or with what refused it. */
+  testSignIn(input: {
+    connectionId: string;
+    callbackQuery: Readonly<Record<string, string | undefined>>;
+  }): Promise<{ error?: SignInStartRefusal | null }>;
+  normalizeSignInErrorCode(code: string): string;
+};
+
+export const SsoTestSignInToken = uiTokens("auth").operations<SsoTestSignInOperations>("signIn");

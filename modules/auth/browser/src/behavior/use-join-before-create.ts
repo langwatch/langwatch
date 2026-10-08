@@ -1,8 +1,10 @@
 import { identityClient } from "@langwatch/identity-client";
 import { useCallback, useRef } from "react";
 
-import type { JoinableOrganization } from "../model/join-before-create.ts";
-import { joinLookupDecisionSchema } from "../model/join-lookup.ts";
+import {
+  type JoinableOrganization,
+  joinLookupDecisionSchema,
+} from "../model/join-before-create.ts";
 import { hardRedirect } from "./hard-redirect.ts";
 
 /**
