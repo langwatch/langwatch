@@ -4,7 +4,8 @@ import {
   principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import type { ScenarioApi, ScenarioServerConfig } from "@langwatch/scenario-contract";
 
 import { ScenarioModule } from "./app/scenario.app.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
@@ -22,7 +23,11 @@ import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 import { createSimulationRunsRest } from "./transport/simulation-run.rest.ts";
 
 /** `scenarios.*`: repositories, the app, its tRPC namespace and REST families. */
-export const scenarioProcessModule = defineProcessModule("scenario")
+export const scenarioProcessModule: PublishedProcessModule<
+  "scenario",
+  ScenarioApi,
+  ScenarioServerConfig
+> = defineProcessModule("scenario")
   .withRepositories(scenarioRepositories)
   .withApi(ScenarioModule)
   .withTransports(

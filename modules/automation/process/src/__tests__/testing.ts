@@ -1,10 +1,11 @@
+import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
+import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import { AutomationDispatchError } from "../features/graph-alert/services/automation-graph-activity.service.ts";
 import { AutomationEmailCapService } from "../features/runaway/services/email-cap.service.ts";
 import type { AutomationRunawaySignals } from "../features/runaway/services/runaway-containment.service.ts";
 import { AutomationSlackConnectionService } from "../features/slack/services/automation-slack-connection.service.ts";
 import { SlackDestinationService } from "../features/slack/services/slack-destination.service.ts";
-import type { AutomationGraphNotifier, AutomationRunawayNotice } from "../index.ts";
-import { AutomationTestFire } from "../index.ts";
 import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { TriggerSecretSeal } from "../repositories/trigger.repository.ts";
 import { AutomationLogger } from "../services/automation.service.ts";

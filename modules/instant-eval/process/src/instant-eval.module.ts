@@ -4,7 +4,8 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { instantEvalRestCredential } from "@langwatch/instant-eval-contract";
-import { defineProcessModule } from "@langwatch/process";
+import type { InstantEvalApi, InstantEvalServerConfig } from "@langwatch/instant-eval-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { InstantEvalModule } from "./app/instant-eval.app.ts";
@@ -16,7 +17,11 @@ import { InstantEvalJudgeSpendCatchUpTask } from "./tasks/instant-eval-judge-spe
 import { instantEvalRest } from "./transport/instant-eval.rest.ts";
 import { instantEvalTrpcTransport } from "./transport/instant-eval.trpc.ts";
 
-export const instantEvalProcessModule = defineProcessModule("instant-eval")
+export const instantEvalProcessModule: PublishedProcessModule<
+  "instant-eval",
+  InstantEvalApi,
+  InstantEvalServerConfig
+> = defineProcessModule("instant-eval")
   .withRepositories(instantEvalRepositories)
   .withChannels(instantEvalChannels)
   .withApi(InstantEvalModule)
