@@ -1,5 +1,5 @@
-import { promptApi } from "./prompt-api.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 
 /** The cascade-resolved model a new prompt starts with; `data` is null when none is configured. */
 export function usePromptDefaultModel({ enabled = true }: { enabled?: boolean } = {}) {

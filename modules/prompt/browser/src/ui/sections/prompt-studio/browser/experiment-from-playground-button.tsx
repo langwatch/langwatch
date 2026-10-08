@@ -16,8 +16,8 @@ import { useMemo, useState } from "react";
 
 import { useCreateExperimentFromPlayground } from "../../../../behavior/use-create-experiment-from-playground.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { useSavedPromptVersions } from "../../../../behavior/use-saved-prompt-versions.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { generateHumanReadableId } from "../../../../model/human-readable-id.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { inferAllTargetMappings } from "../../../../model/target-mapping-inference.ts";

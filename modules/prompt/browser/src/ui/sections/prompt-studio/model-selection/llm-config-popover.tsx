@@ -3,8 +3,8 @@ import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 
 import { ModelSelector } from "../../../../behavior/lent-model-provider.tsx";
-import { useLlmConfigPopoverState } from "../../../../behavior/use-llm-config-popover-state.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { useLlmConfigPopoverState } from "../../../../features/model-selection/behavior/use-llm-config-popover-state.ts";
 import { type LLMConfigValues } from "../../../../model/llm-config-values.types.ts";
 import { getParameterConfigWithModelOverrides } from "../../../../model/parameter-config.ts";
 import { getParamValue } from "../../../../model/parameter-value.utils.ts";

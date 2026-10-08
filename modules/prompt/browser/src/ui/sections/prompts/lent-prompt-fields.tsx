@@ -7,7 +7,7 @@ import type {
   OutputsSectionProps,
 } from "@langwatch/prompt-client";
 
-import { useModelSelectionOptions } from "../../../behavior/use-model-selection-options.ts";
+import { useModelSelectionOptions } from "../../../features/model-selection/behavior/use-model-selection-options.ts";
 import { OutputsSection } from "../outputs/outputs-section.tsx";
 import { LLMConfigField } from "../prompt-studio/model-selection/llm-config-field.tsx";
 import { LLMConfigPopover } from "../prompt-studio/model-selection/llm-config-popover.tsx";

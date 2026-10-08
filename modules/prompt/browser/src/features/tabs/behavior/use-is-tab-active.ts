@@ -1,4 +1,4 @@
-import { useTabId } from "../model/prompt-tab-context.tsx";
+import { useTabId } from "../../../model/prompt-tab-context.tsx";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**

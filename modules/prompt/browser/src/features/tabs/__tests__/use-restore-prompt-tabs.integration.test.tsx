@@ -5,18 +5,18 @@
 import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearStoreInstances, getStoreForTesting } from "../prompt-tabs-store.ts";
-import { useRestorePromptTabs } from "../use-restore-prompt-tabs.ts";
+import { clearStoreInstances, getStoreForTesting } from "../behavior/prompt-tabs-store.ts";
+import { useRestorePromptTabs } from "../behavior/use-restore-prompt-tabs.ts";
 
 const { fetchPrompt, failed } = vi.hoisted(() => ({ fetchPrompt: vi.fn(), failed: vi.fn() }));
 
-vi.mock("../use-prompt-project.ts", () => ({
+vi.mock("../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 vi.mock("@langwatch/prompt-client", () => ({
   promptClient: { useUtils: () => ({ prompts: { getByIdOrHandle: { fetch: fetchPrompt } } }) },
 }));
-vi.mock("../../model/prompt-form/index.ts", () => ({
+vi.mock("../../../model/prompt-form/index.ts", () => ({
   computeInitialFormValuesForPrompt: () => ({ configId: "prompt-1", handle: "greeter" }),
 }));
 
@@ -34,7 +34,7 @@ const capabilities = {
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 };
 
-vi.mock("../../model/prompt-host.ts", () => ({
+vi.mock("../../../model/prompt-host.ts", () => ({
   usePromptHost: () => ({ tabCapabilities: () => capabilities, failed }),
 }));
 

@@ -415,7 +415,7 @@ vi.mock("../../../../../../model/prompt-tab-context.tsx", async (importOriginal)
 
 // The chat input follows which tab is active; that subscription is its own
 // concern, so it is stubbed here to keep this file about the tab layout.
-vi.mock("../../../../../../behavior/use-is-tab-active.ts", () => ({
+vi.mock("../../../../../../features/tabs/behavior/use-is-tab-active.ts", () => ({
   useIsTabActive: () => true,
 }));
 

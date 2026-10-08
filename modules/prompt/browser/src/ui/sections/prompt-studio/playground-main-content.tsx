@@ -1,8 +1,8 @@
 import { HStack } from "@langwatch/design-system/primitives";
 
 import { useLoadSpanIntoPromptPlayground } from "../../../behavior/use-load-span-into-prompt-studio.ts";
-import { useDraggableTabsBrowserStore } from "../../../behavior/use-prompt-tabs-browser-store.ts";
-import { useRestorePromptTabs } from "../../../behavior/use-restore-prompt-tabs.ts";
+import { useDraggableTabsBrowserStore } from "../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
+import { useRestorePromptTabs } from "../../../features/tabs/behavior/use-restore-prompt-tabs.ts";
 import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser.tsx";
 import { MainContentEmptyState } from "./sidebar/main-content-empty-state.tsx";
 

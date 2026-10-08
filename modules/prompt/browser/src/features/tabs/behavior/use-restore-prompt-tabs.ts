@@ -7,10 +7,10 @@
 import { promptClient } from "@langwatch/prompt-client";
 import { useEffect, useRef } from "react";
 
-import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
-import { type PromptHostApi, usePromptHost } from "../model/prompt-host.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { computeInitialFormValuesForPrompt } from "../../../model/prompt-form/index.ts";
+import { type PromptHostApi, usePromptHost } from "../../../model/prompt-host.ts";
 import type { DraggableTabsBrowserState, Tab } from "./prompt-tabs-store.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 async function restoreTab({

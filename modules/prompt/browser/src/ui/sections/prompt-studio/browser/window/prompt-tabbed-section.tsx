@@ -7,7 +7,7 @@ import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 
-import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { type LayoutMode } from "../../../../../model/layout-mode.ts";
 import { usePromptHost } from "../../../../../model/prompt-host.ts";
 import { renderSourceTypeIcon } from "../../../../elements/workflow/workflow-icons.tsx";

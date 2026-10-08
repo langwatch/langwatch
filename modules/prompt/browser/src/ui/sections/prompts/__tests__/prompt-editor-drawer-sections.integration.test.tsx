@@ -34,7 +34,7 @@ vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
   useLentHooks: () => ({ openLiteMemberRestriction: vi.fn() }),
 }));
 
-vi.mock("../../../../behavior/use-model-providers-settings.ts", () => ({
+vi.mock("../../../../features/model-selection/behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     modelMetadata: {
       "openai/gpt-5-mini": {
@@ -57,7 +57,7 @@ vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../behavior/use-model-limits.ts", () => ({
+vi.mock("../../../../features/model-selection/behavior/use-model-limits.ts", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 

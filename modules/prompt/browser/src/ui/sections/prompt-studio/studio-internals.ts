@@ -26,7 +26,7 @@ export {
   type Tab,
   type TabData,
   type Window,
-} from "../../../behavior/prompt-tabs-store.ts";
+} from "../../../features/tabs/behavior/prompt-tabs-store.ts";
 export { createTabId, createWindowId } from "../../../model/tab-id-generators.ts";
 export { Sidebar } from "./prompt-studio-sidebar.tsx";
 export { ChatSendButton, type ChatSendButtonProps } from "./chat-send-button.tsx";

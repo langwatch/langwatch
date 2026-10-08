@@ -29,9 +29,9 @@ import {
 } from "../../../behavior/prompts/use-prompt-editor-form.ts";
 import { usePromptEditorSave } from "../../../behavior/prompts/use-prompt-editor-save.ts";
 import { useLatestPromptVersion } from "../../../behavior/use-latest-prompt-version.ts";
-import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
-import { usePromptDefaultModel } from "../../../behavior/use-prompt-default-model.ts";
 import { usePromptVersion } from "../../../behavior/use-prompt-version.ts";
+import { useModelProvidersSettings } from "../../../features/model-selection/behavior/use-model-providers-settings.ts";
+import { usePromptDefaultModel } from "../../../features/model-selection/behavior/use-prompt-default-model.ts";
 import {
   inputTypeForField,
   missingMappingIdsFor,

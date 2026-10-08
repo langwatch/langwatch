@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 
-import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePrompts } from "../../../../../behavior/use-prompts.ts";
-import { useTabById } from "../../../../../behavior/use-tab-by-id.ts";
-import { useWarnBeforeReload } from "../../../../../behavior/use-warn-before-reload.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
+import { useTabById } from "../../../../../features/tabs/behavior/use-tab-by-id.ts";
+import { useWarnBeforeReload } from "../../../../../features/tabs/behavior/use-warn-before-reload.ts";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
 import { useTabId } from "../../studio-internals.ts";
 import { usePromptTabSummary } from "./use-prompt-tab-summary.ts";

@@ -1,7 +1,7 @@
 import { useHasUnsavedChanges } from "../../../../../behavior/use-has-unsaved-changes.ts";
 import { useLatestPromptVersion } from "../../../../../behavior/use-latest-prompt-version.ts";
-import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
-import { useTabById } from "../../../../../behavior/use-tab-by-id.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
+import { useTabById } from "../../../../../features/tabs/behavior/use-tab-by-id.ts";
 import { NEW_PROMPT_TITLE } from "../../../../../prompt-reference.ts";
 import { shouldShowVersionBadge } from "../../studio-internals.ts";
 

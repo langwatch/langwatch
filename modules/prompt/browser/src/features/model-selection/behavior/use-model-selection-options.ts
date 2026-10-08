@@ -1,8 +1,8 @@
 import { modelSelectionFrom } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
-import { promptApi } from "./prompt-api.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 
 /** The project's pickable models for `mode`, and the chosen one among them. */
 export const useModelSelectionOptions = ({

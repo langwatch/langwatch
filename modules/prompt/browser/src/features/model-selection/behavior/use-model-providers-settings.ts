@@ -5,7 +5,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
-import { promptApi } from "./prompt-api.ts";
+import { promptApi } from "../../../behavior/prompt-api.ts";
 
 export type { ModelMetadataForFrontend };
 

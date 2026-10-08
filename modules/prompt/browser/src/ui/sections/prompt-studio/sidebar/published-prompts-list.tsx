@@ -4,8 +4,8 @@ import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
 
 import { useAllPromptsForProject } from "../../../../behavior/use-all-prompts-for-project.ts";
-import { usePromptDefaultModel } from "../../../../behavior/use-prompt-default-model.ts";
-import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { usePromptDefaultModel } from "../../../../features/model-selection/behavior/use-prompt-default-model.ts";
+import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { Sidebar } from "../studio-internals.ts";
 import { PublishedPromptContent } from "./published-prompt-content.tsx";

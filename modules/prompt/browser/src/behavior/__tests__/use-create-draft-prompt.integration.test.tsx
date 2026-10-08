@@ -5,8 +5,11 @@
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  clearStoreInstances,
+  getStoreForTesting,
+} from "../../features/tabs/behavior/prompt-tabs-store.ts";
 import type { PromptBrowserStorage } from "../../model/browser-capabilities.ts";
-import { clearStoreInstances, getStoreForTesting } from "../prompt-tabs-store.ts";
 import { useCreateDraftPrompt } from "../use-create-draft-prompt.ts";
 
 vi.mock("../use-prompt-project.ts", () => ({

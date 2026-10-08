@@ -4,10 +4,10 @@
  * logger directly, so the HOST answers both through `tabCapabilities()`.
  */
 
-import { usePromptHost } from "../model/prompt-host.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
 import type { DraggableTabsBrowserState } from "./prompt-tabs-store.ts";
 import { usePromptTabsStore } from "./prompt-tabs-store.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
 
 export function useDraggableTabsBrowserStore<T>(
   selector: (state: DraggableTabsBrowserState) => T,

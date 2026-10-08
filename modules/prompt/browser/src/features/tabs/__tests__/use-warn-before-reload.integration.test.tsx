@@ -5,7 +5,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useWarnBeforeReload } from "../use-warn-before-reload.ts";
+import { useWarnBeforeReload } from "../behavior/use-warn-before-reload.ts";
 
 /** Fires an unload the way the browser does and reports whether it was held. */
 function unloadIsHeld(): boolean {

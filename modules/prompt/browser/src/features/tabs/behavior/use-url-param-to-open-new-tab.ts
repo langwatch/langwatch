@@ -1,10 +1,10 @@
 import { promptClient } from "@langwatch/prompt-client";
 import { useEffect } from "react";
 
-import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
-import { usePromptHost } from "../model/prompt-host.ts";
-import { usePromptDefaultModel } from "./use-prompt-default-model.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
+import { computeInitialFormValuesForPrompt } from "../../../model/prompt-form/index.ts";
+import { usePromptHost } from "../../../model/prompt-host.ts";
+import { usePromptDefaultModel } from "../../model-selection/behavior/use-prompt-default-model.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /** `?promptId=` - the address that opens one prompt in a new tab; read, never mirrored. */

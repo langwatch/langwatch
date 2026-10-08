@@ -4,6 +4,8 @@ import cloneDeep from "lodash-es/cloneDeep";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
+import type { TabData } from "../features/tabs/behavior/prompt-tabs-store.ts";
+import { useDraggableTabsBrowserStore } from "../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { usePromptConfigContext } from "../model/prompt-config-context.ts";
 import {
   getSaveBlockerMessage,
@@ -13,9 +15,7 @@ import { usePromptHost } from "../model/prompt-host.ts";
 import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion.ts";
 import { useTabId } from "../model/prompt-tab-context.tsx";
 import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
-import type { TabData } from "./prompt-tabs-store.ts";
 import { useLatestPromptVersion } from "./use-latest-prompt-version.ts";
-import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**
  * Hook to handle the saving of a prompt in the prompt studio: orchestrates

@@ -27,7 +27,7 @@ vi.mock("../../../../../behavior/use-rename-prompt-handle.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-prompt-tabs-browser-store.ts", () => ({
+vi.mock("../../../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts", () => ({
   useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
