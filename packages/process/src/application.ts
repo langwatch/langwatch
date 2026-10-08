@@ -19,6 +19,7 @@ import {
   RoleContributionError,
   StoreTierUnstatedError,
 } from "./boot-errors.ts";
+import { channelsBind, channelsRequire, type AnyChannelRegistry } from "./channel-registry.ts";
 /** Declares, constructs and starts the process graph (ARCHITECTURE.md §5). */
 import type {
   FeatureTransportDescriptor,
@@ -256,6 +257,7 @@ interface DeclaredFeature {
   readonly transports: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: AnyRepositoryRegistry;
+  readonly channelRegistry?: AnyChannelRegistry;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
@@ -392,6 +394,7 @@ export class ApplicationBuilder<
       transports: declaration.transports ?? [],
       repositories: snapshotRepositories(declaration.repositories),
       repositoryRegistry: declaration.repositoryRegistry,
+      ...(declaration.channelRegistry ? { channelRegistry: declaration.channelRegistry } : {}),
       apiContract: declaration.apiContract,
       dependencies: declaration.dependencies,
       transportDependencies: declaration.transportDependencies,
@@ -726,6 +729,13 @@ export class ApplicationBuilder<
           throw new MissingProviderError(declaration.name, key, tokenName(token));
         }
       }
+      // A bound channel is no peer and orders nothing, but its provider must be installed.
+      const channels = declaration.channelRegistry;
+      for (const [key, token] of channels ? channelsBind(channels, declaration.tier) : []) {
+        if (!providerOf.has(token)) {
+          throw new MissingProviderError(declaration.name, `channels.${key}`, tokenName(token));
+        }
+      }
     }
   }
 }
@@ -756,8 +766,14 @@ function statedTier(feature: CollectedFeature): DeclaredFeature {
 function claimedBy(declaration: DeclaredFeature): readonly string[] {
   const registry = declaration.repositoryRegistry;
   const tier = registry === void 0 ? [] : repositoriesRequire(registry, declaration.tier);
+  const channels = declaration.channelRegistry;
+  const channelTier = channels === void 0 ? [] : channelsRequire(channels, declaration.tier);
   // The root hands `operatorReads` to the live tier itself; no store answers it.
-  return [...declaration.requiredMembers, ...tier.filter((member) => member !== "operatorReads")];
+  return [
+    ...declaration.requiredMembers,
+    ...tier.filter((member) => member !== "operatorReads"),
+    ...channelTier,
+  ];
 }
 
 /** Install module's eventing pipeline if runtime exists. */

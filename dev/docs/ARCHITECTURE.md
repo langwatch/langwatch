@@ -292,7 +292,12 @@ document, is the authority on filenames):
   Redis pub/sub, HTTP vendor, queue, email, Slack, SSE): one interface per
   subject, per-tier implementations, a memory twin each, a registry offering
   `{ live, memory }`. Repository = owned state; channel = unowned messages;
-  service = behaviour over both.
+  service = behaviour over both. The module's one registry is
+  `channels/<f>-channels.registry.ts`, `defineChannels({ live, memory })` over per-tier classes
+  (`static readonly requires`, `static create({ <stores>, config, secrets })`); the installer
+  names it with `.withChannels(...)` and the module class reads `setup.channels`
+  (packages/process/specs/module-channels.feature). A tier may also declare
+  `static readonly binds = { judge: InstantEvalApi }` and receive `bound.judge` (§5).
   Messages to ourselves are `@langwatch/internal-slack` templates sent through
   the owning module's Slack channel. Slack a customer configures stays in
   automation's channels and never uses this package (Alex, 2026-09-28).
@@ -887,6 +892,14 @@ channels, the installer names both (`.withRepositories(...)`, `.withChannels(...
 picks the tier and calls `create`. Every `create()` **arrives with its things already resolved**.
 Passing a hand-assembled composition object into anything is banned as a shape: nothing receives a
 bag it has to pick apart.
+
+**A channel may be bound to another module's `*Api` token** (Alex, 2026-10-08, round 34): one
+primitive, the root grows by this one. A channel tier declares `static readonly binds = { key: XApi }`
+and its `create` receives `bound.key`, the process's reference to `XApi`, live once every module has
+resolved; a call while the process is still constructing refuses by name. A binding is not a peer: it
+is not in `static dependencies`, orders nothing and makes no peer-cycles edge, so `XApi`'s owner may
+depend back. A tier binding a token no installed module provides refuses boot by name
+(`MissingProviderError`, key `channels.<key>`). First use: analytics' judge filled from `InstantEvalApi`.
 
 **The module class is the process half's implementation** (§3.2), in `app/<f>.app.ts` (Alex,
 2026-10-05): `static contract`,

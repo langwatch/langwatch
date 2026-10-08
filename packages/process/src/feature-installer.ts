@@ -17,6 +17,12 @@ import {
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 
 import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
+import {
+  instantiateChannels,
+  type AnyChannelRegistry,
+  type ChannelRegistry,
+  type ChannelsFor,
+} from "./channel-registry.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import { buildsMigrationSteps } from "./migration-steps.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
@@ -59,6 +65,7 @@ export type FeatureSetup<
   Members,
   Config,
   Repositories = never,
+  Channels = never,
 > = Readonly<{
   readonly dependencies: ResolvedTokens<Dependencies>;
   readonly config: Config;
@@ -75,7 +82,9 @@ export type FeatureSetup<
         readonly repositories: Repositories;
         /** The tier the repositories came from, so channels follow it; absent if built by hand. */
         readonly tier?: Tier;
-      }>);
+      }>) &
+  /** Built by the container from the registry named in `.withChannels(...)` (record §5). */
+  ([Channels] extends [never] ? object : Readonly<{ readonly channels: Channels }>);
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
@@ -85,10 +94,13 @@ type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
 
 /** Static construction metadata owned by a server app implementation. */
-export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> = AppContract<
-  Dependencies,
-  App
-> &
+export type AppDefinition<
+  Dependencies extends TokenMap,
+  Members,
+  Config,
+  App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
   Readonly<{
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
@@ -96,7 +108,7 @@ export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> =
     /** What this App reads off the process's members, declared with `reads(...)`. */
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, NoInfer<Config>>,
+      setup: FeatureSetup<NoInfer<Dependencies>, Members, NoInfer<Config>, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -110,27 +122,30 @@ export type DeclaredConfigAppDefinition<
   Members,
   Slice extends ConfigSlice,
   App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly config: Slice;
     readonly repositories?: FeatureRepositories;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, ConfigOf<Slice>>,
+      setup: FeatureSetup<NoInfer<Dependencies>, Members, ConfigOf<Slice>, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
 /** Static construction metadata for an app with no semantic configuration. */
-export type AppDefinitionWithoutConfig<Dependencies extends TokenMap, Members, App> = AppContract<
-  Dependencies,
-  App
-> &
+export type AppDefinitionWithoutConfig<
+  Dependencies extends TokenMap,
+  Members,
+  App,
+  Channels = never,
+> = AppContract<Dependencies, App> &
   Readonly<{
     readonly repositories?: FeatureRepositories;
     /** What this App reads off the process's members, declared with `reads(...)`. */
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined>,
+      setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined, never, Channels>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -232,6 +247,8 @@ export interface FeatureSetupArguments<Config, Members, Dependencies> {
    * objects rather than two graphs over the same rows.
    */
   readonly repositories?: unknown;
+  /** The channels the module's registry built on the same tier, once per install. */
+  readonly channels?: unknown;
 }
 
 /** What the one transport assembly is handed, in a role that serves doors. */
@@ -314,6 +331,8 @@ export interface FeatureInstallArguments<Members> {
   readonly role: ServerRole;
   /** Instantiated once by the repository-aware declaration that wraps this. */
   readonly repositories?: unknown;
+  /** Instantiated once by the channel-aware declaration that wraps this. */
+  readonly channels?: unknown;
   /**
    * Scoped to this module's own declared handles by the application root. A
    * process that composed no resolver supplies none, and a module that then
@@ -347,6 +366,8 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: AnyRepositoryRegistry;
+  /** The registry named in `.withChannels(...)`; boot claims the stores its tier requires. */
+  readonly channelRegistry?: AnyChannelRegistry;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
@@ -905,6 +926,7 @@ export class ServerFeatureAssembly<
           role: args.role,
           repositorySelection: args.repositorySelection,
           repositories: args.repositories,
+          channels: args.channels,
         };
         // A module resolving a secret does so in `create()`, so the whole
         // install awaits: only the constructed collaborator comes back.
@@ -1016,13 +1038,23 @@ function declaredReads<const Reads extends readonly string[]>(
   return Object.freeze([...(app.reads ?? [])]);
 }
 
-class DefinedFeatureBuilder<Name extends ModuleName> {
-  constructor(private readonly name: Name) {}
+class DefinedFeatureBuilder<Name extends ModuleName, Channels = never> {
+  constructor(
+    private readonly name: Name,
+    private readonly channels?: AnyChannelRegistry,
+  ) {}
 
   withRepositories<const Live extends AnyProvider, const Memory extends AnyProvider>(
     repositories: RepositoryRegistry<Live, Memory>,
-  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory> {
-    return new RepositoryDefinedFeatureBuilder(this.name, repositories);
+  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory, Channels> {
+    return new RepositoryDefinedFeatureBuilder(this.name, repositories, this.channels);
+  }
+
+  /** This module's channels, built by the container on the tier the stores state (record §5). */
+  withChannels<const Live extends AnyProvider, const Memory extends AnyProvider>(
+    channels: ChannelRegistry<Live, Memory>,
+  ): DefinedFeatureBuilder<Name, ChannelsFor<ChannelRegistry<Live, Memory>>> {
+    return new DefinedFeatureBuilder(this.name, channels);
   }
 
   withApi<
@@ -1032,7 +1064,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
     App,
     const Reads extends readonly string[],
   >(
-    app: AppDefinition<Dependencies, Members, Config, App> & { readonly reads: Reads },
+    app: AppDefinition<Dependencies, Members, Config, App, Channels> & { readonly reads: Reads },
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>;
   withApi<
     Dependencies extends TokenMap,
@@ -1041,29 +1073,37 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
     App,
     const Reads extends readonly string[],
   >(
-    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App> & { readonly reads: Reads },
+    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App, Channels> & {
+      readonly reads: Reads;
+    },
   ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
   withApi<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
-    app: AppDefinitionWithoutConfig<Dependencies, Members, App> & { readonly reads: Reads },
+    app: AppDefinitionWithoutConfig<Dependencies, Members, App, Channels> & {
+      readonly reads: Reads;
+    },
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>;
   withApi<Dependencies extends TokenMap, Members, Config, App>(
-    app: AppDefinition<Dependencies, Members, Config, App>,
+    app: AppDefinition<Dependencies, Members, Config, App, Channels>,
   ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly []>;
   withApi<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
-    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App>,
+    app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App, Channels>,
   ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly []>;
   withApi<Dependencies extends TokenMap, Members, App>(
-    app: AppDefinitionWithoutConfig<Dependencies, Members, App>,
+    app: AppDefinitionWithoutConfig<Dependencies, Members, App, Channels>,
   ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly []>;
   withApi(
     app:
-      | AppDefinition<TokenMap, unknown, unknown, unknown>
-      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
+      | AppDefinition<TokenMap, unknown, unknown, unknown, Channels>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown, Channels>,
   ): object {
-    if ("config" in app) {
-      return new ConfiguredAppBuilder(this.name, app);
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | AppDefinition<TokenMap, unknown, unknown, unknown>
+      | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>;
+    if ("config" in erased) {
+      return new ConfiguredAppBuilder(this.name, erased, this.channels);
     }
-    return new UnconfiguredAppBuilder(this.name, app);
+    return new UnconfiguredAppBuilder(this.name, erased, this.channels);
   }
 }
 
@@ -1074,13 +1114,14 @@ type RepositoryAppDefinition<
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories> &
+      setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;
@@ -1096,12 +1137,13 @@ type RepositoryDeclaredConfigAppDefinition<
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly config: Slice;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories> &
+      setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;
@@ -1112,24 +1154,51 @@ type RepositoryAppDefinitionWithoutConfig<
   Repositories,
   App,
   Created extends App = App,
+  Channels = never,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories> &
+      setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;
+
+/** The registries a module named on its installer, handed to the app builder together. */
+type ModuleRegistries<Live extends AnyProvider, Memory extends AnyProvider> = Readonly<{
+  repositories: RepositoryRegistry<Live, Memory>;
+  channels?: AnyChannelRegistry;
+}>;
 
 class RepositoryDefinedFeatureBuilder<
   Name extends ModuleName,
   Live extends AnyProvider,
   Memory extends AnyProvider,
+  Channels = never,
 > {
   constructor(
     private readonly name: Name,
     private readonly repositories: RepositoryRegistry<Live, Memory>,
+    private readonly channels?: AnyChannelRegistry,
   ) {}
+
+  /** This module's channels, built by the container on the repositories' tier (record §5). */
+  #registries(): ModuleRegistries<Live, Memory> {
+    return this.channels === undefined
+      ? { repositories: this.repositories }
+      : { repositories: this.repositories, channels: this.channels };
+  }
+
+  withChannels<const ChannelLive extends AnyProvider, const ChannelMemory extends AnyProvider>(
+    channels: ChannelRegistry<ChannelLive, ChannelMemory>,
+  ): RepositoryDefinedFeatureBuilder<
+    Name,
+    Live,
+    Memory,
+    ChannelsFor<ChannelRegistry<ChannelLive, ChannelMemory>>
+  > {
+    return new RepositoryDefinedFeatureBuilder(this.name, this.repositories, channels);
+  }
 
   withApi<
     Dependencies extends TokenMap,
@@ -1145,7 +1214,8 @@ class RepositoryDefinedFeatureBuilder<
       Config,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     > & { readonly reads: Reads },
   ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads, Created>;
   withApi<
@@ -1160,7 +1230,8 @@ class RepositoryDefinedFeatureBuilder<
       Members,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     > & { readonly reads: Reads },
   ): RepositoryUnconfiguredAppBuilder<
     Name,
@@ -1179,7 +1250,8 @@ class RepositoryDefinedFeatureBuilder<
       Config,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     >,
   ): RepositoryAppBuilder<
     Name,
@@ -1203,7 +1275,8 @@ class RepositoryDefinedFeatureBuilder<
       Members,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     >,
   ): RepositoryUnconfiguredAppBuilder<
     Name,
@@ -1229,7 +1302,8 @@ class RepositoryDefinedFeatureBuilder<
       Slice,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     > & { readonly reads: Reads },
   ): RepositoryAppBuilder<
     Name,
@@ -1255,7 +1329,8 @@ class RepositoryDefinedFeatureBuilder<
       Slice,
       ModuleRepositories<Live, Memory>,
       App,
-      Created
+      Created,
+      Channels
     >,
   ): RepositoryAppBuilder<
     Name,
@@ -1275,6 +1350,26 @@ class RepositoryDefinedFeatureBuilder<
           unknown,
           unknown,
           ModuleRepositories<Live, Memory>,
+          unknown,
+          unknown,
+          Channels
+        >
+      | RepositoryAppDefinitionWithoutConfig<
+          TokenMap,
+          unknown,
+          ModuleRepositories<Live, Memory>,
+          unknown,
+          unknown,
+          Channels
+        >,
+  ): object {
+    // The overloads typed `setup.channels`; the builders forward it at runtime.
+    const erased = app as
+      | RepositoryAppDefinition<
+          TokenMap,
+          unknown,
+          unknown,
+          ModuleRepositories<Live, Memory>,
           unknown
         >
       | RepositoryAppDefinitionWithoutConfig<
@@ -1282,14 +1377,13 @@ class RepositoryDefinedFeatureBuilder<
           unknown,
           ModuleRepositories<Live, Memory>,
           unknown
-        >,
-  ): object {
+        >;
     // Mirrors the non-repository path: a declared slice is config too, and the
     // one process parse has already produced it (§6).
-    if ("config" in app) {
-      return new RepositoryAppBuilder(this.name, this.repositories, app);
+    if ("config" in erased) {
+      return new RepositoryAppBuilder(this.name, this.#registries(), erased);
     }
-    return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
+    return new RepositoryUnconfiguredAppBuilder(this.name, this.#registries(), erased);
   }
 }
 
@@ -1304,9 +1398,12 @@ class RepositoryAppBuilder<
   Reads extends readonly string[] = readonly [],
   Created extends App = App,
 > {
+  private readonly repositories: RepositoryRegistry<Live, Memory>;
+  private readonly channels: AnyChannelRegistry | undefined;
+
   constructor(
     private readonly name: Name,
-    private readonly repositories: RepositoryRegistry<Live, Memory>,
+    registries: ModuleRegistries<Live, Memory>,
     private readonly app: RepositoryAppDefinition<
       Dependencies,
       Members,
@@ -1315,7 +1412,10 @@ class RepositoryAppBuilder<
       App,
       Created
     > & { readonly reads?: Reads },
-  ) {}
+  ) {
+    this.repositories = registries.repositories;
+    this.channels = registries.channels;
+  }
 
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
@@ -1424,6 +1524,7 @@ class RepositoryAppBuilder<
           role,
           repositories,
           repositorySelection,
+          channels,
         }): App | Promise<App> => {
           return app.create({
             dependencies,
@@ -1434,32 +1535,36 @@ class RepositoryAppBuilder<
             role,
             repositories: repositories as ModuleRepositories<Live, Memory>,
             ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
+            ...(channels === undefined ? {} : { channels }),
           });
         },
       )
       .provides(app.contract)
       .build();
-    return {
-      ...setup,
-      // The name is the literal the module was declared with, which is the key
-      // its config slice is stated under. The builder chain above widens it.
-      name,
-      // The registry is read ONCE per install, here, and the instances are
-      // handed to the app and to this module's eventing declaration alike. A
-      // second read would give the two halves separate objects over the same
-      // rows, and a memory tier two separate databases.
-      install: async (args) => {
-        if (!args.repositorySelection) {
-          throw new Error(`Module "${name}" was installed without a repository tier.`);
-        }
-        const repositories = instantiateRepositories(registry, args.repositorySelection);
-        return { ...(await setup.install({ ...args, repositories })), repositories };
+    return declaringChannels(
+      {
+        ...setup,
+        // The name is the literal the module was declared with, which is the key
+        // its config slice is stated under. The builder chain above widens it.
+        name,
+        // The registry is read ONCE per install, here, and the instances are
+        // handed to the app and to this module's eventing declaration alike. A
+        // second read would give the two halves separate objects over the same
+        // rows, and a memory tier two separate databases.
+        install: async (args) => {
+          if (!args.repositorySelection) {
+            throw new Error(`Module "${name}" was installed without a repository tier.`);
+          }
+          const repositories = instantiateRepositories(registry, args.repositorySelection);
+          return { ...(await setup.install({ ...args, repositories })), repositories };
+        },
+        ...declaredOwner(app),
+        members: declaredReads(app),
+        repositoryRegistry: registry,
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
       },
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      repositoryRegistry: registry,
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+      this.channels,
+    );
   }
 
   /**
@@ -1514,7 +1619,7 @@ class RepositoryUnconfiguredAppBuilder<
 > {
   constructor(
     name: Name,
-    repositories: RepositoryRegistry<Live, Memory>,
+    registries: ModuleRegistries<Live, Memory>,
     app: RepositoryAppDefinitionWithoutConfig<
       Dependencies,
       Members,
@@ -1525,7 +1630,7 @@ class RepositoryUnconfiguredAppBuilder<
   ) {
     // Named member by member: an app is usually a class, and spreading a class
     // drops its static methods (`create` is not enumerable).
-    super(name, repositories, {
+    super(name, registries, {
       contract: app.contract,
       dependencies: app.dependencies,
       ...(app.reads === undefined ? {} : { reads: app.reads }),
@@ -1556,6 +1661,7 @@ class ConfiguredAppBuilder<
     private readonly app: AppDefinition<Dependencies, Members, Config, App> & {
       readonly reads?: Reads;
     },
+    private readonly channels?: AnyChannelRegistry,
   ) {}
 
   /**
@@ -1636,7 +1742,7 @@ class ConfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources, role, channels }) =>
         app.create({
           dependencies,
           members,
@@ -1644,18 +1750,22 @@ class ConfiguredAppBuilder<
           secrets,
           resources,
           role,
+          ...(channels === undefined ? {} : { channels }),
         }),
       )
       .provides(app.contract)
       .build();
-    return {
-      ...declaration,
-      name: this.name,
-      repositories: snapshotRepositories(app.repositories),
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+    return declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        members: declaredReads(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
   }
 }
 
@@ -1671,6 +1781,7 @@ class UnconfiguredAppBuilder<
     private readonly app: AppDefinitionWithoutConfig<Dependencies, Members, App> & {
       readonly reads?: Reads;
     },
+    private readonly channels?: AnyChannelRegistry,
   ) {}
 
   /**
@@ -1751,7 +1862,7 @@ class UnconfiguredAppBuilder<
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<undefined>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources, role }) =>
+      .withSetup(({ dependencies, members, config, secrets, resources, role, channels }) =>
         app.create({
           dependencies,
           members,
@@ -1759,18 +1870,22 @@ class UnconfiguredAppBuilder<
           secrets,
           resources,
           role,
+          ...(channels === undefined ? {} : { channels }),
         }),
       )
       .provides(app.contract)
       .build();
-    return {
-      ...declaration,
-      name: this.name,
-      repositories: snapshotRepositories(app.repositories),
-      ...declaredOwner(app),
-      members: declaredReads(app),
-      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
-    };
+    return declaringChannels(
+      {
+        ...declaration,
+        name: this.name,
+        repositories: snapshotRepositories(app.repositories),
+        ...declaredOwner(app),
+        members: declaredReads(app),
+        ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
+      },
+      this.channels,
+    );
   }
 }
 
@@ -2006,6 +2121,34 @@ function undeclaredSecrets(feature: string): ScopedSecrets {
  * declaration only gives it a type. This is the single boundary where the
  * parsed value stops being `unknown`; there is no second schema.
  */
+type ChannelInstall = (args: FeatureInstallArguments<unknown>) => Promise<InstalledFeatureState>;
+
+/**
+ * Builds the module's channels once per install, on the tier its stores state, and hands them
+ * to the module class as `setup.channels` (record §5). No registry, nothing changes.
+ */
+function declaringChannels<Declaration extends Readonly<{ name: string; install: unknown }>>(
+  declaration: Declaration,
+  registry: AnyChannelRegistry | undefined,
+): Declaration {
+  if (registry === undefined) return declaration;
+  const { name } = declaration;
+  const install = declaration.install as ChannelInstall;
+  const declaring: ChannelInstall = async (args) => {
+    const selection = args.repositorySelection;
+    if (!selection) throw new Error(`Module "${name}" was installed without a store tier.`);
+    const channels = await instantiateChannels(registry, {
+      tier: selection.tier,
+      members: selection.members,
+      config: args.config,
+      secrets: args.secrets ?? undeclaredSecrets(name),
+      resolve: args.resolve,
+    });
+    return install({ ...args, channels });
+  };
+  return { ...declaration, channelRegistry: registry, install: declaring };
+}
+
 function declaredConfig<Config>(value: unknown): Config {
   return value as Config;
 }

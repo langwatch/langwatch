@@ -1,6 +1,7 @@
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
+import { MemoryPlatformHealthChannels } from "../../channels/memory/memory.platform-health.channels.ts";
 import { PlatformHealthModule } from "../platform-health.app.ts";
 
 const values: Record<string, string> = { PLATFORM_HEALTH_API_KEY: "monitoring-key" };
@@ -20,6 +21,7 @@ describe("given the monitoring key is declared as a secret handle", () => {
       const app = await PlatformHealthModule.create({
         dependencies: {},
         config: { publicBaseUrl: undefined },
+        channels: MemoryPlatformHealthChannels.create(),
         secrets,
       } as never);
 

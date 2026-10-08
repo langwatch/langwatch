@@ -78,6 +78,14 @@ export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./re
 export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
 
 export {
+  defineChannels,
+  type AnyChannelRegistry,
+  type BoundApis,
+  type ChannelRegistry,
+  type ChannelsFor,
+  type ChannelTiers,
+} from "./channel-registry.ts";
+export {
   defineRepositories,
   instantiateRepositories,
   repositoriesRequire,

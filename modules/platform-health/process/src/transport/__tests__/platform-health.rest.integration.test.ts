@@ -9,6 +9,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { PlatformHealthModule } from "../../app/platform-health.app.ts";
+import { MemoryPlatformHealthChannels } from "../../channels/memory/memory.platform-health.channels.ts";
 import { platformHealthRest } from "../platform-health.rest.ts";
 
 /** The door the module builds from PLATFORM_HEALTH_API_KEY, unset where `key` is null. */
@@ -19,6 +20,7 @@ async function monitorDoor(key: string | null): Promise<RestIdentity> {
   const app = await PlatformHealthModule.create({
     dependencies: {},
     config: { publicBaseUrl: undefined },
+    channels: MemoryPlatformHealthChannels.create(),
     secrets,
   } as never);
 

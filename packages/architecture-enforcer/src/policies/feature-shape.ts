@@ -60,7 +60,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "unregistered-repositories":
     "Add repositories/<feature>-repositories.registry.ts with defineRepositories({ live, memory }) and select it with .withRepositories() in <feature>.module.ts.",
   "unregistered-channels":
-    "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts exporting { live, memory }, each a class with static readonly requires and static create, and a memory twin under channels/memory/ for every live tier.",
+    "A channel carries messages the module does not own the state of. Add channels/<feature>-channels.registry.ts exporting defineChannels({ live, memory }), each a class with static readonly requires and static create, named on the installer with .withChannels(...), and a memory twin under channels/memory/ for every live tier.",
   "postgres-without-memory":
     "Every Prisma repository has a memory twin under repositories/memory/, bundled by memory.<feature>.repositories.ts, so the app is tested without a database.",
   "memory-twin-untested":
