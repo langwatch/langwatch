@@ -851,3 +851,17 @@ pnpm --filter @langwatch/visual-diff-runner test
 No `Makefile` target names `visualdiff`, `5670` or `5680` - the ports the
 `-no-haven` path uses are only ever derived at runtime from `-base-port`, so
 there is nothing in the `Makefile` for this change to update.
+
+## The judge
+
+A plan with `"judge": { "cacheFile": "<path>" }` asks `claude-haiku-5-5` about every pair the
+pixel diff flags (ratio at or above classify.go's `NoiseRatio`): does the branch screenshot show
+a real regression against main (missing element, broken layout, error text, wrong data) or a
+harmless difference? A pair that names a regression is judged a second time and only regressions
+both judgements name (by kind and element) are kept. Verdicts are cached in `cacheFile` by a hash
+of both screenshots, so a later run never pays twice for the same pair; failures are not cached.
+Each run writes `<outDir>/judge.json`: calls, tokens, dollars, cache hits, failures and every
+flagged pair with its regressions. The key is `ANTHROPIC_API_KEY` (and optional
+`ANTHROPIC_BASE_URL`), read only by `runner/src/capture.entrypoint.ts`. Code: `runner/src/judge.ts`;
+spec: `specs/tooling/visualdiff-judge.feature`. The Go side does not yet set `judge` or read
+`judge.json`.
