@@ -37,7 +37,7 @@ let documentsAnswer: unknown;
 /** When set, the next answer waits until the test resolves it. */
 let holdNextAnswer: Promise<void> | undefined;
 
-const answer: UiProcedureAnswer = async ({ path }) => {
+const answer: UiProcedureAnswer = async ({ path }: { path: string }) => {
   if (path !== "analytics.topUsedDocuments") throw new Error(`No test answer for ${path}`);
   documentRequests++;
   const answered = documentsAnswer;
