@@ -1,5 +1,7 @@
-import { ledgerActorSchema } from "@langwatch/authorization";
+import { AUTHORIZATION_CONDITION_TYPES, ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
+
+import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
 
 export const AUTHZ_ENGINE_MIGRATION_NAME = "authz-engine" as const;
 
@@ -58,6 +60,8 @@ export const GRANT_EVENT_SOURCES = [
   "join-request",
   "read-through-mint",
   "migration",
+  /** ADR-175: one shared project-reader grant per aggregate member; live changes, so audited. */
+  "aggregate-reconciler",
 ] as const;
 export const grantEventSourceSchema = z.enum(GRANT_EVENT_SOURCES);
 export type GrantEventSource = z.infer<typeof grantEventSourceSchema>;
@@ -75,6 +79,24 @@ export const resourceGrantTermsSchema = z
   .strict();
 export type ResourceGrantTerms = z.infer<typeof resourceGrantTermsSchema>;
 
+/**
+ * ADR-175: the window a SHARED grant opens, as the ledger stores it. `type` names the store,
+ * `where` is an OTTL slot nothing compiles yet (the shape refinement refuses a non-empty one),
+ * `from` and `until` are ISO instants bounding rows by occurrence time. Own grants carry none.
+ */
+export const grantConditionSchema = z.object({
+  type: z.enum(AUTHORIZATION_CONDITION_TYPES),
+  where: z.string().optional(),
+  from: z.iso.datetime({ offset: true }).optional(),
+  until: z.iso.datetime({ offset: true }).optional(),
+});
+export type GrantCondition = z.infer<typeof grantConditionSchema>;
+
+/**
+ * A `project` principal has three legal placements: the resource tier, its own project's
+ * credential, and the ADR-175 shared read (`project-reader` on another project's PROJECT scope
+ * with a condition whose `where` is empty). Only that read carries a condition or the role.
+ */
 export const grantShapeRefinement = {
   check: (grant: {
     principal: { type: string; id: string | null };
@@ -82,22 +104,37 @@ export const grantShapeRefinement = {
     scope: { type: string; id: string };
     resource?: unknown;
     expiresAtMs?: number;
+    condition?: { where?: string | undefined };
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
     if (isResourceScope && grant.expiresAtMs !== undefined) return false;
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
-    if (grant.principal.type === "project" && !isResourceScope && !isOwnProjectCredential) {
+    const isSharedProjectRead =
+      grant.principal.type === "project" &&
+      grant.scope.type === "PROJECT" &&
+      grant.principal.id !== grant.scope.id &&
+      grant.roleKey === PROJECT_READER_ROLE_KEY &&
+      grant.condition !== undefined &&
+      (grant.condition.where === undefined || grant.condition.where === "");
+    if (
+      grant.principal.type === "project" &&
+      !isResourceScope &&
+      !isOwnProjectCredential &&
+      !isSharedProjectRead
+    ) {
       return false;
     }
+    if ((grant.condition !== undefined) !== isSharedProjectRead) return false;
+    if ((grant.roleKey === PROJECT_READER_ROLE_KEY) !== isSharedProjectRead) return false;
     return (
       isResourceScope === (grant.resource !== undefined) &&
       isResourceScope === (grant.roleKey === null)
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope; a `project` principal exists at RESOURCE scope, as its own project's credential (a PROJECT scope whose id is the principal's), or as a `project-reader` on another project's PROJECT scope carrying a condition with an empty where; only that shared read carries a condition or the `project-reader` role",
   path: ["resource"] as const,
 };
 
@@ -108,6 +145,8 @@ export const grantAttachedPayloadSchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-175). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     /** When a binding stops granting; absent on every grant that never ends. */
     expiresAtMs: z.number().int().positive().optional(),
@@ -213,6 +252,8 @@ export const grantFactSchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-175). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,

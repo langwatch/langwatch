@@ -28,6 +28,13 @@ import type {
   RolePermissionsChangedEvent,
 } from "./authz-grant.events.ts";
 
+/** The row's `condition`, present only when the event carried one: no undefined-valued key. */
+function conditionField(
+  condition: GrantAttachedEvent["data"]["condition"],
+): { condition: NonNullable<typeof condition> } | Record<string, never> {
+  return condition !== undefined ? { condition } : {};
+}
+
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
 const AUTHZ_GRANTS_WRITE_EVENT_TYPES = AUTHZ_GRANTS_EVENT_TYPES;
 
@@ -91,6 +98,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         createdByUserId: data.resource?.createdByUserId ?? null,
         expiresAt: expiresAtMs ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
         maxViews: data.resource?.maxViews ?? null,
+        ...conditionField(data.condition),
         occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },
     };

@@ -1129,6 +1129,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Language: { source: "language", content: "output" },
       Framework: { source: "framework", content: "output" },
       Kind: { source: "kind" },
+      aggregateRule: "omit", // aggregate membership config, not analytics data
       FirstMessage: { source: "firstMessage" },
       Integrated: { source: "integrated" },
       CreatedAt: { source: "createdAt" },

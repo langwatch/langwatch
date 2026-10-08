@@ -3,11 +3,13 @@ import type { StoredScopeTier } from "@langwatch/authorization";
 import {
   AUTHZ_SHARE_PERMISSION,
   authzShareAudience,
+  grantConditionSchema,
   PRINCIPAL_KIND_FROM_STORED,
   STORED_PRINCIPAL_KIND,
   storedPrincipalKindSchema,
 } from "@langwatch/authz-contract";
 import type {
+  GrantCondition,
   GrantEventSource,
   GrantFact,
   LedgerPrincipalType,
@@ -84,7 +86,19 @@ export interface GrantRowShape {
   createdByUserId: string | null;
   expiresAt: Instant | null;
   maxViews: number | null;
+  /** The shared grant's window (ADR-175); absent on own grants, never a null. */
+  condition?: GrantCondition;
   occurredAt: Instant;
+}
+
+/**
+ * A stored grant condition as a row field, parsed through the wire's own schema; a JSONB value
+ * that does not parse is no field at all, so the fact is built with none and the shared-read
+ * minter leaves the row out of every proof rather than read a wider window.
+ */
+export function grantConditionFieldFromDb(value: unknown): { condition?: GrantCondition } {
+  const parsed = grantConditionSchema.safeParse(value);
+  return parsed.success ? { condition: parsed.data } : {};
 }
 
 /** Exactly the columns a {@link GrantRowShape} holds, for a read that feeds one. */
@@ -105,6 +119,7 @@ export const GRANT_ROW_COLUMNS = {
   createdByUserId: true,
   expiresAt: true,
   maxViews: true,
+  condition: true,
   occurredAt: true,
 } as const;
 
@@ -127,6 +142,9 @@ const storedGrantRowSchema = z
     createdByUserId: z.string().nullable(),
     expiresAt: z.date().nullable(),
     maxViews: z.number().nullable(),
+    // Untyped JSONB: parsed by `grantConditionFieldFromDb`, never by this shape check. Optional,
+    // so a row read through a narrower select (or a memory twin) without the column still parses.
+    condition: z.unknown().optional(),
     occurredAt: z.date(),
   })
   .strict();
@@ -248,16 +266,21 @@ export function grantFactToRow({
     createdByUserId: grant.resource?.createdByUserId ?? null,
     expiresAt: expiresAtMs != null ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
     maxViews: grant.resource?.maxViews ?? null,
+    ...(grant.condition !== undefined ? { condition: grant.condition } : {}),
     occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
   };
 }
 
-/** A row read with {@link GRANT_ROW_COLUMNS}; throws on one that is not a Grant row. */
+/**
+ * A row read with {@link GRANT_ROW_COLUMNS}; throws on one that is not a Grant row. A stored
+ * condition that does not parse is dropped here, so no reader ever holds an unparsed window.
+ */
 export function grantRowFromStored(stored: unknown): GrantRowShape {
-  const row = storedGrantRowSchema.parse(stored);
+  const { condition: storedCondition, ...row } = storedGrantRowSchema.parse(stored);
   return {
     ...row,
     expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+    ...grantConditionFieldFromDb(storedCondition),
     occurredAt: fromDate(row.occurredAt),
   };
 }
@@ -282,6 +305,7 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
   if (row.legacyRole != null) {
     fact.legacyRole = row.legacyRole as LegacyBindingRole;
   }
+  if (row.condition !== undefined) fact.condition = row.condition;
   // All four identity columns or none, and the kind has to parse as one of
   // the two the tier supports. Partial resource identity is not a grant.
   if (

@@ -49,7 +49,17 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, AuthzAuditVerb> = {
 };
 
 const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
-  [GRANT_ATTACHED_EVENT_TYPE]: ["grantId", "principal", "roleKey", "scope", "source", "legacyRole"],
+  // ADR-175 `condition`: a shared read's window (store type, empty `where`, two instants), so
+  // an admin can see from when a project was read.
+  [GRANT_ATTACHED_EVENT_TYPE]: [
+    "grantId",
+    "principal",
+    "roleKey",
+    "scope",
+    "source",
+    "legacyRole",
+    "condition",
+  ],
   [GRANT_ROLE_CHANGED_EVENT_TYPE]: ["grantId", "from", "to"],
   [GRANT_REVOKED_EVENT_TYPE]: ["grantId", "selector", "reason"],
   [ROLE_DEFINED_EVENT_TYPE]: ["roleId", "name", "description", "permissions", "kind"],

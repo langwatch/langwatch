@@ -7,6 +7,8 @@ import {
 } from "@langwatch/authorization";
 import { z } from "zod";
 
+import { PROJECT_READER_ROLE_KEY } from "./roles.ts";
+
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type TeamUserRole = z.infer<typeof teamUserRoleSchema>;
@@ -131,9 +133,14 @@ export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
     (typeof value === "string" && value.startsWith("custom:") && value.length > "custom:".length),
 );
 
+/** ADR-175: the role a SHARED grant carries, one project reading another. Never a legacy
+ *  binding role, so it stays out of `BindingRoleKey` and the compat heads never see it. */
+export type SharedRoleKey = typeof PROJECT_READER_ROLE_KEY;
+export const sharedRoleKeySchema = z.literal(PROJECT_READER_ROLE_KEY);
+
 export const collectedBindingSchema = z
   .object({
-    roleKey: bindingRoleKeySchema,
+    roleKey: z.union([bindingRoleKeySchema, sharedRoleKeySchema]),
     scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),

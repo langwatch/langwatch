@@ -13,7 +13,9 @@ import {
   PLATFORM_TENANT_ID,
   type AuthzLedgerResourceTerms,
   type DefineRoleCommandData,
+  type GrantCondition,
   type GrantEventSource,
+  PROJECT_READER_ROLE_KEY,
   type RevokeGrantCommandData,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
@@ -25,7 +27,9 @@ import type { AuthzEpochRepository } from "../repositories/authz-epoch.repositor
 import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzLedgerReadRepository } from "../repositories/authz-ledger-read.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
+import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "../repositories/authz-revocation.repository.ts";
+import type { AuthzSharedReadRepository } from "../repositories/authz-shared-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
 import {
   compatBindingFromGrantFact,
@@ -44,6 +48,7 @@ import {
   userIdsNeedingStamp,
   validateMembershipBootstrap,
 } from "../rules/membership-stamp-fence.rules.ts";
+import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
@@ -62,6 +67,8 @@ type LedgerWriteSource = GrantEventSource;
 // reads and no accuracy.
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
+// Each step skips one revoked row of the pair; a pair revoked this many seconds running is a fault.
+const MAX_GRANT_IDENTITY_STEPS = 60;
 
 export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that
@@ -102,6 +109,10 @@ type EventingAuthzLedgerAdapterOptions = {
   revocation: AuthzRevocationRepository;
   /** The membership lifetime a USER attach is fenced to. */
   membershipStamps: AuthzMembershipStampRepository;
+  /** ADR-175: the project-reader rows a reader project holds on its members. */
+  sharedReads: AuthzSharedReadRepository;
+  /** Which organization a project sits in, asked before a shared read is written. */
+  lineage: Pick<ScopeLineageRepository, "findProjectLineage">;
   now?: () => number;
   newCommandId?: () => string;
   poll?: { intervalMs: number; timeoutMs: number };
@@ -139,6 +150,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   static create(options: EventingAuthzLedgerAdapterOptions): EventingAuthzLedgerAdapter {
     return new EventingAuthzLedgerAdapter(options);
   }
+
+  private readonly grantIdentity = AuthzGrantIdentityService.create();
 
   private constructor(private readonly options: EventingAuthzLedgerAdapterOptions) {}
 
@@ -427,6 +440,199 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         }),
     });
     await this.options.epoch.bump({ organizationId });
+  }
+
+  /**
+   * INSERT one shared project read (ADR-175): a `project-reader` grant on the member's PROJECT
+   * scope carrying the proof's condition, once both projects are known to sit in this
+   * organization. A live grant for the pair is returned as it stands (a rerun changes nothing).
+   */
+  async attachSharedProjectGrant({
+    organizationId,
+    readerProjectId,
+    memberProjectId,
+    condition,
+    actor,
+    source = "aggregate-reconciler",
+    commandId,
+    awaitProjection = true,
+  }: {
+    organizationId: string;
+    /** The project that reads: an aggregate project. */
+    readerProjectId: string;
+    /** The project whose traces it reads. */
+    memberProjectId: string;
+    condition: GrantCondition;
+    actor: LedgerActor;
+    source?: LedgerWriteSource;
+    commandId?: string;
+    awaitProjection?: boolean;
+  }): Promise<{ grantId: string; wasAttached: boolean }> {
+    refusePlatformTenant(organizationId);
+    if (readerProjectId === memberProjectId) {
+      throw new GrantValidationError("A project cannot share a read with itself", {
+        projectId: readerProjectId,
+      });
+    }
+    for (const projectId of [readerProjectId, memberProjectId]) {
+      const lineage = await this.options.lineage.findProjectLineage({ projectId });
+      if (lineage?.organizationId !== organizationId) {
+        throw new GrantValidationError("Project is not in this organization", { projectId });
+      }
+    }
+    const [existing] = await this.options.sharedReads.findLiveSharedReadGrants({
+      organizationId,
+      readerProjectId,
+      memberProjectIds: [memberProjectId],
+    });
+    if (existing) return { grantId: existing.grantId, wasAttached: false };
+
+    const principal = { type: "project" as const, id: readerProjectId };
+    const scope = { type: "PROJECT" as const, id: memberProjectId };
+    const fresh = await this.freshGrantIdentity({ organizationId, principal, scope });
+    // A concurrent attach of the same pair landed since the read above: its row is the pair's
+    // live grant, returned rather than shadowed by a second live row a second later.
+    if (fresh.isLive) return { grantId: fresh.grantId, wasAttached: false };
+    const { grantId, occurredAtMs } = fresh;
+    await (
+      await this.commands()
+    ).commands.attachGrant.send({
+      tenantId: organizationId,
+      organizationId,
+      commandId: commandId ?? this.options.newCommandId?.() ?? newCommandId(),
+      grant: {
+        grantId,
+        principal,
+        roleKey: PROJECT_READER_ROLE_KEY,
+        scope,
+        condition,
+        source,
+        actor,
+        occurredAtMs,
+      },
+    });
+    if (awaitProjection) {
+      await this.awaitProjection({
+        what: `attach of shared read ${grantId}`,
+        organizationId,
+        check: () => this.areLive({ organizationId, grantIds: [grantId] }),
+      });
+    }
+    await this.options.epoch.bump({ organizationId });
+    return { grantId, wasAttached: true };
+  }
+
+  /**
+   * One read-your-writes wait for a batch attached with `awaitProjection: false`, then an epoch
+   * bump: each attach bumped before its row existed, so a snapshot cached in between would miss
+   * the read. Throws {@link AuthzGrantNotConfirmedError} when the rows do not land in time.
+   */
+  async awaitSharedProjectGrants({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<void> {
+    if (grantIds.length === 0) return;
+    await this.awaitProjection({
+      what: `attach of ${grantIds.length} shared read(s)`,
+      organizationId,
+      check: () => this.areLive({ organizationId, grantIds }),
+    });
+    await this.options.epoch.bump({ organizationId });
+  }
+
+  /** The live shared reads one reader project holds, one per member project, ordered by member. */
+  async findLiveSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+  }): Promise<{ grantId: string; memberProjectId: string }[]> {
+    const rows = await this.options.sharedReads.findLiveSharedReadGrants({
+      organizationId,
+      readerProjectId,
+    });
+    return rows.map(({ grantId, memberProjectId }) => ({ grantId, memberProjectId }));
+  }
+
+  /**
+   * Revoke one reader project's live shared reads: all of them, or only those on the members
+   * named. Marks and bumps exactly as `revokeBindings` does; answers the grant ids revoked.
+   */
+  async revokeSharedProjectGrants({
+    organizationId,
+    readerProjectId,
+    memberProjectIds,
+    actor,
+    reason,
+  }: {
+    organizationId: string;
+    readerProjectId: string;
+    memberProjectIds?: string[];
+    actor: LedgerActor;
+    reason?: string;
+  }): Promise<string[]> {
+    const rows = await this.options.sharedReads.findLiveSharedReadGrants({
+      organizationId,
+      readerProjectId,
+      ...(memberProjectIds !== undefined ? { memberProjectIds } : {}),
+    });
+    const bindingIds = rows.map((row) => row.grantId);
+    await this.revokeBindings({
+      organizationId,
+      bindingIds,
+      actor,
+      ...(reason ? { reason } : {}),
+    });
+    return bindingIds;
+  }
+
+  /** Whether every one of these grant ids is held by a live row. */
+  private async areLive({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<boolean> {
+    const states = await this.options.sharedReads.findGrantStates({ organizationId, grantIds });
+    return states.filter((state) => !state.isRevoked).length === grantIds.length;
+  }
+
+  /**
+   * The id an attach of this pair lands on, a KSUID of the pair and the SECOND. A REVOKED row on it
+   * moves the fact to the next second (else the attach never lands); a LIVE row is the same pair
+   * attached by someone else and is the answer itself (stepping past it made two live rows).
+   */
+  private async freshGrantIdentity({
+    organizationId,
+    principal,
+    scope,
+  }: {
+    organizationId: string;
+    principal: { type: "project"; id: string };
+    scope: { type: "PROJECT"; id: string };
+  }): Promise<{ grantId: string; occurredAtMs: number; isLive: boolean }> {
+    let occurredAtMs = this.now();
+    for (let step = 0; step < MAX_GRANT_IDENTITY_STEPS; step++) {
+      const grantId = this.grantIdentity.deriveGrantId({
+        organizationId,
+        principal,
+        scope,
+        occurredAtMs,
+      });
+      const [taken] = await this.options.sharedReads.findGrantStates({
+        organizationId,
+        grantIds: [grantId],
+      });
+      if (!taken) return { grantId, occurredAtMs, isLive: false };
+      if (!taken.isRevoked) return { grantId, occurredAtMs, isLive: true };
+      occurredAtMs = (Math.floor(occurredAtMs / 1000) + 1) * 1000;
+    }
+    throw new GrantValidationError("No free grant id for this shared read", { scopeId: scope.id });
   }
 
   /**

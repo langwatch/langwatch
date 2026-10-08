@@ -152,6 +152,8 @@ export class MemoryAuthzGrantProjectionRepository extends AuthzGrantProjectionRe
       return 1;
     }
     if (msOf(existing.occurredAt) >= msOf(row.occurredAt)) return 0;
+    // The upsert sets every column, `condition` included: a row without one clears it.
+    if (row.condition === undefined) delete existing.condition;
     Object.assign(existing, stored, { updatedAt: now() });
     return 1;
   }

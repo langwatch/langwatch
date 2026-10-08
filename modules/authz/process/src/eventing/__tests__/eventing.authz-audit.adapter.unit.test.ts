@@ -212,6 +212,31 @@ describe("EventingAuthzAuditAdapter", () => {
     });
   });
 
+  it("records a shared project read's window alongside the grant", async () => {
+    const store = new RecordingAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler(
+      attached({
+        principal: { type: "project", id: "project_aggregate" },
+        roleKey: "project-reader",
+        scope: { type: "PROJECT", id: "project_member" },
+        source: "aggregate-reconciler",
+        condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+        actor: { type: "system", id: SYSTEM_ACTORS.aggregateReconciler },
+      }),
+    );
+
+    expect(store.attempts[0]?.metadata).toEqual({
+      grantId: "grant_1",
+      principal: { type: "project", id: "project_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "project_member" },
+      source: "aggregate-reconciler",
+      condition: { type: "trace", from: "2026-10-07T10:00:00.000Z" },
+    });
+  });
+
   it("allows only named metadata fields and never copies a resource token", async () => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });

@@ -5,7 +5,7 @@
 import { permissionSatisfiedBy } from "@langwatch/authorization";
 
 import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz.ts";
-import { builtinRoleGrants } from "./roles.ts";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles.ts";
 import { audienceMatches, bindingScopeCanGrantPermission } from "./scope.ts";
 
 /**
@@ -102,6 +102,15 @@ export function bindingGrants({
   // A custom key is authoritative, including grants imported beside a legacy
   // built-in role. Missing or empty role facts never restore that old role.
   if (roleKey.startsWith("custom:")) return customRoleGrants({ roleKey, grants, permission });
+
+  // ADR-175: a shared project-to-project read sits on a PROJECT scope only, and nothing widens
+  // or narrows it (no organisation role, no EXTERNAL cap): its principal is a project.
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
+    );
+  }
 
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
     return false;

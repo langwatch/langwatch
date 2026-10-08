@@ -2,6 +2,7 @@ import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
+  grantConditionSchema,
   grantEventSourceSchema,
   grantShapeRefinement,
   ledgerPrincipalSchema,
@@ -66,6 +67,8 @@ export const attachGrantEntrySchema = z
     roleKey: z.string().min(1).nullable(),
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
+    /** Present only on a shared project-reader grant (ADR-175). */
+    condition: grantConditionSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,

@@ -97,6 +97,37 @@ describe("AuthzGrantProjection", () => {
   });
 
   /** @scenario "The insert is fenced on the lifetime the fact was stamped against" */
+  it("carries a shared read's condition onto the row, and no key at all on an own grant", () => {
+    const attach = (data: Record<string, unknown>) =>
+      projection.map(
+        event(
+          {
+            type: GRANT_ATTACHED_EVENT_TYPE,
+            data: {
+              grantId: "grant_1",
+              principal: { type: "project", id: "proj_aggregate" },
+              roleKey: "project-reader",
+              scope: { type: "PROJECT", id: "proj_member" },
+              source: "aggregate-reconciler",
+              actor: ACTOR,
+              ...data,
+            },
+          } as AuthzGrantsEventBody,
+          "grant_1",
+          1,
+        ),
+      );
+
+    const shared = attach({ condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" } });
+    const own = attach({ principal: { type: "user", id: "user_1" }, roleKey: "member" });
+
+    expect(shared.kind === "grant.upsert" && shared.row.condition).toEqual({
+      type: "trace",
+      from: "2026-10-01T00:00:00.000Z",
+    });
+    expect(own.kind === "grant.upsert" && own.row).not.toHaveProperty("condition");
+  });
+
   it("carries a USER membership lifetime into the guarded write", () => {
     const write = projection.map(
       event(

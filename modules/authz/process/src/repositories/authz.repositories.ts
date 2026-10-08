@@ -13,6 +13,7 @@ import type { AuthzPlatformGrantRepository } from "./authz-platform-grant.reposi
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
 import type { AuthzRevocationRepository } from "./authz-revocation.repository.ts";
 import type { AuthzSessionVersionRepository } from "./authz-session-version.repository.ts";
+import type { AuthzSharedReadRepository } from "./authz-shared-read.repository.ts";
 import type { AuthzUserStandingRepository } from "./authz-user-standing.repository.ts";
 
 /** The rows the authz module selects at boot: Postgres facts, and the three Redis counters. */
@@ -37,4 +38,6 @@ export interface AuthzRepositories {
   readonly migration: AuthzMigrationRepository;
   /** What the ledger's read-your-writes hold and the grant writer read. */
   readonly ledgerReads: AuthzLedgerReadRepository;
+  /** ADR-175: the project-reader rows one reader project holds on its members. */
+  readonly sharedReads: AuthzSharedReadRepository;
 }

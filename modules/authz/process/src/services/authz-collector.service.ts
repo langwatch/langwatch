@@ -7,7 +7,7 @@ import type { ShareableResourceKind } from "@langwatch/authorization";
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
-  BindingRoleKey,
+  CollectedBinding,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
@@ -449,7 +449,7 @@ export class AuthzCollectorService {
     }
   }
 
-  private dedupeCustomRoleIds(bindings: readonly { roleKey: BindingRoleKey }[]): string[] {
+  private dedupeCustomRoleIds(bindings: readonly Pick<CollectedBinding, "roleKey">[]): string[] {
     return Array.from(
       new Set(
         bindings

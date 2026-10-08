@@ -15,6 +15,7 @@ import { MemoryAuthzMigrationRepository } from "./memory.authz-migration.reposit
 import { MemoryAuthzPlatformGrantRepository } from "./memory.authz-platform-grant.repository.ts";
 import { MemoryAuthzReadRepository } from "./memory.authz-read.repository.ts";
 import { MemoryAuthzRevocationRepository } from "./memory.authz-revocation.repository.ts";
+import { MemoryAuthzSharedReadRepository } from "./memory.authz-shared-read.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "./memory.authz-user-standing.repository.ts";
 
 export class MemoryAuthzRepositories {
@@ -40,6 +41,7 @@ export class MemoryAuthzRepositories {
       listing: MemoryAuthzListingRepository.create({ memory }),
       migration: MemoryAuthzMigrationRepository.create({ memory }),
       ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
+      sharedReads: MemoryAuthzSharedReadRepository.create({ memory }),
     };
   }
 }

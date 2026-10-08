@@ -218,6 +218,8 @@ export class AuthzModule implements AuthzApi {
       epoch,
       revocation: repositories.revocation,
       membershipStamps: repositories.membershipStamps,
+      sharedReads: repositories.sharedReads,
+      lineage: repositories.read,
     });
     const platformOperators = AuthzPlatformOperatorsService.create({
       grants: repositories.platformGrants,

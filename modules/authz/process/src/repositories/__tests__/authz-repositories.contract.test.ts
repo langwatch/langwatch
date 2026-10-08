@@ -28,6 +28,7 @@ import { MemoryAuthzMigrationRepository } from "../memory/memory.authz-migration
 import { MemoryAuthzPlatformGrantRepository } from "../memory/memory.authz-platform-grant.repository.ts";
 import { MemoryAuthzReadRepository } from "../memory/memory.authz-read.repository.ts";
 import { MemoryAuthzRevocationRepository } from "../memory/memory.authz-revocation.repository.ts";
+import { MemoryAuthzSharedReadRepository } from "../memory/memory.authz-shared-read.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
 import {
   MemoryAuthzCutoverRepository,
@@ -68,6 +69,7 @@ const backends: readonly Backend[] = [
         listing: MemoryAuthzListingRepository.create({ memory }),
         migration: MemoryAuthzMigrationRepository.create({ memory }),
         ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
+        sharedReads: MemoryAuthzSharedReadRepository.create({ memory }),
       };
     },
   },

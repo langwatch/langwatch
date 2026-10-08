@@ -13,6 +13,7 @@ import { PrismaAuthzMembershipStampRepository } from "./prisma.authz-membership-
 import { PrismaAuthzMigrationRepository } from "./prisma.authz-migration.repository.ts";
 import { PrismaAuthzProjectionRepository } from "./prisma.authz-projection.repository.ts";
 import { PrismaAuthzRevocationRepository } from "./prisma.authz-revocation.repository.ts";
+import { PrismaAuthzSharedReadRepository } from "./prisma.authz-shared-read.repository.ts";
 import { PrismaAuthzUserStandingRepository } from "./prisma.authz-user-standing.repository.ts";
 
 type AuthzPostgresRepositories = Omit<
@@ -23,7 +24,7 @@ type AuthzPostgresRepositories = Omit<
 /**
  * The Postgres rows: binding facts, engine cutover, admissions, standings, the audit trail, the
  * platform tier, membership stamps, the guarded projection writes, the synchronous deny, the
- * decision and listing reads, the import's reads and the ledger's.
+ * decision and listing reads, the import's reads, the ledger's and the shared reads.
  */
 export class PostgresAuthzRepositories {
   static create({ prisma }: Readonly<{ prisma: PrismaClient }>): AuthzPostgresRepositories {
@@ -41,6 +42,7 @@ export class PostgresAuthzRepositories {
       listing: EventingAuthzListingRepository.create(prisma),
       migration: PrismaAuthzMigrationRepository.create(prisma),
       ledgerReads: PrismaAuthzLedgerReadRepository.create({ prisma }),
+      sharedReads: PrismaAuthzSharedReadRepository.create({ database: prisma }),
     };
   }
 }

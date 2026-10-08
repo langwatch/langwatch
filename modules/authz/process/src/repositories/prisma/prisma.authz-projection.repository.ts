@@ -39,6 +39,7 @@ const GRANT_FACT_COLUMNS = {
   createdByUserId: true,
   expiresAt: true,
   maxViews: true,
+  condition: true,
   occurredAt: true,
 } as const;
 
@@ -400,7 +401,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         "id", "organizationId", "principalType", "principalId", "roleKey",
         "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
         "resourceKind", "projectId", "createdByUserId", "expiresAt",
-        "maxViews", "occurredAt", "updatedAt"
+        "maxViews", "condition", "occurredAt", "updatedAt"
       ) SELECT
         ${row.id}, ${row.organizationId},
         ${row.principalType}::"GrantPrincipalType", ${row.principalId},
@@ -408,6 +409,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         ${row.scopeType}::"GrantScopeType", ${row.scopeId}, ${row.token},
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
         ${row.createdByUserId}, ${row.expiresAt ? toDate(row.expiresAt) : null}, ${row.maxViews},
+        ${row.condition === undefined ? null : JSON.stringify(row.condition)}::jsonb,
         ${toDate(row.occurredAt)}, NOW()
       WHERE (
         ${stamp}::text IS NULL
@@ -445,6 +447,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         "createdByUserId" = EXCLUDED."createdByUserId",
         "expiresAt"       = EXCLUDED."expiresAt",
         "maxViews"        = EXCLUDED."maxViews",
+        "condition"       = EXCLUDED."condition",
         "occurredAt"      = EXCLUDED."occurredAt",
         "updatedAt"       = NOW()
       WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"

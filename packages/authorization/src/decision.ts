@@ -48,3 +48,10 @@ export const authzGetProjectAnyDecisionInputSchema = z
   })
   .strict();
 export type AuthzGetProjectAnyDecisionInput = z.infer<typeof authzGetProjectAnyDecisionInputSchema>;
+
+/**
+ * ADR-175: the store resources a shared grant's window may name. One list for the ledger's
+ * stored condition and the read proof, so neither can name a store the other lacks.
+ */
+export const AUTHORIZATION_CONDITION_TYPES = ["trace", "span", "log"] as const;
+export type AuthorizationConditionType = (typeof AUTHORIZATION_CONDITION_TYPES)[number];

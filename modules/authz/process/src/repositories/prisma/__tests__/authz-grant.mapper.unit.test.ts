@@ -6,7 +6,9 @@ import {
   type CompatBindingRowShape,
   compatShareLinkFromGrantFact,
   type CompatShareLinkRowShape,
+  grantConditionFieldFromDb,
   grantFactToRow,
+  grantRowFromStored,
   grantRowToFact,
   roleFactToRow,
   roleRowToFact,
@@ -117,6 +119,70 @@ describe("grant row mapping", () => {
       });
       expect(row.principalType).toBe("API_KEY");
       expect(grantRowToFact(row).principal.type).toBe("apiKey");
+    });
+  });
+});
+
+describe("shared grant condition (ADR-175)", () => {
+  const sharedFact = (): GrantFact =>
+    fact({
+      grantId: "grant_shared_1",
+      principal: { type: "project", id: "proj_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "proj_member" },
+      source: "grants-service",
+      condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+    });
+
+  /** The row as Postgres hands it back, with the JSONB column untyped. */
+  const stored = (condition: unknown) => {
+    const row = grantFactToRow({ grant: sharedFact(), organizationId: ORG });
+    return {
+      ...row,
+      condition,
+      expiresAt: null,
+      occurredAt: new Date(row.occurredAt.epochMilliseconds),
+    };
+  };
+
+  describe("when a shared fact is projected and read back", () => {
+    it("carries the condition through the row unchanged", () => {
+      const row = grantFactToRow({ grant: sharedFact(), organizationId: ORG });
+      expect(row.condition).toEqual({ type: "trace", from: "2026-10-01T00:00:00.000Z" });
+      expect(grantRowToFact(row)).toEqual(sharedFact());
+      expect(grantRowToFact(grantRowFromStored(stored(row.condition)))).toEqual(sharedFact());
+    });
+  });
+
+  describe("when an own fact is projected", () => {
+    it("leaves the condition absent and reads back without one", () => {
+      const row = grantFactToRow({ grant: fact(), organizationId: ORG });
+      expect(row).not.toHaveProperty("condition");
+      expect(grantRowToFact(row)).not.toHaveProperty("condition");
+      expect(grantRowFromStored(stored(null))).not.toHaveProperty("condition");
+    });
+  });
+
+  describe("when the stored column does not parse as a condition", () => {
+    it("treats it as no condition rather than widening the window", () => {
+      for (const value of [
+        null,
+        "trace",
+        [],
+        { type: "metric" },
+        { type: "trace", from: 42 },
+        { type: "trace", where: { eq: 1 } },
+        // Strings the event wire would refuse: not ISO instants.
+        { type: "trace", from: "yesterday" },
+        { type: "trace", until: "2026-13-45" },
+        { type: "trace", from: "1760000000000" },
+      ]) {
+        expect(grantConditionFieldFromDb(value)).toEqual({});
+        expect(grantRowFromStored(stored(value))).not.toHaveProperty("condition");
+      }
+      expect(grantConditionFieldFromDb({ type: "span", until: "2026-12-31T00:00:00Z" })).toEqual({
+        condition: { type: "span", until: "2026-12-31T00:00:00Z" },
+      });
     });
   });
 });

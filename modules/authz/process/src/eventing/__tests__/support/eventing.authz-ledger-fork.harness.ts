@@ -11,6 +11,7 @@ import {
   PrismaAuthzMembershipStampRepository,
 } from "../../../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../../../repositories/prisma/prisma.authz-revocation.repository.ts";
+import { PrismaAuthzSharedReadRepository } from "../../../repositories/prisma/prisma.authz-shared-read.repository.ts";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
@@ -81,6 +82,9 @@ export function harness({
       // absent property.
       count: vi.fn().mockResolvedValue(0),
     },
+    // ADR-175: the shared-read writer asks which organization each project sits in. Empty by
+    // default; a test seeds the lineage it is about.
+    project: { findUnique: vi.fn().mockResolvedValue(null) },
   };
   const database = prismaDouble(db);
   const reads = PrismaAuthzLedgerReadRepository.create({ prisma: database });
@@ -105,6 +109,8 @@ export function harness({
     epoch,
     revocation,
     membershipStamps,
+    sharedReads: PrismaAuthzSharedReadRepository.create({ database }),
+    lineage,
     now: () => 1_700_000_000_000,
     newCommandId: () => "authzcmd_test",
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
