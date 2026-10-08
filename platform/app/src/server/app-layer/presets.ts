@@ -1794,6 +1794,7 @@ export function initializeDefaultApp(options?: {
     // service forwards to the worker (ADR-065).
     resolveModel: ({ projectId }) =>
       getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
+    projectKinds: projectKindReaderFor(prisma),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
     // end the live stream (ADR-078). Null without Redis, like the stores below.
@@ -2710,6 +2711,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         resolveModel: async () => {
           throw new Error("no model provider in test app");
         },
+        projectKinds: projectKindReaderFor(testPrisma),
         worker: null,
         tokenBuffer: null,
         reservePermit: async () => ({

@@ -378,6 +378,14 @@ Feature: An aggregate project reads its member projects
     And the same calls on the member are not refused
     And ana can still edit the aggregate's rule, rename it and archive it
 
+  @unit
+  Scenario: Langy refuses to start on an aggregate with the read-only refusal
+    Given an aggregate project, which has no Langy model and accepts no key
+    When ana starts a Langy turn on it, from the panel, the API or a connected folder
+    Then it is refused as read only, titled "Data can't be added to this project"
+    And no conversation is written, no model is resolved and no key is minted
+    And opening the Langy panel on it starts no worker and writes nothing
+
   @integration
   Scenario: Opening an aggregate page never writes a default row under it
     Given an aggregate project and one of its members
