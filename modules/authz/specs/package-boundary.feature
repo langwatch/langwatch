@@ -14,7 +14,8 @@ Feature: AuthZ package boundary
   @unit @architecture @typecheck
   Scenario: AuthZ has one versioned feature root
     Given the AuthZ feature declares layoutVersion 0
-    Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and service capabilities
+    Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and the AuthzApi capability
+    And the contract declares no abstract AuthzService for a caller to type against
     And @langwatch/authz-process contains its concrete services, repositories, adapters, projections and migration
     And packages/authz and packages/authz-server do not exist
     And no compatibility package or forwarding export preserves the old package name

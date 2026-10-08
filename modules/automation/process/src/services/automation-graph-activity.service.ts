@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type {
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
@@ -33,7 +33,7 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
     persistence: AutomationGraphDelivery;
     clock: AutomationClock;
     projects: AutomationProjectDirectory;
-    analytics: AnalyticsService;
+    analytics: Pick<AnalyticsApi, "getTimeseries">;
     /** The process's outbound transports: mail, Slack, webhook. */
     delivery: AutomationNotificationDelivery;
     webhooks: AutomationWebhookProvider;

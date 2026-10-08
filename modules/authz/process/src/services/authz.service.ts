@@ -18,7 +18,6 @@ import {
 } from "@langwatch/authorization";
 import {
   AuthzEngine,
-  AuthzService as AuthzServiceContract,
   type ApiKeyPermissionCheck,
   type ApiKeyProjectDecision,
   type AuthzAccessBinding,
@@ -128,7 +127,7 @@ export type AuthzServiceOptions = {
 
 const rolePermissionListSchema = z.array(z.string());
 
-export class AuthzService extends AuthzServiceContract {
+export class AuthzService {
   static create(options: AuthzServiceOptions): AuthzService {
     const scopeLineage = AuthzScopeLineageService.create({
       repository: options.repository,
@@ -178,7 +177,6 @@ export class AuthzService extends AuthzServiceContract {
     scopeLineage: AuthzScopeLineageService;
     options: AuthzServiceOptions;
   }) {
-    super();
     this.collector = collector;
     this.bindingReader = bindingReader;
     this.scopeLineage = scopeLineage;
@@ -266,6 +264,22 @@ export class AuthzService extends AuthzServiceContract {
       id: authorizedScope.id,
       permission,
     });
+  }
+
+  /** The only minter of a witness; the contract publishes the type and no factory. */
+  private mintAuthorizationWitness<
+    Tier extends DeclaredScopeTier,
+    Permission extends AuthzPermission,
+  >({
+    tier,
+    id,
+    permission,
+  }: {
+    tier: Tier;
+    id: string;
+    permission: Permission;
+  }): Authorized<Tier, Permission> {
+    return { permission, scope: { tier, id } } as Authorized<Tier, Permission>;
   }
 
   /** The caller's full effective permission set at a scope; see AuthzDecisionService. */

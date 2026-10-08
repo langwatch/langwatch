@@ -28,7 +28,6 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * CLI without knowing which it is serving.
  */
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
@@ -426,7 +425,7 @@ export interface GovernanceAppDependencies {
    * because the one question this feature asks it — may the caller see somebody
    * else's personal keys — is a plain decision at the organization scope.
    */
-  permissions: Pick<AuthzService, "getDecision">;
+  permissions: Pick<AuthzApi, "getDecision">;
 }
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */

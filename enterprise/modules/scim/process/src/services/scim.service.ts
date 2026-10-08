@@ -11,7 +11,6 @@ import {
   type ScimRequestLogQuery,
   type ScimRequestRecord,
   type ScimUser,
-  ScimService as ScimServiceContract,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
@@ -41,7 +40,7 @@ import { ScimTokenService } from "./scim-token.service.ts";
  * SCIM takes the dependencies it passes down, not the whole services they came from:
  * `ScimCostCenterFacts` is the one recorder the leaf cost-center service writes through.
  */
-export class ScimService extends ScimServiceContract {
+export class ScimService {
   private readonly repository: ScimRepository;
   private readonly userOperations: ScimProvisioningService;
   private readonly groups: ScimDirectoryService;
@@ -75,7 +74,6 @@ export class ScimService extends ScimServiceContract {
     previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
   }) {
-    super();
     this.repository = prisma;
     this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create({ repository: prisma, connections });

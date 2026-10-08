@@ -9,7 +9,6 @@ export {
   type PreconditionFieldMatcher,
   type PreconditionTraceData,
 } from "./analytics.precondition-matchers.ts";
-export * from "./analytics.service.ts";
 export * from "./analytics.api.ts";
 export * from "./analytics.trpc.ts";
 export * from "./analytics.input-schemas.ts";

@@ -1,4 +1,4 @@
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -44,7 +44,7 @@ function service({
   const findSharedProjectSlugs = vi.fn(async ({ memberUserId }: { memberUserId?: string }) =>
     memberUserId === undefined ? orgSlugs : memberSlugs,
   );
-  const permissions: Pick<AuthzService, "getDecision"> = {
+  const permissions: Pick<AuthzApi, "getDecision"> = {
     getDecision: async () => ({ permitted: manages, organizationRole: null }),
   };
   return {

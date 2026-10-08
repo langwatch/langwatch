@@ -1,4 +1,4 @@
-import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ModelCostNotFoundError,
   type ModelCost,
@@ -166,7 +166,7 @@ class ConnectionRateLimiter extends ModelProviderConnectionRateLimiter {
     return Promise.resolve();
   }
 }
-class Authorization extends AuthzService {
+class Authorization {
   canWriteResult = true;
   listApiKeyBindings(): Promise<never> {
     return this.notUsed();

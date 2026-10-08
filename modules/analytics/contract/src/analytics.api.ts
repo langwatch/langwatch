@@ -26,6 +26,7 @@ import type {
   AnalyticsMetricSource,
   AnalyticsReadInput,
   AnalyticsTimeseriesInput,
+  AnalyticsTimeseriesReadOptions,
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "./analytics.timeseries.ts";
@@ -65,7 +66,7 @@ export interface DashboardWidgetDefinitionInput {
 export interface AnalyticsApi {
   getTimeseries(
     input: AnalyticsTimeseriesInput,
-    options?: { readonly maxResultRows?: number },
+    options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult>;
   getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
   getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
