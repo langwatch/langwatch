@@ -121,6 +121,7 @@ function harness(
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        findTraceCosts: async () => [],
       },
       read: read as TraceLegacyRead,
       spans: spans as TracesSpanReader,

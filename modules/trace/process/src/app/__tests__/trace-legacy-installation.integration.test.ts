@@ -87,6 +87,7 @@ function bootTraceApp(options: {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        findTraceCosts: async () => [],
       },
       read,
       spans: {} as TracesSpanReader,

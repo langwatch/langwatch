@@ -56,6 +56,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
       existence: {
         findExistingTraceIds: async ({ traceIds }) => [...traceIds],
         countUsage: async () => ({ traces: 0, spans: 0 }),
+        findTraceCosts: async () => [],
       },
       read: read as TraceLegacyRead,
       spans: {} as TracesSpanReader,
@@ -68,7 +69,6 @@ function harness(tier: "free" | "paid" | "enterprise") {
       editOverlay: {} as TraceEditOverlayStore,
       changeTraceName: async () => undefined,
     },
-    topics: {} as never,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no read in this suite subscribes");
