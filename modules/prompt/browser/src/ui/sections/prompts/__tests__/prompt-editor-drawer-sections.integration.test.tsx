@@ -29,11 +29,9 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/browser-host/upgrade-modal-store", () => ({
-  useUpgradeModalStore: (selector?: (state: { open: () => void }) => unknown) => {
-    const state = { open: vi.fn() };
-    return typeof selector === "function" ? selector(state) : state;
-  },
+vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLentHooks: () => ({ openLiteMemberRestriction: vi.fn() }),
 }));
 
 vi.mock("../../../../behavior/use-model-providers-settings.ts", () => ({

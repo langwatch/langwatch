@@ -412,17 +412,6 @@ export function createOrgMock() {
   };
 }
 
-export function createUpgradeModalMock() {
-  return {
-    useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) => {
-      if (typeof selector === "function") {
-        return selector({ open: mockOpenUpgradeModal });
-      }
-      return { open: mockOpenUpgradeModal };
-    },
-  };
-}
-
 export function createLicenseEnforcementMock() {
   return {
     useLicenseEnforcement: () => ({

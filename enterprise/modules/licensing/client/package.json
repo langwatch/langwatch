@@ -19,6 +19,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/module": "workspace:*"
   },
   "devDependencies": {

@@ -96,12 +96,11 @@ const renderSubscriptionPage = () => {
 // ---------------------------------------------------------------------------
 // vi.mock declarations (hoisted — must be at module top-level)
 // ---------------------------------------------------------------------------
-vi.mock("@langwatch/browser-host/upgrade-modal-store", async () => {
+vi.mock("@langwatch/browser-host/lent", async (importOriginal) => {
   const setup = await import("./subscription-test-setup.ts");
   return {
-    useUpgradeModalStore: (
-      selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
-    ) => selector({ openSeats: setup.mockOpenSeats }),
+    ...(await importOriginal<object>()),
+    useLentHooks: () => ({ openSeats: setup.mockOpenSeats }),
   };
 });
 

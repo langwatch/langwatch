@@ -5,7 +5,6 @@
  * @see specs/licensing/enforcement-members.feature
  */
 import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,6 +12,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOrganizationHost } from "../../testing.tsx";
 import { useLicenseEnforcement } from "../use-license-enforcement.ts";
+
+const { openUpgradeModal, lent } = vi.hoisted(() => ({
+  openUpgradeModal: vi.fn(),
+  lent: { current: true },
+}));
+
+vi.mock("@langwatch/browser-host/lent", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLentHooks: () => (lent.current ? { open: openUpgradeModal } : undefined),
+}));
 
 vi.mock("../organization-api.ts", () => {
   const answers: Record<string, unknown> = {
@@ -58,7 +67,8 @@ function InviteAnother() {
 describe("license enforcement", () => {
   afterEach(() => {
     cleanup();
-    useUpgradeModalStore.getState().close();
+    openUpgradeModal.mockClear();
+    lent.current = true;
   });
 
   describe("when the seat limit is already reached", () => {
@@ -69,6 +79,7 @@ describe("license enforcement", () => {
 
       await userEvent.click(screen.getByText("Invite another"));
 
+      expect(openUpgradeModal).toHaveBeenCalledWith("members", 5, 5);
       expect(analytics.tracked).toEqual([
         {
           boundary: "organization",
@@ -77,6 +88,18 @@ describe("license enforcement", () => {
           attributes: { mode: "limit", limitType: "members", current: 5, max: 5 },
         },
       ]);
+    });
+  });
+
+  describe("when no module lends the upgrade modal", () => {
+    /** @scenario A screen opens nothing while no module lends the upgrade modal */
+    it("does nothing and the screen still renders", async () => {
+      lent.current = false;
+      renderWithOrganizationHost(<InviteAnother />, void 0, {});
+
+      await userEvent.click(screen.getByText("Invite another"));
+
+      expect(openUpgradeModal).not.toHaveBeenCalled();
     });
   });
 });

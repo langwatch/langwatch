@@ -1,7 +1,8 @@
 // The seat-quote modal is a shared zustand singleton: opening it here and
 // mounting it in the chrome layout is one modal, not a copy.
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { useLentHooks } from "@langwatch/browser-host/lent";
 import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
+import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 
 import { billingApi } from "../../behavior/billing-api.ts";
@@ -101,7 +102,7 @@ export function useSubscriptionActions({
   activePlanType?: string;
 }) {
   const host = useBillingHost();
-  const openSeats = useUpgradeModalStore((s) => s.openSeats);
+  const upgradeModal = useLentHooks(UpgradeModalToken);
 
   const createSubscription = billingApi.subscription.create.useMutation();
   const upgradeWithInvites = billingApi.subscription.upgradeWithInvites.useMutation();
@@ -141,7 +142,7 @@ export function useSubscriptionActions({
 
     const updateTotalMembers = totalFullMembers;
 
-    openSeats({
+    upgradeModal?.openSeats({
       organizationId,
       currentSeats: currentMaxMembers ?? totalFullMembers,
       newSeats: updateTotalMembers,

@@ -3894,6 +3894,9 @@ importers:
 
   enterprise/modules/licensing/client:
     dependencies:
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
@@ -13101,6 +13104,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-licensing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/client
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -16678,9 +16684,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/licensing/contract
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../modules/feature-flag/contract

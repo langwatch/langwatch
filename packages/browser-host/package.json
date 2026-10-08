@@ -118,10 +118,6 @@
       "types": "./dist/global-store.d.ts",
       "default": "./src/global-store.ts"
     },
-    "./upgrade-modal-store": {
-      "types": "./dist/upgrade-modal-store.d.ts",
-      "default": "./src/upgrade-modal-store.ts"
-    },
     "./use-organization-team-project": {
       "types": "./dist/use-organization-team-project.d.ts",
       "default": "./src/use-organization-team-project.ts"
@@ -208,7 +204,6 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",

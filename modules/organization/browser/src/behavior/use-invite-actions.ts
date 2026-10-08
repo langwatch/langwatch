@@ -1,7 +1,8 @@
 // The seat-quote modal is `@langwatch/workflow-browser`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
+import { useLentHooks } from "@langwatch/browser-host/lent";
+import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
 import type { SubmitHandler } from "react-hook-form";
 
 import type { MembersForm } from "../model/member-invite-form.ts";
@@ -135,7 +136,7 @@ export function useInviteActions({
   const showErrorToast = useShowErrorToast();
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
-  const openSeats = useUpgradeModalStore((s) => s.openSeats);
+  const upgradeModal = useLentHooks(UpgradeModalToken);
   const analytics = useUiAnalytics();
   const queryClient = api.useUtils();
 
@@ -204,7 +205,7 @@ export function useInviteActions({
       name: "upgrade_modal",
       attributes: { mode: "seats", current: currentSeats, max: newSeats },
     });
-    openSeats({
+    upgradeModal?.openSeats({
       organizationId,
       currentSeats,
       newSeats,

@@ -4,14 +4,13 @@
  * `isHandledBy*` and stays quiet. specs/licensing/license-failure-modal.feature.
  */
 
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
-
 import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
   markAsHandledByLicenseHandler,
   markAsHandledByLiteMemberHandler,
 } from "../../../model/license-error.ts";
+import { useUpgradeModalStore } from "../../../model/upgrade-modal-store.ts";
 
 /**
  * Reports one failed call as a licence refusal. Answers whether it reported it,
