@@ -6,10 +6,7 @@
  */
 import { z } from "zod";
 
-import {
-  langWatchQLGateSchema,
-  langWatchQLSchema,
-} from "./analytics.lwql.ts";
+import { langWatchQLGateSchema, langWatchQLSchema } from "./analytics.lwql.ts";
 
 /**
  * The document's shape version. Bumped when a consumer would have to change to

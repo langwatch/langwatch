@@ -4,10 +4,7 @@
  * one `lw:init` over `postMessage` with a transferred `MessagePort`; the rest travels the port.
  */
 
-import type {
-  LangWatchQLDiagnostic,
-  LangWatchQLStatistics,
-} from "./analytics.lwql.ts";
+import type { LangWatchQLDiagnostic, LangWatchQLStatistics } from "../lwql/analytics.lwql.ts";
 
 export type ChartFrameTheme = "light" | "dark";
 

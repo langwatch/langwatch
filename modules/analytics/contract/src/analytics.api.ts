@@ -22,7 +22,7 @@ import type {
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
-} from "./dashboard-widget-definition.ts";
+} from "./features/dashboard-widget/dashboard-widget-definition.ts";
 import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
@@ -33,13 +33,13 @@ import type {
   LangWatchQLSchema,
   LangWatchQLTextHydrationInput,
   LangWatchQLValidationInput,
-} from "./analytics.lwql.ts";
+} from "./features/lwql/analytics.lwql.ts";
 import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,
   LangWatchQLJudgementCall,
-} from "./langwatch-ql-app-functions.ts";
-import type { QueryReference } from "./query-reference.ts";
+} from "./features/lwql/langwatch-ql-app-functions.ts";
+import type { QueryReference } from "./features/lwql/query-reference.ts";
 
 /** A persisted custom-chart-playground widget, parsed from its CustomGraph row. */
 export interface DashboardWidget {

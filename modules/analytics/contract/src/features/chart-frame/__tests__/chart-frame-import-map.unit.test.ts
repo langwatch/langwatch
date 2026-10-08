@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildChartsLibScript } from "../chart-frame-charts-lib-source.ts";
+import { buildChartsLibScript } from "../../../chart-frame-charts-lib-source.ts";
 import {
   buildChartFrameImportMap,
   buildGlobalModuleSource,

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { langWatchQLSchema, lwqlSchemaSchema, queryReferenceLangWatchQLSchema } from "../index.ts";
+import {
+  langWatchQLSchema,
+  lwqlSchemaSchema,
+  queryReferenceLangWatchQLSchema,
+} from "../../../index.ts";
 
 const VIEW = {
   name: "analytics.traces",

@@ -5,8 +5,8 @@
  * @see specs/analytics/custom-chart-sandbox-imports.feature
  */
 
+import { buildChartsLibScript } from "../../chart-frame-charts-lib-source.ts";
 import { buildAuthorRuntimeScript } from "./chart-frame-author-runtime.ts";
-import { buildChartsLibScript } from "./chart-frame-charts-lib-source.ts";
 import { buildChartFrameImportMap } from "./chart-frame-import-map.ts";
 import { buildShimScript } from "./chart-frame-shim-source.ts";
 

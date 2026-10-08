@@ -46,9 +46,9 @@ describe("the LangWatchQL time-window vocabulary", () => {
     it("recognises each form it is meant to catch", () => {
       const samples: Record<string, string> = {
         "a static import": 'import { a } from "@langwatch/trace-process";',
-        "a re-export": 'export { a } from "./a";',
-        "a dynamic import": 'const a = await import("./a");',
-        "a CommonJS require": 'const a = require("./a");',
+        "a re-export": 'export { a } from "../../../__tests__/a";',
+        "a dynamic import": 'const a = await import("../../../__tests__/a");',
+        "a CommonJS require": 'const a = require("../../../__tests__/a");',
       };
 
       for (const [form, pattern] of IMPORT_FORMS) {
@@ -57,7 +57,7 @@ describe("the LangWatchQL time-window vocabulary", () => {
     });
 
     it("reports a sibling contract module, which really does import", () => {
-      const source = read("analytics.api.ts");
+      const source = read("../../analytics.api.ts");
 
       expect(IMPORT_FORMS.some(([, pattern]) => pattern.test(source))).toBe(true);
     });

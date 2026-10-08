@@ -7,10 +7,7 @@ import type {
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "./analytics.timeseries.ts";
-import {
-  langWatchQLQueryResultSchema,
-  langWatchQLSchema,
-} from "./analytics.lwql.ts";
+import { langWatchQLQueryResultSchema, langWatchQLSchema } from "./features/lwql/analytics.lwql.ts";
 
 /** `T[]` unwrapped to `T`; anything else unchanged. */
 type Unpacked<T> = T extends (infer U)[] ? U : T;
