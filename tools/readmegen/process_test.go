@@ -76,3 +76,29 @@ func TestPeriodNamesTheLargestWholeUnit(t *testing.T) {
 		}
 	}
 }
+
+func TestASchemaImportFailureStopsTheRun(t *testing.T) {
+	root := writeFixture(t)
+	data, err := os.ReadFile(filepath.Join("testdata", "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Schemas.Errors = []string{"modules/alpha/contract/src/alpha.trpc.ts: Cannot find module"}
+	broken := filepath.Join(t.TempDir(), "manifest.json")
+	encoded, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(broken, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"--write", "--root", root, "--manifest", broken}, &stdout, &stderr); code != 1 ||
+		!strings.Contains(stderr.String(), "the zod schemas could not be read (1 imports failed") {
+		t.Fatalf("a failed schema import wrote pages without their contracts (exit %d):\n%s", code, stderr.String())
+	}
+}

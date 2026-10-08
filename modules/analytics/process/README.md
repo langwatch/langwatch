@@ -6,7 +6,7 @@ The server half of [analytics](../README.md). Analytics reads: timeseries, feedb
 
 ## Installation
 
-`defineProcessModule("analytics").withRepositories(analyticsRepositories).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).withTransportFacts(…).withEventing(lwqlReconvergenceEventing)`, `src/analytics.module.ts:15`.
+`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).withTransportFacts(…).withEventing(lwqlReconvergenceEventing)`, `src/analytics.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,12 +14,12 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:65`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:66`; nothing else in this package is public.
 
 #### `getTimeseries`
 
 ```typescript
-getTimeseries(input: AnalyticsTimeseriesInput, options?: { readonly maxResultRows?: number }): Promise<AnalyticsTimeseriesResult>;
+getTimeseries(input: AnalyticsTimeseriesInput, options?: AnalyticsTimeseriesReadOptions): Promise<AnalyticsTimeseriesResult>;
 ```
 
 #### `getFeedbacks`
@@ -269,7 +269,11 @@ Answers at `/api/analytics/timeseries`, `/api/v1/analytics/timeseries`; also, un
 
 ```typescript
 type Body = z.infer<typeof analyticsTimeseriesRestBodySchema>; // ../contract/src/analytics.input-schemas.ts:162
-type Response = z.infer<typeof analyticsTimeseriesResponseSchema>; // ../contract/src/analytics.input-schemas.ts:168
+// Response: analyticsTimeseriesResponseSchema, ../contract/src/analytics.input-schemas.ts:168
+interface Response {
+  currentPeriod: Record<string, unknown>[];
+  previousPeriod: Record<string, unknown>[];
+}
 ```
 
 ### `queryRest`
@@ -290,7 +294,16 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-type Body = z.infer<typeof lwqlStatementSchema>; // ../contract/src/analytics-lwql.schemas.ts:96
+// Body: lwqlStatementSchema, ../contract/src/analytics-lwql.schemas.ts:96
+interface Body {
+  sql: string;
+  parameters?: Record<string, string | number | boolean | null>;
+  timeWindow?: {
+    start: string | number | unknown;
+    end: string | number | unknown;
+  };
+  granularitySeconds?: 1 | 60 | 3600;
+}
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:178
 ```
 
@@ -331,6 +344,41 @@ Contract `../contract/src/analytics-lwql.trpc.ts:53`, router `src/transport/anal
 | `analytics.lwql.validate`     | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
 | `analytics.lwql.query`        | mutation | Permission `analytics:view` | `lwqlRunRequestSchema`   | `langWatchQLQueryResultSchema`  |
 
+```typescript
+// analytics.lwql.availability
+// Input: lwqlProjectScopeSchema, ../contract/src/analytics-lwql.trpc.ts:22
+interface Input {
+  projectId: string;
+}
+// Output: langWatchQLAvailabilitySchema, ../contract/src/analytics.lwql.ts:365
+interface Output {
+  available: boolean;
+  reason?: "disabled" | "unprovisioned";
+}
+
+// analytics.lwql.schema
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/analytics-lwql.trpc.ts:22
+type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/analytics.lwql.ts:138
+
+// analytics.lwql.validate
+// Input: lwqlRunRequestSchema, ../contract/src/analytics-lwql.trpc.ts:25
+interface Input {
+  projectId: string;
+  sql: string;
+  parameters?: Record<string, string | number | boolean | null>;
+  timeWindow?: {
+    start: string | number | unknown;
+    end: string | number | unknown;
+  };
+  granularitySeconds?: 1 | 60 | 3600;
+}
+type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/analytics-lwql.trpc.ts:47
+
+// analytics.lwql.query
+type Input = z.infer<typeof lwqlRunRequestSchema>; // ../contract/src/analytics-lwql.trpc.ts:25
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/analytics.lwql.ts:55
+```
+
 ### `analytics`
 
 Contract `../contract/src/analytics.trpc.ts:34`, router `src/transport/analytics.trpc.ts:10`.
@@ -341,6 +389,50 @@ Contract `../contract/src/analytics.trpc.ts:34`, router `src/transport/analytics
 | `analytics.dataForFilter`    | query | Permission `analytics:view` | `analyticsDataForFilterInputSchema` | `analyticsFilterOptionsResultSchema` |
 | `analytics.topUsedDocuments` | query | Permission `cost:view`      | `sharedFiltersInputSchema`          | `analyticsTopDocumentsResultSchema`  |
 | `analytics.feedbacks`        | query | Permission `cost:view`      | `sharedFiltersInputSchema`          | `analyticsFeedbacksResultSchema`     |
+
+```typescript
+// analytics.getTimeseries
+type Input = z.infer<typeof timeseriesInputSchema>; // ../contract/src/analytics.input-schemas.ts:115
+// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:76
+interface Output {
+  previousPeriod: {
+    date: string;
+    [key: string]: number | string | Record<string, Record<string, number>>;
+  }[];
+  currentPeriod: {
+    date: string;
+    [key: string]: number | string | Record<string, Record<string, number>>;
+  }[];
+}
+
+// analytics.dataForFilter
+type Input = z.infer<typeof analyticsDataForFilterInputSchema>; // ../contract/src/analytics.trpc.ts:29
+// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:153
+interface Output {
+  options: {
+    field: string;
+    label: string;
+    count: number;
+  }[];
+}
+
+// analytics.topUsedDocuments
+type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:56
+// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:138
+interface Output {
+  topDocuments: {
+    documentId: string;
+    count: number;
+    traceId: string;
+    content?: string;
+  }[];
+  totalUniqueDocuments: number;
+}
+
+// analytics.feedbacks
+type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:56
+type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:125
+```
 
 ## Sockets
 
@@ -361,8 +453,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:50`.
 
 | Kind   | Leaf                          | Environment variable                | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`          | `src/app/analytics.app.ts:337`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`     | `src/app/analytics.app.ts:338`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`          | `src/app/analytics.app.ts:332`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`     | `src/app/analytics.app.ts:333`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`               | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`              | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                     | `../contract/src/analytics.config.ts:13` |

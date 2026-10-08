@@ -6,7 +6,7 @@ The server half of [langy](../README.md). Langy, the in-product assistant: conve
 
 ## Installation
 
-`defineProcessModule("langy").withRepositories(langyRepositories).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).withTransportFacts(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:25`.
+`defineProcessModule("langy").withRepositories(langyRepositories).withChannels(langyChannels).withApi(LangyModule).withTransports(langyTurnsRest, langyUiActionsRest, langyInternalRest, langyLocalRest, langyLocalControlRest, langyLocalControlConnectRest, ...langyLocalControlDatedRests, ...langyLocalControlConnectDatedRests, …, setupSkillsTrpcTransport, langyTrpcTransport, langyEgressTrpcTransport).withTransportFacts(…).withEventing(langyConversationEventing).withEventing(langyGuidedOnboardingEventing).withEventing(langyMaintenanceEventing)`, `src/langy.module.ts:28`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -560,9 +560,15 @@ Authenticated: The deployment's Langy bearer authenticates its control plane. Cr
 Answers at `/api/internal/langy/turn/:turnId/result`.
 
 ```typescript
-type Params = z.infer<typeof langyInternalTurnParamsSchema>; // ../contract/src/langy-rest.schemas.ts:50
+// Params: langyInternalTurnParamsSchema, ../contract/src/langy-rest.schemas.ts:50
+interface Params {
+  turnId: string;
+}
 type Body = z.infer<typeof langyTurnResultSchema>; // ../contract/src/langy-rest.schemas.ts:34
-type Response = z.infer<typeof langyInternalAcceptedSchema>; // ../contract/src/langy-rest.schemas.ts:53
+// Response: langyInternalAcceptedSchema, ../contract/src/langy-rest.schemas.ts:53
+interface Response {
+  status: "accepted";
+}
 ```
 
 #### `POST /api/internal/langy/credentials/revoke` · `revokeWorkerSessionKey`
@@ -572,8 +578,15 @@ Authenticated: The deployment's Langy bearer authenticates its control plane. Cr
 Answers at `/api/internal/langy/credentials/revoke`.
 
 ```typescript
-type Body = z.infer<typeof langyRevokeCredentialsSchema>; // ../contract/src/langy-rest.schemas.ts:63
-type Response = z.infer<typeof langyInternalRevokedSchema>; // ../contract/src/langy-rest.schemas.ts:56
+// Body: langyRevokeCredentialsSchema, ../contract/src/langy-rest.schemas.ts:63
+interface Body {
+  apiKeyId: string;
+  projectId: string;
+}
+// Response: langyInternalRevokedSchema, ../contract/src/langy-rest.schemas.ts:56
+interface Response {
+  outcome: "revoked" | "already_revoked" | "not_found";
+}
 ```
 
 #### `POST /api/internal/langy/relay/frames` · `streamRelayFrames`
@@ -584,7 +597,13 @@ Answers at `/api/internal/langy/relay/frames`.
 
 ```typescript
 // Rawbody: "stream" (inline, src/transport/langy-internal.rest.ts:44)
-type Response = z.infer<typeof langyRelayTallySchema>; // ../contract/src/langy-rest.schemas.ts:197
+// Response: langyRelayTallySchema, ../contract/src/langy-rest.schemas.ts:197
+interface Response {
+  applied: number;
+  duplicate: number;
+  rejected: number;
+  terminal: boolean;
+}
 ```
 
 ### `localControlConnectRest`
@@ -603,7 +622,8 @@ Authenticated: the session-key door names the key's holder. Credential `session_
 ```typescript
 type Body = z.infer<typeof registerFrameSchema>; // ../contract/src/langy.local-control-protocol.ts:158
 // Headers: z.object({ authorization: z.string() }) (inline, src/transport/langy-local-control-connect.rest.ts:66)
-// Response: "protocol" (inline, src/transport/langy-local-control-connect.rest.ts:67)
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:67
+type Response = unknown;
 ```
 
 #### `GET ≈ `/api/langy/control${mount}/connect/poll`` · `langyControlConnectPoll`
@@ -611,9 +631,13 @@ type Body = z.infer<typeof registerFrameSchema>; // ../contract/src/langy.local-
 Public: addressed by the pod-local instance token register handed out, as on main; the session key is checked once, at register. Declared at `src/transport/langy-local-control-connect.rest.ts:95`.
 
 ```typescript
-type Query = z.infer<typeof langyControlPollQuerySchema>; // ../contract/src/langy-rest.schemas.ts:145
+// Query: langyControlPollQuerySchema, ../contract/src/langy-rest.schemas.ts:145
+interface Query {
+  inFlight?: string;
+}
 type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:53
-// Response: "protocol" (inline, src/transport/langy-local-control-connect.rest.ts:99)
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:99
+type Response = unknown;
 ```
 
 #### `POST ≈ `/api/langy/control${mount}/connect/frames`` · `langyControlConnectFrames`
@@ -623,7 +647,8 @@ Public: addressed by the pod-local instance token register handed out, as on mai
 ```typescript
 type Body = z.infer<typeof langyControlFramesBodySchema>; // ../contract/src/langy-rest.schemas.ts:133
 type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-local-control-connect.rest.ts:53
-// Response: "protocol" (inline, src/transport/langy-local-control-connect.rest.ts:130)
+// Response: inline, src/transport/langy-local-control-connect.rest.ts:130
+type Response = unknown;
 ```
 
 ### `localControlRest`
@@ -640,7 +665,19 @@ type Headers = z.infer<typeof instanceTokenHeaders>; // src/transport/langy-loca
 Permission `langy:view`. Declared at `src/transport/langy-local-control.rest.ts:40`.
 
 ```typescript
-type Response = z.infer<typeof listControlRequestsResponseSchema>; // ../contract/src/langy.local-control-http.ts:29
+// Response: listControlRequestsResponseSchema, ../contract/src/langy.local-control-http.ts:29
+interface Response {
+  requests: {
+    id: string;
+    conversationId: string;
+    conversationTitle: string;
+    conversationUrl: string;
+    projectId: string;
+    projectName: string;
+    createdAt: string;
+    expiresAt: string;
+  }[];
+}
 ```
 
 #### `POST ≈ `/api/langy/control${mount}/requests/:requestId/approve`` · `approveLangyControlRequest`
@@ -648,9 +685,21 @@ type Response = z.infer<typeof listControlRequestsResponseSchema>; // ../contrac
 Permission `langy:create`. Declared at `src/transport/langy-local-control.rest.ts:53`.
 
 ```typescript
-type Params = z.infer<typeof langyControlIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:105
+// Params: langyControlIdParamsSchema, ../contract/src/langy-rest.schemas.ts:105
+interface Params {
+  requestId: string;
+}
 type Body = z.infer<typeof approveControlRequestBodySchema>; // ../contract/src/langy.local-control-http.ts:38
-type Response = z.infer<typeof approveControlRequestResponseSchema>; // ../contract/src/langy.local-control-http.ts:42
+// Response: approveControlRequestResponseSchema, ../contract/src/langy.local-control-http.ts:42
+interface Response {
+  sessionKey: string;
+  endpoint: string;
+  conversation: {
+    id: string;
+    title: string;
+    url: string;
+  };
+}
 ```
 
 #### `POST ≈ `/api/langy/control${mount}/requests/:requestId/cancel`` · `cancelLangyControlRequest`
@@ -659,8 +708,13 @@ Permission `langy:create`. Declared at `src/transport/langy-local-control.rest.t
 
 ```typescript
 type Params = z.infer<typeof langyControlIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:105
-type Body = z.infer<typeof controlActionBodySchema>; // ../contract/src/langy.local-control-http.ts:34
-type Response = z.infer<typeof langyControlCancelResultSchema>; // ../contract/src/langy-rest.schemas.ts:109
+// Body: controlActionBodySchema, ../contract/src/langy.local-control-http.ts:34
+type Body = Record<string, unknown>;
+// Response: langyControlCancelResultSchema, ../contract/src/langy-rest.schemas.ts:109
+interface Response {
+  id: string;
+  cancelled: true;
+}
 ```
 
 ### `langyLocalRest`
@@ -681,7 +735,10 @@ Authenticated: the service bridges the session key to its owner and proves the c
 Answers at `/api/langy/local/workspace`.
 
 ```typescript
-type Query = z.infer<typeof langyLocalWorkspaceQuerySchema>; // ../contract/src/langy-rest.schemas.ts:87
+// Query: langyLocalWorkspaceQuerySchema, ../contract/src/langy-rest.schemas.ts:87
+interface Query {
+  conversationId?: string;
+}
 type Response = z.infer<typeof workspaceStatusSchema>; // ../contract/src/langy.local-control-http.ts:55
 ```
 
@@ -694,7 +751,10 @@ Authenticated: the service bridges the session key to its owner and proves the c
 Answers at `/api/langy/local/requests`.
 
 ```typescript
-type Body = z.infer<typeof langyLocalCreateRequestBodySchema>; // ../contract/src/langy-rest.schemas.ts:92
+// Body: langyLocalCreateRequestBodySchema, ../contract/src/langy-rest.schemas.ts:92
+interface Body {
+  conversationId: string;
+}
 type Response = z.infer<typeof createControlRequestResponseSchema>; // ../contract/src/langy.local-control-http.ts:69
 ```
 
@@ -708,7 +768,10 @@ Answers at `/api/langy/local/calls`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/langy-local.rest.ts:102)
-type Response = z.infer<typeof startCallResponseSchema>; // ../contract/src/langy.local-control-http.ts:79
+// Response: startCallResponseSchema, ../contract/src/langy.local-control-http.ts:79
+interface Response {
+  callId: string;
+}
 ```
 
 #### `GET /api/langy/local/calls/:callId` · `langyLocalReadCall`
@@ -720,7 +783,10 @@ Authenticated: the service bridges the session key to its owner and proves the c
 Answers at `/api/langy/local/calls/:callId`.
 
 ```typescript
-type Params = z.infer<typeof langyLocalCallIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:81
+// Params: langyLocalCallIdParamsSchema, ../contract/src/langy-rest.schemas.ts:81
+interface Params {
+  callId: string;
+}
 type Response = z.infer<typeof pollCallResponseSchema>; // ../contract/src/langy.local-control-http.ts:94
 ```
 
@@ -735,7 +801,11 @@ Answers at `/api/langy/local/calls/:callId/cancel`.
 ```typescript
 type Params = z.infer<typeof langyLocalCallIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:81
 type Body = z.infer<typeof controlActionBodySchema>; // ../contract/src/langy.local-control-http.ts:34
-type Response = z.infer<typeof cancelCallResponseSchema>; // ../contract/src/langy.local-control-http.ts:84
+// Response: cancelCallResponseSchema, ../contract/src/langy.local-control-http.ts:84
+interface Response {
+  callId: string;
+  cancelled: true;
+}
 ```
 
 #### `POST /api/langy/waits` · `langyLocalStartWait`
@@ -748,7 +818,10 @@ Answers at `/api/langy/waits`.
 
 ```typescript
 type Body = z.infer<typeof langyLocalStartWaitRequestSchema>; // ../contract/src/langy-rest.schemas.ts:98
-type Response = z.infer<typeof startWaitResponseSchema>; // ../contract/src/langy.local-control-http.ts:128
+// Response: startWaitResponseSchema, ../contract/src/langy.local-control-http.ts:128
+interface Response {
+  waitId: string;
+}
 ```
 
 #### `GET /api/langy/waits/:waitId` · `langyLocalReadWait`
@@ -760,8 +833,20 @@ Authenticated: the service bridges the session key to its owner and proves the c
 Answers at `/api/langy/waits/:waitId`.
 
 ```typescript
-type Params = z.infer<typeof langyLocalWaitIdParamsSchema>; // ../contract/src/langy-rest.schemas.ts:84
-type Response = z.infer<typeof pollWaitResponseSchema>; // ../contract/src/langy.local-control-http.ts:142
+// Params: langyLocalWaitIdParamsSchema, ../contract/src/langy-rest.schemas.ts:84
+interface Params {
+  waitId: string;
+}
+// Response: pollWaitResponseSchema, ../contract/src/langy.local-control-http.ts:142
+interface Response {
+  waitId: string;
+  state: "pending" | "answered" | "expired" | "cancelled";
+  answers?: {
+    question: string;
+    selected: string[];
+    other?: string;
+  }[];
+}
 ```
 
 ### `langyTurnsRest`
@@ -782,8 +867,20 @@ Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:153`.
 Answers at `/api/langy/conversations`, `/api/v1/langy/conversations`.
 
 ```typescript
-type Body = z.infer<typeof startTurnBodySchema>; // src/transport/langy-turns.rest.ts:52
-// Response: "protocol" (inline, src/transport/langy-turns.rest.ts:156)
+// Body: startTurnBodySchema, src/transport/langy-turns.rest.ts:52
+interface Body {
+  messages: {
+    role: "user" | "assistant" | "system";
+    parts?: Record<string, BodySchema0>[];
+    content?: string;
+  }[];
+  idempotencyKey: string;
+  modelOverride?: string;
+  adoptConversationId?: boolean;
+}
+type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
+// Response: inline, src/transport/langy-turns.rest.ts:156
+type Response = unknown;
 ```
 
 #### `POST /api/langy/conversations/:conversationId/messages` · `continueLangyConversationTurn`
@@ -795,9 +892,24 @@ Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:170`.
 Answers at `/api/langy/conversations/:conversationId/messages`, `/api/v1/langy/conversations/:conversationId/messages`.
 
 ```typescript
-type Params = z.infer<typeof langyRestConversationParamsSchema>; // ../contract/src/langy-rest.schemas.ts:168
-type Body = z.infer<typeof langyRestTurnBodySchema>; // ../contract/src/langy-rest.schemas.ts:172
-// Response: "protocol" (inline, src/transport/langy-turns.rest.ts:174)
+// Params: langyRestConversationParamsSchema, ../contract/src/langy-rest.schemas.ts:168
+interface Params {
+  conversationId: string;
+}
+// Body: langyRestTurnBodySchema, ../contract/src/langy-rest.schemas.ts:172
+interface Body {
+  messages: {
+    role: "user" | "assistant" | "system";
+    parts?: Record<string, BodySchema0>[];
+    content?: string;
+  }[];
+  idempotencyKey: string;
+  modelOverride?: string;
+  adoptConversationId?: boolean;
+}
+type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
+// Response: inline, src/transport/langy-turns.rest.ts:174
+type Response = unknown;
 ```
 
 ### `langyUiActionsRest`
@@ -819,7 +931,8 @@ Answers at `/api/langy/ui/actions`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/langy-ui-actions.rest.ts:86)
-// Response: "protocol" (inline, src/transport/langy-ui-actions.rest.ts:88)
+// Response: inline, src/transport/langy-ui-actions.rest.ts:88
+type Response = unknown;
 ```
 
 #### `GET /api/langy/ui/actions` · `langyUiActionsList`
@@ -831,7 +944,8 @@ Deferred scope: the dispatched action's own kind names the permission it require
 Answers at `/api/langy/ui/actions`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/langy-ui-actions.rest.ts:100)
+// Response: inline, src/transport/langy-ui-actions.rest.ts:100
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -870,6 +984,291 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.onConversationUpdate`     | subscription | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyConversationUpdateFrameSchema`  |
 | `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamEntrySchema`              |
 
+```typescript
+// langy.list
+// Input: langyListInputSchema, ../contract/src/langy-trpc.schemas.ts:54
+interface Input {
+  projectId: string;
+  limit?: number;
+  cursor?: {
+    lastActivityAtMs: number | null;
+    id: string;
+  };
+  query?: string;
+}
+type Output = z.infer<typeof langyConversationListPageDtoSchema>; // ../contract/src/langy.dtos.ts:97
+
+// langy.conversationEventsAfter
+// Input: langyEventsAfterInputSchema, ../contract/src/langy-trpc.schemas.ts:61
+interface Input {
+  projectId: string;
+  conversationId: string;
+  after: {
+    acceptedAt: number;
+    eventId: string;
+  };
+}
+type Output = z.infer<typeof langyConversationEventPageDtoSchema>; // ../contract/src/langy.dtos.ts:104
+
+// langy.detail
+// Input: langyPanelConversationInputSchema, ../contract/src/langy-trpc.schemas.ts:49
+interface Input {
+  projectId: string;
+  conversationId: string;
+}
+// Output: inline, ../contract/src/langy.trpc.ts:70
+type Output = {
+  id: string;
+  title: string | null;
+  isShared: boolean;
+  isOwn: boolean;
+  messageCount: number;
+  lastActivityAtMs: number;
+  status: "active" | "running" | "idle" | "failed" | "archived";
+} | null;
+
+// langy.messages
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+type Output = z.infer<typeof langyConversationMessagesDtoSchema>; // ../contract/src/langy.dtos.ts:115
+
+// langy.deleteConversation
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+// Output: langyConversationDeletedSchema, ../contract/src/langy.dtos.ts:152
+interface Output {
+  success: boolean;
+}
+
+// langy.renameConversation
+// Input: langyRenameInputSchema, ../contract/src/langy-trpc.schemas.ts:67
+interface Input {
+  projectId: string;
+  conversationId: string;
+  title: string;
+}
+// Output: langyConversationDetailSchema, ../contract/src/langy.dtos.ts:40
+interface Output {
+  id: string;
+  title: string | null;
+  isShared: boolean;
+  isOwn: boolean;
+  messageCount: number;
+  lastActivityAtMs: number;
+  status: "active" | "running" | "idle" | "failed" | "archived";
+}
+
+// langy.forkConversation
+// Input: langyForkInputSchema, ../contract/src/langy-trpc.schemas.ts:73
+interface Input {
+  projectId: string;
+  conversationId: string;
+}
+type Output = z.infer<typeof langyConversationDetailSchema>; // ../contract/src/langy.dtos.ts:40
+
+// langy.createConversation
+type Input = z.infer<typeof langyPanelCreateConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:93
+// Output: langyTurnStartedSchema, ../contract/src/langy.dtos.ts:155
+interface Output {
+  conversationId: string;
+  turnId: string;
+}
+
+// langy.continueConversation
+type Input = z.infer<typeof langyContinueConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:98
+type Output = z.infer<typeof langyTurnStartedSchema>; // ../contract/src/langy.dtos.ts:155
+
+// langy.stopTurn
+// Input: langyStopTurnPanelInputSchema, ../contract/src/langy-trpc.schemas.ts:103
+interface Input {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+}
+// Output: langyTurnStoppedSchema, ../contract/src/langy.dtos.ts:161
+interface Output {
+  stopped: boolean;
+}
+
+// langy.claimUiAction
+// Input: langyClaimUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:109
+interface Input {
+  projectId: string;
+  conversationId: string;
+  actionId: string;
+}
+// Output: langyUiActionClaimedSchema, ../contract/src/langy.dtos.ts:164
+interface Output {
+  isClaimed: boolean;
+}
+
+// langy.completeUiAction
+// Input: langyCompleteUiActionInputSchema, ../contract/src/langy-trpc.schemas.ts:115
+interface Input {
+  projectId: string;
+  conversationId: string;
+  actionId: string;
+  ok: boolean;
+  result?: unknown;
+  errorCode?: string;
+}
+// Output: langyUiActionCompletedSchema, ../contract/src/langy.dtos.ts:167
+interface Output {
+  isAccepted: boolean;
+}
+
+// langy.answerLocalPermission
+// Input: langyAnswerLocalPermissionInputSchema, ../contract/src/langy-trpc.schemas.ts:124
+interface Input {
+  projectId: string;
+  conversationId: string;
+  waitId: string;
+  decision: "allow_once" | "allow_pattern" | "deny";
+}
+// Output: langyLocalAnsweredSchema, ../contract/src/langy-trpc.schemas.ts:187
+interface Output {
+  answered: true;
+}
+
+// langy.answerQuestion
+// Input: langyAnswerQuestionInputSchema, ../contract/src/langy-trpc.schemas.ts:131
+interface Input {
+  projectId: string;
+  conversationId: string;
+  waitId: string;
+  answers: {
+    question: string;
+    selected: string[];
+    other?: string;
+  }[];
+}
+type Output = z.infer<typeof langyLocalAnsweredSchema>; // ../contract/src/langy-trpc.schemas.ts:187
+
+// langy.setLocalPolicy
+// Input: langySetLocalPolicyInputSchema, ../contract/src/langy-trpc.schemas.ts:147
+interface Input {
+  projectId: string;
+  conversationId: string;
+  skipPermissions: boolean;
+}
+// Output: langyLocalPolicySchema, ../contract/src/langy-trpc.schemas.ts:188
+interface Output {
+  skipPermissions: boolean;
+}
+
+// langy.disconnectLocalWorkspace
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+// Output: langyLocalDisconnectedSchema, ../contract/src/langy-trpc.schemas.ts:189
+interface Output {
+  disconnected: boolean;
+}
+
+// langy.setCodeAccessPreference
+// Input: langySetCodeAccessPreferenceInputSchema, ../contract/src/langy-trpc.schemas.ts:153
+interface Input {
+  projectId: string;
+  preference: "github" | null;
+}
+// Output: langyCodeAccessPreferenceSchema, ../contract/src/langy.local-control-http.ts:178
+interface Output {
+  preference: "github" | null;
+}
+
+// langy.getCodeAccessPreference
+// Input: langyProjectInputSchema, ../contract/src/langy-trpc.schemas.ts:47
+interface Input {
+  projectId: string;
+}
+type Output = z.infer<typeof langyCodeAccessPreferenceSchema>; // ../contract/src/langy.local-control-http.ts:178
+
+// langy.localRecord
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+// Output: langyLocalRecordSchema, ../contract/src/langy.local-control-http.ts:150
+interface Output {
+  waits: {
+    turnId: string;
+    toolCallId: string;
+    [key: string]: unknown;
+  }[];
+  workspaceConnected: boolean;
+}
+
+// langy.getLocalWorkspace
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+// Output: langyLocalWorkspaceStatusSchema, ../contract/src/langy.local-control-http.ts:167
+interface Output {
+  connected: boolean;
+  workspace: Record<string, unknown> | null;
+  skipAllowed: boolean;
+  skipPermissions: boolean;
+  pendingRequest: Record<string, unknown> | null;
+  requestState: "open" | "approved" | "expired" | "declined" | "ended" | "none";
+  codeAccessPreference: "github" | null;
+}
+
+// langy.renewLocalControlRequest
+type Input = z.infer<typeof langyPanelConversationInputSchema>; // ../contract/src/langy-trpc.schemas.ts:49
+// Output: langyControlRequestRenewedSchema, ../contract/src/langy-trpc.schemas.ts:190
+interface Output {
+  expiresAt: string;
+}
+
+// langy.warmWorker
+// Input: langyWarmWorkerInputSchema, ../contract/src/langy-trpc.schemas.ts:158
+interface Input {
+  projectId: string;
+  conversationId?: string;
+  modelOverride?: string;
+}
+// Output: langyWarmedWorkerSchema, ../contract/src/langy.dtos.ts:170
+interface Output {
+  conversationId: string | null;
+  warmed: boolean;
+}
+
+// langy.modelsAllowed
+type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:47
+// Output: langyModelsAllowedSchema, ../contract/src/langy.dtos.ts:176
+interface Output {
+  modelsAllowed: string[] | null;
+}
+
+// langy.recordFeedback
+// Input: langyRecordFeedbackInputSchema, ../contract/src/langy-trpc.schemas.ts:164
+interface Input {
+  projectId: string;
+  conversationId?: string;
+  messageId?: string;
+  traceId?: string;
+  rating: "up" | "down";
+  sentiment?: "frustrated" | "delighted" | "neutral";
+  comment?: string;
+  shareConversationConsent?: boolean;
+}
+
+// langy.feedbackPromptShown
+// Input: langyFeedbackPromptShownInputSchema, ../contract/src/langy-trpc.schemas.ts:176
+interface Input {
+  projectId: string;
+  conversationId: string;
+}
+
+// langy.onConversationUpdate
+type Input = z.infer<typeof langyProjectInputSchema>; // ../contract/src/langy-trpc.schemas.ts:47
+// Output: langyConversationUpdateFrameSchema, ../contract/src/langy.dtos.ts:181
+interface Output {
+  event: unknown;
+  timestamp?: number;
+}
+
+// langy.onTurnStream
+// Input: langyTurnStreamInputSchema, ../contract/src/langy-trpc.schemas.ts:181
+interface Input {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+}
+type Output = z.infer<typeof langyStreamEntrySchema>; // ../contract/src/langy.stream-entry.ts:12
+```
+
 ### `langyEgress`
 
 Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.ts:228`.
@@ -879,6 +1278,27 @@ Contract `../contract/src/langy.trpc.ts:192`, router `src/transport/langy.trpc.t
 | `langyEgress.get` | query    | Permission `langy:view`   | `langyEgressGetInputSchema` | `langyEgressStateSchema` |
 | `langyEgress.set` | mutation | Permission `langy:manage` | `langyEgressSetInputSchema` | `langyEgressStateSchema` |
 
+```typescript
+// langyEgress.get
+// Input: langyEgressGetInputSchema, ../contract/src/langy-trpc.schemas.ts:37
+interface Input {
+  projectId: string;
+}
+// Output: langyEgressStateSchema, ../contract/src/langy-trpc.schemas.ts:32
+interface Output {
+  allowlist: string[];
+  enforcing: boolean;
+}
+
+// langyEgress.set
+// Input: langyEgressSetInputSchema, ../contract/src/langy-trpc.schemas.ts:40
+interface Input {
+  projectId: string;
+  allowlist: string[];
+}
+type Output = z.infer<typeof langyEgressStateSchema>; // ../contract/src/langy-trpc.schemas.ts:32
+```
+
 ### `setupSkills`
 
 Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills.trpc.ts:10`.
@@ -886,6 +1306,19 @@ Contract `../contract/src/langy.trpc.ts:208`, router `src/transport/setup-skills
 | Procedure               | Kind  | Gate                      | Input  | Output |
 | ----------------------- | ----- | ------------------------- | ------ | ------ |
 | `setupSkills.getPrompt` | query | Permission `project:view` | inline | inline |
+
+```typescript
+// setupSkills.getPrompt
+// Input: inline, ../contract/src/langy.trpc.ts:210
+interface Input {
+  projectId: string;
+  skill: string;
+}
+// Output: inline, ../contract/src/langy.trpc.ts:211
+interface Output {
+  body: string;
+}
+```
 
 ## Sockets
 
@@ -920,7 +1353,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:44`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:286`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:284`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

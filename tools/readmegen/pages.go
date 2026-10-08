@@ -14,6 +14,10 @@ type generator struct {
 	kinds    map[string]string // package root -> enforcer kind
 	reverse  map[string][]string
 	pageRoot map[string]string // module id -> catalogue root
+	schemas  schemaIndex
+	uiRoutes map[string]string // page key -> URL, from uiRouteTable
+	sources  []browserSource   // every browser half's source, read on first use
+	groups   []string          // the closed package-group list; empty keeps the Kind column
 }
 
 func newGenerator(ws *workspace, manifest Manifest) *generator {
@@ -23,6 +27,12 @@ func newGenerator(ws *workspace, manifest Manifest) *generator {
 		kinds:    map[string]string{},
 		reverse:  map[string][]string{},
 		pageRoot: map[string]string{},
+		schemas:  newSchemaIndex(manifest.Schemas),
+		uiRoutes: map[string]string{},
+		groups:   packageGroups,
+	}
+	for _, route := range manifest.UIRoutes {
+		g.uiRoutes[route.Page] = route.Path
 	}
 	for index := range manifest.Modules {
 		g.facts[manifest.Modules[index].ID] = manifest.Modules[index]
@@ -67,6 +77,9 @@ func (g *generator) pages() []page {
 		pages = append(pages, g.modulePage(entry))
 		if half := g.ws.half(entry, "process"); half != nil {
 			pages = append(pages, g.processPage(entry, half))
+		}
+		if half := g.ws.half(entry, "browser"); half != nil {
+			pages = append(pages, g.browserPage(entry, half))
 		}
 	}
 	sort.Slice(pages, func(i, j int) bool { return pages[i].Path < pages[j].Path })
@@ -212,21 +225,34 @@ func (g *generator) packageIndex(pagePath, title, prefix string) page {
 			listed = append(listed, pkg)
 		}
 	}
+	grouped := len(g.groups) > 0 && prefix == groupedPrefix
+	first := func(pkg workspacePackage) string { return g.kinds[pkg.Dir] }
+	if grouped {
+		first = func(pkg workspacePackage) string { return pkg.LangWatch.Group }
+	}
 	sort.SliceStable(listed, func(i, j int) bool {
-		left, right := g.kinds[listed[i].Dir], g.kinds[listed[j].Dir]
+		left, right := first(listed[i]), first(listed[j])
+		if grouped {
+			return groupOrder(g.groups, left) < groupOrder(g.groups, right) ||
+				(left == right && listed[i].Name < listed[j].Name)
+		}
 		return left < right || (left == right && listed[i].Name < listed[j].Name)
 	})
 	var rows [][]string
 	for _, pkg := range listed {
 		rows = append(rows, []string{
-			orDash(g.kinds[pkg.Dir]),
+			orDash(first(pkg)),
 			g.packageName(pkg, dir),
 			cell(orDash(pkg.Description)),
 			fmt.Sprint(g.ws.dependents(pkg.Name)),
 		})
 	}
-	body := table([]string{"Kind", "Package", "What it is (package.json `description`)", "Depended on by"}, rows) +
-		"\nKind is the architecture enforcer's classification; \"Depended on by\" counts workspace\n" +
+	header, note := "Kind", "Kind is the architecture enforcer's classification"
+	if grouped {
+		header, note = "Group", "Group is the package's `\"langwatch\": { \"group\" }`, from a closed list"
+	}
+	body := table([]string{header, "Package", "What it is (package.json `description`)", "Depended on by"}, rows) +
+		"\n" + note + "; \"Depended on by\" counts workspace\n" +
 		"packages that list the package in their `package.json`.\n"
 	return page{Path: pagePath, Title: title, Body: body}
 }

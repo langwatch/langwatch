@@ -6,7 +6,7 @@ The server half of [webhook](../README.md). Webhook endpoints: creating and mana
 
 ## Installation
 
-`defineProcessModule("webhook").withRepositories(webhookRepositories).withApi(WebhookModule).withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest).withEventing(webhookDeliveryEventing)`, `src/webhook.module.ts:15`.
+`defineProcessModule("webhook").withRepositories(webhookRepositories).withChannels(webhookChannels).withApi(WebhookModule).withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest).withEventing(webhookDeliveryEventing)`, `src/webhook.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -178,8 +178,24 @@ Permission `gatewaySpend:manage`. Entitlement `webhook_endpoints`. Declared at `
 Answers at `/api/gateway/v1/spend-events/replay`.
 
 ```typescript
-type Body = z.infer<typeof webhookSpendReplayBodySchema>; // ../contract/src/webhook-spend-replay.schemas.ts:14
-type Response = z.infer<typeof webhookSpendReplayResponseSchema>; // ../contract/src/webhook-spend-replay.schemas.ts:35
+// Body: webhookSpendReplayBodySchema, ../contract/src/webhook-spend-replay.schemas.ts:14
+interface Body {
+  from: number;
+  to: number;
+  endpoint_id: string;
+}
+// Response: webhookSpendReplayResponseSchema, ../contract/src/webhook-spend-replay.schemas.ts:35
+interface Response {
+  data: {
+    endpoint_id: string;
+    replay_id: string;
+    replayed: number;
+    window: {
+      from: string;
+      to: string;
+    };
+  };
+}
 ```
 
 ### `webhookRest`
@@ -225,7 +241,10 @@ Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:2
 Answers at `/api/webhooks/v1/endpoints/:id`.
 
 ```typescript
-type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
+// Params: endpointIdParams, src/transport/webhook.rest.ts:39
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:122
 ```
 
@@ -253,7 +272,12 @@ Answers at `/api/webhooks/v1/endpoints/:id`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
-type Response = z.infer<typeof endpointArchivedResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:126
+// Response: endpointArchivedResponseSchema, ../contract/src/webhook-rest.schemas.ts:126
+interface Response {
+  data: {
+    archived: true;
+  };
+}
 ```
 
 #### `POST /endpoints/:id/roll-secret` · `postApiWebhooksV1EndpointsByIdRollSecret`
@@ -266,7 +290,8 @@ Answers at `/api/webhooks/v1/endpoints/:id/roll-secret`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
-type Body = z.infer<typeof rollEndpointSecretBodySchema>; // ../contract/src/webhook-rest.schemas.ts:273
+// Body: rollEndpointSecretBodySchema, ../contract/src/webhook-rest.schemas.ts:273
+type Body = Record<string, unknown>;
 type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:124
 ```
 
@@ -280,8 +305,17 @@ Answers at `/api/webhooks/v1/endpoints/:id/test`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
-type Body = z.infer<typeof testEndpointBodySchema>; // ../contract/src/webhook-rest.schemas.ts:276
-type Response = z.infer<typeof testFireResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:270
+// Body: testEndpointBodySchema, ../contract/src/webhook-rest.schemas.ts:276
+type Body = Record<string, unknown>;
+// Response: testFireResponseSchema, ../contract/src/webhook-rest.schemas.ts:270
+interface Response {
+  data: {
+    delivered: boolean;
+    response_status: number | null;
+    response_body?: string;
+    error?: string;
+  };
+}
 ```
 
 #### `GET /endpoints/:id/deliveries` · `getApiWebhooksV1EndpointsByIdDeliveries`
@@ -294,7 +328,11 @@ Answers at `/api/webhooks/v1/endpoints/:id/deliveries`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
-type Query = z.infer<typeof deliveriesQuerySchema>; // ../contract/src/webhook-rest.schemas.ts:224
+// Query: deliveriesQuerySchema, ../contract/src/webhook-rest.schemas.ts:224
+interface Query {
+  cursor?: string;
+  limit?: number;
+}
 type Response = z.infer<typeof deliveryListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:110
 ```
 
@@ -320,7 +358,16 @@ Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:3
 Answers at `/api/webhooks/v1/event-types`.
 
 ```typescript
-type Response = z.infer<typeof eventTypeListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:106
+// Response: eventTypeListResponseSchema, ../contract/src/webhook-rest.schemas.ts:106
+interface Response {
+  data: {
+    type: string;
+    family: string;
+    schema_version: string;
+    is_emitting: boolean;
+    description: string;
+  }[];
+}
 ```
 
 #### `GET /events` · `getApiWebhooksV1Events`
@@ -332,8 +379,25 @@ Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:4
 Answers at `/api/webhooks/v1/events`.
 
 ```typescript
-type Query = z.infer<typeof eventsQuerySchema>; // ../contract/src/webhook-rest.schemas.ts:229
-type Response = z.infer<typeof webhookEventListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:115
+// Query: eventsQuerySchema, ../contract/src/webhook-rest.schemas.ts:229
+interface Query {
+  type?: string;
+  from: number;
+  to: number;
+  cursor?: string;
+  limit?: number;
+}
+// Response: webhookEventListResponseSchema, ../contract/src/webhook-rest.schemas.ts:115
+interface Response {
+  data: {
+    id: string;
+    type: string;
+    created: string;
+    schema_version: string;
+    data: Record<string, unknown>;
+  }[];
+  next_cursor: string | null;
+}
 ```
 
 #### `GET /events/:id` · `getApiWebhooksV1EventsById`
@@ -346,7 +410,16 @@ Answers at `/api/webhooks/v1/events/:id`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:39
-type Response = z.infer<typeof webhookEventResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:130
+// Response: webhookEventResponseSchema, ../contract/src/webhook-rest.schemas.ts:130
+interface Response {
+  data: {
+    id: string;
+    type: string;
+    created: string;
+    schema_version: string;
+    data: Record<string, unknown>;
+  };
+}
 ```
 
 ## tRPC transport
@@ -368,6 +441,84 @@ Contract `../contract/src/webhook-endpoint.trpc.ts:72`, router `src/transport/we
 | `webhookEndpoints.disable`    | mutation | Permission `webhookEndpoints:manage` | `webhookEndpointScopeSchema`             | `webhookEndpointViewSchema`       |
 | `webhookEndpoints.archive`    | mutation | Permission `webhookEndpoints:manage` | `webhookEndpointScopeSchema`             | inline                            |
 
+```typescript
+// webhookEndpoints.eventTypes
+// Input: webhookEndpointOrganizationScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:19
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:76
+type Output = {
+  type: string;
+  family: string;
+  schemaVersion: "1";
+  isEmitting: boolean;
+  description: string;
+}[];
+
+// webhookEndpoints.list
+type Input = z.infer<typeof webhookEndpointOrganizationScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:19
+// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:80)
+
+// webhookEndpoints.deliveries
+// Input: webhookEndpointDeliveriesInputSchema, ../contract/src/webhook-endpoint.trpc.ts:41
+interface Input {
+  organizationId: string;
+  endpointId: string;
+  limit?: number;
+  cursor?: {
+    firedAt: unknown;
+    id: string;
+  };
+}
+type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:112
+
+// webhookEndpoints.create
+type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:47
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:92
+
+// webhookEndpoints.health
+// Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:23
+interface Input {
+  organizationId: string;
+  endpointId: string;
+}
+// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:73
+interface Output {
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  failingSince: unknown | null;
+  lastSuccessAt: unknown | null;
+  lastFailureAt: unknown | null;
+  oldestUndeliveredAgeMs: number | null;
+  dlqDepth: number;
+  sendsPerMinute: number;
+  successRate: number | null;
+  p95LatencyMs: number | null;
+}
+
+// webhookEndpoints.update
+type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:58
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+
+// webhookEndpoints.rollSecret
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:92
+
+// webhookEndpoints.enable
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+
+// webhookEndpoints.disable
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+
+// webhookEndpoints.archive
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:112
+type Output = unknown;
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.
@@ -376,30 +527,31 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `webhook_delivery` (aggregate `webhook_spend_delivery`)
 
-Declared at `src/eventing/webhook-delivery.pipeline.ts:51`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
+Declared at `src/eventing/webhook-delivery.pipeline.ts:60`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
 
-The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents` (`src/eventing/webhook-delivery.pipeline.ts:61`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents` (`src/eventing/webhook-delivery.pipeline.ts:70`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
-| Kind            | Name                            | Handles                                                                 | Declared at                                    | Built                |
-| --------------- | ------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | -------------------- |
-| command         | `requestSpendDelivery`          | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:59` | always               |
-| command         | `requestGovernanceDelivery`     | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:60` | always               |
-| process manager | `webhookDelivery`               | ≈ applier `input.deliveryProcess`                                       | `src/eventing/webhook-delivery.pipeline.ts:66` | past the early build |
-| process manager | `governanceEventsDelivery`      | ≈ applier `input.governanceProcess`                                     | `src/eventing/webhook-delivery.pipeline.ts:67` | past the early build |
-| peer subscriber | `gatewaySpendAdmittedDelivery`  | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)     | `src/eventing/webhook-delivery.pipeline.ts:68` | past the early build |
-| peer subscriber | `gatewaySpendConfirmedDelivery` | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:69` | past the early build |
-| peer subscriber | `gatewaySpendFailedDelivery`    | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)       | `src/eventing/webhook-delivery.pipeline.ts:70` | past the early build |
-| peer subscriber | `gatewaySpendSettledDelivery`   | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)      | `src/eventing/webhook-delivery.pipeline.ts:71` | past the early build |
-| peer subscriber | `gatewayBudgetCrossingDelivery` | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md) | `src/eventing/webhook-delivery.pipeline.ts:72` | past the early build |
-| peer subscriber | `gatewayVkLifecycleDelivery`    | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:73` | past the early build |
+| Kind            | Name                              | Handles                                                                 | Declared at                                    | Built                |
+| --------------- | --------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | -------------------- |
+| command         | `requestSpendDelivery`            | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:68` | always               |
+| command         | `requestGovernanceDelivery`       | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:69` | always               |
+| process manager | `webhookDelivery`                 | ≈ applier `input.deliveryProcess`                                       | `src/eventing/webhook-delivery.pipeline.ts:75` | past the early build |
+| process manager | `governanceEventsDelivery`        | ≈ applier `input.governanceProcess`                                     | `src/eventing/webhook-delivery.pipeline.ts:76` | past the early build |
+| peer subscriber | `gatewaySpendAdmittedDelivery`    | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)     | `src/eventing/webhook-delivery.pipeline.ts:77` | past the early build |
+| peer subscriber | `gatewaySpendConfirmedDelivery`   | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:78` | past the early build |
+| peer subscriber | `gatewaySpendFailedDelivery`      | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)       | `src/eventing/webhook-delivery.pipeline.ts:79` | past the early build |
+| peer subscriber | `gatewaySpendSettledDelivery`     | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)      | `src/eventing/webhook-delivery.pipeline.ts:80` | past the early build |
+| peer subscriber | `gatewayBudgetCrossingDelivery`   | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md) | `src/eventing/webhook-delivery.pipeline.ts:81` | past the early build |
+| peer subscriber | `gatewayVkLifecycleDelivery`      | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:82` | past the early build |
+| lane aliases    | `≈ MAIN_DELIVERY_MANAGER_ALIASES` | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:83` | past the early build |
 
 ## Configuration
 
 | Kind   | Leaf                         | Environment variable                        | Declared at                            |
 | ------ | ---------------------------- | ------------------------------------------- | -------------------------------------- |
-| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:13` |
-| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:14` |
-| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:16` |
-| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:18` |
+| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:10` |
+| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:11` |
+| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:13` |
+| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:15` |
 
 <!-- readme:generated:end -->

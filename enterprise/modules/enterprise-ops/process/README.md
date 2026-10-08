@@ -132,6 +132,120 @@ Contract `../contract/src/license-registry.trpc.ts:34`, router `src/transport/li
 | `licenseRegistry.issueActivationCode`  | mutation | Platform permission `ops:manage` | `issueActivationCodeInputSchema`       | `issuedActivationCodeSchema` |
 | `licenseRegistry.revokeActivationCode` | mutation | Platform permission `ops:manage` | `revokeActivationCodeInputSchema`      | `activationCodeViewSchema`   |
 
+```typescript
+// licenseRegistry.getAll
+// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:7
+interface Input {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:66
+
+// licenseRegistry.getById
+// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:13
+interface Input {
+  id: string;
+}
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.issue
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:16
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:91
+
+// licenseRegistry.registerLegacy
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:29
+interface Input {
+  licenseKey: string;
+  organizationId: string;
+}
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.revoke
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:34
+interface Input {
+  id: string;
+  reason: string;
+}
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.reissue
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:39
+interface Input {
+  id: string;
+  maxMembers?: number;
+  maxMembersLite?: number;
+  maxMessagesPerMonth?: number;
+  expiresAt: string;
+}
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:91
+
+// licenseRegistry.changeSeats
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:48
+interface Input {
+  id: string;
+  maxMembers: number;
+}
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:105
+
+// licenseRegistry.resetInstanceBinding
+type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:13
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.updateTerms
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:53
+interface Input {
+  id: string;
+  services?: ("instant_evals" | "managed_models")[];
+  seatRateCents?: number | null;
+  seatCurrency?: "USD" | "EUR" | null;
+  commitUsdCents?: number;
+  overageEnabled?: boolean;
+  overageMaxUsdCents?: number | null;
+}
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.linkToOrganization
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:58
+interface Input {
+  id: string;
+  organizationId: string;
+}
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:26
+
+// licenseRegistry.activationCodes
+// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:46
+interface Input {
+  page?: number;
+  pageSize?: number;
+  organizationId?: string;
+}
+type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:40
+
+// licenseRegistry.issueActivationCode
+// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:53
+interface Input {
+  organizationId: string;
+  organizationName: string;
+  email: string;
+  planType: string;
+  maxMembers: number;
+  maxMembersLite?: number;
+  licenseTermDays: number;
+  services?: string[];
+  expiresAt: string;
+  reusable?: boolean;
+}
+type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:73
+
+// licenseRegistry.revokeActivationCode
+// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:70
+interface Input {
+  id: string;
+}
+type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:13
+```
+
 ### `selfHostedInstances`
 
 Contract `../contract/src/license-registry.trpc.ts:91`, router `src/transport/self-hosted-instance.trpc.ts:14`.
@@ -140,6 +254,24 @@ Contract `../contract/src/license-registry.trpc.ts:91`, router `src/transport/se
 | ----------------------------- | ----- | ------------------------------ | ------------------------------------ | -------------------------------- |
 | `selfHostedInstances.getAll`  | query | Platform permission `ops:view` | `listSelfHostedInstancesInputSchema` | `selfHostedInstancePageSchema`   |
 | `selfHostedInstances.getById` | query | Platform permission `ops:view` | `selfHostedInstanceIdInputSchema`    | `selfHostedInstanceDetailSchema` |
+
+```typescript
+// selfHostedInstances.getAll
+// Input: listSelfHostedInstancesInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:63
+interface Input {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+type Output = z.infer<typeof selfHostedInstancePageSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:57
+
+// selfHostedInstances.getById
+// Input: selfHostedInstanceIdInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:69
+interface Input {
+  id: string;
+}
+type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:80
+```
 
 ## Sockets
 

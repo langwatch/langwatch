@@ -6,7 +6,7 @@ The server half of [metric](../README.md). Metrics: receiving OTLP metrics, cano
 
 ## Installation
 
-`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing)`, `src/metric.module.ts:8`.
+`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing)`, `src/metric.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -63,7 +63,8 @@ Answers at `/api/otel/v1/metrics`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:36)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:39)
+// Response: inline, src/transport/otlp-metrics.rest.ts:39
+type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/metrics` · `ingestOtlpMetricsAlias`
@@ -73,9 +74,13 @@ Public: OTLP ingestion API key resolved in-handler. Hidden from the OpenAPI docu
 Answers at `/:otlpBase{.+}/v1/metrics`.
 
 ```typescript
-type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
+// Params: otlpMetricAliasParamsSchema, ../contract/src/metric.api.ts:41
+interface Params {
+  otlpBase: string;
+}
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:57)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:60)
+// Response: inline, src/transport/otlp-metrics.rest.ts:60
+type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1/metrics/` · `ingestOtlpMetricsAliasSlash`
@@ -87,7 +92,8 @@ Answers at `/:otlpBase{.+}/v1/metrics/`.
 ```typescript
 type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:76)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:79)
+// Response: inline, src/transport/otlp-metrics.rest.ts:79
+type Response = unknown;
 ```
 
 #### `POST /:otlpBase{.+}/v1//metrics` · `ingestOtlpMetricsAliasDoubled`
@@ -99,7 +105,8 @@ Answers at `/:otlpBase{.+}/v1//metrics`.
 ```typescript
 type Params = z.infer<typeof otlpMetricAliasParamsSchema>; // ../contract/src/metric.api.ts:41
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:96)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:99)
+// Response: inline, src/transport/otlp-metrics.rest.ts:99
+type Response = unknown;
 ```
 
 #### `POST /v1/metrics` · `ingestOtlpMetricsRootV1`
@@ -110,7 +117,8 @@ Answers at `/v1/metrics`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:114)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:117)
+// Response: inline, src/transport/otlp-metrics.rest.ts:117
+type Response = unknown;
 ```
 
 #### `POST /v1/metrics/` · `ingestOtlpMetricsRootV1Slash`
@@ -121,7 +129,8 @@ Answers at `/v1/metrics/`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/otlp-metrics.rest.ts:132)
-// Response: "protocol" (inline, src/transport/otlp-metrics.rest.ts:135)
+// Response: inline, src/transport/otlp-metrics.rest.ts:135
+type Response = unknown;
 ```
 
 ## tRPC transport

@@ -6,13 +6,13 @@ SCIM provisioning: directory connections, their tokens, and syncing users from a
 
 ## At a glance
 
-|                |                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| Classification | enterprise (`modules/catalogue.json`)                                                      |
-| Subjects       | scim, scim-sync                                                                            |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:287` (33 operations) |
-| Installed by   | api, worker, tasks (process); ui (browser)                                                 |
+|                |                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Classification | enterprise (`modules/catalogue.json`)                                                       |
+| Subjects       | scim, scim-sync                                                                             |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client) |
+| Api token      | `ScimApi` = `moduleApi<ScimApi>()("scim")`, `contract/src/scim.api.ts:287` (33 operations)  |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                  |
 
 ## What scim owns
 
@@ -26,13 +26,12 @@ Anything else scim needs belongs to another module and is reached through its `*
 
 ## Peers (static dependencies)
 
-| Name            | Token             | Module                                                  |
-| --------------- | ----------------- | ------------------------------------------------------- |
-| `auditLog`      | `AuditLogApi`     | [audit-log](../../../modules/audit-log/README.md)       |
-| `authorization` | `AuthzApi`        | [authz](../../../modules/authz/README.md)               |
-| `entitlements`  | `EntitlementApi`  | [entitlement](../../../modules/entitlement/README.md)   |
-| `organization`  | `OrganizationApi` | [organization](../../../modules/organization/README.md) |
-| `users`         | `UserApi`         | [user](../../../modules/user/README.md)                 |
+| Name            | Token            | Module                                                |
+| --------------- | ---------------- | ----------------------------------------------------- |
+| `auditLog`      | `AuditLogApi`    | [audit-log](../../../modules/audit-log/README.md)     |
+| `authorization` | `AuthzApi`       | [authz](../../../modules/authz/README.md)             |
+| `entitlements`  | `EntitlementApi` | [entitlement](../../../modules/entitlement/README.md) |
+| `users`         | `UserApi`        | [user](../../../modules/user/README.md)               |
 
 ## Who depends on scim
 

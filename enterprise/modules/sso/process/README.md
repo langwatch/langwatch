@@ -340,22 +340,151 @@ None: this module declares no REST family.
 
 Contract `../contract/src/sso-connection.trpc.ts:31`, router `src/transport/sso-connection.trpc.ts:48`.
 
-| Procedure                             | Kind     | Gate                                                                                                                                                  | Input                                     | Output                              |
-| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------- |
-| `ssoConnections.getAll`               | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listSsoConnectionsInputSchema`           | `backofficeSsoConnectionPageSchema` |
-| `ssoConnections.getById`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                              |
-| `ssoConnections.getHistory`           | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                              |
-| `ssoConnections.getMigrationProgress` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `operatorSsoMigrationProgressInputSchema` | inline                              |
-| `ssoConnections.startLegacyMigration` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`          |
-| `ssoConnections.register`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `registerSsoConnectionInputSchema`        | –                                   |
-| `ssoConnections.claimDomain`          | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                              |
-| `ssoConnections.approveDomainClaim`   | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                              |
-| `ssoConnections.rejectDomainClaim`    | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `rejectSsoDomainClaimInputSchema`         | inline                              |
-| `ssoConnections.attestDomain`         | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `attestSsoDomainInputSchema`              | inline                              |
-| `ssoConnections.activate`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `activateSsoConnectionInputSchema`        | inline                              |
-| `ssoConnections.suspend`              | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                              |
-| `ssoConnections.resume`               | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionTargetSchema`               | inline                              |
-| `ssoConnections.requestTeardown`      | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                              |
+| Procedure                             | Kind     | Gate                                                                                                                                                  | Input                                     | Output                         |
+| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------ |
+| `ssoConnections.getAll`               | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listSsoConnectionsInputSchema`           | `adminSsoConnectionPageSchema` |
+| `ssoConnections.getById`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getHistory`           | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getMigrationProgress` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `operatorSsoMigrationProgressInputSchema` | inline                         |
+| `ssoConnections.startLegacyMigration` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`     |
+| `ssoConnections.register`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `registerSsoConnectionInputSchema`        | –                              |
+| `ssoConnections.claimDomain`          | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.approveDomainClaim`   | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.rejectDomainClaim`    | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `rejectSsoDomainClaimInputSchema`         | inline                         |
+| `ssoConnections.attestDomain`         | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `attestSsoDomainInputSchema`              | inline                         |
+| `ssoConnections.activate`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `activateSsoConnectionInputSchema`        | inline                         |
+| `ssoConnections.suspend`              | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
+| `ssoConnections.resume`               | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionTargetSchema`               | inline                         |
+| `ssoConnections.requestTeardown`      | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
+
+```typescript
+// ssoConnections.getAll
+// Input: listSsoConnectionsInputSchema, ../contract/src/sso.contract.ts:61
+interface Input {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+type Output = z.infer<typeof adminSsoConnectionPageSchema>; // ../contract/src/sso.contract.ts:50
+
+// ssoConnections.getById
+// Input: ssoConnectionByIdSchema, ../contract/src/sso.contract.ts:68
+interface Input {
+  connectionId: string;
+}
+// Output: adminSsoConnectionSchema.nullable() (inline, ../contract/src/sso-connection.trpc.ts:38)
+
+// ssoConnections.getHistory
+type Input = z.infer<typeof ssoConnectionByIdSchema>; // ../contract/src/sso.contract.ts:68
+// Output: inline, ../contract/src/sso-connection.trpc.ts:43
+type Output =
+  | {
+      eventId: string;
+      occurredAtMs: number;
+      summary: string;
+      carriedOver: boolean;
+    }[]
+  | null;
+
+// ssoConnections.getMigrationProgress
+// Input: operatorSsoMigrationProgressInputSchema, ../contract/src/sso.contract.ts:72
+interface Input {
+  connectionId: string;
+  cursor?: string | null;
+  limit?: number;
+}
+// Output: ssoSetupMigrationSchema.nullable() (inline, ../contract/src/sso-connection.trpc.ts:48)
+
+// ssoConnections.startLegacyMigration
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:446
+// Output: ssoSetupRegisteredSchema, ../contract/src/sso-setup.contract.ts:356
+interface Output {
+  connectionId: string;
+}
+
+// ssoConnections.register
+// Input: registerSsoConnectionInputSchema, ../contract/src/sso.contract.ts:116
+interface Input {
+  organizationId: string;
+  type: "oidc" | "saml";
+  providerId: string;
+  issuer?: string | null;
+  allowsJit?: boolean;
+  arrivalPolicy?: "admit" | "request" | "refuse";
+}
+
+// ssoConnections.claimDomain
+// Input: ssoDomainTargetSchema, ../contract/src/sso.contract.ts:91
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:63
+type Output = unknown;
+
+// ssoConnections.approveDomainClaim
+type Input = z.infer<typeof ssoDomainTargetSchema>; // ../contract/src/sso.contract.ts:91
+// Output: inline, ../contract/src/sso-connection.trpc.ts:67
+type Output = unknown;
+
+// ssoConnections.rejectDomainClaim
+// Input: rejectSsoDomainClaimInputSchema, ../contract/src/sso.contract.ts:97
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+  note: string;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:71
+type Output = unknown;
+
+// ssoConnections.attestDomain
+// Input: attestSsoDomainInputSchema, ../contract/src/sso.contract.ts:104
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+  evidenceRef: string;
+  note: string;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:75
+type Output = unknown;
+
+// ssoConnections.activate
+// Input: activateSsoConnectionInputSchema, ../contract/src/sso.contract.ts:128
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  testLoginAccountId: string;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:79
+type Output = unknown;
+
+// ssoConnections.suspend
+// Input: ssoConnectionReasonInputSchema, ../contract/src/sso.contract.ts:135
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  reason?: string | null;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:83
+type Output = unknown;
+
+// ssoConnections.resume
+// Input: ssoConnectionTargetSchema, ../contract/src/sso.contract.ts:85
+interface Input {
+  organizationId: string;
+  connectionId: string;
+}
+// Output: inline, ../contract/src/sso-connection.trpc.ts:87
+type Output = unknown;
+
+// ssoConnections.requestTeardown
+type Input = z.infer<typeof ssoConnectionReasonInputSchema>; // ../contract/src/sso.contract.ts:135
+// Output: inline, ../contract/src/sso-connection.trpc.ts:91
+type Output = unknown;
+```
 
 ### `ssoSetup`
 
@@ -388,6 +517,202 @@ Contract `../contract/src/sso-setup.trpc.ts:40`, router `src/transport/sso-setup
 | `ssoSetup.revokeBreakGlass`        | mutation     | Permission `sso:manage`                                           | `ssoBreakGlassBindingInputSchema`      | `ssoBreakGlassBindingSchema`  |
 | `ssoSetup.discardConnection`       | mutation     | Permission `sso:manage`                                           | `ssoSetupConnectionSchema`             | inline                        |
 | `ssoSetup.removeConnection`        | mutation     | Permission `sso:manage`                                           | `ssoSetupRemovalSchema`                | inline                        |
+
+```typescript
+// ssoSetup.getSetup
+// Input: ssoSetupOrganizationSchema, ../contract/src/sso-setup.contract.ts:21
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof ssoSetupPageViewSchema>; // ../contract/src/sso-setup.contract.ts:195
+
+// ssoSetup.getMigrationProgress
+// Input: ssoSetupMigrationProgressSchema, ../contract/src/sso-setup.contract.ts:433
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  cursor?: string | null;
+  limit?: number;
+}
+// Output: ssoSetupMigrationSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:60)
+
+// ssoSetup.getHistory
+// Input: ssoSetupConnectionSchema, ../contract/src/sso-setup.contract.ts:13
+interface Input {
+  organizationId: string;
+  connectionId: string;
+}
+// Output: inline, ../contract/src/sso-setup.trpc.ts:65
+type Output = {
+  eventId: string;
+  occurredAtMs: number;
+  summary: string;
+  carriedOver: boolean;
+}[];
+
+// ssoSetup.onHistoryActivity
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+// Output: ssoHistoryActivitySchema, ../contract/src/sso-setup.contract.ts:261
+interface Output {
+  connectionId: string;
+}
+
+// ssoSetup.claimDomain
+// Input: ssoSetupDomainSchema, ../contract/src/sso-setup.contract.ts:267
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+}
+// Output: ssoDomainClaimOutcomeSchema, ../contract/src/sso-setup.contract.ts:279
+interface Output {
+  waitsForReview: boolean;
+  disputed: boolean;
+  verified: boolean;
+}
+
+// ssoSetup.proveDomain
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
+type Output = z.infer<typeof ssoDomainProofSchema>; // ../contract/src/sso-setup.contract.ts:302
+
+// ssoSetup.removeDomain
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
+// Output: inline, ../contract/src/sso-setup.trpc.ts:86
+type Output = unknown;
+
+// ssoSetup.checkDomainRecord
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
+// Output: ssoDomainProvedSchema, ../contract/src/sso-setup.contract.ts:310
+interface Output {
+  proved: true;
+}
+
+// ssoSetup.checkDomainFile
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:267
+type Output = z.infer<typeof ssoDomainProvedSchema>; // ../contract/src/sso-setup.contract.ts:310
+
+// ssoSetup.register
+type Input = z.infer<typeof ssoSetupRegisterSchema>; // ../contract/src/sso-setup.contract.ts:346
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:356
+
+// ssoSetup.startLegacyMigration
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:446
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:356
+
+// ssoSetup.selectMigrationRoute
+// Input: ssoSetupMigrationRouteSchema, ../contract/src/sso-setup.contract.ts:456
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  route: "legacy" | "direct";
+}
+// Output: inline, ../contract/src/sso-setup.trpc.ts:123
+type Output = unknown;
+
+// ssoSetup.finalizeLegacyMigration
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+// Output: inline, ../contract/src/sso-setup.trpc.ts:132
+type Output = unknown;
+
+// ssoSetup.rename
+// Input: ssoSetupRenameSchema, ../contract/src/sso-setup.contract.ts:464
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  name: string;
+}
+// Output: inline, ../contract/src/sso-setup.trpc.ts:138
+type Output = unknown;
+
+// ssoSetup.identityProvider
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+// Output: ssoSetupIdentityProviderViewSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:148)
+
+// ssoSetup.updateIdentityProvider
+type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:378
+// Output: inline, ../contract/src/sso-setup.trpc.ts:157
+type Output = unknown;
+
+// ssoSetup.setArrivals
+// Input: ssoSetupArrivalsSchema, ../contract/src/sso-setup.contract.ts:415
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  policy: "admit" | "request" | "refuse";
+}
+// Output: inline, ../contract/src/sso-setup.trpc.ts:163
+type Output = unknown;
+
+// ssoSetup.activate
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+// Output: inline, ../contract/src/sso-setup.trpc.ts:172
+type Output = unknown;
+
+// ssoSetup.breakGlassBindings
+type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:21
+// Output: ssoBreakGlassGrantSchema.array() (inline, ../contract/src/sso-setup.trpc.ts:182)
+
+// ssoSetup.breakGlassCandidates
+type Input = z.infer<typeof ssoSetupOrganizationSchema>; // ../contract/src/sso-setup.contract.ts:21
+// Output: inline, ../contract/src/sso-setup.trpc.ts:189
+type Output = {
+  userId: string;
+  name: string | null;
+  email: string | null;
+}[];
+
+// ssoSetup.grantBreakGlass
+// Input: ssoBreakGlassGrantInputSchema, ../contract/src/sso-setup.contract.ts:531
+interface Input {
+  organizationId: string;
+  userId: string;
+  expiresAtMs: number;
+}
+// Output: ssoBreakGlassBindingSchema, ../contract/src/sso-setup.contract.ts:512
+interface Output {
+  bindingId: string;
+  organizationId: string;
+  userId: string;
+  grantedByUserId: string;
+  grantedAtMs: number;
+  expiresAtMs: number;
+  supersededAtMs: number | null;
+  renewedFromBindingId: string | null;
+  warnedDays: number[];
+}
+
+// ssoSetup.renewBreakGlass
+// Input: ssoBreakGlassRenewalInputSchema, ../contract/src/sso-setup.contract.ts:540
+interface Input {
+  organizationId: string;
+  bindingId: string;
+  expiresAtMs: number;
+}
+type Output = z.infer<typeof ssoBreakGlassRenewalSchema>; // ../contract/src/sso-setup.contract.ts:557
+
+// ssoSetup.revokeBreakGlass
+// Input: ssoBreakGlassBindingInputSchema, ../contract/src/sso-setup.contract.ts:549
+interface Input {
+  organizationId: string;
+  bindingId: string;
+}
+type Output = z.infer<typeof ssoBreakGlassBindingSchema>; // ../contract/src/sso-setup.contract.ts:512
+
+// ssoSetup.discardConnection
+type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
+// Output: inline, ../contract/src/sso-setup.trpc.ts:216
+type Output = unknown;
+
+// ssoSetup.removeConnection
+// Input: ssoSetupRemovalSchema, ../contract/src/sso-setup.contract.ts:424
+interface Input {
+  organizationId: string;
+  connectionId: string;
+  reason?: string | null;
+}
+// Output: inline, ../contract/src/sso-setup.trpc.ts:222
+type Output = unknown;
+```
 
 ## Sockets
 

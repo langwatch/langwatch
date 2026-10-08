@@ -398,7 +398,7 @@ findConnectServicesForManagedKey(input: { virtualKeyId: string; organizationId: 
 
 #### `issueActivationCode`
 
-Activation codes (ADR-156, section 5): the short code a fresh install pastes instead of a license blob. Minting and revoking are the backoffice's; redeeming is a public route an install calls once.
+Activation codes (ADR-156, section 5): the short code a fresh install pastes instead of a license blob. Minting and revoking are the the admin console's; redeeming is a public route an install calls once.
 
 ```typescript
 issueActivationCode(input: IssueActivationCodeInput): Promise<IssuedActivationCode>;
@@ -462,9 +462,20 @@ Public: a self-hosted install presents its license token or activation code as t
 Answers at `/api/connect/v1/license/sync`.
 
 ```typescript
-type Body = z.infer<typeof licenseSyncBodySchema>; // ../contract/src/license-sync.ts:17
+// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:17
+interface Body {
+  version: string;
+  seats: {
+    members: number;
+    liteMembers: number;
+  };
+}
 type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:32
-type Response = z.infer<typeof connectSyncAnswerSchema>; // ../contract/src/connect-install.ts:25
+// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:25
+interface Response {
+  services: string[];
+  license?: string;
+}
 ```
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
@@ -474,9 +485,17 @@ Public: a self-hosted install presents its license token or activation code as t
 Answers at `/api/connect/v1/license/activate`.
 
 ```typescript
-type Body = z.infer<typeof connectActivationRequestSchema>; // ../contract/src/license-sync.ts:38
+// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:38
+type Body = Record<string, unknown>;
 type Headers = z.infer<typeof connectHostHeadersSchema>; // ../contract/src/license-sync.ts:32
-type Response = z.infer<typeof connectActivationAnswerSchema>; // ../contract/src/connect-install.ts:34
+// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:34
+interface Response {
+  license: string;
+  planType: string;
+  maxMembers: number;
+  expiresAt: string;
+  services: string[];
+}
 ```
 
 ### `connectHostedRest`
@@ -495,7 +514,13 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/connect/instant-evals-classify`.
 
 ```typescript
-type Body = z.infer<typeof hostedServiceEnvelopeSchema>; // ../contract/src/connect-hosted.ts:25
+// Body: hostedServiceEnvelopeSchema, ../contract/src/connect-hosted.ts:25
+interface Body {
+  virtual_key_id: string;
+  organization_id: string;
+  project_id: string;
+  payload: unknown;
+}
 type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:107
 ```
 
@@ -518,7 +543,11 @@ Answers at `/api/internal/gateway/connect/budget`.
 
 ```typescript
 type Body = z.infer<typeof hostedServiceEnvelopeSchema>; // ../contract/src/connect-hosted.ts:25
-type Response = z.infer<typeof hostedCapAnswerSchema>; // ../contract/src/connect-hosted.ts:115
+// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:115
+interface Response {
+  cap_usd: number;
+  maximum_cap_usd: number;
+}
 ```
 
 ## tRPC transport
@@ -533,6 +562,39 @@ Contract `../contract/src/connect.trpc.ts:18`, router `src/transport/connect.trp
 | `connect.setService` | mutation | Permission `organization:manage` | inline              | `connectServicesSetSchema` |
 | `connect.setCap`     | mutation | Permission `organization:manage` | inline              | `connectCapSetSchema`      |
 
+```typescript
+// connect.status
+// Input: organizationInput, ../contract/src/connect.trpc.ts:16
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:177
+
+// connect.setService
+// Input: inline, ../contract/src/connect.trpc.ts:25
+interface Input {
+  organizationId: string;
+  service: "instant_evals" | "managed_models";
+  enabled: boolean;
+}
+// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:192
+interface Output {
+  enabledServices: ("instant_evals" | "managed_models")[];
+}
+
+// connect.setCap
+// Input: inline, ../contract/src/connect.trpc.ts:34
+interface Input {
+  organizationId: string;
+  capUsd: number;
+}
+// Output: connectCapSetSchema, ../contract/src/connect-install.ts:196
+interface Output {
+  capUsd: number;
+  maximumCapUsd: number;
+}
+```
+
 ### `license`
 
 Contract `../contract/src/licensing.trpc.ts:18`, router `src/transport/licensing.trpc.ts:14`.
@@ -545,6 +607,62 @@ Contract `../contract/src/licensing.trpc.ts:18`, router `src/transport/licensing
 | `license.activate`         | mutation | Permission `organization:manage`                                                                                                                                                                                                              | inline                           | `licenseUploadedSchema`       |
 | `license.remove`           | mutation | Permission `organization:manage`                                                                                                                                                                                                              | `licenseOrganizationQuerySchema` | `licenseRemovedSchema`        |
 | `license.refresh`          | mutation | Permission `organization:manage`                                                                                                                                                                                                              | `licenseOrganizationQuerySchema` | `licenseRefreshOutcomeSchema` |
+
+```typescript
+// license.getStatus
+// Input: licenseOrganizationQuerySchema, ../contract/src/license.queries.ts:3
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:220
+
+// license.getSsoGateStatus
+// Input: inline, ../contract/src/licensing.trpc.ts:27
+type Input = Record<string, unknown>;
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:251
+interface Output {
+  configuredProvider: string | null;
+  licensed: boolean;
+  mounted: boolean;
+}
+
+// license.upload
+// Input: storeLicenseInputSchema, ../contract/src/license.commands.ts:6
+interface Input {
+  organizationId: string;
+  licenseKey: string;
+}
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:267
+
+// license.activate
+// Input: inline, ../contract/src/licensing.trpc.ts:36
+interface Input {
+  organizationId: string;
+  code: string;
+}
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:267
+
+// license.remove
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/license.queries.ts:3
+// Output: licenseRemovedSchema, ../contract/src/license.ts:272
+interface Output {
+  success: true;
+  removed: true;
+}
+
+// license.refresh
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/license.queries.ts:3
+// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:201
+type Output =
+  | {
+      outcome: "unchanged";
+    }
+  | {
+      outcome: "updated";
+      maxMembers: number;
+      expiresAt: string;
+    };
+```
 
 ## Sockets
 
@@ -573,8 +691,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:180`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:181`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:179`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:180`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

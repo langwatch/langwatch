@@ -45,6 +45,10 @@ type packageJSON struct {
 	Dependencies     map[string]string `json:"dependencies"`
 	DevDependencies  map[string]string `json:"devDependencies"`
 	PeerDependencies map[string]string `json:"peerDependencies"`
+	Exports          json.RawMessage   `json:"exports"`
+	LangWatch        struct {
+		Group string `json:"group"`
+	} `json:"langwatch"`
 }
 
 // workspacePackage is one package.json found by the walk, with its directory.

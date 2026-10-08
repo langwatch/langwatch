@@ -11,7 +11,7 @@ Evaluators: their definitions, and executing them as code or native checks with 
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | evaluator                                                                                                      |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                    |
-| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:155` (30 operations) |
+| Api token      | `EvaluatorApi` = `moduleApi<EvaluatorApi>()("evaluator")`, `contract/src/evaluator.api.ts:160` (30 operations) |
 | Other token    | `EvaluatorBrowserApi`, `process/src/transport/evaluator.trpc.ts:23`                                            |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                     |
 
@@ -31,6 +31,8 @@ Anything else evaluator needs belongs to another module and is reached through i
 | `auditLog`       | `AuditLogApi`      | [audit-log](../audit-log/README.md)           |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
 | `permissions`    | `AuthzApi`         | [authz](../authz/README.md)                   |
+| `plans`          | `EntitlementApi`   | [entitlement](../entitlement/README.md)       |
+| `projects`       | `ProjectApi`       | [project](../project/README.md)               |
 | `users`          | `UserApi`          | [user](../user/README.md)                     |
 | `workflows`      | `WorkflowApi`      | [workflow](../workflow/README.md)             |
 
