@@ -36,6 +36,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GovernanceModule } from "../../app/governance.app.ts";
@@ -114,6 +115,7 @@ async function buildApi(
     config: void 0,
     repositories,
     dependencies: {
+      webhooks: createApiFixture<WebhookApi>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       auth: createApiFixture<AuthApi>(),

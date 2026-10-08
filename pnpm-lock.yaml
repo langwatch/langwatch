@@ -3763,6 +3763,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
+      '@langwatch/webhook-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/webhook/contract
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
