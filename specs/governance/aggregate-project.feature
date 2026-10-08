@@ -487,6 +487,14 @@ Feature: An aggregate project reads its member projects
     And no empty state invites ana to add a chart
 
   @integration
+  Scenario: A member who cannot add charts still sees the empty reports
+    Given an ordinary project with no charts
+    And a member who may view analytics but not add charts
+    When the member opens the project's reports
+    Then the empty state says there are no custom graphs yet
+    And it offers no "Add chart" button and no invitation to click one
+
+  @integration
   Scenario: A chart save the server refuses says why
     Given a project whose server refuses a new chart, as an aggregate does
     When ana saves the chart from the chart editor

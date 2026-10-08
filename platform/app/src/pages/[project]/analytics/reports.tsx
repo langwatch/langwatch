@@ -245,8 +245,9 @@ export function ReportsContent() {
         />
       )}
 
-      {/* Empty state */}
-      {hasNoGraphs && canAddChart && (
+      {/* Empty state: shown to every member, inviting only those who can
+          add a chart to click the button they can see. */}
+      {hasNoGraphs && (
         <Alert.Root
           status="info"
           borderStartWidth="4px"
@@ -255,11 +256,16 @@ export function ReportsContent() {
         >
           <Alert.Indicator alignSelf="start" />
           <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
+            <Alert.Title>
+              {canAddChart
+                ? "Add your custom graphs here"
+                : "No custom graphs yet"}
+            </Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
+                {canAddChart
+                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+                  : "Nobody has added a custom graph to this dashboard yet."}
               </Text>
             </Alert.Description>
           </VStack>
