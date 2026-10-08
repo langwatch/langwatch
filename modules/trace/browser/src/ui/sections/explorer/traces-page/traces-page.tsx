@@ -6,8 +6,10 @@ import { useFilterStore, useSelectionStore } from "../../../../behavior/explorer
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useExplorerLangyActions } from "../../../../behavior/langy/use-explorer-langy-actions.ts";
 import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
 import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useExplorerCounts } from "../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts";
@@ -38,7 +40,6 @@ import { BulkActionBar } from "../toolbar/bulk-action-bar.tsx";
 import { Toolbar } from "../toolbar/toolbar.tsx";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 import { EmptyResultsPane } from "./empty-results-pane.tsx";
-import { ExplorerLangyActions } from "./explorer-langy-actions.tsx";
 import { IntegratePane } from "./integrate-pane.tsx";
 import { PageKeyboardShortcuts } from "./page-keyboard-shortcuts.tsx";
 import { useDebouncedFilterCommit } from "./use-debounced-filter-commit.ts";
@@ -50,6 +51,20 @@ import {
   useSidebarShortcut,
 } from "./use-keyboard-shortcuts.ts";
 import { useTracesPageTitle } from "./use-page-title.ts";
+
+/**
+ * Publishes the Explorer's actions for as long as the page is open, through
+ * the host the application mounted — the page never reaches the agent itself.
+ * @see specs/langy/langy-trace-explorer-actions.feature
+ */
+export const ExplorerLangyActions: React.FC = () => {
+  const host = useOptionalTraceHost();
+  const handlers = useExplorerLangyActions();
+
+  useEffect(() => host?.registerLangyActions(handlers), [host, handlers]);
+
+  return null;
+};
 
 const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_MAX = 640;

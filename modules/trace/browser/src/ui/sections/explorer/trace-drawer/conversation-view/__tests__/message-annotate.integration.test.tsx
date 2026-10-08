@@ -63,7 +63,7 @@ import type * as scenarioRolesModule from "../../../../../../features/trace-draw
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
-import type { TurnLayout } from "../types.ts";
+import type { TurnLayout } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";
 

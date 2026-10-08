@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import type { Mode } from "./types.ts";
+/** How the conversation reads: a chat thread, side bubbles or one markdown page. */
+export type Mode = "thread" | "bubbles" | "markdown";
 
 /** How wide the reading column gets before the rail is taken into account. */
 export const THREAD_COLUMN_MAX_WIDTH_PX = 800;

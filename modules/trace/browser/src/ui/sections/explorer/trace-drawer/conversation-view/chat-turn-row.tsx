@@ -51,7 +51,9 @@ import {
   TurnSessionCheckbox,
 } from "./turn-annotations.tsx";
 import { TurnSteps, turnHasGenieSteps } from "./turn-steps.tsx";
-import type { TurnLayout } from "./types.ts";
+
+/** Chat-turn presentation: ChatGPT-style full-width thread vs side bubbles. */
+export type TurnLayout = "thread" | "bubbles";
 
 /**
  * Human-readable wall-clock gap between two turns, e.g. "12.5s gap",

@@ -108,7 +108,9 @@ vi.mock("../integrate-pane.tsx", () => ({
   IntegratePane: () => <div data-testid="integrate-pane" />,
 }));
 vi.mock("../empty-results-pane.tsx", () => ({ EmptyResultsPane: () => null }));
-vi.mock("../explorer-langy-actions.tsx", () => ({ ExplorerLangyActions: () => null }));
+vi.mock("../../../../../behavior/langy/use-explorer-langy-actions.ts", () => ({
+  useExplorerLangyActions: () => ({}),
+}));
 vi.mock("../page-keyboard-shortcuts.tsx", () => ({ PageKeyboardShortcuts: () => null }));
 vi.mock("../../export-config-dialog.tsx", () => ({ ExportConfigDialog: () => null }));
 vi.mock("../../../trace-find-bar.tsx", () => ({ FindBar: () => null }));
