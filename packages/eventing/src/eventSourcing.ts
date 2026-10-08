@@ -481,8 +481,13 @@ export class EventSourcing {
 
   /** A pipeline's cross-pipeline lanes, before the global registry starts routing. */
   private registerGlobalProjections(
-    definition: Pick<StaticPipelineDefinition, "globalProjections" | "metadata">,
+    definition: Pick<
+      StaticPipelineDefinition,
+      "globalProjections" | "metadata" | "retentionPolicyResolver"
+    >,
   ): void {
+    const { retentionPolicyResolver } = definition;
+    const host = retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver };
     for (const projection of definition.globalProjections ?? []) {
       if (this.projectionRegistry.isInitialized) {
         throw new ConfigurationError(
@@ -491,7 +496,7 @@ export class EventSourcing {
           { pipeline: definition.metadata.name, projection: projection.name },
         );
       }
-      projection.register(this.projectionRegistry);
+      projection.register(this.projectionRegistry, host);
     }
   }
 

@@ -51,3 +51,22 @@ Feature: A module folds and maps a peer pipeline's events into its own state
     When a projection replay reads the registered pipelines
     Then it lists both lanes under the owner's aggregate type, paused on the global pipeline
     And it folds the owner's stored events through the contract's schema as live delivery does
+
+  # Round 20, option A: a host pipeline's `.withRetention` covers the peer lanes it hosts.
+  @unit
+  Scenario: A peer projection's rows take its host pipeline's retention
+    Given a host pipeline declaring its tenants' retention, with a peer fold and a peer map
+    When the owner's pipeline appends an event for a tenant
+    Then the peer fold's and the peer map's rows are stamped with the host's answer for that tenant
+
+  @unit
+  Scenario: A projection replay stamps a peer projection's rows with the tenant's retention
+    Given a host pipeline declaring its tenants' retention, with a peer fold and a peer map
+    When a projection replay rebuilds both lanes with the same tenant's retention
+    Then each rebuilt row carries the policy live delivery stamped
+
+  @unit
+  Scenario: A peer projection whose host declares no retention keeps the store's default
+    Given a host pipeline declaring no retention, in a runtime with a retention resolver of its own
+    When the owner's pipeline appends an event for a tenant
+    Then the peer lanes' stores are handed no policy and the runtime's resolver is never asked

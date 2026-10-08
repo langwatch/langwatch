@@ -166,6 +166,7 @@ export class ProjectionRouter<
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
+  private readonly laneRetentionPolicyResolvers: ReadonlyMap<string, RetentionPolicyResolver>;
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.projection-router");
   private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
@@ -194,6 +195,8 @@ export class ProjectionRouter<
     executionTarget?: ExecutionTarget;
     replayMarkerChecker?: ReplayMarkerChecker;
     retentionPolicyResolver?: RetentionPolicyResolver;
+    /** A lane's own resolver, preferred to the router's: a peer lane's host pipeline's (§9). */
+    laneRetentionPolicyResolvers?: ReadonlyMap<string, RetentionPolicyResolver>;
     /** One aggregate's leaned events from the log; a state projection rebuilds from it. */
     aggregateHistory?: AggregateHistory<EventType>;
   }) {
@@ -204,6 +207,7 @@ export class ProjectionRouter<
     this.executionTarget = options.executionTarget;
     this.replayMarkerChecker = options.replayMarkerChecker;
     this.retentionPolicyResolver = options.retentionPolicyResolver;
+    this.laneRetentionPolicyResolvers = options.laneRetentionPolicyResolvers ?? new Map();
   }
 
   registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
@@ -760,7 +764,7 @@ export class ProjectionRouter<
     }
     if (toApply.length === 0) return;
 
-    const firstContext = await this.buildStoreContext({ event: toApply[0]! });
+    const firstContext = await this.buildStoreContext({ projectionName: name, event: toApply[0]! });
     const contextFor = (event: EventType) => ({
       ...firstContext,
       aggregateId: String(event.aggregateId),
@@ -906,6 +910,7 @@ export class ProjectionRouter<
       const kept = await this.withoutReplaySkipped({ projectionName, events: [missed] });
       if (kept.length === 0) return;
       const storeContext = await this.buildStoreContext({
+        projectionName,
         event: missed,
         deliveryAttempt: context.deliveryAttempt,
       });
@@ -959,6 +964,7 @@ export class ProjectionRouter<
     }
     if (!latest) return;
     const storeContext = await this.buildStoreContext({
+      projectionName,
       event: missed,
       deliveryAttempt: context.deliveryAttempt,
     });
@@ -1159,7 +1165,7 @@ export class ProjectionRouter<
   }): Promise<void> {
     if (await this.skippedForReplay(name, event)) return;
 
-    const storeContext = await this.buildStoreContext({ event });
+    const storeContext = await this.buildStoreContext({ projectionName: name, event });
     const record = await withMetrics({
       fn: () =>
         executeOwnMapEvent({
@@ -1600,6 +1606,7 @@ export class ProjectionRouter<
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
         const storeContext = await this.buildStoreContext({
+          projectionName,
           event: toApply[0]!,
           key,
           deliveryAttempt: context.deliveryAttempt,
@@ -1705,6 +1712,7 @@ export class ProjectionRouter<
 
         const key = fold.key ? fold.key(event) : undefined;
         const storeContext = await this.buildStoreContext({
+          projectionName,
           event,
           key,
           deliveryAttempt: context.deliveryAttempt,
@@ -1863,6 +1871,7 @@ export class ProjectionRouter<
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
         const storeContext = await this.buildStoreContext({
+          projectionName,
           event: first,
           key,
           deliveryAttempt: context.deliveryAttempt,
@@ -2278,24 +2287,37 @@ export class ProjectionRouter<
     return !executionTargetMatches(subscriber.options?.runIn, this.executionTarget);
   }
 
-  private async resolveRetention(tenantId: unknown): Promise<RetentionPolicy | null> {
-    if (!this.retentionPolicyResolver) return null;
-    return this.retentionPolicyResolver.resolve(String(tenantId));
+  private async resolveRetention({
+    projectionName,
+    tenantId,
+  }: {
+    projectionName: string;
+    tenantId: unknown;
+  }): Promise<RetentionPolicy | null> {
+    const resolver =
+      this.laneRetentionPolicyResolvers.get(projectionName) ?? this.retentionPolicyResolver;
+    if (!resolver) return null;
+    return resolver.resolve(String(tenantId));
   }
 
   /** Shared per-event context so every projection executor sees the same shape. */
   private async buildStoreContext({
+    projectionName,
     event,
     key,
     deliveryAttempt,
     isDeliveryContinuation,
   }: {
+    projectionName: string;
     event: EventType;
     key?: string;
     deliveryAttempt?: number;
     isDeliveryContinuation?: boolean;
   }): Promise<ProjectionStoreContext> {
-    const retentionPolicy = await this.resolveRetention(event.tenantId);
+    const retentionPolicy = await this.resolveRetention({
+      projectionName,
+      tenantId: event.tenantId,
+    });
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,

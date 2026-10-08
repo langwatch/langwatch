@@ -247,7 +247,7 @@ export class PipelineBuilder<
     const fold = peerFoldProjection({ lane, declaration });
     this.globalProjections.push({
       name: lane,
-      register: (registry) => registry.registerPeerFoldProjection(fold),
+      register: (registry, host) => registry.registerPeerFoldProjection(fold, host),
       peer: { kind: "fold", projection: sealFoldProjection(fold) },
     });
     return this;
@@ -262,7 +262,7 @@ export class PipelineBuilder<
     const map = peerMapProjection({ lane, declaration });
     this.globalProjections.push({
       name: lane,
-      register: (registry) => registry.registerPeerMapProjection(map),
+      register: (registry, host) => registry.registerPeerMapProjection(map, host),
       peer: { kind: "map", projection: sealMapProjection<MapRecord, Event, Event>(map) },
     });
     return this;

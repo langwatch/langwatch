@@ -4,7 +4,7 @@ import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
 import { DispatchError } from "../queues/dispatchError.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
-import type { ExecutionTarget } from "../runtime.types.ts";
+import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type { FailedHandoff, HandoffLaneKind } from "../services/handoff/failedHandoff.ts";
 import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager.ts";
@@ -46,7 +46,11 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   private readonly eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private readonly peerLanes = new Map<
     string,
-    { kind: "fold" | "map"; eventTypes: readonly string[] }
+    {
+      kind: "fold" | "map";
+      eventTypes: readonly string[];
+      retentionPolicyResolver?: RetentionPolicyResolver;
+    }
   >();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
@@ -123,18 +127,33 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     );
   }
 
-  /** A peer fold (§9): the host's fold over an owner's events, re-folded from the owner's log. */
-  registerPeerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
+  /**
+   * A peer fold (§9): the host's fold over an owner's events, re-folded from the owner's log.
+   * Its rows take the host pipeline's retention, when the host declares one.
+   */
+  registerPeerFoldProjection<State>(
+    projection: FoldProjectionDefinition<State, EventType>,
+    host: { retentionPolicyResolver?: RetentionPolicyResolver } = {},
+  ): void {
     this.registerFoldProjection(projection);
-    this.peerLanes.set(projection.name, { kind: "fold", eventTypes: projection.eventTypes });
+    this.peerLanes.set(projection.name, {
+      kind: "fold",
+      eventTypes: projection.eventTypes,
+      ...host,
+    });
   }
 
   /** A peer map (§9): the host's map over an owner's events, deduped from the owner's log. */
   registerPeerMapProjection<MapRecord, Own extends Event>(
     projection: MapProjectionDefinition<MapRecord, Own>,
+    host: { retentionPolicyResolver?: RetentionPolicyResolver } = {},
   ): void {
     this.registerMapProjection(projection);
-    this.peerLanes.set(projection.name, { kind: "map", eventTypes: projection.eventTypes });
+    this.peerLanes.set(projection.name, {
+      kind: "map",
+      eventTypes: projection.eventTypes,
+      ...host,
+    });
   }
 
   registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
@@ -225,6 +244,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       queueManager: this.queueManager,
       executionTarget,
       replayMarkerChecker: this.peerReplayMarkerChecker(),
+      laneRetentionPolicyResolvers: this.peerLaneRetention(),
     });
     this.router = router;
 
@@ -265,6 +285,15 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   }
 
   /** Each peer lane's owner log, resolved once every pipeline registered; unknown refuses. */
+  /** Each peer lane whose host pipeline declares retention, with that resolver. */
+  private peerLaneRetention(): Map<string, RetentionPolicyResolver> {
+    const resolvers = new Map<string, RetentionPolicyResolver>();
+    for (const [lane, { retentionPolicyResolver }] of this.peerLanes) {
+      if (retentionPolicyResolver) resolvers.set(lane, retentionPolicyResolver);
+    }
+    return resolvers;
+  }
+
   private wirePeerEventLogs(): void {
     const resolve = this.peerEventLog;
     if (!resolve) return;

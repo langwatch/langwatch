@@ -78,7 +78,11 @@ export type NoCommands = never;
 /** A cross-pipeline map projection, registered onto the runtime's global registry. */
 export interface GlobalProjection {
   readonly name: string;
-  readonly register: (registry: ProjectionRegistry<Event>) => void;
+  /** `host` carries the declaring pipeline's retention, which its peer lanes write under. */
+  readonly register: (
+    registry: ProjectionRegistry<Event>,
+    host?: { retentionPolicyResolver?: RetentionPolicyResolver },
+  ) => void;
   /** Set on a peer fold or map: the lane as registered, which a projection replay rebuilds. */
   readonly peer?: PeerLane;
 }
