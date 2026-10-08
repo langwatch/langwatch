@@ -13,9 +13,10 @@ Feature: Seat subscription provisions an organization retention policy
   # under scenarios), so the entitlement is recorded rather than implied — it
   # survives any future lowering of the platform default that an org without an
   # override would otherwise drift down to. Provisioning is idempotent (one
-  # override per scope + category) and is a best-effort side effect: a retention
-  # failure is logged, never raised, so it can never fail the Stripe webhook and
-  # leave the subscription stuck PENDING.
+  # override per scope + category) and data-retention applies it from billing's
+  # subscription_started fact (round 37 D4): a retention failure is retried on
+  # data-retention's side and can never fail the Stripe webhook or leave the
+  # subscription stuck PENDING.
 
   Background:
     Given an organization with no retention override

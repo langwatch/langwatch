@@ -181,6 +181,8 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("monitor_evaluator_cleanup");
       expect(pipelines).toContain("scim_sso_connections");
       expect(pipelines).toContain("data_retention_project_scope");
+      expect(pipelines).toContain("data_retention_seat_policy");
+      expect(pipelines).toContain("audit_log");
       expect(pipelines).toContain("agent_lifecycle");
       expect(pipelines).toContain("annotation_lifecycle");
       expect(pipelines).toContain("trace_topic_names");

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  BILLING_AUDIT_RECORDED_EVENT_TYPE,
   BILLING_LIFECYCLE_EVENT_VERSION,
   CHECKOUT_COMPLETED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   USAGE_BILLING_CHANGED_EVENT_TYPE,
+  billingAuditRecordedEventDataSchema,
   checkoutCompletedEventDataSchema,
   subscriptionChangedEventDataSchema,
   subscriptionStartedEventDataSchema,
@@ -21,6 +23,7 @@ export const RECORD_CHECKOUT_COMPLETED_COMMAND_TYPE =
   "lw.billing.record_checkout_completed" as const;
 export const RECORD_USAGE_BILLING_CHANGED_COMMAND_TYPE =
   "lw.billing.record_usage_billing_changed" as const;
+export const RECORD_BILLING_AUDIT_COMMAND_TYPE = "lw.billing.record_audit" as const;
 
 export const recordSubscriptionChangedCommandDataSchema = subscriptionChangedEventDataSchema;
 export type RecordSubscriptionChangedCommandData = z.infer<
@@ -39,6 +42,9 @@ export const recordUsageBillingChangedCommandDataSchema = usageBillingChangedEve
 export type RecordUsageBillingChangedCommandData = z.infer<
   typeof recordUsageBillingChangedCommandDataSchema
 >;
+
+export const recordBillingAuditCommandDataSchema = billingAuditRecordedEventDataSchema;
+export type RecordBillingAuditCommandData = z.infer<typeof recordBillingAuditCommandDataSchema>;
 
 export const subscriptionChangedEventSchema = z.object({
   ...EventSchema.shape,
@@ -72,8 +78,17 @@ export const usageBillingChangedEventSchema = z.object({
 });
 export type UsageBillingChangedEvent = z.infer<typeof usageBillingChangedEventSchema>;
 
+export const billingAuditRecordedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(BILLING_AUDIT_RECORDED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: billingAuditRecordedEventDataSchema,
+});
+export type BillingAuditRecordedEvent = z.infer<typeof billingAuditRecordedEventSchema>;
+
 export type BillingLifecycleEvent =
   | SubscriptionChangedEvent
   | SubscriptionStartedEvent
   | CheckoutCompletedEvent
-  | UsageBillingChangedEvent;
+  | UsageBillingChangedEvent
+  | BillingAuditRecordedEvent;

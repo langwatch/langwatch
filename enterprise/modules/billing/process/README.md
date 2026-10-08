@@ -177,16 +177,17 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `billing_lifecycle` (aggregate `billing_lifecycle`)
 
-Declared at `src/eventing/billing-lifecycle.pipeline.ts:61`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`.
+Declared at `src/eventing/billing-lifecycle.pipeline.ts:65`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`, `billingAuditRecordedEventSchema`.
 
 | Kind            | Name                           | Handles               | Declared at                                     |
 | --------------- | ------------------------------ | --------------------- | ----------------------------------------------- |
-| command         | `recordSubscriptionChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:71` |
-| command         | `recordSubscriptionStarted`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:72` |
-| command         | `recordCheckoutCompleted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:73` |
-| command         | `recordUsageBillingChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:74` |
-| peer subscriber | `organizationSeatLimitReached` | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:75` |
-| peer subscriber | `usageLimitReached`            | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:79` |
+| command         | `recordSubscriptionChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:76` |
+| command         | `recordSubscriptionStarted`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:77` |
+| command         | `recordCheckoutCompleted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:78` |
+| command         | `recordUsageBillingChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:79` |
+| command         | `recordAudit`                  | –                     | `src/eventing/billing-lifecycle.pipeline.ts:80` |
+| peer subscriber | `organizationSeatLimitReached` | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:81` |
+| peer subscriber | `usageLimitReached`            | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:85` |
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
@@ -219,12 +220,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:214`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:215`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:216`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:217`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:218`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:219`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:205`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:206`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:207`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:208`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:209`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:210`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |

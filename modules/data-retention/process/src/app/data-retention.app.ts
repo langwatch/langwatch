@@ -27,6 +27,10 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { UserApi } from "@langwatch/user-contract";
 
+import {
+  buildDataRetentionSeatPolicyPipeline,
+  type DataRetentionSeatPolicyPipeline,
+} from "../eventing/data-retention-seat-policy.pipeline.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import {
   DataRetentionPolicyService,
@@ -36,6 +40,7 @@ import { DataRetentionSnapshotService } from "../services/data-retention-snapsho
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
+import { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 import { StorageMeterScopeService } from "../services/storage-meter-scope.service.ts";
 import { StorageMeterService } from "../services/storage-meter.service.ts";
 
@@ -111,6 +116,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #policy: DataRetentionPolicyService;
   readonly #snapshots: DataRetentionSnapshotService;
   readonly #scopeMeter: StorageMeterScopeService;
+  readonly #seatPolicies: SeatRetentionPolicyService;
   readonly #users: UserApi;
 
   private constructor(services: {
@@ -118,12 +124,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
     policy: DataRetentionPolicyService;
     snapshots: DataRetentionSnapshotService;
     scopeMeter: StorageMeterScopeService;
+    seatPolicies: SeatRetentionPolicyService;
     users: UserApi;
   }) {
     this.#retention = services.retention;
     this.#policy = services.policy;
     this.#snapshots = services.snapshots;
     this.#scopeMeter = services.scopeMeter;
+    this.#seatPolicies = services.seatPolicies;
     this.#users = services.users;
   }
 
@@ -169,8 +177,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         permissions,
       }),
+      seatPolicies: SeatRetentionPolicyService.create({ rules: retention }),
       users: dependencies.users,
     });
+  }
+
+  /** The pipeline `data_retention_seat_policy` registers, over billing's activation fact. */
+  seatPolicyPipeline(): DataRetentionSeatPolicyPipeline {
+    return buildDataRetentionSeatPolicyPipeline({ seatPolicies: this.#seatPolicies });
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {

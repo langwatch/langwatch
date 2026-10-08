@@ -26,6 +26,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",

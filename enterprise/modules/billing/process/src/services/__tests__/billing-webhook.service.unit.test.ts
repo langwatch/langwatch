@@ -1,7 +1,3 @@
-import {
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-} from "@langwatch/data-retention-contract";
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { traced } from "@langwatch/observability/node";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -25,11 +21,6 @@ import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 const mockSendSlackBillingThresholdFailureAlert = vi.fn().mockResolvedValue(undefined);
-const mockSetOrganizationRetention = vi.fn().mockResolvedValue(undefined);
-// Seat provisioning is create-if-absent: it reads the org's current rules and
-// only fills the gaps. Default to "no existing rules" so the base case
-// provisions everything.
-const mockListOrganizationRetentionRules = vi.fn().mockResolvedValue([]);
 
 const createMockHost = (): {
   [K in keyof BillingWebhookHost]: Mock<BillingWebhookHost[K]>;
@@ -37,11 +28,6 @@ const createMockHost = (): {
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
 });
-
-const retention = {
-  listOrganizationRules: mockListOrganizationRetentionRules,
-  setForScope: mockSetOrganizationRetention,
-};
 
 const createMockBillingSubscription = (): {
   [K in keyof BillingWebhookSubscriptionRepository]: Mock<BillingWebhookSubscriptionRepository[K]>;
@@ -195,7 +181,6 @@ describe("EEWebhookService", () => {
       stripeSubscriptions,
       itemCalculator,
       host: host,
-      retention,
     });
   });
 
@@ -325,7 +310,6 @@ describe("EEWebhookService", () => {
               stripeSubscriptions,
               itemCalculator,
               host: host,
-              retention,
             }),
             "EEWebhookService",
           );
@@ -377,7 +361,6 @@ describe("EEWebhookService", () => {
           stripeSubscriptions,
           itemCalculator,
           host: host,
-          retention,
           inviteApprover: mockInviteApprover,
         });
 
@@ -705,7 +688,6 @@ describe("EEWebhookService", () => {
           stripeSubscriptions: localStripe,
           itemCalculator,
           host: host,
-          retention,
         });
 
         subRepo.findByStripeId.mockResolvedValue(
@@ -757,7 +739,6 @@ describe("EEWebhookService", () => {
           stripeSubscriptions: localStripe,
           itemCalculator,
           host: host,
-          retention,
         });
 
         subRepo.findByStripeId.mockResolvedValue(
@@ -784,169 +765,6 @@ describe("EEWebhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
-      });
-
-      /** @scenario A first paid Growth Seat activation provisions the organization policies */
-      it("provisions an organization-scoped retention policy for every category at the platform default", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({
-            status: SubscriptionStatus.PENDING,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        );
-        subRepo.activate.mockResolvedValue({
-          outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        });
-        subRepo.migrateToSeatEvent.mockResolvedValue([]);
-
-        const promise = service.handleInvoicePaymentSucceeded({
-          subscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
-        for (const category of retentionCategories) {
-          expect(mockSetOrganizationRetention).toHaveBeenCalledWith({
-            scope: { scopeType: "ORGANIZATION", scopeId: "org_123" },
-            category,
-            retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-          });
-        }
-        expect(mockSetOrganizationRetention).toHaveBeenCalledTimes(retentionCategories.length);
-      });
-
-      /** @scenario A billing event never overwrites an existing retention policy */
-      it("never overwrites an existing org-level policy — only fills missing categories", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({
-            status: SubscriptionStatus.PENDING,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        );
-        subRepo.activate.mockResolvedValue({
-          outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        });
-        subRepo.migrateToSeatEvent.mockResolvedValue([]);
-        // The org already tuned traces retention high; a billing event must NOT
-        // clobber it back to the platform default (that would shorten the
-        // window and delete data). Only the uncovered categories are filled.
-        mockListOrganizationRetentionRules.mockResolvedValueOnce([
-          {
-            scopeType: "ORGANIZATION",
-            scopeId: "org_123",
-            category: "traces",
-          },
-        ]);
-
-        const promise = service.handleInvoicePaymentSucceeded({
-          subscriptionId: "sub_stripe_1",
-        });
-        await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
-        expect(mockSetOrganizationRetention).not.toHaveBeenCalledWith(
-          expect.objectContaining({ category: "traces" }),
-        );
-        expect(mockSetOrganizationRetention).toHaveBeenCalledTimes(retentionCategories.length - 1);
-      });
-
-      /** @scenario A retention failure never fails the billing webhook */
-      it("still activates and notifies when retention provisioning throws", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({
-            status: SubscriptionStatus.PENDING,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        );
-        subRepo.activate.mockResolvedValue({
-          outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        });
-        subRepo.migrateToSeatEvent.mockResolvedValue([]);
-        mockSetOrganizationRetention.mockRejectedValueOnce(new Error("retention store down"));
-
-        const promise = service.handleInvoicePaymentSucceeded({
-          subscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        // Should not throw — retention failure is swallowed
-        await promise;
-
-        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: "confirmed",
-            organizationId: "org_123",
-          }),
-        );
-      });
-    });
-
-    describe("when subscription is a non-seat plan", () => {
-      /** @scenario A non-seat plan does not provision a policy */
-      it("does not provision a retention policy on first activation", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({
-            status: SubscriptionStatus.PENDING,
-            plan: "LAUNCH",
-          }),
-        );
-        subRepo.activate.mockResolvedValue({
-          outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "LAUNCH",
-          }),
-        });
-
-        const promise = service.handleInvoicePaymentSucceeded({
-          subscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
-        expect(mockSetOrganizationRetention).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when an active seat subscription renews", () => {
-      /** @scenario A renewal does not re-provision the policy */
-      it("does not re-provision the retention policy", async () => {
-        subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        );
-        subRepo.activate.mockResolvedValue({
-          outcome: "activated",
-          subscription: makeSubscriptionWithOrg({
-            status: SubscriptionStatus.ACTIVE,
-            plan: "GROWTH_SEAT_EUR_MONTHLY",
-          }),
-        });
-
-        const promise = service.handleInvoicePaymentSucceeded({
-          subscriptionId: "sub_stripe_1",
-        });
-
-        await vi.advanceTimersByTimeAsync(2000);
-        await promise;
-
-        expect(mockSetOrganizationRetention).not.toHaveBeenCalled();
       });
     });
 
@@ -1676,6 +1494,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       },
       recordCheckoutCompleted: { send: async () => {}, ...unused },
       recordUsageBillingChanged: { send: async () => {}, ...unused },
+      recordAudit: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,
@@ -1684,7 +1503,6 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       stripeSubscriptions: subscriptionsTwin(),
       itemCalculator: createMockItemCalculator(),
       host: createMockHost(),
-      retention,
       announcer,
     });
   });
@@ -1727,6 +1545,37 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
 
       expect(subRepo.activate).toHaveBeenCalledTimes(1);
+      expect(startedRecords).toEqual([]);
+    });
+  });
+
+  describe("when a Growth Seat invoice payment succeeds", () => {
+    it("reports the started subscription with its seat plan, which data-retention provisions from", async () => {
+      const seat = makeSubscriptionWithOrg({
+        status: SubscriptionStatus.ACTIVE,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      subRepo.findByStripeId.mockResolvedValue(
+        makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+      );
+      subRepo.activate.mockResolvedValue({ outcome: "activated", subscription: seat });
+      subRepo.migrateToSeatEvent.mockResolvedValue([]);
+
+      await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
+
+      expect(startedRecords).toEqual([
+        expect.objectContaining({ organizationId: "org_123", plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+      ]);
+    });
+
+    /** @scenario A renewal does not re-provision the policy */
+    it("reports no started subscription for a renewal, so nothing is provisioned", async () => {
+      subRepo.findByStripeId.mockResolvedValue(
+        makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+      );
+
+      await settled(service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" }));
+
       expect(startedRecords).toEqual([]);
     });
   });

@@ -1,8 +1,14 @@
 /**
- * Audit-log writes its own rows from organization's audit facts (Alex, 2026-10-06; record §9),
- * so organization holds no audit-log peer. Spec: modules/audit-log/specs/audit-log.feature
+ * Audit-log writes its own rows from organization's and billing's audit facts (Alex, 2026-10-06;
+ * round 37 D3; record §9), so neither holds an audit-log peer.
+ * Spec: modules/audit-log/specs/audit-log.feature
  */
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import {
+  BILLING_AUDIT_RECORDED_EVENT_TYPE,
+  type BillingAuditRecordedEventData,
+  billingAuditRecordedEventDataSchema,
+} from "@langwatch/enterprise-billing-contract";
 import {
   defineAggregate,
   defineEventingModule,
@@ -41,6 +47,18 @@ function organizationAuditCommand(fact: OrganizationAuditRecordedEventData): Rec
   };
 }
 
+/** Billing's operator command as main recorded it: no organization on the row, args kept. */
+function billingAuditCommand(fact: BillingAuditRecordedEventData): RecordAuditLogCommand {
+  return {
+    idempotencyKey: fact.idempotencyKey,
+    userId: fact.userId,
+    action: fact.action,
+    ...(fact.args === undefined ? {} : { args: fact.args }),
+    targetKind: fact.targetKind,
+    targetId: fact.targetId,
+  };
+}
+
 export function buildAuditLogPipeline({
   entries,
 }: {
@@ -57,6 +75,13 @@ export function buildAuditLogPipeline({
       data: organizationAuditRecordedEventDataSchema,
       handle: async (fact) => {
         await entries.record(organizationAuditCommand(fact));
+      },
+    })
+    .withPeerSubscriber("auditLogBillingAudit", {
+      eventType: BILLING_AUDIT_RECORDED_EVENT_TYPE,
+      data: billingAuditRecordedEventDataSchema,
+      handle: async (fact) => {
+        await entries.record(billingAuditCommand(fact));
       },
     })
     .build();

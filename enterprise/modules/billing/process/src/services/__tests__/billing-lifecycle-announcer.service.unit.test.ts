@@ -9,6 +9,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  RecordBillingAuditCommandData,
   RecordCheckoutCompletedCommandData,
   RecordSubscriptionChangedCommandData,
   RecordSubscriptionStartedCommandData,
@@ -84,6 +85,7 @@ function announcerOver(input: {
         await usageRecorder.send(payload);
       },
     },
+    recordAudit: recorder<RecordBillingAuditCommandData>([]),
   });
   return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
@@ -178,6 +180,7 @@ describe("BillingLifecycleAnnouncerService", () => {
       recordSubscriptionStarted: recorder(started),
       recordCheckoutCompleted: recorder<RecordCheckoutCompletedCommandData>([]),
       recordUsageBillingChanged: recorder<RecordUsageBillingChangedCommandData>([]),
+      recordAudit: recorder<RecordBillingAuditCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
@@ -197,7 +200,7 @@ describe("BillingLifecycleAnnouncerService", () => {
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();
   });
 
-  describe("the usage-billing fact", () => {
+  describe("when the usage-billing fact is recorded", () => {
     afterEach(() => {
       vi.useRealTimers();
     });

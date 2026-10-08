@@ -27,6 +27,7 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

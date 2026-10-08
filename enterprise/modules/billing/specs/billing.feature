@@ -167,3 +167,11 @@ Feature: Enterprise billing compatibility
     And each tier answers that customer's summarised values for the window and none for another customer
     And each tier refuses a second event with the same identifier with resource_already_exists
     And each tier passes a refused meter event through as the provider's own error
+
+  # Round 37 D3 (Alex, 2026-10-08): billing records the audit fact; audit-log writes the row.
+  @unit
+  Scenario: A platform operator's billing command records an audit fact for audit-log
+    Given a platform operator on LangWatch Cloud
+    When the operator reads a connected customer's billing overview
+    Then billing records an audit fact naming the operator, the action, its arguments and the organization
+    And the fact carries a fresh audit id, so a redelivery writes one row

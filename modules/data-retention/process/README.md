@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionProjectScopeEventing).withMigrations(…)`, `src/data-retention.module.ts:13`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionProjectScopeEventing).withEventing(dataRetentionSeatPolicyEventing).withMigrations(…)`, `src/data-retention.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -196,6 +196,14 @@ Declared at `src/eventing/data-retention-project-scope.pipeline.ts:17`.
 | Kind                 | Name                                         | Handles | Declared at                                                |
 | -------------------- | -------------------------------------------- | ------- | ---------------------------------------------------------- |
 | peer fold projection | `≈ dataRetentionProjectScopePeerFold(store)` | –       | `src/eventing/data-retention-project-scope.pipeline.ts:22` |
+
+### Pipeline `data_retention_seat_policy` (aggregate `global`)
+
+Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
+
+| Kind            | Name                          | Handles                                                                                         | Declared at                                              |
+| --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
 
 ## Configuration
 

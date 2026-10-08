@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { AuthzApi, PLATFORM_TENANT_ID } from "@langwatch/authz-contract";
 import {
   BillingApi,
   billingBrowserConfig,
@@ -10,6 +8,7 @@ import {
   BillingPriceCatalogue,
   billingSecrets,
   type BillingServerConfig,
+  type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
@@ -78,7 +77,6 @@ import {
   EEWebhookService,
   type LicensePurchaseHandler,
 } from "../services/billing-stripe-webhook.service.ts";
-import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
@@ -141,7 +139,6 @@ type ConnectedLicensing = Pick<
 export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
   authorization: Pick<AuthzApi, "can">;
-  auditLog: Pick<AuditLogApi, "record">;
   organizations: ConnectedCustomerPeers["organizations"];
   gateway: ConnectedCustomerPeers["gateway"];
 }>;
@@ -153,8 +150,6 @@ type BillingStripe = Readonly<{
 
 type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
-  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
-  retention: SeatRetentionRules;
   /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
   licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
@@ -199,14 +194,10 @@ export class BillingModule
     organizations: OrganizationApi,
     /** The spend ledger a statement sums. */
     gateway: GatewayApi,
-    /** Where every backoffice billing command is recorded, as main recorded it. */
-    auditLog: AuditLogApi,
     /** Where the usage-limit warning is written down, and read back so it goes once a month. */
     notifications: NotificationApi,
     /** The named projects a usage-limit warning lists. */
     projects: ProjectApi,
-    /** The retention window a plan change resets, as main's webhook did. */
-    dataRetention: DataRetentionApi,
   };
   static readonly config = billingConfig;
   static readonly publicConfig = billingBrowserConfig.project;
@@ -267,7 +258,6 @@ export class BillingModule
         }),
         webhook: {
           host: billingWebhookHostChannels.slack.create({ notices }),
-          retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
           licenses: setup.dependencies.organizations,
           licensePurchase,
@@ -432,7 +422,6 @@ export class BillingModule
     });
     const gate = {
       authorization: peers.authorization,
-      auditLog: peers.auditLog,
       overview,
       subscriptionPlans: SaaSPlanProviderService.create({
         subscriptions: repositories.subscriptions,
@@ -700,7 +689,6 @@ export class BillingModule
       licenses: webhook.licenses,
       licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,
-      retention: webhook.retention,
       connectedBilling,
       ...(announcer ? { announcer } : {}),
     });
@@ -734,7 +722,6 @@ export class BillingModule
   readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
   readonly #authorization: Pick<AuthzApi, "can">;
-  readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #overview: ConnectedBillingOverviewService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
@@ -749,7 +736,6 @@ export class BillingModule
     subscriptions,
     connected,
     authorization,
-    auditLog,
     overview,
     subscriptionPlans,
     isSaas,
@@ -764,7 +750,6 @@ export class BillingModule
     subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
     authorization: Pick<AuthzApi, "can">;
-    auditLog: Pick<AuditLogApi, "record">;
     overview: ConnectedBillingOverviewService;
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
@@ -777,7 +762,6 @@ export class BillingModule
     this.#subscriptions = subscriptions;
     this.#connected = connected;
     this.#authorization = authorization;
-    this.#auditLog = auditLog;
     this.#overview = overview;
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
@@ -1025,7 +1009,8 @@ export class BillingModule
     staff: BillingStaff,
   ): Promise<void> {
     await this.#connectedBilling().billing.markPaidOutOfBand(input);
-    await this.#auditLog.record({
+    await this.#audited().audited({
+      tenantId: PLATFORM_TENANT_ID,
       userId: staff.id,
       action: "connectedBilling.markPaidOutOfBand",
       args: { stripeInvoiceId: input.stripeInvoiceId },
@@ -1042,16 +1027,25 @@ export class BillingModule
   }: {
     staff: BillingStaff;
     action: string;
-    args: RecordAuditLogCommand["args"];
+    args: BillingAuditRecordedEventData["args"];
     organizationId: string;
   }): Promise<void> {
-    await this.#auditLog.record({
+    await this.#audited().audited({
+      tenantId: organizationId,
       userId: staff.id,
       action,
       args,
       targetKind: "organization",
       targetId: organizationId,
     });
+  }
+
+  /** Audit-log writes each backoffice command's row from billing's fact (round 37 D3). */
+  #audited(): BillingLifecycleAnnouncerService {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle;
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

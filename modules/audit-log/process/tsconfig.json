@@ -34,6 +34,9 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {

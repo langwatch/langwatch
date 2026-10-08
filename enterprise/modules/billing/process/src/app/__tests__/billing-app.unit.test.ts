@@ -1,5 +1,5 @@
-import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
@@ -14,8 +14,9 @@ import { MemoryStripeMetersChannel } from "../../channels/memory/memory.stripe-m
 import { MemoryStripePricesChannel } from "../../channels/memory/memory.stripe-prices.channel.ts";
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { MemoryStripeWebhooksChannel } from "../../channels/memory/memory.stripe-webhooks.channel.ts";
+import type { RecordBillingAuditCommandData } from "../../eventing/billing-lifecycle.events.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
-import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
+import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import type { UsageReportingService } from "../../services/usage-reporting.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
@@ -30,7 +31,6 @@ const CUSTOMER_ADMIN = { id: "user-customer", email: "admin@acme.example" };
 /** The license registry as billing reads it: terms agreed at a fixed commit. */
 function licensedAt(commitUsdCents: number) {
   const asked: string[] = [];
-  const audited: RecordAuditLogCommand[] = [];
   const terms: ContractTerms = {
     commitUsdCents,
     maximumUsdCents: commitUsdCents,
@@ -69,18 +69,42 @@ function licensedAt(commitUsdCents: number) {
           (permission === "ops:manage" || permission === "ops:view")) ||
           (principal.id === VIEWER.id && permission === "ops:view")),
     },
-    auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
-      record: async (command) => {
-        audited.push(command);
-        return { id: "audit", occurredAt: 0 };
-      },
-    }),
     organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({
       findSelfHostedCustomers: async () => [{ organizationId: ACME, organizationName: "Acme" }],
     }),
     gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),
   };
-  return { asked, audited, peers };
+  return { asked, peers };
+}
+
+/** Billing's lifecycle pipeline with its senders captured; only the audit facts are kept. */
+function lifecycleRecording() {
+  const audited: RecordBillingAuditCommandData[] = [];
+  const ignored = <Payload>(kept: Payload[] = []): EventingCommandSender<Payload> => ({
+    send: async (payload) => {
+      kept.push(payload);
+    },
+    sendBatch: async (payloads) => {
+      kept.push(...payloads);
+    },
+    close: async () => {},
+    waitUntilReady: async () => {},
+  });
+  const lifecycle = BillingLifecycleAnnouncerService.create({
+    subscriptions: { findLastNonCancelled: async () => null },
+    organizations: { getAllMembers: async () => [] },
+    resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
+    planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+    billingOrganizations: { getOrganizationForBilling: async () => ({ outcome: "not_found" }) },
+  });
+  lifecycle.connect({
+    recordSubscriptionChanged: ignored(),
+    recordSubscriptionStarted: ignored(),
+    recordCheckoutCompleted: ignored(),
+    recordUsageBillingChanged: ignored(),
+    recordAudit: ignored(audited),
+  });
+  return { lifecycle, audited };
 }
 
 /** Billing's Stripe as memory twins; the SDK client refuses any call by name. */
@@ -111,7 +135,9 @@ function billingApp({
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
   const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
+  const { lifecycle, audited } = lifecycleRecording();
   const app = BillingModule.assemble({
+    lifecycle,
     usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
     repositories,
@@ -126,11 +152,10 @@ function billingApp({
     usageReporting: () => createApiFixture<UsageReportingService>({}, "usage meter"),
     webhook: {
       host: MemoryBillingWebhookHostChannel.create(),
-      retention: createApiFixture<SeatRetentionRules>({}),
       licenses: createApiFixture<OrganizationApi>({}),
     },
   });
-  return { app, asked: registry.asked, audited: registry.audited, repositories, stripe };
+  return { app, asked: registry.asked, audited, repositories, stripe };
 }
 
 const renewal = (commitUsdCents: number) => ({
@@ -262,6 +287,7 @@ describe("the installed billing application", () => {
       });
     });
 
+    /** @scenario A platform operator's billing command records an audit fact for audit-log */
     it("records who read a customer's billing, as main's backoffice did", async () => {
       const { app, audited } = billingApp({ isSaas: true, withStripe: true });
 
@@ -269,6 +295,9 @@ describe("the installed billing application", () => {
 
       expect(audited).toEqual([
         {
+          tenantId: ACME,
+          occurredAt: expect.any(Number),
+          idempotencyKey: expect.stringMatching(/^audit_/),
           userId: STAFF.id,
           action: "connectedBilling.get",
           args: { organizationId: ACME },

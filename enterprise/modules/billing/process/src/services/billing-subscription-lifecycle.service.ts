@@ -1,8 +1,9 @@
-import {
-  type DataRetentionApi,
-  PLATFORM_DEFAULT_RETENTION_DAYS,
-  retentionCategories,
-} from "@langwatch/data-retention-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
+ * the payment-success sync that reconciles quantities and the seat policy. Data-retention stamps
+ * a seat plan's retention from the started fact (round 37 D4).
+ */
 import {
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
@@ -11,11 +12,6 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * What a Stripe subscription's own lifecycle events do to our records: deletion, update, and
- * the payment-success sync that reconciles quantities, retention and the seat policy.
- */
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
@@ -52,8 +48,6 @@ type BillingSubscriptionLifecycleOptions = {
     prices: StripePriceMap;
   };
   host: BillingWebhookHost;
-  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
-  retention: SeatRetentionRules;
   /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
@@ -63,9 +57,6 @@ type BillingSubscriptionLifecycleOptions = {
 
 /** The one organization operation a subscription activation needs for a trial's licence. */
 export type LicenseClearer = Pick<OrganizationApi, "clearLicense">;
-
-/** The two data-retention operations seat provisioning reads and writes. */
-export type SeatRetentionRules = Pick<DataRetentionApi, "listOrganizationRules" | "setForScope">;
 
 export class BillingSubscriptionLifecycleService {
   static create(options: BillingSubscriptionLifecycleOptions): BillingSubscriptionLifecycleService {
@@ -78,7 +69,6 @@ export class BillingSubscriptionLifecycleService {
   private readonly stripeSubscriptions: BillingSubscriptionLifecycleOptions["stripeSubscriptions"];
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
-  private readonly retention: SeatRetentionRules;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
   private readonly bestEffort = BestEffortService.create();
 
@@ -89,7 +79,6 @@ export class BillingSubscriptionLifecycleService {
     this.stripeSubscriptions = options.stripeSubscriptions;
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
-    this.retention = options.retention;
     this.announcer = options.announcer;
   }
 
@@ -411,60 +400,6 @@ export class BillingSubscriptionLifecycleService {
           { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
           "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
             "upgrade. Manual intervention required.",
-        );
-      }
-    }
-
-    await this.applySeatRetentionPolicy(updated.organizationId);
-  }
-
-  /**
-   * A paid Growth-Seat subscription entitles the org to explicit per-category
-   * retention policies at the platform default (49 days), stamped on first
-   * activation. Create-if-absent; best-effort — never fails the Stripe webhook.
-   */
-  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
-    // Create-if-absent, NOT upsert: a seat/subscription event must never
-    // overwrite an existing org-level override, which could clobber a
-    // grandfathered high policy down to 49d and DELETE data. Mirrors
-    // licenseHandler.provisionMissingRetentionPolicies.
-    let covered: Set<string>;
-    try {
-      const existing = await this.retention.listOrganizationRules({
-        organizationId,
-      });
-      covered = new Set(
-        existing
-          .filter((row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId)
-          .map((row) => row.category),
-      );
-    } catch (err) {
-      // If we can't read the current rules we can't prove a category is absent,
-      // so skip provisioning rather than risk a clobber. Ingestion still stamps
-      // PLATFORM_DEFAULT_RETENTION_DAYS via the cascade fallback.
-      logger.error(
-        { organizationId, err },
-        "[stripeWebhook] Failed to read retention rules; skipping seat provisioning",
-      );
-
-      return;
-    }
-
-    for (const category of retentionCategories) {
-      if (covered.has(category)) {
-        continue;
-      }
-
-      try {
-        await this.retention.setForScope({
-          scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
-          category,
-          retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-        });
-      } catch (err) {
-        logger.error(
-          { organizationId, category, err },
-          "[stripeWebhook] Failed to apply seat retention policy",
         );
       }
     }

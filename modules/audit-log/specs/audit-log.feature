@@ -186,3 +186,14 @@ Feature: Audit logging
       Given organization recorded an audit fact keyed by an audit id
       When audit-log's subscriber receives the fact twice
       Then one audit row is stored under that key, with organization's action and metadata
+
+  Rule: Audit-log reacts to billing's audit facts (Alex, 2026-10-08, round 37 D3)
+    Billing records each platform operator's billing command as an audit fact on its own lifecycle
+    pipeline, and audit-log's peer subscriber writes the row main wrote: the operator, the action,
+    its arguments and its target. Billing holds no audit-log peer and never writes the audit table.
+
+    @unit
+    Scenario: A billing audit fact delivered twice writes one audit row
+      Given billing recorded a platform operator's command as an audit fact keyed by an audit id
+      When audit-log's subscriber receives the fact twice
+      Then one audit row is stored under that key, with billing's action, arguments and target

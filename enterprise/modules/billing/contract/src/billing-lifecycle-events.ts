@@ -8,6 +8,7 @@ export const SUBSCRIPTION_CHANGED_EVENT_TYPE = "lw.billing.subscription_changed"
 export const SUBSCRIPTION_STARTED_EVENT_TYPE = "lw.billing.subscription_started" as const;
 export const CHECKOUT_COMPLETED_EVENT_TYPE = "lw.billing.checkout_completed" as const;
 export const USAGE_BILLING_CHANGED_EVENT_TYPE = "lw.billing.usage_billing_changed" as const;
+export const BILLING_AUDIT_RECORDED_EVENT_TYPE = "lw.billing.audit_recorded" as const;
 export const BILLING_LIFECYCLE_EVENT_VERSION = "2026-09-30" as const;
 
 /** An organization gained or lost its subscription, with the members who carry the fact. */
@@ -55,3 +56,22 @@ export const usageBillingChangedEventDataSchema = z.object({
   fromCatchUp: z.boolean(),
 });
 export type UsageBillingChangedEventData = z.infer<typeof usageBillingChangedEventDataSchema>;
+
+/**
+ * A platform operator's billing command, recorded after it ran; audit-log writes the row from its
+ * side (round 37 D3; organization-audit.events.ts shape). Spec: modules/audit-log/specs/audit-log.feature
+ */
+export const billingAuditRecordedEventDataSchema = z.object({
+  /** The organization the command targeted, or the platform tenant for an invoice. */
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  /** An `audit` id minted once per command: a redelivered fact writes one row. */
+  idempotencyKey: z.string().min(1),
+  /** The operator who ran the command. */
+  userId: z.string().min(1),
+  action: z.string().min(1),
+  args: z.json().optional(),
+  targetKind: z.string().min(1),
+  targetId: z.string().min(1),
+});
+export type BillingAuditRecordedEventData = z.infer<typeof billingAuditRecordedEventDataSchema>;

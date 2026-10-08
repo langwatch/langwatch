@@ -3058,15 +3058,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
-      '@langwatch/audit-log-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/audit-log/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
-      '@langwatch/data-retention-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/data-retention/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6024,6 +6018,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -7497,6 +7494,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { BillingAuditRecordedEventData } from "@langwatch/enterprise-billing-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
 
@@ -43,7 +45,7 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
 /**
  * Records billing's own lifecycle facts on its pipeline: that an organization gained or lost its
  * subscription, that a subscription became active, and that a checkout completed. Never throws: a Stripe delivery is answered 200
- * whatever becomes of the record, as main's fire-and-forget hooks were.
+ * whatever becomes of the record, as main's fire-and-forget hooks were. Only an audit fact throws.
  */
 export class BillingLifecycleAnnouncerService {
   readonly pipeline: BillingLifecyclePipeline;
@@ -63,6 +65,21 @@ export class BillingLifecycleAnnouncerService {
   /** Binds the lifecycle pipeline's own senders. */
   connect(commands: EventingCommands<BillingLifecyclePipeline>): void {
     this.#commands = commands;
+  }
+
+  /** A platform operator's command for audit-log; a lost record fails the command, as main's did. */
+  async audited(
+    fact: Omit<BillingAuditRecordedEventData, "occurredAt" | "idempotencyKey">,
+  ): Promise<void> {
+    if (!this.#commands) {
+      throw new Error("billing_lifecycle pipeline senders are not connected yet");
+    }
+    const key = generate("audit");
+    await this.#commands.recordAudit.send({
+      ...fact,
+      occurredAt: key.date.getTime(),
+      idempotencyKey: key.toString(),
+    });
   }
 
   /** A subscription that was not active became active on `plan`; a renewal never reaches this. */

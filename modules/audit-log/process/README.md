@@ -66,11 +66,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `audit_log` (aggregate `global`)
 
-Declared at `src/eventing/audit-log.pipeline.ts:49`.
+Declared at `src/eventing/audit-log.pipeline.ts:67`.
 
-| Kind            | Name                        | Handles                                                                            | Declared at                             |
-| --------------- | --------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------- |
-| peer subscriber | `auditLogOrganizationAudit` | `lw.organization.audit_recorded` from [organization](../../organization/README.md) | `src/eventing/audit-log.pipeline.ts:55` |
+| Kind            | Name                        | Handles                                                                                   | Declared at                             |
+| --------------- | --------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------- |
+| peer subscriber | `auditLogOrganizationAudit` | `lw.organization.audit_recorded` from [organization](../../organization/README.md)        | `src/eventing/audit-log.pipeline.ts:73` |
+| peer subscriber | `auditLogBillingAudit`      | `lw.billing.audit_recorded` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/audit-log.pipeline.ts:80` |
 
 ### Tasks
 

@@ -19,7 +19,6 @@ import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-annou
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
-  type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
@@ -106,7 +105,6 @@ export class EEWebhookService implements WebhookService {
     licensePurchaseHandler,
     licensePaymentLinkId,
     host,
-    retention,
     connectedBilling,
     announcer,
   }: {
@@ -120,7 +118,6 @@ export class EEWebhookService implements WebhookService {
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;
-    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     /** Records the checkout and subscription changes for peers; absent where none is composed. */
     announcer?: BillingLifecycleAnnouncerService;
@@ -142,7 +139,6 @@ export class EEWebhookService implements WebhookService {
       inviteApprover,
       licenses,
       host,
-      retention,
       ...(announcer ? { announcer } : {}),
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
@@ -152,7 +148,6 @@ export class EEWebhookService implements WebhookService {
       stripeSubscriptions,
       itemCalculator,
       host,
-      retention,
       ...(announcer ? { announcer } : {}),
     });
   }
@@ -167,7 +162,6 @@ export class EEWebhookService implements WebhookService {
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;
-    retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
     announcer?: BillingLifecycleAnnouncerService;
   }): EEWebhookService {

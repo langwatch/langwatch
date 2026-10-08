@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
+  BILLING_AUDIT_RECORDED_EVENT_TYPE,
   BILLING_LIFECYCLE_AGGREGATE_TYPE,
   BILLING_LIFECYCLE_EVENT_VERSION,
   CHECKOUT_COMPLETED_EVENT_TYPE,
@@ -11,11 +12,14 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
 import {
+  RECORD_BILLING_AUDIT_COMMAND_TYPE,
   RECORD_CHECKOUT_COMPLETED_COMMAND_TYPE,
   RECORD_SUBSCRIPTION_CHANGED_COMMAND_TYPE,
   RECORD_SUBSCRIPTION_STARTED_COMMAND_TYPE,
   RECORD_USAGE_BILLING_CHANGED_COMMAND_TYPE,
+  type BillingAuditRecordedEvent,
   type CheckoutCompletedEvent,
+  type RecordBillingAuditCommandData,
   type RecordCheckoutCompletedCommandData,
   type RecordSubscriptionChangedCommandData,
   type RecordSubscriptionStartedCommandData,
@@ -23,6 +27,7 @@ import {
   type SubscriptionChangedEvent,
   type SubscriptionStartedEvent,
   type UsageBillingChangedEvent,
+  recordBillingAuditCommandDataSchema,
   recordCheckoutCompletedCommandDataSchema,
   recordSubscriptionChangedCommandDataSchema,
   recordSubscriptionStartedCommandDataSchema,
@@ -173,4 +178,37 @@ export function usageBillingChangedKeyOf({
   return fromCatchUp
     ? `${organizationId}:usage-billed:catch-up:${occurredAt}`
     : `${organizationId}:usage-billed:${usageBilled}:${occurredAt}`;
+}
+
+/** Records a platform operator's billing command for audit-log, keyed by its own audit id. */
+export class RecordBillingAuditCommand implements CommandHandler<
+  Command<RecordBillingAuditCommandData>,
+  BillingAuditRecordedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_BILLING_AUDIT_COMMAND_TYPE,
+    recordBillingAuditCommandDataSchema,
+    "Record a platform operator's billing command for the audit log",
+  );
+
+  handle(command: Command<RecordBillingAuditCommandData>): BillingAuditRecordedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<BillingAuditRecordedEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.tenantId,
+        tenantId: createTenantId(command.tenantId),
+        type: BILLING_AUDIT_RECORDED_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: data.idempotencyKey,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordBillingAuditCommandData): string {
+    return payload.tenantId;
+  }
 }

@@ -37,7 +37,6 @@ function buildService(events: ConnectedBillingInvoiceEvents): EEWebhookService {
     stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
     itemCalculator: createApiFixture<WebhookOptions["itemCalculator"]>(),
     host: createApiFixture<BillingWebhookHost>(),
-    retention: createApiFixture<WebhookOptions["retention"]>(),
     connectedBilling: events,
   });
 }

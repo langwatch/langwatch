@@ -19,7 +19,6 @@ import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-annou
 import {
   BillingSubscriptionLifecycleService,
   type LicenseClearer,
-  type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
@@ -48,7 +47,6 @@ type BillingCheckoutCompletionOptions = {
   inviteApprover?: InviteApprover;
   licenses: LicenseClearer;
   host: BillingWebhookHost;
-  retention: SeatRetentionRules;
   /** Records the checkout and subscription changes for peers; absent where none is composed. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
@@ -86,7 +84,6 @@ export class BillingCheckoutCompletionService {
       stripeSubscriptions: options.stripeSubscriptions,
       itemCalculator: options.itemCalculator,
       host: options.host,
-      retention: options.retention,
       ...(options.announcer ? { announcer: options.announcer } : {}),
     });
   }
