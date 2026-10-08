@@ -131,6 +131,7 @@ type InstantEvalDependencies = Readonly<{
 
 type InstantEvalSetup = FeatureSetup<
   InstantEvalDependencies,
+  never,
   InstantEvalServerConfig,
   InstantEvalRepositories,
   InstantEvalChannels
