@@ -12,13 +12,26 @@ import { describe, expect, it } from "vitest";
 
 import { saasProcessModule } from "../../saas.module.ts";
 
-function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageReport[] }) {
+function boot({
+  isSaas,
+  recorded,
+  targetLookups = [],
+}: {
+  isSaas: boolean;
+  recorded: IncomingUsageReport[];
+  targetLookups?: unknown[];
+}) {
   return createApp({ role: "api" })
     .withModules([saasProcessModule])
     .withStores(memoryStores())
     .withConfig({ saas: { isSaas } })
     .provide({
-      ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
+      ops: createApiFixture<OpsApi>({
+        findProductAnalyticsTargets: () => {
+          targetLookups.push(true);
+          return [];
+        },
+      }),
       licensing: createApiFixture<LicensingApi>({
         recordUsageReport: (report) => {
           recorded.push(report);
@@ -63,6 +76,19 @@ describe("saas installation", () => {
         code: "langwatch_cloud_only",
       });
       expect(recorded).toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A memory install holds product analytics in-process" */
+  it("accepts a report over memory stores without asking ops for analytics targets", async () => {
+    const targetLookups: unknown[] = [];
+    const runtime = await boot({ isSaas: true, recorded: [], targetLookups });
+
+    try {
+      await runtime.service(SaasApi).receiveUsageReport(REQUEST);
+      expect(targetLookups).toEqual([]);
     } finally {
       await runtime.stop();
     }

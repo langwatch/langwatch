@@ -36,6 +36,12 @@ Feature: LangWatch Cloud receives the daily usage report
     And product analytics receives the same event against the install id
 
   @unit
+  Scenario: A memory install holds product analytics in-process
+    Given Cloud is installed over memory stores
+    When it accepts a report
+    Then the event is held in-process and ops is never asked for analytics targets
+
+  @unit
   Scenario: A report the registry cannot store is still accepted
     Given the install registry fails to record
     When Cloud accepts a report
