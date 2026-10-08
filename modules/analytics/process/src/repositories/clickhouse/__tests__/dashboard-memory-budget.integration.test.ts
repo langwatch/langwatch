@@ -26,6 +26,8 @@ const TENANT_ID = `acme-dashboard-memory-${nanoid(8)}`;
 const TRACE_COUNT = 1_000_000;
 const DAY_MS = 86_400_000;
 const RANGE_DAYS = 30;
+/** Traces per seed insert. */
+const SEED_CHUNK = 200_000;
 
 /** Every 5th trace carries RAG contexts on its root span. */
 const RAG_TRACE_EVERY = 5;
@@ -127,6 +129,29 @@ async function runCapped<T>(
   return result.json<T>();
 }
 
+/**
+ * Inserts the seed in slices and small blocks: the test server caps its memory at
+ * 1 GiB for every suite sharing it, and default insert blocks peak near 800 MiB on this seed.
+ */
+async function seedInChunks(
+  ch: ClickHouseClient,
+  { query, query_params }: { query: string; query_params: Record<string, unknown> },
+): Promise<void> {
+  for (let offset = 0; offset < TRACE_COUNT; offset += SEED_CHUNK) {
+    await ch.exec({
+      query,
+      query_params: { ...query_params, offset, chunk: Math.min(SEED_CHUNK, TRACE_COUNT - offset) },
+      clickhouse_settings: {
+        max_threads: 1,
+        max_insert_threads: 1,
+        max_block_size: "2048",
+        min_insert_block_size_rows: "4096",
+        min_insert_block_size_bytes: "1000000",
+      },
+    });
+  }
+}
+
 /** The single series value of a result row, whatever its alias. */
 function seriesValue(row: Record<string, unknown>): unknown {
   return Object.entries(row).find(([key]) => !["period", "date", "group_key"].includes(key))?.[1];
@@ -158,7 +183,7 @@ describe("dashboard panels under a memory cap", () => {
     const traceId = "lower(hex(MD5(concat({tenantId:String}, toString(t)))))";
     const params = { tenantId: TENANT_ID, end };
 
-    await ch.exec({
+    await seedInChunks(ch, {
       query: `
         INSERT INTO trace_analytics (TenantId, TraceId, Version, OccurredAt, UpdatedAt, TraceName, UserId, ConversationId, Origin, Models, TotalCost, TotalDurationMs, TimeToFirstTokenMs, PromptTokens, CompletionTokens, HasError, Attributes, SpanCount)
         SELECT {tenantId:String}, ${traceId}, '2026-09-01', ${occurredAt} AS occ,
@@ -168,13 +193,13 @@ describe("dashboard panels under a memory cap", () => {
           (t % 50) = 0,
           map('metadata.user_id', concat('user-', toString(t % 50000)), 'metadata.thread_id', concat('thread-', toString(intDiv(t, 4)))),
           2 + v
-        FROM (SELECT number AS t FROM numbers(${TRACE_COUNT})) ARRAY JOIN [0, 1] AS v
+        FROM (SELECT number AS t FROM numbers({offset:UInt64}, {chunk:UInt64})) ARRAY JOIN [0, 1] AS v
         WHERE v = 0 OR t % 2 = 0
       `,
       query_params: params,
     });
 
-    await ch.exec({
+    await seedInChunks(ch, {
       query: `
         INSERT INTO trace_summaries (ProjectionId, TenantId, TraceId, Version, Attributes, OccurredAt, UpdatedAt, TotalDurationMs, TimeToFirstTokenMs, SpanCount, ContainsErrorStatus, ContainsOKStatus, Models, TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount, TraceName)
         SELECT tid, {tenantId:String}, tid, '2026-09-01',
@@ -182,12 +207,12 @@ describe("dashboard panels under a memory cap", () => {
           occ, occ, (t * 13) % 60000, (t * 7) % 3000, if(t % ${RAG_TRACE_EVERY} = 0, 2, 1), (t % 50) = 0, 1,
           [if(t % 3 = 0, 'gpt-5-mini', 'claude-sonnet-4')], 0.001 * (t % 7), 0, 1000 + t % 500, 200 + t % 300,
           concat('agent-', toString(t % 40))
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
       `,
       query_params: params,
     });
 
-    await ch.exec({
+    await seedInChunks(ch, {
       query: `
         INSERT INTO stored_spans (ProjectionId, TenantId, TraceId, SpanId, Sampled, StartTime, EndTime, DurationMs, SpanName, SpanKind, ServiceName, SpanAttributes, ScopeName)
         SELECT tid, {tenantId:String}, tid, concat(tid, '-root'), 1, occ, occ + toIntervalMillisecond(500), 500, 'agent', 1, 'agent-service',
@@ -195,13 +220,13 @@ describe("dashboard panels under a memory cap", () => {
               'langwatch.rag.contexts', concat('[{"document_id":"doc-', toString(intDiv(t, ${RAG_TRACE_EVERY}) % ${RAG_DOCUMENT_COUNT}), '","content":"', repeat('lorem ipsum ', 5), '"}]'),
               'gen_ai.input.messages', repeat('please refactor this module and run the tests ', 20)),
           ''
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
         WHERE t % ${RAG_TRACE_EVERY} = 0
       `,
       query_params: params,
     });
 
-    await ch.exec({
+    await seedInChunks(ch, {
       query: `
         INSERT INTO stored_spans (ProjectionId, TenantId, TraceId, SpanId, Sampled, StartTime, EndTime, DurationMs, SpanName, SpanKind, ServiceName, SpanAttributes, ScopeName, Cost)
         SELECT tid, {tenantId:String}, tid, concat(tid, '-llm'), 1, occ, occ + toIntervalMillisecond(400), 400, 'llm', 1, 'agent-service',
@@ -210,7 +235,7 @@ describe("dashboard panels under a memory cap", () => {
               'gen_ai.usage.input_tokens', toString(1000 + t % 500),
               'gen_ai.usage.output_tokens', toString(200 + t % 300)),
           '', 0.001 * (t % 7)
-        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers({offset:UInt64}, {chunk:UInt64}))
       `,
       query_params: params,
     });
