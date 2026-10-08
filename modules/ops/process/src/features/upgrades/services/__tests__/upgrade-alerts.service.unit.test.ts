@@ -12,8 +12,7 @@ import { MemoryUpgradeLedgerRepository } from "#repositories/memory/memory.upgra
 import type { PlatformOperatorsService } from "#services/platform-operators.service";
 
 import { statusOf, stepOf } from "../../../../services/__tests__/support/upgrade-ledger.ts";
-import type { UpgradeAlert } from "../../rules/upgrade-alerts.rules.ts";
-import { type UpgradeAlertNotifier, UpgradeAlertsService } from "../upgrade-alerts.service.ts";
+import { UpgradeAlertsService } from "../upgrade-alerts.service.ts";
 
 const NOW = Temporal.Instant.from("2026-10-09T12:00:00Z");
 const SINCE = NOW.subtract({ hours: 1 }).epochMilliseconds;
@@ -32,17 +31,18 @@ function setup({
     ? [stepOf({ id: "ops:backfill", status: "failed", lastError: "boom", updatedAt: failedAt })]
     : [];
   const status = statusOf({
-    lease: leaseExpiresAt && {
-      name: "upgrade",
-      owner: "pod-a",
-      image: "3.23.0",
-      host: "h",
-      heartbeatAt: null,
-      expiresAt: leaseExpiresAt,
-    },
+    lease: leaseExpiresAt
+      ? {
+          name: "upgrade",
+          owner: "pod-a",
+          image: "3.23.0",
+          host: "h",
+          heartbeatAt: null,
+          expiresAt: leaseExpiresAt,
+        }
+      : null,
   });
   const sent: SendEmailCommand[] = [];
-  const notified: (readonly UpgradeAlert[])[] = [];
   const service = UpgradeAlertsService.create({
     ledger: MemoryUpgradeLedgerRepository.create({
       reader: createApiFixture<UpgradeReader>({
@@ -56,12 +56,9 @@ function setup({
     mail: createApiFixture<Pick<NotificationApi, "sendEmail">>({
       sendEmail: async (command) => void sent.push(command),
     }),
-    notifier: createApiFixture<UpgradeAlertNotifier>({
-      notify: async ({ alerts }) => void notified.push(alerts),
-    }),
     upgradesUrl: "https://app.example.com/ops/upgrades",
   });
-  return { service, sent, notified };
+  return { service, sent };
 }
 
 describe("UpgradeAlertsService", () => {
@@ -104,15 +101,8 @@ describe("UpgradeAlertsService", () => {
 
   /** @scenario "Nothing is sent when nothing changed" */
   it("sends nothing when nothing changed", async () => {
-    const { service, sent, notified } = setup();
+    const { service, sent } = setup();
     await service.check({ since: SINCE, until: UNTIL });
-    expect({ sent, notified }).toEqual({ sent: [], notified: [] });
-  });
-
-  /** @scenario "Slack hears the alert only where ops' notifier is configured" */
-  it("hands the notifier the same alerts as the email", async () => {
-    const { service, notified } = setup({ failedAt: ago(10) });
-    const alerts = await service.check({ since: SINCE, until: UNTIL });
-    expect(notified).toEqual([alerts]);
+    expect(sent).toEqual([]);
   });
 });

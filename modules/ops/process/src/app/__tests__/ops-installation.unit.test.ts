@@ -78,6 +78,11 @@ function process(
         },
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
+        grafana: {
+          baseUrl: undefined,
+          tempoDatasourceUid: undefined,
+          lokiDatasourceUid: undefined,
+        },
         bugReportSlackChannel: undefined,
         cloudOps: cloud.asked ?? false,
         adminEmails: [],

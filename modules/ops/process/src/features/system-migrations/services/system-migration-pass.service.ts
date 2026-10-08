@@ -6,6 +6,7 @@ import {
   SystemMigrationRunnerService,
   groupByTenantSource,
 } from "@langwatch/system-migrations";
+import { nowInstant } from "@langwatch/time";
 
 import type {
   OpsAppDependencies,
@@ -133,6 +134,7 @@ export class SystemMigrationPassService {
     );
     if (userMigration) {
       return new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease,
         tenants: this.options.repositories.organizationMemberTenants.membersOf({ organizationId }),
@@ -145,6 +147,7 @@ export class SystemMigrationPassService {
       named,
     );
     return new SystemMigrationRunnerService({
+      now: nowInstant,
       state,
       lease,
       tenants: {
@@ -207,6 +210,7 @@ export class SystemMigrationPassService {
       merged = mergeSummaries(
         merged,
         await new SystemMigrationRunnerService({
+          now: nowInstant,
           state,
           lease,
           tenants,
@@ -255,7 +259,14 @@ export class SystemMigrationPassService {
       tenants,
       migrations,
       cohort,
-      runner: new SystemMigrationRunnerService({ state, lease, tenants, cohort, migrations }),
+      runner: new SystemMigrationRunnerService({
+        state,
+        lease,
+        tenants,
+        cohort,
+        migrations,
+        now: nowInstant,
+      }),
     };
   }
 

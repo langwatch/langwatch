@@ -113,7 +113,6 @@ export function createOpsTestInfrastructure(
         withdraw: async () => {},
         startPass: async () => {},
       }),
-    bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
     bugReportNotifier: { notify: async () => {} },
     explainClients: { findClient: () => null },
     findOpsApiKey: () => null,

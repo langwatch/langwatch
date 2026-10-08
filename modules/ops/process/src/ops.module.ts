@@ -5,11 +5,13 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { OpsModule } from "#app/ops.app";
 import { opsChannels } from "#channels/ops-channels.registry";
 import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeline";
+import { groupQueueReaperEventing } from "#eventing/ops-group-queue-reaper.pipeline";
 import { platformOperatorSeedEventing } from "#eventing/ops-platform-operator-seed.pipeline";
 import { projectionReplayEventing } from "#eventing/ops-projection-replay.pipeline";
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { systemMigrationsEventing } from "#eventing/ops-system-migrations.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
+import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
@@ -57,6 +59,8 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
     .withEventing(usageReportEventing)
     .withEventing(anomalyDetectionEventing)
     .withEventing(storageStatsEventing)
+    .withEventing(groupQueueReaperEventing)
+    .withEventing(upgradeAlertsEventing)
     .withEventing(projectionReplayEventing)
     .withEventing(systemMigrationsEventing)
     .withEventing(platformOperatorSeedEventing)

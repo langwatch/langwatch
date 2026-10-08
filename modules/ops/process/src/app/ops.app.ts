@@ -48,6 +48,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { grafanaLinkConfigOf } from "@langwatch/observability/grafana-links";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
@@ -208,6 +209,8 @@ import {
   type StartReplayResult,
   type StopImpersonationInput,
   type ReconcileQueuePendingInput,
+  type OpsQueueReapedStrandedGroups,
+  type ReapStrandedQueueGroupsInput,
   type UnblockAllQueueGroupsInput,
   type UnblockAllQueueGroupsResult,
   type UnblockQueueGroupInput,
@@ -257,6 +260,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { UpgradeAlertsService } from "#features/upgrades/services/upgrade-alerts.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
@@ -298,6 +302,7 @@ import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts"
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
 import { EventingIntrospectionService } from "../services/eventing-introspection.service.ts";
+import { GroupQueueReaperService } from "../services/group-queue-reaper.service.ts";
 import {
   type AdminAuditSink,
   ImpersonationService,
@@ -611,19 +616,6 @@ export interface BugReportNotifier {
   notify(input: { report: BugReport }): Promise<void>;
 }
 
-/**
- * Fixed-window counter for the PUBLIC report endpoint, keyed on the
- * caller-asserted nearest-hop IP — a flood bound, not authorization; its
- * absence would let one client fill a cross-tenant inbox.
- */
-export interface BugReportRateLimiter {
-  consume(input: {
-    key: string;
-    windowSeconds: number;
-    max: number;
-  }): Promise<{ allowed: boolean }>;
-}
-
 /** The registered projections and event subscribers, as the process knows them. */
 export interface OpsPipelineRegistry {
   listRegistrations(): OpsPipelineRegistrations;
@@ -650,7 +642,6 @@ export interface OpsAppInfrastructure {
     dependencies: OpsAppDependencies;
     passRequests: SystemMigrationPassRequestsService;
   }): OpsSystemMigrationRunner;
-  bugReportRateLimiter: BugReportRateLimiter;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
   explainClients: OpsExplainClients;
@@ -695,12 +686,16 @@ type OpsRuntimeDependencies = Readonly<{
   anomalies: AnomalyDetectorService | undefined;
   /** The measurement `ops_storage_stats` runs; absent where a composition built none. */
   storageStats: StorageStatsCollectionService | undefined;
+  /** The stranded-group reap `ops_group_queue_reaper` and the operator action run. */
+  groupQueueReaper: GroupQueueReaperService;
   /** The orphaned-organization rate; absent where a composition built none. */
   signUpHealth: SignUpHealthService | undefined;
   /** The Operators page, the recovery task and the seed; absent where a composition built none. */
   platformOperators: PlatformOperatorsService | undefined;
   /** The Upgrades pages' reads over the upgrade ledger. */
   upgrades: OpsUpgradeService;
+  /** The check `ops_upgrade_alerts` runs hourly; absent where a composition built none. */
+  upgradeAlerts: UpgradeAlertsService | undefined;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -865,6 +860,11 @@ export class OpsModule implements OpsApi {
       logger.warn(warning);
     }
 
+    const platformOperators = PlatformOperatorsService.create({
+      authz: dependencies.authz,
+      users: dependencies.users,
+      organizations: dependencies.organizations,
+    });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
       dependencies,
@@ -876,10 +876,12 @@ export class OpsModule implements OpsApi {
         organizations: dependencies.organizations,
         identity: dependencies.identity,
       }),
-      platformOperators: PlatformOperatorsService.create({
-        authz: dependencies.authz,
-        users: dependencies.users,
-        organizations: dependencies.organizations,
+      platformOperators,
+      upgradeAlerts: UpgradeAlertsService.create({
+        ledger: repositories.upgradeLedger,
+        operators: platformOperators,
+        mail: dependencies.notifications,
+        upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
       }),
     });
     return app;
@@ -898,6 +900,7 @@ export class OpsModule implements OpsApi {
     storageStats?: StorageStatsCollectionService;
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
+    upgradeAlerts?: UpgradeAlertsService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -910,7 +913,7 @@ export class OpsModule implements OpsApi {
       inbox,
       intake: BugReportIntakeService.create({
         reports: repositories.bugReports,
-        rateLimiter: members.bugReportRateLimiter,
+        rateLimiter: repositories.bugReportRateLimit,
         notifier: members.bugReportNotifier,
       }),
       apiKeys: dependencies.apiKeys,
@@ -935,8 +938,12 @@ export class OpsModule implements OpsApi {
       upgrades: OpsUpgradeService.create({ ledger: repositories.upgradeLedger }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
+      groupQueueReaper: GroupQueueReaperService.create({
+        repository: repositories.groupQueueReaper,
+      }),
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
+      upgradeAlerts: setup.upgradeAlerts,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -2045,11 +2052,25 @@ export class OpsModule implements OpsApi {
     return anomalies.tick();
   }
 
+  /** Emails this installation's platform operators what went wrong with an upgrade. */
+  async checkUpgradeAlerts(input: { since: number; until: number }): Promise<void> {
+    const { upgradeAlerts } = this.#dependencies;
+    if (!upgradeAlerts) throw new OpsCapabilityUnavailableError("upgrade alerts");
+    await upgradeAlerts.check(input);
+  }
+
   /** One pass of `ops_storage_stats`: measures every endpoint and saves the readings. */
   measureStorage(): Promise<void> {
     const { storageStats } = this.#dependencies;
     if (!storageStats) throw new OpsCapabilityUnavailableError("storage stats");
     return storageStats.collect();
+  }
+
+  /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
+  reapStrandedQueueGroups(
+    input: ReapStrandedQueueGroupsInput,
+  ): Promise<OpsQueueReapedStrandedGroups> {
+    return this.#dependencies.groupQueueReaper.reap(input);
   }
 
   get #signUpHealth(): SignUpHealthService {
@@ -2329,13 +2350,16 @@ function buildOpsInfrastructure(input: {
     },
     eventingIntrospection: introspection,
     pipelines: introspection,
-    // Three operator readings this process composes nothing for. Each answers
-    // its empty shape rather than refusing: the back office renders the page
-    // and shows nothing registered, which is what is true here.
+    // The window the event-log search really uses; the hot-tier TTL is not
+    // configured on this process, so the cold-tier note stays off.
     eventLogWindow: {
-      read: () => ({ searchLookbackDays: 7, hotTierDays: null, hotTierEnvVar: null }),
+      read: () => ({
+        searchLookbackDays: EVENT_LOG_SEARCH_LOOKBACK_MS / (24 * 60 * 60 * 1000),
+        hotTierDays: null,
+        hotTierEnvVar: null,
+      }),
     },
-    grafana: { findLinkConfig: () => null },
+    grafana: { findLinkConfig: () => grafanaLinkConfigOf(config.grafana) },
     createSystemMigrations: ({ dependencies, passRequests }) =>
       SystemMigrationPassService.runner({
         repositories,
@@ -2344,9 +2368,6 @@ function buildOpsInfrastructure(input: {
         dependencies,
         passRequests,
       }),
-    // The intake's flood bound: this process has no dedicated limiter for this
-    // endpoint yet, so it allows rather than refuse a report that reached it.
-    bugReportRateLimiter: { consume: () => Promise.resolve({ allowed: true }) },
     bugReportNotifier: input.bugReportNotifier,
     explainClients: explainRuntime,
     findOpsApiKey: () => config.apiKey ?? null,

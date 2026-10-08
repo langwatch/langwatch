@@ -14,7 +14,9 @@ import { QueueRedisRepository } from "../redis/queue.repository.ts";
 import { RedisAnomalyRateTrackerRepository } from "../redis/redis.anomaly-rate-tracker.repository.ts";
 import { RedisAnomalyStateRepository } from "../redis/redis.anomaly-state.repository.ts";
 import { BlobStoreRedisRepository } from "../redis/redis.blob-store.repository.ts";
+import { RedisBugReportRateLimitRepository } from "../redis/redis.bug-report-rate-limit.repository.ts";
 import { RedisRedisHealthRepository } from "../redis/redis.datastore-health.repository.ts";
+import { RedisGroupQueueReaperRepository } from "../redis/redis.group-queue-reaper.repository.ts";
 import { RedisMigrationLeaseRepository } from "../redis/redis.migration-lease.repository.ts";
 import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
@@ -51,7 +53,9 @@ export const LiveOpsRepositories = {
       snapshots: RedisOpsSnapshotRepository.create(redis),
       metrics: RedisOpsMetricsRepository.create({ redis }),
       queues: QueueRedisRepository.create({ redis }),
+      groupQueueReaper: RedisGroupQueueReaperRepository.create({ redis }),
       blobStore: BlobStoreRedisRepository.create(redis),
+      bugReportRateLimit: RedisBugReportRateLimitRepository.create({ connection: redis }),
       replay: ReplayRedisRepository.create({ redis }),
       replayRuntimes: LiveReplayRuntimeRepository.create({
         redis,

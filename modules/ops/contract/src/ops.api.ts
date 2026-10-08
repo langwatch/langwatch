@@ -97,6 +97,7 @@ import type {
   OpsQueueGroupsPage,
   opsQueueGroupInputSchema,
   OpsQueueJobsPage,
+  OpsQueueReapedStrandedGroups,
   OpsQueueReconcileOutcome,
 } from "./features/queue/ops-queue.ts";
 import type {
@@ -304,6 +305,8 @@ export type UnblockAllQueueGroupsInput = {
 
 export type UnblockAllQueueGroupsResult = { unblockedCount: number };
 
+export type ReapStrandedQueueGroupsInput = { requestedBy: string };
+
 export type DrainQueueGroupInput = {
   queueName: string;
   groupId: string;
@@ -443,6 +446,9 @@ export interface OpsApi {
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]>;
   unblockQueueGroup(input: UnblockQueueGroupInput): Promise<UnblockQueueGroupResult>;
   unblockAllQueueGroups(input: UnblockAllQueueGroupsInput): Promise<UnblockAllQueueGroupsResult>;
+  reapStrandedQueueGroups(
+    input: ReapStrandedQueueGroupsInput,
+  ): Promise<OpsQueueReapedStrandedGroups>;
   drainQueueGroup(input: DrainQueueGroupInput): Promise<DrainQueueGroupResult>;
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void>;
   unpauseQueuePipeline(input: UnpauseQueuePipelineInput): Promise<void>;

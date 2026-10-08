@@ -72,6 +72,7 @@ function readerOfOneRelease(): UpgradeReader {
     getStep: vi.fn(async () => STEP_DETAIL),
     listRuns: vi.fn(async () => ({ items: [RUN_SUMMARY], cursor: null })),
     getRun: vi.fn(async () => RUN),
+    preflight: vi.fn(async () => []),
   };
 }
 

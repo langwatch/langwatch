@@ -5,11 +5,6 @@ import type { PlatformOperatorsService } from "#services/platform-operators.serv
 
 import { type UpgradeAlert, upgradeAlertsBetween } from "../rules/upgrade-alerts.rules.ts";
 
-/** Ops' Slack notifier for upgrade alerts; a no-op where its bot token is not configured. */
-export interface UpgradeAlertNotifier {
-  notify(input: { alerts: readonly UpgradeAlert[]; upgradesUrl: string }): Promise<void>;
-}
-
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -31,8 +26,8 @@ export function describeUpgradeAlert(alert: UpgradeAlert): string {
 }
 
 /**
- * Tells platform operators what went wrong with an upgrade since the last check: one email each
- * through notification's edge, and ops' Slack notifier where configured (ruling Q-U7).
+ * Tells this installation's platform operators what went wrong with an upgrade since the last
+ * check: one email each through notification's edge. Never LangWatch's Slack (Alex, 2026-10-09).
  * Spec: modules/ops/specs/upgrade-alerts.feature
  */
 export class UpgradeAlertsService {
@@ -40,7 +35,6 @@ export class UpgradeAlertsService {
     ledger: UpgradeLedgerRepository;
     operators: Pick<PlatformOperatorsService, "list">;
     mail: Pick<NotificationApi, "sendEmail">;
-    notifier: UpgradeAlertNotifier;
     upgradesUrl: string;
   }): UpgradeAlertsService {
     return new UpgradeAlertsService(input);
@@ -49,7 +43,7 @@ export class UpgradeAlertsService {
   private constructor(private readonly deps: Parameters<typeof UpgradeAlertsService.create>[0]) {}
 
   async check({ since, until }: { since: number; until: number }): Promise<UpgradeAlert[]> {
-    const { ledger, operators, mail, notifier, upgradesUrl } = this.deps;
+    const { ledger, operators, mail, upgradesUrl } = this.deps;
     // ponytail: first page of failed steps only; page through if a release ever fails more at once.
     const [status, failed] = await Promise.all([
       ledger.findStatus(),
@@ -70,7 +64,6 @@ export class UpgradeAlertsService {
         mail.sendEmail({ to, subject, html, idempotencyKey: `upgrade-alert:${until}:${to}` }),
       ),
     );
-    await notifier.notify({ alerts, upgradesUrl });
     return alerts;
   }
 }

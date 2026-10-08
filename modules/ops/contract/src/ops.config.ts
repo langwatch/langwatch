@@ -2,6 +2,7 @@ import {
   adminEmails,
   Config,
   environmentOneOrTrueSchema,
+  grafana,
   isSaas,
   nodeEnvironment,
   otelResourceAttributes,
@@ -43,6 +44,8 @@ export const opsConfig = Config.define((c) => ({
       .transform((value) => !BACKUP_METRICS_OFF_VALUES.has((value ?? "").trim().toLowerCase())),
   ),
   productAnalytics: { key: posthogKey, host: posthogHost },
+  /** GRAFANA_* leaves; ops hands them to its screens as the deep-link config. */
+  grafana,
   /** The Slack channel a new bug report is announced in; blank means `#dev`. */
   bugReportSlackChannel: c.env("SLACK_BUG_REPORTS_CHANNEL", z.string().optional()),
   /** Asks for Cloud admin; boot refuses unless the licence private key matches (§3.5). */

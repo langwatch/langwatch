@@ -16,7 +16,6 @@ export function mergeSummaries(
     alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
     claimed: a.claimed + b.claimed,
     advanced: a.advanced + b.advanced,
-    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
   };
 }
 

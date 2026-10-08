@@ -152,7 +152,7 @@ describe("given ops's system-migrations declaration", () => {
   describe("when the re-drive comes round with a held tenant under recurring reconciliation", () => {
     /** @scenario "A recurring reconciliation keeps running on a long-lived worker" */
     it("re-proves it, because a held tenant is still one a pass can move", async () => {
-      const runPass = vi.fn(async () => ({ ...PASS, parked: 0, held: 1, finiteHeld: 0 }));
+      const runPass = vi.fn(async () => ({ ...PASS, parked: 0, held: 1 }));
       const service = passes({ hasTenantAwaitingRedrive: async () => true, runPass });
 
       await deliver(built((input) => service.executePass(input)).process, true);

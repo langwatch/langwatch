@@ -13,6 +13,7 @@ import { NullQueueRepository } from "../queue.repository.ts";
 import { ReplayRuntimeRepository } from "../replay-runtime.repository.ts";
 import { MemoryAnomalyRateTrackerRepository } from "./memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "./memory.anomaly-state.repository.ts";
+import { MemoryBugReportRateLimitRepository } from "./memory.bug-report-rate-limit.repository.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
 import { MemoryCredentialsResealRepository } from "./memory.credentials-reseal.repository.ts";
 import {
@@ -21,6 +22,7 @@ import {
   MemoryRedisHealthRepository,
 } from "./memory.datastore-health.repository.ts";
 import { MemoryEventExplorerRepository } from "./memory.event-explorer.repository.ts";
+import { MemoryGroupQueueReaperRepository } from "./memory.group-queue-reaper.repository.ts";
 import { MemoryImpersonationRepository } from "./memory.impersonation.repository.ts";
 import { MemoryInstanceAdminRepository } from "./memory.instance-admin.repository.ts";
 import { MemoryMigrationLeaseRepository } from "./memory.migration-lease.repository.ts";
@@ -128,6 +130,7 @@ export class MemoryOpsRepositories {
 
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
+      bugReportRateLimit: MemoryBugReportRateLimitRepository.create(),
       processStore: InMemoryProcessStore.createForLocalDevelopment(),
       processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
       credentialsReseal: MemoryCredentialsResealRepository.create(),
@@ -146,6 +149,7 @@ export class MemoryOpsRepositories {
       snapshots: MemoryOpsSnapshotRepository.create({ store }),
       metrics: MemoryOpsMetricsRepository.create({ store }),
       queues: NullQueueRepository.create(),
+      groupQueueReaper: MemoryGroupQueueReaperRepository.create(),
       blobStore: NullBlobStoreRepository.create(),
       replay: MemoryReplayRepository.create({ store }),
       replayRuntimes: MemoryReplayRuntimeRepository.create(),

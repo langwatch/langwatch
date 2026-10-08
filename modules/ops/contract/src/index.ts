@@ -85,6 +85,7 @@ export type {
   GetQueueDrainPreviewInput,
   ReconcileQueuePendingInput,
   ListParkedQueueTenantsInput,
+  ReapStrandedQueueGroupsInput,
 } from "./ops.api.ts";
 export * from "./features/dashboard/ops-dashboard.ts";
 export * from "./features/queue/ops-queue.ts";

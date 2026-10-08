@@ -86,6 +86,7 @@ function service() {
         getStep: async () => STEP_DETAIL,
         listRuns: async () => ({ items: [RUN_SUMMARY], cursor: "next" }),
         getRun: async () => RUN,
+        preflight: async () => [],
       },
     }),
   });

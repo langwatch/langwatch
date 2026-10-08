@@ -15,7 +15,6 @@ const PASS: MigrationPassSummary = {
   alreadyRolledBack: 0,
   claimed: 1,
   advanced: 1,
-  finiteHeld: 0,
 };
 
 describe("given the tasks process's startup convergence", () => {

@@ -2,15 +2,15 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
-import { useState } from "react";
-
-import { api } from "../../../../behavior/ops-api.ts";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import {
   grafanaGroupLogsUrl,
   grafanaGroupTracesUrl,
   grafanaTraceUrl,
-} from "../../../../model/grafana-links.ts";
+} from "@langwatch/observability/grafana-links";
+import { useState } from "react";
+
+import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useGroupActions } from "../../behavior/use-group-actions.ts";
 import { GroupDrawerHeader } from "../elements/queue-group-drawer-header.tsx";
 import { GroupActionConfirms, GroupDrawerActions } from "./group-action-confirms.tsx";

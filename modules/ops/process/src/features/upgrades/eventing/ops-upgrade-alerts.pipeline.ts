@@ -1,9 +1,13 @@
 import {
   defineAggregate,
+  defineEventingModule,
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+
+import type { OpsModule } from "#app/ops.app";
+import type { OpsRepositories } from "#repositories/ops.repositories";
 
 import {
   UPGRADE_ALERTS_INITIAL_STATE,
@@ -44,8 +48,13 @@ export function buildUpgradeAlerts({
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
           }),
         )
-        // One check at a time; mail and Slack each time out well inside five minutes.
+        // One check at a time; mail times out well inside five minutes.
         .outbox({ leaseDurationMs: 5 * 60 * 1000, maxAttempts: 3, concurrency: 1, batchSize: 1 }),
     )
     .build();
 }
+
+export const upgradeAlertsEventing = defineEventingModule({
+  pipeline: UPGRADE_ALERTS_PIPELINE_NAME,
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildUpgradeAlerts(setup),
+});

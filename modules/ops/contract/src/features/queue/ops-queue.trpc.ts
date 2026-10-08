@@ -40,6 +40,7 @@ import {
   opsQueueJobsPageSchema,
   opsQueueNameInputSchema,
   opsQueuePipelineInputSchema,
+  opsQueueReapedStrandedGroupsSchema,
   opsQueueTenantInputSchema,
   opsRetryBlockedQueueJobInputSchema,
 } from "./ops-queue.ts";
@@ -77,6 +78,11 @@ export const opsQueueTrpc = defineTrpcContract("ops")
   .mutation("unblockAll")
   .withInput(opsQueueNameInputSchema)
   .withOutput(opsQueueUnblockedAllSchema)
+
+  /** Deletes the groups no dispatcher can reach, as the scheduled reaper does. */
+  .mutation("reapStrandedGroups")
+  .withInput(z.void())
+  .withOutput(opsQueueReapedStrandedGroupsSchema)
 
   .mutation("drainGroup")
   .withInput(opsQueueGroupInputSchema)

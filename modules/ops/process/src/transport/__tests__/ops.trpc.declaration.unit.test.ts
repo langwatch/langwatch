@@ -114,6 +114,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   getGroupJobs: "query",
   unblockGroup: "mutation",
   unblockAll: "mutation",
+  reapStrandedGroups: "mutation",
   drainGroup: "mutation",
   pausePipeline: "mutation",
   unpausePipeline: "mutation",

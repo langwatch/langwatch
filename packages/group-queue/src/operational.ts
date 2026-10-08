@@ -78,11 +78,10 @@ export {
   TransientBlobStoreError,
 } from "./tieredBlobStore.ts";
 
-// The stranded-group reaper: main's `scripts/ops/reap-stranded-group-keys.sh`
-// as a task, one-shot and dry-run by default.
+// The stranded-group reaper: main's `scripts/ops/reap-stranded-group-keys.sh`,
+// run by ops on a schedule and from the Queue screen.
 export {
   DEFAULT_GROUP_QUEUE_KEY_PREFIX,
-  GroupQueueReapStrandedGroupsTask,
   reapStrandedGroups,
   type ReapStrandedGroupsReport,
   type StrandedGroup,

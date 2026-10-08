@@ -168,3 +168,13 @@ export const opsRetryBlockedQueueJobInputSchema = z.object({
 export type OpsQueueReconcileOutcome =
   | { kind: "reconciled"; result: OpsQueueReconcileResult }
   | { kind: "skipped" };
+
+/** What one reap of stranded groups found and freed; the per-group list stays in the server log. */
+export const opsQueueReapedStrandedGroupsSchema = z.object({
+  strandedGroups: z.number(),
+  strandedJobs: z.number(),
+  deletedGroups: z.number(),
+  failedDeletes: z.number(),
+  totalPendingNow: z.number().nullable(),
+});
+export type OpsQueueReapedStrandedGroups = z.infer<typeof opsQueueReapedStrandedGroupsSchema>;

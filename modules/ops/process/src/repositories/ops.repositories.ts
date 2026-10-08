@@ -3,6 +3,7 @@ import type { MigrationLeaseRepository } from "@langwatch/system-migrations";
 
 import type { AnomalyRateTrackerRepository, AnomalyStateRepository } from "./anomaly.repository.ts";
 import type { BlobStoreRepository } from "./blob-store.repository.ts";
+import type { BugReportRateLimitRepository } from "./bug-report-rate-limit.repository.ts";
 import type { BugReportRepository } from "./bug-report.repository.ts";
 import type { ClickHouseRoutesRepository } from "./clickhouse.routes.repository.ts";
 import type { CredentialsResealRepository } from "./credentials-reseal.repository.ts";
@@ -12,6 +13,7 @@ import type {
   RedisHealthRepository,
 } from "./datastore-health.repository.ts";
 import type { EventExplorerRepository } from "./event-explorer.repository.ts";
+import type { GroupQueueReaperRepository } from "./group-queue-reaper.repository.ts";
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { InstanceAdminRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
@@ -42,6 +44,8 @@ import type {
  */
 export interface OpsRepositories {
   readonly bugReports: BugReportRepository;
+  /** One bucket per caller of the public report intake. */
+  readonly bugReportRateLimit: BugReportRateLimitRepository;
   readonly processStore: ProcessStore;
   /** The outbox and inbox retention purge only the process-manager-purge task runs. */
   readonly processManagerPurge: ProcessManagerPurgeRepository;
@@ -63,6 +67,7 @@ export interface OpsRepositories {
   readonly snapshots: OpsSnapshotRepository;
   readonly metrics: OpsMetricsRepository;
   readonly queues: QueueRepository;
+  readonly groupQueueReaper: GroupQueueReaperRepository;
   readonly blobStore: BlobStoreRepository;
   readonly replay: ReplayRepository;
   /** One replay run's engine; the named raw-client exception (Q212) for ops' event replay. */

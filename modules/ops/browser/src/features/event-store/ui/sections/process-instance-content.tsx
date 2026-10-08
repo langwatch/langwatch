@@ -22,7 +22,8 @@ type ProcessInstanceDetail = WireOf<StoredProcessInstanceDetail>;
 
 /** One outbox row as the browser receives it. */
 type ProcessOutboxMessageView = WireOf<StoredProcessOutboxMessageView>;
-import type { GrafanaDeepLinkConfig } from "../../../../model/grafana-links.ts";
+import type { GrafanaDeepLinkConfig } from "@langwatch/observability/grafana-links";
+
 import { describeNextWake } from "../../model/process-presentation.ts";
 import { OutboxMessageCard } from "./outbox-message-card.tsx";
 

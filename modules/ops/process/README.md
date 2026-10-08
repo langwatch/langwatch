@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:25`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).withTransportFacts(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…)`, `src/ops.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:404`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:419`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -182,6 +182,12 @@ unblockQueueGroup(input: UnblockQueueGroupInput): Promise<UnblockQueueGroupResul
 
 ```typescript
 unblockAllQueueGroups(input: UnblockAllQueueGroupsInput): Promise<UnblockAllQueueGroupsResult>;
+```
+
+#### `reapStrandedQueueGroups`
+
+```typescript
+reapStrandedQueueGroups(input: ReapStrandedQueueGroupsInput): Promise<OpsQueueReapedStrandedGroups>;
 ```
 
 #### `drainQueueGroup`
@@ -878,12 +884,12 @@ Platform permission `ops:manage`. Credential `browser`. Declared at `src/transpo
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-// Body: adminImpersonationRequestSchema, ../contract/src/admin-operation.ts:75
+// Body: adminImpersonationRequestSchema, ../contract/src/features/admin/admin-operation.ts:75
 interface Body {
   userIdToImpersonate: string;
   reason: string;
 }
-// Response: adminImpersonationStartedSchema, ../contract/src/admin-operation.ts:88
+// Response: adminImpersonationStartedSchema, ../contract/src/features/admin/admin-operation.ts:88
 interface Response {
   message: "Impersonation started";
 }
@@ -896,9 +902,9 @@ Platform permission `ops:manage`. Credential `browser`. Declared at `src/transpo
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
 ```typescript
-// Body: adminEmptyRequestSchema, ../contract/src/admin-operation.ts:80
+// Body: adminEmptyRequestSchema, ../contract/src/features/admin/admin-operation.ts:80
 type Body = Record<string, unknown>;
-// Response: adminImpersonationStoppedSchema, ../contract/src/admin-operation.ts:91
+// Response: adminImpersonationStoppedSchema, ../contract/src/features/admin/admin-operation.ts:91
 interface Response {
   message: "Impersonation ended";
 }
@@ -911,12 +917,12 @@ Platform permission `ops:view`. Credential `browser`. Declared at `src/transport
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
 ```typescript
-// Params: adminResourceParamsSchema, ../contract/src/admin-operation.ts:82
+// Params: adminResourceParamsSchema, ../contract/src/features/admin/admin-operation.ts:82
 interface Params {
   resource: string;
 }
-type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/admin-operation.ts:83
-// Response: adminOperationResponseSchema, ../contract/src/admin-operation.ts:106
+type Body = z.infer<typeof adminOperationBodySchema>; // ../contract/src/features/admin/admin-operation.ts:83
+// Response: adminOperationResponseSchema, ../contract/src/features/admin/admin-operation.ts:106
 interface Response {
   data: unknown;
   total?: number;
@@ -941,7 +947,7 @@ Permission `organization:view`. Declared at `src/transport/checkup.rest.ts:19`.
 Answers at `/api/checkup`, `/api/v1/checkup`.
 
 ```typescript
-type Response = z.infer<typeof projectCheckupReportSchema>; // ../contract/src/checkup.ts:181
+type Response = z.infer<typeof projectCheckupReportSchema>; // ../contract/src/features/checkup/checkup.ts:181
 ```
 
 #### `POST /api/checkup/run` · `runCheckup`
@@ -953,8 +959,8 @@ Permission `organization:manage`. Declared at `src/transport/checkup.rest.ts:30`
 Answers at `/api/checkup/run`, `/api/v1/checkup/run`.
 
 ```typescript
-type Body = z.infer<typeof explicitCheckInputSchema>; // ../contract/src/checkup.ts:174
-type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/checkup.ts:167
+type Body = z.infer<typeof explicitCheckInputSchema>; // ../contract/src/features/checkup/checkup.ts:174
+type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features/checkup/checkup.ts:167
 ```
 
 ### `opsBugReportRest`
@@ -1024,7 +1030,7 @@ type Response = unknown;
 
 ### `checkup`
 
-Contract `../contract/src/checkup.trpc.ts:34`, router `src/transport/checkup.trpc.ts:12`.
+Contract `../contract/src/features/checkup/checkup.trpc.ts:34`, router `src/transport/checkup.trpc.ts:12`.
 
 | Procedure                        | Kind     | Gate                             | Input               | Output              |
 | -------------------------------- | -------- | -------------------------------- | ------------------- | ------------------- |
@@ -1035,28 +1041,28 @@ Contract `../contract/src/checkup.trpc.ts:34`, router `src/transport/checkup.trp
 
 ```typescript
 // checkup.status
-// Input: organizationInput, ../contract/src/checkup.trpc.ts:11
+// Input: organizationInput, ../contract/src/features/checkup/checkup.trpc.ts:11
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof checkupAnswer>; // ../contract/src/checkup.trpc.ts:31
+type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:31
 
 // checkup.run
-// Input: z.object({ ...organizationInput.shape, ...explicitCheckInputSchema.shape }) (inline, ../contract/src/checkup.trpc.ts:40)
-type Output = z.infer<typeof checkupAnswer>; // ../contract/src/checkup.trpc.ts:31
+// Input: z.object({ ...organizationInput.shape, ...explicitCheckInputSchema.shape }) (inline, ../contract/src/features/checkup/checkup.trpc.ts:40)
+type Output = z.infer<typeof checkupAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:31
 
 // checkup.usageReport
-type Input = z.infer<typeof organizationInput>; // ../contract/src/checkup.trpc.ts:11
-type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/checkup.trpc.ts:32
+type Input = z.infer<typeof organizationInput>; // ../contract/src/features/checkup/checkup.trpc.ts:11
+type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:32
 
 // checkup.setUsageReportSwitches
-// Input: inline, ../contract/src/checkup.trpc.ts:49
+// Input: inline, ../contract/src/features/checkup/checkup.trpc.ts:49
 interface Input {
   organizationId: string;
   optionalMetricsOptOut?: boolean;
   hostnameOptOut?: boolean;
 }
-type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/checkup.trpc.ts:32
+type Output = z.infer<typeof usageReportAnswer>; // ../contract/src/features/checkup/checkup.trpc.ts:32
 ```
 
 ### `bugReports`
@@ -1088,7 +1094,7 @@ type Output = z.infer<typeof bugReportSchema>; // ../contract/src/ops-bug-report
 
 ### `ops`
 
-Contract `../contract/src/ops-dashboard.trpc.ts:27`, router `src/transport/ops-dashboard.trpc.ts:12`.
+Contract `../contract/src/features/dashboard/ops-dashboard.trpc.ts:34`, router `src/transport/ops-dashboard.trpc.ts:12`.
 
 | Procedure                  | Kind         | Gate                                                                                                                                  | Input                                 | Output                             |
 | -------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------- |
@@ -1108,7 +1114,7 @@ Contract `../contract/src/ops-dashboard.trpc.ts:27`, router `src/transport/ops-d
 
 ```typescript
 // ops.getScope
-// Input: inline, ../contract/src/ops-dashboard.trpc.ts:34
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:41
 type Input = unknown;
 // Output: opsScopeProbeSchema, ../contract/src/ops.responses.ts:59
 interface Output {
@@ -1122,12 +1128,12 @@ interface Output {
 }
 
 // ops.getDashboardSnapshot
-// Input: inline, ../contract/src/ops-dashboard.trpc.ts:38
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:45
 type Input = unknown;
-// Output: dashboardDataSchema.nullable() (inline, ../contract/src/ops-dashboard.trpc.ts:39)
+// Output: dashboardDataSchema.nullable() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:46)
 
 // ops.getBadgeCounts
-// Input: inline, ../contract/src/ops-dashboard.trpc.ts:47
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:54
 type Input = unknown;
 // Output: opsApiGetBadgeCountsOutputSchema, ../contract/src/ops.responses.ts:66
 interface Output {
@@ -1137,12 +1143,12 @@ interface Output {
 }
 
 // ops.getSignUpHealth
-// Input: opsSignUpHealthInputSchema, ../contract/src/ops-sign-up-health.ts:4
+// Input: opsSignUpHealthInputSchema, ../contract/src/features/dashboard/ops-dashboard.ts:259
 interface Input {
   fromMs: number;
   toMs: number;
 }
-// Output: signUpHealthSchema, ../contract/src/ops-sign-up-health.ts:11
+// Output: signUpHealthSchema, ../contract/src/features/dashboard/ops-dashboard.ts:266
 interface Output {
   organizationsFounded: number;
   orphanedOrganizations: number;
@@ -1152,19 +1158,19 @@ interface Output {
 }
 
 // ops.dashboardStream
-// Input: inline, ../contract/src/ops-dashboard.trpc.ts:56
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:63
 type Input = unknown;
-type Output = z.infer<typeof dashboardDataSchema>; // ../contract/src/ops-dashboard.ts:193
+type Output = z.infer<typeof dashboardDataSchema>; // ../contract/src/features/dashboard/ops-dashboard.ts:193
 
 // ops.listParkedGroups
-// Input: opsListParkedQueueGroupsInputSchema, ../contract/src/ops-queue.ts:136
+// Input: opsListParkedQueueGroupsInputSchema, ../contract/src/features/queue/ops-queue.ts:128
 interface Input {
   queueName: string;
   tenantId: string;
   page?: number;
   pageSize?: number;
 }
-// Output: opsParkedGroupsPageSchema, ../contract/src/ops-queue.ts:51
+// Output: opsParkedGroupsPageSchema, ../contract/src/features/queue/ops-queue.ts:43
 interface Output {
   groups: {
     groupId: string;
@@ -1179,9 +1185,9 @@ interface Output {
 }
 
 // ops.listQueues
-// Input: inline, ../contract/src/ops-dashboard.trpc.ts:69
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:76
 type Input = unknown;
-// Output: inline, ../contract/src/ops-dashboard.trpc.ts:70
+// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:77
 type Output = {
   name: string;
   displayName: string;
@@ -1198,7 +1204,7 @@ type Output = {
 interface Input {
   limit?: number;
 }
-// Output: opsScheduledJobSchema.array() (inline, ../contract/src/ops-dashboard.trpc.ts:74)
+// Output: opsScheduledJobSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:81)
 
 // ops.listPausedSchedules
 // Input: opsListPausedSchedulesInputSchema, ../contract/src/ops-scheduler.ts:76
@@ -1212,7 +1218,7 @@ type Output = z.infer<typeof opsPausedSchedulesPageSchema>; // ../contract/src/o
 interface Input {
   limit?: number;
 }
-// Output: inline, ../contract/src/ops-dashboard.trpc.ts:87
+// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:94
 type Output = {
   id: string;
   at: string;
@@ -1244,7 +1250,7 @@ type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-sche
 
 ### `ops`
 
-Contract `../contract/src/ops-event-log.trpc.ts:35`, router `src/transport/ops-event-log.trpc.ts:12`.
+Contract `../contract/src/features/event-log/ops-event-log.trpc.ts:35`, router `src/transport/ops-event-log.trpc.ts:12`.
 
 | Procedure                     | Kind     | Gate                             | Input                                  | Output                          |
 | ----------------------------- | -------- | -------------------------------- | -------------------------------------- | ------------------------------- |
@@ -1265,7 +1271,7 @@ Contract `../contract/src/ops-event-log.trpc.ts:35`, router `src/transport/ops-e
 
 ```typescript
 // ops.searchAggregates
-// Input: opsSearchAggregatesInputSchema, ../contract/src/ops-event-log.ts:15
+// Input: opsSearchAggregatesInputSchema, ../contract/src/features/event-log/ops-event-log.ts:15
 interface Input {
   query: string;
   tenantId?: string;
@@ -1281,7 +1287,7 @@ type Output = {
 }[];
 
 // ops.getEventLogSearchWindow
-// Input: inline, ../contract/src/ops-event-log.trpc.ts:46
+// Input: inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:46
 type Input = unknown;
 // Output: opsEventLogSearchWindowSchema, ../contract/src/ops.responses.ts:118
 interface Output {
@@ -1291,7 +1297,7 @@ interface Output {
 }
 
 // ops.loadAggregateEvents
-// Input: opsLoadAggregateEventsInputSchema, ../contract/src/ops-event-log.ts:25
+// Input: opsLoadAggregateEventsInputSchema, ../contract/src/features/event-log/ops-event-log.ts:25
 interface Input {
   aggregateId: string;
   tenantId: string;
@@ -1306,7 +1312,7 @@ type Output = {
 }[];
 
 // ops.computeProjectionState
-// Input: opsComputeProjectionStateInputSchema, ../contract/src/ops-event-log.ts:31
+// Input: opsComputeProjectionStateInputSchema, ../contract/src/features/event-log/ops-event-log.ts:31
 interface Input {
   aggregateId: string;
   tenantId: string;
@@ -1322,7 +1328,7 @@ interface Output {
 }
 
 // ops.discoverAggregates
-// Input: opsDiscoverAggregatesInputSchema, ../contract/src/ops-event-log.ts:8
+// Input: opsDiscoverAggregatesInputSchema, ../contract/src/features/event-log/ops-event-log.ts:8
 interface Input {
   projectionNames: string[];
   since: string;
@@ -1341,7 +1347,7 @@ interface Output {
 }
 
 // ops.searchTenants
-// Input: opsSearchTenantsInputSchema, ../contract/src/ops-event-log.ts:39
+// Input: opsSearchTenantsInputSchema, ../contract/src/features/event-log/ops-event-log.ts:39
 interface Input {
   query: string;
 }
@@ -1353,7 +1359,7 @@ type Output = {
 }[];
 
 // ops.dryRunReplay
-// Input: opsDryRunReplayInputSchema, ../contract/src/ops-event-log.ts:41
+// Input: opsDryRunReplayInputSchema, ../contract/src/features/event-log/ops-event-log.ts:41
 interface Input {
   projectionNames: string[];
   since: string;
@@ -1369,19 +1375,19 @@ interface Output {
 }
 
 // ops.getReplayHistory
-// Input: inline, ../contract/src/ops-event-log.trpc.ts:70
+// Input: inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:70
 type Input = unknown;
-// Output: replayHistoryEntrySchema.array() (inline, ../contract/src/ops-event-log.trpc.ts:71)
+// Output: replayHistoryEntrySchema.array() (inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:71)
 
 // ops.getReplayRun
-// Input: opsGetReplayRunInputSchema, ../contract/src/ops-event-log.ts:48
+// Input: opsGetReplayRunInputSchema, ../contract/src/features/event-log/ops-event-log.ts:48
 interface Input {
   runId: string;
 }
-// Output: replayHistoryEntrySchema.nullable() (inline, ../contract/src/ops-event-log.trpc.ts:75)
+// Output: replayHistoryEntrySchema.nullable() (inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:75)
 
 // ops.startReplay
-// Input: opsStartReplayInputSchema, ../contract/src/ops-event-log.ts:50
+// Input: opsStartReplayInputSchema, ../contract/src/features/event-log/ops-event-log.ts:50
 interface Input {
   projectionNames: string[];
   since: string;
@@ -1396,12 +1402,12 @@ interface Output {
 }
 
 // ops.getReplayStatus
-// Input: inline, ../contract/src/ops-event-log.trpc.ts:82
+// Input: inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:82
 type Input = unknown;
-type Output = z.infer<typeof replayStatusSchema>; // ../contract/src/ops-replay.ts:7
+type Output = z.infer<typeof replayStatusSchema>; // ../contract/src/features/event-log/ops-replay.ts:7
 
 // ops.cancelReplay
-// Input: inline, ../contract/src/ops-event-log.trpc.ts:86
+// Input: inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:86
 type Input = unknown;
 // Output: opsReplayCancelledSchema, ../contract/src/ops.responses.ts:246
 interface Output {
@@ -1409,7 +1415,7 @@ interface Output {
 }
 
 // ops.listAnomalies
-// Input: inline, ../contract/src/ops-event-log.trpc.ts:94
+// Input: inline, ../contract/src/features/event-log/ops-event-log.trpc.ts:94
 type Input = unknown;
 // Output: opsAnomalyListingSchema, ../contract/src/ops.responses.ts:249
 interface Output {
@@ -1426,7 +1432,7 @@ interface Output {
 }
 
 // ops.dismissAnomaly
-// Input: opsDismissAnomalyInputSchema, ../contract/src/ops-anomaly.ts:28
+// Input: opsDismissAnomalyInputSchema, ../contract/src/features/dashboard/ops-anomaly.ts:28
 interface Input {
   tenantId: string;
   kind: "rate_breaker";
@@ -1602,7 +1608,7 @@ interface Output {
 
 ### `ops`
 
-Contract `../contract/src/ops-process.trpc.ts:43`, router `src/transport/ops-process.trpc.ts:9`.
+Contract `../contract/src/features/process/ops-process.trpc.ts:43`, router `src/transport/ops-process.trpc.ts:9`.
 
 | Procedure                         | Kind     | Gate                             | Input                                     | Output                                 |
 | --------------------------------- | -------- | -------------------------------- | ----------------------------------------- | -------------------------------------- |
@@ -1627,16 +1633,16 @@ Contract `../contract/src/ops-process.trpc.ts:43`, router `src/transport/ops-pro
 
 ```typescript
 // ops.getAggregateProcessManagers
-// Input: opsAggregateProcessManagersInputSchema, ../contract/src/ops-process.ts:30
+// Input: opsAggregateProcessManagersInputSchema, ../contract/src/features/process/ops-process.ts:30
 interface Input {
   aggregateType: string;
   tenantId: string;
   aggregateId: string;
 }
-// Output: aggregateProcessManagerSchema.array() (inline, ../contract/src/ops-process.trpc.ts:51)
+// Output: aggregateProcessManagerSchema.array() (inline, ../contract/src/features/process/ops-process.trpc.ts:51)
 
 // ops.requeueDeadOutboxMessages
-// Input: opsRequeueDeadOutboxMessagesInputSchema, ../contract/src/ops-process.ts:36
+// Input: opsRequeueDeadOutboxMessagesInputSchema, ../contract/src/features/process/ops-process.ts:36
 interface Input {
   processName: string;
   tenantId: string;
@@ -1649,9 +1655,9 @@ interface Output {
 }
 
 // ops.listProcessFleet
-// Input: inline, ../contract/src/ops-process.trpc.ts:64
+// Input: inline, ../contract/src/features/process/ops-process.trpc.ts:64
 type Input = unknown;
-// Output: inline, ../contract/src/ops-process.trpc.ts:65
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:65
 type Output = {
   processName: string;
   pipelineName: string;
@@ -1665,7 +1671,7 @@ type Output = {
 }[];
 
 // ops.listDeadLetters
-// Input: opsListDeadLettersInputSchema, ../contract/src/ops-process.ts:43
+// Input: opsListDeadLettersInputSchema, ../contract/src/features/process/ops-process.ts:43
 interface Input {
   processName?: string;
   page?: number;
@@ -1674,9 +1680,9 @@ interface Input {
 type Output = z.infer<typeof opsDeadLetterPageSchema>; // ../contract/src/ops.responses.ts:192
 
 // ops.listDeadLetterCounts
-// Input: inline, ../contract/src/ops-process.trpc.ts:78
+// Input: inline, ../contract/src/features/process/ops-process.trpc.ts:78
 type Input = unknown;
-// Output: inline, ../contract/src/ops-process.trpc.ts:79
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:79
 type Output = {
   processName: string;
   count: number;
@@ -1684,7 +1690,7 @@ type Output = {
 }[];
 
 // ops.listProcessInstances
-// Input: opsListProcessInstancesInputSchema, ../contract/src/ops-process.ts:50
+// Input: opsListProcessInstancesInputSchema, ../contract/src/features/process/ops-process.ts:50
 interface Input {
   processName?: string;
   page?: number;
@@ -1694,11 +1700,11 @@ interface Input {
 type Output = z.infer<typeof opsProcessInstancePageSchema>; // ../contract/src/ops.responses.ts:198
 
 // ops.listUpcomingWakes
-// Input: opsListUpcomingWakesInputSchema, ../contract/src/ops-process.ts:58
+// Input: opsListUpcomingWakesInputSchema, ../contract/src/features/process/ops-process.ts:58
 interface Input {
   limit?: number;
 }
-// Output: inline, ../contract/src/ops-process.trpc.ts:88
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:88
 type Output = {
   processName: string;
   projectId: string;
@@ -1707,13 +1713,13 @@ type Output = {
 }[];
 
 // ops.getProcessInstance
-// Input: opsProcessRefInputSchema, ../contract/src/ops-process.ts:18
+// Input: opsProcessRefInputSchema, ../contract/src/features/process/ops-process.ts:18
 interface Input {
   processName: string;
   projectId: string;
   processKey: string;
 }
-// Output: inline, ../contract/src/ops-process.trpc.ts:92
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:92
 type Output = {
   ref: {
     processName: string;
@@ -1728,7 +1734,7 @@ type Output = {
 } | null;
 
 // ops.listProcessOutbox
-// Input: opsListProcessOutboxInputSchema, ../contract/src/ops-process.ts:62
+// Input: opsListProcessOutboxInputSchema, ../contract/src/features/process/ops-process.ts:62
 interface Input {
   processName: string;
   projectId: string;
@@ -1739,11 +1745,11 @@ interface Input {
 type Output = z.infer<typeof opsProcessOutboxPageSchema>; // ../contract/src/ops.responses.ts:203
 
 // ops.listProcessActions
-// Input: opsListProcessActionsInputSchema, ../contract/src/ops-process.ts:68
+// Input: opsListProcessActionsInputSchema, ../contract/src/features/process/ops-process.ts:68
 interface Input {
   limit?: number;
 }
-// Output: inline, ../contract/src/ops-process.trpc.ts:100
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:100
 type Output = {
   id: string;
   createdAt: number;
@@ -1754,18 +1760,18 @@ type Output = {
 }[];
 
 // ops.processWakeNow
-type Input = z.infer<typeof opsProcessRefInputSchema>; // ../contract/src/ops-process.ts:18
+type Input = z.infer<typeof opsProcessRefInputSchema>; // ../contract/src/features/process/ops-process.ts:18
 // Output: opsProcessWokeSchema, ../contract/src/ops.responses.ts:213
 interface Output {
   woke: boolean;
 }
 
 // ops.processRedriveDeadInstance
-type Input = z.infer<typeof opsProcessRefInputSchema>; // ../contract/src/ops-process.ts:18
+type Input = z.infer<typeof opsProcessRefInputSchema>; // ../contract/src/features/process/ops-process.ts:18
 type Output = z.infer<typeof opsProcessRequeuedSchema>; // ../contract/src/ops.responses.ts:212
 
 // ops.processRedriveDeadMessage
-// Input: opsProcessMessageInputSchema, ../contract/src/ops-process.ts:25
+// Input: opsProcessMessageInputSchema, ../contract/src/features/process/ops-process.ts:25
 interface Input {
   processName: string;
   projectId: string;
@@ -1778,14 +1784,14 @@ interface Output {
 }
 
 // ops.processDiscardDeadMessage
-type Input = z.infer<typeof opsProcessMessageInputSchema>; // ../contract/src/ops-process.ts:25
+type Input = z.infer<typeof opsProcessMessageInputSchema>; // ../contract/src/features/process/ops-process.ts:25
 // Output: opsProcessDiscardedMessageSchema, ../contract/src/ops.responses.ts:215
 interface Output {
   discarded: boolean;
 }
 
 // ops.redriveDeadLetters
-// Input: opsRedriveDeadLettersInputSchema, ../contract/src/ops-process.ts:72
+// Input: opsRedriveDeadLettersInputSchema, ../contract/src/features/process/ops-process.ts:72
 interface Input {
   processName?: string;
 }
@@ -1795,7 +1801,7 @@ interface Output {
 }
 
 // ops.discardDeadLetters
-// Input: opsDiscardDeadLettersInputSchema, ../contract/src/ops-process.ts:81
+// Input: opsDiscardDeadLettersInputSchema, ../contract/src/features/process/ops-process.ts:81
 interface Input {
   processName?: string;
   confirm?: "DISCARD ALL";
@@ -1806,12 +1812,12 @@ interface Output {
 }
 
 // ops.listOutboxAttempts
-// Input: opsListOutboxAttemptsInputSchema, ../contract/src/ops-process.ts:91
+// Input: opsListOutboxAttemptsInputSchema, ../contract/src/features/process/ops-process.ts:91
 interface Input {
   outboxId: string;
   projectId: string;
 }
-// Output: inline, ../contract/src/ops-process.trpc.ts:139
+// Output: inline, ../contract/src/features/process/ops-process.trpc.ts:139
 type Output = {
   id: string;
   attempt: number;
@@ -1823,7 +1829,7 @@ type Output = {
 }[];
 
 // ops.processReleaseLapsedLease
-type Input = z.infer<typeof opsProcessMessageInputSchema>; // ../contract/src/ops-process.ts:25
+type Input = z.infer<typeof opsProcessMessageInputSchema>; // ../contract/src/features/process/ops-process.ts:25
 // Output: opsProcessReleasedLeaseSchema, ../contract/src/ops.responses.ts:218
 interface Output {
   released: boolean;
@@ -1832,59 +1838,60 @@ interface Output {
 
 ### `ops`
 
-Contract `../contract/src/ops-queue.trpc.ts:47`, router `src/transport/ops-queue.trpc.ts:9`.
+Contract `../contract/src/features/queue/ops-queue.trpc.ts:48`, router `src/transport/ops-queue.trpc.ts:9`.
 
-| Procedure                    | Kind     | Gate                             | Input                                | Output                             |
-| ---------------------------- | -------- | -------------------------------- | ------------------------------------ | ---------------------------------- |
-| `ops.listGroups`             | query    | Platform permission `ops:view`   | `opsListQueueGroupsInputSchema`      | `opsQueueGroupsPageSchema`         |
-| `ops.getGroupDetail`         | query    | Platform permission `ops:view`   | `opsQueueGroupInputSchema`           | `groupInfoSchema`                  |
-| `ops.getGrafanaLinkConfig`   | query    | Platform permission `ops:view`   | inline                               | `opsGrafanaLinkConfigSchema`       |
-| `ops.getBlockedSummary`      | query    | Platform permission `ops:view`   | inline                               | `opsBlockedSummarySchema`          |
-| `ops.getGroupJobs`           | query    | Platform permission `ops:view`   | `opsListQueueGroupJobsInputSchema`   | `opsQueueJobsPageSchema`           |
-| `ops.unblockGroup`           | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueUnblockedGroupSchema`     |
-| `ops.unblockAll`             | mutation | Platform permission `ops:manage` | `opsQueueNameInputSchema`            | `opsQueueUnblockedAllSchema`       |
-| `ops.drainGroup`             | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueDrainedGroupSchema`       |
-| `ops.pausePipeline`          | mutation | Platform permission `ops:manage` | `opsQueuePipelineInputSchema`        | inline                             |
-| `ops.unpausePipeline`        | mutation | Platform permission `ops:manage` | `opsQueuePipelineInputSchema`        | inline                             |
-| `ops.pauseTenant`            | mutation | Platform permission `ops:manage` | `opsQueueTenantInputSchema`          | inline                             |
-| `ops.unpauseTenant`          | mutation | Platform permission `ops:manage` | `opsQueueTenantInputSchema`          | inline                             |
-| `ops.listPausedTenants`      | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | `opsQueueNameListSchema`           |
-| `ops.drainTenant`            | mutation | Platform permission `ops:manage` | `opsDrainQueueTenantInputSchema`     | `opsQueueDrainedTenantSchema`      |
-| `ops.retryBlocked`           | mutation | Platform permission `ops:manage` | `opsRetryBlockedQueueJobInputSchema` | `opsQueueUnblockedGroupSchema`     |
-| `ops.listProjections`        | query    | Platform permission `ops:view`   | inline                               | `opsPipelineRegistrationsSchema`   |
-| `ops.listDlqGroups`          | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | inline                             |
-| `ops.listAllDlqGroups`       | query    | Platform permission `ops:view`   | inline                               | inline                             |
-| `ops.listPausedKeys`         | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | `opsQueueNameListSchema`           |
-| `ops.drainAllBlockedPreview` | query    | Platform permission `ops:view`   | `opsQueueFilterInputSchema`          | `opsQueueDrainPreviewSchema`       |
-| `ops.moveToDlq`              | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueMovedToDlqSchema`         |
-| `ops.moveAllBlockedToDlq`    | mutation | Platform permission `ops:manage` | `opsQueueFilterInputSchema`          | `opsQueueMovedAllToDlqSchema`      |
-| `ops.replayFromDlq`          | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueReplayedFromDlqSchema`    |
-| `ops.replayAllFromDlq`       | mutation | Platform permission `ops:manage` | `opsQueueFilterInputSchema`          | `opsQueueReplayedAllFromDlqSchema` |
-| `ops.redriveManyFromDlq`     | mutation | Platform permission `ops:manage` | `opsQueueGroupIdsInputSchema`        | `opsQueueRedrivenDlqGroupsSchema`  |
-| `ops.discardManyFromDlq`     | mutation | Platform permission `ops:manage` | `opsQueueGroupIdsInputSchema`        | `opsQueueDiscardedDlqGroupsSchema` |
-| `ops.canaryRedrive`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryRedrivenSchema`     |
-| `ops.canaryUnblock`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryUnblockedSchema`    |
+| Procedure                    | Kind     | Gate                             | Input                                | Output                               |
+| ---------------------------- | -------- | -------------------------------- | ------------------------------------ | ------------------------------------ |
+| `ops.listGroups`             | query    | Platform permission `ops:view`   | `opsListQueueGroupsInputSchema`      | `opsQueueGroupsPageSchema`           |
+| `ops.getGroupDetail`         | query    | Platform permission `ops:view`   | `opsQueueGroupInputSchema`           | `groupInfoSchema`                    |
+| `ops.getGrafanaLinkConfig`   | query    | Platform permission `ops:view`   | inline                               | `opsGrafanaLinkConfigSchema`         |
+| `ops.getBlockedSummary`      | query    | Platform permission `ops:view`   | inline                               | `opsBlockedSummarySchema`            |
+| `ops.getGroupJobs`           | query    | Platform permission `ops:view`   | `opsListQueueGroupJobsInputSchema`   | `opsQueueJobsPageSchema`             |
+| `ops.unblockGroup`           | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueUnblockedGroupSchema`       |
+| `ops.unblockAll`             | mutation | Platform permission `ops:manage` | `opsQueueNameInputSchema`            | `opsQueueUnblockedAllSchema`         |
+| `ops.reapStrandedGroups`     | mutation | Platform permission `ops:manage` | inline                               | `opsQueueReapedStrandedGroupsSchema` |
+| `ops.drainGroup`             | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueDrainedGroupSchema`         |
+| `ops.pausePipeline`          | mutation | Platform permission `ops:manage` | `opsQueuePipelineInputSchema`        | inline                               |
+| `ops.unpausePipeline`        | mutation | Platform permission `ops:manage` | `opsQueuePipelineInputSchema`        | inline                               |
+| `ops.pauseTenant`            | mutation | Platform permission `ops:manage` | `opsQueueTenantInputSchema`          | inline                               |
+| `ops.unpauseTenant`          | mutation | Platform permission `ops:manage` | `opsQueueTenantInputSchema`          | inline                               |
+| `ops.listPausedTenants`      | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | `opsQueueNameListSchema`             |
+| `ops.drainTenant`            | mutation | Platform permission `ops:manage` | `opsDrainQueueTenantInputSchema`     | `opsQueueDrainedTenantSchema`        |
+| `ops.retryBlocked`           | mutation | Platform permission `ops:manage` | `opsRetryBlockedQueueJobInputSchema` | `opsQueueUnblockedGroupSchema`       |
+| `ops.listProjections`        | query    | Platform permission `ops:view`   | inline                               | `opsPipelineRegistrationsSchema`     |
+| `ops.listDlqGroups`          | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | inline                               |
+| `ops.listAllDlqGroups`       | query    | Platform permission `ops:view`   | inline                               | inline                               |
+| `ops.listPausedKeys`         | query    | Platform permission `ops:view`   | `opsQueueNameInputSchema`            | `opsQueueNameListSchema`             |
+| `ops.drainAllBlockedPreview` | query    | Platform permission `ops:view`   | `opsQueueFilterInputSchema`          | `opsQueueDrainPreviewSchema`         |
+| `ops.moveToDlq`              | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueMovedToDlqSchema`           |
+| `ops.moveAllBlockedToDlq`    | mutation | Platform permission `ops:manage` | `opsQueueFilterInputSchema`          | `opsQueueMovedAllToDlqSchema`        |
+| `ops.replayFromDlq`          | mutation | Platform permission `ops:manage` | `opsQueueGroupInputSchema`           | `opsQueueReplayedFromDlqSchema`      |
+| `ops.replayAllFromDlq`       | mutation | Platform permission `ops:manage` | `opsQueueFilterInputSchema`          | `opsQueueReplayedAllFromDlqSchema`   |
+| `ops.redriveManyFromDlq`     | mutation | Platform permission `ops:manage` | `opsQueueGroupIdsInputSchema`        | `opsQueueRedrivenDlqGroupsSchema`    |
+| `ops.discardManyFromDlq`     | mutation | Platform permission `ops:manage` | `opsQueueGroupIdsInputSchema`        | `opsQueueDiscardedDlqGroupsSchema`   |
+| `ops.canaryRedrive`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryRedrivenSchema`       |
+| `ops.canaryUnblock`          | mutation | Platform permission `ops:manage` | `opsQueueCanaryInputSchema`          | `opsQueueCanaryUnblockedSchema`      |
 
 ```typescript
 // ops.listGroups
-// Input: opsListQueueGroupsInputSchema, ../contract/src/ops-queue.ts:143
+// Input: opsListQueueGroupsInputSchema, ../contract/src/features/queue/ops-queue.ts:135
 interface Input {
   queueName: string;
   page?: number;
   pageSize?: number;
 }
-type Output = z.infer<typeof opsQueueGroupsPageSchema>; // ../contract/src/ops-queue.ts:43
+type Output = z.infer<typeof opsQueueGroupsPageSchema>; // ../contract/src/features/queue/ops-queue.ts:35
 
 // ops.getGroupDetail
-// Input: opsQueueGroupInputSchema, ../contract/src/ops-queue.ts:109
+// Input: opsQueueGroupInputSchema, ../contract/src/features/queue/ops-queue.ts:101
 interface Input {
   queueName: string;
   groupId: string;
 }
-type Output = z.infer<typeof groupInfoSchema>; // ../contract/src/ops-dashboard.ts:22
+type Output = z.infer<typeof groupInfoSchema>; // ../contract/src/features/dashboard/ops-dashboard.ts:22
 
 // ops.getGrafanaLinkConfig
-// Input: inline, ../contract/src/ops-queue.trpc.ts:62
+// Input: inline, ../contract/src/features/queue/ops-queue.trpc.ts:63
 type Input = unknown;
 // Output: opsGrafanaLinkConfigSchema, ../contract/src/ops.responses.ts:126
 type Output = {
@@ -1894,9 +1901,9 @@ type Output = {
 } | null;
 
 // ops.getBlockedSummary
-// Input: inline, ../contract/src/ops-queue.trpc.ts:66
+// Input: inline, ../contract/src/features/queue/ops-queue.trpc.ts:67
 type Input = unknown;
-// Output: opsBlockedSummarySchema, ../contract/src/ops-queue.ts:65
+// Output: opsBlockedSummarySchema, ../contract/src/features/queue/ops-queue.ts:57
 interface Output {
   totalBlocked: number;
   clusters: {
@@ -1911,24 +1918,24 @@ interface Output {
 }
 
 // ops.getGroupJobs
-// Input: opsListQueueGroupJobsInputSchema, ../contract/src/ops-queue.ts:149
+// Input: opsListQueueGroupJobsInputSchema, ../contract/src/features/queue/ops-queue.ts:141
 interface Input {
   queueName: string;
   groupId: string;
   page?: number;
   pageSize?: number;
 }
-type Output = z.infer<typeof opsQueueJobsPageSchema>; // ../contract/src/ops-queue.ts:35
+type Output = z.infer<typeof opsQueueJobsPageSchema>; // ../contract/src/features/queue/ops-queue.ts:27
 
 // ops.unblockGroup
-type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/ops-queue.ts:109
+type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/features/queue/ops-queue.ts:101
 // Output: opsQueueUnblockedGroupSchema, ../contract/src/ops.responses.ts:140
 interface Output {
   wasBlocked: boolean;
 }
 
 // ops.unblockAll
-// Input: opsQueueNameInputSchema, ../contract/src/ops-queue.ts:107
+// Input: opsQueueNameInputSchema, ../contract/src/features/queue/ops-queue.ts:99
 interface Input {
   queueName: string;
 }
@@ -1937,47 +1944,59 @@ interface Output {
   unblockedCount: number;
 }
 
+// ops.reapStrandedGroups
+// Input: inline, ../contract/src/features/queue/ops-queue.trpc.ts:84
+type Input = unknown;
+// Output: opsQueueReapedStrandedGroupsSchema, ../contract/src/features/queue/ops-queue.ts:173
+interface Output {
+  strandedGroups: number;
+  strandedJobs: number;
+  deletedGroups: number;
+  failedDeletes: number;
+  totalPendingNow: number | null;
+}
+
 // ops.drainGroup
-type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/ops-queue.ts:109
+type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/features/queue/ops-queue.ts:101
 // Output: opsQueueDrainedGroupSchema, ../contract/src/ops.responses.ts:142
 interface Output {
   jobsRemoved: number;
 }
 
 // ops.pausePipeline
-// Input: opsQueuePipelineInputSchema, ../contract/src/ops-queue.ts:157
+// Input: opsQueuePipelineInputSchema, ../contract/src/features/queue/ops-queue.ts:149
 interface Input {
   queueName: string;
   key: string;
 }
-// Output: inline, ../contract/src/ops-queue.trpc.ts:87
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:93
 type Output = unknown;
 
 // ops.unpausePipeline
-type Input = z.infer<typeof opsQueuePipelineInputSchema>; // ../contract/src/ops-queue.ts:157
-// Output: inline, ../contract/src/ops-queue.trpc.ts:91
+type Input = z.infer<typeof opsQueuePipelineInputSchema>; // ../contract/src/features/queue/ops-queue.ts:149
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:97
 type Output = unknown;
 
 // ops.pauseTenant
-// Input: opsQueueTenantInputSchema, ../contract/src/ops-queue.ts:126
+// Input: opsQueueTenantInputSchema, ../contract/src/features/queue/ops-queue.ts:118
 interface Input {
   queueName: string;
   tenantId: string;
 }
-// Output: inline, ../contract/src/ops-queue.trpc.ts:95
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:101
 type Output = unknown;
 
 // ops.unpauseTenant
-type Input = z.infer<typeof opsQueueTenantInputSchema>; // ../contract/src/ops-queue.ts:126
-// Output: inline, ../contract/src/ops-queue.trpc.ts:99
+type Input = z.infer<typeof opsQueueTenantInputSchema>; // ../contract/src/features/queue/ops-queue.ts:118
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:105
 type Output = unknown;
 
 // ops.listPausedTenants
-type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/ops-queue.ts:107
+type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/features/queue/ops-queue.ts:99
 type Output = z.infer<typeof opsQueueNameListSchema>; // ../contract/src/ops.responses.ts:176
 
 // ops.drainTenant
-// Input: opsDrainQueueTenantInputSchema, ../contract/src/ops-queue.ts:162
+// Input: opsDrainQueueTenantInputSchema, ../contract/src/features/queue/ops-queue.ts:154
 interface Input {
   queueName: string;
   tenantId: string;
@@ -1990,7 +2009,7 @@ interface Output {
 }
 
 // ops.retryBlocked
-// Input: opsRetryBlockedQueueJobInputSchema, ../contract/src/ops-queue.ts:170
+// Input: opsRetryBlockedQueueJobInputSchema, ../contract/src/features/queue/ops-queue.ts:162
 interface Input {
   queueName: string;
   groupId: string;
@@ -1999,13 +2018,13 @@ interface Input {
 type Output = z.infer<typeof opsQueueUnblockedGroupSchema>; // ../contract/src/ops.responses.ts:140
 
 // ops.listProjections
-// Input: inline, ../contract/src/ops-queue.trpc.ts:114
+// Input: inline, ../contract/src/features/queue/ops-queue.trpc.ts:120
 type Input = unknown;
 type Output = z.infer<typeof opsPipelineRegistrationsSchema>; // ../contract/src/ops.responses.ts:107
 
 // ops.listDlqGroups
-type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/ops-queue.ts:107
-// Output: inline, ../contract/src/ops-queue.trpc.ts:119
+type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/features/queue/ops-queue.ts:99
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:125
 type Output = {
   groupId: string;
   error: string | null;
@@ -2016,9 +2035,9 @@ type Output = {
 }[];
 
 // ops.listAllDlqGroups
-// Input: inline, ../contract/src/ops-queue.trpc.ts:122
+// Input: inline, ../contract/src/features/queue/ops-queue.trpc.ts:128
 type Input = unknown;
-// Output: inline, ../contract/src/ops-queue.trpc.ts:123
+// Output: inline, ../contract/src/features/queue/ops-queue.trpc.ts:129
 type Output = {
   groupId: string;
   error: string | null;
@@ -2031,17 +2050,17 @@ type Output = {
 }[];
 
 // ops.listPausedKeys
-type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/ops-queue.ts:107
+type Input = z.infer<typeof opsQueueNameInputSchema>; // ../contract/src/features/queue/ops-queue.ts:99
 type Output = z.infer<typeof opsQueueNameListSchema>; // ../contract/src/ops.responses.ts:176
 
 // ops.drainAllBlockedPreview
-// Input: opsQueueFilterInputSchema, ../contract/src/ops-queue.ts:114
+// Input: opsQueueFilterInputSchema, ../contract/src/features/queue/ops-queue.ts:106
 interface Input {
   queueName: string;
   pipelineFilter?: string;
   errorFilter?: string;
 }
-// Output: opsQueueDrainPreviewSchema, ../contract/src/ops-queue.ts:88
+// Output: opsQueueDrainPreviewSchema, ../contract/src/features/queue/ops-queue.ts:80
 interface Output {
   totalAffected: number;
   byPipeline: {
@@ -2055,14 +2074,14 @@ interface Output {
 }
 
 // ops.moveToDlq
-type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/ops-queue.ts:109
+type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/features/queue/ops-queue.ts:101
 // Output: opsQueueMovedToDlqSchema, ../contract/src/ops.responses.ts:147
 interface Output {
   jobsMoved: number;
 }
 
 // ops.moveAllBlockedToDlq
-type Input = z.infer<typeof opsQueueFilterInputSchema>; // ../contract/src/ops-queue.ts:114
+type Input = z.infer<typeof opsQueueFilterInputSchema>; // ../contract/src/features/queue/ops-queue.ts:106
 // Output: opsQueueMovedAllToDlqSchema, ../contract/src/ops.responses.ts:148
 interface Output {
   movedCount: number;
@@ -2070,14 +2089,14 @@ interface Output {
 }
 
 // ops.replayFromDlq
-type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/ops-queue.ts:109
+type Input = z.infer<typeof opsQueueGroupInputSchema>; // ../contract/src/features/queue/ops-queue.ts:101
 // Output: opsQueueReplayedFromDlqSchema, ../contract/src/ops.responses.ts:152
 interface Output {
   jobsReplayed: number;
 }
 
 // ops.replayAllFromDlq
-type Input = z.infer<typeof opsQueueFilterInputSchema>; // ../contract/src/ops-queue.ts:114
+type Input = z.infer<typeof opsQueueFilterInputSchema>; // ../contract/src/features/queue/ops-queue.ts:106
 // Output: opsQueueReplayedAllFromDlqSchema, ../contract/src/ops.responses.ts:153
 interface Output {
   replayedCount: number;
@@ -2085,7 +2104,7 @@ interface Output {
 }
 
 // ops.redriveManyFromDlq
-// Input: opsQueueGroupIdsInputSchema, ../contract/src/ops-queue.ts:131
+// Input: opsQueueGroupIdsInputSchema, ../contract/src/features/queue/ops-queue.ts:123
 interface Input {
   queueName: string;
   groupIds: string[];
@@ -2097,7 +2116,7 @@ interface Output {
 }
 
 // ops.discardManyFromDlq
-type Input = z.infer<typeof opsQueueGroupIdsInputSchema>; // ../contract/src/ops-queue.ts:131
+type Input = z.infer<typeof opsQueueGroupIdsInputSchema>; // ../contract/src/features/queue/ops-queue.ts:123
 // Output: opsQueueDiscardedDlqGroupsSchema, ../contract/src/ops.responses.ts:161
 interface Output {
   discardedCount: number;
@@ -2105,7 +2124,7 @@ interface Output {
 }
 
 // ops.canaryRedrive
-// Input: opsQueueCanaryInputSchema, ../contract/src/ops-queue.ts:120
+// Input: opsQueueCanaryInputSchema, ../contract/src/features/queue/ops-queue.ts:112
 interface Input {
   queueName: string;
   count?: number;
@@ -2118,7 +2137,7 @@ interface Output {
 }
 
 // ops.canaryUnblock
-type Input = z.infer<typeof opsQueueCanaryInputSchema>; // ../contract/src/ops-queue.ts:120
+type Input = z.infer<typeof opsQueueCanaryInputSchema>; // ../contract/src/features/queue/ops-queue.ts:112
 // Output: opsQueueCanaryUnblockedSchema, ../contract/src/ops.responses.ts:170
 interface Output {
   unblockedCount: number;
@@ -2128,7 +2147,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/ops-upgrade.ts:170`, router `src/transport/ops-upgrade.trpc.ts:12`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:170`, router `src/transport/ops-upgrade.trpc.ts:12`.
 
 | Procedure                                               | Kind     | Gate                             | Input                                             | Output                                |
 | ------------------------------------------------------- | -------- | -------------------------------- | ------------------------------------------------- | ------------------------------------- |
@@ -2151,14 +2170,14 @@ Contract `../contract/src/ops-upgrade.ts:170`, router `src/transport/ops-upgrade
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/ops-upgrade.ts:173
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:173
 type Input = unknown;
-type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/ops-upgrade.ts:62
+type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:62
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/ops-upgrade.ts:178
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:178
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/ops-upgrade.ts:145
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:145
 interface Output {
   items: {
     release: string | null;
@@ -2171,28 +2190,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/ops-upgrade.ts:153
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:153
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/ops-upgrade.ts:147
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:147
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/ops-upgrade.ts:167
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:167
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/ops-upgrade.ts:120
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:120
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/ops-upgrade.ts:160
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:160
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/ops-upgrade.ts:149
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:149
 interface Output {
   items: {
     id: string;
@@ -2207,18 +2226,18 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/ops-upgrade.ts:167
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/ops-upgrade.ts:136
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:167
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:136
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/ops-upgrade.ts:206
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:206
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/ops-upgrade.ts:207)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:207)
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/ops-upgrade.ts:215
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:215
 type Input = unknown;
-// Output: opsMigrationEnrollmentListingSchema, ../contract/src/ops-system-migration.ts:101
+// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:101
 interface Output {
   isSaaS: boolean;
   enrollments: {
@@ -2232,18 +2251,18 @@ interface Output {
 }
 
 // ops.upgrade.searchMigrationOrganizations
-// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/ops-system-migration.ts:31
+// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:31
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/ops-upgrade.ts:224
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:224
 type Output = {
   id: string;
   name: string;
 }[];
 
 // ops.upgrade.enrollMigrationTenant
-// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/ops-system-migration.ts:15
+// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:15
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2255,7 +2274,7 @@ interface Output {
 }
 
 // ops.upgrade.enrollMigrationCohort
-// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/ops-system-migration.ts:23
+// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:23
 interface Input {
   migrationName: string;
   sampleSize: number;
@@ -2263,7 +2282,7 @@ interface Input {
   includePrivateDataplane?: boolean;
   confirm?: "ENROLL";
 }
-// Output: opsMigrationCohortResultSchema, ../contract/src/ops-system-migration.ts:150
+// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:150
 interface Output {
   enrolled: {
     id: string;
@@ -2273,7 +2292,7 @@ interface Output {
 }
 
 // ops.upgrade.withdrawMigrationTenant
-// Input: opsMigrationTenantInputSchema, ../contract/src/ops-system-migration.ts:10
+// Input: opsMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:10
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2284,20 +2303,20 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationForOrganization
-// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/ops-system-migration.ts:35
+// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:35
 interface Input {
   organizationId: string;
   migrationName: string;
   confirm?: "RUN";
 }
-// Output: opsMigrationTargetedRunResultSchema, ../contract/src/ops-system-migration.ts:161
+// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:161
 interface Output {
   status: "migrated" | "finalized" | "parked" | "rolled_back" | null;
   waiting: boolean;
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/ops-upgrade.ts:267
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:267
 type Input = unknown;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:259
 interface Output {
@@ -2305,7 +2324,7 @@ interface Output {
 }
 
 // ops.upgrade.assertSystemMigrationLegacyWritersDrained
-// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/ops-system-migration.ts:42
+// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:42
 interface Input {
   migrationName: string;
   tenantId: string;
@@ -2318,7 +2337,7 @@ interface Output {
 }
 
 // ops.upgrade.rollBackSystemMigrationTenant
-// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/ops-system-migration.ts:49
+// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:49
 interface Input {
   migrationName: string;
   tenantId: string;
@@ -2344,14 +2363,22 @@ Declared at `src/eventing/ops-anomaly-detection.pipeline.ts:30`.
 | --------------- | ------------------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
 | process manager | `anomalyDetection` | every 1 min (`ANOMALY_DETECTION_INTERVAL_MS`); intents `detect` (outbox) | `src/eventing/ops-anomaly-detection.pipeline.ts:35` |
 
+### Pipeline `ops_group_queue_reaper` (aggregate `global`)
+
+Declared at `src/eventing/ops-group-queue-reaper.pipeline.ts:34`.
+
+| Kind            | Name               | Handles                                                                                | Declared at                                          |
+| --------------- | ------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| process manager | `groupQueueReaper` | every 1 h (`GROUP_QUEUE_REAPER_INTERVAL_MS = 60 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/ops-group-queue-reaper.pipeline.ts:39` |
+
 ### Pipeline `ops_platform_operator_seed` (aggregate `platform_operator_seed`)
 
-Declared at `src/eventing/ops-platform-operator-seed.pipeline.ts:53`. Events: `platformOperatorSeedRecordedEventSchema`.
+Declared at `src/eventing/ops-platform-operator-seed.pipeline.ts:51`. Events: `platformOperatorSeedRecordedEventSchema`.
 
 | Kind            | Name                         | Handles                                                                                               | Declared at                                              |
 | --------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| command         | `recordPlatformOperatorSeed` | –                                                                                                     | `src/eventing/ops-platform-operator-seed.pipeline.ts:58` |
-| process manager | `platformOperatorSeed`       | every 1 min (`PLATFORM_OPERATOR_SEED_WAKE_INTERVAL_MS = 60 * 1000`); intents `grant`, `seed` (outbox) | `src/eventing/ops-platform-operator-seed.pipeline.ts:59` |
+| command         | `recordPlatformOperatorSeed` | –                                                                                                     | `src/eventing/ops-platform-operator-seed.pipeline.ts:56` |
+| process manager | `platformOperatorSeed`       | every 1 min (`PLATFORM_OPERATOR_SEED_WAKE_INTERVAL_MS = 60 * 1000`); intents `grant`, `seed` (outbox) | `src/eventing/ops-platform-operator-seed.pipeline.ts:57` |
 
 ### Pipeline `ops_projection_replay` (aggregate `projection_replay`)
 
@@ -2387,6 +2414,14 @@ Declared at `src/eventing/ops-usage-report.pipeline.ts:25`.
 | --------------- | ------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | process manager | `usageReport` | every 1 h (`USAGE_REPORT_WAKE_INTERVAL_MS = 60 * 60 * 1000`); intents `send` (outbox) | `src/eventing/ops-usage-report.pipeline.ts:30` |
 
+### Pipeline `ops_upgrade_alerts` (aggregate `global`)
+
+Declared at `src/features/upgrades/eventing/ops-upgrade-alerts.pipeline.ts:33`.
+
+| Kind            | Name            | Handles                                                                          | Declared at                                                        |
+| --------------- | --------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| process manager | `upgradeAlerts` | every 1 h (`UPGRADE_ALERTS_INTERVAL_MS = 60 * 60_000`); intents `check` (outbox) | `src/features/upgrades/eventing/ops-upgrade-alerts.pipeline.ts:38` |
+
 ### Tasks
 
 Run by the tasks process, before serve.
@@ -2403,26 +2438,27 @@ Run by the tasks process, before serve.
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
 | secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:770`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:772`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:774`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:775`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:776`           |
-| config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:26` |
-| config | `metricsApiKey`                  | `METRICS_API_KEY`                   | `../contract/src/ops.config.ts:28` |
-| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:30` |
-| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:32` |
-| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:33` |
-| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:35` |
-| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:37` |
-| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:44` |
-| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:44` |
-| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:46` |
-| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:48` |
-| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:50` |
-| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:52` |
-| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:53` |
-| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:54` |
-| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:56` |
-| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:57` |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:771`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:773`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:774`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:775`           |
+| config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:28` |
+| config | `metricsApiKey`                  | `METRICS_API_KEY`                   | `../contract/src/ops.config.ts:30` |
+| config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
+| config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |
+| config | `usageStats.installMethod`       | `INSTALL_METHOD`                    | `../contract/src/ops.config.ts:35` |
+| config | `usageStats.chartVersion`        | `LANGWATCH_CHART_VERSION`           | `../contract/src/ops.config.ts:37` |
+| config | `collectClickHouseBackupMetrics` | `CLICKHOUSE_BACKUP_METRICS_ENABLED` | `../contract/src/ops.config.ts:39` |
+| config | `productAnalytics.key`           | `POSTHOG_KEY`                       | `../contract/src/ops.config.ts:46` |
+| config | `productAnalytics.host`          | `POSTHOG_HOST`                      | `../contract/src/ops.config.ts:46` |
+| config | `grafana`                        | `GRAFANA_BASE_URL`                  | `../contract/src/ops.config.ts:48` |
+| config | `bugReportSlackChannel`          | `SLACK_BUG_REPORTS_CHANNEL`         | `../contract/src/ops.config.ts:50` |
+| config | `cloudOps`                       | `LANGWATCH_CLOUD_OPS`               | `../contract/src/ops.config.ts:52` |
+| config | `adminEmails`                    | `ADMIN_EMAILS`                      | `../contract/src/ops.config.ts:54` |
+| config | `nodeEnvironment`                | `NODE_ENV`                          | `../contract/src/ops.config.ts:56` |
+| config | `isSaas`                         | `IS_SAAS`                           | `../contract/src/ops.config.ts:57` |
+| config | `publicBaseUrl`                  | `BASE_HOST`                         | `../contract/src/ops.config.ts:58` |
+| config | `serviceVersion`                 | `SERVICE_VERSION`                   | `../contract/src/ops.config.ts:60` |
+| config | `otelResourceAttributes`         | `OTEL_RESOURCE_ATTRIBUTES`          | `../contract/src/ops.config.ts:61` |
 
 <!-- readme:generated:end -->

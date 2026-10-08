@@ -1,8 +1,3 @@
-/**
- * Pass-level proof of the pacing rules, composed the way
- * `runSystemMigrationPass` composes them: real runner and cohort helpers,
- * filtered by migration declarations. Only storage is faked here.
- */
 import {
   type SystemMigration,
   SystemMigrationRunnerService,
@@ -10,6 +5,12 @@ import {
   type TenantMigrationRecord,
   SystemMigrationRecordNotFoundError,
 } from "@langwatch/system-migrations";
+/**
+ * Pass-level proof of the pacing rules, composed the way
+ * `runSystemMigrationPass` composes them: real runner and cohort helpers,
+ * filtered by migration declarations. Only storage is faked here.
+ */
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -121,6 +122,7 @@ function passOn({
       .map((migration) => migration.name),
   );
   return new SystemMigrationRunnerService({
+    now: nowInstant,
     state,
     lease: grantedLease,
     tenants: tenantSourceOf(tenants),

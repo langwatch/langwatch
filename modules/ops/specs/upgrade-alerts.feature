@@ -1,11 +1,17 @@
 @ops @upgrades
 Feature: Upgrade alerts reach platform operators
-  An upgrade that fails, or a runner that dies holding the lease, is told to the platform
-  operators once: an email through the notification edge, and a Slack message where ops'
-  notifier is configured (ruling Q-U7). Operators also see a banner while the installation is
-  Behind, Unsupported or Needs attention. Plan: dev/docs/plans/upgrade-ui-2026-10-06.md 6.2, W9.
+  An upgrade that fails, or a runner that dies holding the lease, is told once to this
+  installation's own platform operators by email through the notification edge. Upgrades are a
+  self-hosted concern, so nothing goes to LangWatch's Slack. Operators also see a banner while the
+  installation is Behind, Unsupported or Needs attention. Plan: dev/docs/plans/upgrade-ui-2026-10-06.md 6.2, W9.
 
   Rule: The hourly check alerts on what changed since the last wake
+
+    @unit
+    Scenario: Each wake checks the window since the previous wake
+      Given the upgrade alert check last woke an hour ago
+      When it wakes again
+      Then it asks for one check covering the time since that wake, keyed by this wake
 
     @unit
     Scenario: A step that failed since the last wake is alerted
@@ -31,7 +37,7 @@ Feature: Upgrade alerts reach platform operators
       When the upgrade alert check wakes
       Then no alert is raised
 
-  Rule: Alerts go to platform operators by email, and to Slack only where configured
+  Rule: Alerts go to the installation's platform operators by email
 
     @unit
     Scenario: Each platform operator with an email address gets the alert once per wake
@@ -45,14 +51,7 @@ Feature: Upgrade alerts reach platform operators
     Scenario: Nothing is sent when nothing changed
       Given no step failed and no lease expired since the last wake
       When the upgrade alert check runs
-      Then no email is sent and no Slack message is posted
-
-    @unit
-    Scenario: Slack hears the alert only where ops' notifier is configured
-      Given ops' upgrade alert notifier is configured
-      And a step failed since the last wake
-      When the upgrade alert check runs
-      Then the notifier is given the same alerts as the email
+      Then no email is sent
 
   Rule: The operator banner reads the upgrade status already served to operators
 
