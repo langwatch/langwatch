@@ -62,7 +62,6 @@ import type {
   UserSecureAccountOffer,
   UserPasswordRotationOutcome,
   UserPersonalBudget,
-  UserPersonalContext,
   UserProfile,
   UserProfilesInput,
   UserSsoStatus,
@@ -88,7 +87,6 @@ import {
   UserFederatedPasswordChangeUnavailableError,
   UserLastAuthenticationMethodError,
   UserLinkedAccountNotFoundError,
-  UserNotOrganizationMemberError,
   UserPasswordAlreadySetError,
   UserPasswordAttemptsThrottledError,
   UserPasswordAuthUnavailableError,
@@ -145,11 +143,8 @@ const CREDENTIAL_ISSUER = "local:credential";
 interface UserAppDependencies {
   auth: AuthApiContract;
   authz: AuthzApi;
-  /** The default routing policy and personal keys behind /me. */
-  enterpriseGateway: Pick<
-    EnterpriseGatewayApi,
-    "findDefaultRoutingPolicies" | "personalVirtualKeyList"
-  >;
+  /** The personal keys behind the /me budget banner. */
+  enterpriseGateway: Pick<EnterpriseGatewayApi, "personalVirtualKeyList">;
   /** The budget pre-check the /me banner runs at a projected cost of zero. */
   gateway: Pick<GatewayApi, "checkBudget">;
   /** The rollup behind /api/me/usage, whose door has yet to move (peer-cycle-cuts B4 U). */
@@ -855,38 +850,6 @@ export class UserModule implements UserApi {
   }
 
   /**
-   * Personal context inside one organization. The workspace is provisioned
-   * lazily on first read, so somebody who joined before the feature shipped
-   * gets one without re-accepting an invite.
-   */
-  async getPersonalContext({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<UserPersonalContext> {
-    await this.#assertMember({ userId, organizationId });
-
-    const profile = await this.#users.findById({ id: userId });
-    const workspace = await this.#account.ensurePersonalWorkspace({
-      userId,
-      organizationId,
-      displayName: profile?.name ?? null,
-      displayEmail: profile?.email ?? null,
-    });
-    const [policy] = await this.#peers.enterpriseGateway.findDefaultRoutingPolicies({
-      organizationId,
-      personalTeamId: workspace.team.id,
-    });
-
-    return {
-      workspace: { ...workspace, project: { ...workspace.project, apiKey: "" } },
-      routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
-    };
-  }
-
-  /**
    * The /me budget banner, delegated to the gateway's own check at a projected
    * cost of zero — the same code path a request runs — so the banner and the
    * command line's pre-check can never disagree.
@@ -1132,19 +1095,6 @@ export class UserModule implements UserApi {
     if (result.outcome === "weak_password") throw new ValidationError(result.message);
 
     throw new UserFederatedPasswordChangeUnavailableError(result.outcome);
-  }
-
-  /**
-   * Membership, checked again after `organization:view`. The permission answers
-   * "may this caller act on an organization at all"; this answers "is this one
-   * theirs", which is what keeps a personal rollup inside their own tenant.
-   */
-  async #assertMember(input: { userId: string; organizationId: string }): Promise<void> {
-    const member = await this.#peers.organizations.isMember(input);
-
-    if (member) return;
-
-    throw new UserNotOrganizationMemberError(input.organizationId);
   }
 
   async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {

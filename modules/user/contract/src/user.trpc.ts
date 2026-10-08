@@ -16,7 +16,6 @@ import {
   userApiPersonalBudgetSchema,
   userApiBrowserSessionEndedSchema,
   userApiBrowserSessionSchema,
-  userApiPersonalContextSchema,
   userApiSuccessSchema,
 } from "./user.responses.ts";
 import {
@@ -152,10 +151,6 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("removeAvatar")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiSuccessSchema)
-
-  .query("personalContext")
-  .withInput(userApiOrganizationInputSchema)
-  .withOutput(userApiPersonalContextSchema)
 
   .query("personalBudget")
   .withInput(userApiOrganizationInputSchema)

@@ -102,7 +102,7 @@ export function usePersonalContext(): PersonalContext {
   const orgName = organization?.name ?? "Your organization";
   const orgId = organization?.id ?? "org_unknown";
 
-  const personalContextQuery = api.user.personalContext.useQuery(
+  const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: orgId },
     { enabled: !!organization, refetchOnWindowFocus: false },
   );

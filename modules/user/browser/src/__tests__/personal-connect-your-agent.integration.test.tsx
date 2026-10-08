@@ -25,7 +25,7 @@ const { queryImpls, hasFirstMessageRef, hasFirstMessageInputs } = vi.hoisted(() 
   const hasFirstMessageInputs: unknown[] = [];
 
   const queryImpls: Record<string, (input: unknown) => unknown> = {
-    "user.personalContext": () => ({
+    "routingPolicy.personalContext": () => ({
       data: {
         workspace: {
           // Epoch milliseconds, which is what the read hands over and what
@@ -109,7 +109,7 @@ vi.mock("../behavior/personal-workspace-api.ts", () => {
     ]);
   };
   // Every node can act as a procedure (useQuery/useMutation) or nest further,
-  // so a root-level procedure and a router-nested one (api.user.personalContext)
+  // so a root-level procedure and a router-nested one (api.routingPolicy.personalContext)
   // both resolve; queryImpls keys by dotted path.
   const makeNode = (path: string): unknown => {
     const hooks = hooksFor(path);

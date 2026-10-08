@@ -75,8 +75,10 @@ vi.mock("../../../behavior/gateway-api.ts", () => ({
         }),
       },
     },
-    routingPolicy: { list: { useQuery: () => ({ data: [] }) } },
-    user: { personalContext: { useQuery: () => ({ data: undefined }) } },
+    routingPolicy: {
+      list: { useQuery: () => ({ data: [] }) },
+      personalContext: { useQuery: () => ({ data: undefined }) },
+    },
   },
 }));
 

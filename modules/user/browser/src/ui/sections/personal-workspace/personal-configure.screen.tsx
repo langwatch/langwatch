@@ -40,7 +40,7 @@ const fmtRelative = (iso: string | null): string => formatRelativeTime(iso ? toE
 export function PersonalConfigureScreen() {
   const ctx = usePersonalContext();
 
-  const personalContextQuery = api.user.personalContext.useQuery(
+  const personalContextQuery = api.routingPolicy.personalContext.useQuery(
     { organizationId: ctx.organizationId },
     { enabled: !!ctx.organizationId, refetchOnWindowFocus: false },
   );

@@ -14,6 +14,7 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @see enterprise/modules/enterprise-gateway/specs/enterprise-gateway.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { enterpriseGatewayProcessModule } from "../../enterprise-gateway.module.ts";
@@ -35,6 +36,7 @@ describe("given an operator acting as a member", () => {
         organization: createApiFixture<OrganizationApi>({ isMember }),
         authz: createApiFixture<AuthzApi>(),
         "model-provider": createApiFixture<ModelProviderApi>(),
+        user: createApiFixture<UserApi>(),
       })
       .boot();
 

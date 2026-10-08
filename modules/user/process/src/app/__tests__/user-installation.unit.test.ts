@@ -2,7 +2,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   EnterpriseGatewayApi,
   PersonalVirtualKey,
-  RoutingPolicy,
 } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
@@ -148,33 +147,6 @@ describe("the /me gateway reads", () => {
     })),
   });
 
-  /** @scenario "The personal context names the default routing policy the gateway resolves" */
-  it("names the first default routing policy enterprise gateway answers", async () => {
-    const findDefaultRoutingPolicies = vi.fn(async () => [
-      routingPolicy({ id: "policy-team", name: "Team default" }),
-      routingPolicy({ id: "policy-org", name: "Org default" }),
-    ]);
-    const runtime = await process("api", {
-      authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
-      enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({ findDefaultRoutingPolicies }),
-      organization,
-    }).boot();
-
-    try {
-      const context = await runtime
-        .service(UserApi)
-        .getPersonalContext({ userId: "user-1", organizationId: "org-1" });
-
-      expect(context.routingPolicy).toEqual({ id: "policy-team", name: "Team default" });
-      expect(findDefaultRoutingPolicies).toHaveBeenCalledWith({
-        organizationId: "org-1",
-        personalTeamId: "team-1",
-      });
-    } finally {
-      await runtime.stop();
-    }
-  });
-
   /** @scenario "The personal budget warns at the gateway's soft warning on the caller's own key" */
   it("checks the caller's own key with the gateway and answers a warning", async () => {
     const checkBudget = vi.fn(async () => ({
@@ -216,25 +188,6 @@ describe("the /me gateway reads", () => {
     }
   });
 });
-
-function routingPolicy({ id, name }: { id: string; name: string }): RoutingPolicy {
-  return {
-    id,
-    organizationId: "org-1",
-    name,
-    description: null,
-    modelProviderIds: [],
-    modelAliases: {},
-    defaultModel: null,
-    policyRules: {},
-    isDefault: true,
-    createdAtMs: 0,
-    updatedAtMs: 0,
-    createdById: null,
-    updatedById: null,
-    scopes: [],
-  };
-}
 
 function personalKey({ id }: { id: string }): PersonalVirtualKey {
   return {

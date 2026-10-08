@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The server half of `routingPolicy.*`: `routingPolicies:view` reads, `routingPolicies:manage` writes, as on main. */
+/** The server half of `routingPolicy.*`: `routingPolicies:view` reads, `routingPolicies:manage` writes, as on main; `personalContext` keeps `user.personalContext`'s `organization:view`. */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { EnterpriseGatewayApi, routingPolicyTrpc } from "@langwatch/enterprise-gateway-contract";
 
@@ -22,6 +22,12 @@ export const routingPolicyTrpcTransport: TrpcRouterDeclaration<
       tier: input.tier,
       boundProviderTypes: input.boundProviderTypes,
     }),
+  )
+
+  .procedure("personalContext")
+  .withPermission("organization:view")
+  .handle(({ app, input, actor }) =>
+    app.getPersonalContext({ userId: actor.id, organizationId: input.organizationId }),
   )
 
   .procedure("create")

@@ -249,12 +249,6 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { success: true as const };
   })
 
-  .procedure("personalContext")
-  .withPermission("organization:view")
-  .handle(({ app, actor, input }) =>
-    app.getPersonalContext({ userId: actor.id, organizationId: input.organizationId }),
-  )
-
   .procedure("personalBudget")
   .withPermission("organization:view")
   .handle(({ app, actor, input }) =>

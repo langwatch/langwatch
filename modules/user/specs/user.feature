@@ -181,15 +181,6 @@ Feature: Canonical user lifecycle
     Then that session alone is ended
     And the request names no account, so nobody else's session is reachable
 
-  # The personal context is a cached read, so it never carries a credential:
-  # the page mints a personal access token instead of revealing a key.
-  @unit
-  Scenario: The personal context never carries the personal project's API key
-    Given a member of the organization, with or without project:manage on their personal project
-    When they read their personal context in that organization
-    Then the personal project's API key is blank
-    And the blank key is a valid personal context on the wire
-
   @integration
   Scenario: The personal OTLP panel offers a personal access token, shown once
     Given a member opens the personal OTLP endpoint panel
@@ -199,14 +190,8 @@ Feature: Canonical user lifecycle
     And the panel says the token can only send data to this project and cannot read or change anything
     And the token fills the snippet while the panel is open and is held in memory only
 
-  # main's user.personalContext and user.personalBudget read the gateway's
-  # default routing policy, the caller's personal key and the budget check.
-  @unit
-  Scenario: The personal context names the default routing policy the gateway resolves
-    Given a member whose personal team inherits a default routing policy
-    When they read their personal context in that organization
-    Then the personal context names that routing policy
-
+  # main's user.personalBudget reads the caller's personal key and the
+  # gateway's budget check. The personal context is enterprise-gateway's.
   @unit
   Scenario: The personal budget warns at the gateway's soft warning on the caller's own key
     Given a member holding a personal gateway key whose budget is at a soft warning

@@ -85,7 +85,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       personalVirtualKeys: { list: { invalidate: invalidate("keys.list") } },
       personalWorkspaceFeatures: { get: { invalidate: invalidate("features.get") } },
     }),
-    user: {
+    routingPolicy: {
       personalContext: {
         useQuery: () => ({
           data: state.projectId

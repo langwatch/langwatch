@@ -12,6 +12,7 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseGatewayProcessModule } from "../../enterprise-gateway.module.ts";
@@ -28,6 +29,7 @@ function boot() {
       organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
       "model-provider": createApiFixture<ModelProviderApi>(),
+      user: createApiFixture<UserApi>(),
     })
     .boot();
 }

@@ -186,8 +186,6 @@ export class TestUserApi implements UserApi {
   setLastHomePath: UserApi["setLastHomePath"] = (input) =>
     this.overrides.setLastHomePath?.(input) ?? this.unimplemented("setLastHomePath");
 
-  getPersonalContext: UserApi["getPersonalContext"] = (input) =>
-    this.overrides.getPersonalContext?.(input) ?? this.unimplemented("getPersonalContext");
 
   getPersonalBudget: UserApi["getPersonalBudget"] = (input) =>
     this.overrides.getPersonalBudget?.(input) ?? this.unimplemented("getPersonalBudget");

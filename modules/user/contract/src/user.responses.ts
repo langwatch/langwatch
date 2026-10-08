@@ -1,5 +1,4 @@
 /** Response schemas for the `user.*` tRPC surface. */
-import { ensuredPersonalWorkspaceSchema } from "@langwatch/organization-contract";
 import { z } from "zod";
 
 /**
@@ -31,22 +30,6 @@ export const userApiLinkedAccountSchema = z
   .strict();
 
 export const userApiLinkedAccountsSchema = z.array(userApiLinkedAccountSchema);
-
-/**
- * The caller's personal workspace inside one organization, plus the routing
- * policy it inherits by default. Null where the organization declares none.
- */
-/** `project.apiKey` is always blank: a cached read carries no credential. */
-const personalContextWorkspaceSchema = ensuredPersonalWorkspaceSchema.safeExtend({
-  project: ensuredPersonalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
-});
-
-export const userApiPersonalContextSchema = z
-  .object({
-    workspace: personalContextWorkspaceSchema,
-    routingPolicy: z.object({ id: z.string(), name: z.string() }).strict().nullable(),
-  })
-  .strict();
 
 /**
  * The budget banner's state — two shapes, and the bare one is not a
@@ -82,7 +65,6 @@ export const userApiHomePagePickerStateSchema = z
   })
   .strict();
 
-export type UserPersonalContext = z.infer<typeof userApiPersonalContextSchema>;
 export type UserPersonalBudget = z.infer<typeof userApiPersonalBudgetSchema>;
 export type UserBudgetIncreaseRequested = z.infer<typeof userApiBudgetIncreaseRequestedSchema>;
 export type UserHomePagePickerState = z.infer<typeof userApiHomePagePickerStateSchema>;

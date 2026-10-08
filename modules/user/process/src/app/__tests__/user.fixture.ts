@@ -174,11 +174,10 @@ export function createUserTestStoredObjects() {
   });
 }
 
-/** The gateway peers behind /me: no default policy, no personal key, every budget allowed. */
+/** The gateway peers behind /me: no personal key, every budget allowed. */
 export function createUserTestGateways() {
   return {
     enterpriseGateway: createApiFixture<EnterpriseGatewayApi>({
-      findDefaultRoutingPolicies: vi.fn(async () => []),
       personalVirtualKeyList: vi.fn(async () => []),
     }),
     gateway: createApiFixture<GatewayApi>({
