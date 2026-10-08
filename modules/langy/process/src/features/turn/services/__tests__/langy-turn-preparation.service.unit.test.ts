@@ -377,6 +377,43 @@ describe("LangyTurnPreparationService golden path", () => {
       expect(dispatched.prompt).toContain("of 5 GitHub pull requests");
       expect(dispatched.prompt).not.toContain("of 0 GitHub pull requests");
     });
+
+    /** @scenario "Per-user daily PR cap stops runaway loops" */
+    it("reports the cap is reached and dispatches the turn without a GitHub token", async () => {
+      const fixture = makeFixture({
+        credentials: {
+          getOrProvision: vi.fn(async () =>
+            workerCredentials({
+              organizationId: "organization-1",
+              githubToken: "gh-token",
+              githubLogin: "octocat",
+            }),
+          ),
+          findEgressAllowlist: vi.fn(async () => null),
+          resolveMirrorTier: vi.fn(async () => "content" as const),
+          findModelsAllowed: vi.fn(async () => null),
+        },
+        permits: {
+          reserve: vi.fn(async () => ({ reserved: false, allowed: false, resetAt: 0 })),
+          release: vi.fn(async () => undefined),
+          check: vi.fn(async () => ({ allowed: false })),
+        },
+      });
+
+      await LangyTurnService.create(fixture.deps).startConversationTurn({ ...input });
+
+      expect(fixture.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining("USER PR CAP REACHED"),
+          credentials: expect.not.objectContaining({ githubToken: expect.anything() }),
+        }),
+      );
+      expect(fixture.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringContaining("Do not call any tool that opens a PR."),
+        }),
+      );
+    });
   });
 
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
