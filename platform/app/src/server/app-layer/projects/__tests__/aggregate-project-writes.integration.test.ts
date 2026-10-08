@@ -13,7 +13,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Project } from "~/generated/prisma/client";
+import type { Project, SavedView } from "~/generated/prisma/client";
 import { blankTemplate } from "~/optimization_studio/templates/blank";
 import { appRouter } from "~/server/api/root";
 import { handledCodeOf } from "~/server/api/routers/__tests__/helpers/aggregateTraceRoutes";
@@ -318,7 +318,7 @@ describe("Feature: saving a view is refused on the aggregate", () => {
    * would hold trivially.
    */
   const SEEDED_VIEW_ID = `seeded-${run}`;
-  let seededView: Awaited<ReturnType<typeof prisma.savedView.findFirstOrThrow>>;
+  let seededView: SavedView;
 
   beforeAll(async () => {
     seededView = await prisma.savedView.create({
