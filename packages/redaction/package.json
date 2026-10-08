@@ -28,6 +28,7 @@
     "bench": "vitest bench --run"
   },
   "dependencies": {
+    "@noble/hashes": "catalog:",
     "libphonenumber-js": "catalog:"
   },
   "devDependencies": {

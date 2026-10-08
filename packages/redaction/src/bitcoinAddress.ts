@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 /**
  * Checksum validation for base58check and bech32/bech32m addresses. The
@@ -48,10 +48,6 @@ function base58Decode(value: string): Uint8Array | null {
   // cannot represent; the address version byte can be one, so restore them.
   for (let i = 0; i < value.length && value[i] === "1"; i++) bytes.push(0);
   return Uint8Array.from(bytes.reverse());
-}
-
-function sha256(data: Uint8Array): Buffer {
-  return createHash("sha256").update(data).digest();
 }
 
 /**
