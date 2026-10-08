@@ -212,3 +212,11 @@ export const distinctFieldNamesResultSchema = z.object({
   metadataKeys: z.array(fieldNameSchema),
   evaluationNames: z.array(fieldNameSchema),
 });
+
+/** A trace's settled total cost; null when no span of it carried a cost. */
+export const traceCostSchema = z.object({
+  traceId: z.string(),
+  totalCost: z.number().nullable(),
+});
+
+export type TraceCost = z.infer<typeof traceCostSchema>;

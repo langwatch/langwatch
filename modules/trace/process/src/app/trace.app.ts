@@ -142,6 +142,7 @@ import {
   type TraceAttributedTrace,
   type TraceAttributedTraceDetail,
   type TraceAttributedValueComparison,
+  type TraceCost,
   type TraceAttributedValueSpend,
   type TraceAttributeMatch,
   type TraceDailyGroupSpend,
@@ -2203,6 +2204,14 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   findExistingTraceIds(input: {
     projectId: string;
+  findTraceCosts(input: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]> {
+    return this.#dependencies.traces.existence.findTraceCosts(input);
+  }
+
     traceIds: readonly string[];
   }): Promise<string[]> {
     return this.#dependencies.traces.existence.findExistingTraceIds(input);

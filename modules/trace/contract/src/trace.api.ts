@@ -75,6 +75,7 @@ import type {
   TraceQueryFieldCatalogueInput,
 } from "./trace-query.contract.ts";
 import type {
+  TraceCost,
   TraceLegacyListInput,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
@@ -387,6 +388,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectId: string;
     traceIds: readonly string[];
   }): Promise<string[]>;
+  /** Each named trace's latest summary cost inside `occurredAt` (epoch ms); unknown ids absent. */
+  findTraceCosts(input: {
+    projectId: string;
+    traceIds: readonly string[];
+    occurredAt: { from: number; to: number };
+  }): Promise<TraceCost[]>;
   loadTraces(input: {
     userId: string;
     projectId: string;

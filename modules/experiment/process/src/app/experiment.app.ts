@@ -230,7 +230,7 @@ export class ExperimentModule implements ExperimentApi {
     apiKeys: ApiKeyApi,
     /** Reads a row's stored attachment for the target it is dispatched to. */
     storedObjects: StoredObjectApi,
-    /** Reads a settled experiment trace's fold for its run's cost. */
+    /** A settled experiment trace's fold, and the summary costs a run's unpriced rows take. */
     traces: TraceApi,
   };
   static readonly config = experimentConfig;
@@ -250,6 +250,7 @@ export class ExperimentModule implements ExperimentApi {
       slugify: slugifyExperimentName,
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
+      traces: dependencies.traces,
       updates: ExperimentWorkbenchPresenceUpdatesService.create({
         presence: dependencies.presence,
         logger,

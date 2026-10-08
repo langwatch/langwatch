@@ -14,6 +14,7 @@ import {
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -391,6 +392,7 @@ const build = (
       newId: () => "generated",
       now: () => Temporal.Instant.fromEpochMilliseconds(1),
       references,
+      traces: createApiFixture<TraceApi>(),
       updates: NoopExperimentWorkbenchUpdates.create(),
     }),
   };

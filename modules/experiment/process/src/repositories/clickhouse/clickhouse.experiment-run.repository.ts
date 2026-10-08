@@ -19,12 +19,12 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
 import { deriveRunCompleteness } from "../../rules/experiment-run-completeness.rules.ts";
+import { OCCURRED_AT_BUFFER_MS } from "../../rules/experiment-run-occurred-at.rules.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import type { ExperimentWorkflowVersionRepository } from "../experiment-workflow-version.repository.ts";
 import {
   buildDedupedRunItemsWhere,
   computeOccurredAtRangeForRuns,
-  OCCURRED_AT_BUFFER_MS,
   WARN_OLD_RUN_AGE_MS,
 } from "./clickhouse.experiment-run.mapper.ts";
 
@@ -416,13 +416,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
             },
             format: "JSONEachRow",
           });
-          const items = await this.enrichItemCosts({
-            client,
-            projectId: input.projectId,
-            items: await itemsResult.json<ItemRow>(),
-            range,
-          });
-          return mapRunWithItems(run, items, input.projectId);
+          return mapRunWithItems(run, await itemsResult.json<ItemRow>(), input.projectId);
         } catch (error) {
           this.options.telemetry.error(
             { projectId: input.projectId, runId: input.runId, error },
@@ -567,91 +561,6 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
     return this.options.workflowVersions.findByIds({ projectId, versionIds });
-  }
-
-  private async enrichItemCosts({
-    client,
-    projectId,
-    items,
-    range,
-  }: {
-    client: ExperimentClickHouseClient;
-    projectId: string;
-    items: ItemRow[];
-    range: { minOccurredAt: string; maxOccurredAt: string };
-  }): Promise<ItemRow[]> {
-    const traceIds = [
-      ...new Set(
-        items
-          .filter(
-            (item) => item.ResultType === "target" && item.TraceId && item.TargetCost === null,
-          )
-          .flatMap((item) => (item.TraceId ? [item.TraceId] : [])),
-      ),
-    ];
-    if (traceIds.length === 0) return items;
-
-    try {
-      const result = await client.query({
-        query: `
-          SELECT
-            TraceId,
-            TotalCost
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-            AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-            AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, TraceId
-            )
-        `,
-        query_params: {
-          tenantId: projectId,
-          traceIds,
-          minOccurredAt: range.minOccurredAt,
-          maxOccurredAt: range.maxOccurredAt,
-        },
-        format: "JSONEachRow",
-      });
-      const costs = new Map(
-        (await result.json<{ TraceId: string; TotalCost: number | null }>()).flatMap((row) =>
-          row.TotalCost && row.TotalCost > 0 ? [[row.TraceId, row.TotalCost] as const] : [],
-        ),
-      );
-      const counts = new Map<string, number>();
-      for (const item of items) {
-        if (item.ResultType === "target" && item.TraceId && costs.has(item.TraceId)) {
-          counts.set(item.TraceId, (counts.get(item.TraceId) ?? 0) + 1);
-        }
-      }
-      return items.map((item) => {
-        if (
-          !item.TraceId ||
-          item.ResultType !== "target" ||
-          item.TargetCost !== null ||
-          !costs.has(item.TraceId)
-        ) {
-          return item;
-        }
-        return {
-          ...item,
-          TargetCost: Number(
-            (costs.get(item.TraceId)! / (counts.get(item.TraceId) ?? 1)).toFixed(6),
-          ),
-        };
-      });
-    } catch (error) {
-      this.options.telemetry.warn(
-        { projectId, error },
-        "Failed to enrich items with trace costs — returning items without costs",
-      );
-      return items;
-    }
   }
 
   private warnIfRunsAreOld(projectId: string, minMs: number, runCount: number): void {

@@ -11,6 +11,7 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -53,6 +54,7 @@ function createOverRest() {
       workflows: createApiFixture<WorkflowApi>(),
       dataset: createApiFixture<DatasetApi>(),
     },
+    traces: createApiFixture<TraceApi>(),
     updates: ExperimentWorkbenchPresenceUpdatesService.create({
       presence: createApiFixture<PresenceApi>({ publishProjectEvent }),
       logger: createTestLogger().logger,

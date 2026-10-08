@@ -12,6 +12,7 @@ import {
 import type { PresenceApi, PresenceProjectEvent } from "@langwatch/presence-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -216,6 +217,7 @@ describe("given a workflow evaluation refreshing its experiment", () => {
         slugify: (value) => value,
         newId: () => "generated-id",
         references,
+        traces: createApiFixture<TraceApi>(),
         updates,
       });
 

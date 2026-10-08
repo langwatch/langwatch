@@ -54,6 +54,7 @@ import {
   type ExperimentUsageCount,
 } from "@langwatch/experiment-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
@@ -67,6 +68,7 @@ import {
   type ExperimentExecution,
   UnavailableExperimentExecution,
 } from "./experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunTraceCostService } from "./experiment-run-trace-cost.service.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
 import {
   ExperimentWorkbenchReferencesService,
@@ -92,6 +94,8 @@ export type ExperimentServiceOptions = {
   references: ExperimentWorkbenchReferenceServices;
   /** Drops workbench update notices where no live update transport is composed. */
   updates?: ExperimentWorkbenchUpdates;
+  /** Prices a run's unpriced target rows from their traces' settled cost. */
+  traces: Pick<TraceApi, "findTraceCosts">;
 };
 
 /**
@@ -108,11 +112,13 @@ export class ExperimentService {
   private readonly updates: ExperimentWorkbenchUpdates;
   private readonly slugs: ExperimentSlugService;
   private readonly workbenchReferences: ExperimentWorkbenchReferencesService;
+  private readonly runTraceCosts: ExperimentRunTraceCostService;
   readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
     this.execution = options.execution ?? UnavailableExperimentExecution.create();
     this.updates = options.updates ?? NoopExperimentWorkbenchUpdates.create();
+    this.runTraceCosts = ExperimentRunTraceCostService.create({ traces: options.traces });
     this.slugs = ExperimentSlugService.create({
       repository: options.repository,
       newId: options.newId,
@@ -459,8 +465,9 @@ export class ExperimentService {
     return this.options.runRepository.listPage(experimentRunPageInputSchema.parse(input));
   }
 
-  findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    return this.options.runRepository.findRun(experimentRunLookupSchema.parse(input));
+  async findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
+    const run = await this.options.runRepository.findRun(experimentRunLookupSchema.parse(input));
+    return run ? this.runTraceCosts.priceRows(run) : null;
   }
 
   async getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{
