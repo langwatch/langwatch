@@ -99,19 +99,6 @@ export class GroupRoleNotAssignableError extends HandledError {
   }
 }
 
-export class GroupRoleScopeError extends HandledError {
-  declare readonly code: "org_exclusive_permission_scope";
-
-  constructor(permission: string, scopeType: string) {
-    super(
-      "org_exclusive_permission_scope",
-      "That permission only takes effect at organization scope",
-      { httpStatus: 422, meta: { permission, scopeType } },
-    );
-    this.name = "GroupRoleScopeError";
-  }
-}
-
 export class GroupBindingAlreadyExistsError extends HandledError {
   declare readonly code: "role_binding_already_exists";
 

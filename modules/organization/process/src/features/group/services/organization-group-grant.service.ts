@@ -2,11 +2,14 @@
  * A group's bindings: what the group may reach, validated against the roles this organization
  * can assign and the scopes it owns.
  */
-import { AuthzScopeNotFoundError, bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
+import {
+  AuthzScopeNotFoundError,
+  bindingScopeCanGrantPermission,
+  OrgExclusivePermissionScopeError,
+} from "@langwatch/authz-contract";
 import {
   GroupCustomRoleRequiredError,
   GroupRoleNotAssignableError,
-  GroupRoleScopeError,
   GroupScopeNotInOrganizationError,
   PersonalWorkspaceNotManagedHereError,
   type OrganizationGroupGrant,
@@ -95,7 +98,7 @@ export class OrganizationGroupGrantService {
           }),
       );
       if (refused) {
-        throw new GroupRoleScopeError(refused, binding.scopeType);
+        throw new OrgExclusivePermissionScopeError(refused, binding.scopeType);
       }
     }
 

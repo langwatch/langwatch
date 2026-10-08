@@ -1,11 +1,11 @@
 import {
   GrantExceedsCallerPermissionsError,
+  OrgExclusivePermissionScopeError,
   permissionsConferred,
   type AuthzApi,
 } from "@langwatch/authz-contract";
 import {
   GroupRoleNotAssignableError,
-  GroupRoleScopeError,
   UserNotInOrganizationError,
   type OrganizationGroup,
   type OrganizationTeam,
@@ -194,7 +194,7 @@ describe("OrganizationService groups", () => {
         caller: { type: "user", id: "actor_1" },
         actor: { type: "user", id: "actor_1" },
       }),
-    ).rejects.toBeInstanceOf(GroupRoleScopeError);
+    ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
 
     expect(groupRepository.create).not.toHaveBeenCalled();
   });
