@@ -37,11 +37,41 @@ Feature: Migration compatibility gates
     When the base suites run
     Then CI is unset for that step, so they use the job's ClickHouse service
 
+  # Plan pr-7536 revision 2, F-8: a base with no live api suite was skipped, so
+  # nothing ran main's or 3.20.1's code on the branch's schema. Advisory (D7a).
   @unit
-  Scenario: A base without the live api suite is reported, not failed
+  Scenario: A base without the live api suite is judged by its image instead
     Given the base commit predates the live api fixture
-    When the compatibility job runs
-    Then it emits a warning that the base cannot be judged and skips the base suites
+    When the compatibility job runs on a pull request
+    Then it emits a warning that the base suites cannot run and skips them
+    And it runs the LTS floor's published image and an image of main's head on head's migrated schema
+    And the job passes only if both images pass the HTTP smoke
+
+  @unit
+  Scenario: The image of main's head is pulled when published, else built
+    Given base is the merge commit's first parent, main's head
+    When Docker Hub has a langwatch/langwatch tag for base's short sha
+    Then the job pulls that image
+    But when it has none, the job builds base's infra/docker/Dockerfile and uses that image
+
+  @unit
+  Scenario: The old images pass an HTTP smoke on the schema head migrated
+    Given an old image serves on head's migrated databases with a seeded, verified account
+    When the smoke runs against it
+    Then it signs in, creates an organisation and a project, ingests a trace, lists traces and annotates the trace
+    And it creates and deletes a Slack connection, opens the connected-billing overview, and creates and revokes a role binding
+    And each step speaks only the old image's public wire
+
+  @unit
+  Scenario: A smoke step the old image refuses fails the job and names the step
+    When an old image answers a smoke step with an error status or a tRPC error envelope
+    Then the smoke stops, the job fails, and the error names the image, the step and the answer
+
+  @unit
+  Scenario: An old image's log naming a missing table or column fails the job
+    Given an old image has passed the smoke on head's schema
+    When its log names a column or relation that does not exist, or Prisma P2021 or P2022, or ClickHouse code 47 or 60
+    Then the job fails and prints the lines
 
   @unit
   Scenario: The Prisma drift job refuses drift the PR adds

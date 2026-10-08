@@ -7,6 +7,8 @@ name: migration-compat
 # - n-minus-one (per PR): head's tasks migrate fresh databases, then base's live
 #   api suites run on them. On cloud the base build is the one still serving
 #   while a deploy rolls, so this is "safe side by side" proved by running.
+#   A base with no live api suite is judged by images instead: the LTS floor's
+#   and main head's each pass an HTTP smoke on head's schema (plan F-8).
 # - prisma-drift (per PR): the drift between the migrations and schema.prisma,
 #   judged only on what the PR adds; base's drift is the baseline.
 # - lts-floor (nightly, and on dispatch): the LTS floor's published image boots
@@ -30,6 +32,7 @@ on:
       - "modules/*/process/src/**/migrations/**"
       - "enterprise/modules/*/process/src/**/migrations/**"
       - ".github/workflows/migration-compat.yml"
+      - "dev/scripts/migration-compat-smoke/**"
   schedule:
     - cron: "37 2 * * *"
   workflow_dispatch:
@@ -54,7 +57,8 @@ jobs:
     name: base code on head schema
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Main head's image is usually built here, since Docker Hub has none per commit.
+    timeout-minutes: 100
     services:
       postgres:
         image: postgres:16
@@ -143,7 +147,7 @@ jobs:
             fi
           done
           if [ ! -f "${tests}/api-live.fixture.ts" ] || [ "${#suites[@]}" -eq 0 ]; then
-            echo "::warning title=migration-compat::base ${BASE_SHA} has no live api suite, so its code on head's schema cannot be judged here"
+            echo "::warning title=migration-compat::base ${BASE_SHA} has no live api suite, so the LTS floor's and main head's images are judged by the HTTP smoke instead"
             echo "judged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -208,6 +212,43 @@ jobs:
             export "${name}=$(openssl rand -hex 32)"
           done
           pnpm --filter @langwatch/tasks task upgrade
+
+      # Rollback and mid-rollout in one: an old image's own start-up runs over
+      # head's schema, then the smoke writes and reads through its public wire.
+      - name: Read the LTS floor
+        id: floor
+        if: steps.layout.outputs.judged == 'false'
+        run: |
+          set -euo pipefail
+          release="$(jq -r '.release' head/packages/upgrade/releases/lts-floor.json)"
+          if ! [[ "$release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=migration-compat::packages/upgrade/releases/lts-floor.json names no release (${release})"
+            exit 1
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+          docker pull -q "langwatch/langwatch:${release}"
+
+      - name: The LTS floor image passes the smoke on head's schema
+        if: steps.layout.outputs.judged == 'false'
+        env:
+          CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/test_analytics_migrated_schema
+          RELEASE: ${{ steps.floor.outputs.release }}
+        run: bash head/dev/scripts/migration-compat-smoke/run-old-image.sh floor "langwatch/langwatch:${RELEASE}"
+
+      - name: Resolve main head's image
+        id: main_head
+        if: steps.layout.outputs.judged == 'false'
+        run: |
+          set -euo pipefail
+          image="$(bash head/dev/scripts/migration-compat-smoke/main-head-image.sh base)"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+
+      - name: Main head's image passes the smoke on head's schema
+        if: steps.layout.outputs.judged == 'false'
+        env:
+          CLICKHOUSE_URL: ${{ env.CLICKHOUSE_BASE_URL }}/test_analytics_migrated_schema
+          IMAGE: ${{ steps.main_head.outputs.image }}
+        run: bash head/dev/scripts/migration-compat-smoke/run-old-image.sh main-head "$IMAGE"
 
       - name: Install and prepare base
         if: steps.layout.outputs.judged == 'true'
