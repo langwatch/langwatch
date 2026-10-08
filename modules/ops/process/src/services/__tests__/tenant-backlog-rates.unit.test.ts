@@ -3,13 +3,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import Redis from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
+import { OpsMetricsCollectorService } from "../../features/metrics/services/ops-metrics-collector.service.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "../../repositories/memory/memory.anomaly-state.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository.ts";
 import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../rules/anomaly-constants.rules.ts";
 import { AnomalyDetectorService } from "../anomaly-detector.service.ts";
-import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
 import { scannedGroup, scannedQueue } from "./support/queue-scan.ts";
 

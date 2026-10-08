@@ -2,8 +2,8 @@ import { type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contr
 import { describe, expect, it, vi } from "vitest";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../app/ops.app.ts";
+import { ReplayService } from "../../features/replay/services/replay.service.ts";
 import { type ReplayLockHolder, ReplayRepository } from "../../repositories/replay.repository.ts";
-import { ReplayService } from "../replay.service.ts";
 
 class ReplayRepositoryStub extends ReplayRepository {
   readonly getStatus = vi.fn<() => Promise<ReplayStatus>>();

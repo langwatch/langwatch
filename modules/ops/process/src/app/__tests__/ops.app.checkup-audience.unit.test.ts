@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
+import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
@@ -22,7 +23,6 @@ import {
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
-import { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   createOpsTestApp,
   OPS_STAFF_ADDRESS,

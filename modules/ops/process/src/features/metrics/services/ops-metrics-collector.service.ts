@@ -18,15 +18,15 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { AnomalyRateTrackerRepository } from "../repositories/anomaly.repository.ts";
-import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
-import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
-import type { OpsSnapshotRead } from "../repositories/ops-snapshot.repository.ts";
-import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../rules/anomaly-constants.rules.ts";
-import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules.ts";
-import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules.ts";
-import { countWaitingJobsByTenant } from "../rules/ops-tenant-backlog.rules.ts";
-import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
+import type { AnomalyRateTrackerRepository } from "../../../repositories/anomaly.repository.ts";
+import type { OpsMetricsRepository } from "../../../repositories/ops-metrics.repository.ts";
+import type { OpsQueueMetricsSourceRepository } from "../../../repositories/ops-queue-metrics-source.repository.ts";
+import type { OpsSnapshotRead } from "../../../repositories/ops-snapshot.repository.ts";
+import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../rules/anomaly-constants.rules.ts";
+import { totalInFlight as computeTotalInFlight } from "../../../rules/ops-in-flight.rules.ts";
+import { computeEngineCpuPercent } from "../../../rules/ops-redis-engine-cpu.rules.ts";
+import { countWaitingJobsByTenant } from "../../../rules/ops-tenant-backlog.rules.ts";
+import { OpsDashboardViewService } from "../../../services/ops-dashboard-view.service.ts";
 import { OpsMetricsPublicationService } from "./ops-metrics-publication.service.ts";
 import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import {

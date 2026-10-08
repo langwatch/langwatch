@@ -12,14 +12,17 @@ import type {
   OpsAppDependencies,
   OpsSystemMigrationRunner,
   OrganizationDataplaneResolver,
-} from "../app/ops.app.ts";
-import type { OpsRepositories } from "../repositories/ops.repositories.ts";
+} from "../../../app/ops.app.ts";
+import type { OpsRepositories } from "../../../repositories/ops.repositories.ts";
 import {
   migrationRunsOnThisInstallation,
   userMigrates,
-} from "../rules/ops-system-migration-cohort.rules.ts";
-import { declarationOf, mergeSummaries } from "../rules/system-migration-pass-summary.rules.ts";
-import { RoutingTableOrganizationDataplaneService } from "./organization-dataplane.service.ts";
+} from "../../../rules/ops-system-migration-cohort.rules.ts";
+import {
+  declarationOf,
+  mergeSummaries,
+} from "../../../rules/system-migration-pass-summary.rules.ts";
+import { RoutingTableOrganizationDataplaneService } from "../../../services/organization-dataplane.service.ts";
 import { SystemMigrationCohortService } from "./system-migration-cohort.service.ts";
 import type { SystemMigrationPassRequestsService } from "./system-migration-pass-requests.service.ts";
 import { SystemMigrationsService } from "./system-migrations.service.ts";

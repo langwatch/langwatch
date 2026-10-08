@@ -10,7 +10,7 @@ import type {
   CanaryName,
   CheckupFacts,
   ProviderTestOutcome,
-} from "../rules/checkup-facts.rules.ts";
+} from "../../../rules/checkup-facts.rules.ts";
 import {
   NOT_ASKED_FOR,
   bodyText,
@@ -19,7 +19,7 @@ import {
   normalizeUrl,
   portOf,
   reasonOf,
-} from "../rules/checkup-text.rules.ts";
+} from "../../../rules/checkup-text.rules.ts";
 
 const UNTESTED_REASONS: Record<string, string> = {
   no_credential: "no key stored",

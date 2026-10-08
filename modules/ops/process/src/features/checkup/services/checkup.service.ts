@@ -12,8 +12,13 @@ import {
 } from "@langwatch/ops-contract";
 import { Temporal } from "@langwatch/time";
 
-import type { CheckupFacts } from "../rules/checkup-facts.rules.ts";
-import { NOT_ASKED_FOR, hostOf, reasonOf, withoutUserInfo } from "../rules/checkup-text.rules.ts";
+import type { CheckupFacts } from "../../../rules/checkup-facts.rules.ts";
+import {
+  NOT_ASKED_FOR,
+  hostOf,
+  reasonOf,
+  withoutUserInfo,
+} from "../../../rules/checkup-text.rules.ts";
 import { CheckupMigrationsService } from "./checkup-migrations.service.ts";
 import { CheckupPaidService } from "./checkup-paid.service.ts";
 

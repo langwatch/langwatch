@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { OpsMetricsCollectorService } from "../features/metrics/services/ops-metrics-collector.service.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import type {
@@ -14,7 +15,6 @@ import type {
 } from "../repositories/ops-metrics.repository.ts";
 import { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
-import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 
 /** Answers every read the collect cycle makes, with one INFO text per cycle. */
 class ScriptedMetricsRepository extends OpsMetricsRepository {

@@ -53,11 +53,11 @@ export type {
 export type {
   MigrationEnrollmentRecord,
   SystemMigrationStateReader,
-} from "./services/system-migrations.service.ts";
+} from "./features/system-migrations/services/system-migrations.service.ts";
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
 export type { OrganizationDataplane } from "./app/ops.app.ts";
-export type { OrganizationCohortAdmission } from "./services/system-migration-cohort.service.ts";
+export type { OrganizationCohortAdmission } from "./features/system-migrations/services/system-migration-cohort.service.ts";
 export {
   ProcessManagerPurgeTask,
   purgeProcessManagerTables,

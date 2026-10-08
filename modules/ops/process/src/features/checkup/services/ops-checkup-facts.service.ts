@@ -18,17 +18,17 @@ import type {
   StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
-import type { CheckupProbeChannel } from "../channels/checkup-probe.channel.ts";
-import { CANARY_KEY_PERMISSIONS } from "../rules/checkup-canary-key.rules.ts";
+import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
+import { CANARY_KEY_PERMISSIONS } from "../../../rules/checkup-canary-key.rules.ts";
 import {
   type CheckupConnectView,
   type CheckupFacts,
   type CheckupLicenseView,
   type ControlPlaneProbe,
   type ProviderTestOutcome,
-} from "../rules/checkup-facts.rules.ts";
-import { type UsageReportPeers } from "./usage-report-collection.service.ts";
-import { type UsageReportInstall } from "./usage-report.service.ts";
+} from "../../../rules/checkup-facts.rules.ts";
+import { type UsageReportPeers } from "../../../services/usage-report-collection.service.ts";
+import { type UsageReportInstall } from "../../../services/usage-report.service.ts";
 
 export const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
 const CANARY_TIMEOUT_MS = 150_000;

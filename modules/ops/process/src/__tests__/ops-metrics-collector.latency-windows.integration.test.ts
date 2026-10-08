@@ -8,13 +8,13 @@ import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contra
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { OpsMetricsCollectorService } from "../features/metrics/services/ops-metrics-collector.service.ts";
+import { DefaultOpsSnapshotService } from "../features/metrics/services/ops-snapshot-reader.service.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
-import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
-import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;

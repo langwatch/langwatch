@@ -6,16 +6,22 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { CheckupProbeChannel } from "../channels/checkup-probe.channel.ts";
-import type { UsageReportChannel } from "../channels/usage-report.channel.ts";
+import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
+import type { UsageReportChannel } from "../../../channels/usage-report.channel.ts";
 import type {
   ClickHouseHealthRepository,
   PostgresHealthRepository,
   RedisHealthRepository,
-} from "../repositories/datastore-health.repository.ts";
-import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
-import { checkupVerdictsOnly } from "../rules/checkup-audience.rules.ts";
-import { type CheckupFacts } from "../rules/checkup-facts.rules.ts";
+} from "../../../repositories/datastore-health.repository.ts";
+import type { UpgradeLedgerRepository } from "../../../repositories/upgrade-ledger.repository.ts";
+import { checkupVerdictsOnly } from "../../../rules/checkup-audience.rules.ts";
+import { type CheckupFacts } from "../../../rules/checkup-facts.rules.ts";
+import type { OpsHealthService } from "../../../services/ops-health.service.ts";
+import { UsageReportCollectionService } from "../../../services/usage-report-collection.service.ts";
+import {
+  UsageReportService,
+  type UsageReportSwitchChange,
+} from "../../../services/usage-report.service.ts";
 import { CheckupService } from "./checkup.service.ts";
 import {
   GATEWAY_PROBE_TIMEOUT_MS,
@@ -28,9 +34,6 @@ import {
   probeControlPlane,
   storageFacts,
 } from "./ops-checkup-facts.service.ts";
-import type { OpsHealthService } from "./ops-health.service.ts";
-import { UsageReportCollectionService } from "./usage-report-collection.service.ts";
-import { UsageReportService, type UsageReportSwitchChange } from "./usage-report.service.ts";
 
 /** The process facts the checkup and the usage report read, drilled in. */
 type OpsCheckupFacts = Readonly<{

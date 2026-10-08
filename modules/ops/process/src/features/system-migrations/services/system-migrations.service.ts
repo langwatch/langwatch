@@ -20,7 +20,7 @@ import {
   type MigrationEnrollmentRecord,
   type MigrationOverview,
   type SystemMigrationsServiceDependencies,
-} from "../rules/system-migration-support.rules.ts";
+} from "../../../rules/system-migration-support.rules.ts";
 import { SystemMigrationEnrollmentService } from "./system-migration-enrollment.service.ts";
 import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 import { SystemMigrationRollbackService } from "./system-migration-rollback.service.ts";
@@ -30,7 +30,7 @@ export type {
   MigrationEnrollmentRecord,
   SystemMigrationEnrollmentStore,
   SystemMigrationStateReader,
-} from "../rules/system-migration-support.rules.ts";
+} from "../../../rules/system-migration-support.rules.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 

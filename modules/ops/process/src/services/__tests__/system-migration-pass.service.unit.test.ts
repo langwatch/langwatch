@@ -4,11 +4,11 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SystemMigrationPassService } from "../../features/system-migrations/services/system-migration-pass.service.ts";
 import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 

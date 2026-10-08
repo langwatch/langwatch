@@ -270,6 +270,19 @@ import type { OpsChannels } from "../channels/ops.channels.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
+import { OpsCheckupService } from "../features/checkup/services/ops-checkup.service.ts";
+import { OpsMetricsCollectorService } from "../features/metrics/services/ops-metrics-collector.service.ts";
+import { DefaultOpsSnapshotService } from "../features/metrics/services/ops-snapshot-reader.service.ts";
+import { ReplayRetentionService } from "../features/replay/services/replay-retention.service.ts";
+import {
+  type ProjectionReplayRequestSender,
+  ReplayService,
+} from "../features/replay/services/replay.service.ts";
+import {
+  type SystemMigrationPassRequestSender,
+  SystemMigrationPassRequestsService,
+} from "../features/system-migrations/services/system-migration-pass-requests.service.ts";
+import { SystemMigrationPassService } from "../features/system-migrations/services/system-migration-pass.service.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
@@ -296,10 +309,7 @@ import {
   type OrganizationSsoRouting,
 } from "../services/instance-admin.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
-import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import { OpsHealthService } from "../services/ops-health.service.ts";
-import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
-import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 import { OpsUpgradeService } from "../services/ops-upgrade.service.ts";
 import { OpsService } from "../services/ops.service.ts";
 import {
@@ -310,8 +320,6 @@ import {
 import { ProcessAuditService } from "../services/process-audit.service.ts";
 import { QueueAuditService } from "../services/queue-audit.service.ts";
 import { QueueService } from "../services/queue.service.ts";
-import { ReplayRetentionService } from "../services/replay-retention.service.ts";
-import { type ProjectionReplayRequestSender, ReplayService } from "../services/replay.service.ts";
 import { SchedulerAuditService } from "../services/scheduler-audit.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
@@ -320,11 +328,6 @@ import {
   type StorageStatsInstance,
 } from "../services/storage-stats-collection.service.ts";
 import { StorageStatsGaugesService } from "../services/storage-stats-gauges.service.ts";
-import {
-  type SystemMigrationPassRequestSender,
-  SystemMigrationPassRequestsService,
-} from "../services/system-migration-pass-requests.service.ts";
-import { SystemMigrationPassService } from "../services/system-migration-pass.service.ts";
 /** The instance admin methods that only read; every other one needs `ops:manage`. */
 const ADMIN_READ_METHODS: ReadonlySet<string> = new Set([
   "getList",

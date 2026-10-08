@@ -16,10 +16,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
 import { AdminAccessService } from "../../services/admin-access.service.ts";
-import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   OpsModule,
   type OpsAppInfrastructure,

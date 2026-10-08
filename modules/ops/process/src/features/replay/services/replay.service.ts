@@ -13,9 +13,9 @@ import {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
-import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
-import type { ReplayRepository } from "../repositories/replay.repository.ts";
+import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../../app/ops.app.ts";
+import type { ProjectionReplayRun } from "../../../eventing/ops-projection-replay.events.ts";
+import type { ReplayRepository } from "../../../repositories/replay.repository.ts";
 import { ReplayFinalizationService } from "./replay-finalization.service.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 

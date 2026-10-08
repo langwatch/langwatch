@@ -12,7 +12,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   ROLLBACK_EFFECT_STATUSES,
   type SystemMigrationsServiceDependencies,
-} from "../rules/system-migration-support.rules.ts";
+} from "../../../rules/system-migration-support.rules.ts";
 import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");

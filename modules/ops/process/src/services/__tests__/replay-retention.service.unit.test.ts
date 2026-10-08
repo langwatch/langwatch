@@ -7,7 +7,7 @@ import type { DataRetentionApi, ResolvedRetention } from "@langwatch/data-retent
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReplayRetentionService } from "../replay-retention.service.ts";
+import { ReplayRetentionService } from "../../features/replay/services/replay-retention.service.ts";
 
 const PLATFORM_DEFAULT: ResolvedRetention = { traces: 30, scenarios: 30, experiments: 30 };
 

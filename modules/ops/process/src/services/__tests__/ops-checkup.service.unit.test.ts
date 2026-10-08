@@ -14,12 +14,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
+import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
-import { OpsCheckupService } from "../ops-checkup.service.ts";
 import { ledgerOf, stepOf } from "./support/upgrade-ledger.ts";
 import { UsageReportWorld } from "./support/usage-report-peers.ts";
 

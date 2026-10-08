@@ -1,8 +1,8 @@
 import { CHECKUP_DOCS, type CheckVerdict } from "@langwatch/ops-contract";
 import type { UpgradeStepView } from "@langwatch/upgrade/reader";
 
-import type { CheckupFacts } from "../rules/checkup-facts.rules.ts";
-import { reasonOf } from "../rules/checkup-text.rules.ts";
+import type { CheckupFacts } from "../../../rules/checkup-facts.rules.ts";
+import { reasonOf } from "../../../rules/checkup-text.rules.ts";
 
 /** Statuses of a step with nothing left to do; any other status, known or not, is outstanding. */
 const SETTLED_STATUSES: ReadonlySet<string> = new Set(["done", "not-needed"]);

@@ -16,9 +16,9 @@ import type {
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
-import type { OpsSnapshotRead } from "../repositories/ops-snapshot.repository.ts";
-import { OpsDashboardViewService } from "./ops-dashboard-view.service.ts";
+import type { OpsQueueMetricsSourceRepository } from "../../../repositories/ops-queue-metrics-source.repository.ts";
+import type { OpsSnapshotRead } from "../../../repositories/ops-snapshot.repository.ts";
+import { OpsDashboardViewService } from "../../../services/ops-dashboard-view.service.ts";
 import type { OpsMetricsSamplingService } from "./ops-metrics-sampling.service.ts";
 import type { OpsMetricsWindowService } from "./ops-metrics-window.service.ts";
 

@@ -11,10 +11,10 @@ import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { SystemMigrationPassRequestsService } from "../../features/system-migrations/services/system-migration-pass-requests.service.ts";
+import { SystemMigrationsService } from "../../features/system-migrations/services/system-migrations.service.ts";
 import { opsProcessModule } from "../../ops.module.ts";
 import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
-import { SystemMigrationPassRequestsService } from "../../services/system-migration-pass-requests.service.ts";
-import { SystemMigrationsService } from "../../services/system-migrations.service.ts";
 import { SYSTEM_MIGRATION_PASS_PROCESS_NAME } from "../ops-system-migrations.intent.ts";
 import {
   SYSTEM_MIGRATIONS_PIPELINE_NAME,

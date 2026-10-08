@@ -7,13 +7,13 @@ import {
 } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { UserStartupMigrationsUnsupportedError } from "../../features/system-migrations/services/system-migration-pass.service.ts";
+import { SystemMigrationPassService } from "../../features/system-migrations/services/system-migration-pass.service.ts";
 import { PostgresOpsRepositories } from "../../repositories/prisma/prisma.ops.repositories.ts";
 import { PrismaOrganizationTenantSourceRepository } from "../../repositories/prisma/prisma.organization-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import type { UserStartupMigrationsUnsupportedError } from "../system-migration-pass.service.ts";
-import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const clients: PrismaClient[] = [];
 

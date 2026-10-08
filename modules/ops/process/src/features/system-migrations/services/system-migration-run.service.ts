@@ -15,7 +15,7 @@ import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import {
   deriveStatusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
-} from "../rules/system-migration-support.rules.ts";
+} from "../../../rules/system-migration-support.rules.ts";
 import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 
 export class SystemMigrationRunService {
