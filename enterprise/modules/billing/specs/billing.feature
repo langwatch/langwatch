@@ -175,3 +175,26 @@ Feature: Enterprise billing compatibility
     When the operator reads a connected customer's billing overview
     Then billing records an audit fact naming the operator, the action, its arguments and the organization
     And the fact carries a fresh audit id, so a redelivery writes one row
+
+  # Round 37 D5, R40 (Alex, 2026-10-07): billing reads gateway's spend ledger and project's
+  # projects through the owners' declared shares, never a copy and never their *Api.
+  Rule: Billing reads gateway's spend and project's projects through declared shares
+
+    @unit
+    Scenario: Billing sums one request type's confirmed spend from gateway's shared ledger
+      Given gateway's ledger holds confirmed, pending and failed spend of several request types
+      When billing sums one request type's spend for an organization's projects inside a window
+      Then only that request type's confirmed spend inside the window is counted, in nano-USD
+      And no projects sum to zero without a read
+
+    @unit
+    Scenario: Billing's spend read binds exactly the organization's projects
+      When billing sums spend for an organization's projects
+      Then it reads gateway_spend at its latest version, one bound tenant per project
+      And the ClickHouse tenant guard admits the statement
+
+    @unit
+    Scenario: Billing lists an organization's projects from project's shared table
+      Given an organization with live, archived and governance projects
+      Then its spend tenants are every live project, governance included
+      And its usage warning names every project but governance ones, archived included, by name

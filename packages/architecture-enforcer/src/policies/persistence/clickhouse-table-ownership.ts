@@ -174,6 +174,13 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
         "analytics' evaluation metrics and trace's evaluation joins and facets select over evaluation's runs (EF-5; R40, 2026-10-07)",
     },
     {
+      table: "gateway_spend",
+      owner: "gateway",
+      readers: ["billing"],
+      reason:
+        "billing sums a connected customer's confirmed spend per request type for its statement and term cap (round 37 D5, EF-5)",
+    },
+    {
       table: "log_records",
       owner: "log",
       readers: ["trace"],

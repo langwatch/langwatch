@@ -1,14 +1,15 @@
 import type { BillingUsageLimitOrganization } from "@langwatch/enterprise-billing-contract";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
+
+import type { BillingProjectDirectoryRepository } from "../repositories/billing-project-directory.repository.ts";
 
 type UsageLimitOrganizationPeers = Readonly<{
   organizations: Pick<OrganizationApi, "getWithAdministrators" | "updateSentPlanLimitAlert">;
-  projects: Pick<ProjectApi, "findProjectsWithDepartments">;
+  projects: Pick<BillingProjectDirectoryRepository, "findProjectsWithName">;
 }>;
 
-/** Main's `OrganizationService` reads for the usage-limit mail, over the owners' operations. */
+/** Main's `OrganizationService` reads for the usage-limit mail; projects through their share. */
 export class UsageLimitOrganizationService implements BillingUsageLimitOrganization {
   static create(peers: UsageLimitOrganizationPeers): UsageLimitOrganizationService {
     return new UsageLimitOrganizationService(peers);
@@ -42,8 +43,7 @@ export class UsageLimitOrganizationService implements BillingUsageLimitOrganizat
   }
 
   /** Main's `findProjectsWithName`: every non-governance project, by name. */
-  async findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]> {
-    const projects = await this.peers.projects.findProjectsWithDepartments({ organizationId });
-    return projects.map(({ id, name }) => ({ id, name }));
+  findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]> {
+    return this.peers.projects.findProjectsWithName({ organizationId });
   }
 }

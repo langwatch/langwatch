@@ -3,17 +3,18 @@
 /**
  * What a connected customer's statement and backoffice overview read from the
  * modules that own it (ADR-156 section 7): the customers from the organization
- * directory, spend from the gateway ledger, the contract budget and seats from
- * the license registry. Billing queries none of their tables.
+ * directory, the contract budget and seats from the license registry; spend
+ * and projects through gateway's and project's shares (round 37 D5).
  */
 
 import type { ConnectedSpendView } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { BillingGatewaySpendRepository } from "../repositories/billing-gateway-spend.repository.ts";
+import type { BillingProjectDirectoryRepository } from "../repositories/billing-project-directory.repository.ts";
 import type {
   CommitDrawdown,
   ConnectedCustomer,
@@ -24,7 +25,6 @@ import type {
 
 const CENTS_PER_USD = 100;
 const NANO_USD_PER_CENT = 1_000_000_000 / CENTS_PER_USD;
-const PROJECT_PAGE_SIZE = 100;
 
 /**
  * The request type each hosted service records its spend under. A service with
@@ -37,8 +37,12 @@ const SERVICE_REQUEST_TYPES: Readonly<Record<string, string>> = {
 /** The peers the facts are read through, each only as wide as the reads. */
 export type ConnectedCustomerPeers = Readonly<{
   licensing: Pick<LicensingApi, "getConnectedSeats" | "getHostedUsage" | "getContractTerms">;
-  gateway: Pick<GatewayApi, "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType">;
-  organizations: Pick<OrganizationApi, "findSelfHostedCustomers" | "listProjectsByOrganization">;
+  gateway: Pick<
+    BillingGatewaySpendRepository,
+    "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType"
+  >;
+  organizations: Pick<OrganizationApi, "findSelfHostedCustomers">;
+  projects: Pick<BillingProjectDirectoryRepository, "findProjectIds">;
 }>;
 
 const toCents = (usd: number): number => Math.round(usd * CENTS_PER_USD);
@@ -128,20 +132,8 @@ export class ConnectedCustomerFactsService implements ConnectedStatementSources 
     };
   }
 
-  /** Every project the organization holds, walked page by page. */
-  async findProjectIds(organizationId: string): Promise<string[]> {
-    const ids: string[] = [];
-    let total = Number.POSITIVE_INFINITY;
-    for (let page = 1; ids.length < total; page++) {
-      const { data, pagination } = await this.peers.organizations.listProjectsByOrganization({
-        organizationId,
-        page,
-        limit: PROJECT_PAGE_SIZE,
-        includeGovernance: true,
-      });
-      ids.push(...data.map((project) => project.id));
-      total = data.length < PROJECT_PAGE_SIZE ? ids.length : pagination.total;
-    }
-    return ids;
+  /** Every live project the organization holds, governance included. */
+  findProjectIds(organizationId: string): Promise<string[]> {
+    return this.peers.projects.findProjectIds({ organizationId });
   }
 }

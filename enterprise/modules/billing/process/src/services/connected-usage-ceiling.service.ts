@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 
+import type { BillingGatewaySpendRepository } from "../repositories/billing-gateway-spend.repository.ts";
 import {
   billingMonthWindowMs,
   nanoUsdToInstantEvalMeterUnits,
@@ -13,7 +13,10 @@ import {
 
 type ConnectedUsageCeilingPeers = Readonly<{
   licensing: Pick<LicensingApi, "getContractTerms">;
-  gateway: Pick<GatewayApi, "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType">;
+  gateway: Pick<
+    BillingGatewaySpendRepository,
+    "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType"
+  >;
   projects: { findProjectIds(organizationId: string): Promise<readonly string[]> };
 }>;
 

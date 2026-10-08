@@ -38,13 +38,11 @@ import type {
   EventingCommandSender,
   EventingParticipation,
 } from "@langwatch/eventing";
-import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 
 import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
@@ -140,7 +138,6 @@ export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
   authorization: Pick<AuthzApi, "can">;
   organizations: ConnectedCustomerPeers["organizations"];
-  gateway: ConnectedCustomerPeers["gateway"];
 }>;
 
 /** Billing's Stripe, built once per deployment that holds the key. */
@@ -192,12 +189,8 @@ export class BillingModule
     authorization: AuthzApi,
     /** Which organizations are connected customers, and their projects. */
     organizations: OrganizationApi,
-    /** The spend ledger a statement sums. */
-    gateway: GatewayApi,
     /** Where the usage-limit warning is written down, and read back so it goes once a month. */
     notifications: NotificationApi,
-    /** The named projects a usage-limit warning lists. */
-    projects: ProjectApi,
   };
   static readonly config = billingConfig;
   static readonly publicConfig = billingBrowserConfig.project;
@@ -320,7 +313,8 @@ export class BillingModule
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
   ): UsageWarningService {
-    const { notifications, organizations, projects } = setup.dependencies;
+    const { notifications, organizations } = setup.dependencies;
+    const { projects } = setup.repositories;
     return UsageWarningService.create({
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects }),
@@ -334,7 +328,8 @@ export class BillingModule
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
   ): ResourceLimitAlertService {
-    const { organizations, projects } = setup.dependencies;
+    const { organizations } = setup.dependencies;
+    const { projects } = setup.repositories;
     const { isSaas } = setup.config;
     return ResourceLimitAlertService.create({
       isSaas,
@@ -354,7 +349,8 @@ export class BillingModule
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
   ): PlanLimitAlertService {
-    const { organizations, projects } = setup.dependencies;
+    const { organizations } = setup.dependencies;
+    const { projects } = setup.repositories;
     return PlanLimitAlertService.create({
       isSaas: setup.config.isSaas,
       inFlight: planLimitInFlight,
@@ -391,6 +387,8 @@ export class BillingModule
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
+      | "gatewaySpend"
+      | "projects"
     >;
     config: Pick<
       BillingServerConfig,
@@ -414,7 +412,12 @@ export class BillingModule
   }): BillingModule {
     const { isSaas, nodeEnvironment } = config;
     const repository = repositories.connectedBilling;
-    const facts = ConnectedCustomerFactsService.create(peers);
+    const facts = ConnectedCustomerFactsService.create({
+      licensing: peers.licensing,
+      organizations: peers.organizations,
+      gateway: repositories.gatewaySpend,
+      projects: repositories.projects,
+    });
     const overview = ConnectedBillingOverviewService.create({
       repository,
       facts,
@@ -852,9 +855,9 @@ export class BillingModule
   }: {
     repositories: Pick<
       BillingRepositories,
-      "checkpoints" | "reportOrganizations" | "organizationCache"
+      "checkpoints" | "reportOrganizations" | "organizationCache" | "gatewaySpend"
     >;
-    peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
+    peers: Pick<ConnectedBillingPeers, "licensing">;
     facts: ConnectedCustomerFactsService;
     usageReporting: (() => UsageReportingService) | undefined;
     nodeEnvironment: string | undefined;
@@ -863,13 +866,14 @@ export class BillingModule
       findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
     };
     const instantEvalSpend = InstantEvalSpendQueryService.create({
-      isSpendSourceAvailable: () => peers.gateway.isSpendSourceAvailable(),
+      isSpendSourceAvailable: () => repositories.gatewaySpend.isSpendSourceAvailable(),
       listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
-      sumSpendNanoUsdByRequestType: (input) => peers.gateway.sumSpendNanoUsdByRequestType(input),
+      sumSpendNanoUsdByRequestType: (input) =>
+        repositories.gatewaySpend.sumSpendNanoUsdByRequestType(input),
     });
     const ceiling = ConnectedUsageCeilingService.create({
       licensing: peers.licensing,
-      gateway: peers.gateway,
+      gateway: repositories.gatewaySpend,
       projects,
     });
     let reporter: UsageReportingService | undefined;

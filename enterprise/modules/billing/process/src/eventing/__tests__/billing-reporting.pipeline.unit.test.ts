@@ -24,7 +24,6 @@ const peers: ConnectedBillingPeers = {
   licensing: createApiFixture<ConnectedBillingPeers["licensing"]>({}),
   authorization: { can: async () => false },
   organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({}),
-  gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),
 };
 
 const MONTH_COUNTED_LANE = `billing_reporting.${BILLING_MONTH_COUNTED_SUBSCRIBER_NAME}`;

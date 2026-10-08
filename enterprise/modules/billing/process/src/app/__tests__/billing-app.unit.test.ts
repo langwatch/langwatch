@@ -71,7 +71,6 @@ function licensedAt(commitUsdCents: number) {
     organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({
       findSelfHostedCustomers: async () => [{ organizationId: ACME, organizationName: "Acme" }],
     }),
-    gateway: createApiFixture<ConnectedBillingPeers["gateway"]>({}),
   };
   return { asked, peers };
 }

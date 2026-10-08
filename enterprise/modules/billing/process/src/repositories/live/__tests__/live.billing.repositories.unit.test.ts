@@ -3,6 +3,7 @@
 import { BILLING_REPORT_COMMAND_TYPES } from "@langwatch/enterprise-billing-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
@@ -47,6 +48,7 @@ describe("LiveBillingRepositories", () => {
       const cacheLifetimes: unknown[] = [];
       const repositories = LiveBillingRepositories.create({
         prisma,
+        clickhouse: clickHouseQueryClientDouble(),
         redis: memoryRedisDouble({
           store,
           script: {

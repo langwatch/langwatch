@@ -20,6 +20,9 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
