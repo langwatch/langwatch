@@ -5,6 +5,7 @@
   "/auth/reset-password",
   "/auth/verify-email",
   "/auth/error",
+  "/auth/resume",
   "/auth/join",
   "/auth/sso-test-complete",
   "/invite/accept",

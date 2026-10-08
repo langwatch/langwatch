@@ -257,9 +257,9 @@ export function EvaluationsV3Table({
       activeDatasetId: state.activeDatasetId,
       evaluators: state.evaluators,
       targets: state.targets,
-      // Hydration signal for the comparison-reload effect: loadState sets this
-      // atomically with targets/datasets, so a truthy value means getState() is
-      // safe to read.
+      // Hydration signal for the comparison-reload effect: the loader sets this
+      // (setExperimentId) and calls loadState in the same synchronous pass, so a
+      // truthy value means getState() is safe to read.
       results: state.results,
       // Only subscribe to specific UI properties we need (not the entire ui object)
       ui: {

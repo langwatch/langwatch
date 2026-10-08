@@ -12,6 +12,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "  route /auth/reset-password -> pages/auth/reset-password",
   "  route /auth/verify-email -> pages/auth/verify-email",
   "  route /auth/error -> pages/auth/error",
+  "  route /auth/resume -> pages/auth/resume",
   "  route /auth/join -> pages/auth/join",
   "  route /auth/sso-test-complete -> pages/auth/sso-test-complete",
   // Moved under the auth layout 2026-09-18: it is auth's own screen and reads

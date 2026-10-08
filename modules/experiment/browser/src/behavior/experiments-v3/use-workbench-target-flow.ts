@@ -456,10 +456,10 @@ export const useWorkbenchAddTargetFlow = ({
       evaluatorType === COMPARISON_EVALUATOR_TYPE ||
       evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
     if (!isComparisonType) return;
-    // Wait for the workbench store to finish hydrating (loadState sets
-    // experimentId atomically with targets/datasets); reading getState() before
-    // then would snapshot an empty picker and lock it in (the guard below blocks
-    // a later refresh).
+    // Wait for the workbench store to finish hydrating (the loader sets
+    // experimentId, then calls loadState in the same synchronous pass);
+    // reading getState() before then would snapshot an empty picker and
+    // lock it in (the guard below blocks a later refresh).
     if (!experimentId) return;
     // Flow context already present → a live Add/edit flow (or an earlier run of
     // this effect) wired it up. Also the loop guard.

@@ -11,16 +11,20 @@ import { Select } from "@langwatch/design-system/select";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useState } from "react";
 
+import { replicateReferencesNote } from "../../../model/experiments/replicate-references-note.ts";
+import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 
 export const CopyExperimentDialog = ({
   open,
   onClose,
+  experimentType,
   isCopying,
   onCopy,
 }: {
   open: boolean;
   onClose: () => void;
+  experimentType: ExperimentType;
   isCopying: boolean;
   onCopy: (params: {
     targetProjectId: string;
@@ -44,6 +48,12 @@ export const CopyExperimentDialog = ({
 
   const projectCollection = createListCollection({
     items: projects,
+  });
+
+  const note = replicateReferencesNote({
+    experimentType,
+    sourceProjectId: project?.id,
+    targetProjectId: selectedProjectId[0],
   });
 
   const handleCopy = () => {
@@ -107,6 +117,11 @@ export const CopyExperimentDialog = ({
             <Checkbox checked={copyDatasets} onCheckedChange={(e) => setCopyDatasets(!!e.checked)}>
               Replicate associated dataset
             </Checkbox>
+            {note && (
+              <Text fontSize="sm" color="fg.muted">
+                {note}
+              </Text>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>

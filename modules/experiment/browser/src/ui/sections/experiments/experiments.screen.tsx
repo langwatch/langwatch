@@ -343,6 +343,7 @@ export function ExperimentsPage() {
     open: boolean;
     experimentId: string;
     experimentName: string;
+    experimentType: ExperimentType;
   } | null>(null);
   const [experimentToDelete, setExperimentToDelete] = useState<{
     id: string;
@@ -489,6 +490,7 @@ export function ExperimentsPage() {
                               open: true,
                               experimentId: experiment.id,
                               experimentName: experiment.name ?? experiment.slug,
+                              experimentType: experiment.type,
                             })
                           }
                           onDelete={() =>
@@ -512,6 +514,7 @@ export function ExperimentsPage() {
         <CopyExperimentDialog
           open={copyDialogState.open}
           onClose={() => setCopyDialogState(null)}
+          experimentType={copyDialogState.experimentType}
           isCopying={isCopying}
           onCopy={({ targetProjectId, targetProjectName, copyDatasets }) => {
             void copyExperimentTo({

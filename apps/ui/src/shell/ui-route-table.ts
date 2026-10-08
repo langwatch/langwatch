@@ -207,6 +207,8 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/auth/verify-email",
       },
       { path: "/auth/error", page: "pages/auth/error" },
+      // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+      { path: "/auth/resume", page: "pages/auth/resume" },
       // Join before create (ADR-117 §6): a new account passes through here on
       // its way to making an organization. Renders nothing until D12 fills it.
       { path: "/auth/join", page: "pages/auth/join" },

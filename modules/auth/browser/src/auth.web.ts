@@ -43,6 +43,11 @@ export const authWeb = defineBrowserModule("auth")
       path: "/auth/join",
       load: () => import("./ui/sections/join-screen.tsx"),
     },
+    // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+    "pages/auth/resume": {
+      path: "/auth/resume",
+      load: () => import("./ui/sections/auth-resume-screen.tsx"),
+    },
     "pages/auth/sso-test-complete": {
       path: "/auth/sso-test-complete",
       load: () => import("./ui/sections/sso-test-complete-screen.tsx"),
