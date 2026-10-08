@@ -14,6 +14,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowDsl } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
 import type { WorkflowLifecyclePipeline } from "../../eventing/workflow-lifecycle.pipeline.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { StudioEventPreparer } from "../../services/studio-event-preparer.service.ts";
@@ -55,6 +56,15 @@ async function setup() {
     projectId: reference.projectId,
     data: { currentVersionId: "version_2" },
   });
+  const config = {
+    nlpServiceUrl: void 0,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
   const app = await WorkflowModule.create({
     dependencies: {
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
@@ -64,16 +74,10 @@ async function setup() {
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
     },
-    config: {
-      nlpServiceUrl: void 0,
-      stagingThresholdBytes: void 0,
-      stagingTtlSeconds: 600,
-      relayTurnCeilingMs: void 0,
-      publicBaseUrl: void 0,
-      nlpCodeBlockTimeoutSeconds: void 0,
-    },
+    config,
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
     repositories,
   });
   type Commands = EventingCommands<WorkflowLifecyclePipeline>;

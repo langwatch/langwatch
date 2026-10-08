@@ -1,6 +1,7 @@
 import { defineProcessModule } from "@langwatch/process";
 
 import { AutomationModule } from "./app/automation.app.ts";
+import { automationChannels } from "./channels/automation-channels.registry.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
@@ -31,6 +32,7 @@ import { unsubscribeRest } from "./transport/unsubscribe.rest.ts";
 
 export const automationProcessModule = defineProcessModule("automation")
   .withRepositories(automationRepositories)
+  .withChannels(automationChannels)
   .withApi(AutomationModule)
   .withTransports(
     createAutomationRest(),

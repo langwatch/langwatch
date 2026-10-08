@@ -9,6 +9,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import { WorkflowModule } from "../workflow.app.ts";
 
@@ -16,6 +17,15 @@ import { WorkflowModule } from "../workflow.app.ts";
 async function appWith({
   authz = createApiFixture<AuthzApi>({}, "AuthzApi"),
 }: { authz?: AuthzApi } = {}): Promise<WorkflowModule> {
+  const config = {
+    nlpServiceUrl: void 0,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (_handle, build) => build(undefined));
   return WorkflowModule.create({
     dependencies: {
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
@@ -25,16 +35,10 @@ async function appWith({
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
     },
-    config: {
-      nlpServiceUrl: void 0,
-      stagingThresholdBytes: void 0,
-      stagingTtlSeconds: 600,
-      relayTurnCeilingMs: void 0,
-      publicBaseUrl: void 0,
-      nlpCodeBlockTimeoutSeconds: void 0,
-    },
+    config,
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
     repositories: MemoryWorkflowRepositories.create(),
   });
 }

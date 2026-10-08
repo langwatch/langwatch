@@ -1,5 +1,3 @@
-import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
-import { LambdaClient } from "@aws-sdk/client-lambda";
 import {
   AgentApi,
   type AgentApiCopyRequest,
@@ -21,7 +19,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { SecretApi } from "@langwatch/secret-contract";
-import { nlpInternalSecret, Secret } from "@langwatch/secrets";
+import { nlpInternalSecret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
@@ -78,27 +76,15 @@ import {
   WorkflowOptimizationRemovedError,
   WorkflowStudioEventInvalidError,
   workflowStudioRestEventSchema,
-  nlpLambdaFleetFromSecret,
-  type NlpLambdaFleetFields,
 } from "@langwatch/workflow-contract";
 
 import { LambdaWorkflowStudioStreamChannel } from "../channels/aws.lambda-workflow-studio-stream.channel.ts";
-import { AwsNlpLambdaArnResolverChannel } from "../channels/aws.nlp-lambda-arn-resolver.channel.ts";
-import { AwsNlpLambdaFleetChannel } from "../channels/aws.nlp-lambda-fleet.channel.ts";
-import { AwsNlpLambdaInvokeChannel } from "../channels/aws.nlp-lambda-invoke.channel.ts";
-import { AwsNlpLambdaStreamInvokeChannel } from "../channels/aws.nlp-lambda-stream-invoke.channel.ts";
-import {
-  HttpWorkflowNlpRuntimeAdapter,
-  UnconfiguredWorkflowNlpRuntimeAdapter,
-} from "../channels/http/http.workflow-nlp-runtime.channel.ts";
-import {
-  HttpWorkflowStudioStreamAdapter,
-  UnconfiguredWorkflowStudioStreamAdapter,
-} from "../channels/http/http.workflow-studio-stream.channel.ts";
+import { HttpWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
 import type {
   NlpLambdaFunctionReader,
   WorkflowStudioStream,
 } from "../channels/nlp-lambda.channel.ts";
+import { nlpLambdaFleetSecret, type WorkflowChannels } from "../channels/workflow.channels.ts";
 import {
   buildWorkflowAgentArchiveCascadePipeline,
   type WorkflowAgentArchiveCascadePipeline,
@@ -115,10 +101,6 @@ import {
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { relayTurnCeilingMs } from "../rules/execute-sync-relay.rules.ts";
-import {
-  buildStudioLambdaConfig,
-  studioLambdaConfigFingerprint,
-} from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
 import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
 import {
@@ -339,14 +321,9 @@ type WorkflowSetup = FeatureSetup<
   typeof WorkflowModule.dependencies,
   never,
   WorkflowServerConfig,
-  WorkflowRepositories
+  WorkflowRepositories,
+  WorkflowChannels
 >;
-
-/** The per-project studio fleet (`LANGWATCH_NLP_LAMBDA_CONFIG`): a credential, not config. */
-const nlpLambdaFleetSecret = Secret.load("LANGWATCH_NLP_LAMBDA_CONFIG", { optional: true });
-
-/** Main's retry budget, enough to ride out a cold fleet's concurrency burst. */
-const NLP_LAMBDA_CLIENT_MAX_ATTEMPTS = 6;
 
 /** Where studio graphs and workflow runs execute, and the fleet the daily sweep reads. */
 type WorkflowEngine = Readonly<{
@@ -357,105 +334,29 @@ type WorkflowEngine = Readonly<{
   perProjectEngines: boolean;
 }>;
 
-/**
- * Main's precedence: a named fleet wins, and one that cannot be used refuses by
- * name rather than falling back; with none, the engine address; with neither,
- * every run refuses by name. See modules/workflow/specs/studio-lambda-stream.feature.
- */
-async function composeEngine(setup: WorkflowSetup): Promise<WorkflowEngine> {
-  const named = await setup.secrets.into(nlpLambdaFleetSecret, (raw) =>
-    nlpLambdaFleetFromSecret.safeParse(raw),
-  );
-  if (!named.success) {
-    const reason =
-      named.error.issues[0]?.message ?? "The NLP Lambda fleet configuration cannot be used.";
-    logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
+/** The channels' engine, with a project-function fleet's ARNs resolved over its AWS channels. */
+function composeEngine(setup: WorkflowSetup): WorkflowEngine {
+  const { engine } = setup.channels;
+  if (engine.kind === "single") return engine;
 
-    return {
-      stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
-      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create({ reason }),
-      perProjectEngines: true,
-    };
-  }
-
-  // The engine hop's shared credential (ADR-132); the process holds the same handle.
-  const internalSecret = await setup.secrets.into(nlpInternalSecret, (secret) => secret);
-  if (named.data) return lambdaEngine({ fields: named.data, setup, internalSecret });
-
-  const serviceUrl = setup.config.nlpServiceUrl;
-  if (!serviceUrl) {
-    return {
-      stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
-      runtime: UnconfiguredWorkflowNlpRuntimeAdapter.create(),
-      perProjectEngines: false,
-    };
-  }
-
-  return {
-    stream: HttpWorkflowStudioStreamAdapter.create({ serviceUrl, internalSecret }),
-    runtime: HttpWorkflowNlpRuntimeAdapter.create({ serviceUrl, internalSecret }),
-    perProjectEngines: false,
-  };
-}
-
-/** Each project's own function, resolved once cluster-wide and invoked over AWS. */
-function lambdaEngine({
-  fields,
-  setup,
-  internalSecret,
-}: {
-  fields: NlpLambdaFleetFields;
-  setup: WorkflowSetup;
-  internalSecret: string | undefined;
-}): WorkflowEngine {
-  const config = buildStudioLambdaConfig({
-    fields: {
-      region: fields.AWS_REGION,
-      accessKeyId: fields.AWS_ACCESS_KEY_ID,
-      secretAccessKey: fields.AWS_SECRET_ACCESS_KEY,
-      roleArn: fields.role_arn,
-      imageUri: fields.image_uri,
-      cacheBucket: fields.cache_bucket,
-      subnetIds: fields.subnet_ids,
-      securityGroupIds: fields.security_group_ids,
-    },
-    langwatchEndpoint: setup.config.publicBaseUrl ?? "",
-    codeBlockTimeoutRawValue: setup.config.nlpCodeBlockTimeoutSeconds,
-    stagingThresholdBytesRawValue: setup.config.stagingThresholdBytes,
-    stagingTtlSecondsRawValue: setup.config.stagingTtlSeconds,
-  });
-  const credentials = { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey };
-  const lambda = new LambdaClient({
-    region: config.region,
-    credentials,
-    maxAttempts: NLP_LAMBDA_CLIENT_MAX_ATTEMPTS,
-  });
-  // One SDK attempt: its retry re-invokes a function that may already run customer code.
-  const invokeLambda = new LambdaClient({ region: config.region, credentials, maxAttempts: 1 });
-  const logs = new CloudWatchLogsClient({ region: config.region, credentials });
-  setup.resources.own("Workflow NLP Lambda clients", () => {
-    lambda.destroy();
-    invokeLambda.destroy();
-    logs.destroy();
-  });
-
+  setup.resources.own("Workflow NLP Lambda clients", () => engine.close());
   const arns = NlpLambdaRuntimeService.create({
     cache: setup.repositories.nlpLambdaArns,
-    resolver: AwsNlpLambdaArnResolverChannel.create({ lambda, logs, config, logger }),
-    imageUri: config.imageUri,
-    configFingerprint: studioLambdaConfigFingerprint(config),
+    resolver: engine.resolver,
+    imageUri: engine.imageUri,
+    configFingerprint: engine.configFingerprint,
     logger,
   });
   const functions: NlpLambdaFunctionReader = {
     arnFor: ({ projectId }) => arns.resolveArn(projectId),
   };
   const staging = setup.repositories.payloadStaging;
-  const { stagingThresholdBytes, stagingTtlSeconds } = config;
+  const { stagingThresholdBytes, stagingTtlSeconds, internalSecret } = engine;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
       functions,
-      invoke: AwsNlpLambdaStreamInvokeChannel.create({ lambda }),
+      invoke: engine.streamInvoke,
       staging,
       stagingThresholdBytes,
       stagingTtlSeconds,
@@ -463,12 +364,12 @@ function lambdaEngine({
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
       functions,
-      lambda: AwsNlpLambdaInvokeChannel.create({ lambda: invokeLambda }),
+      lambda: engine.invoke,
       staging,
       stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
       internalSecret,
     }),
-    fleet: AwsNlpLambdaFleetChannel.create({ lambda, logs, logger }),
+    fleet: engine.fleet,
     perProjectEngines: true,
   };
 }
@@ -595,7 +496,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   } as const;
 
   static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
-    const engine = await composeEngine(setup);
+    const engine = composeEngine(setup);
     const datasets = setup.dependencies.datasets;
     const llmParameters = ModelProviderWorkflowLlmParameters.create({
       modelProviders: setup.dependencies.modelProviders,

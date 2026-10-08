@@ -7,6 +7,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { WorkflowModule } from "#app/workflow.app";
+import { workflowChannels } from "#channels/workflow-channels.registry";
 import { workflowAgentArchiveCascadeEventing } from "#eventing/workflow-agent-archive-cascade.pipeline";
 import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
@@ -23,6 +24,7 @@ import { workflowTrpcTransport } from "#transport/workflow.trpc";
 
 export const workflowProcessModule = defineProcessModule("workflow")
   .withRepositories(workflowRepositories)
+  .withChannels(workflowChannels)
   .withApi(WorkflowModule)
   .withTransports(
     createWorkflowRest(),

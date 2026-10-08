@@ -15,6 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { HttpWorkflowChannels } from "../../channels/http/http.workflow.channels.ts";
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import { WorkflowModule } from "../workflow.app.ts";
@@ -28,6 +29,17 @@ async function appAt({
   internalSecret?: string;
   repositories?: WorkflowRepositories;
 }): Promise<WorkflowModule> {
+  const config = {
+    nlpServiceUrl,
+    stagingThresholdBytes: void 0,
+    stagingTtlSeconds: 600,
+    relayTurnCeilingMs: void 0,
+    publicBaseUrl: void 0,
+    nlpCodeBlockTimeoutSeconds: void 0,
+  };
+  const secrets = new ScopedSecrets(async (handle, build) =>
+    build(handle === nlpInternalSecret ? internalSecret : undefined),
+  );
   return WorkflowModule.create({
     dependencies: {
       modelProviders: createApiFixture<ModelProviderApi>(
@@ -43,18 +55,10 @@ async function appAt({
         "SecretApi",
       ),
     },
-    config: {
-      nlpServiceUrl,
-      stagingThresholdBytes: void 0,
-      stagingTtlSeconds: 600,
-      relayTurnCeilingMs: void 0,
-      publicBaseUrl: void 0,
-      nlpCodeBlockTimeoutSeconds: void 0,
-    },
+    config,
     resources: { own: () => void 0, ownService: () => void 0 },
-    secrets: new ScopedSecrets(async (handle, build) =>
-      build(handle === nlpInternalSecret ? internalSecret : undefined),
-    ),
+    secrets,
+    channels: await HttpWorkflowChannels.create({ config, secrets }),
     repositories,
   });
 }

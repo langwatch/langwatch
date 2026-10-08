@@ -79,6 +79,7 @@ import type { AutomationGraphNotifier } from "../channels/automation-graph-alert
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationChannels } from "../channels/automation.channels.ts";
 import { OutboxAutomationAuditSink } from "../eventing/automation-audit.intent.ts";
 import {
   createAutomationsPipeline,
@@ -274,6 +275,7 @@ type AutomationInfrastructureInput = Readonly<{
   slackConnections: AutomationSlackConnectionService;
   notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   webhooks: Pick<WebhookApi, "sendRequest">;
+  channels?: AutomationChannels;
   traces: Pick<TraceApi, "translateTraceFilter">;
   auditLog: AuditLogApi;
   verifier: UnsubscribeTokenVerifier;
@@ -343,7 +345,13 @@ type AutomationRuntimeDependencies = Omit<
   AutomationSettlementPeer
 >;
 
-type AutomationSetup = FeatureSetup<AutomationDependencies, never, AutomationServerConfig> &
+type AutomationSetup = FeatureSetup<
+  AutomationDependencies,
+  never,
+  AutomationServerConfig,
+  never,
+  AutomationChannels
+> &
   Readonly<{ repositories: AutomationRepositories }>;
 
 /** What the application is composed from, once the process has supplied it. */
@@ -411,6 +419,7 @@ export class AutomationModule implements AutomationApi {
         slackConnections,
         notifications: setup.dependencies.notifications,
         webhooks: setup.dependencies.webhooks,
+        channels: setup.channels,
         traces: setup.dependencies.traces,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
@@ -471,6 +480,12 @@ export class AutomationModule implements AutomationApi {
             ? {}
             : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
           webhookTransport: input.webhooks,
+          ...(input.channels
+            ? {
+                slackWebhookClient: input.channels.slackWebhookClient,
+                slackApiTransport: input.channels.slackApiTransport,
+              }
+            : {}),
           logger,
         })
       : AutomationNotificationDeliveryUnavailableService.create();
