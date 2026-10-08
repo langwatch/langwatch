@@ -42,6 +42,23 @@ describe("modelSelectionFrom", () => {
     });
   });
 
+  describe("given a built-in model that is labelled but not offered", () => {
+    /** @scenario "The model picker names a saved Instant Evals judge it does not offer" */
+    it("keeps it out of the options and names it among the labelled ones", () => {
+      const { selectOptions, groupedByProvider, labelledOptions } = modelSelectionFrom({
+        providers: [],
+        options: ["openai/gpt-5-mini"],
+        mode: "chat",
+        featureKey: undefined,
+        builtInModels: [{ ...BUILT_IN, isOffered: false }],
+      });
+
+      expect(selectOptions).toEqual([]);
+      expect(groupedByProvider).toEqual([]);
+      expect(labelledOptions.map((option) => option.label)).toEqual(["Instant Evals"]);
+    });
+  });
+
   describe("given no built-in model", () => {
     it("lists nothing for a project with no provider", () => {
       const { selectOptions } = modelSelectionFrom({

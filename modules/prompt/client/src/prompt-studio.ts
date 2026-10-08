@@ -164,7 +164,7 @@ export type LlmConfigPopoverProps = {
   values: PromptStudioLlmConfig;
   onChange: (llmConfig: PromptStudioLlmConfig) => void;
   /** Models LangWatch serves itself, offered first even with no provider configured. */
-  builtInModels?: readonly { value: string; label: string }[];
+  builtInModels?: readonly { value: string; label: string; isOffered?: boolean }[];
 };
 
 const prompt = uiTokens("prompt");

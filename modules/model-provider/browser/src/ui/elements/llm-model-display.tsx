@@ -23,16 +23,19 @@ function getModelDisplayState({
   isLoading,
   groupedByProvider,
   modelOption,
+  isLabelled,
 }: {
   model: string;
   isLoading: boolean;
   groupedByProvider: { provider: string }[];
   modelOption: { icon?: ReactNode; isDisabled?: boolean; label?: string } | undefined;
+  isLabelled: boolean;
 }) {
   const providerKey = model.split("/")[0] ?? "";
   const isProviderMissing =
     !!model &&
     !isLoading &&
+    !isLabelled &&
     groupedByProvider.length > 0 &&
     !groupedByProvider.some((g) => g.provider === providerKey);
   // The inferred mark is dark-safe and covers bare ids ("gpt-5-mini") the options miss.
@@ -58,12 +61,18 @@ export function LLMModelDisplay({
   builtInModels,
   ...props
 }: LLMModelDisplayProps) {
-  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions({
+  const {
+    modelOption: offeredOption,
+    labelledOption,
+    groupedByProvider,
+    isLoading,
+  } = useModelSelectionOptions({
     options: allModelOptions,
     model,
     mode: "chat",
     builtInModels,
   });
+  const modelOption = offeredOption ?? labelledOption;
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
@@ -77,6 +86,7 @@ export function LLMModelDisplay({
     isLoading,
     groupedByProvider,
     modelOption,
+    isLabelled: !!labelledOption,
   });
 
   const disabledColor = isDisabled ? "fg.muted" : undefined;

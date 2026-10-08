@@ -32,7 +32,7 @@ type LLMConfigPopoverProps = {
   /** Whether to show the structured outputs section */
   showStructuredOutputs?: boolean;
   /** Models LangWatch serves itself, offered first even with no provider configured. */
-  builtInModels?: readonly { value: string; label: string }[];
+  builtInModels?: readonly { value: string; label: string; isOffered?: boolean }[];
 };
 
 // ============================================================================
