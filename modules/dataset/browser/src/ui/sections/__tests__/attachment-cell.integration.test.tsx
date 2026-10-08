@@ -19,7 +19,6 @@ import {
 } from "../../../model/dataset-table-context.tsx";
 import { DatasetTestHarness, StubDatasetHost } from "../../../testing.tsx";
 import { EditableCell } from "../../elements/editable-cell.tsx";
-import { renderDatasetImage } from "../../elements/render-dataset-image.tsx";
 import { AttachmentCell } from "../attachment-cell.tsx";
 
 const fetchMock = vi.fn();
@@ -69,7 +68,7 @@ function Harness({
     setSelectedCell: vi.fn(),
     toggleCellExpanded: vi.fn(),
     toggleRowSelection: vi.fn(),
-    renderImage: renderDatasetImage,
+    renderImage: () => null,
     renderAttachment: (slot) => <AttachmentCell {...slot} />,
   };
 

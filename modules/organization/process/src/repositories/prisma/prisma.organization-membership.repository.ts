@@ -24,7 +24,12 @@ import {
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
-import type { OrganizationFounding, User } from "@langwatch/organization-contract";
+import type {
+  FullyLoadedOrganization,
+  OrganizationFounding,
+  OrganizationWithMembersAndTheirTeams,
+  User,
+} from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationIntent,
@@ -78,13 +83,11 @@ import type {
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
-  FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
-  OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,

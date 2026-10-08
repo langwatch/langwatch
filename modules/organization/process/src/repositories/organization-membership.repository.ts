@@ -18,8 +18,6 @@ import type {
 import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
-export type { FullyLoadedOrganization, OrganizationWithMembersAndTheirTeams };
-
 export type OrganizationMemberWithUser = OrganizationWithMembersAndTheirTeams["members"][number];
 
 /**

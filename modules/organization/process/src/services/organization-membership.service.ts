@@ -10,18 +10,18 @@ import {
   type OrganizationIntent,
   type OrganizationUserRole,
   type User,
+  type FullyLoadedOrganization,
+  type OrganizationWithMembersAndTheirTeams,
   MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
 
 import type {
   AuditLogFilters,
   EnrichedAuditLog,
-  FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationMembershipRepository,
-  OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import { enrichTeamWithGrants } from "../rules/team-grant-enrichment.rules.ts";
