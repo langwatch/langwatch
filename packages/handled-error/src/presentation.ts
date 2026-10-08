@@ -2225,6 +2225,22 @@ const presentations = {
     describe: () =>
       "The project, team or organization this refers to no longer exists. Reload and try again.",
   },
+  access_not_granted: {
+    // The read door (ADR-166): a denied permission and an unknown project read
+    // the same on purpose, so the copy never says which it was.
+    title: "You don't have access to this",
+    describe: () => "Ask an organization admin for access, or check the project is still there.",
+  },
+  authorization_forged: {
+    // A platform defect: a read was handed a proof the door never minted.
+    title: "Something went wrong on our side",
+    describe: () => "Reload the page. If it keeps happening, contact support.",
+  },
+  authorization_expired: {
+    // The request outlived the access check it started with.
+    title: "This took too long to finish",
+    describe: () => "Reload the page to try again.",
+  },
   role_binding_already_exists: {
     title: "That role is already bound",
     describe: () => "An identical binding already exists, so there's nothing to add.",

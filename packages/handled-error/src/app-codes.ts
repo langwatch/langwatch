@@ -32,6 +32,7 @@
  */
 export const APP_ERROR_CODES = [
   "LAST_WAY_IN",
+  "access_not_granted",
   "activation_code_already_redeemed",
   "activation_code_expired",
   "activation_code_malformed",
@@ -87,6 +88,8 @@ export const APP_ERROR_CODES = [
   "auth_rate_limited",
   "auth_sign_up_restricted",
   "auth_validate_rate_limited",
+  "authorization_expired",
+  "authorization_forged",
   "authz_grant_not_confirmed",
   "authz_ledger_unavailable",
   "authz_scope_not_found",

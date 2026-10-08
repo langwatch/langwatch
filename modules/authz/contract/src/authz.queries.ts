@@ -1,7 +1,10 @@
 import {
+  actorSchema,
+  authorizationPurposeSchema,
   authzDenialReasonSchema,
   authzPermissionSchema,
   organizationRoleSchema,
+  platformActorSchema,
 } from "@langwatch/authorization";
 import { z } from "zod";
 
@@ -44,6 +47,31 @@ export const authzEffectivePermissionsInputSchema = z
 export type AuthzEffectivePermissionsInput = z.infer<typeof authzEffectivePermissionsInputSchema>;
 export const authzEffectivePermissionsOutputSchema = z.array(authzPermissionSchema);
 export type AuthzEffectivePermissionsOutput = z.infer<typeof authzEffectivePermissionsOutputSchema>;
+
+/** ADR-166: one route call's proof, minted for the caller on one project. */
+export const authzMintAuthorizationInputSchema = z
+  .object({
+    actor: actorSchema,
+    principal: authzPrincipalRefSchema,
+    permission: authzPermissionSchema,
+    scope: z.object({ projectId: z.string().min(1) }).strict(),
+    purpose: authorizationPurposeSchema,
+  })
+  .strict();
+export type AuthzMintAuthorizationInput = z.infer<typeof authzMintAuthorizationInputSchema>;
+
+/** ADR-166: the proof platform code reading one project on its own behalf carries. */
+export const authzMintInternalAuthorizationInputSchema = z
+  .object({
+    actor: platformActorSchema,
+    projectId: z.string().min(1),
+    permission: authzPermissionSchema,
+    purpose: authorizationPurposeSchema,
+  })
+  .strict();
+export type AuthzMintInternalAuthorizationInput = z.infer<
+  typeof authzMintInternalAuthorizationInputSchema
+>;
 
 export const authzScopeIdsSchema = z
   .object({

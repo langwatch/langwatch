@@ -1,4 +1,5 @@
 import type {
+  Authorization,
   AuthzGetDecisionInput,
   AuthzGetProjectAnyDecisionInput,
   AuthzPermission,
@@ -64,6 +65,16 @@ export interface AuthzApi {
     permission: Permission;
     scope: Extract<AuthzScopeRef, { type: Tier }>;
   }): Promise<Authorized<Tier, Permission>>;
+  /**
+   * ADR-166 / ADR-175: the sealed read proof for one route call: the caller's own grant in full
+   * plus one shared grant per project shared with it. A denied permission and an unknown project
+   * both throw `access_not_granted`.
+   */
+  mintAuthorization(args: Queries.AuthzMintAuthorizationInput): Promise<Authorization>;
+  /** The proof platform code reading one project on its own behalf carries; evaluates nothing. */
+  mintInternalAuthorization(
+    args: Queries.AuthzMintInternalAuthorizationInput,
+  ): Promise<Authorization>;
   effectivePermissions(
     args: Queries.AuthzEffectivePermissionsInput,
   ): Promise<Queries.AuthzEffectivePermissionsOutput>;

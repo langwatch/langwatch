@@ -55,7 +55,7 @@ Feature: An aggregate project reads its member projects
 
   # ── B. A proof is minted at the door ─────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Opening an aggregate mints one proof listing own and shared grants
     Given an aggregate project with two members
     When ana's request for traces view on the aggregate reaches the route
@@ -65,20 +65,20 @@ Feature: An aggregate project reads its member projects
     And its expiry is the earliest expiry among those grants
     And its purpose is route
 
-  @unit @unimplemented
+  @unit
   Scenario: A proof built outside the authorizer is refused
     When a proof is assembled by hand and handed to the store client
     Then the client refuses it as forged
     And no query runs
 
-  @unit @unimplemented
+  @unit
   Scenario: An expired proof is refused
     Given a proof whose expiry has passed
     When it is handed to the store client
     Then the client refuses it as expired
     And no query runs
 
-  @integration @unimplemented
+  @unit
   Scenario: A revoked grant is absent from the next proof
     Given an aggregate project with one member
     And a proof minted for ana

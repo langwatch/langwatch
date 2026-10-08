@@ -41,6 +41,7 @@ import {
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
+import { AuthorizationService } from "../services/authorization.service.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
@@ -157,6 +158,8 @@ export class AuthzModule implements AuthzApi {
    * Absent on an app built by {@link AuthzModule.fromServices}, which composes no platform tier.
    */
   #platformOperators: AuthzPlatformOperatorsService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which reads no shared grants. */
+  #authorizations: AuthorizationService | undefined;
 
   private constructor(
     permissions: AuthzPermissions,
@@ -169,6 +172,7 @@ export class AuthzModule implements AuthzApi {
       memberships?: AuthzPermissionService;
       sessionVersions?: AuthzSessionVersionService;
       platformOperators?: AuthzPlatformOperatorsService;
+      authorizations?: AuthorizationService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -186,6 +190,7 @@ export class AuthzModule implements AuthzApi {
     this.#migration = options.migration;
     this.#sessionVersions = options.sessionVersions;
     this.#platformOperators = options.platformOperators;
+    this.#authorizations = options.authorizations;
   }
 
   /**
@@ -282,6 +287,12 @@ export class AuthzModule implements AuthzApi {
       memberships: permissions,
       sessionVersions,
       platformOperators,
+      authorizations: AuthorizationService.create({
+        permissions,
+        sharedReads: repositories.sharedReads,
+        epoch,
+        cacheEnabled: config.cacheEnabled,
+      }),
       eventing: { pipeline, dispatcher },
     });
   }
@@ -359,6 +370,9 @@ export class AuthzModule implements AuthzApi {
   checkDetailed: AuthzApi["checkDetailed"] = (a) => this.#permissions.checkDetailed(a);
   can: AuthzApi["can"] = (a) => this.#permissions.can(a);
   authorize: AuthzApi["authorize"] = (a) => this.#permissions.authorize(a);
+  mintAuthorization: AuthzApi["mintAuthorization"] = (a) => this.authorizations().authorize(a);
+  mintInternalAuthorization: AuthzApi["mintInternalAuthorization"] = (a) =>
+    this.authorizations().authorizeInternal(a);
   effectivePermissions: AuthzApi["effectivePermissions"] = (a) =>
     this.#permissions.effectivePermissions(a);
   checkByIds: AuthzApi["checkByIds"] = (a) => this.#permissions.checkByIds(a);
@@ -506,6 +520,16 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#platformOperators;
+  }
+
+  private authorizations(): AuthorizationService {
+    if (!this.#authorizations) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no proof " +
+          "minter: compose it through AuthzModule.create to mint an authorization.",
+      );
+    }
+    return this.#authorizations;
   }
 
   private memberships(): AuthzPermissionService {

@@ -65,10 +65,22 @@ export type Actor =
       revision?: string;
     };
 
-const systemActorNameSchema = z.custom<SystemActorName>(
+/** One of {@link SYSTEM_ACTORS}' names, and nothing else. */
+export const systemActorNameSchema = z.custom<SystemActorName>(
   (value) =>
     typeof value === "string" && Object.prototype.hasOwnProperty.call(SYSTEM_ACTORS, value),
 );
+
+const systemActorSchema = z
+  .object({ type: z.literal("system"), name: systemActorNameSchema })
+  .strict();
+const internalActorSchema = z
+  .object({
+    type: z.literal("internal"),
+    codePath: z.string().min(1),
+    revision: z.string().min(1).optional(),
+  })
+  .strict();
 
 /** The canonical runtime schema for actors crossing a typed boundary. */
 export const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
@@ -80,14 +92,15 @@ export const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
-  z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
-  z
-    .object({
-      type: z.literal("internal"),
-      codePath: z.string().min(1),
-      revision: z.string().min(1).optional(),
-    })
-    .strict(),
+  systemActorSchema,
+  internalActorSchema,
+]);
+
+/** The platform acting on its own behalf: a named system principal or a code path. */
+export type PlatformActor = Extract<Actor, { type: "system" | "internal" }>;
+export const platformActorSchema: z.ZodType<PlatformActor> = z.discriminatedUnion("type", [
+  systemActorSchema,
+  internalActorSchema,
 ]);
 
 /** Mint the actor for platform-initiated work, named by its code path. */

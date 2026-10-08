@@ -224,6 +224,10 @@ export class TestAuthzApi implements AuthzApi {
   checkDetailed = unsupported<AuthzApi["checkDetailed"]>("checkDetailed");
   can = unsupported<AuthzApi["can"]>("can");
   authorize = unsupported<AuthzApi["authorize"]>("authorize");
+  mintAuthorization = unsupported<AuthzApi["mintAuthorization"]>("mintAuthorization");
+  mintInternalAuthorization = unsupported<AuthzApi["mintInternalAuthorization"]>(
+    "mintInternalAuthorization",
+  );
   effectivePermissions = unsupported<AuthzApi["effectivePermissions"]>("effectivePermissions");
   checkByIds = unsupported<AuthzApi["checkByIds"]>("checkByIds");
   canAnyByIds = unsupported<AuthzApi["canAnyByIds"]>("canAnyByIds");
