@@ -15,8 +15,8 @@ import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboa
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useBoardOnScreen } from "../../langy/behavior/use-board-langy.ts";
-import { boardSubject } from "../../langy/model/board-langy.ts";
+import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import { boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
@@ -42,6 +42,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
     widgets: board.widgets,
   });
   useBoardOnScreen({ boardId: subject.id });
+  const langy = useLangyAsk();
 
   return (
     <BoardPage
@@ -85,6 +86,11 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
             templateId={board.templateId}
             widgets={board.widgets}
             period={period}
+            onAskLangy={
+              langy.enabled
+                ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                : undefined
+            }
           />
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>

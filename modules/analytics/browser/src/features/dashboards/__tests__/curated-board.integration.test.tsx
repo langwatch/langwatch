@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * A From LangWatch board: a template shown live and read-only, stored nowhere, whose
- * widgets with no query yet say so instead of showing numbers.
+ * widgets with no query yet say so instead of showing numbers, and whose every widget
+ * offers Ask Langy when Langy is available.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -11,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -31,10 +33,10 @@ function readOnlyServer() {
   return { calls, answer };
 }
 
-function openCurated(templateId: string) {
+function openCurated(templateId: string, flags: Record<string, boolean> = LANGY_ON) {
   const server = readOnlyServer();
   const host = new StubAnalyticsHost({
-    flags: LANGY_ON,
+    flags,
     permissions: MEMBER,
     route: { params: { templateId } },
   });
@@ -68,6 +70,38 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.getByText("Is my data complete?")).toBeInTheDocument();
       expect(screen.getByText("Which of my traces are noise?")).toBeInTheDocument();
       expect(screen.queryByText("Not built yet")).toBeNull();
+    });
+  });
+
+  describe("when Langy is available", () => {
+    /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
+    it("gives every widget an Ask Langy button that drafts that widget's prompt", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { host } = openCurated("release");
+      const names = curatedBoardById("release")?.widgets.map(({ name }) => name) ?? [];
+
+      await screen.findByRole("heading", { name: "Release check" });
+      const asks = screen.getAllByRole("button", { name: /^Ask Langy about / });
+      expect(asks.map((button) => button.getAttribute("aria-label")).toSorted()).toEqual(
+        names.map((name) => `Ask Langy about ${name}`).toSorted(),
+      );
+
+      await user.click(asks[0]!);
+
+      expect(host.langyAsks).toHaveLength(1);
+      expect(host.langyAsks[0]?.question).toBeUndefined();
+      expect(host.langyAsks[0]?.draft).toContain(names[0]);
+      expect(host.langyAsks[0]?.context[0]?.ref).toContain("From LangWatch dashboard");
+    });
+  });
+
+  describe("when Langy is off", () => {
+    /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
+    it("shows no Ask Langy on any widget", async () => {
+      openCurated("release", { release_dashboards: true });
+
+      await screen.findByRole("heading", { name: "Release check" });
+      expect(screen.queryByRole("button", { name: /^Ask Langy about / })).toBeNull();
     });
   });
 

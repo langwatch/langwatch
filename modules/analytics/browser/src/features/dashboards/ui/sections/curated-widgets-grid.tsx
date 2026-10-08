@@ -1,6 +1,6 @@
 /**
- * A From LangWatch board's widgets on the board grid, read-only: no drag, resize or menu.
- * Each widget runs its own queries over the board's period.
+ * A From LangWatch board's widgets on the board grid, read-only: no drag, resize or menu,
+ * only Ask Langy, which changes nothing. Each widget runs its own queries over the board's period.
  */
 
 import { useMemo } from "react";
@@ -14,6 +14,7 @@ import {
 } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
+import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 
 export function CuratedWidgetsGrid({
@@ -22,12 +23,15 @@ export function CuratedWidgetsGrid({
   templateId,
   widgets,
   period,
+  onAskLangy,
 }: {
   projectId: string;
   projectSlug: string;
   templateId: string;
   widgets: readonly BoardTemplateWidget[];
   period: BoardPeriod;
+  /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
+  onAskLangy?: (widget: BoardTemplateWidget) => void;
 }) {
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
@@ -49,7 +53,13 @@ export function CuratedWidgetsGrid({
         if (!widget) return null;
         const { name, definition } = widget;
         return (
-          <WidgetCardShell name={name} description={definition.description}>
+          <WidgetCardShell
+            name={name}
+            description={definition.description}
+            controls={
+              onAskLangy && <AskLangyButton name={name} onClick={() => onAskLangy(widget)} />
+            }
+          >
             <DashboardWidgetFrameOverWindow
               id={`${templateId}-${graphId}`}
               graph={definition}

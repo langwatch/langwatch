@@ -96,6 +96,7 @@ afterEach(cleanup);
 describe("Ask Langy on a widget card", () => {
   describe("given Langy is on and the member may start a conversation", () => {
     /** @scenario "AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available" */
+    /** @scenario "AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included" */
     it("shows the button between the info icon and the widget menu", async () => {
       openBoard({ server: inMemoryServer() });
 

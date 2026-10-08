@@ -34,7 +34,7 @@ export function WidgetCardShell({
 }: {
   name: string;
   description?: string;
-  /** Absent on a read-only board. */
+  /** Absent when the widget offers no action, as on a read-only board without Langy. */
   controls?: ReactNode;
   children: ReactNode;
 }) {
