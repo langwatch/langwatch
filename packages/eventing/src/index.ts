@@ -30,6 +30,8 @@ export {
 } from "./upcast/eventUpcastReader.ts";
 export {
   type LaneAlias,
+  type LaneTombstone,
+  type RoutedLaneAlias,
   laneAliasesPastWindow,
   type PipelineLaneAliases,
 } from "./upcast/laneAlias.ts";

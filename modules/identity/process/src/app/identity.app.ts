@@ -199,7 +199,7 @@ import type { JoinRequestDoorApi } from "../transport/join-request.trpc.ts";
  * internal reap of this exact repository call does.
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
-type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, never, IdentityServerConfig> &
+type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, IdentityServerConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {

@@ -30,7 +30,7 @@ type LogDependencies = Readonly<{
   traces: typeof TraceApi;
   retention: typeof DataRetentionApi;
 }>;
-type LogSetup = FeatureSetup<LogDependencies, never, LogServerConfig, LogRepositories>;
+type LogSetup = FeatureSetup<LogDependencies, LogServerConfig, LogRepositories>;
 
 /** The process-owned Log capability over private preparation, persistence and its pipeline. */
 export class LogModule implements LogApiContract {

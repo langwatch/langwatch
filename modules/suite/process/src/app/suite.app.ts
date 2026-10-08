@@ -112,7 +112,6 @@ interface SuiteAppDependencies {
 
 type SuiteSetup = FeatureSetup<
   typeof SuiteModule.dependencies,
-  never,
   SuiteServerConfig,
   SuiteRepositories
 >;

@@ -8,6 +8,7 @@ import {
   definePipeline,
   type EventingSetup,
   type FoldProjectionStore,
+  type LaneAlias,
   type PeerSubscriberContext,
   type RetentionPolicyResolver,
 } from "@langwatch/eventing";
@@ -75,6 +76,18 @@ function factContext(context: PeerSubscriberContext): ScenarioRunFactContext {
     eventId: context.eventId,
   };
 }
+
+/** Main's suiteRunSync subscriber (simulation pipeline), now one peer subscriber per event type. */
+const MAIN_SUITE_RUN_SYNC_ALIASES: readonly LaneAlias[] = [
+  { eventType: SIMULATION_RUN_EVENT_TYPES.STARTED, lane: "scenarioRunStarted" },
+  { eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED, lane: "scenarioRunFinished" },
+  { eventType: SIMULATION_RUN_EVENT_TYPES.EVALUATED, lane: "scenarioRunEvaluated" },
+].map(({ eventType, lane }) => ({
+  from: "simulation_processing:subscriber:suiteRunSync",
+  to: { jobType: "subscriber", lane },
+  eventTypes: [eventType],
+  removeAfter: "3.21.0",
+}));
 
 /**
  * Creates the suite run processing pipeline definition.
@@ -149,7 +162,8 @@ const defineSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) 
       data: simulationRunEvaluatedEventDataSchema,
       options: { enqueue: { filter: (data) => SuiteRunScenarioFactsService.belongsToSuite(data) } },
       handle: (data, context) => deps.scenarioRunFacts.recordEvaluated(data, factContext(context)),
-    });
+    })
+    .withLaneAliases(MAIN_SUITE_RUN_SYNC_ALIASES);
   return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
 };
 

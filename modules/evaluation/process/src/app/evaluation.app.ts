@@ -211,7 +211,6 @@ interface EvaluationRunner {
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationModule.dependencies,
-  never,
   EvaluationServerConfig,
   EvaluationRepositories
 >;

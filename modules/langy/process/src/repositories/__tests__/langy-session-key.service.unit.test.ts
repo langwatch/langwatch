@@ -1,6 +1,6 @@
 import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  type AuthzService,
+  type AuthzApi,
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
 } from "@langwatch/authz-contract";
@@ -51,7 +51,7 @@ class SessionKeyMetrics implements LangySessionKeyMetrics {
 function createService(input: {
   repository: SessionKeyRepository;
   apiKeys: ApiKeyApi;
-  authz: AuthzService;
+  authz: AuthzApi;
   metrics: SessionKeyMetrics;
 }): LangySessionKeyService {
   return LangySessionKeyService.create(input);
@@ -64,16 +64,14 @@ describe("LangySessionKeyService", () => {
       const apiKey = Object.assign(Object.create(null), { id: "key-1" });
       return { token: "session-token", apiKey };
     });
-    const permissions: Awaited<ReturnType<AuthzService["effectivePermissions"]>> = [
+    const permissions: Awaited<ReturnType<AuthzApi["effectivePermissions"]>> = [
       "project:view",
       "prompts:update",
     ];
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
-    const effectivePermissions: AuthzService["effectivePermissions"] = vi.fn(
-      async () => permissions,
-    );
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
+    const effectivePermissions: AuthzApi["effectivePermissions"] = vi.fn(async () => permissions);
     authz.effectivePermissions = effectivePermissions;
     const metrics = new SessionKeyMetrics();
 
@@ -116,7 +114,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     authz.effectivePermissions = vi.fn(async () => [...LANGY_CANDIDATE_PERMISSIONS]);
 
     await createService({
@@ -166,7 +164,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     authz.effectivePermissions = vi
       .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
       .mockImplementation(async () => ["project:view", "experiments:delete"]);
@@ -196,7 +194,7 @@ describe("LangySessionKeyService", () => {
     });
     const apiKeys: ApiKeyApi = Object.create(null);
     apiKeys.create = apiKeyCreate;
-    const authz: AuthzService = createApiFixture<AuthzService>();
+    const authz: AuthzApi = createApiFixture<AuthzApi>();
     // Holds enough to mint a key at all (view), but not the destructive grain.
     authz.effectivePermissions = vi
       .fn<(args: AuthzEffectivePermissionsInput) => Promise<AuthzEffectivePermissionsOutput>>()
@@ -229,7 +227,7 @@ describe("LangySessionKeyService", () => {
       });
       const apiKeys: ApiKeyApi = Object.create(null);
       apiKeys.create = apiKeyCreate;
-      const authz: AuthzService = createApiFixture<AuthzService>();
+      const authz: AuthzApi = createApiFixture<AuthzApi>();
       authz.effectivePermissions = vi.fn(async () => held);
       const service = createService({
         repository: new SessionKeyRepository(),
@@ -328,7 +326,7 @@ describe("LangySessionKeyService", () => {
     const service = createService({
       repository,
       apiKeys: Object.create(null),
-      authz: createApiFixture<AuthzService>(),
+      authz: createApiFixture<AuthzApi>(),
       metrics,
     });
 

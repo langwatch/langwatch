@@ -49,7 +49,6 @@ type HostedMcpDependenciesMap = Readonly<{
 
 type HostedMcpSetup = FeatureSetup<
   HostedMcpDependenciesMap,
-  never,
   HostedMcpServerConfig,
   HostedMcpRepositories
 >;

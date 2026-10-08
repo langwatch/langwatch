@@ -264,7 +264,7 @@ class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
   }
 }
 
-type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, never, SsoConfig>;
+type SsoSetup = FeatureSetup<typeof SsoModule.dependencies, SsoConfig>;
 
 /** Every credential this module resolves, alongside the deployment facts. */
 async function resolveConfiguration(

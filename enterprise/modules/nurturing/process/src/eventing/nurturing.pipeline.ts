@@ -376,6 +376,14 @@ export function buildNurturingPipeline(deps: {
         },
       })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
+      // Main's run milestones (succeeded run, active day) were a subscriber on the simulation pipeline.
+      .withLaneAliases([
+        {
+          from: "simulation_processing:subscriber:scenarioRunMilestones",
+          to: { jobType: "subscriber", lane: "scenarioRunSucceeded" },
+          removeAfter: "3.21.0",
+        },
+      ])
       .build()
   );
 }

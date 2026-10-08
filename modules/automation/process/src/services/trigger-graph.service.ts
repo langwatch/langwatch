@@ -1,4 +1,4 @@
-import type { AnalyticsApi, AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type {
   AutomationPersistCapBreach,
   GraphTriggerEvaluationReason,
@@ -37,7 +37,7 @@ export class AutomationGraphService {
     triggers: TriggerRepository;
     customGraphs: CustomGraphRepository;
     projects: ProjectApi;
-    analytics: AnalyticsService & Pick<AnalyticsApi, "findLastOccurredAt">;
+    analytics: Pick<AnalyticsApi, "getTimeseries" | "findLastOccurredAt">;
     triggerSent: GraphTriggerSentRepository;
     notifier: AutomationGraphNotifier;
     logger: AutomationLogger;

@@ -59,11 +59,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       }),
     },
     channels: MemoryAuthChannels.create(),
-    members: {
-      identityEmails: void 0,
-      invites: null,
-      processName: "langwatch-api",
-    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

@@ -1,5 +1,5 @@
 /** @see specs/trace-processing/worker-record-span-capability-services.feature */
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { frozenAt } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
@@ -28,7 +28,7 @@ import { TriggerLatestEvaluationService } from "../trigger-latest-evaluation.ser
 
 const crypto = { encrypt: (plain: string) => plain, decrypt: (cipher: string) => cipher };
 
-function composeOver(input: { projects: AutomationProjectDirectory; analytics: AnalyticsService }) {
+function composeOver(input: { projects: AutomationProjectDirectory; analytics: AnalyticsApi }) {
   const database = createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] });
   const delivery = new RecordingDelivery();
   const clock = frozenAt(FROZEN_NOW);

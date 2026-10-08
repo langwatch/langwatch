@@ -2155,9 +2155,6 @@ importers:
       '@langwatch/notification-browser':
         specifier: workspace:*
         version: link:../../modules/notification/browser
-      '@langwatch/notification-contract':
-        specifier: workspace:*
-        version: link:../../modules/notification/contract
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../modules/onboarding/browser
@@ -3760,6 +3757,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../modules/trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
@@ -6888,6 +6888,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/webhook-contract':
         specifier: workspace:*
         version: link:../../webhook/contract

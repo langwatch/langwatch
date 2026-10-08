@@ -15,7 +15,6 @@ import { BrowserTraceIngestService } from "../services/browser-trace-ingest.serv
 
 type RumSetup = FeatureSetup<
   typeof RumModule.dependencies,
-  never,
   RumConfig,
   RumRepositories,
   RumChannels

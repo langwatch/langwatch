@@ -170,7 +170,8 @@ class ProjectModule implements ProjectApi {
     dependencies,
     members,
     resources,
-  }: FeatureSetup<typeof ProjectModule.dependencies, DeclaredMembers, undefined>) {
+  }: FeatureSetup<typeof ProjectModule.dependencies, undefined> &
+    Readonly<{ members: DeclaredMembers }>) {
     members.events.push("create:project");
     resources.own("project", () => {
       members.events.push("close:project");
@@ -209,7 +210,8 @@ class OrganizationApp implements OrganizationApi {
     dependencies,
     members,
     resources,
-  }: FeatureSetup<typeof OrganizationApp.dependencies, DeclaredMembers, undefined>) {
+  }: FeatureSetup<typeof OrganizationApp.dependencies, undefined> &
+    Readonly<{ members: DeclaredMembers }>) {
     members.events.push("create:organization");
     resources.own("organization", () => {
       members.events.push("close:organization");
@@ -453,7 +455,8 @@ describe("feature APIs", () => {
 
       static create({
         dependencies,
-      }: FeatureSetup<typeof GrantedOrganizationApp.dependencies, DeclaredMembers, undefined>) {
+      }: FeatureSetup<typeof GrantedOrganizationApp.dependencies, undefined> &
+        Readonly<{ members: DeclaredMembers }>) {
         return new GrantedOrganizationApp(dependencies.projects, dependencies.grant);
       }
 

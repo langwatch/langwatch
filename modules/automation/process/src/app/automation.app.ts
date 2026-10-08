@@ -347,7 +347,6 @@ type AutomationRuntimeDependencies = Omit<
 
 type AutomationSetup = FeatureSetup<
   AutomationDependencies,
-  never,
   AutomationServerConfig,
   never,
   AutomationChannels

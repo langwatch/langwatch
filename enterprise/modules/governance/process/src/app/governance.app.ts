@@ -28,7 +28,6 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * CLI without knowing which it is serving.
  */
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
@@ -418,6 +417,7 @@ export interface GovernanceAppDependencies {
       | "saveSessionPolicy"
       | "getSettings"
       | "getOrganizationIdByTeamId"
+      | "listAllIds"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -426,19 +426,15 @@ export interface GovernanceAppDependencies {
    * because the one question this feature asks it — may the caller see somebody
    * else's personal keys — is a plain decision at the organization scope.
    */
-  permissions: Pick<AuthzService, "getDecision">;
+  permissions: Pick<AuthzApi, "getDecision">;
 }
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<
-    typeof GovernanceModule.dependencies,
-    never,
-    undefined
-  >["dependencies"];
+  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
-  resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
-  secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
+  resources: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["secrets"];
   repositories: GovernanceRepositories;
 }>;
 
@@ -566,8 +562,14 @@ export class GovernanceModule implements GovernanceRestApi {
     );
     this.codingAssistantBilling = CodingAssistantBillingFactService.create({
       policies: repositories.costAttributionPolicies,
-      record: (command) =>
-        this.codingAssistantBillingSender("recordCodingAssistantBilling").send(command),
+      organizationIds: (input) => dependencies.organizations.listAllIds(input),
+      // The command's schema is the event data with the envelope merged in, never a wrapper.
+      record: ({ tenantId, occurredAt, data }) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").send({
+          tenantId,
+          occurredAt,
+          ...data,
+        }),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,

@@ -12,7 +12,6 @@ export * from "./authz.errors.ts";
 export * from "./authz-grant.events.ts";
 export * from "./authz-grants.service.ts";
 export * from "./authz.queries.ts";
-export * from "./authz.service.ts";
 export * from "./authz.api.ts";
 export * from "./authz-rest.schemas.ts";
 export * from "./authz-grants-rest.schemas.ts";

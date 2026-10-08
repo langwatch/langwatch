@@ -16,7 +16,6 @@ import { HotelBotService } from "../services/hotel-bot.service.ts";
 
 type SampleAgentsSetup = FeatureSetup<
   typeof SampleAgentsModule.dependencies,
-  never,
   SampleAgentsServerConfig,
   never,
   SampleAgentsChannels

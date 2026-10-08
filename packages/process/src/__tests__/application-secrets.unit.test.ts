@@ -23,7 +23,7 @@ class SessionApp implements SessionIdentity {
     this.#key = key;
   }
 
-  static create({ secrets }: FeatureSetup<{}, unknown, undefined>): Promise<SessionApp> {
+  static create({ secrets }: FeatureSetup<{}, undefined>): Promise<SessionApp> {
     return secrets.into(sessionKey, (key) => new SessionApp(key));
   }
 
@@ -38,7 +38,7 @@ class UndeclaredSessionApp {
   static readonly contract = SessionIdentity;
   static readonly dependencies = {};
 
-  static create(setup: FeatureSetup<{}, unknown, undefined>): Promise<SessionApp> {
+  static create(setup: FeatureSetup<{}, undefined>): Promise<SessionApp> {
     return SessionApp.create(setup);
   }
 }

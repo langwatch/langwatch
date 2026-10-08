@@ -35,7 +35,6 @@ import { InstantEvalRateLimiterService } from "../services/instant-eval-rate-lim
 
 type InstantEvalJudgeSetup = FeatureSetup<
   typeof InstantEvalJudgeModule.dependencies,
-  never,
   InstantEvalJudgeServerConfig,
   InstantEvalJudgeRepositories
 >;

@@ -43,7 +43,6 @@ import { WebPushService, type WebPushQueue } from "../services/web-push.service.
 
 type NotificationSetup = FeatureSetup<
   typeof NotificationModule.dependencies,
-  never,
   NotificationServerConfig,
   NotificationRepositories
 >;

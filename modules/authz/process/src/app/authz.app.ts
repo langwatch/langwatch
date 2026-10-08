@@ -17,7 +17,6 @@ import {
   type AuthzRevokeBindingsWhereInput,
   type AuthzRevokeBindingsWhereOutput,
   type AuthzRevokeResourceGrantsInput,
-  type AuthzService,
   type EffectivePermissions,
   type AuthzServerConfig,
   AuthzScopeNotFoundError,
@@ -76,7 +75,7 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
-export type AuthzSetup = FeatureSetup<Readonly<{}>, never, AuthzServerConfig, AuthzRepositories>;
+export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzServerConfig, AuthzRepositories>;
 
 /**
  * The legacy import speaks the command vocabulary directly: it supplies
@@ -117,13 +116,16 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
   }
 }
 
+/** The decision service's public surface; a test app states only the slice it drives. */
+type AuthzPermissions = Pick<AuthzPermissionService, keyof AuthzPermissionService>;
+
 /** The composed callable authorization boundary. */
 export class AuthzModule implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
-  #permissions: AuthzService;
+  #permissions: AuthzPermissions;
   #grantIdentity = AuthzGrantIdentityService.create();
   #grants: AuthzGrantsService;
   /**
@@ -157,7 +159,7 @@ export class AuthzModule implements AuthzApi {
   #platformOperators: AuthzPlatformOperatorsService | undefined;
 
   private constructor(
-    permissions: AuthzService,
+    permissions: AuthzPermissions,
     grants: AuthzGrantsService,
     options: Readonly<{
       demoProjectId?: string | undefined;
@@ -296,7 +298,7 @@ export class AuthzModule implements AuthzApi {
    * and grants graph as the legacy transport collaborators.
    */
   static fromServices(input: {
-    permissions: AuthzService;
+    permissions: AuthzPermissions;
     grants: AuthzGrantsService;
     config?: AuthzServerConfig | undefined;
   }): AuthzModule {

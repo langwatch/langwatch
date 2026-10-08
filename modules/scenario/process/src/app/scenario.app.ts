@@ -278,7 +278,6 @@ export class ScenarioModule implements ScenarioApi {
   static async create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
-      never,
       ScenarioServerConfig,
       ScenarioRepositories
     >,

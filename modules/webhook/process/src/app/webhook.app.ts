@@ -145,7 +145,6 @@ export interface WebhookAppDependencies {
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
-  never,
   WebhookServerConfig,
   WebhookRepositories,
   WebhookChannels

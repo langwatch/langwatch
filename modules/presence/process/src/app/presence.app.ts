@@ -52,7 +52,6 @@ export interface PresenceEmitter {
 
 type PresenceSetup = FeatureSetup<
   typeof PresenceModule.dependencies,
-  never,
   undefined,
   PresenceRepositories
 >;

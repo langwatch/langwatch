@@ -87,7 +87,6 @@ type StoredObjectDependencies = Readonly<{
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
-  never,
   StoredObjectServerConfig,
   StoredObjectRepositories,
   StoredObjectChannels

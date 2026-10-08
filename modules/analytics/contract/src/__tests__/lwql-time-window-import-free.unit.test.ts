@@ -57,7 +57,7 @@ describe("the LangWatchQL time-window vocabulary", () => {
     });
 
     it("reports a sibling contract module, which really does import", () => {
-      const source = read("analytics.service.ts");
+      const source = read("analytics.api.ts");
 
       expect(IMPORT_FORMS.some(([, pattern]) => pattern.test(source))).toBe(true);
     });

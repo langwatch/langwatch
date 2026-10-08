@@ -186,7 +186,6 @@ export interface ModelProviderCodexDeviceFlow {
 
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
-  never,
   ModelProviderServerConfig,
   ModelProviderRepositories,
   ModelProviderChannels

@@ -77,7 +77,6 @@ const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetModule.dependencies,
-  never,
   DatasetServerConfig,
   DatasetRepositories
 >;

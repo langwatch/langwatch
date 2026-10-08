@@ -15,7 +15,6 @@ import {
   type AuthzCreateBindingInput,
   type AuthzCreateBindingOutput,
   type AuthzLedgerBindingPrincipal,
-  type AuthzService,
   type AuthzUpdateBindingInput,
   type AuthzDeleteBindingInput,
   type GrantScopeTier,
@@ -41,6 +40,7 @@ import {
 } from "../rules/grant-escalation.rules.ts";
 import { AuthzGrantCeilingService } from "./authz-grant-ceiling.service.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
+import type { AuthzService } from "./authz.service.ts";
 
 /** The reads the writer's guards ask of the permission side. */
 export type AuthzGrantWriterPermissions = Pick<

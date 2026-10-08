@@ -143,7 +143,6 @@ class ConfiguredAnnotationModule implements AnnotationApi {
   static create(
     _setup: FeatureSetup<
       typeof ConfiguredAnnotationModule.dependencies,
-      unknown,
       ConfigOf<typeof ConfiguredAnnotationModule.config>
     >,
   ): ConfiguredAnnotationModule {

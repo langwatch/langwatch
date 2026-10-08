@@ -1,8 +1,6 @@
 import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
-import { releaseVersionOf } from "@langwatch/config";
 import { ModuleApiToken } from "@langwatch/module";
-import { otlpHeadersFrom } from "@langwatch/observability/node";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import { hostedMembers, openStores, type ProcessMemberSource } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
@@ -277,44 +275,6 @@ export class ProcessServer implements ProcessBoot {
   close(): Promise<void> {
     return this.server.close();
   }
-}
-
-const releaseSettings = z.object({
-  serviceVersion: z.string().optional(),
-  resourceAttributes: z.string().optional(),
-});
-
-/** The release this install runs, read from observability's slice of the shared leaves. */
-export function serviceVersionOf(observability: unknown): string {
-  const settings = releaseSettings.parse(observability ?? {});
-  return releaseVersionOf({
-    serviceVersion: settings.serviceVersion,
-    otelResourceAttributes: settings.resourceAttributes,
-  });
-}
-
-const exporterSettings = z.object({ otlpEndpoint: z.string().optional() });
-
-/** OTLP collector headers, applied inside a build and never handed out as a value (ADR-132). */
-type TelemetryExporterHeaders = <Out>(
-  build: (headers: Readonly<Record<string, string>>) => Out,
-) => Out;
-
-/** Where this process exports OTLP, as observability owns it: `OTEL_EXPORTER_OTLP_*`. */
-type TelemetryExporter = Readonly<{
-  endpoint: string | undefined;
-  withHeaders: TelemetryExporterHeaders;
-}>;
-
-export function telemetryExporterOf({
-  observability,
-  rawHeaders,
-}: Readonly<{ observability: unknown; rawHeaders: string | undefined }>): TelemetryExporter {
-  const headers = otlpHeadersFrom(rawHeaders);
-  return {
-    endpoint: exporterSettings.parse(observability ?? {}).otlpEndpoint,
-    withHeaders: (build) => build(headers),
-  };
 }
 
 const processSettings = z.object({

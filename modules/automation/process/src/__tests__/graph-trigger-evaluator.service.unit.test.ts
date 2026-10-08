@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type {
   CustomGraph,
   GraphTriggerEvaluationReason,
@@ -281,7 +281,7 @@ function makeHarness({
     projects: {
       findById: async () => project,
     },
-    analytics: createApiFixture<AnalyticsService>({
+    analytics: createApiFixture<AnalyticsApi>({
       getTimeseries,
     }),
     triggerSent,

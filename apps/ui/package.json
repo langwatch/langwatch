@@ -68,7 +68,6 @@
     "@langwatch/navigation-browser": "workspace:*",
     "@langwatch/navigation-contract": "workspace:*",
     "@langwatch/notification-browser": "workspace:*",
-    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
     "@langwatch/onboarding-client": "workspace:*",
     "@langwatch/ops-browser": "workspace:*",

@@ -28,12 +28,7 @@ import { LedgerShareRepository } from "../repositories/ledger/ledger.share.repos
 import type { ShareRepositories } from "../repositories/share.repositories.ts";
 import { ShareService } from "../services/share.service.ts";
 
-type ShareSetup = FeatureSetup<
-  typeof ShareModule.dependencies,
-  never,
-  undefined,
-  ShareRepositories
->;
+type ShareSetup = FeatureSetup<typeof ShareModule.dependencies, undefined, ShareRepositories>;
 
 export class ShareModule implements ShareApiContract {
   static readonly contract = ShareApi;

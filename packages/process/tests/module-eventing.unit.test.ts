@@ -65,12 +65,7 @@ class ComposedKeyApp extends KeyApp {
   }
 
   static create(
-    setup: FeatureSetup<
-      typeof ComposedKeyApp.dependencies,
-      Readonly<Record<string, unknown>>,
-      undefined,
-      KeyRepositories
-    >,
+    setup: FeatureSetup<typeof ComposedKeyApp.dependencies, undefined, KeyRepositories>,
   ): ComposedKeyApp {
     return new ComposedKeyApp(setup.repositories);
   }

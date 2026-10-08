@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PersonaHomeResolverService,
   type PersonaResolution,
@@ -17,7 +17,7 @@ type PersonaHomePeers = {
   setupState: Pick<DefaultGovernanceSetupStateService, "resolve">;
   projects: Pick<ProjectApi, "findSharedProjectSlugs">;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
-  permissions: Pick<AuthzService, "getDecision">;
+  permissions: Pick<AuthzApi, "getDecision">;
   users: Pick<UserApi, "findLastHomePath">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   organizations: Pick<OrganizationApi, "findPrimaryIntent">;

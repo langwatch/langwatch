@@ -116,7 +116,6 @@ const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
   typeof BillingModule.dependencies,
-  never,
   BillingServerConfig,
   BillingRepositories
 >;

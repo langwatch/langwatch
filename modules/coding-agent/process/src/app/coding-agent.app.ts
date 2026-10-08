@@ -130,12 +130,7 @@ type CodingAgentDependencies = {
   auditLog: typeof AuditLogApi;
   governance: typeof GovernanceRestApi;
 };
-type CodingAgentSetup = FeatureSetup<
-  CodingAgentDependencies,
-  never,
-  undefined,
-  CodingAgentRepositories
->;
+type CodingAgentSetup = FeatureSetup<CodingAgentDependencies, undefined, CodingAgentRepositories>;
 
 export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;

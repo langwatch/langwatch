@@ -45,7 +45,6 @@ import {
   type ScimRequestEntry,
   type ScimReconciliationScope,
   type ScimServerConfig,
-  type ScimService,
   type ScimDeliveryReceipt,
   type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
@@ -108,13 +107,9 @@ import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
+import type { ScimService } from "../services/scim.service.ts";
 
-type ScimSetup = FeatureSetup<
-  typeof ScimModule.dependencies,
-  never,
-  ScimServerConfig,
-  ScimRepositories
->;
+type ScimSetup = FeatureSetup<typeof ScimModule.dependencies, ScimServerConfig, ScimRepositories>;
 
 const CONNECTION_NOT_WRITABLE =
   "This directory token can no longer write through its single sign-on connection";
@@ -219,7 +214,7 @@ function findBearer(authorization: string | null): string | null {
 type ScimDirectoryMoveSender = Pick<EventingCommandSender<RequestDirectoryMoveCommandData>, "send">;
 
 type ScimAppOptions = {
-  scim: ScimService;
+  scim: Pick<ScimService, keyof ScimService>;
   connections: ScimConnectionsService;
   directoryExternalIds: ScimDirectoryExternalIdsService;
   reconciliation: ScimReconciliationService;
@@ -246,7 +241,7 @@ export class ScimModule implements ScimApiContract {
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
   static readonly operatorReads = scimOperatorReads;
 
-  readonly #scim: ScimService;
+  readonly #scim: Pick<ScimService, keyof ScimService>;
   readonly #connections: ScimConnectionsService;
   readonly #directoryExternalIds: ScimDirectoryExternalIdsService;
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;

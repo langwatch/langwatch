@@ -1,11 +1,9 @@
 import {
   analyticsMetricAggregations,
   analyticsTimeseriesInputSchema,
-  AnalyticsService as AnalyticsServiceContract,
   type AnalyticsFeedbacksResult,
   type AnalyticsReadInput,
   type AnalyticsTopDocumentsResult,
-  type AnalyticsTripwire,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -28,6 +26,7 @@ import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 
 import type { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 import type { AnalyticsRepository } from "../repositories/analytics.repository.ts";
+import type { LoggingAnalyticsTripwireService } from "./analytics-tripwire.service.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -122,26 +121,25 @@ function refuseDisallowedSeriesAggregations(input: AnalyticsTimeseriesInput): vo
   }
 }
 
-export class AnalyticsService extends AnalyticsServiceContract {
+export class AnalyticsService {
   static create(options: {
     repository: AnalyticsRepository;
     evaluationRepository: AnalyticsEvaluationRepository;
-    tripwire?: AnalyticsTripwire;
+    tripwire?: LoggingAnalyticsTripwireService;
   }): AnalyticsService {
     return new AnalyticsService(options);
   }
 
   private readonly repository: AnalyticsRepository;
   private readonly evaluationRepository: AnalyticsEvaluationRepository;
-  private readonly tripwire?: AnalyticsTripwire;
+  private readonly tripwire?: LoggingAnalyticsTripwireService;
   private readonly cache = new Map<string, CacheEntry>();
 
   private constructor(deps: {
     repository: AnalyticsRepository;
     evaluationRepository: AnalyticsEvaluationRepository;
-    tripwire?: AnalyticsTripwire;
+    tripwire?: LoggingAnalyticsTripwireService;
   }) {
-    super();
     this.repository = deps.repository;
     this.evaluationRepository = deps.evaluationRepository;
     this.tripwire = deps.tripwire;

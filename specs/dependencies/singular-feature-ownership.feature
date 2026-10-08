@@ -114,7 +114,7 @@ Feature: Singular feature ownership
     Scenario: Public cross-feature capability is a service contract
       Given a feature has a contract, server implementation, and private persistence
       When another feature consumes it
-      Then the consumer imports the abstract service and portable Zod 4 values from the contract root
+      Then the consumer imports the *Api type and portable Zod 4 values from the contract root
       And repository, store, projection, adapter, and provider ports remain private
       And the concrete service is a class composed once by the runtime
 

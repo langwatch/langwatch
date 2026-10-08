@@ -55,7 +55,6 @@ type DashboardDependencies = Readonly<{
 
 type DashboardSetup = FeatureSetup<
   DashboardDependencies,
-  never,
   DashboardServerConfig,
   DashboardRepositories
 >;

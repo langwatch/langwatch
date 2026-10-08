@@ -1,4 +1,4 @@
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import { type MailSender, sendAutomationLimitEmail } from "@langwatch/mail";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -18,7 +18,7 @@ import {
  */
 type AutomationRunawayDirectories = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
-  authorization: Pick<AuthzService, "listOrganizationBindings">;
+  authorization: Pick<AuthzApi, "listOrganizationBindings">;
 }>;
 
 /** Which addresses this project has already asked not to hear from again. */

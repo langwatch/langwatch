@@ -201,7 +201,7 @@ export type AuthzDecision = z.infer<typeof authzDecisionSchema>;
 /**
  * Branded proof that the service allowed one permission at one binding tier.
  * The brand is module-private and the package exports no factory. Only the
- * concrete AuthzService implementation may construct this after authorization.
+ * authz process's AuthzService may construct this after authorization.
  */
 declare const AUTHORIZED_BRAND: unique symbol;
 export type Authorized<

@@ -11,14 +11,13 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  ScimService,
-  type ScimDirectoryOwnership,
-  type ScimRequestLogEntry,
-  type ScimRequestLogQuery,
-  type ScimRequestRecord,
-  type ScimTokenEntitlement,
-  type ScimSyncActivityEntry,
+import type {
+  ScimDirectoryOwnership,
+  ScimRequestLogEntry,
+  ScimRequestLogQuery,
+  ScimRequestRecord,
+  ScimTokenEntitlement,
+  ScimSyncActivityEntry,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
@@ -32,8 +31,9 @@ import { ScimDirectoryExternalIdsService } from "../../../services/scim-director
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
 import { ScimTokenMintService } from "../../../services/scim-token-mint.service.ts";
+import type { ScimService } from "../../../services/scim.service.ts";
 
-export class ScimServiceFake extends ScimService {
+export class ScimServiceFake implements Pick<ScimService, keyof ScimService> {
   readonly verifyToken = vi.fn(
     async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
       status: "invalid_token",
@@ -65,6 +65,7 @@ export class ScimServiceFake extends ScimService {
   readonly replaceGroup = vi.fn();
   readonly updateGroup = vi.fn();
   readonly deleteGroup = vi.fn();
+  readonly toScimUser = vi.fn();
 }
 
 /** A minimal but complete plan, at the type the doors only ever read `.type` off. */
@@ -85,7 +86,7 @@ function fakePlan(type: string): Plan {
 /** One application, and the audit entries it recorded. */
 export function scimTestApp(
   options: {
-    scim?: ScimService;
+    scim?: Pick<ScimService, keyof ScimService>;
     connections?: OrganizationSsoConnection[];
     webhookSecret?: string | undefined;
     planType?: string;

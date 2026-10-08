@@ -23,7 +23,6 @@ import { SlackConnectionService } from "../services/slack-connection.service.ts"
 
 type SlackSetup = FeatureSetup<
   typeof SlackModule.dependencies,
-  never,
   undefined,
   SlackRepositories,
   SlackChannels

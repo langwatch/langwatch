@@ -128,9 +128,6 @@
       "path": "../../modules/notification/browser/tsconfig.build.json"
     },
     {
-      "path": "../../modules/notification/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/onboarding/browser/tsconfig.build.json"
     },
     {

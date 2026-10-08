@@ -41,7 +41,7 @@ function peerModule({
   class PeerApp {
     static readonly contract = token;
     static readonly dependencies = {};
-    static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+    static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
       return { read: () => name };
     }
   }
@@ -53,7 +53,7 @@ function dependentModule({ constructed }: { constructed: string[] }) {
   class DependentApp {
     static readonly contract = DependentApi;
     static readonly dependencies = { workflows: WorkflowApi, auditLog: AuditLogApi };
-    static create(_setup: FeatureSetup<typeof DependentApp.dependencies, object, undefined>) {
+    static create(_setup: FeatureSetup<typeof DependentApp.dependencies, undefined>) {
       constructed.push("agent");
       return { read: () => "agent" };
     }

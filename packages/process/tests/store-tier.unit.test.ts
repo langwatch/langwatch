@@ -42,7 +42,7 @@ class ProjectApp implements ProjectApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { projects: { read(): string } }>): ProjectApp {
+  }: FeatureSetup<{}, undefined, { projects: { read(): string } }>): ProjectApp {
     return new ProjectApp(repositories.projects);
   }
 

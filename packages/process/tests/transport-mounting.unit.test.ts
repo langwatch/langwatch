@@ -19,7 +19,7 @@ class CatalogueApp implements CatalogueApi {
   static readonly contract = CatalogueApi;
   static readonly dependencies = {};
 
-  static create(_setup: FeatureSetup<Record<never, never>, object, undefined>): CatalogueApi {
+  static create(_setup: FeatureSetup<Record<never, never>, undefined>): CatalogueApi {
     return new CatalogueApp();
   }
 

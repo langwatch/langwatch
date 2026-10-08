@@ -23,7 +23,6 @@ import {
   type ScimDirectoryActivityEntry,
   type ScimReconciliationChange,
   type ScimReconciliationFailure,
-  type ScimService,
   type ScimSyncState,
 } from "@langwatch/enterprise-scim-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
@@ -39,6 +38,7 @@ import {
 } from "../rules/scim-reconciliation-copy.rules.ts";
 import type { ScimConnectionsService } from "./scim-connections.service.ts";
 import type { ScimSyncReadsService } from "./scim-sync-reads.service.ts";
+import type { ScimService } from "./scim.service.ts";
 
 /** Every answer this view is assembled from, each from the module that owns it. */
 export type ScimReconciliationReads = {

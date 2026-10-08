@@ -4,7 +4,7 @@
  * provisions once it is. Its payload is untyped at the boundary, and the replay
  * window lives here because one process remembers one set of deliveries.
  */
-import type { ScimDeliveryReceipt, ScimService } from "@langwatch/enterprise-scim-contract";
+import type { ScimDeliveryReceipt } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ import {
   verifyScimWebhookSignature,
 } from "../rules/scim-webhook-signature.rules.ts";
 import type { ScimConnectionRetirementService } from "./scim-connection-retirement.service.ts";
+import type { ScimService } from "./scim.service.ts";
 
 /** Whether one delivery provisions anything, and whose directory, before anything is. */
 type ScimDeliveryAdmission =
@@ -80,12 +81,16 @@ const scimWebhookEventSchema = z.looseObject({
 
 type ScimWebhookEvent = z.infer<typeof scimWebhookEventSchema>;
 type ScimWebhookPayload = z.infer<typeof scimWebhookPayloadSchema>;
+type ScimDirectoryStreamProvisioning = Pick<
+  ScimService,
+  "createUser" | "deleteUser" | "listUsers" | "recordTokenUse" | "verifyToken"
+>;
 
 export class ScimDirectoryStreamService {
   readonly #replays = new ScimWebhookReplayWindow();
 
   private constructor(
-    private readonly scim: ScimService,
+    private readonly scim: ScimDirectoryStreamProvisioning,
     private readonly retirement: ScimConnectionRetirementService,
     private readonly webhookSecret: () => string | undefined,
   ) {}
@@ -95,7 +100,7 @@ export class ScimDirectoryStreamService {
     retirement,
     webhookSecret,
   }: {
-    scim: ScimService;
+    scim: ScimDirectoryStreamProvisioning;
     /** The same credential rule the protocol door holds: a token whose
      *  connection the organization no longer holds provisions nothing. */
     retirement: ScimConnectionRetirementService;

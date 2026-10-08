@@ -3,14 +3,43 @@
  */
 
 import { readFileSync } from "fs";
+import { createServer } from "http";
+import type { AddressInfo } from "net";
 import path from "path";
 
 import {
   PUBLIC_APP_CONFIG_META_NAME,
+  createPublicAppConfigMetaTag,
   parsePublicAppConfigMetaContent,
 } from "@langwatch/config/public-app-config";
 import { loadConfigFromFile } from "vite";
 import { describe, expect, it } from "vitest";
+
+const apiConfig = {
+  process: {
+    appBaseUrl: "http://localhost:5560",
+    mode: "development",
+    deployment: "self-hosted",
+    nlp: false,
+  },
+};
+
+/** An api rendering the shell the dev server lifts its config from, while `run` runs. */
+async function withStubApi<T>(run: () => Promise<T>): Promise<T> {
+  const server = createServer((_request, response) => {
+    response.setHeader("Content-Type", "text/html");
+    response.end(`<html><head>${createPublicAppConfigMetaTag(apiConfig)}</head></html>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return await withoutEnv("LANGWATCH_PORTLESS", () =>
+      withEnv("LANGWATCH_API_URL", `http://127.0.0.1:${port}`, run),
+    );
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
 
 const packageRoot = path.resolve(import.meta.dirname, "../..");
 const scripts = (
@@ -65,15 +94,17 @@ describe("given the apps/ui Vite config", () => {
 
       // Set and restore our own env rather than `??=`: whatever the shell
       // already carries for BASE_HOST/NODE_ENV must not change the outcome.
-      const loaded = await withEnv("BASE_HOST", "http://localhost:5560", () =>
-        withEnv("NODE_ENV", "development", () =>
-          loadConfigFromFile(
-            { command: "serve", mode: "development" },
-            "vite.config.ts",
-            packageRoot,
-            undefined,
-            undefined,
-            loader,
+      const loaded = await withStubApi(() =>
+        withEnv("BASE_HOST", "http://localhost:5560", () =>
+          withEnv("NODE_ENV", "development", () =>
+            loadConfigFromFile(
+              { command: "serve", mode: "development" },
+              "vite.config.ts",
+              packageRoot,
+              undefined,
+              undefined,
+              loader,
+            ),
           ),
         ),
       );
@@ -82,34 +113,38 @@ describe("given the apps/ui Vite config", () => {
     });
   });
 
-  describe("when no BASE_HOST is set for the dev server", () => {
-    /** @scenario "The Vite config loads the way the dev and build scripts load it" */
-    it("takes the dev server's own address instead of refusing to boot", async () => {
-      await withoutEnv("BASE_HOST", async () => {
-        const loaded = await loadConfigFromFile(
-          { command: "serve", mode: "development" },
-          "vite.config.ts",
-          packageRoot,
-          undefined,
-          undefined,
-          configLoaderOf(requiredScript("dev")),
-        );
-        const inject = loaded?.config.plugins
-          ?.flat()
-          .find(
-            (plugin) =>
-              plugin && "name" in plugin && plugin.name === "inject-development-public-config",
+  describe("when the api renders the page's public config", () => {
+    /** @scenario "The dev server injects the api's public config" */
+    it("injects the api's config into the dev shell", async () => {
+      await withStubApi(() =>
+        withoutEnv("BASE_HOST", async () => {
+          const loaded = await loadConfigFromFile(
+            { command: "serve", mode: "development" },
+            "vite.config.ts",
+            packageRoot,
+            undefined,
+            undefined,
+            configLoaderOf(requiredScript("dev")),
           );
-        expect(inject).toBeDefined();
-        const html = await transformIndexHtmlOf(inject)("<html><head></head><body></body></html>");
-        const content = new RegExp(`name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`).exec(
-          html,
-        )?.[1];
-        expect(content).toBeDefined();
-        expect(parsePublicAppConfigMetaContent(content!).process?.appBaseUrl).toBe(
-          "http://localhost:5560",
-        );
-      });
+          const inject = loaded?.config.plugins
+            ?.flat()
+            .find(
+              (plugin) =>
+                plugin && "name" in plugin && plugin.name === "inject-development-public-config",
+            );
+          expect(inject).toBeDefined();
+          const html = await transformIndexHtmlOf(inject)(
+            "<html><head></head><body></body></html>",
+          );
+          const content = new RegExp(
+            `name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`,
+          ).exec(html)?.[1];
+          expect(content).toBeDefined();
+          expect(parsePublicAppConfigMetaContent(content!).process?.appBaseUrl).toBe(
+            "http://localhost:5560",
+          );
+        }),
+      );
     });
   });
 });

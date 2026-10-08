@@ -326,7 +326,7 @@ export type LangWatchQLValidationInput = Readonly<{
 
 /**
  * Analytics' separate restricted-query lifecycle and trust boundary. Ordinary Analytics reads
- * use AnalyticsService; LangWatchQL owns its own tenant capability, restricted identity, query
+ * go through AnalyticsApi; LangWatchQL owns its own tenant capability, restricted identity, query
  * ceilings and close lifecycle, so consumers depend only on this contract, never a server impl.
  */
 export abstract class LangWatchQLService {

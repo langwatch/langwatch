@@ -49,7 +49,7 @@ class ProjectModule implements ProjectApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { projects: ProjectRepository }>): ProjectModule {
+  }: FeatureSetup<{}, undefined, { projects: ProjectRepository }>): ProjectModule {
     return new ProjectModule(repositories.projects);
   }
 
@@ -67,7 +67,7 @@ class StatelessApp {
   static readonly contract = moduleApi<{ ready(): boolean }>()("annotation");
   static readonly dependencies = {};
 
-  static create(_setup: FeatureSetup<{}, unknown, undefined>) {
+  static create(_setup: FeatureSetup<{}, undefined>) {
     return { ready: () => true };
   }
 }
@@ -90,7 +90,9 @@ class FilesApp implements FilesApi {
     this.#storage = storage;
   }
 
-  static create(setup: FeatureSetup<{}, { objectStorage: ObjectStorage }, undefined>): FilesApp {
+  static create(
+    setup: FeatureSetup<{}, undefined> & Readonly<{ members: { objectStorage: ObjectStorage } }>,
+  ): FilesApp {
     return new FilesApp(setup.members.objectStorage);
   }
 

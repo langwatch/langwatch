@@ -235,7 +235,6 @@ interface LangyLocalControl {
 
 type LangySetup = FeatureSetup<
   typeof LangyModule.dependencies,
-  never,
   LangyServerConfig,
   LangyRepositories,
   LangyChannels

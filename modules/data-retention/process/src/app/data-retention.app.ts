@@ -89,7 +89,6 @@ export interface DataRetentionDirectoryReader {
 
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionModule.dependencies,
-  never,
   DataRetentionServerConfig,
   DataRetentionRepositories
 >;

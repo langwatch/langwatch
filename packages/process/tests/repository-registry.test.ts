@@ -47,7 +47,7 @@ class App {
   static create({
     repositories,
     tier,
-  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): App {
+  }: FeatureSetup<Record<never, never>, undefined, Repositories>): App {
     return new App(repositories.value.read(), tier);
   }
   constructor(
@@ -65,12 +65,8 @@ class ConfiguredApp {
     repositories,
     members,
     config,
-  }: FeatureSetup<
-    Record<never, never>,
-    { suffix: string },
-    { prefix: string },
-    Repositories
-  >): ConfiguredApp {
+  }: FeatureSetup<Record<never, never>, { prefix: string }, Repositories> &
+    Readonly<{ members: { suffix: string } }>): ConfiguredApp {
     return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}:${members.suffix}`);
   }
   constructor(readonly value: string) {}
@@ -103,7 +99,7 @@ class DuplicateApp {
   static readonly dependencies = {};
   static create({
     repositories,
-  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): DuplicateApp {
+  }: FeatureSetup<Record<never, never>, undefined, Repositories>): DuplicateApp {
     return new DuplicateApp(repositories.value.read());
   }
   constructor(readonly value: string) {}
@@ -306,7 +302,7 @@ describe("given a module that declares both repository tiers", () => {
         static readonly dependencies = {};
         static create({
           repositories,
-        }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): MethodApp {
+        }: FeatureSetup<Record<never, never>, undefined, Repositories>): MethodApp {
           return new MethodApp(repositories.value.read());
         }
         constructor(readonly value: string) {}

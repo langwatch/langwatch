@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -27,7 +26,7 @@ export class PostgresScimService {
     tokenPepper: string | undefined;
     previousTokenPepper?: string | undefined;
     connections: ScimHeldConnections;
-  }): ScimServiceContract {
+  }): ScimService {
     return ScimService.create({
       prisma: options.repository,
       writer: options.writer,

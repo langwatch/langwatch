@@ -14,7 +14,6 @@ import {
   type AnalyticsFilterOption,
   type AnalyticsMetricSource,
   type AnalyticsReadInput,
-  type AnalyticsService,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
@@ -160,7 +159,7 @@ export type AnalyticsFilterOptionsRequest = Readonly<{
 
 /** What the process composes this feature's application from. */
 export interface AnalyticsAppDependencies {
-  analytics: AnalyticsService;
+  analytics: AnalyticsServiceClass;
   /** The host's filter catalogue; see {@link AnalyticsFilterOptionsLookup}. */
   filterOptions: AnalyticsFilterOptionsLookup;
   langWatchQL: LangWatchQLService;
@@ -273,7 +272,6 @@ function lwqlProvisioningOperations({
 
 type AnalyticsSetup = FeatureSetup<
   AnalyticsDependencies,
-  never,
   AnalyticsServerConfig,
   AnalyticsRepositories,
   AnalyticsChannels

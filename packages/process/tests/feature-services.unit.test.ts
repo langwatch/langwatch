@@ -56,7 +56,8 @@ class ProjectModule implements ProjectApi {
   static create({
     members,
     resources,
-  }: FeatureSetup<typeof ProjectModule.dependencies, DeclaredMembers, undefined>): ProjectApi {
+  }: FeatureSetup<typeof ProjectModule.dependencies, undefined> &
+    Readonly<{ members: DeclaredMembers }>): ProjectApi {
     const { events } = members;
     resources.own("connection", () => {
       events.push("connection:close");

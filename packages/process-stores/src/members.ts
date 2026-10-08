@@ -176,7 +176,7 @@ export type DatabaseTarget =
  * and `objectStorage` are each ONE client that routes internally, so "every
  * statement names its tenant" is structural, not a rule to remember.
  */
-export interface ProcessMembers {
+export interface StoreClients {
   readonly prisma: PrismaClient;
   readonly clickhouse: ClickHouseQueryClient;
   readonly clickhouseAdmin: ClickHouseAdmin;
@@ -197,14 +197,14 @@ export interface ProcessMembers {
 }
 
 /** One member's name. A misspelling is a compile error where it is written. */
-export type MemberName = keyof ProcessMembers;
+export type StoreClientName = keyof StoreClients;
 
 /**
  * Every member name, in construction order - load-bearing, and asserted by
  * this package's tests: `prisma` precedes `clickhouse`/`objectStorage` (both
  * route through its directory read), `redis` precedes what's built over it.
  */
-export const MEMBER_NAMES = [
+export const STORE_CLIENT_NAMES = [
   "logger",
   "clock",
   "secrets",
@@ -221,12 +221,7 @@ export const MEMBER_NAMES = [
   "rateLimiter",
   "eventing",
   "eventReadSeat",
-] as const satisfies readonly MemberName[];
-
-/** The record a module is handed for the names it declared in `static readonly reads`. */
-export type MembersRead<Names extends readonly MemberName[]> = {
-  readonly [Name in Names[number]]: ProcessMembers[Name];
-};
+] as const satisfies readonly StoreClientName[];
 
 /** What a process's opened stores hand boot: names in build order, values on demand. */
 export interface StoresMemberSource {

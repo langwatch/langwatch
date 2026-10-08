@@ -5,7 +5,17 @@ import { ConfigurationError } from "../services/errorHandling.ts";
  * one release (round 49 E4), as `UpcastDrain` drains a former pipeline and round 16's retired lanes
  * drained a living one. Spec: packages/eventing/specs/lane-alias.feature.
  */
-export interface LaneAlias {
+export type LaneAlias = RoutedLaneAlias | LaneTombstone;
+
+/** A former lane whose work has no successor lane: its jobs are acknowledged with a log line. */
+export interface LaneTombstone {
+  readonly from: string;
+  /** Why nothing takes the job, written into the log line. */
+  readonly tombstone: string;
+  readonly removeAfter: string;
+}
+
+export interface RoutedLaneAlias {
   /** The former key, `<pipeline>:<jobType>:<name>`, as the previous release's jobs carry it. */
   readonly from: string;
   /** This pipeline's lane that takes them: its own lane, or its peer lane of that name. */
@@ -55,37 +65,52 @@ export function assertLaneAliasesDeclarable({
       new ConfigurationError("PipelineBuilder", `Pipeline "${pipeline}" ${details}`, {
         pipeline,
         from: alias.from,
-        to: `${alias.to.jobType}:${alias.to.lane}`,
+        to: "to" in alias ? `${alias.to.jobType}:${alias.to.lane}` : "tombstone",
       });
     if (!LANE_KEY.test(alias.from)) {
       throw refuse(`aliases "${alias.from}", which is not a <pipeline>:<jobType>:<name> key.`);
     }
-    if (laneAliasTargetKeys({ pipeline, to: alias.to }).includes(alias.from)) {
+    if ("to" in alias && laneAliasTargetKeys({ pipeline, to: alias.to }).includes(alias.from)) {
       throw refuse(`aliases "${alias.from}" to itself.`);
     }
     if (!parseRelease(alias.removeAfter)) {
       throw refuse(`aliases "${alias.from}" with no release that ends it.`);
     }
     const types = claimed.get(alias.from) ?? new Set<string>();
-    for (const type of alias.eventTypes ?? ["*"]) {
-      if (types.has(type) || types.has("*") || (type === "*" && types.size > 0)) {
-        throw refuse(`aliases "${alias.from}" twice for the event type "${type}".`);
-      }
-      types.add(type);
-    }
+    const twice = claimEventTypes({ types, alias });
+    if (twice) throw refuse(`aliases "${alias.from}" twice for the event type "${twice}".`);
     claimed.set(alias.from, types);
   }
 }
 
-/** The registry keys an alias's successor may sit under: this pipeline's lane, then its peer. */
+/** Adds the types an alias takes to those its key already gave away; the first repeat, if any. */
+function claimEventTypes({
+  types,
+  alias,
+}: {
+  types: Set<string>;
+  alias: LaneAlias;
+}): string | undefined {
+  for (const type of ("eventTypes" in alias ? alias.eventTypes : undefined) ?? ["*"]) {
+    if (types.has(type) || types.has("*") || (type === "*" && types.size > 0)) return type;
+    types.add(type);
+  }
+  return undefined;
+}
+
+/** The registry keys an alias's successor may sit under: its lane, its peer lane, a global lane. */
 export function laneAliasTargetKeys({
   pipeline,
   to,
 }: {
   pipeline: string;
-  to: LaneAlias["to"];
+  to: RoutedLaneAlias["to"];
 }): readonly string[] {
-  return [`${pipeline}:${to.jobType}:${to.lane}`, `global:${to.jobType}:${pipeline}.${to.lane}`];
+  return [
+    `${pipeline}:${to.jobType}:${to.lane}`,
+    `global:${to.jobType}:${pipeline}.${to.lane}`,
+    `global:${to.jobType}:${to.lane}`,
+  ];
 }
 
 /** The former body as the successor reads it: the declared transform, else a reactor's event. */
@@ -93,7 +118,7 @@ export function readAliasedBody({
   alias,
   stored,
 }: {
-  alias: LaneAlias;
+  alias: RoutedLaneAlias;
   stored: Record<string, unknown>;
 }): Record<string, unknown> {
   if (alias.data) return toRecord(alias.data(stored));
@@ -110,7 +135,7 @@ export function laneAliasTakes({
   alias: LaneAlias;
   stored: Record<string, unknown>;
 }): boolean {
-  if (!alias.eventTypes) return true;
+  if (!("eventTypes" in alias) || !alias.eventTypes) return true;
   const type = formerEventType(stored);
   return type !== undefined && alias.eventTypes.includes(type);
 }

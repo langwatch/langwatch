@@ -39,7 +39,9 @@ class CatalogueApp extends CatalogueApi {
     super();
   }
 
-  static create(setup: FeatureSetup<typeof CatalogueApp.dependencies, Members, Config>) {
+  static create(
+    setup: FeatureSetup<typeof CatalogueApp.dependencies, Config> & Readonly<{ members: Members }>,
+  ) {
     return new CatalogueApp(`${setup.members.prefix}${setup.config.suffix}`);
   }
 
@@ -125,12 +127,7 @@ describe("given a module that owns repositories", () => {
     }
 
     static create(
-      setup: FeatureSetup<
-        typeof StoredApp.dependencies,
-        never,
-        Config,
-        Readonly<{ rows: () => number }>
-      > &
+      setup: FeatureSetup<typeof StoredApp.dependencies, Config, Readonly<{ rows: () => number }>> &
         Readonly<{ members: Members }>,
     ) {
       return new StoredApp(setup.repositories.rows());

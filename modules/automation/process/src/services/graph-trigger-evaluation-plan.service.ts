@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import {
   type CustomGraph,
   type GraphTriggerEvaluationReason,
@@ -303,7 +303,7 @@ export type GraphTriggerEvaluationDeps = {
   triggers: TriggerRepository;
   customGraphs: CustomGraphRepository;
   projects: AutomationProjectDirectory;
-  analytics: AnalyticsService;
+  analytics: Pick<AnalyticsApi, "getTimeseries">;
   triggerSent: GraphTriggerSentRepository;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;

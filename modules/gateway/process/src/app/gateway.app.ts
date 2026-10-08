@@ -1097,7 +1097,6 @@ function extractSessionActor(value: object): { user: { id: string } } | null {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayModule.dependencies,
-  never,
   GatewayServerConfig,
   GatewayRepositories
 >;

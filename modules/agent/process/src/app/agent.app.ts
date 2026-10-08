@@ -103,7 +103,6 @@ const THREAD_KSUID_RESOURCE = "thread";
  */
 type AgentSetup = FeatureSetup<
   typeof AgentModule.dependencies,
-  never,
   AgentServerConfig,
   AgentRepositories
 >;

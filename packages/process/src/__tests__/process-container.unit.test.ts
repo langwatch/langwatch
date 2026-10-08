@@ -87,7 +87,7 @@ describe("process container", () => {
     class CatalogueApp {
       static readonly contract = CatalogueApi;
       static readonly dependencies = {};
-      static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+      static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
         return { read: () => "one dataset" };
       }
     }
@@ -106,7 +106,7 @@ describe("process container", () => {
     class CatalogueApp {
       static readonly contract = CatalogueApi;
       static readonly dependencies = {};
-      static create(_setup: FeatureSetup<Record<never, never>, object, undefined>) {
+      static create(_setup: FeatureSetup<Record<never, never>, undefined>) {
         return { read: () => "one dataset" };
       }
     }

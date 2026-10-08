@@ -18,7 +18,12 @@ import {
 import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
-import { type Encryption, MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
+import {
+  type Encryption,
+  STORE_CLIENT_NAMES,
+  type StoreClientName,
+  type StoreClients,
+} from "./members.ts";
 import { buildObjectStorage } from "./object-storage-member.ts";
 import { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 import { buildClickHouseAdmin, buildDatabaseTarget } from "./store-targets.ts";
@@ -35,7 +40,7 @@ import {
  */
 export class MemberNotConfiguredError extends Error {
   constructor(
-    readonly member: MemberName,
+    readonly member: StoreClientName,
     remedy: string,
   ) {
     super(`This process has no "${member}" member: ${remedy}.`);
@@ -66,7 +71,7 @@ function refusingEncryption(): Encryption {
 
 /** A member handed in as an own property whose value is `undefined`. */
 export class MemberSuppliedUndefinedError extends Error {
-  constructor(readonly member: MemberName) {
+  constructor(readonly member: StoreClientName) {
     super(
       `The "${member}" member was handed in as undefined. Omit it to have this process ` +
         "build it, or pass a value; a misspelt override would otherwise become the real client.",
@@ -76,16 +81,16 @@ export class MemberSuppliedUndefinedError extends Error {
 }
 
 /**
- * Where a process's members come from. `order` is the construction order,
+ * Where a process's store clients come from. `order` is the construction order,
  * so a root that builds several reads them in an order where nothing opens
  * under something not yet open.
  */
-export interface MemberSource<Members> {
-  /** The store tier these members belong to; boot selects every registry from it (§7). */
+export interface ProcessMemberSource {
+  /** The store tier these clients belong to; boot selects every registry from it (§7). */
   readonly tier?: "live" | "memory";
-  readonly order: readonly (keyof Members & string)[];
-  /** Builds the member, or refuses naming it. Repeated reads answer once. */
-  read<Name extends keyof Members & string>(name: Name): Members[Name];
+  readonly order: readonly StoreClientName[];
+  /** Builds the client, or refuses naming it. Repeated reads answer once. */
+  read<Name extends StoreClientName>(name: Name): StoreClients[Name];
   /**
    * Resolves once every client this source opened answers one cheap query; rejects naming
    * the first that does not. Spec: specs/server/process-readiness.feature.
@@ -97,10 +102,8 @@ export interface MemberSource<Members> {
   [Symbol.asyncDispose](): Promise<void>;
 }
 
-export type ProcessMemberSource = MemberSource<ProcessMembers>;
-
 /** Reads a member through the one source, building it on first read. */
-type ReadMember = <Name extends MemberName>(name: Name) => ProcessMembers[Name];
+type ReadMember = <Name extends StoreClientName>(name: Name) => StoreClients[Name];
 
 type TenantDirectory = ReturnType<typeof cachedTenantDirectory>;
 
@@ -153,7 +156,7 @@ function clickhouseMember({
 }: {
   config: ProcessConfig;
   tenantDirectory: () => TenantDirectory;
-}): BuiltMember<ProcessMembers["clickhouse"]> {
+}): BuiltMember<StoreClients["clickhouse"]> {
   const clickhouse = config.clickhouse;
   if (!clickhouse || !clickhouseConfigured(config)) {
     throw new MemberNotConfiguredError(
@@ -172,7 +175,7 @@ function objectStorageMember({
   config: ProcessConfig;
   read: ReadMember;
   tenantDirectory: () => TenantDirectory;
-}): BuiltMember<ProcessMembers["objectStorage"]> {
+}): BuiltMember<StoreClients["objectStorage"]> {
   if (!config.objectStorage) {
     throw new MemberNotConfiguredError(
       "objectStorage",
@@ -188,9 +191,9 @@ function objectStorageMember({
 
 /** An override handed in as `undefined` is a misspelling, never a request to build. */
 function refuseUndefinedMembers(supplied: {
-  readonly [Name in MemberName]?: ProcessMembers[Name];
+  readonly [Name in StoreClientName]?: StoreClients[Name];
 }): void {
-  for (const member of MEMBER_NAMES) {
+  for (const member of STORE_CLIENT_NAMES) {
     if (Object.hasOwn(supplied, member) && supplied[member] === undefined) {
       throw new MemberSuppliedUndefinedError(member);
     }
@@ -203,7 +206,7 @@ function eventingMember({
 }: {
   config: ProcessConfig;
   read: ReadMember;
-}): BuiltMember<ProcessMembers["eventing"]> {
+}): BuiltMember<StoreClients["eventing"]> {
   const eventing = config.eventing;
   if (!eventing) {
     throw new MemberNotConfiguredError("eventing", "name this role's event store and queue");
@@ -258,7 +261,7 @@ function eventReadSeatMember({
 
 /** What each member is built from, and what closing it means. */
 type MemberBuilders = {
-  readonly [Member in MemberName]: () => BuiltMember<ProcessMembers[Member]>;
+  readonly [Member in StoreClientName]: () => BuiltMember<StoreClients[Member]>;
 };
 
 type BuildProcessStoresOptions = {
@@ -267,7 +270,7 @@ type BuildProcessStoresOptions = {
    * Members this caller built itself. One passed is used as it stands and is
    * never closed here, because the caller that made it owns it.
    */
-  readonly members?: { readonly [Name in MemberName]?: ProcessMembers[Name] };
+  readonly members?: { readonly [Name in StoreClientName]?: StoreClients[Name] };
 };
 
 /** The opened members, plus the operator-read mint only the process root may hold (§7). */
@@ -281,20 +284,20 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   const supplied = options.members ?? {};
   refuseUndefinedMembers(supplied);
 
-  const built = new Map<MemberName, unknown>();
-  const opened: { member: MemberName; close: () => Promise<void> }[] = [];
+  const built = new Map<StoreClientName, unknown>();
+  const opened: { member: StoreClientName; close: () => Promise<void> }[] = [];
   const answering: { member: string; answer: () => Promise<void> }[] = [];
 
-  const read = <Name extends MemberName>(name: Name): ProcessMembers[Name] => {
+  const read = <Name extends StoreClientName>(name: Name): StoreClients[Name] => {
     const handed = supplied[name];
     if (handed !== undefined) return handed;
-    if (built.has(name)) return built.get(name) as ProcessMembers[Name];
+    if (built.has(name)) return built.get(name) as StoreClients[Name];
 
     const result = builders[name]();
     built.set(name, result.value);
     if (result.close) opened.push({ member: name, close: result.close });
     if (result.answer) answering.push({ member: name, answer: result.answer });
-    return result.value as ProcessMembers[Name];
+    return result.value as StoreClients[Name];
   };
 
   /**
@@ -359,7 +362,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   const source: ProcessMemberSource = {
     // Real clients: the one place the live tier is stated, so boot never assumes it.
     tier: "live",
-    order: MEMBER_NAMES,
+    order: STORE_CLIENT_NAMES,
     read,
     async answer(): Promise<void> {
       await Promise.all(

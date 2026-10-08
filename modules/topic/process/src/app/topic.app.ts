@@ -48,12 +48,7 @@ export interface TopicClusteringScheduleReader {
 
 const triggerLogger = createLogger("langwatch:topic:clustering-trigger");
 
-type TopicSetup = FeatureSetup<
-  typeof TopicModule.dependencies,
-  never,
-  undefined,
-  TopicRepositories
->;
+type TopicSetup = FeatureSetup<typeof TopicModule.dependencies, undefined, TopicRepositories>;
 
 export class TopicModule implements TopicApi, TopicBrowserApi {
   static readonly contract = TopicApiToken;
