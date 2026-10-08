@@ -25,7 +25,6 @@ import {
 } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -315,8 +314,8 @@ type BuildBetterAuthOptions = Readonly<{
     AuthRepositories,
     "betterAuthStorage" | "betterAuthSecondaryStorage" | "betterAuthHooks"
   >;
-  /** Whether this process has a Redis, which decides Better Auth's rate-limit storage. */
-  redis: RedisConnection | null;
+  /** Whether this tier keeps a shared store, which decides Better Auth's rate-limit storage. */
+  sharedStorage: boolean;
   /** The Auth application whose sessions this instance mints and revokes. */
   auth: AuthApi;
   /** The grants ledger an SSO domain auto-join writes its organization binding to. */
@@ -411,7 +410,7 @@ export async function buildBetterAuth(
     users: options.users,
     database: options.repositories.betterAuthHooks,
     secondaryStorage: options.repositories.betterAuthSecondaryStorage,
-    redis: options.redis,
+    sharedStorage: options.sharedStorage,
     storage: options.repositories.betterAuthStorage,
     deployment: {
       baseUrl: identity.baseUrl,

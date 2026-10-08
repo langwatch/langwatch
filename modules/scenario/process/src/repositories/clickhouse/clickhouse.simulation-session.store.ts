@@ -1,5 +1,5 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 type SimulationEventingClickHouseClient = {
   query(input: {
@@ -23,11 +23,11 @@ export type SimulationEventingClickHouseResolver = (
 /** One tenant's view of the routing ClickHouse member, as evaluation's session reads it. */
 export class ClickHouseSimulationSession implements SimulationEventingClickHouseClient {
   constructor(
-    private readonly clickhouse: ProcessMembers["clickhouse"],
+    private readonly clickhouse: ClickHouseQueryClient,
     private readonly tenantId: string,
   ) {}
 
-  static resolver(clickhouse: ProcessMembers["clickhouse"]): SimulationEventingClickHouseResolver {
+  static resolver(clickhouse: ClickHouseQueryClient): SimulationEventingClickHouseResolver {
     return (tenantId) => Promise.resolve(new ClickHouseSimulationSession(clickhouse, tenantId));
   }
 

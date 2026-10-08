@@ -115,7 +115,7 @@ export function betterAuthTransportFor(
       }),
     ),
     sendResetPassword: async () => undefined,
-    redis: null,
+    sharedStorage: false,
     secondaryStorage: MemoryBetterAuthSecondaryStorageRepository.create(),
     signUpVerification: {
       completeVerification: async () => {

@@ -2,24 +2,23 @@
   "record": "dev/docs/ARCHITECTURE.md §15, deleted spellings: each spelling's count in code (Alex, plan dev/docs/plans/architecture-teaching-2026-10-05.md step 2). Shrink-only: lower a count in the change that removes a use (node --experimental-transform-types packages/architecture-enforcer/src/tools/deleted-spellings.ts --lower).",
   "findings": {
     "`*-composition.build.ts` files": 1,
-    "`reads(...)` statics and `static readonly reads`": 22,
+    "`reads(...)` statics and `static readonly reads`": 21,
     "absence classes (`Logged*Absence`, `Absent*`)": 1,
     "declared(\"<name>\")": 1,
     "MEMBER_NAMES": 12,
     "MemberName": 16,
     "membersFrom": 4,
     "MemberSource": 21,
-    "MembersRead": 4,
+    "MembersRead": 2,
     "MissingSupply": 9,
     "noMembers": 4,
     "per-module `use-feature-flag.ts` copies": 1,
-    "ProcessMembers": 51,
+    "ProcessMembers": 35,
     "public-app-config.projection.ts": 1,
     "setup.members": 6,
     "storesBackedMembers": 8,
-    "withKeyvalue": 4,
-    "withMemoryRepositories": 11,
-    "withPersistence": 1,
-    "withRelational": 4
+    "withKeyvalue": 3,
+    "withMemoryRepositories": 8,
+    "withRelational": 3
   }
 }

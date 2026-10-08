@@ -75,7 +75,7 @@ function referenceFeature(): void {
   write("modules/widget/browser/src/widgets.ts");
   write(
     "apps/api/src/features/widget/widget.composition.ts",
-    "createApp().withModules([withMemoryRepositories(widgetServer)]).boot();\n",
+    "createApp().withModules([widgetServer]).withStores(memoryStores()).boot();\n",
   );
 }
 

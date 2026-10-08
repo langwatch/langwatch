@@ -22,6 +22,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
 import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
@@ -102,12 +103,8 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
+    channels: MemoryAuthChannels.create(),
     members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      // Better Auth's storage and hook repositories take the client and query
-      // nothing until a request reaches them; no test below reaches one.
-      prisma: {} as never,
-      redis: null as never,
       identityEmails: undefined as never,
       invites: null,
       processName: "langwatch-api",

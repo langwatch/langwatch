@@ -64,7 +64,6 @@ import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   internalSlackSignupsWebhook,
@@ -75,8 +74,8 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { AuthChannels } from "../channels/auth.channels.ts";
 import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
-import { cliDeviceSettlementChannels } from "../channels/cli-device-settlement-channels.registry.ts";
 import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
 import { IdTokenIssuerRefusalChannel } from "../channels/http/http.id-token-issuer-refusal.channel.ts";
 import { OAuthProfileEmailChannel } from "../channels/http/http.oauth-profile-email.channel.ts";
@@ -89,7 +88,6 @@ import {
 } from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRateLimitRepository } from "../repositories/auth-rate-limit.repository.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
-import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { mountedSocialMethodIds } from "../rules/mounted-social-methods.rules.ts";
 import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
@@ -167,29 +165,22 @@ type AuthInviteDirectory = {
 
 const logger = createLogger("langwatch:auth");
 
-/** The closed members this module reads, as a literal for the typing below. */
-const AUTH_CLOSED_READS = ["encryption", "prisma", "redis"] as const;
-
-/**
- * Process-supplied infrastructure. Declared members required at boot;
- * front-door features need identity, organization, and notification peers.
- */
-type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
-  Readonly<{
-    /** The address the identifier ledger holds for a person, where it holds
-     * one. `undefined` until the front-door wiring lane supplies identity's
-     * service — the session read then falls back to the stored user's own
-     * address, which is the documented chain, not a degraded one. */
-    identityEmails: IdentityEmailService | undefined;
-    /** The invitation reads, or nothing where this process composed none. */
-    invites: AuthInviteDirectory | null;
-    /** Names this process in every refusal below. */
-    processName: string;
-    /** Process time, injected so session expiry has deterministic tests. */
-    now?: (() => Instant) | undefined;
-    /** Where composition notices go, injected so a test can read the one absence line. */
-    logger?: Logger | undefined;
-  }>;
+/** What the process hands this module beside its repositories and channels. */
+type AuthInfrastructure = Readonly<{
+  /** The address the identifier ledger holds for a person, where it holds
+   * one. `undefined` until the front-door wiring lane supplies identity's
+   * service — the session read then falls back to the stored user's own
+   * address, which is the documented chain, not a degraded one. */
+  identityEmails: IdentityEmailService | undefined;
+  /** The invitation reads, or nothing where this process composed none. */
+  invites: AuthInviteDirectory | null;
+  /** Names this process in every refusal below. */
+  processName: string;
+  /** Process time, injected so session expiry has deterministic tests. */
+  now?: (() => Instant) | undefined;
+  /** Where composition notices go, injected so a test can read the one absence line. */
+  logger?: Logger | undefined;
+}>;
 
 /** The peers the app keeps past construction; identity decides where an address signs in. */
 type AuthAppPeers = Readonly<{
@@ -202,7 +193,8 @@ type AuthSetup = FeatureSetup<
   typeof AuthModule.dependencies,
   AuthInfrastructure,
   AuthServerConfig,
-  AuthRepositories
+  AuthRepositories,
+  AuthChannels
 >;
 
 export class AuthModule implements AuthApiContract {
@@ -235,7 +227,6 @@ export class AuthModule implements AuthApiContract {
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
-  static readonly reads = AUTH_CLOSED_READS;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: sessionSecret,
@@ -432,7 +423,7 @@ export class AuthModule implements AuthApiContract {
   }
 
   static async create(setup: AuthSetup): Promise<AuthModule> {
-    const { members, repositories, dependencies, config } = setup;
+    const { members, repositories, channels, dependencies, config } = setup;
     /** Every mail auth sends goes out through notification, which owns the gateway. */
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = members.now ?? nowInstant;
@@ -440,9 +431,7 @@ export class AuthModule implements AuthApiContract {
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
-      cache: members.redis
-        ? RedisAuthSessionCacheRepository.create({ redis: members.redis })
-        : null,
+      cache: repositories.sessionCache,
       identityEmails: members.identityEmails,
       users: dependencies.users,
       sessionBound: SessionBoundService.create({
@@ -455,9 +444,7 @@ export class AuthModule implements AuthApiContract {
 
     const cliSessions = CliDeviceSessionService.create({
       store: repositories.cliSessions,
-      settlements: members.redis
-        ? cliDeviceSettlementChannels.live.create(members.redis)
-        : cliDeviceSettlementChannels.memory.create(),
+      settlements: channels.cliSettlements,
     });
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
@@ -648,7 +635,7 @@ export class AuthModule implements AuthApiContract {
             signUpProofs: app.#signUp,
             passkeySignUpEligibility: app.#signUpEnrollment,
             repositories,
-            redis: members.redis,
+            sharedStorage: repositories.sessionCache !== null,
             auth: app,
             grants: dependencies.authz,
             organizations: dependencies.organizations,

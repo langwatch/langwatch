@@ -41,7 +41,7 @@ const prisma = PrismaConnectionService.create({
 async function liveTier(redis: RedisConnection | null) {
   const members = { prisma, redis, rateLimiter: {}, encryption: IDENTITY_ENCRYPTION };
   const repositories = instantiateRepositories(authRepositories, { tier: "live", members });
-  return composedAuth({ repositories, members });
+  return composedAuth({ repositories });
 }
 
 describe.skipIf(!DB_URL)("Better Auth's storage on the live tier", () => {
