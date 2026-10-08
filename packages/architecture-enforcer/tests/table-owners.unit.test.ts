@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { tableOwnerMap } from "../src/tools/table-owners.ts";
+import type { FeatureCatalogueEntry } from "../src/types.ts";
 
 /**
  * @see specs/upgrade/release-manifests.feature
