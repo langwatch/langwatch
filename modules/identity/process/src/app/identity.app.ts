@@ -58,6 +58,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
+import type { IdentityChannels } from "../channels/identity.channels.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
@@ -200,7 +201,7 @@ import type { JoinRequestDoorApi } from "../transport/join-request.trpc.ts";
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, IdentityServerConfig> &
-  Readonly<{ repositories: IdentityRepositories }>;
+  Readonly<{ repositories: IdentityRepositories; channels: IdentityChannels }>;
 
 type IdentityAppParts = {
   emails: IdentityEmailService;
@@ -292,8 +293,8 @@ function testArrivalMemberships(organizations: OrganizationApi): SsoTestArrivalM
 
 /** Which providers signed this person in, from the module that owns every
  *  `Account` row (ADR-129) — identity reads none of them itself. */
-function testArrivalAccounts(auth: AuthApi): SsoTestArrivalAccounts {
-  return { findAccountProvidersForUser: (args) => auth.findFederatedAccountProviders(args) };
+function testArrivalAccounts(reads: IdentityChannels["authReads"]): SsoTestArrivalAccounts {
+  return { findAccountProvidersForUser: (args) => reads.findFederatedAccountProviders(args) };
 }
 
 /** The organization's own member rows, as the migration read asks for them:
@@ -335,9 +336,15 @@ function breakGlassEligibility(
 
 /** Auth owns every `Account` row an identity provider minted, so what still
  *  lets somebody in through a retiring connection is its answer (ADR-129). */
-function legacySsoAccess(auth: AuthApi): SsoLegacyAccessRetirement {
+function legacySsoAccess({
+  reads,
+  auth,
+}: {
+  reads: IdentityChannels["authReads"];
+  auth: Pick<AuthApi, "retireLegacySsoAccess">;
+}): SsoLegacyAccessRetirement {
   return {
-    count: (args) => auth.countLegacySsoAccess(args),
+    count: (args) => reads.countLegacySsoAccess(args),
     retire: (args) => auth.retireLegacySsoAccess(args),
   };
 }
@@ -435,8 +442,8 @@ export class IdentityModule
   static readonly dependencies = {
     organizations: OrganizationApi,
     permissions: AuthzApi,
-    /** Who holds the federated account rows a cutover retires: identity
-     *  decides, auth owns and sweeps them. */
+    /** The commands left until auth's doors take them (round 48, A1-d): linking a provider
+     *  account, the two-step reset, the lookup's revokes and a cutover's sweep. */
     auth: AuthApi,
     /** Whether somebody holds a password is the module that owns it. */
     users: UserApi,
@@ -531,12 +538,12 @@ export class IdentityModule
       requests: setup.repositories.joinRequests,
     });
     const signInMethodPolicy = SignInMethodPolicyService.create({
-      resolveAuthProvider: () => setup.dependencies.auth.resolveAuthProvider(),
+      resolveAuthProvider: () => setup.channels.authReads.resolveAuthProvider(),
       federationLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
-      offersPasskeys: () => setup.dependencies.auth.offersPasskeys(),
-      issuesOwnPasswords: () => setup.dependencies.auth.issuesOwnPasswords(),
+      offersPasskeys: () => setup.config.passkeysEnabled,
+      issuesOwnPasswords: () => setup.config.localPasswords,
       selfHosted: () => !setup.config.isSaas,
-      mountedSocialMethodIds: () => setup.dependencies.auth.findMountedSocialMethodIds(),
+      mountedSocialMethodIds: () => setup.channels.authReads.findMountedSocialMethodIds(),
     });
     const passwordDoor = passwordDoorMounted(signInMethodPolicy);
     const holderCanWalkIn = breakGlassEligibility(
@@ -590,7 +597,7 @@ export class IdentityModule
         })
       : null;
     // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
-    const dialableIdpOrigins = () => setup.dependencies.auth.findDialableIdentityProviderOrigins();
+    const dialableIdpOrigins = () => setup.channels.authReads.findDialableIdentityProviderOrigins();
     // The same fence the published-proof reads go through: an issuer is a
     // string an administrator typed.
     const issuerDiscovery = ssoIssuerDiscoveryChannels.live.create({
@@ -679,7 +686,7 @@ export class IdentityModule
       signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
-      accounts: testArrivalAccounts(setup.dependencies.auth),
+      accounts: testArrivalAccounts(setup.channels.authReads),
       connections: setup.repositories.ssoConnections,
       memberships: testArrivalMemberships(setup.dependencies.organizations),
     });
@@ -694,7 +701,10 @@ export class IdentityModule
       trail: ssoActivity,
     });
     const memberships = migrationMemberships(setup.dependencies.organizations);
-    const legacyAccess = legacySsoAccess(setup.dependencies.auth);
+    const legacyAccess = legacySsoAccess({
+      reads: setup.channels.authReads,
+      auth: setup.dependencies.auth,
+    });
     // `directory` is unanswered here: whether provisioning has been repointed
     // is the directory module's to say, and an installation without one
     // provisions nobody — which is what `not-applicable` means.
@@ -749,8 +759,7 @@ export class IdentityModule
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
         ),
     });
-    const auth = setup.dependencies.auth;
-    const resolveAuthProvider = () => auth.resolveAuthProvider();
+    const resolveAuthProvider = () => setup.channels.authReads.resolveAuthProvider();
     const mountedMethods = () =>
       SignInMethodPolicyService.findFederatedMethods(resolveAuthProvider);
     // Main's router (identity/runtime.ts): projected connections first, the legacy columns
@@ -819,7 +828,7 @@ export class IdentityModule
           baseUrl: setup.config.publicBaseUrl ?? "",
         }),
         rateLimiter: setup.repositories.rateLimits,
-        sessions: setup.dependencies.auth,
+        sessions: setup.channels.authReads,
         accountAddress: async ({ userId }) => {
           const user = await setup.dependencies.users.findById({ id: userId });
           return user?.email ? { email: user.email, confirmed: user.emailVerified } : null;
@@ -883,12 +892,17 @@ export class IdentityModule
       }),
       twoStepAccounts: TwoStepAccountService.create({
         accounts: setup.repositories.twoStepVerification,
-        deployment: setup.dependencies.auth,
+        deployment: { offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen },
         protocol: setup.dependencies.auth,
       }),
       organizationMfa: OrganizationMfaService.create({
         accounts: setup.repositories.twoStepVerification,
-        auth: setup.dependencies.auth,
+        auth: {
+          findSessionAmr: (args) => setup.channels.authReads.findSessionAmr(args),
+          findAssertedAmrForIdentifiers: (args) =>
+            setup.channels.authReads.findAssertedAmrForIdentifiers(args),
+          offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen,
+        },
         notifier: OrganizationMfaNotifierService.create({
           accounts: setup.repositories.twoStepVerification,
           mail: organizationMfaRequirementMailChannels.ses.create({ mailer }),

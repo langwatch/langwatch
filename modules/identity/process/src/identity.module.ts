@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { IdentityModule } from "./app/identity.app.ts";
+import { identityChannels } from "./channels/identity-channels.registry.ts";
 import { identityEventing } from "./eventing/identity.pipeline.ts";
 import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { joinRequestEventing } from "./features/join-request/eventing/join-request.pipeline.ts";
@@ -23,6 +24,7 @@ export const identityProcessModule: PublishedProcessModule<
   IdentityServerConfig
 > = defineProcessModule("identity")
   .withRepositories(identityRepositories)
+  .withChannels(identityChannels)
   .withApi(IdentityModule)
   .withTransports(
     identityLookupTrpcTransport,

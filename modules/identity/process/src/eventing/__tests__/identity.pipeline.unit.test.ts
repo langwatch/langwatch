@@ -70,7 +70,14 @@ async function installed() {
     .withModules([identityProcessModule])
     .withStores(memoryStores())
     .withConfig({
-      identity: { ssoDomainProofDnsServers: [], isSaas: false, publicBaseUrl: undefined },
+      identity: {
+        ssoDomainProofDnsServers: [],
+        isSaas: false,
+        publicBaseUrl: undefined,
+        passkeysEnabled: false,
+        mfaEnrollmentOpen: false,
+        localPasswords: false,
+      },
     })
     .withEventing(eventSourcing)
     .provide({
