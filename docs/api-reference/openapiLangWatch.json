@@ -11968,6 +11968,9 @@
                   },
                   "timeZone": {
                     "type": "string"
+                  },
+                  "shouldSkipPreviousPeriod": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -14590,6 +14593,9 @@
                   },
                   "timeZone": {
                     "type": "string"
+                  },
+                  "shouldSkipPreviousPeriod": {
+                    "type": "boolean"
                   }
                 },
                 "required": [

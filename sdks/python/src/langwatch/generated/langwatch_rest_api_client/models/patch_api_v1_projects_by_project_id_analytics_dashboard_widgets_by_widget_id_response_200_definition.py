@@ -11,6 +11,18 @@ if TYPE_CHECKING:
     from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item import (
         PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem,
     )
+    from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
+        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
+    )
+    from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_1 import (
+        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1,
+    )
+    from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_2 import (
+        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2,
+    )
+    from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_3 import (
+        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3,
+    )
 
 
 T = TypeVar("T", bound="PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200Definition")
@@ -26,6 +38,10 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
             (list[PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem]):
         description (str | Unset):
         prompt (str | Unset):
+        source (PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0 |
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1 |
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2 |
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3 | Unset):
     """
 
     version: float
@@ -33,8 +49,25 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
     queries: list[PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem]
     description: str | Unset = UNSET
     prompt: str | Unset = UNSET
+    source: (
+        PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0
+        | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1
+        | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2
+        | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3
+        | Unset
+    ) = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_1 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_2 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2,
+        )
+
         version = self.version
 
         code = self.code
@@ -47,6 +80,27 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
         description = self.description
 
         prompt = self.prompt
+
+        source: dict[str, Any] | Unset
+        if isinstance(self.source, Unset):
+            source = UNSET
+        elif isinstance(
+            self.source,
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
+        ):
+            source = self.source.to_dict()
+        elif isinstance(
+            self.source,
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1,
+        ):
+            source = self.source.to_dict()
+        elif isinstance(
+            self.source,
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2,
+        ):
+            source = self.source.to_dict()
+        else:
+            source = self.source.to_dict()
 
         field_dict: dict[str, Any] = {}
 
@@ -61,6 +115,8 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
             field_dict["description"] = description
         if prompt is not UNSET:
             field_dict["prompt"] = prompt
+        if source is not UNSET:
+            field_dict["source"] = source
 
         return field_dict
 
@@ -68,6 +124,18 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_queries_item import (
             PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionQueriesItem,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_0 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_1 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_2 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2,
+        )
+        from ..models.patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition_source_type_3 import (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3,
         )
 
         d = dict(src_dict)
@@ -88,12 +156,64 @@ class PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse20
 
         prompt = d.pop("prompt", UNSET)
 
+        def _parse_source(
+            data: object,
+        ) -> (
+            PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0
+            | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1
+            | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2
+            | PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                source_type_0 = PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType0.from_dict(
+                    data
+                )
+
+                return source_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                source_type_1 = PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType1.from_dict(
+                    data
+                )
+
+                return source_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                source_type_2 = PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType2.from_dict(
+                    data
+                )
+
+                return source_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            source_type_3 = PatchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse200DefinitionSourceType3.from_dict(
+                data
+            )
+
+            return source_type_3
+
+        source = _parse_source(d.pop("source", UNSET))
+
         patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition = cls(
             version=version,
             code=code,
             queries=queries,
             description=description,
             prompt=prompt,
+            source=source,
         )
 
         return patch_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_200_definition
