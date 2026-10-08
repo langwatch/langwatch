@@ -54,6 +54,7 @@ import {
 import { ContactSalesBlock } from "./ContactSalesBlock";
 import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { InvoicesBlock } from "./InvoicesBlock";
+import { SeatLimitCallout } from "./SeatLimitCallout";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -113,6 +114,12 @@ export function SubscriptionPage() {
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
+  // Seat limit state as enforcement counts it (custom roles, open invites)
+  const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );
@@ -177,11 +184,13 @@ export function SubscriptionPage() {
     ? parsedPlan.currency
     : currency;
 
-  // Classify and map pending invites to include in billing calculation
+  // Classify and map open invites to include in billing calculation. An
+  // expired invite holds no seat: enforcement does not count it, so neither
+  // does the seat count nor the checkout.
   const pendingInvitesWithMemberType = useMemo(() => {
     if (!pendingInvites.data) return [];
     return pendingInvites.data
-      .filter((inv) => inv.status === "PENDING")
+      .filter((inv) => inv.displayStatus === "PENDING")
       .map((inv) => ({
         id: inv.id,
         email: inv.email,
@@ -194,8 +203,19 @@ export function SubscriptionPage() {
 
   const existingCoreMembers = countFullMembers(users);
   const plannedCoreSeatCount = countFullMembers(allPlannedUsers);
-  const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
+  // Members and open invites as enforcement counts them (custom roles
+  // included) when the server has answered, plus rows planned in the drawer.
+  const serverMembersCount = usage.data?.membersCount;
+  const seatUsageN =
+    serverMembersCount !== undefined
+      ? serverMembersCount + countFullMembers(plannedUsers)
+      : existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
+
+  // Above the plan's seats, the organization is offered the upgrade (or more
+  // seats) up front instead of waiting for an invite to be refused.
+  const seatLimitInfo = usage.data?.seatLimitInfo;
+  const isOverPlanSeats = seatLimitInfo?.status === "exceeded";
 
   const {
     seatPricePerPeriodCents,
@@ -221,6 +241,7 @@ export function SubscriptionPage() {
     isDeveloperPlan || isLicenseOverride
       ? Math.max(
           totalFullMembers,
+          seatUsageN,
           (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount,
         )
       : Math.max(
@@ -233,7 +254,7 @@ export function SubscriptionPage() {
   // For tiered legacy plans upgrading to seat-based, use actual member count
   // (not the old plan's maxMembers capacity which is irrelevant for the new model)
   const upgradeBillingSeats = isTieredLegacyPaidPlan
-    ? Math.max(1, totalFullMembers)
+    ? Math.max(1, totalFullMembers, seatUsageN)
     : billingSeats;
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
@@ -274,6 +295,7 @@ export function SubscriptionPage() {
               type: "success",
             });
             void pendingInvites.refetch();
+            void usage.refetch();
             void organizationWithMembers.refetch();
           },
           onError: (error) =>
@@ -317,6 +339,7 @@ export function SubscriptionPage() {
       setDeletedSeatCount(0);
       void activePlan.refetch();
       void pendingInvites.refetch();
+      void usage.refetch();
     },
     organizationWithMembers,
     activePlanType: plan?.type,
@@ -396,7 +419,35 @@ export function SubscriptionPage() {
     ? isUpgradePlanRequiredForFreePlan
     : isUpgradePlanRequired;
 
-  const updateRequired = isUpgradeSeatsRequired || freePlanUpgradeRequired;
+  const updateRequired =
+    isUpgradeSeatsRequired ||
+    freePlanUpgradeRequired ||
+    (isOverPlanSeats && !isEnterprisePlan);
+
+  const seatLimitAction = isUpgradePlanRequired ? (
+    "Upgrade to the Growth plan below to keep everyone."
+  ) : isEnterprisePlan ? (
+    <>
+      <Link href={CONTACT_SALES_URL} textDecoration="underline">
+        Contact sales
+      </Link>{" "}
+      to add seats.
+    </>
+  ) : (
+    <>
+      <Button
+        variant="plain"
+        size="sm"
+        height="auto"
+        padding={0}
+        textDecoration="underline"
+        onClick={() => setIsDrawerOpen(true)}
+      >
+        Add seats
+      </Button>{" "}
+      to keep everyone.
+    </>
+  );
 
   return (
     <SettingsLayout>
@@ -522,6 +573,13 @@ export function SubscriptionPage() {
               : undefined
           }
         />
+
+        {isOverPlanSeats && seatLimitInfo && (
+          <SeatLimitCallout
+            message={seatLimitInfo.message}
+            action={seatLimitAction}
+          />
+        )}
 
         {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}
         <InvoicesBlock

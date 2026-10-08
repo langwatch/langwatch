@@ -6,6 +6,7 @@ import type { Scenario } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
+import { enforceCreationLimit } from "~/server/license-enforcement";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import {
@@ -474,6 +475,12 @@ function registerCreateScenarioRoute(
       const body = c.req.valid("json");
 
       logger.info({ projectId: project.id }, "Creating scenario");
+
+      await enforceCreationLimit({
+        prisma,
+        projectId: project.id,
+        limitType: "scenarios",
+      });
 
       const service = getService();
       const scenario = await service.create(

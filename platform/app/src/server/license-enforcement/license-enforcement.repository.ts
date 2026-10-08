@@ -50,6 +50,8 @@ export interface ILicenseEnforcementRepository {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
   getMembersDeveloperCount(organizationId: string): Promise<number>;
+  getActiveScenarioCount(organizationId: string): Promise<number>;
+  getEvaluatorCount(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
@@ -98,6 +100,30 @@ export class LicenseEnforcementRepository
   async getMembersDeveloperCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
     return this.countMembersByType(context, isDeveloper);
+  }
+
+  /**
+   * Counts active (non-archived) scenarios across the organization's projects.
+   * Archived scenarios do not count against the plan's scenario cap.
+   */
+  async getActiveScenarioCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+    return this.prisma.scenario.count({
+      where: { projectId: { in: projectIds }, archivedAt: null },
+    });
+  }
+
+  /**
+   * Counts active (non-archived) custom evaluators across the organization's
+   * projects. Archived evaluators do not count against the plan's cap.
+   */
+  async getEvaluatorCount(organizationId: string): Promise<number> {
+    const projectIds = await this.getProjectIds(organizationId);
+    if (projectIds.length === 0) return 0;
+    return this.prisma.evaluator.count({
+      where: { projectId: { in: projectIds }, archivedAt: null },
+    });
   }
 
   /**
