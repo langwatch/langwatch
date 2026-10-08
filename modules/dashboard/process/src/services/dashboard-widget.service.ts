@@ -3,7 +3,10 @@ import {
   type AnalyticsApi,
   type DashboardWidget,
 } from "@langwatch/analytics-contract";
-import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
+  DASHBOARD_WIDGET_DEFINITION_VERSION,
+  dashboardWidgetDefinitionSchema,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { DASHBOARD_WIDGET_KSUID_RESOURCE } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
@@ -16,6 +19,9 @@ import type {
   AssignDashboardWidgetInput,
   DashboardWidgetLayoutsInput,
 } from "#repositories/dashboard-widget.repository";
+
+/** An update's code and queries, each optional; the repository merges them into the stored half. */
+const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
 
 /** Every widget operation first asks analytics whether the project may use the playground. */
 export class DashboardWidgetService {
@@ -47,16 +53,21 @@ export class DashboardWidgetService {
 
   async createWidget(input: Omit<CreateDashboardWidgetInput, "id">): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
-    return this.#present(
-      await this.#repository.createWidget({
-        ...input,
-        id: generate(DASHBOARD_WIDGET_KSUID_RESOURCE).toString(),
+    const id = generate(DASHBOARD_WIDGET_KSUID_RESOURCE).toString();
+    this.#assertWritable(
+      id,
+      dashboardWidgetDefinitionSchema.safeParse({
+        ...input.input,
+        version: DASHBOARD_WIDGET_DEFINITION_VERSION,
       }),
     );
+    return this.#present(await this.#repository.createWidget({ ...input, id }));
   }
 
+  /** The repository merges the halves given into the stored half, which it parses first. */
   async updateWidget(input: UpdateDashboardWidgetInput): Promise<DashboardWidget> {
     await this.#assertEnabled(input);
+    this.#assertWritable(input.id, definitionUpdateSchema.safeParse(input.input));
     return this.#present(await this.#repository.updateWidget(input));
   }
 
@@ -77,6 +88,16 @@ export class DashboardWidgetService {
 
   #assertEnabled({ projectId }: { projectId: string }): Promise<void> {
     return this.#analytics.assertCustomChartPlaygroundEnabled({ projectId });
+  }
+
+  /** Refuses before the write what `#present` would refuse after it, so no bad row is stored. */
+  #assertWritable(
+    widgetId: string,
+    parsed: { success: true } | { success: false; error: Error },
+  ): void {
+    if (!parsed.success) {
+      throw new DashboardWidgetDefinitionInvalidError(widgetId, { reasons: [parsed.error] });
+    }
   }
 
   #present(row: DashboardWidgetRow): DashboardWidget {
