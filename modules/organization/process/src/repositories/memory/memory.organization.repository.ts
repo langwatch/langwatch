@@ -17,7 +17,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
@@ -345,12 +345,33 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organizationId: string;
     licenseKey: string;
     expiresAt: Instant;
+    validatedAt: Instant | null;
   }): Promise<void> {
     const organization = this.memory.organizations.get(input.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
     organization.license = input.licenseKey;
     organization.licenseExpiresAt = input.expiresAt;
+    organization.licenseLastValidatedAt = input.validatedAt;
+  }
+
+  async clearLicense(input: { organizationId: string }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.license = null;
+    organization.licenseExpiresAt = null;
     organization.licenseLastValidatedAt = null;
+  }
+
+  async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
+    const [first] = this.memory.organizationUsers
+      .filter(
+        (member) =>
+          member.organizationId === organizationId &&
+          member.role === "ADMIN" &&
+          member.disabledAt === null,
+      )
+      .toSorted((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt));
+    return (first && this.memory.users.get(first.userId)?.email) ?? null;
   }
 
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {

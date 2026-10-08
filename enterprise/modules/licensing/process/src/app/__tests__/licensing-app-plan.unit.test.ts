@@ -23,8 +23,6 @@ function recordingLicenses(rows: MemoryOrganizationLicenseRepository): {
       },
       findOrganizationsWithLicense: () => rows.findOrganizationsWithLicense(),
       organizationExists: (organizationId) => rows.organizationExists(organizationId),
-      storeLicense: (organizationId, license) => rows.storeLicense(organizationId, license),
-      removeLicense: (organizationId) => rows.removeLicense(organizationId),
     },
   };
 }

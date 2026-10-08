@@ -403,8 +403,20 @@ export class OrganizationService extends OrganizationServiceContract {
     organizationId: string;
     licenseKey: string;
     expiresAt: Instant;
+    validatedAt: Instant | null;
   }): Promise<void> {
     return this.repository.setLicense(input);
+  }
+
+  clearLicense(input: { organizationId: string }): Promise<void> {
+    return this.repository.clearLicense(input);
+  }
+
+  /** As `/me` read it: the configured contact, else the longest-seated enabled administrator. */
+  async findSupportContact(input: { organizationId: string }): Promise<string | null> {
+    const settings = await this.getSettings(input);
+    if (settings.supportContact) return settings.supportContact;
+    return this.repository.findFirstAdministratorEmail(input.organizationId);
   }
 
   getBillingProfile(

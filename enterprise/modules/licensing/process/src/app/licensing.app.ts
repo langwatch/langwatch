@@ -269,6 +269,7 @@ export class LicensingModule implements LicensingApiContract {
     // own membership classification (a peer, not owned here).
     const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
+      organizations: dependencies.organizations,
       ...seatCountsOver(dependencies.organizations),
     });
     const registryParts = licenseRegistryParts({

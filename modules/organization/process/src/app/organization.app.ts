@@ -1213,8 +1213,17 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationId: string;
     licenseKey: string;
     expiresAt: Instant;
+    validatedAt: Instant | null;
   }): Promise<void> {
     return this.#dependencies.organizations.setLicense(input);
+  }
+
+  clearLicense(input: { organizationId: string }): Promise<void> {
+    return this.#dependencies.organizations.clearLicense(input);
+  }
+
+  findSupportContact(input: { organizationId: string }): Promise<string | null> {
+    return this.#dependencies.organizations.findSupportContact(input);
   }
 
   /** The billing-facing profile, which is also where the display name lives. */

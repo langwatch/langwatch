@@ -75,6 +75,7 @@ export class LicenseMintService {
         organizationId: organization.id,
         licenseKey,
         expiresAt: Temporal.Instant.from(licenseData.expiresAt),
+        validatedAt: null,
       });
     } catch (error) {
       // A registry row the organization never got would read as an active license, and the

@@ -223,3 +223,35 @@ Feature: Shared organization service
     When the organization's dataset limits are read
     Then the per-file limit answers 104857600 bytes
     And an organization with nothing stored, or an unknown one, answers no limit
+
+  @integration
+  Scenario: A licence is stored with the moment it was validated and cleared with both its dates
+    Given an organization in Postgres
+    When a licence is set with its expiry and the moment it was validated
+    Then the organization carries the licence, its expiry and that validated stamp
+    And a licence set with no validated stamp stores none
+    And clearing the licence empties the licence, its expiry and its validated stamp
+    And setting or clearing a licence on an unknown organization refuses with organization not found
+
+  @unit
+  Scenario: The memory organization store sets and clears a licence the same way
+    Given a memory organization
+    When a licence is set with its expiry and the moment it was validated
+    Then the organization carries the licence, its expiry and that validated stamp
+    And clearing the licence empties the licence, its expiry and its validated stamp
+    And setting or clearing a licence on an unknown organization refuses with organization not found
+
+  @unit
+  Scenario: An organization's support contact is the one set in its settings, else its longest-seated enabled administrator
+    Given an organization whose settings name a support contact
+    When its support contact is found
+    Then the configured contact answers
+    And without one, the email of the earliest-seated administrator who is not disabled answers
+    And with no enabled administrator, no contact answers
+
+  @integration
+  Scenario: The longest-seated enabled administrator is read from Postgres
+    Given an organization whose earliest administrator is disabled, followed by two enabled administrators
+    When its first administrator's email is read
+    Then the earlier-seated of the two enabled administrators answers
+    And an organization with no enabled administrator answers none

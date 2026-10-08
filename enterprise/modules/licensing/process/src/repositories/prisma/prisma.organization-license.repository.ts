@@ -1,11 +1,9 @@
 import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { toDate } from "@langwatch/time";
 
 import type {
   OrganizationLicenseCandidate,
   OrganizationLicenseRepository,
-  StoredLicense,
 } from "../organization-license.repository.ts";
 
 /**
@@ -14,7 +12,7 @@ import type {
  */
 type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
 
-/** The activated licence key, read off and written onto the organization row it is stored on. */
+/** The activated licence key, read off the organization row it is stored on. */
 export class PrismaOrganizationLicenseRepository implements OrganizationLicenseRepository {
   static create(database: OrganizationLicenseDatabase): PrismaOrganizationLicenseRepository {
     return new PrismaOrganizationLicenseRepository(database);
@@ -51,23 +49,5 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
       select: { id: true },
     });
     return organization !== null;
-  }
-
-  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: {
-        license: license.licenseKey,
-        licenseExpiresAt: toDate(license.expiresAt),
-        licenseLastValidatedAt: toDate(license.validatedAt),
-      },
-    });
-  }
-
-  async removeLicense(organizationId: string): Promise<void> {
-    await this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-    });
   }
 }

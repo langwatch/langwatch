@@ -33,9 +33,7 @@ export interface OrganizationLicenseCandidates {
 export interface OrganizationLicenseReads
   extends OrganizationLicense, OrganizationLicenseCandidates {}
 
-/** The licence rows read and written, without the seat counts a peer answers. */
+/** The licence rows read; organization writes them, through `setLicense` and `clearLicense`. */
 export interface OrganizationLicenseRepository extends OrganizationLicenseReads {
   organizationExists(organizationId: string): Promise<boolean>;
-  storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
-  removeLicense(organizationId: string): Promise<void>;
 }

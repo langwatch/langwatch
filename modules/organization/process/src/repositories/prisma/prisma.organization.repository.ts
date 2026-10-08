@@ -444,16 +444,34 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     organizationId: string;
     licenseKey: string;
     expiresAt: Instant;
+    validatedAt: Instant | null;
   }): Promise<void> {
     const { count } = await this.database.organization.updateMany({
       where: { id: input.organizationId },
       data: {
         license: input.licenseKey,
         licenseExpiresAt: toDate(input.expiresAt),
-        licenseLastValidatedAt: null,
+        licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
       },
     });
     if (count === 0) throw new OrganizationNotFoundError();
+  }
+
+  async clearLicense(input: { organizationId: string }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
+  async findFirstAdministratorEmail(organizationId: string): Promise<string | null> {
+    const administrator = await this.database.organizationUser.findFirst({
+      where: { organizationId, role: "ADMIN", disabledAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { user: { select: { email: true } } },
+    });
+    return administrator?.user.email ?? null;
   }
 
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {

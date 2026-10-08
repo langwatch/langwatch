@@ -567,10 +567,19 @@ export interface OrganizationApi {
   updateSentPlanLimitAlert(
     input: Readonly<{ organizationId: string; sentAt: Instant }>,
   ): Promise<void>;
-  /** Main's mint script write: the licence and its expiry, the validated stamp cleared. */
+  /** The licence and its expiry; the mint stamps `validatedAt` null, an activation now. */
   setLicense(
-    input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant }>,
+    input: Readonly<{
+      organizationId: string;
+      licenseKey: string;
+      expiresAt: Instant;
+      validatedAt: Instant | null;
+    }>,
   ): Promise<void>;
+  /** The licence and both its dates cleared; throws `OrganizationNotFoundError`. */
+  clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
+  /** The support contact set in settings, else the longest-seated enabled administrator's email. */
+  findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
   claimBillingCustomerId(
     input: Readonly<{ organizationId: string; billingCustomerId: string }>,
   ): Promise<boolean>;

@@ -19,7 +19,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 
-import type { OrganizationLicenseRepository } from "../repositories/organization-license.repository.ts";
+import type {
+  OrganizationLicenseRepository,
+  StoredLicense,
+} from "../repositories/organization-license.repository.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
@@ -443,6 +446,8 @@ export interface LicenseUsage {
  * plan-resolution-only process can compose those alone, without seats.
  */
 export interface LicenseStorage extends OrganizationLicenseRepository {
+  storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
+  removeLicense(organizationId: string): Promise<void>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
 }

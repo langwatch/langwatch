@@ -1,3 +1,6 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { createTestLicensingApp, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
@@ -61,9 +64,39 @@ describe("licensing infrastructure composed without licence mutation", () => {
   });
 
   it("leaves an organization that carries no key out of the scan", async () => {
-    const { candidates } = licenceRows();
-    await candidates.removeLicense(LICENSED_ORGANIZATION_ID);
+    const candidates = MemoryOrganizationLicenseRepository.create(
+      new Map([[LICENSED_ORGANIZATION_ID, null]]),
+    );
 
     await expect(candidates.findOrganizationsWithLicense()).resolves.toEqual([]);
+  });
+});
+
+describe("licensing infrastructure composed with licence storage", () => {
+  it("writes an activation and a removal through organization, the stamp as given", async () => {
+    const writes: unknown[] = [];
+    const { repository } = LicensingInfrastructureService.create({ role: "api" }).withStorage({
+      licenses: MemoryOrganizationLicenseRepository.create(new Map([["org_acme", null]])),
+      organizations: createApiFixture<OrganizationApi>({
+        setLicense: async (input) => {
+          writes.push({ set: input });
+        },
+        clearLicense: async (input) => {
+          writes.push({ clear: input });
+        },
+      }),
+      getMemberCount: async () => 0,
+      getMembersLiteCount: async () => 0,
+    });
+    const expiresAt = Temporal.Instant.from("2027-01-01T00:00:00Z");
+    const validatedAt = Temporal.Instant.from("2026-10-08T12:00:00Z");
+
+    await repository.storeLicense("org_acme", { licenseKey: "key", expiresAt, validatedAt });
+    await repository.removeLicense("org_acme");
+
+    expect(writes).toEqual([
+      { set: { organizationId: "org_acme", licenseKey: "key", expiresAt, validatedAt } },
+      { clear: { organizationId: "org_acme" } },
+    ]);
   });
 });

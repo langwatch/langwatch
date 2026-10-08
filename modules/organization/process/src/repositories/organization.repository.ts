@@ -159,7 +159,12 @@ export abstract class OrganizationRepository {
     organizationId: string;
     licenseKey: string;
     expiresAt: Instant;
+    validatedAt: Instant | null;
   }): Promise<void>;
+  /** Clears the licence and both its dates; throws OrganizationNotFoundError. */
+  abstract clearLicense(input: { organizationId: string }): Promise<void>;
+  /** The longest-seated enabled administrator's email, or null when none is. */
+  abstract findFirstAdministratorEmail(organizationId: string): Promise<string | null>;
   abstract claimBillingCustomerId(input: {
     organizationId: string;
     billingCustomerId: string;

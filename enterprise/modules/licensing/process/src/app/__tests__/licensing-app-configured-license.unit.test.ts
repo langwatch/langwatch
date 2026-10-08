@@ -3,6 +3,7 @@
  * specs/licensing/sso-license-gating.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ import { createTestLicensingApp, ENTERPRISE_LICENSE_KEY } from "../../__tests__/
 import { ScriptedConnectHost } from "../../channels/__tests__/support/scripted-connect-fetch.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
-import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
+import type { OrganizationLicenseRepository } from "../../repositories/organization-license.repository.ts";
 
 const CODE = "LW-A1B2-C3D4-E5F6-G7H8";
 
@@ -42,9 +43,31 @@ function activations(host: ScriptedConnectHost) {
     }));
 }
 
+/** One organization row: organization writes its licence, licensing reads it back. */
+function organizationRow() {
+  const rows = new Map<string, string | null>([["org-old", null]]);
+  const licenses: OrganizationLicenseRepository = {
+    getOrganizationLicense: async (organizationId) => ({
+      licenseKey: rows.get(organizationId) ?? null,
+    }),
+    findOrganizationsWithLicense: async () =>
+      [...rows].flatMap(([organizationId, licenseKey]) =>
+        licenseKey === null ? [] : [{ organizationId, licenseKey }],
+      ),
+    organizationExists: async (organizationId) => rows.has(organizationId),
+  };
+  const organizations = createApiFixture<OrganizationApi>({
+    countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
+    setLicense: async ({ organizationId, licenseKey }) => {
+      rows.set(organizationId, licenseKey);
+    },
+  });
+  return { licenses, organizations };
+}
+
 async function bootWithConfiguredValue(value: string) {
   const host = connectHost();
-  const licenses = MemoryOrganizationLicenseRepository.create(new Map([["org-old", null]]));
+  const { licenses, organizations } = organizationRow();
   const resources = new ResourceScope();
   const app = await createTestLicensingApp({
     repositories: {
@@ -68,6 +91,7 @@ async function bootWithConfiguredValue(value: string) {
       }),
     },
     dependencies: {
+      organizations,
       gateway: createApiFixture<GatewayApi>({
         setConnectUpstreamInternal: async () => undefined,
         clearConnectUpstreamInternal: async () => undefined,

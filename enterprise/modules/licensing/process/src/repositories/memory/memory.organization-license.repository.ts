@@ -3,13 +3,11 @@ import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contr
 import type {
   OrganizationLicenseCandidate,
   OrganizationLicenseRepository,
-  StoredLicense,
 } from "../organization-license.repository.ts";
 
 /**
  * The licence key on each organization, held in memory: an organization in the
- * map exists, and `null` is an organization with no licence. Writes to an unknown
- * organization are refused the way the prisma twin's `update` refuses them.
+ * map exists, and `null` is an organization with no licence.
  */
 export class MemoryOrganizationLicenseRepository implements OrganizationLicenseRepository {
   static create(
@@ -34,19 +32,5 @@ export class MemoryOrganizationLicenseRepository implements OrganizationLicenseR
 
   async organizationExists(organizationId: string): Promise<boolean> {
     return this.licenses.has(organizationId);
-  }
-
-  async storeLicense(organizationId: string, license: StoredLicense): Promise<void> {
-    this.refuseUnknown(organizationId);
-    this.licenses.set(organizationId, license.licenseKey);
-  }
-
-  async removeLicense(organizationId: string): Promise<void> {
-    this.refuseUnknown(organizationId);
-    this.licenses.set(organizationId, null);
-  }
-
-  private refuseUnknown(organizationId: string): void {
-    if (!this.licenses.has(organizationId)) throw new Error(`no organization ${organizationId}`);
   }
 }
