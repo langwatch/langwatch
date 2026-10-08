@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's model picker offers Instant Evals behind the release flag or the
- * organization's own opt-in; the picker itself is lent by the prompt module, so
- * the stand-in lists exactly the options this field hands it.
+ * Only an LLM judge's model picker offers Instant Evals, once released; the picker is
+ * lent by the prompt module, so the stand-in lists exactly the options this field hands it.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -96,12 +95,15 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-function renderField({ model }: { model?: string } = {}) {
+function renderField({
+  model,
+  evaluatorType = "langevals/llm_boolean",
+}: { model?: string; evaluatorType?: string } = {}) {
   const Harness = () => {
     const methods = useForm({ defaultValues: { settings: model ? { model } : {} } });
     return (
       <FormProvider {...methods}>
-        <EvaluatorLLMConfigField prefix="settings" />
+        <EvaluatorLLMConfigField prefix="settings" evaluatorType={evaluatorType} />
       </FormProvider>
     );
   };
@@ -175,6 +177,28 @@ describe("EvaluatorLLMConfigField", () => {
       });
     });
 
+    describe("when an LLM evaluator that is not a judge saved on Instant Evals opens", () => {
+      /** @scenario "An LLM evaluator that is not a judge saved on Instant Evals reads by its name" */
+      it("reads Instant Evals, says only LLM judges run on it, and does not offer it", () => {
+        state.flagReleased = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID, evaluatorType: "ragas/faithfulness" });
+
+        expect(screen.queryAllByText("Instant Evals").length).toBeGreaterThan(0);
+        expect(screen.queryByText(/only LLM judges run on Instant Evals/i)).not.toBeNull();
+        expect(screen.queryByText(/not enabled for this project/i)).toBeNull();
+        expect(screen.queryByText(INSTANT_EVAL_JUDGE_MODEL_ID, { exact: false })).toBeNull();
+        expect(screen.queryByText(/update needed/i)).toBeNull();
+        expect(offersInstantEvals()).toBe(false);
+      });
+
+      it("reads it the same before release is known, without waiting", () => {
+        state.flagLoading = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID, evaluatorType: "ragas/faithfulness" });
+
+        expect(screen.queryByText(/only LLM judges run on Instant Evals/i)).not.toBeNull();
+      });
+    });
+
     describe("when a judge saved on Instant Evals opens before release is known", () => {
       it("waits rather than flash not enabled", () => {
         state.flagLoading = true;
@@ -213,6 +237,26 @@ describe("EvaluatorLLMConfigField", () => {
         expect(screen.queryByText(/not enabled for this project/i)).not.toBeNull();
         expect(screen.queryByText(/No models configured/i)).not.toBeNull();
         expect(screen.queryByText(INSTANT_EVAL_JUDGE_MODEL_ID, { exact: false })).toBeNull();
+      });
+    });
+
+    describe("when release_instant_evals is on and the evaluator is not a judge", () => {
+      /** @scenario "An LLM evaluator that is not a judge, with no model provider, says no models are configured" */
+      it("says no models are configured and does not offer Instant Evals", () => {
+        state.flagReleased = true;
+        renderField({ evaluatorType: "ragas/faithfulness" });
+
+        expect(screen.queryByText(/No models configured/i)).not.toBeNull();
+        expect(screen.queryByLabelText("model options")).toBeNull();
+      });
+
+      it("still reads a saved Instant Evals model by its name", () => {
+        state.flagReleased = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID, evaluatorType: "ragas/faithfulness" });
+
+        expect(screen.queryByText("Instant Evals")).not.toBeNull();
+        expect(screen.queryByText(/only LLM judges run on Instant Evals/i)).not.toBeNull();
+        expect(screen.queryByText(/No models configured/i)).not.toBeNull();
       });
     });
 

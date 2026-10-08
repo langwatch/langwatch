@@ -19,6 +19,7 @@ export function useEvaluatorFallbackModel({
   const instantEvals = useInstantEvalJudgeModels({
     projectId: project?.id,
     organizationId: organization?.id,
+    evaluatorType,
   });
   const providerModels = useModelSelection({ options: allModelOptions, model: "", mode: "chat" });
 

@@ -588,6 +588,51 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And it is never marked as needing an update
       And Instant Evals is not one of the options
 
+    @unit
+    Scenario Outline: Only an LLM judge's model picker offers Instant Evals
+      Given a project with release_instant_evals <flag>
+      When a member opens the model picker on a <evaluator>
+      Then Instant Evals <offered> one of the options
+      And a saved Instant Evals model still reads by its name
+
+      Examples:
+        | flag | evaluator              | offered |
+        | on   | boolean LLM judge      | is      |
+        | on   | score LLM judge        | is      |
+        | on   | category LLM judge     | is      |
+        | on   | faithfulness evaluator | is not  |
+        | on   | off topic evaluator    | is not  |
+        | off  | boolean LLM judge      | is not  |
+
+    @integration
+    Scenario Outline: The evaluator settings form offers Instant Evals only for the LLM judge it edits
+      Given a project with release_instant_evals on and a model provider
+      When a member opens the <form> of an LLM evaluator that is not a judge
+      Then Instant Evals is not one of the options
+      And opened on an LLM judge, Instant Evals is one of the options
+
+      Examples:
+        | form                  |
+        | evaluator settings    |
+        | Studio evaluator node |
+
+    @integration
+    Scenario: An LLM evaluator that is not a judge, with no model provider, says no models are configured
+      Given a project with release_instant_evals on and no model provider configured
+      When a member opens the settings of an LLM evaluator that is not a judge
+      Then the settings say no models are configured
+      And Instant Evals is not offered
+
+    @integration
+    Scenario: An LLM evaluator that is not a judge saved on Instant Evals reads by its name
+      Given a project with release_instant_evals on
+      And an LLM evaluator that is not a judge saved with Instant Evals as its model
+      When a member opens its settings
+      Then its model field reads "Instant Evals", never the model id
+      And the field says only LLM judges run on Instant Evals
+      And it is never marked as needing an update
+      And Instant Evals is not one of the options
+
     @integration
     Scenario: A new judge in a project with no model provider starts on Instant Evals when released
       Given a project with release_instant_evals on, no model provider and no default model configured

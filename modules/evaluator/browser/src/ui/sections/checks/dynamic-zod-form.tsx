@@ -199,9 +199,11 @@ function selectOptionsFor(schema: ZodType): { value: string | number }[] {
 function compositeLlmConfigField({
   variant,
   prefix,
+  evaluatorType,
 }: {
   variant: "default" | "studio";
   prefix: string;
+  evaluatorType: string;
 }) {
   if (variant === "studio") {
     return (
@@ -210,7 +212,7 @@ function compositeLlmConfigField({
           <PropertySectionTitle>Model</PropertySectionTitle>
         </HStack>
         <Field.Root>
-          <EvaluatorLLMConfigField prefix={prefix} />
+          <EvaluatorLLMConfigField prefix={prefix} evaluatorType={evaluatorType} />
         </Field.Root>
       </VStack>
     );
@@ -218,7 +220,7 @@ function compositeLlmConfigField({
   return (
     <React.Fragment key="llm-config">
       <HorizontalFormControl label="Model" tooltip="The model to use for evaluation">
-        <EvaluatorLLMConfigField prefix={prefix} />
+        <EvaluatorLLMConfigField prefix={prefix} evaluatorType={evaluatorType} />
       </HorizontalFormControl>
     </React.Fragment>
   );
@@ -377,7 +379,7 @@ const DynamicZodForm = ({
 
       // Render the composite LLM config field (if applicable)
       const compositeField = shouldUseCompositeField
-        ? compositeLlmConfigField({ variant, prefix })
+        ? compositeLlmConfigField({ variant, prefix, evaluatorType })
         : null;
 
       // Render remaining fields

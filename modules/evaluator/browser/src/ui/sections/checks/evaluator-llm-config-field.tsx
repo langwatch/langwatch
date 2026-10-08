@@ -11,11 +11,12 @@ import { useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
+import { useInstantEvalJudgeModels } from "../../../behavior/use-instant-eval-judge-models.ts";
+import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import {
   INSTANT_EVALS_BUILT_IN_MODEL,
-  useInstantEvalJudgeModels,
-} from "../../../behavior/use-instant-eval-judge-models.ts";
-import { useModelSelection } from "../../../behavior/use-model-selection.ts";
+  isInstantEvalJudgeSlot,
+} from "../../../model/instant-eval-judge-models.ts";
 import { toInternalKey } from "../prompt/llm-parameters/parameter-config.ts";
 
 /**
@@ -37,15 +38,20 @@ export const LLM_CONFIG_KEYS = [
   "verbosity",
 ] as const;
 
-/** A judge saved on Instant Evals where it is not released reads by its name, not as a broken id. */
-function InstantEvalsNotEnabled() {
+/**
+ * A model saved on Instant Evals where it is not offered reads by its name, not as a
+ * broken id: not released for a judge, and never run for any other evaluator.
+ */
+function InstantEvalsNotOffered({ evaluatorType }: { evaluatorType: string | undefined }) {
   return (
     <VStack gap={0} align="start">
       <Text fontSize="14px" fontFamily="mono" color="fg.muted">
         {INSTANT_EVALS_BUILT_IN_MODEL.label}
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Not enabled for this project
+        {isInstantEvalJudgeSlot({ evaluatorType })
+          ? "Not enabled for this project"
+          : "Only LLM judges run on Instant Evals"}
       </Text>
     </VStack>
   );
@@ -56,7 +62,14 @@ function InstantEvalsNotEnabled() {
  * object-based API: reads params from form context, builds an LLMConfig
  * object, writes changed params back on change.
  */
-export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
+export const EvaluatorLLMConfigField = ({
+  prefix,
+  evaluatorType,
+}: {
+  prefix: string;
+  /** The evaluator this model belongs to: only an LLM judge is offered Instant Evals. */
+  evaluatorType: string | undefined;
+}) => {
   const { setValue, control } = useFormContext();
 
   // Watch all LLM config fields for changes
@@ -95,16 +108,14 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     [prefix, setValue],
   );
 
-  // Skip the popover trigger entirely when the project has zero
-  // enabled providers — same honest empty state used by the prompt
-  // playground and workflow LLM-node pickers. While the providers
-  // query is in flight, render a skeleton so the empty state doesn't
-  // flash before the data resolves.
-  // Instant Evals needs no provider, so a released project keeps the picker.
+  // No enabled provider skips the popover for the same empty state as the prompt and
+  // workflow pickers, behind a skeleton while providers load so it never flashes.
+  // Instant Evals needs no provider, so a judge it is offered to keeps the picker.
   const { project, organization } = useOrganizationTeamProject();
   const instantEvals = useInstantEvalJudgeModels({
     projectId: project?.id,
     organizationId: organization?.id,
+    evaluatorType,
   });
   const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
@@ -117,11 +128,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   if (isLoading || (instantEvals.isLoading && (isEmpty || isInstantEvalsSaved))) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }
-  const isInstantEvalsNotEnabled = isInstantEvalsSaved && !instantEvals.released;
+  const isInstantEvalsNotOffered = isInstantEvalsSaved && !instantEvals.offered;
   if (isEmpty) {
-    return isInstantEvalsNotEnabled ? (
+    return isInstantEvalsNotOffered ? (
       <VStack width="full" align="stretch" gap={2}>
-        <InstantEvalsNotEnabled />
+        <InstantEvalsNotOffered evaluatorType={evaluatorType} />
         <NoModelsConfiguredCallout size="sm" />
       </VStack>
     ) : (
@@ -144,8 +155,8 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          {isInstantEvalsNotEnabled ? (
-            <InstantEvalsNotEnabled />
+          {isInstantEvalsNotOffered ? (
+            <InstantEvalsNotOffered evaluatorType={evaluatorType} />
           ) : (
             <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
           )}
