@@ -1,0 +1,133 @@
+// Package pinnedrelease installs a pinned release asset into haven's home: it
+// downloads the asset, checks its sha256 and only then puts the binary in
+// place, so a binary that exists is a verified one. The one downloader every
+// native host process (ClickHouse, Tempo) uses.
+package pinnedrelease
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+)
+
+// Ensure returns dest, downloading and verifying the artifact first when dest
+// does not exist yet. A tar.gz artifact names the Member it unpacks.
+func Ensure(ctx context.Context, a domain.PinnedArtifact, dest string) (string, error) {
+	if _, err := os.Stat(dest); err == nil {
+		return dest, nil
+	}
+	if a.URL == "" {
+		return "", errors.New("no artifact is pinned for this machine")
+	}
+	dir := filepath.Dir(dest)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	fmt.Printf("downloading %s (first run only) ...\n", a.URL)
+	asset, err := download(ctx, a, dir)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = os.Remove(asset) }()
+	bin := asset
+	if a.Member != "" {
+		if bin, err = unpack(asset, a.Member, dir); err != nil {
+			return "", fmt.Errorf("unpack %s from %s: %w", a.Member, a.URL, err)
+		}
+		defer func() { _ = os.Remove(bin) }() // a no-op once renamed into place
+	}
+	if err := os.Chmod(bin, 0o755); err != nil { // #nosec G302 -- an executable haven runs
+		return "", err
+	}
+	return dest, os.Rename(bin, dest)
+}
+
+// download writes the asset to a temp file in dir, hashing while it writes,
+// and returns the file only when the digest matched.
+func download(ctx context.Context, a domain.PinnedArtifact, dir string) (path string, err error) {
+	tmp, err := os.CreateTemp(dir, "download-*.part")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = tmp.Close()
+		if err != nil {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.URL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("download %s: %w", a.URL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download %s: HTTP %d", a.URL, resp.StatusCode)
+	}
+	sum := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(tmp, sum), resp.Body); err != nil {
+		return "", fmt.Errorf("download %s: %w", a.URL, err)
+	}
+	if got := hex.EncodeToString(sum.Sum(nil)); got != a.SHA256 {
+		return "", fmt.Errorf("download %s: sha256 %s, want %s", a.URL, got, a.SHA256)
+	}
+	return tmp.Name(), tmp.Close()
+}
+
+// unpack copies the regular file named member (at any depth) out of a
+// verified tar.gz into a temp file in dir.
+func unpack(archive, member, dir string) (path string, err error) {
+	f, err := os.Open(archive) // #nosec G304 -- the temp file download just wrote
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return "", err
+	}
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return "", errors.New("not in the archive")
+		}
+		if err != nil {
+			return "", err
+		}
+		if hdr.Typeflag == tar.TypeReg && filepath.Base(hdr.Name) == member {
+			return copyMember(tr, hdr.Size, dir)
+		}
+	}
+}
+
+func copyMember(r io.Reader, size int64, dir string) (path string, err error) {
+	out, err := os.CreateTemp(dir, "unpack-*.part")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			_ = os.Remove(out.Name())
+		}
+	}()
+	// CopyN at the header's size bounds what the archive can make us write.
+	if _, err := io.CopyN(out, r, size); err != nil {
+		_ = out.Close()
+		return "", err
+	}
+	return out.Name(), out.Close()
+}

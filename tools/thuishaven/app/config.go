@@ -47,8 +47,11 @@ type Config struct {
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
-	ShouldManagePostgres     bool // haven ensures a shared brew-services Postgres + per-slug DBs
-	ShouldManageRedis        bool // haven ensures a shared brew-services Redis is running
+	// ClickHousePostgresHost is how the managed ClickHouse reaches host Postgres
+	// (domain.ClickHouseRuntime.PostgresHost), recorded on each stack it serves.
+	ClickHousePostgresHost string
+	ShouldManagePostgres   bool // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis      bool // haven ensures a shared brew-services Redis is running
 	// RedisDBOverride pins this worktree's Redis DB index
 	// (LANGWATCH_HAVEN_REDIS_DB). nil = unset, so a Config built without the
 	// field never pins database 0 by accident — which a plain int sentinel does
@@ -60,8 +63,8 @@ type Config struct {
 	// worktree that has to route around such a neighbor.
 	RedisDBOverride *int
 	// ShouldStartObservability makes `up` boot the LGTM stack itself. On by
-	// default: it shares ClickHouse's colima VM, so the VM is already paying for
-	// itself — opt out with LANGWATCH_HAVEN_OBS=0.
+	// default: native host processes on macOS, the container elsewhere
+	// (LANGWATCH_HAVEN_OBS_TIER pins either). Opt out with LANGWATCH_HAVEN_OBS=0.
 	ShouldStartObservability bool
 	LocalAPIKey              string // stable local dev API key seeded + injected into every stack
 	RepoRoot                 string // repo root the daemon prunes orphaned git worktrees from

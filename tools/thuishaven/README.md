@@ -384,11 +384,22 @@ machinery itself is intact and tested (`seedPreset.ingest`, `runSeedIngest`,
 shipped preset's list is empty until they do.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
-container and the observability stack are memory-capped (and their colima VM is
-sized at creation), and the managed Redis gets a `maxmemory` ceiling
+container and the observability stack are memory-capped (the container tier by
+cgroup, the native tier by `GOMEMLIMIT`; the colima VM is sized at creation), and the managed Redis gets a `maxmemory` ceiling
 (`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
 loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Observability tier.** The observability stack is on by default. On macOS it
+runs as host processes, no VM: `brew install grafana prometheus loki
+grafana/grafana/alloy`; haven fetches Tempo 3.1.0 itself (the official darwin
+tarball, pinned and sha256-checked like the native ClickHouse binary, into
+`<haven home>/observability/bin`; `HAVEN_OBS_TEMPO_BIN` overrides it). Same ports (OTLP 4317/4318, Grafana 3000) and
+datasource uids as the container; files under `<haven home>/observability`;
+`haven logs obs` tails its per-process logs. A missing binary prints its
+install line and never fails `up`. `LANGWATCH_HAVEN_OBS_TIER=container` runs
+the `grafana/otel-lgtm` container on colima instead (the default off macOS).
+Pyroscope is container-tier only. See ADR-042.
 
 **Machine limits.** `haven limits` prints the ClickHouse, observability and
 Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
@@ -598,8 +609,12 @@ The daemon's JSON, which the console reads:
 
 ## More of what haven does
 
-- **Managed ClickHouse.** haven runs one shared `clickhouse-server` in Docker (colima) with its data on the
-  named volume `langwatch-clickhouse-data` (off virtiofs), and
+- **Managed ClickHouse.** On macOS haven runs one shared native `clickhouse-server`: the pinned
+  upstream 25.8 LTS binary, downloaded once into `<haven home>/clickhouse-native/` and checked
+  against its sha256, with its data beside it and no VM. Elsewhere, or with
+  `HAVEN_CH_RUNTIME=container`, it runs in Docker (colima) with its data on the named volume
+  `langwatch-clickhouse-data` (off virtiofs). The two never share data: switching starts an empty
+  server and each stack re-runs its migrations. Either way haven
   gives every worktree its own database (`lw_<slug>`) on it — so migration counts
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`

@@ -14,17 +14,15 @@
 package clickhousedocker
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousehttp"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/netports"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -36,6 +34,7 @@ type Server struct {
 	home   string // <havenHome>/clickhouse
 	image  string
 	limits domain.ClickHouseLimits
+	clickhousehttp.Client
 }
 
 // endpoint is the persisted record of the container's chosen host port, so a
@@ -50,7 +49,9 @@ func New(rt *colima.Runtime, havenHome, image string, limits domain.ClickHouseLi
 	if image == "" {
 		image = domain.ClickHouseImage
 	}
-	return &Server{rt: rt, home: filepath.Join(havenHome, "clickhouse"), image: image, limits: limits}
+	s := &Server{rt: rt, home: filepath.Join(havenHome, "clickhouse"), image: image, limits: limits}
+	s.Client = clickhousehttp.Client{Port: s.HTTPPort}
+	return s
 }
 
 // dataDir is the legacy virtiofs bind mount, kept only as the one-time source
@@ -167,7 +168,7 @@ func (s *Server) writeConfig() (bool, error) {
 // idempotent.
 func (s *Server) applySystemLogPolicy(ctx context.Context) {
 	for _, stmt := range domain.SystemLogRetrofitStatements(s.limits) {
-		_ = s.exec(ctx, stmt)
+		_ = s.Exec(ctx, stmt)
 	}
 }
 
@@ -286,60 +287,10 @@ func (s *Server) writeEndpoint(ep endpoint) error {
 }
 
 func (s *Server) waitHealthy(ctx context.Context, port int, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if s.ping(port) {
-			return nil
-		}
-		time.Sleep(300 * time.Millisecond)
+	if err := s.WaitHealthy(ctx, port, timeout); err != nil {
+		return fmt.Errorf("%w (see `docker logs %s`)", err, domain.ClickHouseContainer)
 	}
-	return fmt.Errorf("clickhouse container did not become healthy within %s (see `docker logs %s`)",
-		timeout, domain.ClickHouseContainer)
-}
-
-// EnsureDatabase creates a stack's database if it does not exist.
-func (s *Server) EnsureDatabase(ctx context.Context, database string) error {
-	return s.exec(ctx, "CREATE DATABASE IF NOT EXISTS "+quoteIdent(database))
-}
-
-// DropDatabase removes a stack's database.
-func (s *Server) DropDatabase(ctx context.Context, database string) error {
-	return s.exec(ctx, "DROP DATABASE IF EXISTS "+quoteIdent(database))
-}
-
-// Databases lists the lw_* databases currently on the server.
-func (s *Server) Databases(ctx context.Context) ([]string, error) {
-	body, err := s.query(ctx, "SELECT name FROM system.databases WHERE name LIKE 'lw\\_%' ORDER BY name FORMAT TabSeparated")
-	if err != nil {
-		return nil, err
-	}
-	return splitLines(body), nil
-}
-
-func splitLines(body string) []string {
-	var out []string
-	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
-		if line != "" {
-			out = append(out, line)
-		}
-	}
-	return out
-}
-
-// StrayDatabases lists test, apidiff and bare langwatch databases whose newest
-// table change is older than olderThan (a database with no tables counts as old).
-func (s *Server) StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error) {
-	body, err := s.query(ctx, fmt.Sprintf(`SELECT d.name FROM system.databases d
-LEFT JOIN (SELECT database, max(metadata_modification_time) AS m FROM system.tables GROUP BY database) t ON t.database = d.name
-WHERE (d.name LIKE 'test\_%%' OR d.name LIKE 'lw\_apidiff\_%%' OR d.name = 'langwatch' OR d.name LIKE 'langwatch\_%%')
-AND t.m < now() - INTERVAL %d SECOND ORDER BY d.name FORMAT TabSeparated`, int64(olderThan.Seconds())))
-	if err != nil {
-		return nil, err
-	}
-	return splitLines(body), nil
+	return nil
 }
 
 // HTTPPort returns the container's host port if provisioned (0 otherwise).
@@ -353,7 +304,7 @@ func (s *Server) HTTPPort() int {
 // Running reports whether the managed server answers right now (no start).
 func (s *Server) Running() bool {
 	ep, ok := s.readEndpoint()
-	return ok && s.ping(ep.HTTPPort)
+	return ok && s.Ping(ep.HTTPPort)
 }
 
 // Health pings the server and returns a one-line status.
@@ -362,7 +313,7 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 	if !ok {
 		return false, "not provisioned"
 	}
-	if !s.ping(ep.HTTPPort) {
+	if !s.Ping(ep.HTTPPort) {
 		if !s.rt.IsRunning(ctx) {
 			return false, fmt.Sprintf("colima profile %q is not running", s.rt.Profile())
 		}
@@ -385,11 +336,7 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 // ceiling ("" if it cannot be read) — the number that tells you whether the
 // shared ClickHouse is the thing eating the machine.
 func (s *Server) memoryUse(ctx context.Context) string {
-	body, err := s.query(ctx, "SELECT formatReadableSize(value) FROM system.asynchronous_metrics WHERE metric = 'MemoryResident' FORMAT TabSeparated")
-	if err != nil {
-		return ""
-	}
-	used := strings.TrimSpace(body)
+	used := s.MemoryResident(ctx)
 	if used == "" {
 		return ""
 	}
@@ -408,57 +355,4 @@ func (s *Server) Stop() {
 		return
 	}
 	_ = s.rt.Docker(ctx, dockerHost, "rm", "-f", domain.ClickHouseContainer).Run()
-}
-
-// --- HTTP helpers -----------------------------------------------------------
-
-// ping does not authenticate — /ping is a pre-auth liveness probe on every
-// ClickHouse server regardless of credentials, so it stays a plain GET.
-func (s *Server) ping(port int) bool {
-	client := &http.Client{Timeout: 1500 * time.Millisecond}
-	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/ping", port))
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode == http.StatusOK && strings.Contains(string(b), "Ok")
-}
-
-func (s *Server) exec(ctx context.Context, sql string) error {
-	_, err := s.query(ctx, sql)
-	return err
-}
-
-// query authenticates as domain.ClickHouseUser — the Altinity image's bootstrap
-// entrypoint requires CLICKHOUSE_PASSWORD to be set or it rejects the default
-// user outright (unlike the earlier native-binary adapter's own passwordless
-// users.xml), so every query beyond /ping needs Basic Auth.
-func (s *Server) query(ctx context.Context, sql string) (string, error) {
-	port := s.HTTPPort()
-	if port == 0 {
-		return "", fmt.Errorf("clickhouse not provisioned")
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/", port), bytes.NewReader([]byte(sql)))
-	if err != nil {
-		return "", err
-	}
-	req.SetBasicAuth(domain.ClickHouseUser, domain.ClickHousePassword)
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("clickhouse query failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-	return string(body), nil
-}
-
-// quoteIdent backtick-quotes a ClickHouse identifier. haven only ever passes
-// lw_<slug> names (validated upstream), but quoting keeps the DDL well-formed.
-func quoteIdent(name string) string {
-	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }

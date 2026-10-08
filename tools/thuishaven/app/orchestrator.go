@@ -937,6 +937,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	}
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
+	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{

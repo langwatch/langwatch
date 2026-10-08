@@ -13,6 +13,17 @@ import (
 // `haven logs obs` target, so the observability stack is a log target like
 // any service.
 func (o *Orchestrator) ObservabilityLogs(ctx context.Context, follow bool) error {
+	// The native stack writes one log file per process instead of docker logs.
+	if native, ok := o.obs.(interface{ LogFiles() []string }); ok {
+		shell := "tail -n 200"
+		if follow {
+			shell += " -F"
+		}
+		for _, f := range native.LogFiles() {
+			shell += " " + shellQuote(f)
+		}
+		return o.sup.RunOnce(ctx, "obs", o.cfg.RepoRoot, shell, nil)
+	}
 	if o.container == nil {
 		return fmt.Errorf("no container runtime configured")
 	}
