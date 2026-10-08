@@ -1,6 +1,7 @@
 package openaiformat
 
 import (
+	"encoding/json"
 	"strings"
 
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
@@ -76,10 +77,8 @@ func (GenericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 		span.SetAttributes(semconv.OpenAIResponseSystemFingerprint(fp))
 	}
 
-	if usage, ok := body["usage"].(otelhttp.JSONObject); ok {
-		genUsage := langwatch.GenAIUsage{}
-		probeUsage(&genUsage, usage)
-		span.SetGenAIUsage(genUsage)
+	if usage := decodeUsage(raw); usage != nil {
+		recordUsage(span, usage)
 	}
 
 	if choices, ok := body["choices"].([]any); ok {
@@ -157,31 +156,33 @@ func (a *genericStreamAccumulator) Consume(dataLine string) {
 		}
 	}
 
-	if usage, ok := event["usage"].(otelhttp.JSONObject); ok {
-		probeUsage(&a.usage, usage)
+	if usage := decodeUsage([]byte(dataLine)); usage != nil {
+		mergeUsage(&a.usage, usage)
 	}
 }
 
-// probeUsage folds an untyped usage block into dst, accepting both OpenAI usage
-// spellings: chat/completions reports prompt_tokens/completion_tokens, while the
-// Responses API reports input_tokens/output_tokens. Both the single-body and the
-// streamed paths go through here so a stream cannot silently lose the counts one
-// of them understands. A field absent from the block leaves dst untouched, which
-// is what lets a later chunk carrying only totals refine an earlier one.
-func probeUsage(dst *langwatch.GenAIUsage, usage otelhttp.JSONObject) {
-	for _, key := range []string{"prompt_tokens", "input_tokens"} {
-		if v, ok := otelhttp.GetInt(usage, key); ok {
-			dst.InputTokens = langwatch.Int(v)
-		}
+// decodeUsage reads a body's usage block in either OpenAI spelling
+// (prompt/completion or Responses input/output) into the chat shape, so the
+// fallback shares toGenAIUsage/mergeUsage and their exclusive cached split.
+// A malformed field is skipped; nil means the body carries no usage object.
+func decodeUsage(raw []byte) *usagePayload {
+	var body struct {
+		Usage json.RawMessage `json:"usage"`
 	}
-	for _, key := range []string{"completion_tokens", "output_tokens"} {
-		if v, ok := otelhttp.GetInt(usage, key); ok {
-			dst.OutputTokens = langwatch.Int(v)
-		}
+	if json.Unmarshal(raw, &body) != nil || len(body.Usage) == 0 || body.Usage[0] != '{' {
+		return nil
 	}
-	if v, ok := otelhttp.GetInt(usage, "total_tokens"); ok {
-		dst.TotalTokens = langwatch.Int(v)
+	var usage usagePayload
+	_ = json.Unmarshal(body.Usage, &usage)
+	var responses responsesUsagePayload
+	_ = json.Unmarshal(body.Usage, &responses)
+	if responses.InputTokens > 0 || responses.OutputTokens > 0 {
+		usage.PromptTokens = responses.InputTokens
+		usage.CompletionTokens = responses.OutputTokens
+		usage.PromptTokensDetails.CachedTokens = responses.InputTokensDetails.CachedTokens
+		usage.CompletionTokensDetails.ReasoningTokens = responses.OutputTokensDetails.ReasoningTokens
 	}
+	return &usage
 }
 
 func (a *genericStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.DataCaptureMode) {
