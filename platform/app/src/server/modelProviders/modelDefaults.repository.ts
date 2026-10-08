@@ -310,6 +310,15 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     return attached.map((a) => a.config);
   }
 
+  /** Return a config's stored JSON payload, or null when the row is gone. */
+  async findConfigById(configId: string): Promise<unknown | null> {
+    const row = await this.prisma.modelDefaultConfig.findUnique({
+      where: { id: configId },
+      select: { config: true },
+    });
+    return row ? row.config : null;
+  }
+
   /** Return the current scope attachments for a config row — used by
    * the diff logic in `updateConfigScopes`. */
   async findScopesForConfig(configId: string): Promise<AttachedScope[]> {

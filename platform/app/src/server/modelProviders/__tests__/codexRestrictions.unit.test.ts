@@ -142,7 +142,7 @@ describe("codexRestrictions", () => {
     }
   });
 
-  it("pins the allowed set: langy.chat plus exactly the FAST tier", () => {
+  it("pins the allowed set: langy.chat plus the FAST tier minus the non-runnable topic clustering feature", () => {
     // The rule is derived (Langy + every FAST feature); this pin makes any
     // widening of it — a feature moving into FAST, a new fast assist — show
     // up in review rather than land silently.

@@ -57,3 +57,16 @@ Feature: Topic clustering model resolution skips Codex models
     When the customer opens the topic clustering settings page
     Then the page explains a Codex model cannot serve topic clustering
     And offers a link to the Model Providers settings to choose another model
+
+  @unit
+  Scenario: A saved Codex clustering override does not block other default-model changes
+    Given a default-models config stores a Codex model for topic clustering
+    When the customer changes a different model in that config
+    Then the change is saved
+    And the stored Codex clustering model is left untouched
+
+  @unit
+  Scenario: Saving a new Codex model for topic clustering is still rejected
+    Given a default-models config stores a Codex model for topic clustering
+    When the customer saves a different Codex model for topic clustering
+    Then the save is rejected as a restricted model

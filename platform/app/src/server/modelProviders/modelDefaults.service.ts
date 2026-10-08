@@ -121,16 +121,36 @@ function validKeySet(): Set<string> {
   return keys;
 }
 
-function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
+/** Structural cleanup only: drops unknown, non-string and empty entries. */
+function dropInvalidEntries(
+  raw: Record<string, unknown>,
+): Record<string, string> {
   const valid = validKeySet();
-  const roleKeys = new Set<string>(MODEL_ROLES);
   const clean: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!valid.has(key)) continue;
     if (typeof value !== "string") continue;
     if (value.length === 0) continue;
-    // Restricted models (codex) are rejected loudly, not dropped: a save
-    // that silently loses a key would read as "worked" in the drawer.
+    clean[key] = value;
+  }
+  return clean;
+}
+
+/**
+ * Restricted models (codex) are rejected loudly, not dropped: a save
+ * that silently loses a key would read as "worked" in the drawer. Only
+ * keys being WRITTEN are checked: a value equal to the one already
+ * stored is passed back unchanged by the drawer and the upsert path, and
+ * may predate a tightened restriction. Rejecting it would lock the whole
+ * config; resolution already skips such a stored value at runtime.
+ */
+function assertWritable(
+  clean: Record<string, string>,
+  stored: Record<string, unknown> = {},
+): void {
+  const roleKeys = new Set<string>(MODEL_ROLES);
+  for (const [key, value] of Object.entries(clean)) {
+    if (stored[key] === value) continue;
     const allowed = roleKeys.has(key)
       ? isModelAllowedAsRoleDefault(value, key as ModelRole)
       : isModelAllowedForFeature({ modelId: value, featureKey: key });
@@ -139,8 +159,12 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
         `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
       );
     }
-    clean[key] = value;
   }
+}
+
+function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
+  const clean = dropInvalidEntries(raw);
+  assertWritable(clean);
   return clean;
 }
 
@@ -298,8 +322,14 @@ export async function updateConfig(
   const data: { config?: Record<string, string>; authorId?: string | null } =
     {};
   let deletesTheConfig = false;
+  // Restriction check needs the stored config, so it runs inside the lock.
+  const assertConfigWritable = async (repo: ModelDefaultsRepository) => {
+    if (data.config === undefined) return;
+    const stored = await repo.findConfigById(params.id);
+    assertWritable(data.config, (stored ?? {}) as Record<string, unknown>);
+  };
   if (params.config !== undefined) {
-    const clean = sanitizeConfig(params.config);
+    const clean = dropInvalidEntries(params.config);
     if (Object.keys(clean).length === 0) {
       // Empty config = pure inherit at every key. We treat that as a
       // delete because an attached-but-empty config has no effect on
@@ -335,6 +365,7 @@ export async function updateConfig(
       // collected it. Both branches below are satisfied by that.
       if (!organizationId) return;
       await lockForWrite(txRepo, { organizationId });
+      await assertConfigWritable(txRepo);
       if (deletesTheConfig) {
         await txRepo.delete(params.id);
         return;
@@ -358,6 +389,7 @@ export async function updateConfig(
     // last scope and collected it, and that save's config now owns the
     // scopes this one wanted. Re-creating the row here would undo it.
     if ((await txRepo.findOrganizationIdForConfig(params.id)) === null) return;
+    await assertConfigWritable(txRepo);
     const desired = new Map<string, ScopeAttachment>();
     for (const s of desiredScopes) {
       desired.set(`${s.scopeType}::${s.scopeId}`, s);
