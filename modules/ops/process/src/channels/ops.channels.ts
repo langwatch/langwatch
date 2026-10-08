@@ -1,3 +1,4 @@
+import type { BugReportNotifier } from "../app/ops.app.ts";
 import type { CheckupProbeChannel } from "./checkup-probe.channel.ts";
 import type { UsageReportChannel } from "./usage-report.channel.ts";
 
@@ -5,4 +6,5 @@ import type { UsageReportChannel } from "./usage-report.channel.ts";
 export interface OpsChannels {
   readonly usageReport: UsageReportChannel;
   readonly probes: CheckupProbeChannel;
+  readonly bugReportNotifier: BugReportNotifier;
 }

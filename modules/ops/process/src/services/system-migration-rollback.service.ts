@@ -13,7 +13,7 @@ import {
   ROLLBACK_EFFECT_STATUSES,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
-import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -21,6 +21,8 @@ export class SystemMigrationRollbackService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRollbackService {
     return new SystemMigrationRollbackService(deps);
   }
+
+  private readonly lookup = SystemMigrationLookupService.create();
 
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
@@ -38,7 +40,7 @@ export class SystemMigrationRollbackService {
     tenantId: string;
     actorUserId: string;
   }): Promise<void> {
-    systemMigrationLookup.registeredMigration(this.deps, migrationName);
+    this.lookup.registeredMigration(this.deps, migrationName);
     const [found] = await this.deps.state
       .getRecord({ migrationName, tenantId })
       .then((found) => [found], noneWhenNotFound);

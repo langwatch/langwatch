@@ -266,9 +266,7 @@ import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
-import { HttpSlackAlertChannel } from "../channels/http/http.slack-alert.channel.ts";
 import type { OpsChannels } from "../channels/ops.channels.ts";
-import { SlackBugReportNotifierChannel } from "../channels/slack/slack.bug-report-notifier.channel.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
 import { PLATFORM_OPERATOR_SEED_TENANT_ID } from "../eventing/ops-platform-operator-seed.process.ts";
 import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
@@ -795,20 +793,8 @@ export class OpsModule implements OpsApi {
     // One tracker: the queue-metrics writer records into it, the detector reads it.
     const { rateTracker } = setup.repositories;
     const logger = createLogger("langwatch:ops");
-    const bugReportNotifier = await setup.secrets.into(
-      OpsModule.secrets.slackBugReportsBotToken,
-      (botToken) =>
-        SlackBugReportNotifierChannel.create({
-          transport: HttpSlackAlertChannel.create(),
-          config: {
-            botToken,
-            channel: setup.config.bugReportSlackChannel,
-            baseHost: setup.config.publicBaseUrl,
-          },
-        }),
-    );
     const infrastructure = buildOpsInfrastructure({
-      bugReportNotifier,
+      bugReportNotifier: setup.channels.bugReportNotifier,
       logger,
       config: setup.config,
       resources: setup.resources,

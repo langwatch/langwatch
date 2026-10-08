@@ -16,12 +16,14 @@ import {
   deriveStatusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
-import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 
 export class SystemMigrationRunService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationRunService {
     return new SystemMigrationRunService(deps);
   }
+
+  private readonly lookup = SystemMigrationLookupService.create();
 
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
@@ -34,7 +36,7 @@ export class SystemMigrationRunService {
     migrationName: string;
     actorUserId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
-    const migration = systemMigrationLookup.registeredMigration(this.deps, migrationName);
+    const migration = this.lookup.registeredMigration(this.deps, migrationName);
     await this.requireRunnableForOrganization({
       migration,
       organizationId,

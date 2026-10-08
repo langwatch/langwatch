@@ -22,7 +22,7 @@ import {
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
 import { SystemMigrationEnrollmentService } from "./system-migration-enrollment.service.ts";
-import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 import { SystemMigrationRollbackService } from "./system-migration-rollback.service.ts";
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
@@ -42,6 +42,8 @@ export class SystemMigrationsService {
   private readonly enrollment: SystemMigrationEnrollmentService;
   private readonly runs: SystemMigrationRunService;
   private readonly rollback: SystemMigrationRollbackService;
+
+  private readonly lookup = SystemMigrationLookupService.create();
 
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {
     this.enrollment = SystemMigrationEnrollmentService.create(deps);
@@ -153,8 +155,7 @@ export class SystemMigrationsService {
    * which migration is dangerous.
    */
   requiresOperatorConfirmation({ migrationName }: { migrationName: string }): boolean {
-    return systemMigrationLookup.registeredMigration(this.deps, migrationName)
-      .requiresOperatorConfirmation;
+    return this.lookup.registeredMigration(this.deps, migrationName).requiresOperatorConfirmation;
   }
 
   /**

@@ -15,7 +15,7 @@ import {
   type MigrationEnrollmentRecord,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
-import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
+import { SystemMigrationLookupService } from "./system-migration-lookup.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
 
@@ -23,6 +23,8 @@ export class SystemMigrationEnrollmentService {
   static create(deps: SystemMigrationsServiceDependencies): SystemMigrationEnrollmentService {
     return new SystemMigrationEnrollmentService(deps);
   }
+
+  private readonly lookup = SystemMigrationLookupService.create();
 
   private constructor(private readonly deps: SystemMigrationsServiceDependencies) {}
 
@@ -76,7 +78,7 @@ export class SystemMigrationEnrollmentService {
       throw new MigrationEnrollmentCloudOnlyError();
     }
 
-    systemMigrationLookup.registeredMigration(this.deps, migrationName);
+    this.lookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     await this.deps.enrollments.getOrganizationById({ organizationId });
 
@@ -124,7 +126,7 @@ export class SystemMigrationEnrollmentService {
       throw new MigrationEnrollmentCloudOnlyError();
     }
 
-    systemMigrationLookup.registeredMigration(this.deps, migrationName);
+    this.lookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     // The steps run as an ordered pipeline per organization, so a later
     // step's pool is the step before it: an organization enrolled for a

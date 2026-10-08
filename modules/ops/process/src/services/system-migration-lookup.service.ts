@@ -27,6 +27,3 @@ export class SystemMigrationLookupService {
     return migration;
   }
 }
-
-/** Stateless, so one instance serves every caller. */
-export const systemMigrationLookup = SystemMigrationLookupService.create();
