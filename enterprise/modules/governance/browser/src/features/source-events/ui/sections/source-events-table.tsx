@@ -13,10 +13,9 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { Fragment, type ReactNode, useState } from "react";
 
-import { readableDate } from "../../../../model/display-formatters.ts";
 import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
 import { EventDetailRow } from "./source-event-detail-panels.tsx";
 

@@ -14,10 +14,11 @@ import {
   Wrap,
 } from "@langwatch/design-system/primitives";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
+import { readableDate } from "@langwatch/time";
 import { DatabaseZap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
 import {
   runOutcomeLabel,
   statusTone,

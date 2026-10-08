@@ -1,6 +1,4 @@
-import { format, nowInstant } from "@langwatch/time";
-
-import { readableDate } from "../display-formatters.ts";
+import { format, nowInstant, readableDate } from "@langwatch/time";
 
 /**
  * A date as a table cell wants it: "Aug 3" within the current year, "Aug 3,

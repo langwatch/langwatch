@@ -2,6 +2,7 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
@@ -16,7 +17,6 @@ import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,
   HoverActionCluster,

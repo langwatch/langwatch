@@ -4,6 +4,7 @@
 
 import { Button, Text } from "@langwatch/design-system/primitives";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
+import { readableDate } from "@langwatch/time";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -17,7 +18,6 @@ import {
   textValue,
   totalOf,
 } from "../../../../tools/model/langy-cli-result-document.ts";
-import { readableDate } from "../../../../transcript/model/langy-row-format.ts";
 import {
   buildTraceExplorerHref,
   readTraceSearchQuery,

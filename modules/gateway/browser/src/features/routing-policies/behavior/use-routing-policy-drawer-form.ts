@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { readableDate } from "@langwatch/time";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
@@ -9,7 +10,6 @@ import { api } from "../../../behavior/gateway-api.ts";
  * place: the form, the row being edited, the providers on offer, and the
  * problems worth telling the operator before they save. Never JSX.
  */
-import { readableDate } from "../../../model/readable-date.ts";
 import type { ProviderCredentialOption } from "../model/provider-credential-option.ts";
 import {
   emptyRoutingPolicyForm,

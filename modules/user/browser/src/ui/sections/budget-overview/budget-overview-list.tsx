@@ -1,11 +1,10 @@
 import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, readableDate } from "@langwatch/time";
 import { Info } from "lucide-react";
 
 import type { BudgetOverviewItemView } from "../../../model/budget-overview-item.ts";
-import { readableDate } from "../../../model/display-formatters.ts";
 
 export type { BudgetOverviewItemView };
 

@@ -1,6 +1,7 @@
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import type { LangyChoiceSelection, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import { readableDate } from "@langwatch/time";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,7 +12,6 @@ import type { resolveLangyActivityOwnership } from "../../../../../model/langy-a
 import type { langyPlan } from "../../../../../model/langy-plan.ts";
 import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
 import { StreamingStatusLine } from "../../../../../ui/sections/streaming-status-line.tsx";
-import { readableDate } from "../../../../transcript/model/langy-row-format.ts";
 import { LangyDerivedCardView } from "../../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyThinkingLine } from "../../../../transcript/ui/sections/langy-thinking-line.tsx";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";

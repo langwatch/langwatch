@@ -1,6 +1,6 @@
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 
-import { readableDate } from "../../model/display-formatters.ts";
 import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
 import { IdentityChip, IdentityRow, IdentityRowList } from "../elements/identity-row.tsx";
 import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";

@@ -1,8 +1,6 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { emailDomainsOf } from "@langwatch/feature-flag-contract";
-import { toEpochMs } from "@langwatch/time";
-
-import { readableDate } from "../../../model/ops-formatters.ts";
+import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
  * Translating between stored and UI rule shapes for the targeting-rules

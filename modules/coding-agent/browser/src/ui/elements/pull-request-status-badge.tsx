@@ -1,5 +1,6 @@
 import { Badge } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readableDate } from "@langwatch/time";
 import type { IconType } from "react-icons";
 import {
   LuGitMerge,
@@ -12,7 +13,6 @@ import {
   PULL_REQUEST_STATUS_LABELS,
   type PullRequestStatus,
 } from "../../model/pull-request-status.ts";
-import { readableDate } from "../../model/short-date.ts";
 
 /**
  * A pull request's state, drawn the way GitHub draws it: a solid badge in

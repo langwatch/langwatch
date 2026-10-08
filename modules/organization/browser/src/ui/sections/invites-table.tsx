@@ -1,10 +1,10 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 import { IdentityChip, IdentityRow, IdentityRowList } from "../elements/identity-row.tsx";
 import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
 

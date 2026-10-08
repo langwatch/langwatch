@@ -1,7 +1,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Alert, Heading, HStack, Stack, Table, Text } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 
-import { readableDate } from "../../../../model/ops-formatters.ts";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 import { modeLabel, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";

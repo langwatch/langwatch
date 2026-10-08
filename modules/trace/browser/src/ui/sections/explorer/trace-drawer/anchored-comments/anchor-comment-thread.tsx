@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 
 import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 import { PersonAvatar } from "../../../person-avatar.tsx";
 
 /**

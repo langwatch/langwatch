@@ -65,3 +65,8 @@ export function fromDate(value: Date): Instant {
 export function toDate(value: Instant | ZonedDateTime): Date {
   return new Date(value.epochMilliseconds);
 }
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput): Date {
+  return new Date(toEpochMs(value));
+}

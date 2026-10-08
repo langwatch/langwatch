@@ -15,13 +15,13 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
+import { readableDate } from "@langwatch/time";
 import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { readableDate } from "../../../../model/ops-formatters.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
 const STATUS_COLOR: Record<string, string> = {

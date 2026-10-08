@@ -1,10 +1,11 @@
 import { Badge, Card, HStack, Status, Table, Text } from "@langwatch/design-system/primitives";
 import type { ReplayHistoryEntry } from "@langwatch/ops-contract";
+import { readableDate } from "@langwatch/time";
 import { ArrowRight } from "lucide-react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
+import { formatDuration } from "../../../../model/ops-formatters.ts";
 import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export function ReplayHistoryTable() {

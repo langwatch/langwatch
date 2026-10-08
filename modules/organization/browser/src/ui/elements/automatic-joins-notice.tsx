@@ -1,6 +1,6 @@
 import { Alert, Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 
-import { readableDate } from "../../model/display-formatters.ts";
 import type { AutomaticJoin } from "../../model/pending-join-request.ts";
 import { RandomColorAvatar } from "./random-color-avatar.tsx";
 

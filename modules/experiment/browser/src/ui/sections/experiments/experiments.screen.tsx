@@ -21,7 +21,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, readableDate } from "@langwatch/time";
 import type { TimeInput } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
@@ -39,7 +39,6 @@ import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
-import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";

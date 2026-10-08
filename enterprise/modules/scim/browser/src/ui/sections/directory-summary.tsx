@@ -18,12 +18,12 @@ import {
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, readableDate } from "@langwatch/time";
 import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
-import { readableDate, relativeTime } from "../../model/display-formatters.ts";
+import { relativeTime } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 
 /** Sources named before the rest collapse into a count. */

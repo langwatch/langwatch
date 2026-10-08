@@ -27,6 +27,7 @@ import {
   type SingleEvaluationResult,
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
+import { readableDate } from "@langwatch/time";
 import type { CheckPreconditions, ElasticSearchTrace } from "@langwatch/trace-contract";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
@@ -37,7 +38,6 @@ import { useDebounceValue } from "usehooks-ts";
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
-import { readableDate } from "../../../model/display-formatters.ts";
 import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,

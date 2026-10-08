@@ -1,8 +1,8 @@
 import type { GatewayPersonalBudget } from "@langwatch/gateway-contract";
+import { readableDate } from "@langwatch/time";
 import { useMemo } from "react";
 
 import type { BudgetOverviewItemView } from "../model/budget-overview-item.ts";
-import { readableDate } from "../model/display-formatters.ts";
 import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 

@@ -2,6 +2,7 @@ import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-bo
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
+import { readableDate } from "@langwatch/time";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,7 +18,6 @@ import {
  * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
  * panel.
  */
-import { readableDate } from "../../../transcript/model/langy-row-format.ts";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,

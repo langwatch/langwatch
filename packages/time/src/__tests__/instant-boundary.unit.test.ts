@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Temporal, fromDate, nowInstant, toDate } from "../zoned.ts";
+import { Temporal, fromDate, nowInstant, readableDate, toDate } from "../zoned.ts";
 
 const MOMENT_MS = Date.UTC(2026, 5, 15, 10, 30, 0);
 
@@ -40,6 +40,25 @@ describe("toDate", () => {
         Temporal.Instant.fromEpochMilliseconds(MOMENT_MS).toZonedDateTimeISO("Europe/Amsterdam");
 
       expect(toDate(zoned).getTime()).toBe(MOMENT_MS);
+    });
+  });
+});
+
+describe("readableDate", () => {
+  describe("given each shape a screen holds a moment in", () => {
+    /** @scenario "A moment in any held shape becomes a Date a screen can print" */
+    it("names the same epoch millisecond count", () => {
+      const zoned =
+        Temporal.Instant.fromEpochMilliseconds(MOMENT_MS).toZonedDateTimeISO("Europe/Amsterdam");
+
+      for (const value of [
+        MOMENT_MS,
+        new Date(MOMENT_MS),
+        new Date(MOMENT_MS).toISOString(),
+        zoned,
+      ]) {
+        expect(readableDate(value).getTime()).toBe(MOMENT_MS);
+      }
     });
   });
 });

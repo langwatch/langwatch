@@ -12,12 +12,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, readableDate } from "@langwatch/time";
 import { Monitor } from "lucide-react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { browserSessionLabel, isSessionStale } from "../../model/browser-session.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 
 export function BrowserSessionsSection() {

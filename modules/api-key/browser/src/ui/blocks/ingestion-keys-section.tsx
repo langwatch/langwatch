@@ -14,11 +14,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { MoreVertical, Radio } from "lucide-react";
 
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type IngestionKeyRow = WireOf<ApiKeyListEntry>;

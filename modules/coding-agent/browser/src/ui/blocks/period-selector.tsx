@@ -18,12 +18,13 @@ import {
   subDays,
   toEpochMs,
   type TimeInput,
+  readableDate,
 } from "@langwatch/time";
 import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 
 import type { Period, PeriodMode } from "../../model/session-filters.ts";
-import { readableDate, type ReadableDate } from "../../model/short-date.ts";
+import { type ReadableDate } from "../../model/short-date.ts";
 
 /**
  * The date-range control the activity tables narrow by. A copy of the old

@@ -25,7 +25,7 @@ import {
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ScopeFilter } from "@langwatch/design-system/scope-filter";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
+import { nowInstant, toDate, toEpochMs, readableDate } from "@langwatch/time";
 import { Key, MoreVertical, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -40,7 +40,6 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter.ts";
-import { readableDate } from "../../model/display-formatters.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";

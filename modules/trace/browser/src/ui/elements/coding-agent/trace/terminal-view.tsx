@@ -6,6 +6,7 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import {
   Fragment,
   memo,
@@ -46,7 +47,6 @@ import {
   findCacheRebuilds,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
-import { readableDate } from "../../../../model/display-formatters.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
 import { TerminalPatch } from "./terminal-patch.tsx";

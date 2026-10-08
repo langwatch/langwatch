@@ -1,5 +1,5 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+import { toEpochMs, readableDate } from "@langwatch/time";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
 export type LicenseStatusWithMetadata = Extract<LicenseStatus, { hasLicense: true; plan: string }>;
@@ -76,14 +76,6 @@ export function formatLimitOrUnlimited(value: number): string {
 }
 
 /**
- * Formats a current/max pair for display.
- * Example: "5 / 10" or "5 / Unlimited"
- */
-export function formatResourceUsage(current: number, max: number): string {
-  return `${current.toLocaleString()} / ${formatLimitOrUnlimited(max)}`;
-}
-
-/**
  * Formats a file size in bytes to a human-readable string.
  * Returns bytes for < 1KB, KB for < 1MB, MB otherwise.
  */
@@ -91,9 +83,4 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** The moment a screen prints, as the `Date` the Intl formatters take. */
-export function readableDate(value: TimeInput) {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
 }

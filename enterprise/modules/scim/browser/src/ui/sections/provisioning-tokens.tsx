@@ -23,12 +23,13 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
+import { readableDate } from "@langwatch/time";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { scimApi } from "../../behavior/scim-api.ts";
 import { chosenConnectionOf, isActiveConnection } from "../../model/connection-lifecycle.ts";
-import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
+import { connectionLabel } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../elements/copy-input.tsx";
 

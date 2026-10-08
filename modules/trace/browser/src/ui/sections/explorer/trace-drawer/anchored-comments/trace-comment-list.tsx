@@ -1,5 +1,6 @@
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import { Crosshair, Lightbulb } from "lucide-react";
 
 import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
@@ -7,7 +8,6 @@ import {
   canJumpToAnnotationAnchor,
   useJumpToAnnotationAnchor,
 } from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 import { PersonAvatar } from "../../../person-avatar.tsx";
 
 /** What a comment reads as when the part it was left on is gone. */

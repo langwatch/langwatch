@@ -1,7 +1,5 @@
 import type { ShareLink } from "@langwatch/share-contract";
-import { type Instant, nowInstant, toEpochMs } from "@langwatch/time";
-
-import { readableDate } from "../display-formatters.ts";
+import { type Instant, nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 
 /**
  * Contract dates arrive as ISO strings because the wire performs no transformation.

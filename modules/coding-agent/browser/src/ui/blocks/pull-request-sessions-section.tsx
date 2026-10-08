@@ -1,11 +1,12 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { chakra, HStack, Spinner, Table, Text } from "@langwatch/design-system/primitives";
+import { readableDate } from "@langwatch/time";
 import type React from "react";
 
 import { useTerminalReplay } from "../../behavior/use-terminal-replay.ts";
 import { type DetailPayload } from "../../model/pull-request-detail.ts";
-import { formatShortDate, readableDate } from "../../model/short-date.ts";
+import { formatShortDate } from "../../model/short-date.ts";
 import { AgentLabel } from "../elements/agent-label.tsx";
 import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
 import { ContributorName } from "../elements/contributor-name.tsx";
