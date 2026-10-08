@@ -228,7 +228,6 @@ import { VirtualKeyCryptoService } from "../features/virtual-key/services/virtua
 import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
 import { VirtualKeyService } from "../features/virtual-key/services/virtual-key.service.ts";
 import type { GatewayAgentCacheEntryRepository } from "../repositories/gateway-agent-cache.repository.ts";
-import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayBudgetRepository } from "../repositories/gateway-budget.repository.ts";
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
@@ -736,11 +735,6 @@ type GatewayBudgetOverviewDeps = Readonly<{
   /** Where the /me banner's request-increase link points; absent, it carries none. */
   publicBaseUrl: string | undefined;
 }>;
-
-/** Unread by `overviewForUser`; only the budget's own `findBudgetOverview` uses this port. */
-const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
-  findBudget: async () => null,
-};
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -1846,8 +1840,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       throw new Error("The gateway budget-overview family was mounted without its members");
 
     return (this.#budgetOverview ??= BudgetOverviewService.create({
-      // Unread by `overviewForUser`: only the budget's own `findBudgetOverview` read uses it.
-      repository: unusedBudgetOverviewRepository,
       organizations: deps.organizations,
       featureFlags: deps.featureFlags,
       // The service asks for one principal's own active keys; this application

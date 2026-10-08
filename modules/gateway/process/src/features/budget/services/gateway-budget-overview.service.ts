@@ -5,16 +5,14 @@
  */
 
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
-import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
+import type { GatewayBudgetScopeType } from "@langwatch/gateway-contract";
+import { GatewayWindow } from "@langwatch/gateway-contract";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { GatewayBudgetOverviewRepository } from "../../../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../../../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayProviderLabelRepository } from "../../../repositories/gateway-provider-label.repository.ts";
-import { budgetSpendTargetsFor } from "../../../rules/gateway-budget-spend-targets.rules.ts";
 import type { GatewayService } from "../../../services/gateway.service.ts";
 import {
   type ApplicableBudget,
@@ -91,7 +89,6 @@ type PersonalVirtualKeyReader = {
 };
 
 export class BudgetOverviewService {
-  private readonly repository: GatewayBudgetOverviewRepository;
   private readonly organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
   private readonly featureFlags: FeatureFlagApi;
   private readonly personalVirtualKeys: PersonalVirtualKeyReader;
@@ -101,7 +98,6 @@ export class BudgetOverviewService {
   private readonly chRepo?: GatewayBudgetSpendRepository;
 
   private constructor({
-    repository,
     organizations,
     featureFlags,
     personalVirtualKeys,
@@ -110,7 +106,6 @@ export class BudgetOverviewService {
     providerLabels,
     chRepo,
   }: {
-    repository: GatewayBudgetOverviewRepository;
     organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
@@ -119,7 +114,6 @@ export class BudgetOverviewService {
     providerLabels: GatewayProviderLabelRepository;
     chRepo?: GatewayBudgetSpendRepository;
   }) {
-    this.repository = repository;
     this.organizations = organizations;
     this.featureFlags = featureFlags;
     this.personalVirtualKeys = personalVirtualKeys;
@@ -137,7 +131,6 @@ export class BudgetOverviewService {
   }
 
   static create(options: {
-    repository: GatewayBudgetOverviewRepository;
     organizations: Pick<OrganizationApi, "isMember" | "getPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
@@ -147,7 +140,6 @@ export class BudgetOverviewService {
     budgetRepository?: GatewayBudgetSpendRepository;
   }): BudgetOverviewService {
     return new BudgetOverviewService({
-      repository: options.repository,
       organizations: options.organizations,
       featureFlags: options.featureFlags,
       personalVirtualKeys: options.personalVirtualKeys,
@@ -238,82 +230,6 @@ export class BudgetOverviewService {
       topModels,
     });
     return { gatewayAccess: true, budgets };
-  }
-
-  /**
-   * One budget in the same item shape, for surfaces looking at the budget itself rather than at a
-   * person. There is no user in context, so a group budget reports the whole group's spend and
-   * person-relative labels fall back to absolute phrases.
-   */
-  async findBudgetOverview(input: {
-    organizationId: string;
-    budgetId: string;
-  }): Promise<BudgetOverviewItem | null> {
-    const budget = await this.repository.findBudget({
-      organizationId: input.organizationId,
-      budgetId: input.budgetId,
-    });
-    if (!budget) {
-      return null;
-    }
-
-    const [targets, providerLabels, spentUsd] = await Promise.all([
-      this.budgetDecisions.resolveScopeTargets([budget], input.organizationId),
-      this.providerLabels.resolveProviderLabels([budget]),
-      this.loadSpendForBudget(budget, input.organizationId),
-    ]);
-
-    const scopeLabel =
-      targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId;
-    const scopeClass = classifyAbsoluteScope(budget.scopeType) ?? "other";
-
-    return {
-      id: budget.id,
-      name: budget.name,
-      scopeType: budget.scopeType,
-      scopeId: budget.scopeId,
-      scopeLabel,
-      window: budget.window,
-      limitUsd: budget.limitUsd.toFixed(6),
-      spentUsd,
-      onBreach: budget.onBreach,
-      timezone: budget.timezone,
-      providerKey: budget.providerKey,
-      providerLabel: budget.providerKey
-        ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
-        : null,
-      isPerMember: budget.scopeType === "GROUP",
-      managedByVirtualKeyId: budget.managedByVirtualKeyId,
-      scopeClass,
-      scopePhrase: absoluteScopePhrase(budget.scopeType, scopeLabel),
-      resetsAt: computeResetsAt(budget.window),
-    };
-  }
-
-  private async loadSpendForBudget(budget: GatewayBudget, organizationId: string): Promise<string> {
-    if (!this.chRepo) {
-      return "0";
-    }
-
-    const tenantIds = await this.budgetDecisions.listSpendTenantIds(organizationId);
-    if (tenantIds.length === 0) {
-      return "0";
-    }
-
-    const now = nowInstant();
-    try {
-      const spends = await this.chRepo.findSpendForTargetsAcrossTenants(
-        tenantIds,
-        budgetSpendTargetsFor({ budgets: [budget], now }),
-        now,
-      );
-
-      return spends[0]?.spentUsd ?? "0";
-    } catch {
-      // Same posture as the applicable-budgets list: spend decorates the
-      // budget, a rollup outage must not blank the surface.
-      return "0";
-    }
   }
 
   private async loadTopModels(input: {
@@ -467,21 +383,6 @@ function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string
     case "other":
       return `budget (${scopeLabel})`;
   }
-}
-
-function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
-  const scopeClass = classifyAbsoluteScope(scopeType);
-  // Without a user in context "this key's budget" and a bare "personal
-  // budget" would dangle; name the target instead.
-  if (scopeClass === "key") {
-    return `key budget (${scopeLabel})`;
-  }
-
-  if (scopeClass === "personal") {
-    return `personal budget (${scopeLabel})`;
-  }
-
-  return scopePhraseFor(scopeClass ?? "other", scopeLabel);
 }
 
 function computeResetsAt(window: string): string | null {

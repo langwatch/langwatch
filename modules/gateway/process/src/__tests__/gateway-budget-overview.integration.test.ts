@@ -17,7 +17,6 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository.ts";
 import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import {
@@ -132,7 +131,6 @@ const featureFlags = new TestFeatureFlags();
 
 const overviewService = (): BudgetOverviewService =>
   BudgetOverviewService.create({
-    repository: PrismaGatewayBudgetOverviewRepository.create({ database: prisma }),
     organizations: suiteOrganizations(),
     featureFlags: featureFlags.api,
     personalVirtualKeys: {
@@ -269,9 +267,9 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       const onOverview = overview.budgets.find((b) => b.id === BUDGET_ARCHIVED_ID);
       expect(onOverview).toBeDefined();
 
-      const detail = await service.findBudgetOverview({
+      const detail = await budgetDecisions.findDetailById({
+        id: BUDGET_ARCHIVED_ID,
         organizationId: ORG_ID,
-        budgetId: BUDGET_ARCHIVED_ID,
       });
 
       // Archiving a project retires it from the product, not from the
@@ -280,13 +278,13 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       // there. The tRPC and REST mirrors above this service are transports
       // over the same two reads.
       expect(Number(onOverview!.spentUsd)).toBeCloseTo(3.3, 6);
-      expect(Number(detail!.spentUsd)).toBeCloseTo(3.3, 6);
+      expect(Number(detail!.budget.spentUsd)).toBeCloseTo(3.3, 6);
     });
   });
 
   describe("given the same seeded budget read through every surface", () => {
     /** @scenario "Every surface reports the same spend for the same budget" */
-    it("the member overview, the budget's own overview read and the budget detail agree on spentUsd", async () => {
+    it("the member overview and the budget detail agree on spentUsd", async () => {
       const service = overviewService();
       const overview = await service.overviewForUser({
         organizationId: ORG_ID,
@@ -294,12 +292,6 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       });
       const onOverview = overview.budgets.find((b) => b.id === BUDGET_ORG_ID);
       expect(onOverview).toBeDefined();
-
-      const perBudget = await service.findBudgetOverview({
-        organizationId: ORG_ID,
-        budgetId: BUDGET_ORG_ID,
-      });
-      expect(perBudget).not.toBeNull();
 
       const detail = await budgetDecisions.findDetailById({
         id: BUDGET_ORG_ID,
@@ -312,9 +304,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       // budgets settings read is a transport over `findDetailById`, a different
       // query against the same ledger.
       expect(Number(onOverview!.spentUsd)).toBeCloseTo(2.43, 6);
-      expect(Number(perBudget!.spentUsd)).toBeCloseTo(Number(onOverview!.spentUsd), 6);
       expect(Number(detail!.budget.spentUsd)).toBeCloseTo(Number(onOverview!.spentUsd), 6);
-      expect(perBudget!.scopePhrase).toBe(onOverview!.scopePhrase);
     });
   });
 
