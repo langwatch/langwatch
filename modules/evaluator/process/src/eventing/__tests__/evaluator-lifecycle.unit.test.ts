@@ -11,8 +11,10 @@ import { createTenantId, type Command } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { EvaluatorDeletionFactsService } from "../../services/evaluator-deletion-facts.service.ts";
-import { RecordEvaluatorDeletedCommand } from "../evaluator-lifecycle.commands.ts";
-import type { RecordEvaluatorDeletedCommandData } from "../evaluator-lifecycle.events.ts";
+import {
+  RecordEvaluatorDeletedCommand,
+  type RecordEvaluatorDeletedCommandData,
+} from "../evaluator-lifecycle.commands.ts";
 
 const DELETED: RecordEvaluatorDeletedCommandData = {
   tenantId: "project-1",

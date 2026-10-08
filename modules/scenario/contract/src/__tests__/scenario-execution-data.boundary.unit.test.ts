@@ -81,7 +81,7 @@ describe("the child execution contract's schemas", () => {
     describe("when its imports are inspected", () => {
       /** @scenario "The shared field mapping schema carries no framework dependency" */
       it("imports zod and nothing else", () => {
-        const source = readFileSync(join(CONTRACT_SRC, "field-mapping.ts"), "utf8");
+        const source = readFileSync(join(CONTRACT_SRC, "resolve-field-mappings.ts"), "utf8");
         const specifiers = [
           ...source.matchAll(/^import\s+(?:type\s+)?[\s\S]*?\sfrom\s+["']([^"']+)["']/gm),
         ].map((match) => match[1]);

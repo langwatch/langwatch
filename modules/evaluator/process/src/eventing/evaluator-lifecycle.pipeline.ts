@@ -11,8 +11,10 @@ import {
 
 import type { EvaluatorModule } from "../app/evaluator.app.ts";
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
-import { RecordEvaluatorDeletedCommand } from "./evaluator-lifecycle.commands.ts";
-import { evaluatorDeletedEventSchema } from "./evaluator-lifecycle.events.ts";
+import {
+  evaluatorDeletedEventSchema,
+  RecordEvaluatorDeletedCommand,
+} from "./evaluator-lifecycle.commands.ts";
 
 /**
  * evaluator_lifecycle: evaluator records its deletion; monitor removes the monitors that ran

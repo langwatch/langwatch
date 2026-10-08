@@ -1,7 +1,7 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { RecordEvaluatorDeletedCommandData } from "../eventing/evaluator-lifecycle.events.ts";
+import type { RecordEvaluatorDeletedCommandData } from "../eventing/evaluator-lifecycle.commands.ts";
 
 /** evaluator_lifecycle's senders, bound once the pipeline registers in this process. */
 export type EvaluatorLifecycleSenders = Readonly<{

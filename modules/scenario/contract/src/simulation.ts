@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FieldMappingSchema } from "./field-mapping.ts";
+import { FieldMappingSchema } from "./resolve-field-mappings.ts";
 import { runActorLabelSchema } from "./run-actor.ts";
 import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";

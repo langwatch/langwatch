@@ -10,4 +10,3 @@ export * from "./webhook-rest.schemas.ts";
 export * from "./webhook-spend-replay.schemas.ts";
 export * from "./webhook-request.ts";
 export * from "./webhook-delivery-request.ts";
-export * from "./webhook.config.ts";

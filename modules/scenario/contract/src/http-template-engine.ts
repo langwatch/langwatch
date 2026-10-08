@@ -2,10 +2,10 @@
 
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
 
-import type { FieldMapping } from "./field-mapping.ts";
-import type { ScenarioInput } from "./resolve-field-mappings.ts";
 import {
+  type FieldMapping,
   resolveFieldMappings,
+  type ScenarioInput,
   sessionAsText,
   extractSourceField,
 } from "./resolve-field-mappings.ts";

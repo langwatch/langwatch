@@ -1,6 +1,5 @@
 export * from "./agent.ts";
 export * from "./agent.commands.ts";
-export * from "./agent-lifecycle.events.ts";
 export * from "./agent.errors.ts";
 export * from "./agent.queries.ts";
 export * from "./agent.schemas.ts";
@@ -21,4 +20,3 @@ export * from "./connected-agent.transport.ts";
 export * from "./connected-agent.view.ts";
 export * from "./connected-agent.visibility.ts";
 export * from "./agent.api.ts";
-export * from "./agent.config.ts";

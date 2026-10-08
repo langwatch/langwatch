@@ -13,14 +13,6 @@ vi.mock("../use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 
-vi.mock("../use-prompt-id-query-param.ts", () => ({
-  usePromptIdQueryParam: () => ({
-    selectedPromptId: null,
-    setSelectedPromptId: vi.fn(),
-    clearSelection: vi.fn(),
-  }),
-}));
-
 const { mockGetResolvedDefault } = vi.hoisted(() => ({
   mockGetResolvedDefault: vi.fn(),
 }));
@@ -66,7 +58,7 @@ const capabilities = {
 };
 
 vi.mock("../../model/prompt-host.ts", () => ({
-  usePromptHost: () => ({ tabCapabilities: () => capabilities }),
+  usePromptHost: () => ({ tabCapabilities: () => capabilities, route: () => ({ query: {} }) }),
 }));
 
 const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));

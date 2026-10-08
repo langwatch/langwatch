@@ -1,6 +1,1 @@
-export {
-  evaluatorClient,
-  type EvaluatorInputs,
-  type EvaluatorOutputs,
-} from "./evaluator-client.ts";
-export * from "./evaluator-lent.ts";
+export * from "./evaluator-client.ts";

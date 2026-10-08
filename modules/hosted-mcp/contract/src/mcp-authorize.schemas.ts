@@ -1,3 +1,4 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
@@ -84,3 +85,10 @@ export const mcpAuthorizationCodeRecordSchema = z.object({
 });
 
 export type McpAuthorizationCodeRecord = z.infer<typeof mcpAuthorizationCodeRecordSchema>;
+
+/** Hosted MCP's one deployment fact: the public origin an MCP client is told to come back to. */
+export const hostedMcpConfig = Config.define(() => ({
+  publicBaseUrl,
+}));
+
+export type HostedMcpServerConfig = ConfigOf<typeof hostedMcpConfig>;

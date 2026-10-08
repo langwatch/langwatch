@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FieldMappingSchema } from "./field-mapping.ts";
+import { FieldMappingSchema } from "./resolve-field-mappings.ts";
 import { runParameterValuesSchema } from "./scenario.parameters.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 

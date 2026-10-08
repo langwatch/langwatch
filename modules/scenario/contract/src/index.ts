@@ -1,6 +1,5 @@
 export * from "./scenario.ts";
 export * from "./scenario.errors.ts";
-export * from "./field-mapping.ts";
 export * from "./resolve-field-mappings.ts";
 export * from "./http-template-engine.ts";
 export * from "./run-parameters.ts";

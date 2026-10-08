@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { TOPIC_CLUSTERING_TRIGGER } from "./topic-clustering.constants.ts";
@@ -96,3 +97,15 @@ export const namedTopicCountsSchema = z.object({
   ),
 });
 export type NamedTopicCounts = z.infer<typeof namedTopicCountsSchema>;
+
+/** The project's conversation topics, and what the last clustering run did. */
+export interface TopicApi {
+  getAll(input: TopicProjectInput): Promise<Topic[]>;
+  getNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
+  getClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatus>;
+  getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
+  /** Asks the project's clustering process for a run; ports main's `requestClustering`. */
+  requestClustering(input: TopicClusteringRequestInput): Promise<void>;
+}
+
+export const TopicApi = moduleApi<TopicApi>()("topic");

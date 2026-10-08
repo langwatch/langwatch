@@ -2,7 +2,7 @@ Feature: Scenario child execution contract stays private to the child
 
   `modules/scenario/contract/src/scenario-execution-data.ts` defines
   the validated stdin contract between the worker and its isolated child.
-  Portable field mappings live separately in `field-mapping.ts`, so Suite and
+  Portable field mappings live separately in `resolve-field-mappings.ts`, so Suite and
   browser authoring do not import the child execution payload.
 
   # ---------------------------------------------------------------------------

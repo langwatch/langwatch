@@ -4,4 +4,3 @@ export * from "./github.api.ts";
 export * from "./github.trpc.ts";
 export * from "./github.errors.ts";
 export * from "./github.config.ts";
-export * from "./github-lifecycle.events.ts";
