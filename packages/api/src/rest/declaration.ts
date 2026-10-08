@@ -824,7 +824,12 @@ class RouteBuilder<Api, S extends RouteShape> {
   withRawBody<Form extends RestRawBodyForm>(
     this: RouteBuilder<Api, With<S, { method: Exclude<HttpMethod, "get" | "head"> }>>,
     form: Form,
-    options: Readonly<{ mediaType?: string; mismatch?: RestMediaTypeMismatch }> = {},
+    options: Readonly<{
+      mediaType?: string;
+      mismatch?: RestMediaTypeMismatch;
+      /** Why the route needs the exact body; `langwatch/raw-body-bypass` asks for it. */
+      because?: string;
+    }> = {},
   ): RouteBuilder<
     Api,
     With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
