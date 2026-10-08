@@ -3,6 +3,7 @@ import {
   Field,
   HStack,
   Spinner,
+  Stack,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -12,7 +13,7 @@ import { HandledErrorAlert } from "~/features/errors";
 import type { AggregateRule } from "~/server/app-layer/projects/aggregate-rule";
 import { api } from "../../utils/api";
 import { ProjectAvatar } from "../ProjectAvatar";
-import { Checkbox } from "../ui/checkbox";
+import { Radio, RadioGroup } from "../ui/radio";
 import { Select } from "../ui/select";
 
 type Candidate = {
@@ -23,52 +24,35 @@ type Candidate = {
 };
 
 /**
- * What the admin picked for a new aggregate: whether it reads every personal
- * workspace, and which projects it reads besides (or instead).
+ * What the admin answered for a new aggregate: everyone's personal project
+ * (optionally one department's), or a list of specific projects. Each answer
+ * is exactly one rule kind; they never mix.
  */
-export type AggregateMemberSelection = {
-  allPersonal: boolean;
-  projectIds: string[];
-};
+export type AggregateMemberSelection =
+  | { mode: "personal"; departmentId: string | null }
+  | { mode: "specific"; projectIds: string[] };
 
-/** Preselected: every personal workspace, nothing else named. */
+/** Preselected: every personal project, in every department. */
 export const AGGREGATE_DEFAULT_SELECTION: AggregateMemberSelection = {
-  allPersonal: true,
-  projectIds: [],
+  mode: "personal",
+  departmentId: null,
 };
 
-/**
- * The rule the selection stands for (ADR-144). "All personal workspaces" is
- * the all-personal rule, carrying any picked projects on top; without it the
- * picks are an explicit list.
- */
+/** The rule the selection stands for (ADR-144). */
 export function aggregateRuleOf(
   selection: AggregateMemberSelection,
 ): AggregateRule {
-  const { allPersonal, projectIds } = selection;
-  if (!allPersonal) return { kind: "explicit", projectIds };
-  return projectIds.length > 0
-    ? { kind: "all-personal", projectIds }
+  if (selection.mode === "specific") {
+    return { kind: "explicit", projectIds: selection.projectIds };
+  }
+  return selection.departmentId
+    ? { kind: "personal-by-department", departmentId: selection.departmentId }
     : { kind: "all-personal" };
 }
 
-/** Whether the selection includes anything: an aggregate reading nothing is refused. */
+/** Whether the selection reads anything: specific projects need at least one. */
 export function selectsAnyMember(selection: AggregateMemberSelection): boolean {
-  return selection.allPersonal || selection.projectIds.length > 0;
-}
-
-/**
- * The two groups of the dropdown. Personal is the stored `Project.isPersonal`
- * flag, the same one the all-personal rule resolves by, never a guess from a
- * name. The server has already left out the kinds an aggregate never reads.
- */
-function groupAggregateCandidates<C extends { isPersonal: boolean }>(
-  candidates: readonly C[],
-): { personal: C[]; llmOps: C[] } {
-  return {
-    personal: candidates.filter((candidate) => candidate.isPersonal),
-    llmOps: candidates.filter((candidate) => !candidate.isPersonal),
-  };
+  return selection.mode === "personal" || selection.projectIds.length > 0;
 }
 
 /**
@@ -80,25 +64,14 @@ function summariseSelectedProjects(names: readonly string[]): string {
   return `${names.length} projects`;
 }
 
-/** Whose workspace a personal project is: the owner's email, else their name. */
-function ownerOf(candidate: Candidate): string | null {
-  if (!candidate.isPersonal) return null;
-  return candidate.owner?.email || candidate.owner?.name || null;
-}
-
-type CandidateItem = { value: string; label: string; candidate: Candidate };
-
-const toItem = (candidate: Candidate): CandidateItem => ({
-  value: candidate.id,
-  label: candidate.name,
-  candidate,
-});
+/** The department select's value for "every department". */
+const ALL_DEPARTMENTS = "all";
 
 /**
- * The members a new aggregate reads (ADR-144): every personal workspace by
- * default, which keeps joiners and leavers in step, and any projects picked
- * from the dropdown on top. Unchecking "All personal workspaces" turns the
- * dropdown into the whole list, personal workspaces included.
+ * "What do you want to govern?" for a new aggregate (ADR-144). Personal
+ * projects is the default: it follows people as they join and leave. An
+ * organisation with departments may narrow it to one. Specific projects is a
+ * fixed list picked from a dropdown.
  */
 export function AggregateMemberPicker({
   organizationId,
@@ -109,108 +82,198 @@ export function AggregateMemberPicker({
   value: AggregateMemberSelection;
   onChange: (selection: AggregateMemberSelection) => void;
 }): React.ReactElement {
+  return (
+    <Field.Root>
+      <Field.Label>What do you want to govern?</Field.Label>
+      <RadioGroup
+        value={value.mode}
+        onValueChange={({ value: mode }) => {
+          if (mode === value.mode) return;
+          onChange(
+            mode === "specific"
+              ? { mode: "specific", projectIds: [] }
+              : AGGREGATE_DEFAULT_SELECTION,
+          );
+        }}
+      >
+        <Stack gap={3} align="stretch">
+          <VStack align="stretch" gap={2}>
+            <Radio value="personal">Personal projects (coding agents)</Radio>
+            <Text fontSize="sm" color="fg.muted" paddingStart={6}>
+              Everyone's personal project, including people who join later.
+            </Text>
+            {value.mode === "personal" && (
+              <DepartmentSelect
+                organizationId={organizationId}
+                value={value.departmentId}
+                onChange={(departmentId) =>
+                  onChange({ mode: "personal", departmentId })
+                }
+              />
+            )}
+          </VStack>
+          <VStack align="stretch" gap={2}>
+            <Radio value="specific">Specific projects</Radio>
+            {value.mode === "specific" && (
+              <SpecificProjects
+                organizationId={organizationId}
+                value={value.projectIds}
+                onChange={(projectIds) =>
+                  onChange({ mode: "specific", projectIds })
+                }
+              />
+            )}
+          </VStack>
+        </Stack>
+      </RadioGroup>
+    </Field.Root>
+  );
+}
+
+/**
+ * Narrows the personal rule to one department. Shown only when the
+ * organisation has departments: with none there is nothing to narrow to, and
+ * a list that cannot load leaves the default, every department, in place.
+ */
+function DepartmentSelect({
+  organizationId,
+  value,
+  onChange,
+}: {
+  organizationId: string;
+  value: string | null;
+  onChange: (departmentId: string | null) => void;
+}): React.ReactElement | null {
+  const departments = api.departments.list.useQuery(
+    { organizationId },
+    { enabled: !!organizationId, refetchOnWindowFocus: false },
+  );
+  const collection = useMemo(
+    () =>
+      createListCollection({
+        items: [
+          { value: ALL_DEPARTMENTS, label: "All departments" },
+          ...(departments.data ?? []).map((department) => ({
+            value: department.id,
+            label: department.name,
+          })),
+        ],
+      }),
+    [departments.data],
+  );
+
+  if (!departments.data || departments.data.length === 0) return null;
+
+  return (
+    <Field.Root paddingStart={6}>
+      <Select.Root
+        collection={collection}
+        value={[value ?? ALL_DEPARTMENTS]}
+        onValueChange={({ value: [next] }) =>
+          onChange(!next || next === ALL_DEPARTMENTS ? null : next)
+        }
+      >
+        <Select.Trigger aria-label="Department">
+          <Select.ValueText placeholder="All departments" />
+        </Select.Trigger>
+        <Select.Content>
+          {collection.items.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Field.Root>
+  );
+}
+
+type CandidateItem = { value: string; label: string };
+
+const toItem = (candidate: Candidate): CandidateItem => ({
+  value: candidate.id,
+  label: candidate.name,
+});
+
+/** Whose workspace a personal project is: the owner's email, else their name. */
+function ownerOf(candidate: Candidate): string | null {
+  if (!candidate.isPersonal) return null;
+  return candidate.owner?.email || candidate.owner?.name || null;
+}
+
+/**
+ * The fixed list: every project an aggregate may read, personal projects and
+ * LLMOps projects in two groups. Personal is the stored `Project.isPersonal`
+ * flag, never a guess from a name; the server has already left out the kinds
+ * an aggregate never reads.
+ */
+function SpecificProjects({
+  organizationId,
+  value,
+  onChange,
+}: {
+  organizationId: string;
+  value: string[];
+  onChange: (projectIds: string[]) => void;
+}): React.ReactElement {
   const candidates = api.project.aggregateMemberCandidates.useQuery(
     { organizationId },
     { enabled: !!organizationId },
   );
-
-  const groups = useMemo(
-    () => groupAggregateCandidates(candidates.data ?? []),
-    [candidates.data],
-  );
-
-  const setAllPersonal = (allPersonal: boolean) => {
-    // The rule covers every personal workspace once this is on, so a
-    // workspace picked by hand would be both hidden and named twice.
-    const personalIds = new Set(groups.personal.map((c) => c.id));
-    onChange({
-      allPersonal,
-      projectIds: allPersonal
-        ? value.projectIds.filter((id) => !personalIds.has(id))
-        : value.projectIds,
-    });
-  };
-
-  return (
-    <VStack align="stretch" gap={4}>
-      <Field.Root>
-        <Checkbox
-          checked={value.allPersonal}
-          onCheckedChange={({ checked }) => setAllPersonal(checked === true)}
-        >
-          All personal workspaces
-        </Checkbox>
-        <Field.HelperText>
-          Everyone's workspace, including people who join later.
-        </Field.HelperText>
-      </Field.Root>
-
-      <Field.Root>
-        <Field.Label>Projects</Field.Label>
-        {candidates.error ? (
-          <HandledErrorAlert
-            error={candidates.error}
-            fallbackTitle="Couldn't list this organization's projects"
-          />
-        ) : !candidates.data ? (
-          <Spinner size="sm" />
-        ) : (
-          <ProjectsSelect
-            personal={value.allPersonal ? [] : groups.personal}
-            llmOps={groups.llmOps}
-            value={value.projectIds}
-            onChange={(projectIds) => onChange({ ...value, projectIds })}
-          />
-        )}
-        {!selectsAnyMember(value) && (
-          <Field.HelperText>
-            Pick at least one project, or include all personal workspaces.
-          </Field.HelperText>
-        )}
-      </Field.Root>
-    </VStack>
-  );
-}
-
-function ProjectsSelect({
-  personal,
-  llmOps,
-  value,
-  onChange,
-}: {
-  personal: Candidate[];
-  llmOps: Candidate[];
-  value: string[];
-  onChange: (projectIds: string[]) => void;
-}): React.ReactElement {
+  const groups = useMemo(() => {
+    const all = candidates.data ?? [];
+    return {
+      personal: all.filter((candidate) => candidate.isPersonal),
+      llmOps: all.filter((candidate) => !candidate.isPersonal),
+    };
+  }, [candidates.data]);
   const collection = useMemo(
-    () => createListCollection({ items: [...personal, ...llmOps].map(toItem) }),
-    [personal, llmOps],
+    () =>
+      createListCollection({
+        items: [...groups.personal, ...groups.llmOps].map(toItem),
+      }),
+    [groups],
   );
 
+  if (candidates.error) {
+    return (
+      <HandledErrorAlert
+        error={candidates.error}
+        fallbackTitle="Couldn't list this organization's projects"
+      />
+    );
+  }
+  if (!candidates.data) return <Spinner size="sm" />;
+
   return (
-    <Select.Root
-      collection={collection}
-      multiple
-      value={value}
-      onValueChange={(details) => onChange(details.value)}
-    >
-      <Select.Trigger aria-label="Projects">
-        <Select.ValueText placeholder="Select projects">
-          {(items) =>
-            summariseSelectedProjects(
-              items.map((item) => (item as CandidateItem).label),
-            )
-          }
-        </Select.ValueText>
-      </Select.Trigger>
-      <Select.Content>
-        {personal.length > 0 && (
-          <CandidateGroup label="Personal workspaces" candidates={personal} />
-        )}
-        <CandidateGroup label="LLMOps projects" candidates={llmOps} />
-      </Select.Content>
-    </Select.Root>
+    <Field.Root paddingStart={6}>
+      <Select.Root
+        collection={collection}
+        multiple
+        value={value}
+        onValueChange={(details) => onChange(details.value)}
+      >
+        <Select.Trigger aria-label="Projects">
+          <Select.ValueText placeholder="Select projects">
+            {(items) =>
+              summariseSelectedProjects(
+                items.map((item) => (item as CandidateItem).label),
+              )
+            }
+          </Select.ValueText>
+        </Select.Trigger>
+        <Select.Content>
+          <CandidateGroup
+            label="Personal projects"
+            candidates={groups.personal}
+          />
+          <CandidateGroup label="LLMOps projects" candidates={groups.llmOps} />
+        </Select.Content>
+      </Select.Root>
+      {value.length === 0 && (
+        <Field.HelperText>Pick at least one project.</Field.HelperText>
+      )}
+    </Field.Root>
   );
 }
 

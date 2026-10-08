@@ -2,9 +2,10 @@
  * @vitest-environment jsdom
  *
  * ADR-144: an organisation admin creates an aggregate project from the
- * "Create New Project" drawer by checking Governance: every personal workspace
- * by default, and projects picked from a dropdown on top or instead. The API is mocked at its boundary; the claims are about what the
- * drawer offers and what it sends.
+ * "Create New Project" drawer by checking Governance, then answering what it
+ * governs: personal projects (all, or one department's) or specific projects
+ * picked from a dropdown. The API is mocked at its boundary; the claims are
+ * about what the drawer offers and what it sends.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -31,6 +32,12 @@ let candidatesQuery: { data: unknown; error: unknown } = {
   data: null,
   error: null,
 };
+let departmentsQuery: { data: unknown } = { data: [] };
+
+const DEPARTMENTS = [
+  { id: "dept-eng", name: "Engineering", organizationId: "org-acme" },
+  { id: "dept-sales", name: "Sales", organizationId: "org-acme" },
+];
 
 const CANDIDATES = [
   {
@@ -100,6 +107,9 @@ vi.mock("../../../utils/api", () => ({
         useQuery: () => candidatesQuery,
       },
     },
+    departments: {
+      list: { useQuery: () => departmentsQuery },
+    },
     team: {
       getTeamsWithMembers: {
         useQuery: () => ({
@@ -121,12 +131,15 @@ const renderDrawer = () =>
   });
 
 const createButton = () => screen.getByRole("button", { name: "Create" });
-const allPersonalCheckbox = () =>
-  screen.getByRole("checkbox", { name: "All personal workspaces" });
+const personalRadio = () =>
+  screen.getByRole("radio", { name: "Personal projects (coding agents)" });
+const specificRadio = () =>
+  screen.getByRole("radio", { name: "Specific projects" });
 const projectsTrigger = () =>
   screen.getByRole("combobox", { name: "Projects" });
-const PICK_ONE =
-  "Pick at least one project, or include all personal workspaces.";
+const departmentTrigger = () =>
+  screen.getByRole("combobox", { name: "Department" });
+const PICK_ONE = "Pick at least one project.";
 
 type User = ReturnType<typeof userEvent.setup>;
 const checkGovernance = (user: User) =>
@@ -138,6 +151,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
     organizationRole = "ADMIN";
     mutateCalls = [];
     candidatesQuery = { data: CANDIDATES, error: null };
+    departmentsQuery = { data: [] };
   });
 
   afterEach(() => {
@@ -145,27 +159,18 @@ describe("<CreateProjectDrawer/> Governance", () => {
   });
 
   describe("given an organisation admin", () => {
-    describe("when she checks Governance and creates without picking a project", () => {
-      /** @scenario "Governance covers every personal workspace by default" */
-      it("keeps All personal workspaces on, offers only LLMOps projects and sends the all-personal rule", async () => {
+    describe("when she checks Governance and creates straight away", () => {
+      /** @scenario "Governance covers every personal project by default" */
+      it("has Personal projects chosen and sends the all-personal rule", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
 
-        expect(allPersonalCheckbox()).toBeChecked();
-        await openProjects(user);
-        expect(
-          screen.getByRole("option", { name: /Support chatbot/ }),
-        ).toBeInTheDocument();
-        expect(
-          screen.queryByRole("option", { name: /Eve's workspace/ }),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByText("Personal workspaces"),
-        ).not.toBeInTheDocument();
-        await user.keyboard("{Escape}");
+        expect(personalRadio()).toBeChecked();
+        expect(specificRadio()).not.toBeChecked();
+        expect(screen.queryByRole("combobox", { name: "Projects" })).toBeNull();
 
         expect(createButton()).toBeEnabled();
         await user.click(createButton());
@@ -177,51 +182,70 @@ describe("<CreateProjectDrawer/> Governance", () => {
           kind: "aggregate",
           aggregateRule: { kind: "all-personal" },
         });
-        expect(mutateCalls[0]?.aggregateRule).not.toHaveProperty("projectIds");
       });
     });
 
-    describe("when she keeps All personal workspaces and picks one LLMOps project", () => {
-      /** @scenario "An admin adds LLMOps projects on top of every personal workspace" */
-      it("shows the pick on the dropdown and sends it on top of every personal workspace", async () => {
+    describe("when the organisation has departments and she picks one", () => {
+      /** @scenario "An admin narrows personal projects to one department" */
+      it("defaults to All departments and sends the by-department rule", async () => {
+        departmentsQuery = { data: DEPARTMENTS };
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
-        await openProjects(user);
-        await user.click(
-          screen.getByRole("option", { name: /Support chatbot/ }),
-        );
-        await user.keyboard("{Escape}");
 
-        expect(projectsTrigger()).toHaveTextContent("Support chatbot");
+        expect(departmentTrigger()).toHaveTextContent("All departments");
+        await user.click(departmentTrigger());
+        await user.click(screen.getByRole("option", { name: "Engineering" }));
+        expect(departmentTrigger()).toHaveTextContent("Engineering");
+
         await user.click(createButton());
 
         await waitFor(() => expect(mutateCalls).toHaveLength(1));
         expect(mutateCalls[0]).toMatchObject({
           kind: "aggregate",
           aggregateRule: {
-            kind: "all-personal",
-            projectIds: ["project-chatbot"],
+            kind: "personal-by-department",
+            departmentId: "dept-eng",
           },
         });
       });
     });
 
-    describe("when she unchecks All personal workspaces, picks two projects and creates", () => {
-      /** @scenario "An admin picks projects one by one when All personal workspaces is off" */
+    describe("when the organisation has no departments", () => {
+      /** @scenario "An organisation without departments is not offered a department choice" */
+      it("shows no department choice", async () => {
+        departmentsQuery = { data: [] };
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await checkGovernance(user);
+
+        expect(personalRadio()).toBeChecked();
+        expect(
+          screen.queryByRole("combobox", { name: "Department" }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when she chooses Specific projects, picks two and creates", () => {
+      /** @scenario "An admin picks specific projects from a dropdown" */
       it("offers both groups with each owner's email and sends an explicit rule over the two", async () => {
+        departmentsQuery = { data: DEPARTMENTS };
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
-        await user.click(allPersonalCheckbox());
+        await user.click(specificRadio());
+        expect(
+          screen.queryByRole("combobox", { name: "Department" }),
+        ).not.toBeInTheDocument();
         await openProjects(user);
 
         const personal = screen.getByRole("group", {
-          name: "Personal workspaces",
+          name: "Personal projects",
         });
         const llmOps = screen.getByRole("group", { name: "LLMOps projects" });
         expect(
@@ -266,7 +290,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         renderDrawer();
 
         await checkGovernance(user);
-        await user.click(allPersonalCheckbox());
+        await user.click(specificRadio());
         await openProjects(user);
         for (const name of [
           /Eve's workspace/,
@@ -281,36 +305,30 @@ describe("<CreateProjectDrawer/> Governance", () => {
       });
     });
 
-    describe("when she picks a personal workspace and then checks All personal workspaces again", () => {
-      it("drops the hand-picked workspace, which the rule now covers", async () => {
+    describe("when she picks a department, then specific projects, then personal again", () => {
+      it("starts over from every personal project", async () => {
+        departmentsQuery = { data: DEPARTMENTS };
         const user = userEvent.setup();
         renderDrawer();
 
         await user.type(screen.getByPlaceholderText("AI Project"), "Company");
         await checkGovernance(user);
-        await user.click(allPersonalCheckbox());
-        await openProjects(user);
-        await user.click(
-          screen.getByRole("option", { name: /Eve's workspace/ }),
-        );
-        await user.click(
-          screen.getByRole("option", { name: /Support chatbot/ }),
-        );
-        await user.keyboard("{Escape}");
-        await user.click(allPersonalCheckbox());
+        await user.click(departmentTrigger());
+        await user.click(screen.getByRole("option", { name: "Engineering" }));
+        await user.click(specificRadio());
+        await user.click(personalRadio());
+
+        expect(departmentTrigger()).toHaveTextContent("All departments");
         await user.click(createButton());
 
         await waitFor(() => expect(mutateCalls).toHaveLength(1));
         expect(mutateCalls[0]).toMatchObject({
-          aggregateRule: {
-            kind: "all-personal",
-            projectIds: ["project-chatbot"],
-          },
+          aggregateRule: { kind: "all-personal" },
         });
       });
     });
 
-    describe("when she unchecks All personal workspaces and picks nothing", () => {
+    describe("when she chooses Specific projects and picks nothing", () => {
       /** @scenario "Create stays disabled until a project is picked" */
       it("keeps Create disabled and says why until one project is picked", async () => {
         const user = userEvent.setup();
@@ -320,7 +338,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
         await checkGovernance(user);
         expect(createButton()).toBeEnabled();
 
-        await user.click(allPersonalCheckbox());
+        await user.click(specificRadio());
         expect(createButton()).toBeDisabled();
         expect(screen.getByText(PICK_ONE)).toBeVisible();
 
@@ -379,7 +397,8 @@ describe("<CreateProjectDrawer/> Governance", () => {
         const user = userEvent.setup();
         renderDrawer();
 
-        await user.click(screen.getByRole("checkbox", { name: "Governance" }));
+        await checkGovernance(user);
+        await user.click(specificRadio());
 
         const alert = screen.getByRole("alert");
         expect(
@@ -427,7 +446,8 @@ describe("<CreateProjectDrawer/> Governance", () => {
         const user = userEvent.setup();
         renderDrawer();
 
-        await user.click(screen.getByRole("checkbox", { name: "Governance" }));
+        await checkGovernance(user);
+        await user.click(specificRadio());
 
         const alert = screen.getByRole("alert");
         expect(

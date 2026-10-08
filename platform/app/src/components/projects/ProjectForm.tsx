@@ -42,7 +42,7 @@ export interface ProjectFormData {
   newTeamName?: string;
   /** ADR-144: create an aggregate that reads the picked members. */
   isAggregate: boolean;
-  /** What the aggregate reads: every personal workspace, picked projects, or both. */
+  /** What the aggregate reads: personal projects (optionally one department) or specific projects. */
   aggregateMembers: AggregateMemberSelection;
 }
 

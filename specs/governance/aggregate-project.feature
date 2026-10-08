@@ -164,10 +164,34 @@ Feature: An aggregate project reads its member projects
     Then exactly those two projects are members
     And the list may include projects that are not personal
 
+  # The drawer asks "What do you want to govern?" and takes exactly one answer:
+  # personal projects (optionally one department's) or specific projects. Each
+  # answer is one rule kind; a rule never mixes them.
+
   @integration
-  Scenario: An admin creates an aggregate from the new project drawer by picking projects
+  Scenario: Governance covers every personal project by default
     When ana opens "Create New Project" and checks "Governance"
-    Then she sees the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
+    Then "Personal projects (coding agents)" is chosen
+    When she creates the project
+    Then the new project is an aggregate whose rule is "all personal projects"
+
+  @integration
+  Scenario: An admin narrows personal projects to one department
+    Given the organisation has the department Engineering
+    When ana checks "Governance" and picks Engineering in place of "All departments"
+    And she creates the project
+    Then the new project is an aggregate whose rule is "personal projects in department Engineering"
+
+  @integration
+  Scenario: An organisation without departments is not offered a department choice
+    Given the organisation has no departments
+    When ana checks "Governance"
+    Then there is no department choice under "Personal projects (coding agents)"
+
+  @integration
+  Scenario: An admin picks specific projects from a dropdown
+    When ana checks "Governance" and chooses "Specific projects"
+    Then the dropdown lists the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
     When she picks two projects and creates the project
     Then the new project is an aggregate whose explicit rule names exactly those two projects
 
@@ -187,8 +211,9 @@ Feature: An aggregate project reads its member projects
 
   @integration
   Scenario: Create stays disabled until a project is picked
-    When ana checks "Governance" and has picked no project
+    When ana checks "Governance", chooses "Specific projects" and has picked no project
     Then the "Create" button is disabled
+    And she reads that she must pick at least one project
     When she picks one project
     Then the "Create" button is enabled
 
@@ -205,7 +230,7 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: A project list that fails to load never shows the server's own words
     Given listing the projects ana may pick fails for a reason we cannot name
-    When ana checks "Governance"
+    When ana checks "Governance" and chooses "Specific projects"
     Then she reads that the projects could not be listed and to try again
     And she can copy the error ID
     And the server's own message, which names the request it made, is not shown
