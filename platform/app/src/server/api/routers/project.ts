@@ -29,6 +29,7 @@ import {
   hasTracesToShow,
   isAggregateProjectKind,
 } from "~/server/app-layer/projects/project-kinds";
+import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
 import { TeamService } from "~/server/teams/team.service";
@@ -644,6 +645,14 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("project:update")
     .mutation(async ({ ctx, input }) => {
+      // Clustering writes topics under the project it names. It is declared
+      // under `project:update`, which the permission-level guard exempts, so
+      // it asks the guard itself, before the catch below would turn the
+      // refusal into a generic failure (ADR-144 decision 8).
+      await assertProjectAcceptsWrites({
+        kinds: getApp().projectKinds,
+        projectId: input.projectId,
+      });
       try {
         const app = getApp();
         // A request made while a run is already underway is declined by the

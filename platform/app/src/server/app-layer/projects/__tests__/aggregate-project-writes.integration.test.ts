@@ -18,7 +18,7 @@ import { blankTemplate } from "~/optimization_studio/templates/blank";
 import { appRouter } from "~/server/api/root";
 import { handledCodeOf } from "~/server/api/routers/__tests__/helpers/aggregateTraceRoutes";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
@@ -160,6 +160,7 @@ afterAll(async () => {
       await cleanupTestRows(prisma, [
         ["dashboard", { projectId: { in: projectIds } }],
         ["savedView", { projectId: { in: projectIds } }],
+        ["pinnedTrace", { projectId: { in: projectIds } }],
         ["traceEditOverlay", { projectId: { in: projectIds } }],
         ["annotation", { projectId: { in: projectIds } }],
         ["llmPromptConfigVersion", { projectId: { in: projectIds } }],
@@ -386,6 +387,61 @@ describe("Feature: saving a view is refused on the aggregate", () => {
         });
 
         expect(view.projectId).toBe(member.id);
+      });
+    });
+  });
+});
+
+/**
+ * Pinning a trace and starting topic clustering write under the project they
+ * name, but are declared under `project:update`, which the permission-level
+ * guard exempts so an admin can still manage the aggregate. Each asks the
+ * write guard itself.
+ */
+describe("Feature: pinning and topic clustering are refused on the aggregate", () => {
+  const PROJECT_WRITES = {
+    "pinnedTrace.pin": (projectId: string) =>
+      admin.pinnedTrace.pin({ projectId, traceId: TRACE_ID }),
+    "pinnedTrace.unpin": (projectId: string) =>
+      admin.pinnedTrace.unpin({ projectId, traceId: TRACE_ID }),
+    "project.triggerTopicClustering": (projectId: string) =>
+      admin.project.triggerTopicClustering({ projectId }),
+  } as const;
+
+  describe("given an aggregate project and one of its members", () => {
+    for (const [path, write] of Object.entries(PROJECT_WRITES)) {
+      describe(`when ana calls ${path} on the aggregate`, () => {
+        /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+        it("is refused with the read-only code, pins nothing and requests no clustering", async () => {
+          const requestClustering = vi.spyOn(
+            getApp().topicClustering,
+            "requestClustering",
+          );
+          try {
+            const refusal = await refusalOf(write(aggregate.id));
+
+            expect(handledCodeOf(refusal)).toBe(READ_ONLY);
+            expect(
+              await prisma.pinnedTrace.count({
+                where: { projectId: aggregate.id },
+              }),
+            ).toBe(0);
+            expect(requestClustering).not.toHaveBeenCalled();
+          } finally {
+            requestClustering.mockRestore();
+          }
+        });
+      });
+    }
+
+    describe("when ana pins a trace on the member", () => {
+      /** @scenario "Pinning a trace or starting topic clustering is refused on the aggregate" */
+      it("is not refused as read only", async () => {
+        const refusal = await refusalOf(
+          PROJECT_WRITES["pinnedTrace.pin"](member.id),
+        );
+
+        expect(handledCodeOf(refusal)).not.toBe(READ_ONLY);
       });
     });
   });

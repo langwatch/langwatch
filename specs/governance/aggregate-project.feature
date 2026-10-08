@@ -499,6 +499,14 @@ Feature: An aggregate project reads its member projects
     And saving a view on the member still writes one
 
   @integration
+  Scenario: Pinning a trace or starting topic clustering is refused on the aggregate
+    Given an aggregate project and one of its members
+    When ana pins or unpins a trace on the aggregate, or starts topic clustering on it
+    Then each is refused as read only
+    And no pin is written and no clustering run is requested
+    And pinning a trace on the member is not refused as read only
+
+  @integration
   Scenario: The aggregate's trace list offers no control to save a view
     Given an aggregate project
     When ana opens its trace list
