@@ -13,6 +13,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 
+import { MemoryAuthChannels } from "../../../channels/memory/memory.auth.channels.ts";
 import type { AuthRepositories } from "../../../repositories/auth.repositories.ts";
 import { AuthModule } from "../../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./sign-in-providers.ts";
@@ -24,13 +25,7 @@ export const SEAM_BASE = "https://app.langwatch.test";
  * Auth composed over the repositories a test's registry built, mounted behind the door the
  * api process mounts it behind. Every peer answers as a deployment with no organization rules.
  */
-export async function composedAuth({
-  repositories,
-  members,
-}: {
-  repositories: AuthRepositories;
-  members: { prisma: unknown; redis: unknown };
-}) {
+export async function composedAuth({ repositories }: { repositories: AuthRepositories }) {
   const app = await AuthModule.create({
     config: {
       sessionUrl: SEAM_BASE,
@@ -87,10 +82,8 @@ export async function composedAuth({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
+    channels: MemoryAuthChannels.create(),
     members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma: members.prisma as never,
-      redis: members.redis as never,
       identityEmails: undefined as never,
       invites: null,
       processName: "langwatch-api",

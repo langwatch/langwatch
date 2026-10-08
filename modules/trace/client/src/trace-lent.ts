@@ -124,10 +124,6 @@ type TraceMappingSource =
   | "events"
   | "threads"
   | "threads_until_current"
-  | "spans.llm.span_id"
-  | "spans.all.span_id"
-  | "annotations.id"
-  | "events.event_id"
   | "formatted_trace"
   | "";
 

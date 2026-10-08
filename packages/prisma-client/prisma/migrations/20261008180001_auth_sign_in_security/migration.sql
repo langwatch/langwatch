@@ -11,7 +11,7 @@
 -- window; a NULL reads as `updatedAt`, which is never earlier than the real
 -- last use, so adding this column signs nobody out.
 ALTER TABLE "Session"
-  ADD COLUMN "lastSeenAt" TIMESTAMP(3);
+  ADD COLUMN IF NOT EXISTS "lastSeenAt" TIMESTAMP(3);
 
 -- Consecutive failed sign-ins, and the lock they earn.
 --
@@ -24,7 +24,7 @@ ALTER TABLE "Session"
 -- deployment's own secret, never the address. Without the key this table
 -- would be a recoverable list of every address anybody has ever tried to sign
 -- in as.
-CREATE TABLE "SignInAttemptLock" (
+CREATE TABLE IF NOT EXISTS "SignInAttemptLock" (
   "id" TEXT NOT NULL,
   "identifierHash" TEXT NOT NULL,
   "failedCount" INTEGER NOT NULL DEFAULT 0,
@@ -40,13 +40,13 @@ CREATE TABLE "SignInAttemptLock" (
 
 -- The lookup every sign-in attempt makes, and what makes two attempts racing
 -- for one address an update rather than a second row.
-CREATE UNIQUE INDEX "SignInAttemptLock_identifierHash_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "SignInAttemptLock_identifierHash_key"
   ON "SignInAttemptLock"("identifierHash");
 
 -- The reaper's read: rows whose lock has lifted and which are not held.
-CREATE INDEX "SignInAttemptLock_lockedUntil_idx"
+CREATE INDEX IF NOT EXISTS "SignInAttemptLock_lockedUntil_idx"
   ON "SignInAttemptLock"("lockedUntil");
 
 -- An administrator releasing somebody names a person, not a hash.
-CREATE INDEX "SignInAttemptLock_userId_idx"
+CREATE INDEX IF NOT EXISTS "SignInAttemptLock_userId_idx"
   ON "SignInAttemptLock"("userId");

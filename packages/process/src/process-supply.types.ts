@@ -1,4 +1,4 @@
-import type { ModuleApiToken, SupplyToken } from "@langwatch/module";
+import type { ModuleApiToken } from "@langwatch/module";
 
 import type { InstallableServerFeature, ModuleConfigFor } from "./feature-installer.ts";
 
@@ -80,9 +80,7 @@ export type RequiredConfig<Modules extends readonly SupplyModule[]> = Simplify<
 type Peer<Token> =
   Token extends ModuleApiToken<infer Api, infer Name>
     ? { readonly [Key in Name]: Api }
-    : Token extends SupplyToken<infer Api, infer Name>
-      ? { readonly [Key in Name]: Api }
-      : Record<never, never>;
+    : Record<never, never>;
 type TokenPeers<Tokens> = Intersection<{ [Key in keyof Tokens]: Peer<Tokens[Key]> }[keyof Tokens]>;
 type ModulePeers<Module> = Module extends { readonly dependencies: infer Dependencies }
   ? TokenPeers<Dependencies>

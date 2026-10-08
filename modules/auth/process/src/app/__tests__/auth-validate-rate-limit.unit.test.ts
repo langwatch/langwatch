@@ -19,6 +19,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import type { AuthRepositories } from "../../repositories/auth.repositories.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
@@ -61,6 +62,8 @@ function withRateLimits(
     betterAuthSecondaryStorage: memory.betterAuthSecondaryStorage,
     betterAuthHooks: memory.betterAuthHooks,
     directory: memory.directory,
+    pendingSsoSetup: memory.pendingSsoSetup,
+    sessionCache: memory.sessionCache,
   };
 }
 
@@ -102,10 +105,8 @@ async function appFor(
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
+    channels: MemoryAuthChannels.create(),
     members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma: {} as never,
-      redis: null as never,
       identityEmails: undefined as never,
       invites: null,
       processName: "langwatch-api",

@@ -71,6 +71,39 @@ Feature: Entitlement's meters, decisions and who learns them
     Then the trace meter lane is replayed from trace's log
     And each trace counts once, in the month its first span arrived
 
+  # Seeding at cloud scale (E3, round 47): the month to date, tenant by tenant, after old writers.
+  @unit @usage
+  Scenario: The trace meter seed replays from the first of the current month at deploy
+    Given a deploy on the 8th of October
+    When the trace meter seed runs for the first time
+    Then it replays trace's spans received since 1 October 00:00 UTC
+    And the months before stay as they were counted before the deploy
+
+  @unit @usage
+  Scenario: The trace meter seed waits until no old writer remains
+    Given a rollout where pods of the previous image may still append spans
+    Then the trace meter seed is a background step that needs the old writers gone
+
+  @unit @usage
+  Scenario: The trace meter seed replays one tenant at a time and saves each tenant it completes
+    Given trace's span log holds spans of two tenants this month
+    When the trace meter seed runs
+    Then each tenant is replayed on its own
+    And each completed tenant is saved with the cursor the run completes through
+
+  @unit @usage @unimplemented
+  Scenario: The trace meter seed takes a trailing pass from the cursor its first pass completed
+    Given a span an old pod appended that became readable after the first pass discovered its tenant
+    When the trace meter seed's first pass completes through its cursor
+    Then a second pass replays the lane from that cursor
+    And the span counts once, in the month it arrived
+
+  @integration @usage @unimplemented
+  Scenario: A seeded month's trace meter count equals trace's own count for that month
+    Given ClickHouse holding a month of trace's spans and no trace meter rows
+    When the trace meter seed runs
+    Then each project's trace meter count for the month equals its distinct traces in trace's log
+
   @unit @usage
   Scenario: The trace meter decides a limit as the live trace count did, over the same traces
     Given an organization metered in traces whose projects' traces this month are on the trace meter

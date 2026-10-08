@@ -43,6 +43,9 @@
       "path": "../../../../modules/identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/organization/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
@@ -50,9 +53,6 @@
     },
     {
       "path": "../../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/organization/client/tsconfig.build.json"
     }
   ]
 }

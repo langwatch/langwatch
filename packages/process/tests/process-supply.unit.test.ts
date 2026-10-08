@@ -1,4 +1,3 @@
-import { SupplyToken, supplyToken } from "@langwatch/module";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +20,6 @@ import {
   facilities,
   licenseConsumerModule,
   licenseSource,
-  memoryRepositoryModule,
   ScoringApi,
   scoringModule,
   type VerdictApi,
@@ -95,10 +93,11 @@ describe("process supply", () => {
 
   it("requires only the selected memory repository tier", async () => {
     const runtime = await createApp({ role: "api" })
-      .withModules([memoryRepositoryModule])
+      .withModules([repositoryModule])
+      .withStores(memoryStores())
       .withClock(clock)
       .boot();
-    expect(runtime.module(memoryRepositoryModule).provided.row()).toBe("memory@frozen");
+    expect(runtime.module(repositoryModule).provided.row()).toBe("memory@frozen");
     await runtime.stop();
   });
 
@@ -112,10 +111,10 @@ describe("process supply", () => {
     await runtime.stop();
   });
 
-  it("resolves a process-provided supply token outside the module namespace", async () => {
+  it("resolves a provided peer no installed module serves", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([licenseConsumerModule])
-      .provide({ licenseSource })
+      .provide({ licensing: licenseSource })
       .boot();
     expect(runtime.module(licenseConsumerModule).provided.plan()).toBe("pro");
     await runtime.stop();
@@ -123,10 +122,6 @@ describe("process supply", () => {
 
   it("exports the process supply chain as the package createApp", () => {
     expect(packageCreateApp).toBe(createApp);
-    const token = supplyToken<{ resolve(): string }>()("licenseSource");
-    expect(token).toBeInstanceOf(SupplyToken);
-    expect(token.name).toBe("licenseSource");
-    expect(Object.isFrozen(token)).toBe(true);
   });
 
   it("keeps builder branches independent", async () => {

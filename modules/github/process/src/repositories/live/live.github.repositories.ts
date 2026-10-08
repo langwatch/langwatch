@@ -14,7 +14,7 @@ export class LiveGithubRepositories {
     prisma,
     redis,
   }: {
-    prisma: ProcessMembers["prisma"];
+    prisma: Parameters<typeof PostgresGithubRepositories.create>[0]["prisma"];
     redis: ProcessMembers["redis"];
   }): GithubRepositories {
     return {

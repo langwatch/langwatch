@@ -83,6 +83,7 @@ func TestCompatWorkflowTriggersOnlyOnMigrationPaths(t *testing.T) {
 		"modules/*/process/src/**/migrations/**",
 		"enterprise/modules/*/process/src/**/migrations/**",
 		".github/workflows/migration-compat.yml",
+		"dev/scripts/migration-compat-smoke/**",
 	}
 	if got := triggerPaths(t, workflow); !slices.Equal(got, want) {
 		t.Errorf("trigger paths = %q, want %q", got, want)
@@ -156,8 +157,8 @@ func TestCompatWorkflowUnsetsCIForTheBaseSuites(t *testing.T) {
 	}
 }
 
-// @scenario "A base without the live api suite is reported, not failed"
-func TestCompatWorkflowWarnsWhenTheBaseCannotBeJudged(t *testing.T) {
+// @scenario "A base without the live api suite is judged by its image instead"
+func TestCompatWorkflowJudgesAnUnjudgeableBaseByItsImage(t *testing.T) {
 	workflow, _ := loadWorkflow(t, "migration-compat.yml")
 	steps := workflow.Jobs["n-minus-one"].Steps
 	layout := stepNamed(t, steps, "Can the base be judged")
@@ -167,6 +168,58 @@ func TestCompatWorkflowWarnsWhenTheBaseCannotBeJudged(t *testing.T) {
 	for _, name := range []string{"Install and prepare base", "Base's live api suites on head's schema", "Every base suite passed a test"} {
 		if got := stepNamed(t, steps, name).If; got != "steps.layout.outputs.judged == 'true'" {
 			t.Errorf("step %q runs on an unjudgeable base (if = %q)", name, got)
+		}
+	}
+	for name, want := range map[string]string{
+		"Read the LTS floor": "packages/upgrade/releases/lts-floor.json",
+		"The LTS floor image passes the smoke on head's schema": "run-old-image.sh floor",
+		"Resolve main head's image":                             "main-head-image.sh base",
+		"Main head's image passes the smoke on head's schema":   "run-old-image.sh main-head",
+	} {
+		step := stepNamed(t, steps, name)
+		if step.If != "steps.layout.outputs.judged == 'false'" {
+			t.Errorf("step %q does not run on an unjudgeable base (if = %q)", name, step.If)
+		}
+		if !strings.Contains(step.Run, want) {
+			t.Errorf("step %q lacks %q:\n%s", name, want, step.Run)
+		}
+	}
+}
+
+func smokeScript(t *testing.T, name string) string {
+	t.Helper()
+	root, err := ciscan.RepoRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "dev", "scripts", "migration-compat-smoke", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+// @scenario "The image of main's head is pulled when published, else built"
+func TestCompatSmokePullsOrBuildsMainHeadsImage(t *testing.T) {
+	script := smokeScript(t, "main-head-image.sh")
+	for _, want := range []string{`git -C "$base_dir" rev-parse HEAD`, "docker manifest inspect", "docker pull",
+		`docker build -q -f "${base_dir}/infra/docker/Dockerfile"`} {
+		if !strings.Contains(script, want) {
+			t.Errorf("main-head-image.sh lacks %q", want)
+		}
+	}
+	if strings.Index(script, "docker pull") > strings.Index(script, "docker build") {
+		t.Error("main-head-image.sh builds before it tries the published image")
+	}
+}
+
+// @scenario "An old image's log naming a missing table or column fails the job"
+func TestCompatSmokeScansTheOldImagesLog(t *testing.T) {
+	script := smokeScript(t, "run-old-image.sh")
+	for _, want := range []string{`(column|relation) "[^"]+" does not exist|P2021|P2022|Code: (47|60)\.`,
+		`node "${here}/smoke.mjs"`, "::error title=migration-compat::"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("run-old-image.sh lacks %q", want)
 		}
 	}
 }

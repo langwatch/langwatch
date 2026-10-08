@@ -131,15 +131,15 @@ void missingCustomMember.withMembers({ connections: { primary: () => 42 } });
 // @ts-expect-error a custom member name must be declared by an installed module
 void missingCustomMember.withMembers({ connection: connections });
 
-const missingSupplyToken = createApp({ role: "api" }).withModules([licenseConsumerModule]);
-expectTypeOf<MissingNames<typeof missingSupplyToken>>().toEqualTypeOf<"peer.licenseSource">();
-// @ts-expect-error the named external supply is required
-void missingSupplyToken.boot();
-const suppliedTokenReady = missingSupplyToken.provide({ licenseSource });
-expectTypeOf<MissingNames<typeof suppliedTokenReady>>().toEqualTypeOf<never>();
-void (() => suppliedTokenReady.boot());
-// @ts-expect-error a supplied token keeps its declared API type
-void missingSupplyToken.provide({ licenseSource: { resolve: () => 42 } });
+const missingUnservedPeer = createApp({ role: "api" }).withModules([licenseConsumerModule]);
+expectTypeOf<MissingNames<typeof missingUnservedPeer>>().toEqualTypeOf<"peer.licensing">();
+// @ts-expect-error a peer no installed module serves is required
+void missingUnservedPeer.boot();
+const suppliedPeerReady = missingUnservedPeer.provide({ licensing: licenseSource });
+expectTypeOf<MissingNames<typeof suppliedPeerReady>>().toEqualTypeOf<never>();
+void (() => suppliedPeerReady.boot());
+// @ts-expect-error a provided peer keeps its declared API type
+void missingUnservedPeer.provide({ licensing: { resolve: () => 42 } });
 
 const missingBound = createApp({ role: "api" }).withModules([scoringModule]);
 expectTypeOf<MissingNames<typeof missingBound>>().toEqualTypeOf<"peer.instant-eval">();

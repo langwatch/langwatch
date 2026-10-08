@@ -6,7 +6,7 @@ import { createApp } from "@langwatch/process";
  */
 import { describe, expect, it } from "vitest";
 
-describe("given a process stated with createProcess", () => {
+describe("given a process stated with the createApp chain", () => {
   describe("when it is told which modules it installs", () => {
     it("boots with no module reading anything", async () => {
       const runtime = await createApp({ role: "api" }).withModules([]).boot();

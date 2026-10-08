@@ -51,9 +51,9 @@ const statements = {
   configTypo:
     'createApp({ role: "api" }).withModules([configModule]).withConfig({ "api-key": { peper: "test" } });',
   peer: 'createApp({ role: "api" }).withModules([peerModule]).boot();',
-  supplyTokenMissing: 'createApp({ role: "api" }).withModules([licenseConsumerModule]).boot();',
-  supplyTokenType:
-    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource: { resolve: () => 42 } });',
+  unservedPeerMissing: 'createApp({ role: "api" }).withModules([licenseConsumerModule]).boot();',
+  unservedPeerType:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licensing: { resolve: () => 42 } });',
   peerType:
     'createApp({ role: "api" }).withModules([peerModule]).provide({ project: { other: () => "wrong" } });',
   peerEarlier:
@@ -121,8 +121,8 @@ const statements = {
   goodMemory:
     'createApp({ role: "api" }).withModules([memoryRepositoryModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
-  goodSupplyToken:
-    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource }).boot();',
+  goodUnservedPeer:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licensing: licenseSource }).boot();',
   installedLater:
     'createApp({ role: "api" }).withModules([peerModule]).withModules([projectModule]).boot();',
   noModules: 'createApp({ role: "worker" }).boot();',
@@ -211,8 +211,8 @@ describe("compiler checked process supply", () => {
     "configSlice",
     "configType",
     "peer",
-    "supplyTokenMissing",
-    "supplyTokenType",
+    "unservedPeerMissing",
+    "unservedPeerType",
     "peerType",
     "peerEarlier",
     "widened",
@@ -280,8 +280,8 @@ describe("compiler checked process supply", () => {
 
   it("names declared custom members and external supplies", () => {
     expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingSupply<"connections">');
-    expect(diagnostics.get("supplyTokenMissing")?.join("\n")).toContain(
-      'MissingSupply<"peer.licenseSource">',
+    expect(diagnostics.get("unservedPeerMissing")?.join("\n")).toContain(
+      'MissingSupply<"peer.licensing">',
     );
   });
 
@@ -319,7 +319,7 @@ describe("compiler checked process supply", () => {
     "goodCustom",
     "goodMemory",
     "goodPeer",
-    "goodSupplyToken",
+    "goodUnservedPeer",
     "installedLater",
     "noModules",
     "noAnalytics",

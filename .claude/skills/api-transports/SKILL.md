@@ -69,7 +69,7 @@ anything; the process mounts every installed module's declarations.
    and E10 (below) are built (record §8).
    **The audit is declared too.** A mutation whose row names the organization holding the project its
    input names declares `.withAudit({ target: "organization", via: "projectId" })` (record §8, E10,
-   Alex 2026-10-05; `modules/trace/process/src/transport/traces-instant-eval.trpc.ts`). The door resolves
+   Alex 2026-10-05; `modules/instant-eval/process/src/transport/instant-eval.trpc.ts`). The door resolves
    the organization; never write an audit row by hand.
 10. **A query never returns a credential.** Secrets come back only from a mutation.
 

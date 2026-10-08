@@ -1,3 +1,5 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ObjectStorage } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import { ClickHouseEvaluationSession } from "../clickhouse/clickhouse.evaluation-session.store.ts";
@@ -24,10 +26,12 @@ export class LiveEvaluationRepositories {
     clickhouse,
     redis,
     objectStorage,
-  }: Pick<
-    ProcessMembers,
-    "prisma" | "clickhouse" | "redis" | "objectStorage"
-  >): EvaluationRepositories {
+  }: {
+    prisma: Parameters<typeof PostgresEvaluationRepositories.create>[0]["prisma"];
+    clickhouse: ClickHouseQueryClient;
+    redis: ProcessMembers["redis"];
+    objectStorage: ObjectStorage;
+  }): EvaluationRepositories {
     const resolveClient: EvaluationClickHouseResolver = (tenantId) =>
       Promise.resolve(new ClickHouseEvaluationSession(clickhouse, tenantId));
 

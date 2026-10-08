@@ -3,6 +3,7 @@ import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import { defineProcessModule } from "@langwatch/process";
 
 import { AuthModule } from "./app/auth.app.ts";
+import { authChannels } from "./channels/auth-channels.registry.ts";
 import { authLifecycleEventing } from "./eventing/auth-lifecycle.pipeline.ts";
 import { authEventing } from "./eventing/auth.pipeline.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
@@ -20,13 +21,14 @@ import { signInSecurityTrpcTransport } from "./transport/sign-in-security.trpc.t
  */
 export const authProcessModule = defineProcessModule("auth")
   .withRepositories(authRepositories)
+  .withChannels(authChannels)
   .withApi(AuthModule)
   .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
   .withEventing(authEventing)
   .withEventing(authLifecycleEventing)
-  .withTasks(({ members, dependencies }) => [
+  .withTasks(({ repositories, dependencies }) => [
     ClearStalePendingSsoSetupTask.create({
-      database: () => members.prisma,
+      candidates: repositories.pendingSsoSetup,
       organizations: dependencies.organizations,
     }),
   ])

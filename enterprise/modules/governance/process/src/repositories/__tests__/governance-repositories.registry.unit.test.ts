@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * The governance module's own registry, selected via
- * `.withPersistence("memory", {})`: writing then reading through the SAME
+ * `instantiateRepositories(..., { tier: "memory" })`: writing then reading through the SAME
  * instances proves the memory tier boots with no Postgres behind it.
  */
 import { instantiateRepositories } from "@langwatch/process";

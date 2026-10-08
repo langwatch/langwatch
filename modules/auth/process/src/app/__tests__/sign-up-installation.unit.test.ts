@@ -13,13 +13,13 @@ import type {
   SendEmailCommand,
 } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/process";
-import { resolvedSecrets } from "@langwatch/process-stores";
+import { createApp } from "@langwatch/process";
+import { memoryStores, resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { nowInstant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -41,11 +41,10 @@ async function bootAuth({
 }) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(authProcessModule)])
+    .withModules([authProcessModule])
+    .withStores(memoryStores())
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withSecrets(resolvedSecrets({}))
-    .withRelational(prismaDouble({}))
-    .withKeyvalue(redisDouble({}))
     .withConfig({
       auth: {
         sessionUrl: undefined,
@@ -62,6 +61,13 @@ async function bootAuth({
         publicBaseUrl: "https://app.acme.test",
         nodeEnvironment: "test",
       },
+    })
+    .withObservability((observability) => observability.withLogging(createTestLogger().logger))
+    .withMembers({
+      now: nowInstant,
+      identityEmails: void 0,
+      invites: null,
+      processName: "langwatch-api",
     })
     .provide({
       user: createApiFixture<UserApi>({ findByEmail: async () => null }),

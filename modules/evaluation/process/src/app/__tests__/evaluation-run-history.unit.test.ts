@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  */
@@ -10,8 +11,9 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import { memoryStores, type ObjectStorage } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -112,17 +114,17 @@ describe("given the live evaluation repositories over the process's ClickHouse m
     /** @scenario "The live tier reads run history through the process's routing ClickHouse" */
     it("names the tenant on every statement and passes only the member's settings", async () => {
       const statements: { tenantId: string; settings?: Record<string, string | number> }[] = [];
-      const clickhouse = createApiFixture<ProcessMembers["clickhouse"]>({
+      const clickhouse = createApiFixture<ClickHouseQueryClient>({
         query: async (request) => {
           statements.push({ tenantId: request.tenantId, settings: request.settings });
           return { rows: [] };
         },
       });
       const repositories = LiveEvaluationRepositories.create({
-        prisma: createApiFixture<ProcessMembers["prisma"]>(),
+        prisma: createApiFixture<PrismaClient>(),
         clickhouse,
         redis: createApiFixture<ProcessMembers["redis"]>(),
-        objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
+        objectStorage: createApiFixture<ObjectStorage>(),
       });
 
       await expect(
@@ -152,8 +154,8 @@ describe("given the live run read over a tenant's retention from data retention"
   async function fallbackFloorMs(retention: Pick<DataRetentionApi, "getRetentionDays">) {
     const probes: number[] = [];
     const repositories = LiveEvaluationRepositories.create({
-      prisma: createApiFixture<ProcessMembers["prisma"]>(),
-      clickhouse: createApiFixture<ProcessMembers["clickhouse"]>({
+      prisma: createApiFixture<PrismaClient>(),
+      clickhouse: createApiFixture<ClickHouseQueryClient>({
         query: async (request) => {
           const sinceMs = request.params?.sinceMs;
           if (typeof sinceMs === "number") probes.push(sinceMs);
@@ -161,7 +163,7 @@ describe("given the live run read over a tenant's retention from data retention"
         },
       }),
       redis: createApiFixture<ProcessMembers["redis"]>(),
-      objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
+      objectStorage: createApiFixture<ObjectStorage>(),
     });
     const before = nowInstant().epochMilliseconds;
     await expect(

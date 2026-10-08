@@ -84,6 +84,9 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/client/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
@@ -109,9 +112,6 @@
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
-      "path": "../../prompt/client/tsconfig.build.json"
     }
   ]
 }

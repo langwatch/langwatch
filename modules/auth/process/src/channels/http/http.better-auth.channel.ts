@@ -24,7 +24,6 @@ import {
   type SsoAssertionApi,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
@@ -894,8 +893,8 @@ type BetterAuthTransportOptions = Readonly<{
    */
   sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
   secondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
-  /** Presence decides whether Better Auth's rate limiter uses secondary storage. */
-  redis: RedisConnection | null;
+  /** Whether Better Auth's rate limiter counts in the shared secondary storage. */
+  sharedStorage: boolean;
   signUpVerification: SignUpVerification & SignUpAddressConfirmation;
   users: UserApi;
   /** Whether an already proved password may open this deployment's local door
@@ -926,7 +925,7 @@ const transportOptions = ({
   identity,
   invites,
   organizations,
-  redis,
+  sharedStorage,
   secondaryStorage,
   sendResetPassword,
   shadow,
@@ -997,7 +996,7 @@ const transportOptions = ({
     secondaryStorage,
     rateLimit: {
       ...authOptions.rateLimit,
-      storage: redis ? "secondary-storage" : "memory",
+      storage: sharedStorage ? "secondary-storage" : "memory",
     },
     emailAndPassword: {
       ...authOptions.emailAndPassword,

@@ -4,7 +4,6 @@ import {
   type DependencyToken,
   type FeatureApiIdentity,
   ModuleApiToken,
-  SupplyToken,
   type TokenIdentity,
   type TokenMap,
   tokenName,
@@ -333,7 +332,7 @@ export interface ApplicationOptions<
   readonly secrets?: ModuleSecretsScope;
   /** Scopes the stores' operator reads to one module's declared handles (§7). */
   readonly operatorReads?: ModuleOperatorReadsScope;
-  /** Test-only stand-ins for peers the process does not install (`@langwatch/process/testing`). */
+  /** Stand-ins for peers the process does not install: `testPeer` or `.provide()` values. */
   readonly peers?: readonly TestPeer[];
 }
 
@@ -419,12 +418,6 @@ export class ApplicationBuilder<
       ...(declaration.operatorReads ? { operatorReads: declaration.operatorReads } : {}),
       install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
     });
-    return this;
-  }
-
-  /** Provide a peer by token; install module providing same token to refuse. */
-  withProvided<Instance>(token: DependencyToken<Instance>, instance: Instance): this {
-    this.addProvision(token, instance);
     return this;
   }
 
@@ -716,7 +709,7 @@ export class ApplicationBuilder<
         );
       }
       for (const [key, token] of Object.entries(declaration.dependencies)) {
-        if (!(token instanceof ModuleApiToken) && !(token instanceof SupplyToken)) {
+        if (!(token instanceof ModuleApiToken)) {
           throw new Error(
             `Feature "${declaration.name}" dependency "${key}" must use a dependency token.`,
           );

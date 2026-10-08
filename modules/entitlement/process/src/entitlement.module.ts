@@ -4,6 +4,7 @@ import {
   type EntitlementConfig,
 } from "@langwatch/entitlement-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { nowInstant } from "@langwatch/time";
 import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { EntitlementModule } from "./app/entitlement.app.ts";
@@ -31,7 +32,14 @@ export const entitlementProcessModule: PublishedProcessModule<
       id: "entitlement:seed-trace-meter",
       description: "Seeds entitlement's trace meter from trace's span log at deploy.",
       lane: `${USAGE_PIPELINE_NAME}.${TRACE_METER_PROJECTION_NAME}`,
-      since: "2026-09-01T00:00:00.000Z",
+      // E3 (round 47): the month to date at the worker's boot; earlier months stay as counted.
+      since: nowInstant()
+        .toZonedDateTimeISO("UTC")
+        .with({ day: 1 })
+        .startOfDay()
+        .toInstant()
+        .toString(),
+      needsOldWritersGone: true,
       replayer,
     }),
   ]);

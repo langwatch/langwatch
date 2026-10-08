@@ -55,6 +55,12 @@
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/scim/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
@@ -80,12 +86,6 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/scim/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     }
   ]
 }

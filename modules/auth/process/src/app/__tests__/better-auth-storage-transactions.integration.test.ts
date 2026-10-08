@@ -25,6 +25,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
+import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
 import { LiveAuthRepositories } from "../../repositories/live/live.auth.repositories.ts";
 import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
@@ -82,10 +83,8 @@ async function storage() {
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),
     },
+    channels: MemoryAuthChannels.create(),
     members: {
-      encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
-      prisma,
-      redis: null as never,
       identityEmails: undefined as never,
       invites: null,
       processName: "langwatch-api",
