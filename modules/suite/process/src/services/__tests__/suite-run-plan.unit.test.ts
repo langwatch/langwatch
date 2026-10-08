@@ -1,6 +1,10 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  InstantEvalJudgeOnlyModelError,
+} from "@langwatch/instant-eval-judge-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
@@ -141,6 +145,27 @@ describe("SuiteService.runPlan", () => {
       expect(result.created).toBe(true);
       expect(result.batchRunId).toBe("batch-1");
     });
+  });
+
+  describe("when the config names Instant Evals as a model override", () => {
+    /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+    it.each(["judgeModel", "simulatorModel"])(
+      "refuses %s before touching the plan row",
+      async (key) => {
+        const { service, findOrCreatePlanByName } = buildService({});
+
+        await expect(
+          service.runPlan({
+            projectId,
+            organizationId: "org-1",
+            name: "Refunds prod-agent",
+            config: { ...config, [key]: INSTANT_EVAL_JUDGE_MODEL_ID },
+            idempotencyKey: "idem-1",
+          }),
+        ).rejects.toThrow(InstantEvalJudgeOnlyModelError);
+        expect(findOrCreatePlanByName).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe("when the config names no target", () => {

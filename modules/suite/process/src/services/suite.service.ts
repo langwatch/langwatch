@@ -43,6 +43,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
+import { assertNoInstantEvalOverride } from "../rules/suite-model-override.rules.ts";
 import { isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
 import type { ConnectedPresenceReader } from "./connected-target.service.ts";
 import { SuiteRunService } from "./suite-run.service.ts";
@@ -125,6 +126,7 @@ export class SuiteService {
 
   async create(input: CreateSuiteCommand): Promise<Suite> {
     const parsed = createSuiteCommandSchema.parse(input);
+    assertNoInstantEvalOverride(parsed);
     const slug = suiteSlugOf(parsed.name);
     await this.assertSlugAvailable({ projectId: parsed.projectId, slug });
 
@@ -137,6 +139,7 @@ export class SuiteService {
 
   async update(input: UpdateSuiteCommand): Promise<Suite> {
     const parsed = updateSuiteCommandSchema.parse(input);
+    assertNoInstantEvalOverride(parsed);
     const existing = await this.get({ id: parsed.id, projectId: parsed.projectId });
     if (existing.kind === "test_suite") {
       if (parsed.scope !== void 0) {

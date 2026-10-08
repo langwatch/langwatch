@@ -1,4 +1,9 @@
 import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+  InstantEvalJudgeOnlyModelError,
+} from "@langwatch/instant-eval-judge-contract";
+import {
   PromptTagInvalidError,
   SystemPromptConflictError,
   SystemPromptRequiredError,
@@ -38,6 +43,34 @@ function getPrompt(
 }
 
 describe("the /api/prompts refusals", () => {
+  describe("when a new prompt names Instant Evals as its model", () => {
+    /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+    it("answers 422 with the plain refusal, never a 500", async () => {
+      const app = buildPromptApp(
+        createApiFixture<PromptService>({
+          createPrompt: async () => {
+            throw new InstantEvalJudgeOnlyModelError();
+          },
+        }),
+      );
+
+      const response = await mountPromptRest({ app }).request("/api/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          handle: "support-reply",
+          prompt: "Answer kindly.",
+          model: INSTANT_EVAL_JUDGE_MODEL_ID,
+        }),
+      });
+      const body = (await response.json()) as { code: string; message: string };
+
+      expect(response.status).toBe(422);
+      expect(body.code).toBe("instant_eval_judge_only_model");
+      expect(body.message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
+    });
+  });
+
   describe("when an update is refused for a missing system prompt (Issue #3196)", () => {
     /** @scenario "Toast on server-side validation failure shows a friendly message" */
     it("answers 400 with the refusal's own code and friendly message", async () => {

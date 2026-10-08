@@ -1,4 +1,8 @@
 import type { HandledError } from "@langwatch/handled-error";
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -213,6 +217,19 @@ describe("model provider handled errors", () => {
         },
       );
     }).not.toThrow();
+  });
+
+  /** @scenario "Instant Evals is never a default model" */
+  it("words a restricted Instant Evals default without the coding-assistant wording", () => {
+    const error = new ModelRestrictedForFeatureError({
+      featureKey: "prompt.create_default",
+      role: "DEFAULT",
+      featureDisplayName: "New prompt model",
+      projectId: "project_abc",
+      restrictedModels: [INSTANT_EVAL_JUDGE_MODEL_ID],
+    });
+
+    expect(error.message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
   });
 
   it("words the execution refusal for whichever path caught it", () => {

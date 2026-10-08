@@ -1,3 +1,4 @@
+import { refuseInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 import type { Named } from "@langwatch/module";
 import {
   evaluatorAttachmentSchema,
@@ -283,12 +284,14 @@ const runSuiteInputSchemaDefinition = z.object({
     ),
   simulatorModel: z
     .string()
+    .refine(...refuseInstantEvalJudgeModel)
     .nullish()
     .describe(
       "The model that plays the user for every scenario in the run. Used only when the id names a test suite.",
     ),
   judgeModel: z
     .string()
+    .refine(...refuseInstantEvalJudgeModel)
     .nullish()
     .describe(
       "The model that judges every scenario in the run. Used only when the id names a test suite.",

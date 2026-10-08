@@ -44,3 +44,19 @@ export class InstantEvalFreeBudgetExhaustedError extends HandledError {
     this.name = "InstantEvalFreeBudgetExhaustedError";
   }
 }
+
+export const INSTANT_EVAL_JUDGE_ONLY_MESSAGE =
+  "Instant Evals works only as an evaluator judge model.";
+
+/** A save named Instant Evals as the model of something that is not an evaluator judge. */
+export class InstantEvalJudgeOnlyModelError extends HandledError {
+  declare readonly code: "instant_eval_judge_only_model";
+
+  constructor() {
+    super("instant_eval_judge_only_model", INSTANT_EVAL_JUDGE_ONLY_MESSAGE, {
+      httpStatus: 422,
+      fault: "customer",
+    });
+    this.name = "InstantEvalJudgeOnlyModelError";
+  }
+}

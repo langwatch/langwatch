@@ -24,6 +24,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/time": "workspace:*",
     "safe-regex2": "catalog:",

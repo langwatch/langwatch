@@ -3,6 +3,10 @@
  *
  * @see specs/scenarios/simulation-run-model-resolution.feature
  */
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import { modelOverrideSchema } from "../model-override-schema.ts";
@@ -46,6 +50,16 @@ describe("modelOverrideSchema", () => {
       expect(result.success).toBe(false);
       if (result.success) throw new Error("unreachable: asserted above");
       expect(result.error.issues[0]?.message).toContain("provider/model");
+    });
+  });
+
+  describe("when the value is Instant Evals", () => {
+    /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+    it("rejects it as a scenario or suite override in plain words", () => {
+      const result = modelOverrideSchema.safeParse(INSTANT_EVAL_JUDGE_MODEL_ID);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
     });
   });
 });

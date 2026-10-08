@@ -34,6 +34,7 @@ import {
 } from "@langwatch/suite-contract";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
+import { assertNoInstantEvalOverride } from "../rules/suite-model-override.rules.ts";
 import {
   suiteSlugOf,
   TARGET_SECRET_REFUSAL,
@@ -152,6 +153,7 @@ export class SuiteRunService {
    */
   async runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult> {
     const parsed = suiteRunPlanInputSchema.parse(input);
+    assertNoInstantEvalOverride(parsed.config);
     const { repository } = this.options;
 
     if (parsed.config.targets.length === 0) {
