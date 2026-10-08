@@ -33,8 +33,9 @@ const DEFAULT_WATCH_DEBOUNCE_MS = 2_000;
 const DEFAULT_WATCH_MAX_WAIT_MS = 30_000;
 /** A boot that never says it is ready settles anyway after this (cold start p90 is 24 s). */
 const DEFAULT_BOOT_SETTLE_MS = 30_000;
-/** The agent-turn hold (`.haven-hmr-gate`) defers a restart at most this long. */
-const MAX_HOLD_MS = 60_000;
+/** The agent-turn hold (`.haven-hmr-gate`) defers a restart at most this long: a whole
+ * agent turn, yet bounded so a crashed agent's marker cannot hold forever. */
+const MAX_HOLD_MS = 600_000;
 /** How often a held restart looks at whether the hold was released. */
 const HOLD_POLL_MS = 500;
 /** Default watch roots, relative to cwd: the package's own source, plus every
@@ -169,6 +170,18 @@ function isConfigJson(normalized) {
   return !/(^|\/)src\//.test(normalized);
 }
 
+/**
+ * Whether a change needs a new process. A child that reloads in-process still
+ * needs one for a package.json or a file in its own `src/`: Node loaded those
+ * natively, and no module runner can drop them.
+ */
+export function needsNewProcess({ relativePath, reloadsInChild }) {
+  if (shouldIgnoreWatchPath(relativePath)) return false;
+  if (!reloadsInChild) return true;
+  const normalized = relativePath.split(path.sep).join("/");
+  return /(^|\/)package\.json$/.test(normalized) || normalized.startsWith("src/");
+}
+
 /** The watch roots and quiet window, from the environment (or its defaults). */
 export function resolveWatchConfig(env) {
   const rawDirs = (env.LANGWATCH_DEV_WATCH_DIRS ?? "").trim();
@@ -189,6 +202,8 @@ export function resolveWatchConfig(env) {
     maxWaitMs: positiveInt(env.LANGWATCH_DEV_WATCH_MAX_WAIT_MS, DEFAULT_WATCH_MAX_WAIT_MS),
     bootSettleMs: positiveInt(env.LANGWATCH_DEV_BOOT_SETTLE_MS, DEFAULT_BOOT_SETTLE_MS),
     readyPattern: (env.LANGWATCH_DEV_READY_PATTERN ?? "").trim(),
+    // LANGWATCH_DEV_RELOAD=module: the child reloads source in-process (ADR-168, B1).
+    reloadsInChild: (env.LANGWATCH_DEV_RELOAD ?? "").trim() === "module",
     holdMarker:
       (env.LANGWATCH_DEV_HOLD_MARKER ?? "").trim() ||
       path.join(REPO_ROOT, "apps", "ui", ".haven-hmr-gate"),
@@ -639,7 +654,7 @@ export function createBackendFilter({ cwd, roots }) {
  * unwatchable directory is skipped with a warning, never a gate — the
  * command still runs, just without live reload for that path.
  */
-function watchDirs({ dirs, debouncer, filter }) {
+function watchDirs({ dirs, debouncer, filter, reloadsInChild }) {
   const watchers = [];
   for (const dir of dirs) {
     const abs = path.resolve(process.cwd(), dir);
@@ -648,7 +663,7 @@ function watchDirs({ dirs, debouncer, filter }) {
       const watcher = fs.watch(abs, { recursive: true }, (_event, filename) => {
         if (!filename) return;
         const rel = path.join(dir, filename);
-        if (shouldIgnoreWatchPath(rel)) return;
+        if (!needsNewProcess({ relativePath: rel, reloadsInChild })) return;
         if (filter.isOutsideBackend(path.join(abs, filename))) return;
         debouncer.note(rel);
       });
@@ -715,7 +730,12 @@ class WatchSupervisor {
       ...new Set([...watched, ...WORKSPACE_ROOTS.map((d) => path.join(REPO_ROOT, d))]),
     ];
     const filter = createBackendFilter({ cwd: process.cwd(), roots });
-    this.watchers = watchDirs({ dirs: this.config.dirs, debouncer: this.debouncer, filter });
+    this.watchers = watchDirs({
+      dirs: this.config.dirs,
+      debouncer: this.debouncer,
+      filter,
+      reloadsInChild: this.config.reloadsInChild,
+    });
     const firstBuild = await this.rebuild();
     if (!firstBuild.ok) {
       for (const w of this.watchers) w.close();
@@ -758,7 +778,7 @@ class WatchSupervisor {
     });
     const timer = setTimeout(settle, this.config.bootSettleMs);
     timer.unref?.();
-    const handle = { child, stopping: false, settle, settled };
+    const handle = { child, stopping: false, isReady: false, settle, settled };
     this.handle = handle;
     if (child.stdout) wireStdout(child.stdout, this.crashOptions);
     if (child.stderr) wireStderr(child.stderr, this.crashOptions);
@@ -766,14 +786,16 @@ class WatchSupervisor {
       clearTimeout(timer);
       settle();
       if (handle.stopping || this.handle !== handle) return; // ours; the reload owns what follows
-      this.onExit({ code, signal });
+      this.onExit({ code, signal, wasReady: handle.isReady });
     });
     return true;
   }
 
   /** A line of the current child's output: the ready pattern ends its boot. */
   noteOutput(text) {
-    if (this.ready !== null && this.handle !== null && this.ready.test(text)) this.handle.settle();
+    if (this.ready === null || this.handle === null || !this.ready.test(text)) return;
+    this.handle.isReady = true;
+    this.handle.settle();
   }
 
   /**
@@ -781,13 +803,19 @@ class WatchSupervisor {
    * exiting would end the lane. A signal, a clean exit, or a crash with nothing
    * watched ends us instead.
    */
-  onExit({ code, signal }) {
+  onExit({ code, signal, wasReady }) {
     if (signal !== null || code === 0 || code === null || this.watchers.length === 0) {
       this.settledCode = exitCodeFor({ code, signal });
       this.finish();
       return;
     }
     this.handle = null;
+    // A child that reloads in-process never exits for a bad edit: after boot, this is a crash.
+    if (this.config.reloadsInChild && wasReady) {
+      stderr(`${PREFIX} exited with code ${code} after booting; starting it again\n`);
+      setTimeout(() => void this.queue.request([]), this.config.debounceMs);
+      return;
+    }
     stderr(`${PREFIX} exited with code ${code}; waiting for the next change to start it again\n`);
   }
 
