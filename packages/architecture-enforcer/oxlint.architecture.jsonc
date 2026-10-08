@@ -75,6 +75,7 @@
     "langwatch/test-description-is-an-action": "error",
     "langwatch/unbounded-loop": "error",
     "langwatch/unit-test-does-not-render": "error",
+    "langwatch/upcast-drain-window": "error",
     "langwatch/web-imports-server-shaped-value": "error",
     "langwatch/zod-internals": "error",
     "langwatch/zod-object-composition": "error",

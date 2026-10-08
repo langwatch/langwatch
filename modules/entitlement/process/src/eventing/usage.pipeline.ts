@@ -90,7 +90,7 @@ export function buildUsagePipeline({
           to: USAGE_LIMIT_CLEARED_EVENT_TYPE,
         },
       ],
-      drain: { pipeline: "usage" },
+      drain: { pipeline: "usage", removeAfter: "3.21.0" },
     })
     .withCommandInstance({
       name: "countMonth",

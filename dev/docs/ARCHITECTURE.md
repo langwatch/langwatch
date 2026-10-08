@@ -1894,12 +1894,12 @@ pipeline declares `.withUpcasts({ events: [{ from: { type, aggregateType? }, to,
 drain? })` after `.withEvents`, `to` one of its declared types and `data` a pure payload transform.
 Its queued-event parse, its event-store reads (the renamed aggregate type read beside its own) and
 replay apply it, so consumers and type filters see only the current type; `drain: { pipeline,
-jobNames? }` routes jobs a previous release queued under the former pipeline's keys into the current
+jobNames?, removeAfter }` routes jobs a previous release queued under the former pipeline's keys into the current
 lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
 `EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
 An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
-lint names any drain older than one release; a fresh install plans upcast steps by their mode (Alex,
+lint names any drain older than one release (`langwatch/upcast-drain-window`, against `removeAfter`); a fresh install plans upcast steps by their mode (Alex,
 2026-10-06, rounds 15 and 16).
 A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data?, removeAfter }])` on its pipeline: jobs the previous release queued under `from` run on that lane, its own or its peer lane, for one release. They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone, removeAfter }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries. The worker installation test refuses an alias once its `removeAfter` release has been cut (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over

@@ -21,6 +21,8 @@ export interface UpcastDrain {
   readonly pipeline: string;
   /** Former lane names by the current name they drain into; an absent lane keeps its name. */
   readonly jobNames?: Readonly<Record<string, string>>;
+  /** The release after which the drain is deleted, as `.withLaneAliases` states it. */
+  readonly removeAfter: string;
 }
 
 /** What `.withUpcasts` declares: the upcast events and, for a pipeline rename, the drain. */
