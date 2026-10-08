@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withTasks(…)`, `src/dataset.module.ts:17`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withMigrations(…).withTasks(…)`, `src/dataset.module.ts:18`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Dataset application.
 
-Peers call these through the token, declared at `../contract/src/dataset.api.ts:73`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dataset.api.ts:75`; nothing else in this package is public.
 
 #### `upsertDataset`
 
@@ -266,6 +266,14 @@ The platform's own address for one dataset resource, built from the project's sl
 platformUrl(input: { projectSlug: string; path: string }): string;
 ```
 
+#### `listStoragePage`
+
+One id-ordered page of the project's datasets for a storage migration's inventory, archived ones included: they remain recoverable customer data.
+
+```typescript
+listStoragePage(input: DatasetStoragePageInput): Promise<DatasetStorageEntry[]>;
+```
+
 #### `countUsage`
 
 The usage report's figures for these projects.
@@ -380,7 +388,7 @@ Answers at `/api/dataset/imports`, `/api/v1/dataset/imports`; also, undocumented
 
 ```typescript
 type Body = z.infer<typeof datasetRestImportSchema>; // ../contract/src/dataset-rest.schemas.ts:90
-// Response: datasetImportStartedSchema, ../contract/src/dataset.ts:406
+// Response: datasetImportStartedSchema, ../contract/src/dataset.ts:419
 interface Response {
   datasetId: string;
   slug: string;
@@ -403,7 +411,7 @@ type Body = BodyDatasetAppendImport;
 type BodyDatasetAppendImport = {
   storedObjectId: string;
 };
-// Response: datasetImportAppendedSchema, ../contract/src/dataset.ts:423
+// Response: datasetImportAppendedSchema, ../contract/src/dataset.ts:436
 interface Response {
   datasetId: string;
   recordsCreated: number;
@@ -434,7 +442,7 @@ Answers at `/api/dataset/:slugOrId/upload`, `/api/v1/dataset/:slugOrId/upload`; 
 ```typescript
 type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:75
 // Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:295)
-type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:423
+type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:436
 ```
 
 #### `POST /attachments` · `postApiDatasetAttachments`
@@ -451,7 +459,7 @@ interface Query {
   projectId: string;
 }
 // Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:318)
-// Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:350
+// Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:363
 type Response = ResponseDatasetAttachment;
 type ResponseDatasetAttachment = {
   url: string;
@@ -476,7 +484,7 @@ interface Body {
   mediaType: string;
   byteLength: number;
 }
-// Response: datasetAttachmentUploadSchema, ../contract/src/dataset.ts:376
+// Response: datasetAttachmentUploadSchema, ../contract/src/dataset.ts:389
 interface Response {
   objectId: string;
   uploadUrl: string;
@@ -642,7 +650,7 @@ interface Input {
   recordId: string;
   updatedRecord: Record<string, unknown>;
 }
-// Output: datasetRecordMutationResultSchema, ../contract/src/dataset.ts:215
+// Output: datasetRecordMutationResultSchema, ../contract/src/dataset.ts:228
 interface Output {
   record: {
     id: string;
@@ -717,8 +725,8 @@ Contract `../contract/src/dataset.trpc.ts:39`, router `src/transport/dataset.trp
 
 ```typescript
 // dataset.upsert
-// Input: datasetApiUpsertBaseInputSchema.and(datasetApiUpsertTargetInputSchema) (inline, ../contract/src/dataset.trpc.ts:42)
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:132
+// Input: z.object({ ...datasetApiUpsertBaseInputSchema.shape, ...datasetApiUpsertTargetInputSchema… (inline, ../contract/src/dataset.trpc.ts:43)
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
 
 // dataset.validateDatasetName
 // Input: datasetApiValidateNameInputSchema, ../contract/src/dataset.schemas.ts:39
@@ -727,7 +735,7 @@ interface Input {
   proposedName: string;
   excludeDatasetId?: string;
 }
-// Output: datasetNameResultSchema, ../contract/src/dataset.ts:241
+// Output: datasetNameResultSchema, ../contract/src/dataset.ts:254
 interface Output {
   available: boolean;
   slug: string;
@@ -739,7 +747,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:53)
+// Output: z.array(datasetSummaryWireSchema) (inline, ../contract/src/dataset.trpc.ts:58)
 
 // dataset.getById
 // Input: datasetApiDatasetInputSchema, ../contract/src/dataset.schemas.ts:49
@@ -747,7 +755,7 @@ interface Input {
   projectId: string;
   datasetId: string;
 }
-// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:58)
+// Output: datasetWireSchema.nullable() (inline, ../contract/src/dataset.trpc.ts:63)
 
 // dataset.deleteById
 // Input: datasetApiDeleteInputSchema, ../contract/src/dataset.schemas.ts:54
@@ -774,7 +782,7 @@ interface Input {
     mapping: Record<string, unknown>;
   };
 }
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:132
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
 
 // dataset.findNextName
 // Input: datasetApiFindNextNameInputSchema, ../contract/src/dataset.schemas.ts:76
@@ -782,7 +790,7 @@ interface Input {
   projectId: string;
   proposedName: string;
 }
-// Output: inline, ../contract/src/dataset.trpc.ts:73
+// Output: inline, ../contract/src/dataset.trpc.ts:78
 type Output = string;
 
 // dataset.copy
@@ -792,20 +800,20 @@ interface Input {
   sourceProjectId: string;
   projectId: string;
 }
-type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:132
+type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:145
 
 // dataset.createFromStoredObject
-type Input = z.infer<typeof createDatasetFromStoredObjectInputSchema>; // ../contract/src/dataset.ts:396
-type Output = z.infer<typeof datasetImportStartedSchema>; // ../contract/src/dataset.ts:406
+type Input = z.infer<typeof createDatasetFromStoredObjectInputSchema>; // ../contract/src/dataset.ts:409
+type Output = z.infer<typeof datasetImportStartedSchema>; // ../contract/src/dataset.ts:419
 
 // dataset.appendStoredObject
-// Input: appendStoredObjectToDatasetInputSchema, ../contract/src/dataset.ts:414
+// Input: appendStoredObjectToDatasetInputSchema, ../contract/src/dataset.ts:427
 interface Input {
   projectId: string;
   slugOrId: string;
   storedObjectId: string;
 }
-type Output = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:423
+type Output = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:436
 
 // dataset.getLimits
 type Input = z.infer<typeof datasetApiProjectInputSchema>; // ../contract/src/dataset.schemas.ts:46
@@ -821,22 +829,22 @@ interface Output {
 }
 
 // dataset.createAttachmentUpload
-// Input: createDatasetAttachmentUploadInputSchema, ../contract/src/dataset.ts:363
+// Input: createDatasetAttachmentUploadInputSchema, ../contract/src/dataset.ts:376
 interface Input {
   projectId: string;
   filename: string;
   mediaType: string;
   byteLength: number;
 }
-type Output = z.infer<typeof datasetAttachmentUploadSchema>; // ../contract/src/dataset.ts:376
+type Output = z.infer<typeof datasetAttachmentUploadSchema>; // ../contract/src/dataset.ts:389
 
 // dataset.retryNormalize
-// Input: retryNormalizeInputSchema, ../contract/src/dataset.ts:436
+// Input: retryNormalizeInputSchema, ../contract/src/dataset.ts:449
 interface Input {
   projectId: string;
   datasetId: string;
 }
-// Output: uploadProcessingSchema, ../contract/src/dataset.ts:429
+// Output: uploadProcessingSchema, ../contract/src/dataset.ts:442
 interface Output {
   datasetId: string;
   status: "processing";
@@ -864,7 +872,7 @@ Run by the tasks process, before serve.
 
 | Task                       | Class                        | Declared at                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------- |
-| `dataset-content-backfill` | `DatasetContentBackfillTask` | `src/tasks/dataset-content-backfill.task.ts:48` |
+| `dataset-content-backfill` | `DatasetContentBackfillTask` | `src/tasks/dataset-content-backfill.task.ts:46` |
 
 ## Configuration
 

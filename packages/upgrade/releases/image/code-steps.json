@@ -21,6 +21,13 @@
     "description": "Claims each active Slack automation's connection and releases claims no active automation holds."
   },
   {
+    "id": "dataset:move-content-to-object-storage",
+    "kind": "data",
+    "mode": "background",
+    "owner": "dataset",
+    "description": "Moves each dataset's content out of Postgres and into object-storage chunks."
+  },
+  {
     "id": "entitlement:seed-trace-meter",
     "kind": "data",
     "mode": "background",
