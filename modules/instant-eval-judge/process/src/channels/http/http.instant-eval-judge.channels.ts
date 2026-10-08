@@ -18,10 +18,10 @@ export class HttpInstantEvalJudgeChannels {
     secrets: ScopedSecrets;
   }): Promise<InstantEvalJudgeChannels> {
     const classifier = await secrets.into(classifierApiKey, (secretKey) => {
-      const apiKey = cloudClassifierKeyOf({ isCloud: config.isSaas, apiKey: secretKey });
-      if (!apiKey) return void 0;
+      const key = cloudClassifierKeyOf({ isCloud: config.isSaas, apiKey: secretKey });
+      if (!key.available) return void 0;
       return HttpInstantEvalClassifierChannel.create({
-        apiKey,
+        apiKey: key.apiKey,
         ...(config.classifierBaseUrl ? { baseUrl: config.classifierBaseUrl } : {}),
         ...(config.classifierModel ? { model: config.classifierModel } : {}),
       });

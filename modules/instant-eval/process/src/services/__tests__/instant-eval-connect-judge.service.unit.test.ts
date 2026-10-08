@@ -5,8 +5,10 @@
  */
 
 import type { ConnectClassifyAnswer } from "@langwatch/enterprise-licensing-contract";
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
+  INSTANT_EVAL_PRICING,
+} from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

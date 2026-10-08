@@ -7,12 +7,12 @@
 
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
+  INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   INSTANT_EVAL_SKIP_REASONS,
   instantEvalSkipped,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 

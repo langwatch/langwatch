@@ -2,10 +2,8 @@ import { randomUUID } from "node:crypto";
 
 /**
  * @vitest-environment node
- * Two priced events for one request leave one spend row, live and after the judge's spend is
- * rebuilt from its events (ADR-174 decision 13). Subscribers are never replayed by the runtime,
- * so the rebuild here hands the stored events to the subscriber again, over memory and Postgres.
- * A run's and a judged query's spend reach the same total through the judge's recordSpend.
+ * Two priced events for one request leave one spend row, live and after a rebuild from the
+ * events over memory and Postgres (ADR-174 decision 13).
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";

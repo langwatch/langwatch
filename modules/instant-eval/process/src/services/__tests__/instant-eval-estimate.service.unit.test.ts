@@ -4,8 +4,10 @@
  */
 
 import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
+import {
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
+  INSTANT_EVAL_PRICING,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {

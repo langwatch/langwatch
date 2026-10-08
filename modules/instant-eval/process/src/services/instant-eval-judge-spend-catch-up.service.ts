@@ -1,7 +1,6 @@
 /**
- * The spend catch-up: copies each confirmed Instant Evals row of the gateway ledger into the
- * judge's own spend under its request id (ADR-174 decision 17). There is no cutover: a request
- * the judge already holds is skipped, so a re-run at any time copies only the rows still missing.
+ * The spend catch-up copies each confirmed Instant Evals ledger row into the judge's spend
+ * under its request id (ADR-174 decision 17); a request already held is skipped.
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";

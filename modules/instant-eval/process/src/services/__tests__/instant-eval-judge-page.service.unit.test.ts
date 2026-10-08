@@ -5,12 +5,12 @@
  */
 
 import {
+  INSTANT_EVAL_PRICING,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   InstantEvalClassifierUnavailableError,
   InstantEvalFreeBudgetExhaustedError,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

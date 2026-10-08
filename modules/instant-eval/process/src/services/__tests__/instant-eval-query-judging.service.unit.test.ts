@@ -10,8 +10,6 @@ import {
   type InstantEvalJudgement,
   type InstantEvalJudgeSpendRecord,
   type InstantEvalVerdict,
-} from "@langwatch/instant-eval-judge-contract";
-import {
   INSTANT_EVAL_PRICING,
   instantEvalCostUsd,
   instantEvalPriceUsd,

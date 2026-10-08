@@ -5,6 +5,7 @@
  */
 
 import {
+  INSTANT_EVAL_PRICING,
   estimateInstantEvalRequestTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
@@ -12,7 +13,6 @@ import {
   instantEvalSkipped,
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
-import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 
 import type {
   InstantEvalClassifyRequest,

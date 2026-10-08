@@ -9,7 +9,7 @@ type InstantEvalBudgetPeers = Parameters<typeof InstantEvalFreeBudgetService.cre
 
 export type InstantEvalRunStartBudget = Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
 
-/** The check `InstantEvalRunService.createRun` makes before a run is accepted, with no holds taken. */
+/** The check `createRun` makes before a run is accepted, with no holds taken. */
 export function instantEvalRunStartBudgetOver({
   peers,
 }: {

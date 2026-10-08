@@ -18,8 +18,9 @@ import {
   estimateInstantEvalRequestTokens,
   type InstantEvalClassifierLimits,
   type InstantEvalPricing,
+  instantEvalCostUsd,
+  instantEvalPriceUsd,
 } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { instantEvalAverageTextBytes } from "../rules/instant-eval-run-sizing.rules.ts";
