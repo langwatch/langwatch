@@ -8,7 +8,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/evaluator-client", () => ({
   evaluatorClient: {
-    evaluators: { getAll: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+    evaluators: {
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      listByWorkflow: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/monitor-client", () => ({
+  monitorClient: {
+    monitors: {
+      getAllForProject: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
   },
 }));
 

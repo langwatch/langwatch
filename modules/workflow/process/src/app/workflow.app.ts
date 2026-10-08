@@ -18,7 +18,6 @@ import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/even
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -204,10 +203,6 @@ export interface WorkflowLineageReads {
     workflowId: string;
     projectId: string;
   }): Promise<readonly Readonly<{ id: string; name: string }>[]>;
-  listMonitors(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<readonly Readonly<{ id: string; name: string; evaluatorId: string }>[]>;
   cascadeArchive(input: {
     projectId: string;
     workflowId: string;
@@ -494,7 +489,6 @@ function lineageOf({
     findWorkflowWithCopies: (input) => rows.findWorkflowWithCopies(input),
     findLatestVersionNumber: (input) => rows.findLatestVersionNumber(input),
     listAgents: (input) => linked.listAgents(input),
-    listMonitors: (input) => linked.listMonitors(input),
     cascadeArchive: (input) => linked.cascadeArchive(input),
   };
 }
@@ -590,8 +584,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     authz: AuthzApi,
     /** Mints the key a run calls LangWatch back with. */
     apiKeys: ApiKeyApi,
-    /** The monitors an archive preview names, the ones its evaluators back. */
-    monitors: MonitorApi,
     /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
     secrets: SecretApi,
   };
@@ -667,7 +659,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
         linked: WorkflowLinkedRowsService.create({
           workflows,
           agents: setup.dependencies.agents,
-          monitors: setup.dependencies.monitors,
         }),
       }),
       publications: publicationsOf(setup.repositories.lineage),
@@ -1336,20 +1327,17 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   /**
-   * What archiving this workflow takes with it: the agents that run it and the monitors its
-   * evaluators back. The browser names the evaluators themselves from evaluator's client.
+   * What archiving this workflow takes with it: the agents that run it. The browser names
+   * the evaluators and their monitors from evaluator's and monitor's clients.
    */
   async getRelatedEntities(input: {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowRelatedEntities> {
-    // Copied out of the readonly views: the dialog types these lists as plain arrays.
-    const [agents, monitors] = await Promise.all([
-      this.#infrastructure.lineage.listAgents(input),
-      this.#infrastructure.lineage.listMonitors(input),
-    ]);
+    // Copied out of the readonly view: the dialog types this list as a plain array.
+    const agents = await this.#infrastructure.lineage.listAgents(input);
 
-    return { agents: [...agents], monitors: [...monitors] };
+    return { agents: [...agents] };
   }
 
   /**

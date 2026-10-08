@@ -9,7 +9,6 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -77,7 +76,6 @@ async function appWith(fleetSecret?: string): Promise<WorkflowModule> {
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
-      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),
     },
     config: {

@@ -15943,6 +15943,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/monitor-client':
+        specifier: workspace:*
+        version: link:../../monitor/client
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -16219,9 +16222,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../monitor/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability

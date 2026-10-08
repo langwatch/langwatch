@@ -36,6 +36,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-client": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/monitor-client": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",

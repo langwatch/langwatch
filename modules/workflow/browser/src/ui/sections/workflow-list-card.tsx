@@ -5,7 +5,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { type WorkflowCardBase, WorkflowCardDisplay } from "@langwatch/design-system/workflow-card";
 import { toEpochMs } from "@langwatch/time";
-import type { WorkflowCascadeArchive, WorkflowRelatedEntities } from "@langwatch/workflow-contract";
+import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
 import { useWorkflowArchivePreview } from "../../behavior/use-workflow-archive-preview.ts";
@@ -201,7 +201,7 @@ function describeCascadeArchive({
 }: {
   result: Pick<WorkflowCascadeArchive, "archivedAgentsCount">;
   related:
-    | (Pick<WorkflowRelatedEntities, "monitors"> & { evaluators: readonly { id: string }[] })
+    | { evaluators: readonly { id: string }[]; monitors: readonly { id: string }[] }
     | undefined;
 }): string[] {
   return [

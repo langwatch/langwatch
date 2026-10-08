@@ -15,10 +15,14 @@ const { state } = vi.hoisted(() => ({
     isLoading: false,
     related: {
       agents: [] as { id: string; name: string }[],
-      monitors: [] as { id: string; name: string }[],
     },
     relatedLoading: false,
     evaluators: [] as { id: string; name: string; workflowId: string | null }[],
+    monitors: [] as {
+      id: string;
+      name: string;
+      evaluator: { id: string; workflowId: string | null; archivedAt: Date | null } | null;
+    }[],
   },
 }));
 
@@ -79,6 +83,14 @@ vi.mock("@langwatch/evaluator-client", () => ({
   },
 }));
 
+vi.mock("@langwatch/monitor-client", () => ({
+  monitorClient: {
+    monitors: {
+      getAllForProject: { useQuery: () => ({ data: state.monitors, isLoading: false }) },
+    },
+  },
+}));
+
 const workflowRow = (overrides: Record<string, unknown> = {}) => ({
   id: "wf_1",
   projectId: "project-1",
@@ -97,7 +109,8 @@ describe("given the workflows library", () => {
     vi.clearAllMocks();
     state.workflows = [];
     state.isLoading = false;
-    state.related = { agents: [], monitors: [] };
+    state.related = { agents: [] };
+    state.monitors = [];
     state.relatedLoading = false;
     state.evaluators = [];
   });
@@ -169,7 +182,23 @@ describe("given the workflows library", () => {
     it("names what goes with it before the reader confirms, and takes the cascade", async () => {
       const user = userEvent.setup();
       state.workflows = [workflowRow()];
-      state.related = { agents: [], monitors: [{ id: "mo_1", name: "Nightly relevance" }] };
+      state.monitors = [
+        {
+          id: "mo_1",
+          name: "Nightly relevance",
+          evaluator: { id: "ev_1", workflowId: "wf_1", archivedAt: null },
+        },
+        {
+          id: "mo_2",
+          name: "Another workflow's monitor",
+          evaluator: { id: "ev_2", workflowId: "wf_2", archivedAt: null },
+        },
+        {
+          id: "mo_3",
+          name: "Archived evaluator's monitor",
+          evaluator: { id: "ev_3", workflowId: "wf_1", archivedAt: new Date("2026-09-28") },
+        },
+      ];
       state.evaluators = [
         { id: "ev_1", name: "Answer relevance", workflowId: "wf_1" },
         { id: "ev_2", name: "Another workflow's judge", workflowId: "wf_2" },
@@ -184,6 +213,8 @@ describe("given the workflows library", () => {
       expect(await screen.findByText("Answer relevance")).toBeTruthy();
       expect(screen.getByText("Nightly relevance")).toBeTruthy();
       expect(screen.queryByText("Another workflow's judge")).toBeNull();
+      expect(screen.queryByText("Another workflow's monitor")).toBeNull();
+      expect(screen.queryByText("Archived evaluator's monitor")).toBeNull();
 
       const confirm = screen.getByTestId("cascade-archive-confirm-input");
       await user.type(confirm, "delete");
