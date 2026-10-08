@@ -121,7 +121,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const groupDetail = useOpsOverlay("group");
   const openGroup = readOverlayParts(groupDetail.value, 2);
   // One config fetch serves every row's Grafana links; the pure builders in
-  // ~/utils/grafanaLinks turn it into per-group hrefs client-side.
+  // the grafana-links model turn it into per-group hrefs client-side.
   const grafanaQuery = api.ops.getGrafanaLinkConfig.useQuery(undefined, {
     staleTime: 10 * 60 * 1000,
   });

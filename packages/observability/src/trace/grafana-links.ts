@@ -161,3 +161,20 @@ export function grafanaGroupLogsUrl(groupId: string, config: GrafanaDeepLinkConf
     range: { from: config.from ?? DEFAULT_FROM, to: config.to ?? DEFAULT_TO },
   });
 }
+
+/** The link config ops hands its screens, from the `grafana` config leaves; null with no base. */
+export function grafanaLinkConfigOf(
+  settings: Partial<GrafanaDeepLinkConfig>,
+): GrafanaDeepLinkConfig | null {
+  const { baseUrl, tempoDatasourceUid, lokiDatasourceUid } = settings;
+  return baseUrl ? { baseUrl, tempoDatasourceUid, lokiDatasourceUid } : null;
+}
+
+/** A HandledError trace-URL provider: undefined with no Grafana, trace id or valid base URL. */
+export function grafanaTraceUrlProvider(
+  settings: Partial<GrafanaDeepLinkConfig>,
+): (traceId: string | undefined) => string | undefined {
+  const config = grafanaLinkConfigOf(settings);
+  return (traceId) =>
+    config && traceId ? (grafanaTraceUrl(traceId, config) ?? undefined) : undefined;
+}

@@ -26,6 +26,7 @@ export {
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  grafana,
   isSaas,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,

@@ -9,7 +9,7 @@ import { isSpanContextValid, trace } from "@opentelemetry/api";
 /**
  * Trace identity of the span that was active where the error was captured, so a PostHog
  * exception can be followed back to the trace it happened in — and from there, via
- * `~/utils/grafanaLinks`, straight into Tempo.
+ * `@langwatch/observability/grafana-links`, straight into Tempo.
  */
 function activeTraceContext(): { trace_id: string; span_id: string } | undefined {
   const spanContext = trace.getActiveSpan()?.spanContext();

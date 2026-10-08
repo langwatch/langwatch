@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   grafanaGroupLogsUrl,
   grafanaGroupTracesUrl,
+  grafanaLinkConfigOf,
   grafanaLinksForTrace,
   grafanaLogsUrlByTrace,
   grafanaTraceUrl,
+  grafanaTraceUrlProvider,
 } from "../grafana-links.ts";
 
 const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
@@ -164,5 +166,57 @@ describe("grafanaLinksForTrace", () => {
     it("returns null so a bad env value can't throw through the error handler", () => {
       expect(grafanaLinksForTrace(TRACE_ID, { baseUrl: "127.0.0.1:3000" })).toBeNull();
     });
+  });
+});
+
+describe("grafanaTraceUrlProvider", () => {
+  describe("given a configured Grafana", () => {
+    /** @scenario "A configured Grafana gives a handled error a trace link" */
+    it("links the trace id to Tempo with the configured datasource", () => {
+      const provide = grafanaTraceUrlProvider({
+        baseUrl: "http://127.0.0.1:3000",
+        tempoDatasourceUid: "my-tempo",
+      });
+      const { panes } = panesOf(provide(TRACE_ID) ?? null);
+
+      expect(panes.lw.datasource).toBe("my-tempo");
+      expect(panes.lw.queries[0].query).toBe(TRACE_ID);
+    });
+
+    it("gives no link without a trace id", () => {
+      expect(grafanaTraceUrlProvider({ baseUrl: "http://127.0.0.1:3000" })(undefined)).toBe(
+        undefined,
+      );
+    });
+  });
+
+  describe("given no Grafana configured", () => {
+    /** @scenario "With no Grafana configured an error carries no link and nothing fails" */
+    it("gives no link", () => {
+      expect(grafanaTraceUrlProvider({})(TRACE_ID)).toBe(undefined);
+    });
+  });
+
+  describe("given a malformed base URL", () => {
+    /** @scenario "A malformed Grafana base URL yields no link rather than a second error" */
+    it("gives no link and does not throw", () => {
+      expect(grafanaTraceUrlProvider({ baseUrl: "grafana.internal:3000" })(TRACE_ID)).toBe(
+        undefined,
+      );
+    });
+  });
+});
+
+describe("grafanaLinkConfigOf", () => {
+  /** @scenario "Ops screens are handed the link config only when a Grafana is configured" */
+  it("hands over the config when a base URL is set and null when it is not", () => {
+    expect(
+      grafanaLinkConfigOf({ baseUrl: "http://127.0.0.1:3000", lokiDatasourceUid: "my-loki" }),
+    ).toEqual({
+      baseUrl: "http://127.0.0.1:3000",
+      tempoDatasourceUid: undefined,
+      lokiDatasourceUid: "my-loki",
+    });
+    expect(grafanaLinkConfigOf({})).toBeNull();
   });
 });

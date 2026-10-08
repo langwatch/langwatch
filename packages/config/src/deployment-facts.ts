@@ -122,6 +122,15 @@ const optionalNonBlank = z.preprocess(
   z.string().min(1).optional(),
 );
 
+/** Grafana Explore deep links: no base URL, no links. Datasource uids default to LGTM's. */
+export const { grafana } = Config.define((c) => ({
+  grafana: {
+    baseUrl: c.env("GRAFANA_BASE_URL", optionalNonBlank),
+    tempoDatasourceUid: c.env("GRAFANA_TEMPO_DATASOURCE_UID", optionalNonBlank),
+    lokiDatasourceUid: c.env("GRAFANA_LOKI_DATASOURCE_UID", optionalNonBlank),
+  },
+}));
+
 /**
  * The release this install runs, as the deployment names it: observability and every module that
  * reports a version hold these two leaves. Read them through `releaseVersionOf`.
