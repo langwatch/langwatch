@@ -833,6 +833,18 @@ describe("strict feature source layout", () => {
     expect(policies()).not.toContain("feature-layout");
   });
 
+  /** @scenario A contract that records callable false declares no feature API */
+  it("accepts a contract with no feature API only when it records callable false", () => {
+    featurePackage({ feature: "widget", role: "contract" });
+    rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
+    expect(policies()).toContain("feature-layout");
+
+    const manifestPath = join(root, "modules/widget/contract/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+    write("modules/widget/contract/package.json", JSON.stringify({ ...manifest, callable: false }));
+    expect(policies()).not.toContain("feature-layout");
+  });
+
   it("rejects process wiring bound from the composition root by a portable API contract", () => {
     featurePackage({
       feature: "widget",

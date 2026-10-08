@@ -1,6 +1,7 @@
 export type { InstantEvalServerConfig } from "./instant-eval.config.ts";
 export { instantEvalConfig, isInstantEvalBounded } from "./instant-eval.config.ts";
 export * from "./instant-eval.api.ts";
+export * from "./instant-eval.trpc.ts";
 export * from "./instant-eval.errors.ts";
 export * from "./instant-eval-event.constants.ts";
 export * from "./instant-eval-judging.ts";

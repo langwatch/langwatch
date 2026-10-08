@@ -4,7 +4,7 @@ import type {
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
-import { moduleApi, defineTrpcContract } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -240,5 +240,3 @@ export interface InstantEvalApi {
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");
-
-export const instantEvalTrpc = defineTrpcContract("instantEval").build();

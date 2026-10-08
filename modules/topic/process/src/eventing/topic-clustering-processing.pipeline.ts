@@ -18,13 +18,6 @@ import {
 
 import type { TopicModule } from "../app/topic.app.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
-import {
-  TopicClusteringRequestedEventSchema,
-  TopicClusteringRunStartedEventSchema,
-  TopicClusteringRunCompletedEventSchema,
-  TopicClusteringRunFailedEventSchema,
-  TopicClusteringTopicsRecordedEventSchema,
-} from "../rules/topic-clustering-events.rules.ts";
 import { TOPIC_CLUSTERING_PROCESS_NAME } from "../rules/topic-clustering-process.rules.ts";
 import type { TopicClusteringBootstrapService } from "../services/topic-clustering-bootstrap.service.ts";
 import {
@@ -48,6 +41,13 @@ import {
   topicClusteringSeedSchema,
   topicClusteringSeedWake,
 } from "./topic-clustering-seed.process.ts";
+import {
+  TopicClusteringRequestedEventSchema,
+  TopicClusteringRunStartedEventSchema,
+  TopicClusteringRunCompletedEventSchema,
+  TopicClusteringRunFailedEventSchema,
+  TopicClusteringTopicsRecordedEventSchema,
+} from "./topic-clustering.events.ts";
 import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,

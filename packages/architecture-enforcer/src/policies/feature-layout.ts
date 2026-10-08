@@ -118,6 +118,7 @@ function lintContract(
   pkg: ClassifiedPackage,
 ): ArchitectureViolation[] {
   if (contractArtifacts(snapshot, pkg).length === 0) {
+    if (pkg.manifest.callable === false) return [];
     return [
       violation(
         `${pkg.root}/src`,

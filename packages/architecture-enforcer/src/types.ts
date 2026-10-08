@@ -28,6 +28,8 @@ export type PackageKind =
 export type PackageManifest = {
   name?: string;
   private?: boolean;
+  /** `false` records a contract package that deliberately declares no callable `*Api`. */
+  callable?: boolean;
   license?: string;
   exports?: unknown;
   scripts?: Record<string, string>;

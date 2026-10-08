@@ -11,13 +11,13 @@ import {
 } from "@langwatch/topic-contract";
 import { z } from "zod";
 
-import type { TopicClusteringProcessingEvent } from "../rules/topic-clustering-events.rules.ts";
+import { nextDailySlot, runIdForSlot } from "../rules/topic-clustering-process.rules.ts";
+import type { TopicClusteringProcessingEvent } from "./topic-clustering.events.ts";
 import {
   TopicClusteringRequestedEventSchema,
   TopicClusteringRunCompletedEventSchema,
   TopicClusteringRunFailedEventSchema,
-} from "../rules/topic-clustering-events.rules.ts";
-import { nextDailySlot, runIdForSlot } from "../rules/topic-clustering-process.rules.ts";
+} from "./topic-clustering.events.ts";
 import {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,

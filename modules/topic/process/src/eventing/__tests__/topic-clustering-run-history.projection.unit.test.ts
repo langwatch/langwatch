@@ -6,15 +6,15 @@ import {
 } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
-import type {
-  TopicClusteringRunCompletedEvent,
-  TopicClusteringRunFailedEvent,
-  TopicClusteringRunStartedEvent,
-} from "../../rules/topic-clustering-events.rules.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
 } from "../topic-clustering-run-history.projection.ts";
+import type {
+  TopicClusteringRunCompletedEvent,
+  TopicClusteringRunFailedEvent,
+  TopicClusteringRunStartedEvent,
+} from "../topic-clustering.events.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunHistoryData> = {
   get: async () => ({ kind: "empty" as const }),

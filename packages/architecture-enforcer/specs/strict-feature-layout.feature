@@ -27,6 +27,13 @@ Feature: Strict versioned feature source layout
     And server-only artifact suffixes are rejected from contract source
 
   @unit @architecture
+  Scenario: A contract that records callable false declares no feature API
+    Given a strict contract package that declares no callable feature API
+    Then it is reported as missing its feature API
+    When its package.json records "callable": false
+    Then it is no longer reported
+
+  @unit @architecture
   Scenario: Behaviour-bearing modules are classes
     Given a layout-version-0 service, store, projection, API, migration, or repository module
     When Oxlint checks the module
