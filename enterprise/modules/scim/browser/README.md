@@ -4,7 +4,7 @@ The browser half of [scim](../README.md). What a browser installs when it instal
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/scim.web.ts:9` (`defineBrowserModule("scim")`), exported as `scimWeb` at `./declaration`.
+Declared in `src/scim.web.ts:11` (`defineBrowserModule("scim")`), exported as `scimWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -28,8 +28,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/identity-client`.
+- Client packages (package.json): `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`.
+- Lends: `AuthenticationOverviewCardToken`, `DirectorySummaryToken`.
 - Host APIs it requires: `ScimHostApi`.
-- Capabilities: `authenticationOverviewCard`, `directorySummary`.
 
 <!-- readme:generated:end -->

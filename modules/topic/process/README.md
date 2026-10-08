@@ -6,7 +6,7 @@ The server half of [topic](../README.md). A project's conversation topics, and w
 
 ## Installation
 
-`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…)`, `src/topic.module.ts:11`.
+`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…)`, `src/topic.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The project's conversation topics, and what the last clustering run did.
 
-Peers call these through the token, declared at `../contract/src/topic.api.ts:13`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/topic.ts:102`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -81,12 +81,12 @@ type Output = {
 }[];
 
 // topics.getTopicCounts
-type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:86
-type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:87
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:87
+type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:88
 
 // topics.getClusteringStatus
 type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
-type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:36
+type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:37
 
 // topics.getClusteringRunHistory
 type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
@@ -94,7 +94,7 @@ type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.t
 
 // topics.triggerTopicClustering
 type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
-// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:80
+// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:81
 type Output =
   | {
       started: true;

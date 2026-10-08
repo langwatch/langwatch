@@ -65,12 +65,10 @@ interface Input {
   projectId: string;
   limit?: number;
 }
-// Output: inline, ../contract/src/recent-items.ts:38
+// Output: inline, ../contract/src/recent-items.ts:36
 type Output = {
   id: string;
   type: "prompt" | "workflow" | "dataset" | "evaluation" | "annotation" | "simulation";
-  name: string;
-  href: string;
   updatedAt: unknown;
 }[];
 ```

@@ -20,7 +20,7 @@ Platform health: checks of the services a deployment depends on, all at once or 
 | Kind            | Name                                                                              | Declared at                                                    |
 | --------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | Stores required |                                                                                   | `process/src/channels/http/http.platform-health.channels.ts:8` |
-| Secrets         | `probeApiKey` (PLATFORM_HEALTH_PROBE_API_KEY), `apiKey` (PLATFORM_HEALTH_API_KEY) | `process/src/app/platform-health.app.ts:63`                    |
+| Secrets         | `probeApiKey` (PLATFORM_HEALTH_PROBE_API_KEY), `apiKey` (PLATFORM_HEALTH_API_KEY) | `process/src/app/platform-health.app.ts:62`                    |
 | Config          | `publicBaseUrl` (BASE_HOST)                                                       | `contract/src/platform-health.config.ts:4`                     |
 
 Anything else platform-health needs belongs to another module and is reached through its `*Api`.

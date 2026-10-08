@@ -6,7 +6,7 @@ The server half of [share](../README.md). Share links: creating, resolving and r
 
 ## Installation
 
-`defineProcessModule("share").withRepositories(shareRepositories).withApi(ShareModule).withTransports(shareTrpcTransport, pinnedTraceTrpcTransport).withEventing(shareTraceSharingRevocationEventing)`, `src/share.module.ts:9`.
+`defineProcessModule("share").withRepositories(shareRepositories).withApi(ShareModule).withTransports(shareTrpcTransport, pinnedTraceTrpcTransport).withEventing(shareTraceSharingRevocationEventing)`, `src/share.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

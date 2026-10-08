@@ -4,7 +4,7 @@ The browser half of [evaluator](../README.md). What a browser installs when it i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/evaluator.web.ts:14` (`defineBrowserModule("evaluator")`), exported as `evaluatorWeb` at `./declaration`.
+Declared in `src/evaluator.web.ts:17` (`defineBrowserModule("evaluator")`), exported as `evaluatorWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -37,10 +37,9 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(evaluatorApi)`, tRPC contracts: `evaluators.*`.
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/api-key-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/model-provider-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
-- Lends: `EvaluatorSettingsFormToken`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/api-key-client`, `@langwatch/evaluator-client`, `@langwatch/experiment-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
+- Lends: `StudioEvaluatorEditorToken`, `EvaluatorSettingsFormToken`.
 - Host APIs it requires: `EvaluatorHostApi`.
-- Capabilities: `studioEvaluatorEditor`.
 - Config slices: `evaluation`.
 
 <!-- readme:generated:end -->

@@ -174,7 +174,7 @@ None: data-privacy declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:103`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:102`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

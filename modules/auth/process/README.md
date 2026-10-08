@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:21`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -784,13 +784,13 @@ Run by the tasks process, before serve.
 
 | Task                            | Class                           | Declared at                                          |
 | ------------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:14` |
+| `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:11` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable       | Declared at                                          |
 | ------ | ----------------------------- | -------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:241`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:204`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -800,20 +800,20 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`    | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`   | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`       | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:244`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:246`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:36`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:37`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:38`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`    | `../contract/src/auth.config.ts:40`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`  | `../contract/src/auth.config.ts:46`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`     | `../contract/src/auth.config.ts:51`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`  | `../contract/src/auth.config.ts:53`                  |
-| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`     | `../contract/src/auth.config.ts:58`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`            | `../contract/src/auth.config.ts:60`                  |
-| config | `isSaas`                      | `IS_SAAS`                  | `../contract/src/auth.config.ts:62`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`             | `../contract/src/auth.config.ts:64`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                | `../contract/src/auth.config.ts:66`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                 | `../contract/src/auth.config.ts:67`                  |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:207`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:209`                            |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:19`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:21`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:22`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`    | `../contract/src/auth.config.ts:24`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`  | `../contract/src/auth.config.ts:26`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`     | `../contract/src/auth.config.ts:27`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`  | `../contract/src/auth.config.ts:29`                  |
+| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`     | `../contract/src/auth.config.ts:34`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`            | `../contract/src/auth.config.ts:36`                  |
+| config | `isSaas`                      | `IS_SAAS`                  | `../contract/src/auth.config.ts:38`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`             | `../contract/src/auth.config.ts:40`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                | `../contract/src/auth.config.ts:42`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                 | `../contract/src/auth.config.ts:43`                  |
 
 <!-- readme:generated:end -->

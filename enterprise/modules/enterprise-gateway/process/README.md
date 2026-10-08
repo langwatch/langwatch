@@ -6,7 +6,7 @@ The server half of [enterprise-gateway](../README.md). The Enterprise half of th
 
 ## Installation
 
-`defineProcessModule("enterprise-gateway").withRepositories(enterpriseGatewayRepositories).withApi(EnterpriseGatewayModule).withTransports(routingPolicyTrpcTransport, personalVirtualKeysTrpcTransport)`, `src/enterprise-gateway.module.ts:9`.
+`defineProcessModule("enterprise-gateway").withRepositories(enterpriseGatewayRepositories).withApi(EnterpriseGatewayModule).withTransports(routingPolicyTrpcTransport, personalVirtualKeysTrpcTransport)`, `src/enterprise-gateway.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

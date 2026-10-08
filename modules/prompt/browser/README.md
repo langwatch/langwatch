@@ -4,7 +4,7 @@ The browser half of [prompt](../README.md). What a browser installs when it inst
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/prompt.web.ts:10` (`defineBrowserModule("prompt")`), exported as `promptWeb` at `./declaration`.
+Declared in `src/prompt.web.ts:18` (`defineBrowserModule("prompt")`), exported as `promptWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -20,7 +20,7 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 
 | Drawer         | Opens                                              | Opened from                             |
 | -------------- | -------------------------------------------------- | --------------------------------------- |
-| `promptList`   | `src/ui/sections/prompt-list-drawer.tsx`           | experiment                              |
+| `promptList`   | `src/ui/sections/prompt-list-drawer.tsx`           | experiment, workflow                    |
 | `promptEditor` | `src/ui/sections/prompts/prompt-editor-drawer.tsx` | experiment, navigation, scenario, trace |
 
 Opened from lists the other modules (and `ui`, the app) whose browser source names the drawer in a
@@ -29,8 +29,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(promptApi)`, tRPC contracts: `prompts.*`, `promptTags.*`.
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/model-provider-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`.
+- Lends: `LlmConfigFieldToken`, `LlmConfigPopoverToken`, `OutputsSectionToken`, `StudioPromptEditorToken`.
 - Host APIs it requires: `PromptHostApi`.
-- Capabilities: `llmConfigField`, `llmConfigPopover`, `outputsSection`, `studioPromptEditor`.
 
 <!-- readme:generated:end -->

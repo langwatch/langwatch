@@ -6,7 +6,7 @@ The server half of [feature-flag](../README.md). Feature flags: evaluation, oper
 
 ## Installation
 
-`defineProcessModule("feature-flag").withRepositories(featureFlagRepositories).withApi(FeatureFlagModule).withTransports(featureFlagTrpcTransport)`, `src/feature-flag.module.ts:7`.
+`defineProcessModule("feature-flag").withRepositories(featureFlagRepositories).withApi(FeatureFlagModule).withTransports(featureFlagTrpcTransport)`, `src/feature-flag.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

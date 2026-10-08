@@ -35,9 +35,9 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(organizationApi)`, tRPC contracts: `organization.*`, `plan.*`.
-- Client packages (package.json): `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
 - Lends: `JoinOfferToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
 - Host APIs it requires: `OrganizationHostApi`.
-- Capabilities: `scope`, `copyTargets`, `organizationFacts`, `joinOffer`, `teamAccessWaiting`.
+- Capabilities: `scope`, `copyTargets`, `organizationFacts`, `teamAccessWaiting`.
 
 <!-- readme:generated:end -->

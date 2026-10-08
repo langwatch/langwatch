@@ -6,7 +6,7 @@ The server half of [prompt](../README.md). Prompts: versioned prompt configurati
 
 ## Installation
 
-`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withTransportFacts(…)`, `src/prompt.module.ts:13`.
+`defineProcessModule("prompt").withRepositories(promptRepositories).withApi(PromptModule).withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport).withEventing(promptLifecycleEventing).withTransportFacts(…)`, `src/prompt.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -837,6 +837,8 @@ Declared at `src/eventing/prompt-lifecycle.pipeline.ts:29`. Events: `promptCreat
 
 ## Configuration
 
-None: no `static secrets` or `static config` leaf.
+| Kind   | Leaf            | Environment variable | Declared at                          |
+| ------ | --------------- | -------------------- | ------------------------------------ |
+| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/prompt.config.ts:5` |
 
 <!-- readme:generated:end -->

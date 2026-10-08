@@ -4,7 +4,7 @@ The browser half of [licensing](../README.md). What a browser installs when it i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/licensing.web.ts:11` (`defineBrowserModule("licensing")`), exported as `licensingWeb` at `./declaration`.
+Declared in `src/licensing.web.ts:13` (`defineBrowserModule("licensing")`), exported as `licensingWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -23,7 +23,8 @@ None.
 
 ## Calls
 
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`.
+- Lends: `UpgradeModalToken`, `ResourceLimitRowToken`.
 - Host APIs it requires: `LicensingHostApi`.
-- Capabilities: `resourceLimitRow`.
 
 <!-- readme:generated:end -->

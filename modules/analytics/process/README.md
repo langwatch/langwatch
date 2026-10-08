@@ -6,7 +6,7 @@ The server half of [analytics](../README.md). Analytics reads: timeseries, feedb
 
 ## Installation
 
-`defineProcessModule("analytics").withRepositories(analyticsRepositories).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).withTransportFacts(…).withEventing(lwqlReconvergenceEventing)`, `src/analytics.module.ts:15`.
+`defineProcessModule("analytics").withRepositories(analyticsRepositories).withChannels(analyticsChannels).withApi(AnalyticsModule).withTransports(analyticsRest, analyticsLegacyRest, queryRest, analyticsTrpcTransport, analyticsLwqlTrpcTransport).withTransportFacts(…).withEventing(lwqlReconvergenceEventing)`, `src/analytics.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,12 +14,12 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:65`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:66`; nothing else in this package is public.
 
 #### `getTimeseries`
 
 ```typescript
-getTimeseries(input: AnalyticsTimeseriesInput, options?: { readonly maxResultRows?: number }): Promise<AnalyticsTimeseriesResult>;
+getTimeseries(input: AnalyticsTimeseriesInput, options?: AnalyticsTimeseriesReadOptions): Promise<AnalyticsTimeseriesResult>;
 ```
 
 #### `getFeedbacks`
@@ -453,8 +453,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:50`.
 
 | Kind   | Leaf                          | Environment variable                | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`          | `src/app/analytics.app.ts:337`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`     | `src/app/analytics.app.ts:338`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`          | `src/app/analytics.app.ts:332`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`     | `src/app/analytics.app.ts:333`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`               | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`              | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                     | `../contract/src/analytics.config.ts:13` |

@@ -6,7 +6,7 @@ The server half of [log](../README.md). Logs: receiving OTLP logs, canonicalisin
 
 ## Installation
 
-`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing)`, `src/log.module.ts:8`.
+`defineProcessModule("log").withRepositories(logRepositories).withApi(LogModule).withTransports(otlpLogsRest).withEventing(logEventing)`, `src/log.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

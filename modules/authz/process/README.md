@@ -37,7 +37,7 @@ the grant or role aggregate ID.
 
 ## Installation
 
-`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing)`, `src/authz.module.ts:25`.
+`defineProcessModule("authz").withRepositories(authzRepositories).withApi(AuthzModule).withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport).withTransportFacts(…).withEventing(authzEventing)`, `src/authz.module.ts:27`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -760,12 +760,12 @@ Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:8
 
 ```typescript
 // authz.effectivePermissions
-// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:430
+// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:444
 interface Input {
   projectId?: string;
   organizationId?: string;
 }
-// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:417
+// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:431
 interface Output {
   scope: {
     type: "project" | "team" | "organization" | "resource";

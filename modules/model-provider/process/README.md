@@ -6,7 +6,7 @@ The server half of [model-provider](../README.md). Model providers: the provider
 
 ## Installation
 
-`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…)`, `src/model-provider.module.ts:20`.
+`defineProcessModule("model-provider").withRepositories(modelProviderRepositories).withChannels(modelProviderChannels).withApi(ModelProviderModule).withTransports(modelProviderRest, modelDefaultsRest, playgroundRest, modelProviderTrpcTransport, llmModelCostTrpcTransport, translateTrpcTransport).withTransportFacts(…).withTasks(…)`, `src/model-provider.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -851,8 +851,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:267`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:268`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:256`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:257`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:20` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:21` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:22` |

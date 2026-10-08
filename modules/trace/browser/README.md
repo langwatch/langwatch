@@ -4,7 +4,7 @@ The browser half of [trace](../README.md). What a browser installs when it insta
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/trace.web.ts:23` (`defineBrowserModule("trace")`), exported as `traceWeb` at `./declaration`.
+Declared in `src/trace.web.ts:24` (`defineBrowserModule("trace")`), exported as `traceWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -31,8 +31,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - Client packages (package.json): `@langwatch/annotation-client`, `@langwatch/api-key-client`, `@langwatch/dataset-client`, `@langwatch/evaluator-client`, `@langwatch/onboarding-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
-- Lends: `AgentActionsMenuToken`, `ConversationThreadToken`, `TracePreviewHoverCardToken`, `RenderInputOutputToken`, `TraceIdPeekToken`, `SetupWithAgentButtonToken`, `AnnotationQueueConversationToken`, `TraceEditButtonToken`.
+- Lends: `AgentActionsMenuToken`, `EvaluatorTracesMappingToken`, `ConversationThreadToken`, `TracePreviewHoverCardToken`, `RenderInputOutputToken`, `TraceIdPeekToken`, `SetupWithAgentButtonToken`, `AnnotationQueueConversationToken`, `TraceEditButtonToken`.
 - Host APIs it requires: `TraceHostApi`.
-- Capabilities: `evaluatorTracesMapping`, `presenceMenuItem`.
+- Capabilities: `presenceMenuItem`.
 
 <!-- readme:generated:end -->

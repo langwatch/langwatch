@@ -4,7 +4,7 @@ The browser half of [billing](../README.md). What a browser installs when it ins
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/billing.web.ts:14` (`defineBrowserModule("billing")`), exported as `billingWeb` at `./declaration`.
+Declared in `src/billing.web.ts:15` (`defineBrowserModule("billing")`), exported as `billingWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -24,9 +24,9 @@ None.
 
 ## Calls
 
-- Lends: `ContactSalesToken`, `SeatProrationPreviewToken`.
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`.
+- Lends: `LicenseBillingSectionToken`, `ContactSalesToken`, `SeatProrationPreviewToken`.
 - Host APIs it requires: `BillingHostApi`.
-- Capabilities: `licenseBillingSection`.
 - Config slices: `billing`.
 
 <!-- readme:generated:end -->

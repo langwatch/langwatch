@@ -305,6 +305,82 @@ Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instan
 | `instantEval.enable`         | mutation | Permission `organization:manage, via projectId` | `explorerInstantEvalProjectSchema`        | `instantEvalOptInAccessSchema`       |
 | `instantEval.classifySearch` | mutation | Permission `analytics:view`                     | `explorerSearchClassificationInputSchema` | `explorerSearchClassificationSchema` |
 
+```typescript
+// instantEval.estimate
+type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:19
+type Output = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:364
+
+// instantEval.start
+type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:19
+// Output: explorerInstantEvalProgressSchema, ../contract/src/instant-eval-explorer.schemas.ts:47
+interface Output {
+  id: string;
+  status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+  total: number | null;
+  progress: number;
+  matched: number | null;
+  failed: number;
+  skipped: number;
+  error: string | null;
+  priceUsd: number;
+  finishedAtMs: number | null;
+}
+
+// instantEval.cancel
+// Input: explorerInstantEvalRunIdSchema, ../contract/src/instant-eval-explorer.schemas.ts:41
+interface Input {
+  projectId: string;
+  runId: string;
+}
+type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:47
+
+// instantEval.get
+type Input = z.infer<typeof explorerInstantEvalRunIdSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:41
+type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:47
+
+// instantEval.access
+// Input: explorerInstantEvalProjectSchema, ../contract/src/instant-eval-explorer.schemas.ts:38
+interface Input {
+  projectId: string;
+}
+// Output: instantEvalOptInAccessSchema, ../contract/src/instant-eval.schemas.ts:491
+interface Output {
+  released: boolean;
+  offer:
+    | "enable"
+    | "ask_admin"
+    | "contact_us"
+    | "not_in_license"
+    | "switched_off"
+    | "not_connected"
+    | "ask_operator";
+  viaConnect: boolean;
+}
+
+// instantEval.enable
+type Input = z.infer<typeof explorerInstantEvalProjectSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:38
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:491
+
+// instantEval.classifySearch
+// Input: explorerSearchClassificationInputSchema, ../contract/src/instant-eval-explorer.schemas.ts:71
+interface Input {
+  projectId: string;
+  text: string;
+  timeRange: {
+    from: number;
+    to: number;
+  };
+  activeQuery?: string;
+  lensId?: string;
+  isLangyAvailable?: boolean;
+}
+// Output: explorerSearchClassificationSchema, ../contract/src/instant-eval-explorer.schemas.ts:88
+interface Output {
+  classified: string | null;
+  isInstantEvalAvailable: boolean;
+}
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

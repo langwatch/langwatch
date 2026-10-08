@@ -34,7 +34,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/dataset-client`.
+- Client packages (package.json): `@langwatch/dataset-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `AutomationHost`.
 
 <!-- readme:generated:end -->

@@ -6,7 +6,7 @@ The server half of [evaluator](../README.md). Evaluators: their definitions, and
 
 ## Installation
 
-`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing).withEventing(evaluatorWorkflowArchiveCascadeEventing)`, `src/evaluator.module.ts:10`.
+`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing).withEventing(evaluatorWorkflowArchiveCascadeEventing)`, `src/evaluator.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -219,7 +219,7 @@ cascadeArchive(input: EvaluatorScope): Promise<EvaluatorCascadeArchive>;
 Replicates the evaluator, and the workflow backing it, into another project.
 
 ```typescript
-copy(input: { evaluatorId: string; projectId: string; sourceProjectId: string; newEvaluatorId: string; actorId: string; }): Promise<Evaluator>;
+copy(input: { evaluatorId: string; projectId: string; sourceProjectId: string; newEvaluatorId: string; actorId: string; /** * Copying a library evaluator counts against the plan's evaluator cap; an * online evaluation's copy brings its evaluator along uncapped, so it passes false. */ shouldCheckEvaluatorCap?: boolean; }): Promise<Evaluator>;
 ```
 
 #### `pushToCopies`
@@ -541,11 +541,11 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `evaluator_lifecycle` (aggregate `evaluator`)
 
-Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:22`. Events: `evaluatorDeletedEventSchema`.
+Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:24`. Events: `evaluatorDeletedEventSchema`.
 
 | Kind    | Name                     | Handles | Declared at                                       |
 | ------- | ------------------------ | ------- | ------------------------------------------------- |
-| command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:27` |
+| command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:29` |
 
 ### Pipeline `evaluator_workflow_archive_cascade` (aggregate `global`)
 

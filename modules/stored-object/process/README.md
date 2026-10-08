@@ -6,7 +6,7 @@ The server half of [stored-object](../README.md). Stored objects: uploads and st
 
 ## Installation
 
-`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport)`, `src/stored-object.module.ts:10`.
+`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport)`, `src/stored-object.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

@@ -398,7 +398,7 @@ findConnectServicesForManagedKey(input: { virtualKeyId: string; organizationId: 
 
 #### `issueActivationCode`
 
-Activation codes (ADR-156, section 5): the short code a fresh install pastes instead of a license blob. Minting and revoking are the backoffice's; redeeming is a public route an install calls once.
+Activation codes (ADR-156, section 5): the short code a fresh install pastes instead of a license blob. Minting and revoking are the the admin console's; redeeming is a public route an install calls once.
 
 ```typescript
 issueActivationCode(input: IssueActivationCodeInput): Promise<IssuedActivationCode>;
@@ -691,8 +691,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:180`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:181`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:179`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:180`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

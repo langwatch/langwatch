@@ -37,7 +37,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/onboarding-client`.
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/onboarding-client`.
 - Host APIs it requires: `GatewayHostApi`.
 - Config slices: `gateway`.
 

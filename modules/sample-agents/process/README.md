@@ -6,7 +6,7 @@ The server half of [sample-agents](../README.md). The demo agents a caller runs 
 
 ## Installation
 
-`defineProcessModule("sample-agents").withApi(SampleAgentsModule).withTransports(hotelBotRest)`, `src/sample-agents.module.ts:7`.
+`defineProcessModule("sample-agents").withChannels(sampleAgentsChannels).withApi(SampleAgentsModule).withTransports(hotelBotRest)`, `src/sample-agents.module.ts:8`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

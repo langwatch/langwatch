@@ -4,7 +4,7 @@ The browser half of [sso](../README.md). What a browser installs when it install
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/sso.web.ts:9` (`defineBrowserModule("sso")`), exported as `ssoWeb` at `./declaration`.
+Declared in `src/sso.web.ts:10` (`defineBrowserModule("sso")`), exported as `ssoWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -22,7 +22,8 @@ None.
 
 ## Calls
 
+- Client packages (package.json): `@langwatch/organization-client`.
+- Lends: `AuthenticationOverviewCardToken`.
 - Host APIs it requires: `SsoHostApi`.
-- Capabilities: `authenticationOverviewCard`.
 
 <!-- readme:generated:end -->

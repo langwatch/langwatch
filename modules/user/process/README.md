@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/user.module.ts:13`.
+`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/user.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -765,8 +765,11 @@ Declared at `src/eventing/user-lifecycle.pipeline.ts:62`. Events: `userDeactivat
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                        |
-| ------ | --------------- | -------------------- | ---------------------------------- |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/user.config.ts:6` |
+| Kind   | Leaf                | Environment variable      | Declared at                         |
+| ------ | ------------------- | ------------------------- | ----------------------------------- |
+| config | `publicBaseUrl`     | `BASE_HOST`               | `../contract/src/user.config.ts:13` |
+| config | `passkeysEnabled`   | `PASSKEYS_ENABLED`        | `../contract/src/user.config.ts:15` |
+| config | `mfaEnrollmentOpen` | `MFA_ENROLLMENT_OPEN`     | `../contract/src/user.config.ts:16` |
+| config | `localPasswords`    | `LOCAL_PASSWORDS_ENABLED` | `../contract/src/user.config.ts:17` |
 
 <!-- readme:generated:end -->

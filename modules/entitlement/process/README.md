@@ -6,7 +6,7 @@ The server half of [entitlement](../README.md). What a plan allows, and what has
 
 ## Installation
 
-`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing).withMigrations(…)`, `src/entitlement.module.ts:15`.
+`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing).withMigrations(…)`, `src/entitlement.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -118,7 +118,7 @@ Contract `../contract/src/entitlement.trpc.ts:23`, router `src/transport/usage-l
 ```typescript
 // limits.getUsage
 type Input = z.infer<typeof entitlementOrganizationScopeSchema>; // ../contract/src/entitlement.schemas.ts:11
-type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:40
+type Output = z.infer<typeof usageStatsSchema>; // ../contract/src/usage.ts:60
 
 // limits.checkAndSendUsageLimitNotification
 // Input: sendUsageLimitWarningInputSchema, ../contract/src/entitlement.schemas.ts:26
@@ -155,14 +155,15 @@ Declared at `src/eventing/usage.pipeline.ts:72`. Events: `monthCountedEventSchem
 
 The chain builds early when `!billableEventsMeter` (`src/eventing/usage.pipeline.ts:112`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
-| Kind                  | Name                                                                  | Handles                                     | Declared at                          | Built                |
-| --------------------- | --------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | -------------------- |
-| command               | –                                                                     | –                                           | `src/eventing/usage.pipeline.ts:95`  | always               |
-| command               | `recordLimitDecision`                                                 | –                                           | `src/eventing/usage.pipeline.ts:107` | always               |
-| process manager       | `refusedOrganizations`                                                | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:114` | past the early build |
-| upcasts               | –                                                                     | –                                           | `src/eventing/usage.pipeline.ts:78`  | always               |
-| peer map projection   | –                                                                     | –                                           | `src/eventing/usage.pipeline.ts:108` | always               |
-| global map projection | `≈ BillableEventsMeterProjection.create(billableEventsMeter).build()` | –                                           | `src/eventing/usage.pipeline.ts:125` | past the early build |
+| Kind                  | Name                                                                                           | Handles                                     | Declared at                          | Built                |
+| --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | -------------------- |
+| command               | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:95`  | always               |
+| command               | `recordLimitDecision`                                                                          | –                                           | `src/eventing/usage.pipeline.ts:107` | always               |
+| process manager       | `refusedOrganizations`                                                                         | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:115` | past the early build |
+| upcasts               | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:78`  | always               |
+| peer map projection   | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:108` | always               |
+| global map projection | `≈ BillableEventsMeterProjection.create(billableEventsMeter).build()`                          | –                                           | `src/eventing/usage.pipeline.ts:126` | past the early build |
+| lane aliases          | `≈ [ { from: "global:reactor:billingMeterDispatch", to: { jobType: "reactor", lane: "usageMe…` | –                                           | `src/eventing/usage.pipeline.ts:130` | past the early build |
 
 ## Configuration
 
