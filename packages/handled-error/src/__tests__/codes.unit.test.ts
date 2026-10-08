@@ -151,7 +151,7 @@ function declaredCodes(): Set<string> {
     const source = readFileSync(file, "utf8");
     // Only files that actually deal in handled errors — `super("...")` is far
     // too common a shape to scan blind.
-    if (!source.includes("@langwatch/handled-error")) continue;
+    if (!source.includes("@langwatch/handled-error") && !source.includes("CheckVerdict")) continue;
     for (const pattern of CODE_PATTERNS) {
       for (const match of source.matchAll(pattern)) {
         if (match[1] && !NON_CODE_LITERALS.has(match[1])) found.add(match[1]);

@@ -217,6 +217,7 @@ export const reads = {
     "tsconfig*.json",
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
+  "@langwatch/gateway-contract": [".env.example"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

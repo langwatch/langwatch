@@ -158,6 +158,7 @@ describe("the tasks process installation", () => {
         "trace-destination-report",
         "virtual-key-config-backfill",
         "instant-eval-judge-spend-catch-up",
+        "generate-license",
         "model-registry-sync",
         "model-provider-migrate-credentials",
         "model-provider-migrate-custom-models",

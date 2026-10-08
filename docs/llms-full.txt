@@ -61835,7 +61835,7 @@ Organization members can read the page. Running the checks behind the buttons ne
 
 | Section | What it checks | When it runs |
 |---------|----------------|--------------|
-| Install | The release, Postgres, ClickHouse, their migrations, Redis and the AI Gateway | When the page opens |
+| Install | The release, Postgres, ClickHouse, the **Postgres migrations** and **ClickHouse migrations** rows (read from the upgrade ledger), Redis and the AI Gateway | When the page opens |
 | LangWatch | The license, the connect host, the daily usage report, and whether the gateway reports this install as its control plane | **Run connection checks** |
 | Integrations | Object storage, email and model providers, plus a write to storage, an SMTP connection and a call to each model provider | Basic rows when the page opens, the rest with **Run integration checks** |
 | Pipelines | Canaries that send one real trace, evaluation, scenario run or Langy turn through the install | **Run canaries** |
@@ -61857,6 +61857,8 @@ The last section shows the exact usage report the install sends to LangWatch onc
 | Reach the connect host | Fail | The install cannot open `connect.langwatch.ai:443`. It needs that only with a license that names hosted services. See [Connect](/self-hosting/connect). |
 | AI Gateway control plane | Fail | The gateway reports a control plane that is not this install. Point `GATEWAY_CONTROL_PLANE_URL` on the gateway at this app and restart it. |
 | Model provider connection | Not checked | No stored key could be tested. The row names the reason for each provider. |
+| Postgres migrations, ClickHouse migrations | Fail | A migration is pending or failed. Run `pnpm task upgrade` from the app image, then restart; the failed row names the step. Follow it on **Ops > Upgrades** (`/ops/upgrades`). See [Run the upgrade](/self-hosting/upgrade#run-the-upgrade). |
+| Postgres migrations, ClickHouse migrations | Not checked | No upgrade is recorded yet, or the upgrade ledger could not be read. Run `pnpm task upgrade` (or `pnpm task upgrade status` to read the ledger). The ClickHouse row is also Not checked when ClickHouse is not configured. |
 | Scenarios | Not checked | Enter a run plan id or slug and run the canaries again. |
 
 For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshooting).
@@ -64286,6 +64288,7 @@ Docker Compose starts the following services:
 | Service         | Image                                   | Host port | Description                 |
 | --------------- | --------------------------------------- | --------- | --------------------------- |
 | `app`           | `langwatch/langwatch:latest`            | 5560      | Main application            |
+| `migrate`       | `langwatch/langwatch:latest`            | -         | One-shot: runs `pnpm task upgrade`, then exits |
 | `workers`       | `langwatch/langwatch:latest`            | -         | Background job processing   |
 | `langwatch_nlp` | `langwatch/langwatch_nlp:latest`        | -         | NLP processing, workflows   |
 | `langevals`     | `langwatch/langevals:latest`            | 5562      | Evaluators, guardrails      |
@@ -64350,6 +64353,8 @@ docker compose -f infra/compose.yml --project-directory . down
 docker compose -f infra/compose.yml --project-directory . pull
 docker compose -f infra/compose.yml --project-directory . up -d
 ```
+
+The one-shot `migrate` service runs `pnpm task upgrade` on the new image on every `up`; the app and the workers start only after it completes successfully. On a current installation it applies no step. If it fails, read `docker compose logs migrate`; the exit code is explained in the [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 
 ### Reset data
 
@@ -67319,6 +67324,7 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | Need to debug a specific trace or aggregate    | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream                                |
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces                                    |
 | SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below                                                            |
+| An upgrade is running, behind or failed       | `/ops/upgrades`: the installation's state, each release's steps and every run ([Upgrade Guide](/self-hosting/upgrade#while-it-runs-and-after)) |
 | An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report                                                          |
 | Failed jobs need reprocessing                  | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ                                 |
 
@@ -67393,11 +67399,11 @@ and will be retried. **Finalized** means the organization completed that
 migration. A run that is waiting for an earlier migration has not changed the
 organization yet. Do not treat starting a migration as proof it finished.
 
-For an identity and access upgrade, follow the
-[two-stage migration checklist](/self-hosting/upgrade#complete-identity-and-access-migrations-first)
-before deploying the new version. Check every required migration, including
-users as well as organizations. Credential repair is recurring and does not
-finalize; the one-time backfills must finalize.
+Identity and access migrations run automatically after each upgrade; see
+[Automatic identity and access migration](/self-hosting/upgrade#automatic-identity-and-access-migration).
+Check every required migration, including users as well as organizations.
+Credential repair is recurring and does not finalize; the one-time backfills
+must finalize.
 
 ## Architecture Context
 
@@ -68461,16 +68467,28 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### The app refuses to start: the installation is behind
 
-The app and the workers never migrate. They log `refuses to serve: the installation is behind this image` with the outstanding steps when the upgrade has not run for their version. Run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)), or check why the pre-upgrade Job did not:
+The app and the workers never migrate. They log `refuses to serve: the installation is behind this image` with the outstanding steps when the upgrade has not run for their version. Run it from the new image (see [Run the upgrade](/self-hosting/upgrade#run-the-upgrade)), or check why the pre-upgrade Job (Helm) or the `migrate` service (Docker Compose) did not.
+
+The refusal names the cause: outstanding steps, a release below the installation's floor, or no ClickHouse configured (set `CLICKHOUSE_URL`, run the upgrade, start again). **Ops > Upgrades** and `pnpm task upgrade status` show the state.
+
+On Helm, read the pre-upgrade Job:
 
 ```bash
 kubectl -n langwatch get jobs | grep migrate-pre-roll
 kubectl -n langwatch logs job/<release>-migrate-pre-roll --tail=100
 ```
 
+On Docker Compose, read the `migrate` service:
+
+```bash
+docker compose -f infra/compose.yml --project-directory . logs migrate
+```
+
 ### The upgrade failed
 
-A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
+A failed upgrade fails the `helm upgrade` before any pod rolls, so the previous version keeps serving. On Docker Compose, the `migrate` service exits non-zero and the app and workers do not start.
+
+The exit code and outcome code, and what to do for each, are in [Exit codes and what to do](/self-hosting/upgrade#exit-codes-and-what-to-do). The Job's log and **Ops > Upgrades** name the failed step. A failed PostgreSQL migration is named with the command that clears it: check what it left behind, then run `prisma migrate resolve --rolled-back <migration>` if none of it remains, and run the upgrade again. It resumes where it stopped.
 
 `SKIP_PRISMA_MIGRATE` and `SKIP_CLICKHOUSE_MIGRATE` do not get a stuck installation serving: the app refuses to start until the upgrade has applied every migration its version needs.
 
@@ -69392,6 +69410,13 @@ A failed row an earlier run left is cleared the same way before the schema is ap
 
 An older migration, or a failed one this image does not ship, stops the run with `failed_prisma_migration`. Check what it left behind, run `prisma migrate resolve --rolled-back <migration>` if none of it remains (or `--applied <migration>` if you finished it by hand) with the app's `DATABASE_URL`, then run the upgrade again. No migration has rolled forward, so the previous version keeps serving.
 
+### Large tables: build indexes ahead of the upgrade
+
+Two schema changes touch a whole large table while the upgrade runs.
+
+- **`AuditLog` unique index** (`170500_audit_log_idempotency_key`): PostgreSQL builds it in place and holds a lock that blocks audit writes for the build. On a large table the build can outlast the 10 second `lock_timeout` and fail. Build the index yourself first, during a quiet period, with `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` using the index name the migration declares. The migration then finds it and moves on.
+- **ClickHouse `trace_summaries` index** (`00103_trace_summaries_updated_at_index`): the index is added and then materialised over every existing row. The mutation runs in the background and competes with merges for IO, and later `ALTER` statements on that table queue behind it. Watch `system.mutations` and run the upgrade at a quiet time on a large table.
+
 ### What the upgrade does
 
 - **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. An upgrade by one release applies its schema in one pass, then its blocking steps, as before.
@@ -69421,7 +69446,7 @@ To follow an upgrade:
 | --- | --- |
 | **Ops > Upgrades** (`/ops/upgrades`) | The installation's state, each release's steps with their status and a one-line description, every run with its phases and error. It refreshes while a run is in progress. Platform operators only (`ADMIN_EMAILS`). |
 | `pnpm task upgrade status` | The same state and steps, in the terminal, from the app image (`--json` for scripts) |
-| **Settings, Checkup**, `langwatch doctor` | A row for pending or failed PostgreSQL and ClickHouse migrations, with the fix |
+| **Settings, Checkup**, `langwatch doctor` | The **Postgres migrations** and **ClickHouse migrations** rows: Fail for a pending or failed migration, with the fix; Not checked when no upgrade is recorded yet or the ledger cannot be read |
 | `npx @langwatch/server doctor` | The same output as `upgrade status`, for a local install |
 
 The installation is in one of eight states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps), **Needs attention** (a step or run failed) and **Unsupported** (below the floor).

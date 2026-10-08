@@ -426,6 +426,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "ActivationCode",
   "ConnectedBillingAccount",
   "IssuedLicense",
+  "OrganizationLicense",
   "ScimDirectoryUser",
   "ScimRequestLog",
   "ScimUserResource",
