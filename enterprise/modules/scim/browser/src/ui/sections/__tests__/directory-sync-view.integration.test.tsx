@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * The operator's directory-sync surface: one more back-office list, with the
+ * The operator's directory-sync surface: one more Admin list, with the
  * operator's depth. The router's gating is the server's, asserted in scim-process.
  * @see enterprise/modules/scim/specs/scim-reconciliation-surfaces.feature
  */

@@ -17,7 +17,7 @@ export const billingWeb = defineBrowserModule("billing")
     requires: ["BillingHostApi"],
     mounts: { BillingHostApi: { load: () => import("./behavior/billing-host-mount.tsx") } },
   })
-  // The license drawer's Billing section, for the backoffice that hosts that drawer.
+  // The license drawer's Billing section, for the Admin that hosts that drawer.
   .withCapabilities({
     licenseBillingSection: {
       load: () => import("./features/connected-billing/ui/sections/license-billing-section.tsx"),

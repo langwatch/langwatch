@@ -5,7 +5,7 @@ import { adminClient, impersonateUser } from "../behavior/admin-client.ts";
 /**
  * Pin the request-body shape the admin UI posts to `/api/admin/:resource`.
  * The app-owned Ops Hono handler reads these exact fields (via
- * ra-data-simple-prisma), so drift here breaks every Backoffice resource view.
+ * ra-data-simple-prisma), so drift here breaks every Admin resource view.
  */
 describe("adminClient", () => {
   let fetchMock: MockInstance<typeof fetch>;

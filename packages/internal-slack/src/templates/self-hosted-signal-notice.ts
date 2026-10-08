@@ -27,7 +27,7 @@ export const selfHostedSignalNotice = defineNotice({
       { label: "Traces, last 28 days", value: count(props.traces28d) },
       { label: "Instance", value: code(props.instanceId) },
     ],
-    actions: [{ label: "Open in backoffice", url: props.instanceUrl, primary: true }],
+    actions: [{ label: "Open in Admin", url: props.instanceUrl, primary: true }],
   }),
   fixtures: {
     "a known company": {
@@ -38,12 +38,12 @@ export const selfHostedSignalNotice = defineNotice({
       version: "3.4.0",
       users: 14,
       traces28d: 482_113,
-      instanceUrl: "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+      instanceUrl: "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
     },
     "nothing reported yet": {
       headline: "A self-hosted install grew past a team",
       instanceId: "instance_7c1f0e",
-      instanceUrl: "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+      instanceUrl: "https://app.langwatch.ai/ops/cloud/self-hosted-instances",
     },
   },
 });
