@@ -83,3 +83,52 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When trace_count and total_cost queries are executed
     Then trace_count returns the expected number of unique traces
     And total_cost returns the expected sum of costs
+
+  # ---------------------------------------------------------------------------
+  # Layer 3: Default dashboard on a high-volume project
+  #
+  # A 30-day dashboard on a project with millions of traces failed with
+  # "query memory exceeded" on about a dozen panels. Every panel read the
+  # newest version of each trace through an IN-tuple dedup, whose hash set
+  # holds one entry per trace in range and cannot spill to disk.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Dashboard panels on a high-volume project answer under a memory cap
+    Given about a million traces over the current and previous 30 days, half of them with a second version
+    When the trace, user, error, latency and thread panels run with a 150 MB per-query cap
+    Then every panel answers without a memory exceeded error
+    And the trace, user and error counts match the seeded data
+
+  @integration
+  Scenario: The documents panel reads only the RAG contexts attribute
+    Given about a million traces whose root spans carry RAG contexts and large message attributes
+    When the top documents panel runs with a 150 MB per-query cap
+    Then it answers in one query with the top 10 documents and the distinct document total
+
+  @unit
+  Scenario: Dashboard panels dedup traces with a collapse that can spill to disk
+    When a slim trace panel query is built
+    Then it collapses each trace to its newest version with argMax grouped by trace
+    And it carries only the columns the panel reads, never the whole attributes map
+
+  @unit
+  Scenario: Dashboard percentiles use a bounded-memory estimator
+    When a slim trace panel asks for a median or p90
+    Then the query uses a t-digest quantile, not an exact one
+
+  @unit
+  Scenario: A panel that hides the previous period does not scan it
+    When a panel asks to skip the previous period
+    Then the previous window is empty and the query reads only the current window
+
+  @unit
+  Scenario: The evaluations summary reads the slim evaluation table
+    When the evaluations summary asks for evaluation runs grouped by pass or fail with an empty evaluator key
+    Then the query runs on the slim evaluation table instead of the full evaluation runs table
+
+  @unit
+  Scenario: A query over the memory limit is not retried in place
+    When ClickHouse refuses a query for exceeding the query or user memory limit
+    Then the client does not run the same statement again
+    And the caller gets a query memory exceeded error with the reasons preserved

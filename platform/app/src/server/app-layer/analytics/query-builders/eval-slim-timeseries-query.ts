@@ -19,10 +19,12 @@
  *     (multi-tenancy contract);
  *   * filter on the partition column `OccurredAt` so ClickHouse prunes
  *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table via the IN-tuple pattern — eval slim is
- *     `ReplacingMergeTree(UpdatedAt)`.
+ *   * dedup the slim table to the latest version of each evaluation (eval
+ *     slim is `ReplacingMergeTree(UpdatedAt)`) with the spillable `argMax`
+ *     collapse of `latestVersionSubquery`.
  */
 
+import { latestVersionSubquery } from "~/server/analytics/clickhouse/latest-version-dedup";
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import type {
@@ -153,24 +155,37 @@ function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
 }
 
 /**
- * Build a deduped FROM-clause for the eval slim table — IN-tuple dedup
- * against `(TenantId, EvaluationId, UpdatedAt)` because slim is
- * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the trace slim builder.
+ * Deduped FROM-clause for the eval slim table: the latest version of each
+ * evaluation in range (slim is `ReplacingMergeTree(UpdatedAt)`), collapsed
+ * with the spillable `argMax` form of {@link latestVersionSubquery}, carrying
+ * only the columns the outer query reads. Same pattern as the trace slim
+ * builder.
  */
-function dedupedSlim(alias: string, dateClause: string): string {
-  return `(
-    SELECT *
-    FROM ${SLIM_TABLE}
-    WHERE TenantId = {tenantId:String}
-      ${dateClause}
-      AND (TenantId, EvaluationId, UpdatedAt) IN (
-        SELECT TenantId, EvaluationId, max(UpdatedAt)
-        FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${dateClause}
-        GROUP BY TenantId, EvaluationId
-      )
-  ) ${alias}`;
+function dedupedSlim({
+  alias,
+  dateClause,
+  expressions,
+}: {
+  alias: string;
+  dateClause: string;
+  expressions: readonly string[];
+}): string {
+  const columns = new Set<string>(["OccurredAt"]);
+  const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
+  for (const expression of expressions) {
+    for (const match of expression.matchAll(pattern)) {
+      columns.add(match[1]!);
+    }
+  }
+  columns.delete("TenantId");
+  columns.delete("EvaluationId");
+  return latestVersionSubquery({
+    table: SLIM_TABLE,
+    alias,
+    keyColumns: ["TenantId", "EvaluationId"],
+    columns: Array.from(columns, (name) => ({ name })),
+    where: `TenantId = {tenantId:String} ${dateClause}`,
+  });
 }
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
@@ -263,7 +278,11 @@ export function buildEvalSlimTimeseriesQuery(
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim(ea, SLIM_DATE_FILTER_BOTH_PERIODS)}
+    FROM ${dedupedSlim({
+      alias: ea,
+      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
+      expressions: selectExprs,
+    })}
     WHERE ${ea}.TenantId = {tenantId:String}
       AND (
         (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})
