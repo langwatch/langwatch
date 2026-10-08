@@ -2,12 +2,12 @@ import { createTenantId } from "@langwatch/eventing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
 import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
 import type {
   ExecutionDataServices,
   ExperimentWorkflowDsl,
 } from "../../services/experiment-execution-data.service.ts";
-import { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import { workflowEvaluationRequestedEventSchema } from "../experiment-run-events.process.ts";
 import { ExperimentRunProgressFoldProjection } from "../experiment-run-progress.projection.ts";
 import { ExperimentRunProgressStore } from "../experiment-run-progress.store.ts";

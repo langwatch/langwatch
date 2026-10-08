@@ -13,8 +13,8 @@ import {
 } from "@langwatch/experiment-contract";
 import { workflowWithoutHttpAgentSecrets } from "@langwatch/workflow-contract";
 
+import type { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
 import { extractDatasetId, pickLatestRun } from "../rules/experiment-evaluations-list.rules.ts";
-import type { ExperimentWorkflowLinkService } from "./experiment-workflow-link.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type ExperimentListingServiceOptions = {

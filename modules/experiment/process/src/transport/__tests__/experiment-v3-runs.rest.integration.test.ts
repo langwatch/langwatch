@@ -22,6 +22,8 @@ import { describe, expect, it, vi } from "vitest";
 import { ExperimentModule, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
 import type { ExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { experimentProcessModule } from "../../experiment.module.ts";
+import { ExperimentRunCommandDispatcherService } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
+import type { WorkflowEvaluationService } from "../../features/workflow/services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentIdLookupRepository } from "../../repositories/experiment-id-lookup.repository.ts";
 import type { ExperimentRunStreamMessage } from "../../repositories/experiment-run-event-stream.repository.ts";
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";
@@ -35,8 +37,6 @@ import type {
   ExperimentWorkflowDsl,
 } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
-import { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
-import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import {
   experimentV3LegacyRest,

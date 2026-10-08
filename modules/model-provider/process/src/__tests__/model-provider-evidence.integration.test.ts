@@ -23,8 +23,8 @@ import {
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ModelProviderEvidenceService } from "../features/credential-probe/services/model-provider-evidence.service.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
-import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
 import {
   ModelCostProject,
   ModelProviderProjectScopeService,

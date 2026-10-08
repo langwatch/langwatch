@@ -4,15 +4,15 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { keptAsEvaluatorError } from "../rules/experiment-cell-evaluator-error.rules.ts";
-import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
-import { planDatasetRows, runCellKey } from "../rules/experiment-run-plan.rules.ts";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type {
   CellScope,
   ExperimentCellRequest,
   ExperimentCellResult,
-} from "./experiment-run-cell.service.ts";
+} from "../features/run/services/experiment-run-cell.service.ts";
+import { keptAsEvaluatorError } from "../rules/experiment-cell-evaluator-error.rules.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import { planDatasetRows, runCellKey } from "../rules/experiment-run-plan.rules.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-cell");
 

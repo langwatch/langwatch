@@ -11,8 +11,8 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
+import { ModelProviderEvidenceService } from "../features/credential-probe/services/model-provider-evidence.service.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
-import { ModelProviderEvidenceService } from "../services/model-provider-evidence.service.ts";
 import {
   ModelCostProject,
   ModelProviderProjectScopeService,

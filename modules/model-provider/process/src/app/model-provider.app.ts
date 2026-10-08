@@ -80,26 +80,31 @@ import {
   type ModelProviderConnectionPing,
 } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelProviderChannels } from "../channels/model-provider.channels.ts";
-import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
-import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
-import { CodexAccountService } from "../services/codex-account.service.ts";
+import { CodexAccountService } from "../features/codex/services/codex-account.service.ts";
 import {
   CodexOAuthModelProviderTokenRefresherService,
   type CodexTokenRefresher,
-} from "../services/codex-oauth-model-provider-token-refresher.service.ts";
+} from "../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
 import {
   HttpModelProviderCredentialProbeService,
   type ModelProviderCredentialProbe,
-} from "../services/http-model-provider-credential-probe.service.ts";
-import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
+} from "../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { SsrfModelProviderEgressService } from "../features/credential-probe/services/ssrf-model-provider-egress.service.ts";
+import {
+  WindowedModelProviderConnectionRateLimiterService,
+  type ModelProviderConnectionRateLimiter,
+} from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
+import { ModelProviderEvaluatorModelEnvService } from "../features/defaults/services/model-provider-evaluator-model-env.service.ts";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
-} from "../services/model-cost-preview.service.ts";
-import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
-import { ModelLimitsService } from "../services/model-limits.service.ts";
+} from "../features/model-cost/services/model-cost-preview.service.ts";
+import { ModelCostRegexSafetyService } from "../features/model-cost/services/model-cost-regex-safety.service.ts";
+import { ModelLimitsService } from "../features/model-cost/services/model-limits.service.ts";
+import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
+import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
+import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderEvaluatorModelEnvService } from "../services/model-provider-evaluator-model-env.service.ts";
 import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
@@ -113,15 +118,10 @@ import {
   RegistryModelProviderCatalogService,
   type ModelProviderCatalog,
 } from "../services/registry-model-provider-catalog.service.ts";
-import { SsrfModelProviderEgressService } from "../services/ssrf-model-provider-egress.service.ts";
 import {
   VercelAiModelTranslationService,
   type ModelTranslation,
 } from "../services/vercel-ai-model-translation.service.ts";
-import {
-  WindowedModelProviderConnectionRateLimiterService,
-  type ModelProviderConnectionRateLimiter,
-} from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
 
 /** The feature key the translation call is priced and routed under. */
 const TRANSLATE_FEATURE_KEY = "translate.text";

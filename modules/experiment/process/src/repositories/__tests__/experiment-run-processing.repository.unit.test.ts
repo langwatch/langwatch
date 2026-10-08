@@ -11,7 +11,7 @@ import { ExperimentRunProgressStore } from "../../eventing/experiment-run-progre
 import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
-import type { ExperimentRunCellService } from "../../services/experiment-run-cell.service.ts";
+import type { ExperimentRunCellService } from "../../features/run/services/experiment-run-cell.service.ts";
 import { MemoryExperimentRunEventStreamRepository } from "../memory/memory.experiment-run-event-stream.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../memory/memory.experiment-run-fold.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";

@@ -25,7 +25,7 @@ import {
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { ModelProviderCredentialProbe } from "./http-model-provider-credential-probe.service.ts";
+import type { ModelProviderCredentialProbe } from "../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
 import type { ModelProviderManagedGateway } from "./managed-model-provider-gateway.service.ts";
 
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */

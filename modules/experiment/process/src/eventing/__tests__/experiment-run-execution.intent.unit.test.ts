@@ -1,7 +1,7 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import type { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunCommandDispatcherService } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
 import { completeRun, executeCell, failLostCell } from "../experiment-run-execution.intent.ts";
 import { EXPERIMENT_RUN_INTENT_ATTEMPTS } from "../experiment-run-execution.schemas.ts";
 

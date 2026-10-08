@@ -16,10 +16,13 @@ import type {
   ModelProviderModule,
   ModelProviderCodexDeviceFlow,
 } from "../../app/model-provider.app.ts";
+import type {
+  CodexDeviceCode,
+  CodexPollResult,
+} from "../../features/codex/services/codex-account.service.ts";
+import { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import type { CodexDeviceCode, CodexPollResult } from "../../services/codex-account.service.ts";
-import { ModelProviderCredentialProbe } from "../../services/http-model-provider-credential-probe.service.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };

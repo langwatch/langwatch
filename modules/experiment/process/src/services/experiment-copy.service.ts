@@ -14,8 +14,8 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
-import type { ExperimentWorkflowAuthoringService } from "./experiment-workflow-authoring.service.ts";
-import type { ExperimentWorkflowLinkService } from "./experiment-workflow-link.service.ts";
+import type { ExperimentWorkflowAuthoringService } from "../features/workflow/services/experiment-workflow-authoring.service.ts";
+import type { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type ExperimentCopyServiceOptions = {

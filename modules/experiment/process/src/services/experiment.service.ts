@@ -56,6 +56,20 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  type ExperimentExecution,
+  UnavailableExperimentExecution,
+} from "../features/run/services/experiment-run-command-dispatcher.service.ts";
+import { ExperimentRunTraceCostService } from "../features/run/services/experiment-run-trace-cost.service.ts";
+import {
+  ExperimentWorkbenchReferencesService,
+  type ExperimentWorkbenchReferenceServices,
+} from "../features/workbench/services/experiment-workbench-references.service.ts";
+import {
+  ExperimentWorkbenchService,
+  NoopExperimentWorkbenchUpdates,
+  type ExperimentWorkbenchUpdates,
+} from "../features/workbench/services/experiment-workbench.service.ts";
 import type { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository.ts";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository.ts";
@@ -64,21 +78,7 @@ import {
   type ExperimentRepository,
 } from "../repositories/experiment.repository.ts";
 import { isPostgresUniqueConflict } from "../rules/postgres-unique-conflict.rules.ts";
-import {
-  type ExperimentExecution,
-  UnavailableExperimentExecution,
-} from "./experiment-run-command-dispatcher.service.ts";
-import { ExperimentRunTraceCostService } from "./experiment-run-trace-cost.service.ts";
 import { ExperimentSlugService } from "./experiment-slug.service.ts";
-import {
-  ExperimentWorkbenchReferencesService,
-  type ExperimentWorkbenchReferenceServices,
-} from "./experiment-workbench-references.service.ts";
-import {
-  ExperimentWorkbenchService,
-  NoopExperimentWorkbenchUpdates,
-  type ExperimentWorkbenchUpdates,
-} from "./experiment-workbench.service.ts";
 
 type ExperimentServiceOptions = {
   repository: ExperimentRepository;

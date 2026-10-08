@@ -12,17 +12,17 @@ import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
+import { CodexAccountService } from "../../features/codex/services/codex-account.service.ts";
+import { CodexOAuthModelProviderTokenRefresherService } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import type { ModelProviderCredentialProbe } from "../../features/credential-probe/services/http-model-provider-credential-probe.service.ts";
+import { UnavailableModelProviderCredentialProbeService } from "../../features/credential-probe/services/unavailable-model-provider-credential-probe.service.ts";
+import { WindowedModelProviderConnectionRateLimiterService } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
-import { CodexAccountService } from "../../services/codex-account.service.ts";
-import { CodexOAuthModelProviderTokenRefresherService } from "../../services/codex-oauth-model-provider-token-refresher.service.ts";
-import type { ModelProviderCredentialProbe } from "../../services/http-model-provider-credential-probe.service.ts";
 import { PrefixedModelProviderIdService } from "../../services/prefixed-model-provider-id.service.ts";
 import { RegistryModelProviderCatalogService } from "../../services/registry-model-provider-catalog.service.ts";
-import { UnavailableModelProviderCredentialProbeService } from "../../services/unavailable-model-provider-credential-probe.service.ts";
 import { UnmanagedModelProviderGatewayService } from "../../services/unmanaged-model-provider-gateway.service.ts";
 import { VercelAiModelTranslationService } from "../../services/vercel-ai-model-translation.service.ts";
-import { WindowedModelProviderConnectionRateLimiterService } from "../../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import { ModelProviderModule, type ModelProviderInfrastructure } from "../model-provider.app.ts";
 
 /** A suite that did not decide the issuer's answers must not reach one. */

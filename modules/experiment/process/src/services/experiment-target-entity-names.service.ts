@@ -1,7 +1,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 
-import { ExperimentTargetEntityNames } from "./experiment-workbench-target-names.service.ts";
+import { ExperimentTargetEntityNames } from "../features/workbench/services/experiment-workbench-target-names.service.ts";
 
 /** The names of the agents and evaluators a workbench's columns point at, from their owners. */
 export class ExperimentTargetEntityNamesService extends ExperimentTargetEntityNames {

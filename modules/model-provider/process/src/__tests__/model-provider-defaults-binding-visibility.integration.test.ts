@@ -9,10 +9,10 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
-import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service.ts";
 import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
 import {
   DB_URL,

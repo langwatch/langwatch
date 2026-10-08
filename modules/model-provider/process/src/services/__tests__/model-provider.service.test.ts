@@ -25,19 +25,19 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memory/memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
+import { CodexTokenRefresher } from "../../features/codex/services/codex-oauth-model-provider-token-refresher.service.ts";
+import { ModelProviderConnectionRateLimiter } from "../../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
   ModelDefaultConfigSaveInput,
   ModelDefaultRepository,
 } from "../../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../../repositories/model-provider.repository.ts";
-import { CodexTokenRefresher } from "../codex-oauth-model-provider-token-refresher.service.ts";
 import { ModelProviderCredentialPolicy } from "../model-provider-keys.service.ts";
 import { ModelProviderService } from "../model-provider.service.ts";
 import { ModelProviderIdService } from "../prefixed-model-provider-id.service.ts";
 import { ModelProviderCatalog } from "../registry-model-provider-catalog.service.ts";
 import { ModelTranslation } from "../vercel-ai-model-translation.service.ts";
-import { ModelProviderConnectionRateLimiter } from "../windowed-model-provider-connection-rate-limiter.service.ts";
 
 const now = toDate(nowInstant());
 function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {

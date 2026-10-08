@@ -15,17 +15,17 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import type {
+  ExperimentCellExecution,
+  ExperimentCellRequest,
+  ExperimentCellResult,
+} from "../features/run/services/experiment-run-cell.service.ts";
 import {
   EXPERIMENT_RUN_COMMAND_TYPES,
   EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../rules/experiment-run-event-types.rules.ts";
 import { makeExperimentRunKey } from "../rules/experiment-run-key.rules.ts";
-import type {
-  ExperimentCellExecution,
-  ExperimentCellRequest,
-  ExperimentCellResult,
-} from "../services/experiment-run-cell.service.ts";
 import type {
   CellFinishedEvent,
   EvaluatorResultEvent,

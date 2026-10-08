@@ -111,6 +111,26 @@ import {
   type ExperimentLifecyclePipeline,
 } from "../eventing/experiment-lifecycle.pipeline.ts";
 import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
+import { ExperimentRunCommandDispatcherService } from "../features/run/services/experiment-run-command-dispatcher.service.ts";
+import type { ExperimentRunModelCostService } from "../features/run/services/experiment-run-model-cost.service.ts";
+import {
+  ExperimentRunService,
+  type ExperimentRunProcessing,
+} from "../features/run/services/experiment-run.service.ts";
+import {
+  ExperimentWorkbenchObserverService,
+  type ExperimentWorkbenchObserver,
+} from "../features/workbench/services/experiment-workbench-observer.service.ts";
+import { ExperimentWorkbenchPresenceUpdatesService } from "../features/workbench/services/experiment-workbench-presence-updates.service.ts";
+import {
+  ExperimentWorkbenchRunService,
+  type WorkbenchExecutionRequest,
+} from "../features/workbench/services/experiment-workbench-run.service.ts";
+import { ExperimentWorkbenchTargetNamesService } from "../features/workbench/services/experiment-workbench-target-names.service.ts";
+import { ExperimentWorkbenchVersionService } from "../features/workbench/services/experiment-workbench-version.service.ts";
+import { ExperimentWorkflowAuthoringService } from "../features/workflow/services/experiment-workflow-authoring.service.ts";
+import type { WorkflowEvaluationService } from "../features/workflow/services/experiment-workflow-evaluation.service.ts";
+import { ExperimentWorkflowLinkService } from "../features/workflow/services/experiment-workflow-link.service.ts";
 import type { ExperimentPeopleRepository } from "../repositories/experiment-people.repository.ts";
 import type { ExperimentRepositories } from "../repositories/experiment.repositories.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
@@ -125,31 +145,11 @@ import { ExperimentDatasetEvaluationService } from "../services/experiment-datas
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
-import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
-import type { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
-import {
-  ExperimentRunService,
-  type ExperimentRunProcessing,
-} from "../services/experiment-run.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
   ExperimentUpdateStreamService,
   type ExperimentUpdateEmitters,
 } from "../services/experiment-update-stream.service.ts";
-import {
-  ExperimentWorkbenchObserverService,
-  type ExperimentWorkbenchObserver,
-} from "../services/experiment-workbench-observer.service.ts";
-import { ExperimentWorkbenchPresenceUpdatesService } from "../services/experiment-workbench-presence-updates.service.ts";
-import {
-  ExperimentWorkbenchRunService,
-  type WorkbenchExecutionRequest,
-} from "../services/experiment-workbench-run.service.ts";
-import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
-import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
-import { ExperimentWorkflowAuthoringService } from "../services/experiment-workflow-authoring.service.ts";
-import type { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
-import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
 
 /** What the process composes this feature's application from. */
