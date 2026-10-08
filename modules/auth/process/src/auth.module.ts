@@ -1,6 +1,7 @@
 import { bindApiDoor } from "@langwatch/api/hosting";
 import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
-import { defineProcessModule } from "@langwatch/process";
+import type { AuthApi, AuthServerConfig } from "@langwatch/auth-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { AuthModule } from "./app/auth.app.ts";
 import { authChannels } from "./channels/auth-channels.registry.ts";
@@ -19,41 +20,42 @@ import { signInSecurityTrpcTransport } from "./transport/sign-in-security.trpc.t
  * Auth instance. The CLI device grant mounts before the /api/auth catch-all.
  * auth binds the one API door every request passes (record §8).
  */
-export const authProcessModule = defineProcessModule("auth")
-  .withRepositories(authRepositories)
-  .withChannels(authChannels)
-  .withApi(AuthModule)
-  .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
-  .withEventing(authEventing)
-  .withEventing(authLifecycleEventing)
-  .withTasks(({ repositories, dependencies }) => [
-    ClearStalePendingSsoSetupTask.create({
-      candidates: repositories.pendingSsoSetup,
-      organizations: dependencies.organizations,
-    }),
-  ])
-  .withTransportFacts(({ app, dependencies }) => {
-    if (!(app instanceof AuthModule)) {
-      throw new TypeError("The auth API door requires its constructed application");
-    }
+export const authProcessModule: PublishedProcessModule<"auth", AuthApi, AuthServerConfig> =
+  defineProcessModule("auth")
+    .withRepositories(authRepositories)
+    .withChannels(authChannels)
+    .withApi(AuthModule)
+    .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
+    .withEventing(authEventing)
+    .withEventing(authLifecycleEventing)
+    .withTasks(({ repositories, dependencies }) => [
+      ClearStalePendingSsoSetupTask.create({
+        candidates: repositories.pendingSsoSetup,
+        organizations: dependencies.organizations,
+      }),
+    ])
+    .withTransportFacts(({ app, dependencies }) => {
+      if (!(app instanceof AuthModule)) {
+        throw new TypeError("The auth API door requires its constructed application");
+      }
 
-    return [
-      bindTrpcFact(
-        authRequestHeadersFact,
-        (context: TrpcRuntimeContext) => context.req?.headers ?? null,
-      ),
-      bindApiDoor(
-        ApiDoorService.create({
-          sessions: app,
-          twoStep: app,
-          identity: dependencies.identity,
-          apiKeys: dependencies.apiKeys,
-          cliProjects: app,
-          authz: dependencies.authz,
-          organizations: dependencies.organizations,
-          entitlements: dependencies.entitlements,
-          auditLog: dependencies.auditLog,
-        }).door(),
-      ),
-    ];
-  });
+      return [
+        bindTrpcFact(
+          authRequestHeadersFact,
+          (context: TrpcRuntimeContext) => context.req?.headers ?? null,
+        ),
+        bindApiDoor(
+          ApiDoorService.create({
+            sessions: app,
+            twoStep: app,
+            identity: dependencies.identity,
+            apiKeys: dependencies.apiKeys,
+            cliProjects: app,
+            authz: dependencies.authz,
+            organizations: dependencies.organizations,
+            entitlements: dependencies.entitlements,
+            auditLog: dependencies.auditLog,
+          }).door(),
+        ),
+      ];
+    });

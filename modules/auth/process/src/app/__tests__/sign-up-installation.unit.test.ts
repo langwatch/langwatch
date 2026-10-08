@@ -42,7 +42,7 @@ async function bootAuth({
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([authProcessModule])
     .withStores(memoryStores())
-    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
+    .withEncryption({ encrypt: (value: string) => value, decrypt: (value: string) => value })
     .withSecrets(resolvedSecrets({}))
     .withConfig({
       auth: {
