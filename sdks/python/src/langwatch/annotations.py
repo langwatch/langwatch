@@ -7,7 +7,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -82,16 +82,16 @@ class AnnotationsFacade:
     def _http(self) -> httpx.Client:
         return self._client.get_httpx_client()
 
-    def list(self) -> Dict[str, Any]:
+    def list(self) -> List[Dict[str, Any]]:
         """
         List all annotations for the project.
 
         Returns:
-            Dictionary with annotation data.
+            List of annotations, empty when the project has none.
         """
         response = self._http().get("/api/annotations")
         _raise_for_status(response, operation="list")
-        return response.json()
+        return response.json()["data"]
 
     def get(self, annotation_id: str) -> Dict[str, Any]:
         """
@@ -101,13 +101,13 @@ class AnnotationsFacade:
             annotation_id: The annotation ID.
 
         Returns:
-            Dictionary containing the annotation data.
+            The annotation.
         """
         response = self._http().get(f"/api/annotations/{_quote(annotation_id)}")
         _raise_for_status(response, operation="get")
-        return response.json()
+        return response.json()["data"]
 
-    def get_by_trace(self, trace_id: str) -> Dict[str, Any]:
+    def get_by_trace(self, trace_id: str) -> List[Dict[str, Any]]:
         """
         Retrieve annotations for a specific trace.
 
@@ -115,36 +115,60 @@ class AnnotationsFacade:
             trace_id: The trace ID to look up annotations for.
 
         Returns:
-            Dictionary containing the annotation data for the trace.
+            List of the trace's annotations, empty when it has none.
         """
         response = self._http().get(
             f"/api/annotations/trace/{_quote(trace_id)}"
         )
         _raise_for_status(response, operation="get_by_trace")
-        return response.json()
+        return response.json()["data"]
 
     def create(
         self,
         trace_id: str,
         *,
+        comment: Optional[str] = None,
+        is_thumbs_up: Optional[bool] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new annotation on a trace.
 
+        Both ``comment`` and ``is_thumbs_up`` are mandatory: the route refuses
+        a body missing either. They are checked here so a caller learns which
+        field is missing without spending a round trip on a 400, and they are
+        keyword arguments rather than dictionary keys so the requirement is
+        visible at the call site. Either may still arrive through ``params``
+        under its wire name, which is how callers supplied them before this
+        signature existed.
+
         Args:
             trace_id: The trace ID to annotate.
-            params: Dictionary of annotation fields (comment, isThumbsUp, etc.).
+            comment: What the reviewer said about the trace.
+            is_thumbs_up: The reviewer's verdict on the trace.
+            params: Any further annotation fields, under their wire names.
 
         Returns:
-            Dictionary containing the created annotation data.
+            The created annotation.
         """
-        body = params or {}
+        body: Dict[str, Any] = dict(params or {})
+        if comment is not None:
+            body["comment"] = comment
+        if is_thumbs_up is not None:
+            body["isThumbsUp"] = is_thumbs_up
+
+        if not body.get("comment") or not isinstance(body["comment"], str):
+            raise ValueError(
+                "comment is required and must be a non-empty string."
+            )
+        if not isinstance(body.get("isThumbsUp"), bool):
+            raise ValueError("is_thumbs_up is required and must be a boolean.")
+
         response = self._http().post(
             f"/api/annotations/trace/{_quote(trace_id)}", json=body
         )
         _raise_for_status(response, operation="create")
-        return response.json()
+        return response.json()["data"]
 
     def delete(self, annotation_id: str) -> Dict[str, Any]:
         """
@@ -154,7 +178,9 @@ class AnnotationsFacade:
             annotation_id: The annotation ID to delete.
 
         Returns:
-            Dictionary with deletion result.
+            The route's ``{status, message}`` acknowledgement. Alone among
+            these methods the delete carries no ``data`` key, so there is
+            nothing here to unwrap.
         """
         response = self._http().delete(
             f"/api/annotations/{_quote(annotation_id)}"
