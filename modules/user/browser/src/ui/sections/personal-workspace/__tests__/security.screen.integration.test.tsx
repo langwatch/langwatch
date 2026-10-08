@@ -70,8 +70,8 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
   return { personalWorkspaceApi: api, api };
 });
 
-vi.mock("../../../../features/two-step-verification/behavior/two-step-verification-api.ts", () => ({
-  twoStepVerificationApi: {
+vi.mock("@langwatch/api/web", () => ({
+  createModuleApi: () => ({
     useUtils: () => ({ twoStepVerification: { account: { invalidate: vi.fn() } } }),
     twoStepVerification: {
       account: {
@@ -82,7 +82,7 @@ vi.mock("../../../../features/two-step-verification/behavior/two-step-verificati
       },
       disable: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
     },
-  },
+  }),
 }));
 
 beforeEach(() => {
