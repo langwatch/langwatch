@@ -13,10 +13,10 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { EntitlementModule } from "../app/entitlement.app.ts";
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type { TraceMeterRecord } from "../repositories/trace-meter.repository.ts";
 import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
 import {
@@ -66,7 +66,7 @@ export function buildUsagePipeline({
   countMonth: CountMonthCommand;
   traceMeter: AppendStore<TraceMeterRecord>;
   billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
-  projects: Pick<ProjectApi, "findOrganizationId">;
+  projects: Pick<TenancyRepository, "getProjectPlacement">;
   send: () => UsageSenders;
 }): UsagePipelineDefinition {
   const pipeline = definePipeline({

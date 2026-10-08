@@ -1,11 +1,10 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo, PricingModel, UsageUnit } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
@@ -44,17 +43,10 @@ export interface UsageCounter {
 }
 
 /**
- * What enforcement needs of the organization graph: which organization a team belongs to, which
- * projects it owns, and the pricing model a licence override is read against. The aggregate is
- * another feature's, so this is the shape rather than its repository.
+ * What enforcement needs of the organization graph: which projects it owns, and the pricing
+ * model a licence override is read against.
  */
 export interface UsageOrganization {
-  /**
-   * Throws `organization_not_found_for_team`: enforcement refuses a tenant that does not
-   * resolve rather than metering traffic against nobody's plan.
-   */
-  getOrganizationIdByTeamId(input: { teamId: string }): Promise<string>;
-
   getProjectIds(organizationId: string): Promise<string[]>;
 
   getPricingModel(organizationId: string): Promise<{ pricingModel: PricingModel | null }>;
@@ -129,12 +121,13 @@ export class InProcessUsageCache implements UsageCache {
   }
 }
 
-/** The peers the usage count reads through; traces are counted off entitlement's own meter. */
+/** The peer the usage count prices through; traces are counted off entitlement's own meter. */
 export type EntitlementUsagePeers = Readonly<{
   billing: Pick<BillingApi, "getPricingModel" | "sendUsageWarning">;
-  organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId" | "findAllIds">;
-  projects: Pick<ProjectApi, "listIdsByOrganization">;
 }>;
+
+/** Where the usage count finds an organisation's projects, and the organisations to sweep. */
+export type UsageTenancy = Pick<TenancyRepository, "findProjectIds" | "findMeteredOrganizationIds">;
 
 /** This UTC month's events per named project off the meter, 0 for a project with none. */
 function meterEventCounter({
@@ -236,14 +229,15 @@ export class UsageService {
     isSaas: boolean;
     planResolver: PlanResolver;
     peers: EntitlementUsagePeers;
+    tenancy: UsageTenancy;
     meter: Pick<BillableEventsMeterRepository, "countByProjects">;
     traceMeter: Pick<TraceMeterRepository, "countByProjects">;
   }): UsageService {
-    const { billing, organizations, projects } = input.peers;
+    const { billing } = input.peers;
+    const { tenancy } = input;
     return new UsageService({
       organizations: {
-        getOrganizationIdByTeamId: (lookup) => organizations.getOrganizationIdByTeamId(lookup),
-        getProjectIds: (organizationId) => projects.listIdsByOrganization({ organizationId }),
+        getProjectIds: (organizationId) => tenancy.findProjectIds({ organizationId }),
         getPricingModel: (organizationId) => billing.getPricingModel({ organizationId }),
       },
       traceCounter: meterTraceCounter({ meter: input.traceMeter }),
@@ -263,12 +257,6 @@ export class UsageService {
     this.deployment = deps.deployment;
     this.countCache = deps.countCache ?? new NoUsageCache();
     this.decisionCache = deps.decisionCache ?? new NoUsageCache();
-  }
-
-  async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
-    const organizationId = await this.organizations.getOrganizationIdByTeamId({ teamId });
-
-    return this.checkLimitForOrganization({ organizationId });
   }
 
   async checkLimitForOrganization({

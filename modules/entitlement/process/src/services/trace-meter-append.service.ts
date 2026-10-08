@@ -1,7 +1,7 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import type {
   TraceMeterRecord,
   TraceMeterRepository,
@@ -13,7 +13,7 @@ const defaultLogger = createLogger("langwatch:usage:traceMeter");
 export class TraceMeterAppendService implements AppendStore<TraceMeterRecord> {
   private constructor(
     private readonly meter: TraceMeterRepository,
-    private readonly projects: Pick<ProjectApi, "findOrganizationId">,
+    private readonly projects: Pick<TenancyRepository, "getProjectPlacement">,
     private readonly logger: Pick<Logger, "warn">,
   ) {}
 
@@ -23,7 +23,7 @@ export class TraceMeterAppendService implements AppendStore<TraceMeterRecord> {
     logger = defaultLogger,
   }: {
     meter: TraceMeterRepository;
-    projects: Pick<ProjectApi, "findOrganizationId">;
+    projects: Pick<TenancyRepository, "getProjectPlacement">;
     logger?: Pick<Logger, "warn">;
   }): TraceMeterAppendService {
     return new TraceMeterAppendService(meter, projects, logger);
@@ -31,14 +31,14 @@ export class TraceMeterAppendService implements AppendStore<TraceMeterRecord> {
 
   /** An orphan project is skipped loudly, and the miss is not remembered. */
   async append(record: TraceMeterRecord): Promise<void> {
-    const organizationId = await this.projects.findOrganizationId(record.tenantId);
-    if (!organizationId) {
+    const placement = await this.projects.getProjectPlacement({ projectId: record.tenantId });
+    if (placement.kind === "unplaced") {
       this.logger.warn(
         { projectId: record.tenantId },
         "orphan project has no organization, trace not metered",
       );
       return;
     }
-    await this.meter.insert({ record, organizationId });
+    await this.meter.insert({ record, organizationId: placement.organizationId });
   }
 }

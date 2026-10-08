@@ -1,3 +1,4 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type {
   EntitlementConfig,
   EntitlementSource,
@@ -80,10 +81,10 @@ export class TestUsageWarnings implements UsageWarning {
 
 export function createEntitlementTestApp(
   input: Readonly<{
-    repositories?: Pick<EntitlementRepositories, "membership" | "spend">;
+    repositories?: Pick<EntitlementRepositories, "membership" | "spend" | "tenancy">;
     infrastructure: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
-    dependencies?: Partial<{ organizations: OrganizationApi }>;
+    dependencies?: Partial<{ organizations: OrganizationApi; billing: BillingApi }>;
     config?: Pick<EntitlementConfig, "requestBounds">;
   }>,
 ): EntitlementModule {
@@ -99,8 +100,10 @@ export function createEntitlementTestApp(
         input.dependencies?.organizations ??
         createApiFixture<OrganizationApi>({
           countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
-          getDatasetLimits: async () => ({ attachmentMaxBytes: null }),
         }),
+      billing:
+        input.dependencies?.billing ??
+        createApiFixture<BillingApi>({ getPricingModel: async () => ({ pricingModel: null }) }),
     },
     config: input.config,
   });

@@ -1,12 +1,12 @@
 import { USAGE_PIPELINE_NAME } from "@langwatch/entitlement-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
 import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import type { TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { BillableEventsMeterAppendService } from "../../services/billable-events-meter-append.service.ts";
 import { TraceMeterAppendService } from "../../services/trace-meter-append.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
@@ -23,11 +23,11 @@ const refuse = async (): Promise<never> => {
 function build({
   saas,
   traceMeter = MemoryTraceMeterRepository.create(),
-  projects = { findOrganizationId: refuse },
+  projects = { getProjectPlacement: refuse },
 }: {
   saas: boolean;
   traceMeter?: MemoryTraceMeterRepository;
-  projects?: Pick<ProjectApi, "findOrganizationId">;
+  projects?: Pick<TenancyRepository, "getProjectPlacement">;
 }) {
   const meter = MemoryBillableEventsMeterRepository.create();
   return buildUsagePipeline({
@@ -60,7 +60,9 @@ async function meterThroughPeerLane({ data }: { data: unknown }) {
   const peer = build({
     saas: false,
     traceMeter,
-    projects: { findOrganizationId: async () => "org_1" },
+    projects: {
+      getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
+    },
   }).globalProjections?.find(({ name }) => name === TRACE_METER_LANE)?.peer;
   const event: Event = {
     id: "event_1",

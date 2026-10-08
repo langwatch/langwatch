@@ -5,7 +5,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { UNLIMITED } from "@langwatch/plans";
 import { createApp, MissingProviderError } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 /**
  * The background worker resolves a plan through the same entitlement peer the
@@ -63,7 +62,6 @@ function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sour
       licensing: createApiFixture<LicensingApi>({ resolve: async () => licence }),
       billing: billing ?? createApiFixture<BillingApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
-      project: createApiFixture<ProjectApi>({}),
     })
     .boot();
 }
@@ -182,7 +180,6 @@ describe("given the entitlement module installed on the worker role", () => {
           .provide({
             licensing: createApiFixture<LicensingApi>({ resolve: async () => unlicensed }),
             organization: createApiFixture<OrganizationApi>({}),
-            project: createApiFixture<ProjectApi>({}),
           })
           // @ts-expect-error MissingSupply: the compiler refuses a process that supplies no billing
           .boot(),
@@ -214,7 +211,6 @@ describe("given the entitlement module installed on the worker role", () => {
           }),
           billing: createApiFixture<BillingApi>({}),
           organization: createApiFixture<OrganizationApi>({}),
-          project: createApiFixture<ProjectApi>({}),
         })
         .boot();
 

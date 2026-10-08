@@ -57,7 +57,25 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     owner: "organization",
     readers: ["scim"],
     reason:
-      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42)",
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42); entitlement reads the currency and dataset limit it prices and bounds by (C1, R40)",
+  },
+  {
+    table: "Topic",
+    owner: "topic",
+    readers: ["trace"],
+    reason: "trace labels topic facets with topic's names, keeping no copy (R40)",
+  },
+  {
+    table: "Annotation",
+    owner: "annotation",
+    readers: ["trace"],
+    reason: "trace's legacy read attaches a page's annotations, keeping no copy (R40)",
+  },
+  {
+    table: "AnnotationScore",
+    owner: "annotation",
+    readers: ["trace"],
+    reason: "trace's legacy read names annotation scores, deleted definitions included (R40)",
   },
 ];
 

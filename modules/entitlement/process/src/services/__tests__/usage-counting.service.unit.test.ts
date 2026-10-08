@@ -186,7 +186,12 @@ describe("UsageCountingService", () => {
         const meter = MemoryBillableEventsMeterRepository.create();
         const append = BillableEventsMeterAppendService.create({
           meter,
-          projects: { findOrganizationId: async () => ORGANIZATION },
+          projects: {
+            getProjectPlacement: async () => ({
+              kind: "placed" as const,
+              organizationId: ORGANIZATION,
+            }),
+          },
         });
         const projection = BillableEventsMeterProjection.create(append).build();
         const types = [

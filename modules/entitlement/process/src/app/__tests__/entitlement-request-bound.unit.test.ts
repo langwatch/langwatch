@@ -5,7 +5,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -150,7 +149,6 @@ describe("EntitlementModule.requestBound", () => {
       .provide({
         billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
         organization: createApiFixture<OrganizationApi>({}),
-        project: createApiFixture<ProjectApi>({}),
         licensing: createApiFixture<LicensingApi>({
           resolve: async () => ({ granted: true, plan: free }),
         }),

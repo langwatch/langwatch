@@ -1,8 +1,8 @@
 import type { Event, SubscriberDispatchDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 import type { CountMonthCommandData } from "./usage.events.ts";
 
@@ -18,7 +18,7 @@ export function usageMeterCountSubscriber({
   projects,
   countMonth,
 }: {
-  projects: Pick<ProjectApi, "findOrganizationId">;
+  projects: Pick<TenancyRepository, "getProjectPlacement">;
   countMonth: (data: CountMonthCommandData) => Promise<void>;
 }): SubscriberDispatchDefinition<Event> {
   return {
@@ -30,8 +30,9 @@ export function usageMeterCountSubscriber({
       ttl: SUPPRESS_MS,
     },
     handle: async (_event, context) => {
-      const organizationId = await projects.findOrganizationId(context.tenantId);
-      if (!organizationId) return;
+      const placement = await projects.getProjectPlacement({ projectId: context.tenantId });
+      if (placement.kind === "unplaced") return;
+      const { organizationId } = placement;
       const now = nowInstant();
       const occurredAt = now.epochMilliseconds;
       const months = [UsageCountingService.monthOf(occurredAt)];

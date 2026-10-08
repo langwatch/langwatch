@@ -4,7 +4,6 @@ import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -47,7 +46,6 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
       }),
       billing,
       organization: createApiFixture<OrganizationApi>({}),
-      project: createApiFixture<ProjectApi>({}),
     })
     .boot();
 }

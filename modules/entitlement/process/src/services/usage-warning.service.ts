@@ -10,8 +10,8 @@ import { findCrossedUsageThreshold } from "../rules/usage-warning-thresholds.rul
 import type { EntitlementService } from "./entitlement.service.ts";
 import {
   USAGE_UNKNOWN,
-  type EntitlementUsagePeers,
   type UsageService,
+  type UsageTenancy,
 } from "./usage-enforcement.service.ts";
 import {
   type CountedUsageReading,
@@ -32,12 +32,11 @@ export class UsageWarningService implements UsageWarning {
     billing: Pick<BillingApi, "sendUsageWarning">;
     counter: UsageService;
     plans: Pick<EntitlementService, "getActivePlan">;
-    peers: EntitlementUsagePeers;
+    tenancy: UsageTenancy;
     isSaas: boolean;
     logger: Pick<Logger, "debug" | "info" | "warn" | "error">;
   }): UsageWarningService {
-    const projectIds = (organizationId: string) =>
-      input.peers.projects.listIdsByOrganization({ organizationId });
+    const projectIds = (organizationId: string) => input.tenancy.findProjectIds({ organizationId });
     return new UsageWarningService({
       billing: input.billing,
       counter: input.counter,
@@ -46,7 +45,7 @@ export class UsageWarningService implements UsageWarning {
         UsageWarningSweepService.create({
           isSaas: input.isSaas,
           logger: input.logger,
-          organizationIds: () => input.peers.organizations.findAllIds(),
+          organizationIds: () => input.tenancy.findMeteredOrganizationIds(),
           projectIds,
           countByProjects: (counted) => input.counter.getCurrentMonthCountByProjects(counted),
           activePlan: (organizationId) => input.plans.getActivePlan({ organizationId }),

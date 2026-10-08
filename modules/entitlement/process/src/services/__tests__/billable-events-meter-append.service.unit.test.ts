@@ -1,18 +1,19 @@
-import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import type { BillableEventRecord } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
+import type { ProjectPlacement, TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { BillableEventsMeterAppendService } from "../billable-events-meter-append.service.ts";
 
-type ProjectLookup = Pick<ProjectApi, "findOrganizationId">;
+type ProjectLookup = Pick<TenancyRepository, "getProjectPlacement">;
 
 /** Answers from a mutable map, so a project can join an organization mid-test. */
 class ProjectDirectory implements ProjectLookup {
   readonly organizationOf = new Map<string, string>();
 
-  async findOrganizationId(projectId: string): Promise<string | undefined> {
-    return this.organizationOf.get(projectId);
+  async getProjectPlacement({ projectId }: { projectId: string }): Promise<ProjectPlacement> {
+    const organizationId = this.organizationOf.get(projectId);
+    return organizationId ? { kind: "placed", organizationId } : { kind: "unplaced" };
   }
 }
 

@@ -29,9 +29,6 @@ const PLAN: PlanInfo = {
 };
 
 class TestOrganizations implements UsageOrganization {
-  getOrganizationIdByTeamId(): Promise<string> {
-    return Promise.resolve("org-1");
-  }
   getProjectIds(): Promise<string[]> {
     return Promise.resolve(["project-1"]);
   }
@@ -67,9 +64,9 @@ describe("the month's usage count", () => {
       let clock = 1_000_000;
       const { service, traceCounter } = serviceWithCache(() => clock);
 
-      const first = await service.checkLimit({ teamId: "team-456" });
+      const first = await service.checkLimitForOrganization({ organizationId: "org-1" });
       clock += 2 * 60 * 1000;
-      const second = await service.checkLimit({ teamId: "team-456" });
+      const second = await service.checkLimitForOrganization({ organizationId: "org-1" });
 
       expect(first).toEqual({ exceeded: false });
       expect(second).toEqual({ exceeded: false });

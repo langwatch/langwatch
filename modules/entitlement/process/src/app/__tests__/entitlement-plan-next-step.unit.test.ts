@@ -1,8 +1,11 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
+import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
+import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
 import { createEntitlementTestApp, fixedEntitlementSource } from "./entitlement.fixture.ts";
 
 const free: Plan = {
@@ -17,27 +20,42 @@ const free: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-function pricedOrganizations(pricing: Awaited<ReturnType<OrganizationApi["getPricing"]>>) {
+/** An app whose organisation is priced in a currency on its own row and a model billing answers. */
+function pricedApp(pricing: { pricingModel: "TIERED" | "SEAT_EVENT"; currency: "USD" | "EUR" }) {
   const asked: string[] = [];
-  const organizations = createApiFixture<OrganizationApi>({
-    getPricing: async ({ organizationId }) => {
-      asked.push(organizationId);
-      return pricing;
+  const database = MemoryEntitlementDatabase.create();
+  database.put({
+    organizationId: "organization-1",
+    memberCount: 0,
+    membersLiteCount: 0,
+    currentMonthCost: 0,
+    projectCosts: {},
+    spendByUserId: {},
+    currency: pricing.currency,
+  });
+  const app = createEntitlementTestApp({
+    infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
+    repositories: {
+      ...MemoryEntitlementRepositories.create(),
+      tenancy: MemoryTenancyRepository.create({ memory: database }),
+    },
+    dependencies: {
+      billing: createApiFixture<BillingApi>({
+        getPricingModel: async ({ organizationId }) => {
+          asked.push(organizationId);
+          return { pricingModel: pricing.pricingModel };
+        },
+      }),
     },
   });
 
-  return Object.assign(organizations, { asked });
+  return { app, asked };
 }
 
 describe("EntitlementModule.resolvePlanNextStep", () => {
   /** @scenario "A peer asks the entitlement capability for the next step" */
   it("names the rung the self-serve catalogue sells above a paid tiered plan", async () => {
-    const app = createEntitlementTestApp({
-      infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
-      dependencies: {
-        organizations: pricedOrganizations({ pricingModel: "TIERED", currency: "USD" }),
-      },
-    });
+    const { app } = pricedApp({ pricingModel: "TIERED", currency: "USD" });
 
     const pro: Plan = {
       ...free,
@@ -64,11 +82,7 @@ describe("EntitlementModule.resolvePlanNextStep", () => {
 
   /** @scenario "A peer asks for the next step without knowing the organization's pricing" */
   it("quotes the rung in the currency the organization's own pricing names", async () => {
-    const organizations = pricedOrganizations({ pricingModel: "TIERED", currency: "EUR" });
-    const app = createEntitlementTestApp({
-      infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
-      dependencies: { organizations },
-    });
+    const { app, asked } = pricedApp({ pricingModel: "TIERED", currency: "EUR" });
     const pro: Plan = {
       ...free,
       planSource: "subscription",
@@ -79,7 +93,7 @@ describe("EntitlementModule.resolvePlanNextStep", () => {
 
     const step = await app.resolvePlanNextStep({ plan: pro, organizationId: "organization-1" });
 
-    expect(organizations.asked).toEqual(["organization-1"]);
+    expect(asked).toEqual(["organization-1"]);
     expect(step).toMatchObject({ kind: "self_serve", tier: "LAUNCH", currency: "EUR" });
   });
 });

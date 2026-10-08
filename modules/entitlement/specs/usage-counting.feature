@@ -34,12 +34,6 @@ Feature: Entitlement owns all counting
     And a warning is logged naming the organization and its plan
 
   @unit @usage
-  Scenario: The limit check refuses a tenant that resolves to no organization
-    Given a team that belongs to no organization
-    When a caller checks the usage limit for that team's organization
-    Then the check fails with organization_not_found_for_team
-
-  @unit @usage
   Scenario: Entitlement counts billable events from every pipeline itself
     Given spans, evaluations, experiment results and simulation messages recorded for a project this month
     When the month's count is read for the project's organization

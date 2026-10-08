@@ -60,7 +60,9 @@ const plan: Plan = planSchema.parse({
 });
 
 function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["send"] } = {}) {
-  const projects = { findOrganizationId: async () => ORGANIZATION };
+  const projects = {
+    getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: ORGANIZATION }),
+  };
   return buildUsagePipeline({
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({

@@ -10,7 +10,6 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -19,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
 import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
+import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
 import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
 import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
 import { EntitlementModule } from "../entitlement.app.ts";
@@ -93,9 +93,6 @@ describe("entitlement app installation", () => {
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
-          project: createApiFixture<ProjectApi>({
-            listIdsByOrganization: async () => ["project-1"],
-          }),
           licensing: createApiFixture<LicensingApi>({
             resolve: async () => ({ granted: true, plan: free }),
           }),
@@ -134,7 +131,8 @@ describe("entitlement app installation", () => {
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
             crossedThreshold: 90,
-            projectCounts: [{ projectId: "project-1", count: 0 }],
+            // The memory stores hold no Project rows, so the organisation owns none yet.
+            projectCounts: [],
           },
         ]);
       } finally {
@@ -160,7 +158,6 @@ describe("entitlement app installation", () => {
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),
-          project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({
             resolve: (input) => source.resolve(input),
           }),
@@ -384,6 +381,7 @@ describe("entitlement app installation", () => {
         repositories: {
           membership: MemoryUsageMembershipRepository.create({ memory: database }),
           spend: MemoryOrganizationSpendRepository.create({ memory: database }),
+          tenancy: MemoryTenancyRepository.create({ memory: database }),
         },
         infrastructure: { baseline: free },
       });
@@ -416,6 +414,7 @@ describe("entitlement app installation", () => {
             memory: MemoryEntitlementDatabase.create(),
           }),
           spend,
+          tenancy: MemoryTenancyRepository.create({ memory: MemoryEntitlementDatabase.create() }),
         },
         infrastructure: { baseline: free },
       });

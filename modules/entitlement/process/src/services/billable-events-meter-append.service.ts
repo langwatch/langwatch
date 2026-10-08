@@ -1,11 +1,11 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import type {
   BillableEventRecord,
   BillableEventsMeterRepository,
 } from "../repositories/billable-events-meter.repository.ts";
+import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
 
 const defaultLogger = createLogger("langwatch:usage:meter");
 
@@ -13,7 +13,7 @@ const defaultLogger = createLogger("langwatch:usage:meter");
 export class BillableEventsMeterAppendService implements AppendStore<BillableEventRecord> {
   private constructor(
     private readonly meter: BillableEventsMeterRepository,
-    private readonly projects: Pick<ProjectApi, "findOrganizationId">,
+    private readonly projects: Pick<TenancyRepository, "getProjectPlacement">,
     private readonly logger: Pick<Logger, "warn">,
   ) {}
 
@@ -23,7 +23,7 @@ export class BillableEventsMeterAppendService implements AppendStore<BillableEve
     logger = defaultLogger,
   }: {
     meter: BillableEventsMeterRepository;
-    projects: Pick<ProjectApi, "findOrganizationId">;
+    projects: Pick<TenancyRepository, "getProjectPlacement">;
     logger?: Pick<Logger, "warn">;
   }): BillableEventsMeterAppendService {
     return new BillableEventsMeterAppendService(meter, projects, logger);
@@ -31,14 +31,14 @@ export class BillableEventsMeterAppendService implements AppendStore<BillableEve
 
   /** An orphan project is skipped loudly, and the miss is not remembered. */
   async append(record: BillableEventRecord): Promise<void> {
-    const organizationId = await this.projects.findOrganizationId(record.tenantId);
-    if (!organizationId) {
+    const placement = await this.projects.getProjectPlacement({ projectId: record.tenantId });
+    if (placement.kind === "unplaced") {
       this.logger.warn(
         { projectId: record.tenantId },
         "orphan project has no organization, not metered",
       );
       return;
     }
-    await this.meter.insert({ record, organizationId });
+    await this.meter.insert({ record, organizationId: placement.organizationId });
   }
 }

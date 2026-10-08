@@ -1,5 +1,4 @@
 import type { Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   DATASET_ATTACHMENT_DEFAULT_MAX_BYTES,
   DATASET_ATTACHMENT_OVERRIDE_CEILING_BYTES,
@@ -8,9 +7,11 @@ import {
   deriveDatasetBounds,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
+import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
+import { MemoryTenancyRepository } from "../../repositories/memory/memory.tenancy.repository.ts";
 import { createEntitlementTestApp, fixedEntitlementSource } from "./entitlement.fixture.ts";
 
 const MiB = 1024 * 1024;
@@ -27,17 +28,29 @@ const free: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** Organizations by the per-file limit an operator stored for each, in bytes. */
+/** Organization rows by the per-file limit an operator stored for each, given in bytes. */
 function organizationsWithLimits(limits: Record<string, number>) {
   const asked: string[] = [];
-  const organizations = createApiFixture<OrganizationApi>({
-    getDatasetLimits: async ({ organizationId }) => {
-      asked.push(organizationId);
-      return { attachmentMaxBytes: limits[organizationId] ?? null };
-    },
-  });
+  const database = MemoryEntitlementDatabase.create();
+  for (const [organizationId, bytes] of Object.entries(limits)) {
+    database.put({
+      organizationId,
+      memberCount: 0,
+      membersLiteCount: 0,
+      currentMonthCost: 0,
+      projectCosts: {},
+      spendByUserId: {},
+      datasetAttachmentMaxMb: bytes / MiB,
+    });
+  }
+  const tenancy = MemoryTenancyRepository.create({ memory: database });
+  const read = tenancy.getDatasetLimits.bind(tenancy);
+  tenancy.getDatasetLimits = async (input) => {
+    asked.push(input.organizationId);
+    return read(input);
+  };
 
-  return Object.assign(organizations, { asked });
+  return Object.assign(tenancy, { asked });
 }
 
 function appWith(input: {
@@ -47,7 +60,7 @@ function appWith(input: {
   const organizations = organizationsWithLimits(input.limits);
   const app = createEntitlementTestApp({
     infrastructure: { baseline: free, license: fixedEntitlementSource(null) },
-    dependencies: { organizations },
+    repositories: { ...MemoryEntitlementRepositories.create(), tenancy: organizations },
     config: { requestBounds: input.requestBounds },
   });
 

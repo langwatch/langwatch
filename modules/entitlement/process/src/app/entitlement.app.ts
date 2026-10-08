@@ -35,7 +35,6 @@ import {
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
@@ -107,6 +106,9 @@ export type EntitlementInfrastructure = Readonly<{
 
 const logger = createLogger("langwatch:usage");
 
+/** Organization stores the per-file dataset limit in MiB; the bounds are in bytes. */
+const BYTES_PER_MEBIBYTE = 1024 * 1024;
+
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
@@ -121,14 +123,17 @@ type EntitlementSetup = FeatureSetup<
 type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /**
- * What the constructor actually reads off `dependencies`: the organization peer
- * alone. `license` is consumed once, by `create`, to build
+ * What the constructor actually reads off `dependencies`: seats from organization, the pricing
+ * model from billing. `license` is consumed once, by `create`, to build
  * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "organizations">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "organizations" | "billing">;
 
 /** The repositories the app reads directly; the meters reach it only through its usage pipeline. */
-type EntitlementReadRepositories = Pick<EntitlementRepositories, "membership" | "spend">;
+type EntitlementReadRepositories = Pick<
+  EntitlementRepositories,
+  "membership" | "spend" | "tenancy"
+>;
 
 /** The usage pipeline over the senders its process manager and subscriber call back through. */
 type UsagePipelineBuild = (send: () => UsageSenders) => UsagePipelineDefinition;
@@ -140,7 +145,6 @@ export class EntitlementModule implements EntitlementApiContract {
     license: LicensingApi,
     billing: BillingApi,
     organizations: OrganizationApi,
-    projects: ProjectApi,
   };
   static readonly config = entitlementConfig;
 
@@ -150,7 +154,8 @@ export class EntitlementModule implements EntitlementApiContract {
   #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
-  #organizations: OrganizationApi;
+  #tenancy: EntitlementRepositories["tenancy"];
+  #pricing: EntitlementCallerLookup["billing"];
   #requestBoundOverrides: RequestBoundsOverrides;
   #buildUsagePipeline: UsagePipelineBuild | undefined;
   #usageSenders: UsageSenders | undefined;
@@ -181,7 +186,8 @@ export class EntitlementModule implements EntitlementApiContract {
     });
     this.#warnings = infrastructure.warnings;
     this.#spend = repositories.spend;
-    this.#organizations = dependencies.organizations;
+    this.#tenancy = repositories.tenancy;
+    this.#pricing = dependencies.billing;
     this.#requestBoundOverrides = config.requestBounds ?? {};
     this.#buildUsagePipeline = usagePipeline;
   }
@@ -203,6 +209,7 @@ export class EntitlementModule implements EntitlementApiContract {
       isSaas: config.isSaas,
       planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
       peers: dependencies,
+      tenancy: repositories.tenancy,
       meter: repositories.billableEvents,
       traceMeter: repositories.traces,
     });
@@ -210,7 +217,7 @@ export class EntitlementModule implements EntitlementApiContract {
       billing: dependencies.billing,
       counter,
       plans,
-      peers: dependencies,
+      tenancy: repositories.tenancy,
       isSaas: config.isSaas,
       logger: createLogger("langwatch:entitlement:usage-warning"),
     });
@@ -224,12 +231,12 @@ export class EntitlementModule implements EntitlementApiContract {
     // The trace meter is appended everywhere (round 22); the billable-events meter on Cloud only.
     const traceMeter = TraceMeterAppendService.create({
       meter: repositories.traces,
-      projects: dependencies.projects,
+      projects: repositories.tenancy,
     });
     const billableEventsMeter = config.isSaas
       ? BillableEventsMeterAppendService.create({
           meter: repositories.billableEvents,
-          projects: dependencies.projects,
+          projects: repositories.tenancy,
         })
       : undefined;
 
@@ -243,7 +250,7 @@ export class EntitlementModule implements EntitlementApiContract {
           countMonth: CountMonthCommand.create({ counting }),
           traceMeter,
           billableEventsMeter,
-          projects: dependencies.projects,
+          projects: repositories.tenancy,
           send,
         }),
     });
@@ -284,12 +291,14 @@ export class EntitlementModule implements EntitlementApiContract {
     const deploymentBound = await this.#deploymentRequestBound(input);
     if (!isDatasetDerivedBoundKey(input.key)) return deploymentBound;
 
-    const { attachmentMaxBytes } = await this.#organizations.getDatasetLimits({
+    const { attachmentMaxMb } = await this.#tenancy.getDatasetLimits({
       organizationId: input.organizationId,
     });
-    if (attachmentMaxBytes === null) return deploymentBound;
+    if (attachmentMaxMb === null) return deploymentBound;
 
-    const raised = deriveDatasetBounds(effectiveDatasetAttachmentMaxBytes(attachmentMaxBytes));
+    const raised = deriveDatasetBounds(
+      effectiveDatasetAttachmentMaxBytes(attachmentMaxMb * BYTES_PER_MEBIBYTE),
+    );
 
     return Math.max(deploymentBound, raised[input.key]);
   }
@@ -314,9 +323,10 @@ export class EntitlementModule implements EntitlementApiContract {
   async resolvePlanNextStep(
     input: Readonly<{ plan: Plan; organizationId: string }>,
   ): Promise<PlanNextStep> {
-    const { pricingModel, currency } = await this.#organizations.getPricing({
-      organizationId: input.organizationId,
-    });
+    const [{ pricingModel }, currency] = await Promise.all([
+      this.#pricing.getPricingModel({ organizationId: input.organizationId }),
+      this.#tenancy.getCurrency({ organizationId: input.organizationId }),
+    ]);
 
     return this.#nextStep.resolve({ plan: input.plan, pricingModel, currency });
   }

@@ -21,7 +21,9 @@ describe("usageMeterCount redelivery", () => {
     // countMonth collapses on `${organizationId}:${month}`, as usage.pipeline.ts deduplicates.
     const pending = new Map<string, CountMonthCommandData>();
     const subscriber = usageMeterCountSubscriber({
-      projects: { findOrganizationId: async () => "org_1" },
+      projects: {
+        getProjectPlacement: async () => ({ kind: "placed" as const, organizationId: "org_1" }),
+      },
       countMonth: async (data: CountMonthCommandData) => {
         pending.set(`${data.organizationId}:${data.month}`, data);
       },

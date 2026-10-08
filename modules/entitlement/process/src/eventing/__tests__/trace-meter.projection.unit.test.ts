@@ -1,10 +1,10 @@
 import { createTenantId, type Event } from "@langwatch/eventing";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import type { ProjectPlacement, TenancyRepository } from "../../repositories/tenancy.repository.ts";
 import { TraceMeterAppendService } from "../../services/trace-meter-append.service.ts";
 import { TraceMeterProjection } from "../trace-meter.projection.ts";
 
@@ -15,14 +15,15 @@ const OTHER_PROJECT = "project_b";
 const ORPHAN_PROJECT = "project_orphan";
 
 /** Answers from a fixed directory; a project missing from it belongs to no organization. */
-class ProjectDirectory implements Pick<ProjectApi, "findOrganizationId"> {
+class ProjectDirectory implements Pick<TenancyRepository, "getProjectPlacement"> {
   readonly organizationOf = new Map<string, string>([
     [PROJECT, ORGANIZATION],
     [OTHER_PROJECT, OTHER_ORGANIZATION],
   ]);
 
-  async findOrganizationId(projectId: string): Promise<string | undefined> {
-    return this.organizationOf.get(projectId);
+  async getProjectPlacement({ projectId }: { projectId: string }): Promise<ProjectPlacement> {
+    const organizationId = this.organizationOf.get(projectId);
+    return organizationId ? { kind: "placed", organizationId } : { kind: "unplaced" };
   }
 }
 

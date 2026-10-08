@@ -1,6 +1,5 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -27,10 +26,9 @@ function warningsOver(counts: ProjectUsageCounts) {
       return { sent: true, notificationId: "notification-1" };
     },
   });
-  const peers = {
-    billing,
-    organizations: createApiFixture<OrganizationApi>({}),
-    projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
+  const tenancy = {
+    findProjectIds: async () => ["project-1", "project-2"],
+    findMeteredOrganizationIds: async () => ["org-1"],
   };
   const plans = EntitlementService.create({
     baseline: coreBaselinePlan({ isSaas: false }),
@@ -39,8 +37,7 @@ function warningsOver(counts: ProjectUsageCounts) {
   });
   const counter = UsageService.create({
     organizations: {
-      getOrganizationIdByTeamId: async () => "org-1",
-      getProjectIds: peers.projects.listIdsByOrganization,
+      getProjectIds: () => tenancy.findProjectIds(),
       getPricingModel: async () => ({ pricingModel: null }),
     },
     traceCounter: {
@@ -61,7 +58,7 @@ function warningsOver(counts: ProjectUsageCounts) {
     billing,
     counter,
     plans,
-    peers,
+    tenancy,
     isSaas: false,
     logger: createTestLogger().logger,
   });
