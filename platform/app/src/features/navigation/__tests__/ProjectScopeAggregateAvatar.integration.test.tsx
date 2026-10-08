@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  *
  * ADR-144: an aggregate project reads its members' traces and takes no data
- * of its own, so the project switcher marks it, in the list and on the chip
- * when it is the open project.
+ * of its own, so the project switcher draws it as a stacked avatar named
+ * "Aggregate project", in the list and on the chip when it is the open
+ * project. A plain project keeps its single avatar.
  *
  * @see specs/governance/aggregate-project.feature
  */
@@ -99,9 +100,9 @@ afterEach(() => {
 describe("the project switcher", () => {
   describe("when ana opens the list", () => {
     /** @scenario "The app marks the aggregate and offers no way to add data to it" */
-    it("marks the aggregate and nothing else", async () => {
+    it("draws the aggregate stacked and every other project single", async () => {
       renderControl();
-      expect(screen.queryByText("Aggregate")).not.toBeInTheDocument();
+      expect(queryAggregateAvatar(document.body)).toBeNull();
 
       fireEvent.click(screen.getByRole("button", { name: "Switch project" }));
 
@@ -112,14 +113,16 @@ describe("the project switcher", () => {
         .getAllByText("Support Bot")
         .map((node) => node.closest("a"))
         .find(Boolean);
-      expect(within(aggregateRow!).getByText("Aggregate")).toBeInTheDocument();
-      expect(within(plainRow!).queryByText("Aggregate")).toBeNull();
+      expect(queryAggregateAvatar(aggregateRow!)).toBeInTheDocument();
+      expect(within(aggregateRow!).getByText("C")).toBeInTheDocument();
+      expect(queryAggregateAvatar(plainRow!)).toBeNull();
+      expect(within(plainRow!).getByText("S")).toBeInTheDocument();
     });
   });
 
   describe("when the aggregate is the open project", () => {
     /** @scenario "The app marks the aggregate and offers no way to add data to it" */
-    it("marks the current-project chip", () => {
+    it("draws the current-project chip stacked", () => {
       current.project = {
         id: "proj-aggregate",
         name: "Company Traces",
@@ -129,7 +132,22 @@ describe("the project switcher", () => {
       renderControl();
 
       const chip = screen.getByRole("button", { name: "Switch project" });
-      expect(within(chip).getByText("Aggregate")).toBeInTheDocument();
+      expect(queryAggregateAvatar(chip)).toBeInTheDocument();
+    });
+  });
+
+  describe("when a plain project is the open project", () => {
+    /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+    it("draws the current-project chip single", () => {
+      renderControl();
+
+      const chip = screen.getByRole("button", { name: "Switch project" });
+      expect(queryAggregateAvatar(chip)).toBeNull();
+      expect(within(chip).getByText("S")).toBeInTheDocument();
     });
   });
 });
+
+function queryAggregateAvatar(container: HTMLElement) {
+  return within(container).queryByRole("img", { name: "Aggregate project" });
+}

@@ -1,9 +1,11 @@
 import { Button, Combobox, Text } from "@chakra-ui/react";
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-import { ProjectAvatar } from "~/components/ProjectAvatar";
+import {
+  AggregateProjectAvatar,
+  ProjectAvatar,
+} from "~/components/ProjectAvatar";
 import { useRouter } from "~/utils/compat/next-router";
-import { AggregateProjectBadge } from "./AggregateProjectBadge";
 import { ProjectComboboxPopup } from "./ProjectSwitcherComboboxPopup";
 import {
   type ProjectPickGroup,
@@ -122,9 +124,12 @@ function ProjectComboboxTrigger({
           gap={2}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <ProjectAvatar name={currentProjectName} />
+          {currentProjectIsAggregate ? (
+            <AggregateProjectAvatar name={currentProjectName} />
+          ) : (
+            <ProjectAvatar name={currentProjectName} />
+          )}
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
-          {currentProjectIsAggregate && <AggregateProjectBadge />}
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Combobox.Trigger>

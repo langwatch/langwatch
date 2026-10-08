@@ -503,7 +503,8 @@ Feature: An aggregate project reads its member projects
   @integration
   Scenario: The app marks the aggregate and offers no way to add data to it
     When ana opens the project switcher
-    Then the aggregate carries an "Aggregate" badge, in the list and on the current project
+    Then the aggregate shows a stacked avatar named "Aggregate project", in the list and on the current project
+    And a plain project shows a single avatar
     When ana opens the aggregate project
     Then no control offers to comment, suggest an edit, edit a trace, automate or add a dashboard
     And its analytics overview offers no card to build a dashboard

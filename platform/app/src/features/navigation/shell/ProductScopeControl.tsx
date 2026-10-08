@@ -1,6 +1,9 @@
 import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
-import { ProjectAvatar } from "~/components/ProjectAvatar";
+import {
+  AggregateProjectAvatar,
+  ProjectAvatar,
+} from "~/components/ProjectAvatar";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { useWorkspaceData } from "~/components/useWorkspaceData";
@@ -8,7 +11,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import type { ProductId } from "../products";
-import { AggregateProjectBadge } from "./AggregateProjectBadge";
 import { ProjectSwitcherCombobox } from "./ProjectSwitcherCombobox";
 import type { ProjectPickGroup } from "./projectPickItems";
 
@@ -155,9 +157,12 @@ function ProjectMenu({
           gap={2}
           _hover={{ backgroundColor: "bg.muted" }}
         >
-          <ProjectAvatar name={currentProjectName} />
+          {currentProjectIsAggregate ? (
+            <AggregateProjectAvatar name={currentProjectName} />
+          ) : (
+            <ProjectAvatar name={currentProjectName} />
+          )}
           <Text whiteSpace="nowrap">{currentProjectName}</Text>
-          {currentProjectIsAggregate && <AggregateProjectBadge />}
           <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
         </Button>
       </Menu.Trigger>
@@ -180,9 +185,12 @@ function ProjectMenu({
                     _hover={{ textDecoration: "none" }}
                   >
                     <HStack gap={2} width="full">
-                      <ProjectAvatar name={candidate.label} />
+                      {candidate.isAggregate ? (
+                        <AggregateProjectAvatar name={candidate.label} />
+                      ) : (
+                        <ProjectAvatar name={candidate.label} />
+                      )}
                       <Text flex={1}>{candidate.label}</Text>
-                      {candidate.isAggregate && <AggregateProjectBadge />}
                       {candidate.projectId === currentProjectId && (
                         <Check size={13} aria-label="Current project" />
                       )}
