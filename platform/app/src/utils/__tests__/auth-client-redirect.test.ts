@@ -9,6 +9,7 @@
  *  - Absolute same-origin URLs collapse to their path+query+hash
  *  - Cross-origin URLs are replaced with "/"
  *  - Malformed URLs fall back to "/"
+ *  - Paths that normalise to `//host` or `/\host` are replaced with `/`
  *  - Dangerous schemes (javascript:, data:) are rejected
  *
  * Spec: specs/auth/signin-callback-url-unsupported-characters.feature
@@ -40,10 +41,7 @@ vi.mock("~/utils/browserNavigation", () => ({
 }));
 
 import {
-  BETTER_AUTH_CALLBACK_PATTERN,
-  betterAuthCallbackURL,
   consumeStoredReturnTo,
-  parkReturnTo,
   safeRedirectTarget,
   signIn,
 } from "../auth-client";
@@ -183,16 +181,18 @@ beforeEach(() => {
   ssoSpy.mockResolvedValue({ error: null, data: {} });
 });
 
-describe("betterAuthCallbackURL and parkReturnTo", () => {
+describe("provider sign-in hand-off", () => {
   describe("when the target already passes better-auth's check", () => {
     /** @scenario "An address better-auth already accepts is handed over unchanged" */
     it.each([
       "/dashboard",
       "/p/traces?x=1&y=2",
-    ])("hands %s over unchanged and parks nothing", (target) => {
-      parkReturnTo(target);
+    ])("hands %s over unchanged and parks nothing", async (target) => {
+      await signIn("google", { callbackUrl: target, redirect: false });
 
-      expect(betterAuthCallbackURL(target)).toBe(target);
+      expect(socialSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: target,
+      });
       expect(consumeStoredReturnTo()).toBe("/");
     });
   });
@@ -205,12 +205,12 @@ describe("betterAuthCallbackURL and parkReturnTo", () => {
       "/a#frag",
       "/a~b",
       "/a,b",
-    ])("sends %s through the resume page and returns it once", (target) => {
-      parkReturnTo(target);
-      const callbackURL = betterAuthCallbackURL(target);
+    ])("sends %s through the resume page and returns it once", async (target) => {
+      await signIn("google", { callbackUrl: target, redirect: false });
 
-      expect(callbackURL).toBe("/auth/resume");
-      expect(BETTER_AUTH_CALLBACK_PATTERN.test(callbackURL)).toBe(true);
+      expect(socialSpy.mock.calls[0]![0]).toMatchObject({
+        callbackURL: "/auth/resume",
+      });
       expect(consumeStoredReturnTo()).toBe(target);
       expect(consumeStoredReturnTo()).toBe("/");
     });
@@ -248,7 +248,7 @@ describe("signIn", () => {
   });
 
   describe("when signing in with a password from a page whose address better-auth accepts", () => {
-    /** @scenario "A password sign-in from a page better-auth accepts hands it over unchanged" */
+    /** @scenario "An address better-auth already accepts is handed over unchanged" */
     it("hands better-auth the address and navigates to it", async () => {
       await signIn("credentials", { callbackUrl: "/dashboard" });
 
@@ -295,6 +295,19 @@ describe("signIn", () => {
       expect(socialSpy.mock.calls[1]![0]).toMatchObject({
         callbackURL: "/dashboard",
       });
+      expect(consumeStoredReturnTo()).toBe("/");
+    });
+  });
+
+  describe("when a password sign-in follows an abandoned provider sign-in", () => {
+    /** @scenario "An abandoned provider sign-in leaves nothing behind for the next one" */
+    it("clears the parked page", async () => {
+      await signIn("google", {
+        callbackUrl: AGENT_TESTING_PATH,
+        redirect: false,
+      });
+      await signIn("credentials", { callbackUrl: "/dashboard" });
+
       expect(consumeStoredReturnTo()).toBe("/");
     });
   });

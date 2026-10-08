@@ -21,13 +21,6 @@ Feature: Signing in returns people to pages whose address better-auth would refu
     And they land on the results page they started from
 
   @unit
-  Scenario: A password sign-in from a page better-auth accepts hands it over unchanged
-    Given a page whose address better-auth accepts
-    When somebody signs in with their password
-    Then better-auth is handed that address as it is
-    And they land on that page
-
-  @unit
   Scenario: A password sign-in never navigates off the site
     Given a return address that is the same site on paper but reads as another site once cleaned up
     When somebody signs in with their password
@@ -36,7 +29,7 @@ Feature: Signing in returns people to pages whose address better-auth would refu
   @unit
   Scenario: An abandoned provider sign-in leaves nothing behind for the next one
     Given somebody started a provider sign-in from a page better-auth refuses and abandoned it
-    When they sign in through a provider from a page better-auth accepts
+    When they sign in through a provider from a page better-auth accepts, or with their password
     Then nothing is kept for the resume page
 
   @unit
@@ -47,16 +40,23 @@ Feature: Signing in returns people to pages whose address better-auth would refu
     And the resume page continues to the results page they started from
 
   @unit
-  Scenario: Addresses better-auth refuses are carried through the resume page
-    Given a page whose address has a colon, a fragment, a tilde or a comma
-    When somebody signs in from it
-    Then better-auth is handed the resume page, or nothing for a password sign-in
+  Scenario Outline: Addresses better-auth refuses are carried through the resume page
+    Given a page whose address has <reason>
+    When somebody signs in through a provider from it
+    Then better-auth is handed the resume page
     And the resume page continues to that address once, and only once
+
+    Examples:
+      | reason     |
+      | a colon    |
+      | a fragment |
+      | a tilde    |
+      | a comma    |
 
   @unit
   Scenario: An address better-auth already accepts is handed over unchanged
     Given a page whose address better-auth accepts
-    When somebody signs in from it
+    When somebody signs in from it, by provider or with their password
     Then better-auth is handed that address as it is
     And nothing is kept for the resume page
 

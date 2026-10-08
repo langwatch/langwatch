@@ -370,12 +370,12 @@ async function signInWithCredentials({
   target: string | undefined;
   shouldRedirect: boolean;
 }): Promise<SignInResult> {
+  // A target left by an abandoned provider sign-in must not outlive this one.
+  clearReturnTo();
   // better-auth refuses some targets outright, and this path navigates to the
   // target itself, so it is only handed one it accepts and otherwise none.
   const callbackURL =
-    target !== undefined && BETTER_AUTH_CALLBACK_PATTERN.test(target)
-      ? target
-      : undefined;
+    target !== undefined && betterAuthAccepts(target) ? target : undefined;
   // Retry timing is carried by the response header, not the auth result.
   let retryAfterSeconds: number | undefined;
   const result = await client.signIn.email({
@@ -475,7 +475,7 @@ export const safeRedirectTarget = (
  * refused callbackURL makes sign-in impossible from that page. Re-check on
  * every better-auth upgrade.
  */
-export const BETTER_AUTH_CALLBACK_PATTERN =
+const BETTER_AUTH_CALLBACK_PATTERN =
   /^\/(?!\/|\\|%2f|%5c)[\w.+/@-]*(?:\?[\w.+/=&%@-]*)?$/;
 
 /** Landing page that reads the parked target back and continues to it. */
@@ -483,13 +483,24 @@ const AUTH_RESUME_PATH = "/auth/resume";
 
 const RETURN_TO_STORAGE_KEY = "langwatch.auth.returnTo";
 
+const betterAuthAccepts = (target: string): boolean =>
+  BETTER_AUTH_CALLBACK_PATTERN.test(target);
+
+const clearReturnTo = (): void => {
+  try {
+    window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
+  } catch {
+    // Storage unavailable: nothing was parked.
+  }
+};
+
 /**
  * The callbackURL to hand better-auth for a same-origin `target`: the target
  * itself when better-auth accepts it, otherwise the resume page, which always
  * passes its check and forwards to the target parked by `parkReturnTo`.
  */
-export const betterAuthCallbackURL = (target: string): string =>
-  BETTER_AUTH_CALLBACK_PATTERN.test(target) ? target : AUTH_RESUME_PATH;
+const betterAuthCallbackURL = (target: string): string =>
+  betterAuthAccepts(target) ? target : AUTH_RESUME_PATH;
 
 /**
  * Parks a target better-auth would refuse in sessionStorage for the resume
@@ -498,13 +509,13 @@ export const betterAuthCallbackURL = (target: string): string =>
  * clears the slot instead, so a value left by an abandoned provider sign-in
  * never survives to hijack a later landing.
  */
-export const parkReturnTo = (target: string): void => {
+const parkReturnTo = (target: string): void => {
+  if (betterAuthAccepts(target)) {
+    clearReturnTo();
+    return;
+  }
   try {
-    if (BETTER_AUTH_CALLBACK_PATTERN.test(target)) {
-      window.sessionStorage.removeItem(RETURN_TO_STORAGE_KEY);
-    } else {
-      window.sessionStorage.setItem(RETURN_TO_STORAGE_KEY, target);
-    }
+    window.sessionStorage.setItem(RETURN_TO_STORAGE_KEY, target);
   } catch {
     // Storage unavailable: the resume page falls back to "/", which still
     // beats a sign-in that can never succeed.
@@ -517,7 +528,7 @@ export const parkReturnTo = (target: string): void => {
  */
 const parkAndHandOff = (target: string | undefined): string | undefined => {
   if (target === undefined) {
-    parkReturnTo("/");
+    clearReturnTo();
     return undefined;
   }
   parkReturnTo(target);
