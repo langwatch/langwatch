@@ -1,5 +1,4 @@
 /** The User application: one object behind every user door this product opens. */
-import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -116,7 +115,6 @@ const CREDENTIAL_ISSUER = "local:credential";
 
 /** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
-  auth: AuthApiContract;
   authz: AuthzApi;
   organizations: OrganizationApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
@@ -151,13 +149,11 @@ export class UserModule implements UserApi {
   static readonly contract = UserApi;
   static readonly config = userConfig;
   static readonly dependencies: {
-    auth: typeof AuthApi;
     authz: typeof AuthzApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
     storedObjects: typeof StoredObjectApi;
   } = {
-    auth: AuthApi,
     authz: AuthzApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
@@ -480,20 +476,6 @@ export class UserModule implements UserApi {
 
   dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
     return this.#users.dismissJoinOffer(input);
-  }
-
-  /**
-   * Ends every browser session of one user except the one named. A password
-   * outlives session revocation, so the sessions a credential write must end
-   * are a property of the write rather than of the door it arrived over.
-   */
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
-    return this.#account.revokeOtherBrowserSessions(input);
-  }
-
-  /** Ends every browser session of one user, keeping none. */
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    return this.#account.revokeAllBrowserSessions(input);
   }
 
   /** Verifies the current password and replaces it, as ONE operation. */

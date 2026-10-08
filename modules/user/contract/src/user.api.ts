@@ -124,8 +124,6 @@ export interface UserApi {
   unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome>;
   /** Removes one of the caller's own sign-in methods, refusing the last one. */
   unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   /** Retires an account, never the last active operator, in one write; records no fact. */
   deactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
   /** Records a written retirement as user's fact, at the instant the database stamped. */

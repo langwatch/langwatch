@@ -132,14 +132,6 @@ export class TestUserApi implements UserApi {
     this.overrides.adoptUnconfirmedAccount?.(input) ??
     this.unimplemented("adoptUnconfirmedAccount");
 
-  revokeOtherBrowserSessions: UserApi["revokeOtherBrowserSessions"] = (input) =>
-    this.overrides.revokeOtherBrowserSessions?.(input) ??
-    this.unimplemented("revokeOtherBrowserSessions");
-
-  revokeAllBrowserSessions: UserApi["revokeAllBrowserSessions"] = (input) =>
-    this.overrides.revokeAllBrowserSessions?.(input) ??
-    this.unimplemented("revokeAllBrowserSessions");
-
   deactivate: UserApi["deactivate"] = (input) =>
     this.overrides.deactivate?.(input) ?? this.unimplemented("deactivate");
 

@@ -1,4 +1,3 @@
-import type { AuthApi } from "@langwatch/auth-contract";
 import {
   type EnsuredPersonalWorkspace,
   type FindPersonalWorkspaceInput,
@@ -13,16 +12,10 @@ import {
 } from "@langwatch/user-contract";
 
 export class UserAccountService {
-  private constructor(
-    private readonly auth: AuthApi,
-    private readonly organizations: OrganizationApi,
-  ) {}
+  private constructor(private readonly organizations: OrganizationApi) {}
 
-  static create(dependencies: {
-    auth: AuthApi;
-    organizations: OrganizationApi;
-  }): UserAccountService {
-    return new UserAccountService(dependencies.auth, dependencies.organizations);
+  static create(dependencies: { organizations: OrganizationApi }): UserAccountService {
+    return new UserAccountService(dependencies.organizations);
   }
 
   personalCallerFor(input: {
@@ -38,14 +31,6 @@ export class UserAccountService {
     }
 
     return input.project.ownerUserId;
-  }
-
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
-    return this.auth.revokeOtherBrowserSessions(input);
-  }
-
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    return this.auth.revokeAllBrowserSessions(input);
   }
 
   ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {

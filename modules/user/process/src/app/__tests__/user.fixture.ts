@@ -38,8 +38,6 @@ export function createUserTestAuth(
   { governedDomain }: { governedDomain?: string } = {},
 ) {
   return Object.assign(createApiFixture<AuthApi>(), {
-    revokeOtherBrowserSessions: vi.fn(async () => undefined),
-    revokeAllBrowserSessions: vi.fn(async () => undefined),
     revokeCliTokens: vi.fn(async () => ({ revokedCount: 0 })),
     resolveAuthProvider: vi.fn(async () => provider),
     assertSignUpOrigin: vi.fn(async () => undefined),
@@ -214,7 +212,6 @@ export function createUserTestApp(
     passwords: new TestPasswordHasher(),
     ...(input.now ? { now: input.now } : {}),
     dependencies: {
-      auth,
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),
