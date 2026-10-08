@@ -135,14 +135,11 @@ setup-hooks:
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= platform/app/.env
-# `.` in POSIX sh (dash on Debian) looks a slash-free name up on PATH, never
-# in the current directory, so the file is always sourced by absolute path.
-DEV_ENV_PATH = $(abspath $(DEV_ENV_FILE))
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
-		{ test -f "$(DEV_ENV_PATH)" \
-			&& set -a && . "$(DEV_ENV_PATH)" && set +a \
+		{ test -f "$(DEV_ENV_FILE)" \
+			&& . dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)" \
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
@@ -153,10 +150,10 @@ service:
 # Usage: make service-watch svc=aigateway
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f "$(DEV_ENV_PATH)" || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f "$(DEV_ENV_FILE)" || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
-		set -a && . "$(DEV_ENV_PATH)" && set +a && \
+		. dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)" && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \

@@ -63,7 +63,8 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     Given DEV_ENV_FILE names a file in the current directory without a slash, such as ".env"
     And the recipe shell is a POSIX /bin/sh that looks such names up on PATH only, as dash does
     When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
-    Then it sources that file by its absolute path, quoted so a checkout path with spaces still works
+    Then the variables that file sets are in the environment the service starts with
+    And it does so when the folder path contains spaces
 
   # --- The gateway's own awareness of how it was configured ---
 
