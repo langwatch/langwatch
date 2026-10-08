@@ -9150,27 +9150,13 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
-        },
-        {
-          "name": "claims",
-          "columnName": "claims",
-          "type": "SlackConnectionClaim",
-          "kind": "relation",
-          "isList": true,
-          "isOptional": false,
-          "documentation": "",
-          "relation": {
-            "fields": [],
-            "references": [],
-            "to": "SlackConnectionClaim"
-          }
         }
       ]
     },
     {
       "name": "SlackConnectionClaim",
       "tableName": "slack_connection_claim",
-      "documentation": "An automation holding a Slack connection in use (ARCHITECTURE.md §3, the\nclaims ruling): a claimed connection is never deleted. `projectId` is the\nclaimant's project; `organizationId` is the connection's tenancy anchor.",
+      "documentation": "An automation holding a Slack connection in use (ARCHITECTURE.md §3, the\nclaims ruling): a claimed connection is never deleted. `projectId` is the\nclaimant's project; `organizationId` is the connection's tenancy anchor.\nNo foreign key: slack's service refuses to delete a claimed connection.",
       "primaryKey": [
         "connectionId",
         "claimantId"
@@ -9184,24 +9170,6 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
-        },
-        {
-          "name": "connection",
-          "columnName": "connection",
-          "type": "SlackIntegration",
-          "kind": "relation",
-          "isList": false,
-          "isOptional": false,
-          "documentation": "",
-          "relation": {
-            "fields": [
-              "connectionId"
-            ],
-            "references": [
-              "id"
-            ],
-            "to": "SlackIntegration"
-          }
         },
         {
           "name": "claimantId",
