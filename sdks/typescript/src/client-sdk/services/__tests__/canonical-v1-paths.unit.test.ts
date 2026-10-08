@@ -36,7 +36,6 @@ const VERSION_SEGMENT = /^v\d+$/;
 
 /** Routes the document keeps bare because they have no `/api/v1` twin. */
 const BARE_ONLY = [
-  /^\/api\/traces\/[^/]+\/transcript$/,
   /^\/api\/trace\/(search|[^/]+(\/share|\/unshare)?)$/,
   // Langy's in-process worker families, declared literal.
   /^\/api\/langy\/(local|waits|ui)(\/|$)/,

@@ -32,7 +32,7 @@ var (
 	versionSegment  = regexp.MustCompile(`^v\d+$`)
 	// Routes the document keeps bare because they have no /api/v1 twin, including
 	// Langy's in-process worker families, declared literal.
-	bareOnly = regexp.MustCompile(`^/api/traces/[^/]+/transcript$|^/api/trace/(search|[^/]+(/share|/unshare)?)$|^/api/langy/(local|waits|ui)(/|$)`)
+	bareOnly = regexp.MustCompile(`^/api/trace/(search|[^/]+(/share|/unshare)?)$|^/api/langy/(local|waits|ui)(/|$)`)
 )
 
 // @scenario "The track-event path is v1-form"

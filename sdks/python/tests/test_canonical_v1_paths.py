@@ -30,7 +30,6 @@ V1_PATH = re.compile(r"/api/v1((?:/[a-zA-Z0-9_{}-]+)+)")
 
 # Routes the document keeps bare because they have no `/api/v1` twin.
 BARE_ONLY = (
-    re.compile(r"^/api/traces/[^/]+/transcript$"),
     re.compile(r"^/api/trace/(search|[^/]+(/share|/unshare)?)$"),
     # Langy's in-process worker families, declared literal with no /api/v1 twin.
     re.compile(r"^/api/langy/(local|waits|ui)(/|$)"),

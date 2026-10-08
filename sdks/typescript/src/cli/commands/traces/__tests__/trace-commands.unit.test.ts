@@ -691,7 +691,7 @@ describe("transcriptTraceCommand()", () => {
   it("fetches the transcript endpoint and prints the entries", async () => {
     await transcriptTraceCommand("trace_abc", {});
 
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/traces/trace_abc/transcript");
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/v1/traces/trace_abc/transcript");
     const printed = logSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(printed).toContain("summarise the repo");
     expect(printed).toContain("Here is the summary.");
