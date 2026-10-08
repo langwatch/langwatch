@@ -4,8 +4,10 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -48,12 +50,31 @@ export function testEvaluatorPermissions(permits: (projectId: string) => boolean
   });
 }
 
+/** A plan in the resolved shape; no creation cap unless the case sets one. */
+export function testPlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    planSource: "free",
+    type: "FREE",
+    name: "Free",
+    free: true,
+    maxMembers: 2,
+    maxMembersLite: 0,
+    maxMessagesPerMonth: 50_000,
+    canPublish: true,
+    prices: { USD: 0, EUR: 0 },
+    ...overrides,
+  };
+}
+
 export function createEvaluatorTestApp(
   input: Readonly<{
     repository?: MemoryEvaluatorRepository;
     modelProviders?: Partial<ModelProviderApi>;
     permissions?: AuthzApi;
     graph?: EvaluatorGraph;
+    /** The organization's plan; uncapped unless the case says otherwise. */
+    plan?: Partial<Plan>;
+    workflows?: Partial<WorkflowApi>;
   }> = {},
 ): Readonly<{
   app: EvaluatorModule;
@@ -84,8 +105,18 @@ export function createEvaluatorTestApp(
         permissions,
         auditLog: createApiFixture<AuditLogApi>({ listEntityHistory: async () => [] }),
         users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
-        workflows: createApiFixture<WorkflowApi>({ assertInProject: async () => void 0 }),
+        workflows: createApiFixture<WorkflowApi>({
+          assertInProject: async () => void 0,
+          ...input.workflows,
+        }),
         modelProviders,
+        projects: createApiFixture<ProjectApi>({
+          getOrganizationId: async () => "organization-1",
+          listIdsByOrganization: async () => ["project-1", "project-2"],
+        }),
+        plans: createApiFixture<EntitlementApi>({
+          getActivePlan: async () => testPlan(input.plan),
+        }),
       },
       config: { publicBaseUrl: "https://langwatch.test" },
       resources: new ResourceScope(),

@@ -78,6 +78,22 @@ describe("<GlobalUpgradeModal/>", () => {
       expect(link).toHaveAttribute("href", "/settings/subscription");
     });
 
+    /** @scenario The upgrade modal names the cap that was reached */
+    it("names the cloud Free scenario cap with the real counts", async () => {
+      renderGate(true);
+
+      act(() => {
+        useUpgradeModalStore.getState().open("scenarios", 3, 3);
+      });
+
+      expect(
+        await screen.findByText("You've reached the limit of 3 scenarios on your current plan."),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Current usage: 3 / 3")).toBeInTheDocument();
+      expect(screen.getByText(/everything you already have keeps working/i)).toBeInTheDocument();
+      expect(screen.queryByText(/disable a membership/i)).toBeNull();
+    });
+
     it("links to the license page on a self-hosted deployment", async () => {
       renderGate(false);
 

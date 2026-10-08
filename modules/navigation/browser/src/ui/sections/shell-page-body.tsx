@@ -24,6 +24,7 @@ import { isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
+import { SeatLimitBanner } from "../blocks/seat-limit-banner.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { PageErrorFallback } from "../elements/page-error-fallback.tsx";
 
@@ -283,6 +284,13 @@ export const ShellPageBody = ({
               </Text>
             </Alert.Content>
           </Alert.Root>
+        )}
+        {usage.data?.seatLimitInfo?.status === "exceeded" && (
+          <SeatLimitBanner
+            message={usage.data.seatLimitInfo.message}
+            isEnterprisePlan={usage.data.activePlan.type === "ENTERPRISE"}
+            planManagementHref={planManagementHref(deployment.isSaaS)}
+          />
         )}
         {usage.data && usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
           <Alert.Root status="warning" width="full">

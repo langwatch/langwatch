@@ -1,6 +1,7 @@
 import { newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { EvaluatorCreationCapService } from "./evaluator-creation-cap.service.ts";
 import type { EvaluatorService } from "./evaluator.service.ts";
 
 /**
@@ -12,6 +13,7 @@ export class EvaluatorWorkflowPublicationService {
   static create(deps: {
     workflows: Pick<WorkflowApi, "findWorkflowFlags" | "setWorkflowFlags">;
     evaluators: Pick<EvaluatorService, "findByWorkflow" | "create" | "update" | "archive">;
+    creationCaps: Pick<EvaluatorCreationCapService, "assertCreationAllowed">;
   }): EvaluatorWorkflowPublicationService {
     return new EvaluatorWorkflowPublicationService(deps);
   }
@@ -29,6 +31,14 @@ export class EvaluatorWorkflowPublicationService {
     const workflow = await this.deps.workflows.findWorkflowFlags(input);
     if (!workflow) {
       throw new WorkflowNotFoundError(input.workflowId, input.projectId);
+    }
+
+    // Saving as an evaluator creates one when none is linked yet, so the
+    // plan's evaluator cap is checked before any flag changes.
+    if (input.isEvaluator) {
+      const [linked] = await this.deps.evaluators.findByWorkflow(input);
+      if (!linked)
+        await this.deps.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     }
 
     await this.deps.workflows.setWorkflowFlags({

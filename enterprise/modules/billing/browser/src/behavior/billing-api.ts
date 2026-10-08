@@ -6,7 +6,7 @@
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { subscriptionTrpc, currencyTrpc } from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import type { Plan } from "@langwatch/entitlement-contract";
+import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
 
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
 
@@ -26,6 +26,8 @@ export type UsageRead = {
   membersCount: number;
   membersLiteCount: number;
   currentMonthMessagesCount: number | null;
+  /** Seats used against the plan, counted the way enforcement counts them. */
+  seatLimitInfo?: SeatLimitInfo;
 };
 
 /** A member row, as the seat count and the seat drawer read it. */
@@ -41,6 +43,7 @@ export type PendingInviteRead = {
   email: string;
   role: OrganizationUserRole;
   status: string;
+  displayStatus: string;
 };
 
 /** Procedures from features not yet split: plan, limits, license, organization, invite. */

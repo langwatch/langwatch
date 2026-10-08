@@ -103,6 +103,8 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
           maxMonthlyUsageLimit: number;
           usageUnit?: string;
           messageLimitInfo?: { status: string; message: string };
+          /** Seats used against the plan; "exceeded" once a shrunk plan no longer covers them. */
+          seatLimitInfo?: { status: string; message: string };
         };
       };
     };

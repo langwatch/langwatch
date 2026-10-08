@@ -9,7 +9,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -34,6 +34,18 @@ import {
 } from "../../__tests__/support/simulation-service-fake.fixture.ts";
 import { ScenarioModule, type ScenarioTabStore } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
+
+const UNCAPPED_PLAN: Plan = {
+  planSource: "subscription",
+  type: "LAUNCH",
+  name: "Launch",
+  free: false,
+  maxMembers: 10,
+  maxMembersLite: 10,
+  maxMessagesPerMonth: 1_000_000,
+  canPublish: true,
+  prices: { USD: 0, EUR: 0 },
+};
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
@@ -65,11 +77,16 @@ export async function createScenarioRestTestApp(
       evaluations: createApiFixture<EvaluationApi>(),
       users: createApiFixture<UserApi>(),
       projects: createApiFixture<ProjectApi>(
-        options.projects ?? { getOrganizationId: async () => ORGANIZATION_ID },
+        { getOrganizationId: async () => ORGANIZATION_ID, ...options.projects },
         "Project API",
       ),
       plans: createApiFixture<EntitlementApi>(
-        options.plans ?? { assertWithinUsageLimit: async () => {} },
+        {
+          assertWithinUsageLimit: async () => {},
+          // A plan with no creation caps, so a create never counts here.
+          getActivePlan: async () => UNCAPPED_PLAN,
+          ...options.plans,
+        },
         "Entitlement API",
       ),
       modelProviders: createApiFixture<ModelProviderApi>(),

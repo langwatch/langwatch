@@ -1,8 +1,14 @@
 /**
- * The seat kinds a licence limits, keyed by the labels and the refusal below.
- * Organization owns the limit check and its wire schemas (organization-contract
- * `license-limit-type.ts`); this list goes once licensing-contract depends on it.
+ * The limits a refusal names, keyed by the labels and the refusal below: the
+ * seats organization checks, and the cloud Free creation caps the owning
+ * modules check (entitlement-contract `plan-creation-caps.ts`).
  */
-export const limitTypes = ["members", "membersLite"] as const;
+export const limitTypes = [
+  "members",
+  "membersLite",
+  "scenarios",
+  "scenarioSets",
+  "evaluators",
+] as const;
 
 export type LimitType = (typeof limitTypes)[number];

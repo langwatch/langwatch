@@ -48,7 +48,11 @@ function serviceWith({
   return {
     workflows,
     evaluators,
-    service: EvaluatorWorkflowPublicationService.create({ workflows, evaluators }),
+    service: EvaluatorWorkflowPublicationService.create({
+      workflows,
+      evaluators,
+      creationCaps: { assertCreationAllowed: async () => void 0 },
+    }),
   };
 }
 

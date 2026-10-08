@@ -3,10 +3,12 @@ import { join } from "node:path";
 
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -33,6 +35,8 @@ async function bootEvaluator() {
       testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
       testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
       testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

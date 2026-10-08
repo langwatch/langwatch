@@ -127,6 +127,11 @@ export interface EvaluatorApi {
     sourceProjectId: string;
     newEvaluatorId: string;
     actorId: string;
+    /**
+     * Copying a library evaluator counts against the plan's evaluator cap; an
+     * online evaluation's copy brings its evaluator along uncapped, so it passes false.
+     */
+    shouldCheckEvaluatorCap?: boolean;
   }): Promise<Evaluator>;
   /** Pushes the source evaluator's config onto the replicas the caller may write. */
   pushToCopies(

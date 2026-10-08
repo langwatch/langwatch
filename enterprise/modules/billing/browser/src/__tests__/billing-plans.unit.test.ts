@@ -1,17 +1,16 @@
 /**
- * Unit tests for currency-aware pricing strings in billing-plans.
- *
- * Verifies that getGrowthFeatures() and getGrowthPlanFeatures() produce
- * the correct per-100K events and per-GB retention pricing lines for each
- * supported currency.
+ * Currency-aware pricing strings in billing-plans: getGrowthFeatures() and
+ * getGrowthPlanFeatures() produce the per-100K events and per-GB retention
+ * lines for each supported currency, and the Free card's creation caps.
  */
 
-import { Currency } from "@langwatch/enterprise-billing-contract";
+import { Currency, FREE_PLAN_CREATION_CAPS } from "@langwatch/enterprise-billing-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   buildEnterprisePlanFeatures,
   ENTERPRISE_PLAN_FEATURES,
+  FREE_PLAN_FEATURES,
   getGrowthFeatures,
   getGrowthPlanFeatures,
   WEBHOOK_FEATURE_LABEL,
@@ -91,6 +90,20 @@ describe("buildEnterprisePlanFeatures()", () => {
   describe("given a plan that says nothing about webhook endpoints", () => {
     it("lists everything, since silence is answered by the tier and not by us", () => {
       expect(buildEnterprisePlanFeatures({})).toEqual(ENTERPRISE_PLAN_FEATURES);
+    });
+  });
+});
+
+describe("FREE_PLAN_FEATURES", () => {
+  describe("when the Free plan card is shown", () => {
+    /** @scenario The Free plan card matches the pricing page */
+    it("lists the creation caps the plan enforces, as the pricing page does", () => {
+      const { maxScenarios, maxScenarioSets, maxEvaluators } = FREE_PLAN_CREATION_CAPS;
+
+      expect(FREE_PLAN_FEATURES).toContain(
+        `${maxScenarios} scenarios, ${maxScenarioSets} simulations, ${maxEvaluators} custom evals`,
+      );
+      expect(FREE_PLAN_FEATURES).toContain("3 scenarios, 3 simulations, 3 custom evals");
     });
   });
 });

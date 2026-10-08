@@ -160,6 +160,7 @@ import { ConnectedTargetService } from "../services/connected-target.service.ts"
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 import { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { RunConfigurationsService } from "../services/run-configurations.service.ts";
+import { ScenarioCreationCapService } from "../services/scenario-creation-cap.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
@@ -197,6 +198,8 @@ export interface ScenarioAppDependencies {
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
+  /** The cloud Free caps on scenarios and simulations. */
+  creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
   prefetcher: ScenarioExecutionPrefetcherService;
@@ -316,6 +319,12 @@ export class ScenarioModule implements ScenarioApi {
       testSuiteIds,
       clock,
     });
+    const creationCaps = ScenarioCreationCapService.create({
+      plans: setup.dependencies.plans,
+      projects: setup.dependencies.projects,
+      scenarios: repositories.scenarios,
+      simulations,
+    });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
       projects: setup.dependencies.projects,
@@ -419,6 +428,7 @@ export class ScenarioModule implements ScenarioApi {
         exports,
         presence: setup.dependencies.presence,
       }),
+      creationCaps,
       events: ScenarioEventService.create({
         simulations,
         scenarioTabs,
@@ -426,6 +436,7 @@ export class ScenarioModule implements ScenarioApi {
         traces: setup.dependencies.traces,
         entitlement: setup.dependencies.plans,
         projects: setup.dependencies.projects,
+        creationCaps,
       }),
       platformLinks,
       runViews: SimulationRunViewService.create({ simulations, platformLinks }),
@@ -688,6 +699,10 @@ export class ScenarioModule implements ScenarioApi {
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
+    });
     const scenario = await this.#dependencies.scenarios.create({
       ...input,
       // REST can name an explicit actor when its credential names no person;
@@ -796,10 +811,14 @@ export class ScenarioModule implements ScenarioApi {
   }
 
   /** Copies a scenario, attributed to the caller who asked for it. */
-  duplicate(
+  async duplicate(
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
+    await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
+      projectId: input.projectId,
+      operatorId: by.label === "user" ? by.id : undefined,
+    });
     return this.#dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
   }
 

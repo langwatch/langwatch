@@ -6,6 +6,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
@@ -40,6 +41,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -52,6 +54,7 @@ import type { EvaluatorRepositories } from "../repositories/evaluator.repositori
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
+import { EvaluatorCreationCapService } from "../services/evaluator-creation-cap.service.ts";
 import {
   EvaluatorDeletionFactsService,
   type EvaluatorLifecycleSenders,
@@ -104,6 +107,8 @@ type EvaluatorAppParts = Readonly<{
   graph: EvaluatorGraph;
   deletionFacts: EvaluatorDeletionFactsService;
   publications: EvaluatorWorkflowPublicationService;
+  /** The cloud Free cap on custom evaluators. */
+  creationCaps: EvaluatorCreationCapService;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -121,6 +126,10 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     workflows: WorkflowApi,
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
+    /** The project's organization and its projects, which the evaluator cap counts across. */
+    projects: ProjectApi,
+    /** The plan whose cloud Free evaluator cap a create is checked against. */
+    plans: EntitlementApi,
   };
 
   static create(setup: EvaluatorSetup): EvaluatorModule {
@@ -147,8 +156,15 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       generateId: (kind: string) => generate(kind).toString(),
     });
 
+    const creationCaps = EvaluatorCreationCapService.create({
+      plans: dependencies.plans,
+      projects: dependencies.projects,
+      evaluators: repositories.evaluators,
+    });
+
     return new EvaluatorModule({
       evaluators,
+      creationCaps,
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
@@ -156,6 +172,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       publications: EvaluatorWorkflowPublicationService.create({
         workflows: dependencies.workflows,
         evaluators,
+        creationCaps,
       }),
       publicBaseUrl: config.publicBaseUrl,
     });
@@ -351,10 +368,16 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   // ── Writes ────────────────────────────────────────────────────────────────
 
   /**
-   * Creates an evaluator, refusing a code evaluator that carries no program and
-   * a workflow that already answers for one.
+   * Creates an evaluator within the plan's evaluator cap, refusing a code evaluator
+   * with no program and a workflow that already answers for one.
    */
   async create(input: EvaluatorCreateInput): Promise<Evaluator> {
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
+    return this.#createGuarded(input);
+  }
+
+  /** The create guards without the plan's cap, which a copy asks for itself. */
+  async #createGuarded(input: EvaluatorCreateInput): Promise<Evaluator> {
     if (input.type === "code") assertCodeEvaluatorConfig(input.id, input.config);
 
     if (input.workflowId) {
@@ -385,6 +408,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     config: EvaluatorConfig;
     id?: string;
   }): Promise<Evaluator> {
+    await this.#dependencies.creationCaps.assertCreationAllowed({ projectId: input.projectId });
     const [resolvedDefault, resolvedEmbedding] = await Promise.all([
       this.#dependencies.modelProviders.resolveModelForFeature({
         projectId: input.projectId,
@@ -453,6 +477,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     sourceProjectId: string;
     newEvaluatorId: string;
     actorId: string;
+    shouldCheckEvaluatorCap?: boolean;
   }): Promise<Evaluator> {
     const permitted = await this.#dependencies.permissions.hasPermission({
       userId: input.actorId,
@@ -461,6 +486,12 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     });
 
     if (!permitted) throw new EvaluatorSourcePermissionDeniedError(input.sourceProjectId);
+    if (input.shouldCheckEvaluatorCap !== false) {
+      await this.#dependencies.creationCaps.assertCreationAllowed({
+        projectId: input.projectId,
+        operatorId: input.actorId,
+      });
+    }
 
     return EvaluatorReplicationService.create({
       replicateEvaluatorWorkflow: (replication) =>
@@ -471,7 +502,10 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       deleteReplicatedWorkflow: (replication) =>
         this.#dependencies.graph.deleteReplicatedWorkflow(replication),
     }).copyToProject({
-      evaluators: this,
+      evaluators: {
+        findById: (lookup) => this.findById(lookup),
+        create: (copy) => this.#createGuarded(copy),
+      },
       evaluatorId: input.evaluatorId,
       sourceProjectId: input.sourceProjectId,
       targetProjectId: input.projectId,
