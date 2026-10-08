@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import { FROM_LANGWATCH_ABOUT } from "../model/curated-boards.ts";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -110,7 +111,7 @@ const inputsTo = (calls: UiProcedureCall[], path: string) =>
 
 describe("the Dashboards sidebar", () => {
   describe("given the member's boards, stars and the From LangWatch boards", () => {
-    /** @scenario "AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order" */
+    /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
     it("shows the groups in the prototype's order, each board once", async () => {
       renderSection();
 
@@ -120,9 +121,7 @@ describe("the Dashboards sidebar", () => {
         "Can I trust my numbers?",
         "Where my agent breaks",
       ]);
-      const links = screen.getAllByRole("link");
-      expect(links.at(-1)).toHaveTextContent("Browse templates");
-      expect(links.at(-1)).toHaveAttribute("href", "/test-project/dashboards/templates");
+      expect(screen.queryByRole("link", { name: /Browse templates/ })).toBeNull();
       expect(screen.queryByText("All dashboards")).toBeNull();
     });
 
@@ -136,7 +135,7 @@ describe("the Dashboards sidebar", () => {
       );
     });
 
-    /** @scenario "AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order" */
+    /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
     it("links a From LangWatch board to its live address and marks the open one", async () => {
       renderSection({ openPath: "curated/data" });
 
@@ -161,27 +160,22 @@ describe("the Dashboards sidebar", () => {
 
   describe("when the stars fail to load", () => {
     /** @scenario "AC161c Starred shows only when the member has stars, in their own order" */
-    it("shows a one-line error with Retry and keeps Browse templates", async () => {
+    it("shows a one-line error with Retry and keeps the + to make a board", async () => {
       renderSection({ listFails: true });
 
       expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Browse templates/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "New dashboard" })).toBeInTheDocument();
     });
   });
 
   describe("when the member presses the '+' on Your dashboards", () => {
-    /** @scenario "AC162 The '+' on Your dashboards makes a blank board or opens the templates" */
-    it("offers a blank board or a template", async () => {
-      const { user, host, calls } = renderSection();
+    /** @scenario "AC162 The '+' on Your dashboards makes a blank board at once" */
+    it("makes a blank board at once, with no menu", async () => {
+      const { user, calls } = renderSection();
       await listNamed("Your dashboards");
 
       await user.click(screen.getByRole("button", { name: "New dashboard" }));
-      expect(menuItemNames()).toEqual(["Blank dashboard", "From a template"]);
-      await user.click(screen.getByRole("menuitem", { name: "From a template" }));
-      expect(host.navigations).toEqual(["/test-project/dashboards/templates"]);
-
-      await user.click(screen.getByRole("button", { name: "New dashboard" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Blank dashboard" }));
+      expect(screen.queryByRole("menuitem")).toBeNull();
       await waitFor(() => expect(inputsTo(calls, "dashboards.create")).toHaveLength(1));
     });
   });
@@ -192,11 +186,36 @@ describe("the Dashboards sidebar", () => {
       const { user } = renderSection();
       await listNamed("From LangWatch");
 
-      await user.click(screen.getByRole("button", { name: /From LangWatch/ }));
+      await user.click(screen.getByRole("button", { name: "From LangWatch" }));
       expect(screen.queryByRole("list", { name: "From LangWatch" })).toBeNull();
 
-      await user.click(screen.getByRole("button", { name: /From LangWatch/ }));
+      await user.click(screen.getByRole("button", { name: "From LangWatch" }));
       expect(await listNamed("From LangWatch")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the member hovers or focuses the (i) beside From LangWatch", () => {
+    /** @scenario "From LangWatch: the heading's (i) says what these boards are" */
+    it("says what the boards are, on hover and on keyboard focus, leaving the fold alone", async () => {
+      const { user } = renderSection();
+      await listNamed("From LangWatch");
+      const about = screen.getByRole("button", { name: "About From LangWatch" });
+
+      await user.hover(about);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(FROM_LANGWATCH_ABOUT);
+      await user.unhover(about);
+      await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+
+      about.focus();
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(FROM_LANGWATCH_ABOUT);
+      expect(screen.getByRole("button", { name: "From LangWatch" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(FROM_LANGWATCH_ABOUT).toBe(
+        "Boards LangWatch made for you. They are read-only and improve over time. " +
+          "Duplicate one to make a copy you can edit.",
+      );
     });
   });
 

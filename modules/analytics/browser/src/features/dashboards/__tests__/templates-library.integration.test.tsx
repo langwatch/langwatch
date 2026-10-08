@@ -310,8 +310,9 @@ describe("the templates finder", () => {
         name: `Add ${READY.name} to this project`,
       });
       expect(create).toHaveTextContent("Add to this project");
-      const category = within(card).getByTitle(POOL[0]!.trunk);
-      expect(category).toHaveTextContent(POOL[0]!.trunk);
+      const trunk = POOL[0]!.trunk;
+      const category = card.querySelector(`[data-trunk-badge="${trunk}"]`)!;
+      expect(category).toHaveTextContent(`${trunk}: ${TRUNK_QUESTIONS[trunk]}`);
       const order = [name, job, count, create, category];
       for (const [index, element] of order.slice(1).entries()) {
         expect(
@@ -320,6 +321,27 @@ describe("the templates finder", () => {
       }
       expect(within(card).queryByText(/coming soon/i)).toBeNull();
       expect(within(card).queryByRole("button", { name: /^Filter by/ })).toBeNull();
+    });
+  });
+
+  describe("given a card's category icon", () => {
+    /** @scenario "Template card: the category icon names its category and description on hover and focus" */
+    it("shows the category and its one-line description on hover and on focus", async () => {
+      const user = userEvent.setup();
+      openLibrary();
+
+      const card = screen.getByRole("article", { name: READY.name });
+      const trunk = POOL[0]!.trunk;
+      const badge = card.querySelector<HTMLElement>(`[data-trunk-badge="${trunk}"]`)!;
+      const tip = `${trunk}: ${TRUNK_QUESTIONS[trunk]}`;
+
+      await user.hover(badge);
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(tip);
+      await user.unhover(badge);
+      await waitFor(() => expect(screen.queryByRole("tooltip")).toBeNull());
+
+      badge.focus();
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(tip);
     });
   });
 

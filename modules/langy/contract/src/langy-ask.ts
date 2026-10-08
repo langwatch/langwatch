@@ -27,3 +27,9 @@ export type LangyAsk = {
 };
 
 export const LangyAskToken = uiTokens("langy").operations<LangyAsk>("langyAsk");
+
+/**
+ * The docked panel's width on the right edge, so an asking module's own drawer can stop
+ * short of it and sit beside Langy rather than under or over it.
+ */
+export const LANGY_DOCK_WIDTH_PX = 392;

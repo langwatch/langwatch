@@ -68,14 +68,14 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.step).toContain("countIf(errored AND NOT failed) AS recovered");
   });
 
-  /** @scenario "AC23 Flight Deck: Top request it cannot serve names a topic, a count and an example" */
+  /** @scenario "AC23 Flight Deck: Top request my agent cannot serve names a topic, a count and an example" */
   it("names the topic with the most capability-gap conversations and one request", () => {
     const { code, queries } = build("ck-top-ask");
     expect(queries.gap).toContain("countIf(o.outcome = 'capability_gap') AS gaps");
     expect(queries.gap).toContain("anyIf(t.input, o.outcome = 'capability_gap') AS example");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
     expect(code).toContain("<TraceLink id={top.trace_id} />");
-    expect(code).toContain("conversations asked for something it cannot do.");
+    expect(code).toContain("conversations asked for something my agent cannot do.");
   });
 
   /** @scenario "AC24 Flight Deck: An outcome widget tells a quiet period from a missing judge" */

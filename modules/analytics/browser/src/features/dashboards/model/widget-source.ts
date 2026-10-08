@@ -6,7 +6,7 @@
 
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-/** A widget written in the editor, such as the blank one "Skip" opens. */
+/** A widget written in the editor, such as the blank one "I'll build it myself" opens. */
 export const CODE_SOURCE: DashboardWidgetSource = { kind: "code" };
 
 /** A widget built from the catalogue, by a pick in "Add a widget" or from a template. */

@@ -4,7 +4,11 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { SavedDashboardsToken, type SavedDashboardsProps } from "@langwatch/analytics-contract";
+import {
+  SavedDashboardsToken,
+  type SavedDashboardsProps,
+  StarredDashboardsToken,
+} from "@langwatch/analytics-contract";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -39,12 +43,20 @@ function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
+/** Stands in for analytics' lent starred group, which draws itself only when stars exist. */
+function LentStarred() {
+  return <div data-testid="starred-dashboards">Starred dashboards</div>;
+}
+
 const analyticsLends = uiDeclarations([
   {
     name: "analytics",
     installation: {
       capabilities: {},
-      lends: [{ token: SavedDashboardsToken, load: async () => ({ default: LentList }) }],
+      lends: [
+        { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
+        { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
+      ],
     },
   },
 ]);
@@ -52,9 +64,11 @@ const analyticsLends = uiDeclarations([
 function renderSidebar({
   surface,
   pathname,
+  permissions = ["analytics:view"],
 }: {
-  surface: "llm-ops" | "dashboards";
+  surface: "llm-ops" | "dashboards" | "gateway" | "settings";
   pathname: string;
+  permissions?: string[];
 }) {
   declarations.current = analyticsLends;
   return render(
@@ -63,7 +77,7 @@ function renderSidebar({
         readings={{
           project: PROJECT,
           pathname,
-          permissions: ["analytics:view"],
+          permissions,
           flags: { release_dashboards: { enabled: true, isLoading: false } },
           commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
         }}
@@ -123,6 +137,47 @@ describe("the LLM Ops sidebar", () => {
       expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Dashboards" })).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
+    });
+  });
+});
+
+describe("the starred dashboards group", () => {
+  describe("given a member who can reach Dashboards, in LLM Ops", () => {
+    /** @scenario "Starred dashboards show in the other products' sidebars" */
+    it("draws analytics' starred group under the product's own pages", async () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+
+      expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
+      expect(screen.getByText("Observe")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the Gateway sidebar", () => {
+    /** @scenario "Starred dashboards show in the other products' sidebars" */
+    it("draws the starred group there too", async () => {
+      renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
+
+      expect(await screen.findByTestId("starred-dashboards")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the Dashboards sidebar", () => {
+    /** @scenario "Starred dashboards show in the other products' sidebars" */
+    it("leaves the stars to the saved-dashboards list", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
+
+      await screen.findByTestId("saved-dashboards");
+      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+    });
+  });
+
+  describe("given a member who cannot reach Dashboards", () => {
+    /** @scenario "Starred dashboards show in the other products' sidebars" */
+    it("draws no starred group", async () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
+
+      await screen.findByRole("button", { name: "Quick Search" });
+      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
     });
   });
 });

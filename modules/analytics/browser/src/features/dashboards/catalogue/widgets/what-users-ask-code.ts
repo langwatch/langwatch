@@ -38,7 +38,7 @@ export const CANNOT_SERVE_CODE = widgetCode({
     figure: count(num(row.requests)),
     note: row.reason ? "Most often: " + row.reason : undefined,
   }));
-  const label = "of " + count(closed) + " closed conversations asked for something it cannot do";
+  const label = "of " + count(closed) + " closed conversations asked for something my agent cannot do";
   return (
     <Panel>
       <Headline value={count(cannot)} label={label} />

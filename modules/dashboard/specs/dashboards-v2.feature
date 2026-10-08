@@ -269,7 +269,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the card shows the problem and its figure, and the sentence that explains it is its hover
 
   @unit
-  Scenario: AC23 Flight Deck: Top request it cannot serve names a topic, a count and an example
+  Scenario: AC23 Flight Deck: Top request my agent cannot serve names a topic, a count and an example
     Given conversations that ended as a capability gap in the period
     Then the widget names the topic with the most of them, how many, and one request with its trace
 
@@ -378,8 +378,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it divides traces with a retrieval span that returned no contexts by traces with a retrieval span, per bucket
 
   @unit
-  Scenario: AC46 What users ask: Requests it cannot serve counts capability gaps per topic
-    Given the "Requests it cannot serve" widget
+  Scenario: AC46 What users ask: Requests my agent cannot serve counts capability gaps per topic
+    Given the "Requests my agent cannot serve" widget
     Then it counts closed conversations with the outcome "capability_gap" per topic, with the most common reason
 
   @unit
@@ -775,11 +775,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then one "My dashboard" is made for them, starred by nobody, and opens
 
   @unit @integration
-  Scenario: AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order
+  Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order
     When the member looks at the Dashboards sidebar
-    Then they see "Your dashboards" with a "+", then Starred, then From LangWatch, then Browse templates
+    Then they see "Your dashboards" with a "+", then Starred, then From LangWatch
     And From LangWatch holds Release check, "Can I trust my numbers?" and Where my agent breaks
-    And Browse templates opens /[project]/dashboards/templates
+    And the sidebar has no Browse templates item; a new board offers the templates
 
   @unit @integration
   Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name
@@ -793,10 +793,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And with no stars there is no Starred group
 
   @integration
-  Scenario: AC162 The '+' on Your dashboards makes a blank board or opens the templates
+  Scenario: AC162 The '+' on Your dashboards makes a blank board at once
     When the member presses "+" by "Your dashboards"
-    Then they can pick "Blank dashboard", which makes and opens a new board,
-      or "From a template", which opens the templates library
+    Then a new blank board is made and opened, with no menu in between
+    And the new board offers "Or start from a template"
 
   @integration
   Scenario: AC163 My dashboard cannot be deleted
@@ -807,6 +807,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC164 From LangWatch folds only when the member clicks it
     When the member clicks "From LangWatch"
     Then its boards fold away, and stay folded after a reload until it is clicked again
+
+  @integration
+  Scenario: From LangWatch: the heading's (i) says what these boards are
+    Given the Dashboards sidebar shows the From LangWatch group
+    When the member hovers over the (i) beside its heading, or moves keyboard focus to it
+    Then it says "Boards LangWatch made for you. They are read-only and improve over time.
+      Duplicate one to make a copy you can edit."
+    And the heading and its fold control stay exactly where they were
+    # Owner list, 2026-10-08; the prototype uses the same words
 
   @unit @integration
   Scenario: AC165 A star can point at a From LangWatch board
@@ -823,9 +832,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: Boards: every empty board shows one view
     Given a board with no widgets
-    Then it shows the ask bar, the suggested questions on one line,
+    Then it shows the ask bar, the suggested questions,
       "Or start from a template" with the three From LangWatch boards and "View all templates"
     And each card opens its live board
+
+  @integration
+  Scenario: Boards: the suggested questions show in full at every width
+    Given an empty board with Langy available
+    Then each suggested question under the ask bar shows its whole text
+    And at a narrow width they wrap onto more lines instead of scrolling or being cut at the edges
+    # Owner list, 2026-10-08
 
   @integration
   Scenario: Boards: the ask bar opens its modal on a click, with the cursor in the modal
@@ -984,7 +1000,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC130 Picker filters: the picker offers the finder's search and chips
     Given the member opens "Add a widget"
     Then it shows the finder's plain search, the category chips with "All" and the agent-type chips
-    And its header holds "Skip" beside the close button
+    And its header holds "I'll build it myself" beside the close button
+    And it is a solid surface over a dimmed, blurred page, readable in light and dark mode
     And it keeps its "Ask Langy" footer while Langy is available
     And it never says "block"
 
@@ -1052,6 +1069,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the draft ends with the dashboard period and grain the new board opens on
     And the new board, with its widgets, is attached as the context
 
+  @unit
+  Scenario: Template prompt: Langy also checks what the template needs that is not set up yet
+    Given any template, base or focus
+    Then its report prompt ends by asking Langy to check what the board needs that the project
+      has not set up yet: the data its widgets need (such as cost, user id or evaluator
+      results) and integrations not connected
+    And it names the pieces the template's widgets need that the member can send or turn on
+    And it asks Langy to say what is missing and offer to help set up each piece
+    # Owner list, 2026-10-08. Plain traces and what LangWatch has still to build are not named.
+
   @integration
   Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted
     Given Langy is off or the member may not start a conversation
@@ -1102,6 +1129,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Decision: no board column records its template and adding one needs a migration, so the
     # board is matched by the name it was made with
 
+  @integration
+  Scenario: Template card: the category icon names its category and description on hover and focus
+    Given a template's card
+    When the member hovers over its category icon, or moves focus to it
+    Then a tooltip names the category and its one-line description, such as
+      "Protect: Can my agent hurt me?"
+    # Owner list, 2026-10-08
+
   # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
@@ -1138,19 +1173,19 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 43: "Answer quality: to review" → Scenario: AC43 Answer quality: To review lists failed checks from the last 3 days with one random audit
   # AC 44: "Answer quality: retrieval or generation" → Scenario: AC44 Answer quality: Retrieval or generation splits failed searches by cause
   # AC 45: "Answer quality: empty retrieval rate" → Scenario: AC45 Answer quality: Empty retrieval rate counts questions whose search returned nothing
-  # AC 46: "What users ask: requests it cannot serve" → Scenario: AC46 What users ask: Requests it cannot serve counts capability gaps per topic
+  # AC 46: "What users ask: requests my agent cannot serve" → Scenario: AC46 What users ask: Requests my agent cannot serve counts capability gaps per topic
   # AC 47: "What users ask: rising and new topics" → Scenario: AC47 What users ask: Rising and new topics compares topic shares with the period before
   # AC 48: "What users ask: topics people ask about" → Scenario: AC48 What users ask: Topics people ask about shows volume, success and cannot-do per topic
   # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
   # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71
   # AC 80-93: "The boards preloaded for one agent kind are built" (By customer, Call quality, Field accuracy, Outputs users keep, Risk sign-off) → Scenario: AC80 By customer: the board groups by the first key the traces carry; Scenario: AC80b By customer: no grouping key says what to send; Scenario: AC81 By customer: conversations by customer with each one's share; Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost; Scenario: AC83 By customer: pass rate on the newest prompt version against the one before; Scenario: AC84 By customer: spend by customer, top six; Scenario: AC85 Call quality: reply time by stage; Scenario: AC86 Call quality: calls not ended and repeated sentences; Scenario: AC87 Field accuracy: accuracy per field and document type; Scenario: AC88 Field accuracy: share sent to human review; Scenario: AC89 Outputs users keep: drop-off after generation; Scenario: AC90 Risk sign-off: sign-off status; Scenario: AC91 Risk sign-off: policy checks with their margin; Scenario: AC92 Risk sign-off: review queue; Scenario: AC93 Risk sign-off: change log
-  # AC 100-106: "Templates library" (AC100 folded into AC161: Browse templates is the sidebar's last item) → Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every ready template is listed by trunk; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a template creates a board for the whole project
+  # AC 100-106: "Templates library" (AC100 retired: the sidebar has no Browse templates item; a new board offers the templates) → Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every ready template is listed by trunk; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a template creates a board for the whole project
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
   # AC 107-109: "Sidebar menu" (changed by langwatch/tasks#911: stars replace sharing and the default board; Share and Set as default are gone, Move up/down added) → Scenario: AC107 Sidebar menu: each board offers its actions in order; Scenario: AC107b Sidebar menu: reorder is bounded by the Starred list's ends; Scenario: AC109 Sidebar menu: Duplicate copies the board and its widgets
   # AC 150-159: "Dashboards page and favourites" (changed by langwatch/tasks#911: the All dashboards page is gone, nothing is starred automatically) → Scenario: AC155 Move up and Move down reorder the member's stars; Scenario: AC156 No board is starred unless the member stars it; Scenario: AC157 Stars are per member; Scenario: AC159 No sharing control appears anywhere
-  # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred by nobody; Scenario: AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board or opens the templates; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
+  # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, starred by nobody; Scenario: AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unstarred boards by name; Scenario: AC161c Starred shows only when the member has stars, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A star can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for

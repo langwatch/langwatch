@@ -7,7 +7,13 @@
 import { describe, expect, it } from "vitest";
 
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
-import { type SidebarBoard, sameStar, sidebarGroups, starRefOf } from "../model/sidebar-boards.ts";
+import {
+  type SidebarBoard,
+  sameStar,
+  sidebarGroups,
+  starredLinks,
+  starRefOf,
+} from "../model/sidebar-boards.ts";
 
 const board = (id: string, name: string, createdById = "user-1"): SidebarBoard => ({
   id,
@@ -79,5 +85,30 @@ describe("sameStar", () => {
     expect(
       sameStar({ kind: "board", dashboardId: "x" }, { kind: "template", templateId: "x" }),
     ).toBe(false);
+  });
+});
+
+describe("starredLinks", () => {
+  /** @scenario "Starred dashboards show in the other products' sidebars" */
+  it("links every star in the member's order, My dashboard included, into Dashboards", () => {
+    const links = starredLinks({
+      stars: [
+        { kind: "template", templateId: "release" },
+        { kind: "board", board: MINE },
+        { kind: "template", templateId: "no-longer-offered" },
+        { kind: "board", board: board("b 2", "Weekly review") },
+      ],
+      curated: CURATED_BOARDS,
+      projectSlug: "demo",
+    });
+
+    expect(links.map(({ name, href }) => ({ name, href }))).toEqual([
+      {
+        name: CURATED_BOARDS.find(({ templateId }) => templateId === "release")!.name,
+        href: "/demo/dashboards/curated/release",
+      },
+      { name: "My dashboard", href: "/demo/dashboards/mine" },
+      { name: "Weekly review", href: "/demo/dashboards/b%202" },
+    ]);
   });
 });

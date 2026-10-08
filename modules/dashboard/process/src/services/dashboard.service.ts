@@ -18,6 +18,7 @@ import {
   graphPlacementSchema,
   GraphNotFoundError,
   graphUpdateInputSchema,
+  MY_DASHBOARD_NAME,
   projectIdSchema,
   type Dashboard,
   type DashboardGraphCountScope,
@@ -109,7 +110,7 @@ export class DashboardService {
     return dashboard;
   }
 
-  /** A new board after the last; creating never stars it. */
+  /** A new board after the last; only a member's own My dashboard starts starred, for them. */
   async create(input: {
     projectId: string;
     name: string;
@@ -128,6 +129,14 @@ export class DashboardService {
       order: (last?.order ?? -1) + 1,
       createdById: createdById ?? null,
     });
+    // Stored as an ordinary star, so unstarring it later removes it for good.
+    if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {
+      await this.#repository.addStar({
+        projectId: parsed.projectId,
+        userId: createdById,
+        star: { kind: "board", dashboardId: dashboard.id },
+      });
+    }
 
     return dashboard;
   }

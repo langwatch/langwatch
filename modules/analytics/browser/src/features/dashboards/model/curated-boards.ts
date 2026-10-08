@@ -19,6 +19,11 @@ import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
  */
 export const CURATED_TEMPLATE_IDS = ["release", "data", "breaks"] as const;
 
+/** What the From LangWatch group is, under its heading's (i); the prototype says the same. */
+export const FROM_LANGWATCH_ABOUT =
+  "Boards LangWatch made for you. They are read-only and improve over time. Duplicate one to " +
+  "make a copy you can edit.";
+
 /** One From LangWatch board: its template's words and its widgets laid out on the grid. */
 export interface CuratedBoard {
   readonly templateId: string;

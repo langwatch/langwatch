@@ -58,6 +58,8 @@ interface DashboardWidgetEditDrawerProps<Tab extends string> {
   assist?: ReactNode;
   /** The side it opens from; "start" leaves a panel docked on the right in view. */
   placement?: "start" | "end";
+  /** Room kept free at the far edge, so a panel docked there sits beside the drawer. */
+  reserveEndPx?: number;
 }
 
 export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
@@ -82,6 +84,7 @@ export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
   extraTabs = [],
   assist,
   placement = "end",
+  reserveEndPx,
 }: DashboardWidgetEditDrawerProps<Tab>) {
   const canSave = isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
 
@@ -94,7 +97,11 @@ export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
       size="xl"
       placement={placement}
     >
-      <Drawer.Content display="flex" flexDirection="column">
+      <Drawer.Content
+        display="flex"
+        flexDirection="column"
+        {...(reserveEndPx === void 0 ? {} : { maxWidth: `calc(100vw - ${reserveEndPx}px)` })}
+      >
         <Drawer.Header>
           <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
         </Drawer.Header>

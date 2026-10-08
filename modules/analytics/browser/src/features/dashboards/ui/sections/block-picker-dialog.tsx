@@ -1,7 +1,7 @@
 /**
- * "Add a widget", laid out like the templates finder: one centred search, category chips and
- * agent-type chips over the built widgets in question-tree branch sections. A pick adds the
- * widget and drafts its prompt in Langy (AC141); Skip goes to the widget editor instead.
+ * "Add a widget", laid out like the templates finder: one search, category and agent-type chips
+ * over the built widgets in question-tree branch sections. A pick adds the widget and drafts its
+ * prompt in Langy (AC141); "I'll build it myself" goes to the widget editor instead.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -60,6 +60,12 @@ const QUESTION_ICONS: Readonly<Record<WidgetQuestionIcon, LucideIcon>> = {
   scale: Scale,
 };
 
+const afterNextPaint = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
+/** The way past the catalogue, to the editor on a new widget, spelled out in full. */
+export const BUILD_IT_MYSELF = "I'll build it myself";
+
 export function BlockPickerDialog({
   board,
   period,
@@ -70,13 +76,16 @@ export function BlockPickerDialog({
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
   period: BoardPeriod;
-  /** Adds the picked question's widget(s) to the board; false when the write failed. */
+  /** Adds the picked question's widget(s), shown at once; resolves false when refused. */
   onAddWidgets: (question: WidgetQuestion) => Promise<boolean>;
   /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */
   onSkip: () => void;
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
+  // Closed here first: the address that unmounts the picker commits in a transition, which a
+  // board busy drawing the picked widget holds back for seconds.
+  const [isOpen, setIsOpen] = useState(true);
   const [filters, setFilters] = useState<CatalogueFilters>(NO_CATALOGUE_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -87,14 +96,16 @@ export function BlockPickerDialog({
   const hasMatches = sections.length > 0;
 
   const addWidget = async (question: WidgetQuestion) => {
-    // A failed write is reported by the host; leave the picker open and seed nothing.
-    if (!(await onAddWidgets(question))) return;
-    if (langy.enabled) {
-      for (const widget of pickerWidgets(question.id)) {
-        langy.ask(widgetPromptDraft({ widget, board, period }));
-      }
-    }
+    // Closed at once: the board shows the widget while it is written. A refused write is
+    // reported by the host and seeds nothing.
+    setIsOpen(false);
     onClose();
+    // After the close has painted: starting the write redraws every card on the board.
+    await afterNextPaint();
+    if (!(await onAddWidgets(question)) || !langy.enabled) return;
+    for (const widget of pickerWidgets(question.id)) {
+      langy.ask(widgetPromptDraft({ widget, board, period }));
+    }
   };
 
   const askLangy = (text: string) => {
@@ -105,25 +116,28 @@ export function BlockPickerDialog({
 
   return (
     <Dialog.Root
-      open
+      open={isOpen}
       size="lg"
       initialFocusEl={() => searchRef.current}
       onOpenChange={({ open }) => !open && onClose()}
     >
-      <Dialog.Content maxHeight="76vh" maxWidth="800px" borderRadius="xl">
+      {/* Solid, over a dimmed page: the shared see-through surface is unreadable over a board
+          in dark mode. */}
+      <Dialog.Content
+        maxHeight="76vh"
+        maxWidth="800px"
+        borderRadius="xl"
+        background="bg.panel"
+        backdropFilter="none"
+        backdropProps={{ backdropFilter: "blur(2px) brightness(0.45)" }}
+      >
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <HStack width="full" gap={2}>
             <Dialog.Title fontSize="14px" fontWeight="semibold">
               Add a widget
             </Dialog.Title>
-            <Button
-              size="sm"
-              variant="outline"
-              marginStart="auto"
-              title="Write the widget yourself, with Langy"
-              onClick={onSkip}
-            >
-              Skip
+            <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
+              {BUILD_IT_MYSELF}
             </Button>
             <Dialog.CloseTrigger position="static" />
           </HStack>
@@ -163,7 +177,7 @@ export function BlockPickerDialog({
             {!hasMatches && (
               <VStack align="start" gap={2} paddingX={3}>
                 <Text fontSize="13px" color="fg.muted">
-                  No widget matches. Skip to write your own with Langy.
+                  {`No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`}
                 </Text>
                 <Button
                   size="xs"

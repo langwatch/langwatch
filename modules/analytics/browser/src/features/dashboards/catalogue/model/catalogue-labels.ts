@@ -89,12 +89,12 @@ export type QuestionType = (typeof QUESTION_TYPES)[number];
 /** The shape of a question; it decides the chart. */
 export const QUESTION_TYPE_LABELS: Readonly<Record<QuestionType, string>> = {
   happened: "What happened?",
-  changed: "Did it change? (vs yesterday or the last version)",
-  line: "Is it past a limit?",
+  changed: "Did the number change? (vs yesterday or the last version)",
+  line: "Is the number past a limit?",
   compare: "How do A and B compare?",
-  why: "Why did it happen?",
+  why: "Why did the number move?",
   matters: "What matters most?",
-  prove: "Can I show or prove it?",
+  prove: "Can I show or prove the result?",
 };
 
 /** The question tree's trunks: each a verb for what the member wants from their agent. */
@@ -104,8 +104,8 @@ export type Trunk = (typeof TRUNKS)[number];
 /** The question each trunk answers. */
 export const TRUNK_QUESTIONS: Readonly<Record<Trunk, string>> = {
   Profit: "Am I spending well?",
-  Grow: "Is it growing my business?",
-  Protect: "Can it hurt me?",
+  Grow: "Is my agent growing my business?",
+  Protect: "Can my agent hurt me?",
   Trust: "Can I trust the numbers?",
 };
 

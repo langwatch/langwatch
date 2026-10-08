@@ -407,6 +407,7 @@ describe("a member's board", () => {
         );
 
         await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
+        await waitFor(() => expect(host.langyAsks).toHaveLength(1));
         const created = server.state.widgets.find(({ id }) => id === "widget-new-1")!;
         expect(created).toMatchObject({
           dashboardId: "board-1",
@@ -526,7 +527,7 @@ describe("a member's board", () => {
         const types = within(screen.getByRole("group", { name: "Agent types" }));
         expect(types.getByRole("button", { name: /^Voice agent\s*\d+$/ })).toBeInTheDocument();
         expect(types.queryByRole("button", { name: /^Coding agent/ })).toBeNull();
-        expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "I'll build it myself" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
         expect(dialog.textContent).not.toMatch(/\bblocks?\b/i);
       });
@@ -610,8 +611,8 @@ describe("a member's board", () => {
       });
     });
 
-    describe("when the member presses Skip", () => {
-      /** @scenario "Finder: Skip in Add a widget hands over to the widget editor" */
+    describe("when the member presses I'll build it myself", () => {
+      /** @scenario "Finder: Add a widget's I'll build it myself hands over to the widget editor" */
       it("hands over to the widget editor and adds or drafts nothing", async () => {
         const user = userEvent.setup();
         const skips: string[] = [];
@@ -637,7 +638,7 @@ describe("a member's board", () => {
           host,
         });
 
-        await user.click(await screen.findByRole("button", { name: "Skip" }));
+        await user.click(await screen.findByRole("button", { name: "I'll build it myself" }));
 
         expect(skips).toEqual(["skip"]);
         expect(added).toEqual([]);
@@ -662,8 +663,8 @@ describe("a member's board", () => {
         );
 
         await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
+        await waitFor(() => expect(host.langyAsks).toHaveLength(1));
         expect(server.state.widgets.map(({ name }) => name)).toEqual([traffic.question]);
-        expect(host.langyAsks).toHaveLength(1);
         expect(host.langyAsks[0]?.draft?.startsWith(traffic.prompt)).toBe(true);
         expect(host.langyAsks[0]?.draft).toContain(`This widget:\nName: ${traffic.question}`);
         expect(host.langyAsks[0]?.draft).toContain("Queries (LangWatchQL):");
@@ -683,7 +684,9 @@ describe("a member's board", () => {
         });
 
         expect(
-          screen.getByText("No widget matches. Skip to write your own with Langy."),
+          screen.getByText(
+            'No widget matches. Press "I\'ll build it myself" to write your own with Langy.',
+          ),
         ).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
 

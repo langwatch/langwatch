@@ -88,7 +88,7 @@ describe("given the Answer quality widgets", () => {
 });
 
 describe("given the What users ask widgets", () => {
-  /** @scenario "AC46 What users ask: Requests it cannot serve counts capability gaps per topic" */
+  /** @scenario "AC46 What users ask: Requests my agent cannot serve counts capability gaps per topic" */
   it("counts capability gaps per topic with the most common reason", () => {
     const { sql } = buildOf("ask-cannot");
     expect(sql.topics).toContain("WHERE outcome = 'capability_gap'");

@@ -1,7 +1,7 @@
 /**
- * Which widget the board's editor is open on, from the address, and Langy beside it. The
- * editor always opens with Langy: the widget attached, or the edit drafted ("Edit with
- * Langy"). While it is open Langy is told that widget is on screen, so its drafts go after.
+ * Which widget the board's editor is open on, from the address, and Langy beside it. Building
+ * with Langy, a new widget or "Edit with Langy", sends Langy its starting prompt; "Edit code"
+ * only attaches the widget. While it is open Langy is told that widget is on screen.
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
@@ -13,7 +13,7 @@ import {
   type WidgetAsk,
   widgetAskDraft,
   widgetAsks,
-  widgetEditDraft,
+  widgetBuildQuestion,
   widgetEditorOpened,
 } from "../langy/model/board-langy.ts";
 import { BLANK_WIDGET } from "../model/blank-widget.ts";
@@ -74,7 +74,8 @@ export function useBoardEditor({
     address.open({ target: widget?.id ?? NEW_WIDGET_REF, ...(closing ? { closing } : {}) });
     if (!langy.enabled) return;
     const subject = { widget: editedWidget(widget), board, period };
-    langy.ask(withLangy ? widgetEditDraft(subject) : widgetEditorOpened(subject));
+    const builds = widget === null || withLangy;
+    langy.ask(builds ? widgetBuildQuestion(subject) : widgetEditorOpened(subject));
   };
 
   const asks = editing && langy.enabled ? asksFor(editing.widget) : void 0;

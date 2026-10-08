@@ -1,7 +1,7 @@
 /**
  * Opens the member's My dashboard, where `/[project]/dashboards` lands. A member who has
- * none gets it made, empty and starred by nobody; the ref keeps a re-run effect (React
- * strict mode) from making a second.
+ * none gets it made, empty; the server stars it for them. The ref keeps a re-run effect
+ * (React strict mode) from making a second.
  */
 
 import { useEffect, useRef } from "react";
@@ -33,8 +33,13 @@ export function useLandingBoard() {
     createRequested.current = true;
     createBoard(
       { projectId, name: MY_DASHBOARD_NAME },
-      // The re-read lists the new board, which this effect then opens.
-      { onSuccess: () => void utils.dashboards.getAll.invalidate({ projectId }) },
+      // The re-reads list the new board, which this effect then opens, and its star.
+      {
+        onSuccess: () => {
+          void utils.dashboards.getAll.invalidate({ projectId });
+          void utils.dashboards.listStarred.invalidate({ projectId });
+        },
+      },
     );
   }, [host, utils, projectId, projectSlug, userId, isLoading, loadError, myId, createBoard]);
 

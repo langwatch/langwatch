@@ -1,11 +1,18 @@
 /**
- * How the member's own agent edits a widget: the REST call and the MCP tool call.
+ * How the member's own agent makes a widget: the prompt that creates one, and the REST call
+ * and the MCP tool call that edit a saved one.
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
 import { describe, expect, it } from "vitest";
 
-import { WIDGET_MCP_TOOL, widgetApiSnippet, widgetMcpSnippet } from "../model/widget-api.ts";
+import {
+  WIDGET_CREATE_MCP_TOOL,
+  WIDGET_MCP_TOOL,
+  widgetApiSnippet,
+  widgetCreatePrompt,
+  widgetMcpSnippet,
+} from "../model/widget-api.ts";
 
 const WIDGET = { projectId: "proj-1", dashboardId: "board-1", widgetId: "w-1" };
 
@@ -34,5 +41,17 @@ describe("given a saved widget", () => {
       },
     });
     expect(WIDGET_MCP_TOOL).toBe("update_dashboard_widget");
+  });
+});
+
+describe("given a widget not saved yet", () => {
+  /** @scenario "Widget editor: API / MCP on a new widget shows how my agent creates it" */
+  it("prompts the agent to create it on this board with add_dashboard_widget", () => {
+    const prompt = widgetCreatePrompt({ dashboardId: "board-1" });
+
+    expect(WIDGET_CREATE_MCP_TOOL).toBe("add_dashboard_widget");
+    expect(prompt).toContain("add_dashboard_widget");
+    expect(prompt).toContain("board-1");
+    expect(prompt).toContain("run_query");
   });
 });

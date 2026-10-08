@@ -24,7 +24,7 @@ const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE
 
 const OUTCOMES = `const FAILURES = [
   ["misunderstood", "Misunderstood", C.orange],
-  ["capability_gap", "Could not do it", C.pink],
+  ["capability_gap", "Could not do the task", C.pink],
   ["refusal", "Refused", C.red],
   ["handover", "Handed to a person", C.teal],
 ];`;

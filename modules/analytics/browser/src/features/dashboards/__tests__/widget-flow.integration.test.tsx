@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
- * The widget flow on a board, against an in-memory dashboards and widgets server: the editor
- * with Langy beside it and its API / MCP tab, Skip to a new widget, the widget menu and its
- * copies, Undo after every change, and where each widget says it came from.
+ * The widget flow on a board, against an in-memory widgets server: the editor with Langy
+ * beside it, its API / MCP tab, "I'll build it myself", the widget menu, Undo after every
+ * change, and where each widget says it came from.
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
+import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useEffect, useReducer } from "react";
@@ -16,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AnalyticsRouteReading } from "../../../model/analytics-host.ts";
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import { PICKER_QUESTIONS, pickerWidgets } from "../catalogue/index.ts";
+import { WIDGET_AGENT_DOCS_URL, widgetCreatePrompt } from "../model/widget-api.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -53,13 +55,26 @@ const traces = (): Widget => ({
   rowSpan: 3,
 });
 
-/** One board and its widgets, answered from memory across reloads; every call is kept. */
+/**
+ * One board and its widgets, answered from memory across reloads; every call is kept. A path
+ * in `held` waits for its gate to open; a path in `refused` fails, as a server refusing would.
+ */
 function inMemoryServer() {
-  const state = { widgets: [traces()], calls: [] as UiProcedureCall[] };
+  const state = {
+    widgets: [traces()],
+    calls: [] as UiProcedureCall[],
+    held: new Map<string, Promise<void>>(),
+    refused: new Set<string>(),
+  };
   let minted = 0;
   const find = (id: unknown) => state.widgets.find((widget) => widget.id === id)!;
-  const answer = (call: UiProcedureCall): Promise<unknown> => {
+  const answer = async (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
+    await state.held.get(call.path);
+    if (state.refused.has(call.path)) throw new Error(`refused ${call.path}`);
+    return respond(call);
+  };
+  const respond = (call: UiProcedureCall): Promise<unknown> => {
     const input = (call.input ?? {}) as Input;
     switch (call.path) {
       case "dashboards.getAll":
@@ -223,17 +238,20 @@ describe("the widget editor", () => {
   });
 
   describe("when the member picks Edit with Langy", () => {
-    /** @scenario "Widget editor: Edit with Langy drafts the edit about that widget" */
-    it("opens the editor and drafts the edit about that board and widget", async () => {
+    /** @scenario "Widget editor: Edit with Langy sends Langy its starting prompt about that widget" */
+    it("opens the editor and sends Langy the edit, with that widget attached", async () => {
       const host = openBoard({ server: inMemoryServer() });
 
       await chooseFromMenu("Edit with Langy");
       await editor();
 
       const [request] = host.langyAsks;
-      expect(request?.question).toBeUndefined();
-      expect(request?.draft?.startsWith('Edit "Traces" with me.')).toBe(true);
-      expect(request?.about).toEqual({ ref: BOARD.id, itemRef: "w-1" });
+      expect(request?.draft).toBeUndefined();
+      expect(
+        request?.question?.startsWith('Edit my "Traces" widget on my "Weekly review" dashboard'),
+      ).toBe(true);
+      expect(request?.question).toContain("Ask me what I want the widget to show");
+      expect(request?.context[0]?.ref).toContain('widget "Traces" (id w-1)');
       expect(host.langyScreens.at(-1)).toEqual({ ref: BOARD.id, itemRef: "w-1" });
     });
   });
@@ -272,6 +290,34 @@ describe("the widget editor", () => {
     });
   });
 
+  describe("given Langy is docked beside the board", () => {
+    /** @scenario "Widget editor: the editor and Langy sit side by side" */
+    it("opens the editor from the left and stops it short of Langy's dock", async () => {
+      openBoard({ server: inMemoryServer() });
+
+      await chooseFromMenu("Edit code");
+      await editor();
+      const drawer = screen
+        .getAllByRole("dialog")
+        .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }))!;
+
+      expect(getComputedStyle(drawer).maxWidth).toBe(`calc(100vw - ${LANGY_DOCK_WIDTH_PX + 24}px)`);
+    });
+
+    /** @scenario "Widget editor: the editor and Langy sit side by side" */
+    it("keeps the full drawer width when there is no Langy to sit beside", async () => {
+      openBoard({ server: inMemoryServer(), permissions: MEMBER });
+
+      await chooseFromMenu("Edit code");
+      await editor();
+      const drawer = screen
+        .getAllByRole("dialog")
+        .find((dialog) => within(dialog).queryByRole("tab", { name: "API / MCP" }))!;
+
+      expect(getComputedStyle(drawer).maxWidth).not.toContain("100vw");
+    });
+  });
+
   describe("given Langy is not available", () => {
     /** @scenario "Widget editor: Langy's suggestions fit the widget's shape" */
     it("shows no suggestions and asks Langy nothing", async () => {
@@ -286,9 +332,11 @@ describe("the widget editor", () => {
   });
 });
 
-describe("Skip in Add a widget", () => {
+describe("I'll build it myself in Add a widget", () => {
   /**
-   * @scenario "Add a widget: Skip opens the editor on a new widget"
+   * @scenario "Add a widget: I'll build it myself opens the editor on a new widget"
+   * @scenario "Widget editor: API / MCP on a new widget shows how my agent creates it"
+   * @scenario "Widget editor: building a new widget with Langy sends Langy a starting prompt"
    * @scenario "Widget source: every widget made on a board records where it came from"
    */
   it("opens the editor on a new widget, which saves half wide at the bottom, made in code", async () => {
@@ -296,15 +344,28 @@ describe("Skip in Add a widget", () => {
     const server = inMemoryServer();
     const host = openBoard({ server, query: { addBlock: "open" } });
 
-    await user.click(await screen.findByRole("button", { name: "Skip" }));
+    await user.click(await screen.findByRole("button", { name: "I'll build it myself" }));
     const drawer = await editor();
 
     expect(host.lastQuery).toEqual({ addBlock: void 0, editWidget: "new" });
     expect(screen.queryByRole("heading", { name: "Add a widget" })).toBeNull();
     expect(drawer.getByRole("button", { name: "Rename New widget" })).toBeInTheDocument();
     expect(host.langyScreens.at(-1)).toEqual({ ref: BOARD.id, itemRef: "new" });
+    expect(host.langyAsks).toHaveLength(1);
+    expect(host.langyAsks[0]?.draft).toBeUndefined();
+    expect(host.langyAsks[0]?.question).toContain(
+      'I am building a new widget on my "Weekly review" dashboard, which already shows: Traces.',
+    );
+    expect(host.langyAsks[0]?.question).toContain("Ask me what I want this widget to show");
+    expect(host.langyAsks[0]?.context[0]?.ref).toContain('new widget "New widget", not saved yet');
     await user.click(drawer.getByRole("tab", { name: "API / MCP" }));
-    expect(drawer.getByRole("tabpanel")).toHaveTextContent("Save the widget first.");
+    const panel = drawer.getByRole("tabpanel");
+    expect(panel).toHaveTextContent(widgetCreatePrompt({ dashboardId: BOARD.id }));
+    expect(panel).not.toHaveTextContent("Save the widget first");
+    expect(within(panel).getByRole("link", { name: "Read the docs" })).toHaveAttribute(
+      "href",
+      WIDGET_AGENT_DOCS_URL,
+    );
 
     await user.click(drawer.getByTestId("analytics-widget-save"));
 
@@ -365,6 +426,57 @@ describe("the widget menu", () => {
   });
 });
 
+describe("Picking a widget in Add a widget", () => {
+  const traffic = PICKER_QUESTIONS.find(({ id }) => id === "traffic")!;
+  const pick = async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    await user.click(
+      await screen.findByRole("button", {
+        name: (accessible) => accessible.startsWith(traffic.question),
+      }),
+    );
+  };
+
+  /** @scenario "Add a widget: a picked widget shows on the board at once" */
+  it("closes the picker and shows the widget before the server has stored it", async () => {
+    const server = inMemoryServer();
+    let land = () => void 0;
+    server.state.held.set("dashboardWidgets.create", new Promise((open) => (land = open)));
+    const host = openBoard({ server, query: { addBlock: "open" } });
+
+    await pick();
+
+    expect(host.lastQuery).toEqual({ addBlock: void 0 });
+    expect(await screen.findAllByText(pickerWidgets(traffic.id)[0]!.name)).not.toHaveLength(0);
+    expect(server.state.widgets).toHaveLength(1);
+    expect(host.langyAsks).toEqual([]);
+    land();
+
+    expect(await screen.findByText("Widget added")).toBeInTheDocument();
+    expect(server.state.widgets).toHaveLength(2);
+    await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+  });
+
+  /** @scenario "Add a widget: a picked widget shows on the board at once" */
+  it("takes the widget off again and seeds nothing when the server refuses it", async () => {
+    const server = inMemoryServer();
+    server.state.refused.add("dashboardWidgets.create");
+    const host = openBoard({ server, query: { addBlock: "open" } });
+
+    await pick();
+
+    await waitFor(() =>
+      expect(host.failures).toEqual([
+        expect.objectContaining({ fallbackTitle: "Couldn't add the widget" }),
+      ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryAllByText(pickerWidgets(traffic.id)[0]!.name)).toHaveLength(0),
+    );
+    expect(host.langyAsks).toEqual([]);
+  });
+});
+
 describe("Undo", () => {
   describe("when the member deletes a widget and presses Undo", () => {
     /**
@@ -377,7 +489,7 @@ describe("Undo", () => {
 
       const user = await chooseFromMenu("Delete");
       expect(await screen.findByText("Widget deleted")).toBeInTheDocument();
-      expect(server.state.widgets).toHaveLength(0);
+      await waitFor(() => expect(server.state.widgets).toHaveLength(0));
       await user.click(screen.getByRole("button", { name: "Undo" }));
 
       await waitFor(() =>
@@ -393,6 +505,49 @@ describe("Undo", () => {
           rowSpan: 3,
         }),
       ]);
+    });
+  });
+
+  describe("when the member deletes a widget while the server is still answering", () => {
+    /** @scenario "Delete: a widget leaves the board at once, with Undo" */
+    it("hides it and offers Undo before the delete lands, then Undo waits and restores it", async () => {
+      const server = inMemoryServer();
+      let land = () => void 0;
+      server.state.held.set("dashboardWidgets.delete", new Promise((open) => (land = open)));
+      openBoard({ server });
+
+      const user = await chooseFromMenu("Delete");
+
+      expect(await screen.findByText("Widget deleted")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
+      expect(server.state.widgets).toHaveLength(1);
+      await user.click(screen.getByRole("button", { name: "Undo" }));
+      land();
+
+      await waitFor(() =>
+        expect(callsTo(server, "dashboardWidgets.batchUpdateLayouts")).toHaveLength(1),
+      );
+      expect(server.state.widgets).toEqual([expect.objectContaining({ name: "Traces" })]);
+    });
+  });
+
+  describe("when the server refuses a delete", () => {
+    /** @scenario "Delete: a refused delete puts the widget back and says so" */
+    it("brings the widget back, withdraws the Undo and reports the failure", async () => {
+      const server = inMemoryServer();
+      server.state.refused.add("dashboardWidgets.delete");
+      const host = openBoard({ server });
+
+      await chooseFromMenu("Delete");
+
+      await waitFor(() =>
+        expect(host.failures).toEqual([
+          expect.objectContaining({ fallbackTitle: "Couldn't delete the widget" }),
+        ]),
+      );
+      expect(await screen.findByRole("button", { name: "Actions for Traces" })).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Undo" })).toBeNull());
+      expect(server.state.widgets).toHaveLength(1);
     });
   });
 

@@ -3,8 +3,9 @@
  * boards get and the addresses in the area. Addresses are built and read here only.
  */
 
-/** The member's default board, made the first time they open the area; it may stay empty. */
-export const MY_DASHBOARD_NAME = "My dashboard";
+import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
+
+export { MY_DASHBOARD_NAME };
 
 /**
  * The member's own "My dashboard": the first board they made under that name. No column

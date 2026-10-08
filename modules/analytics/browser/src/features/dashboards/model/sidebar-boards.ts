@@ -7,7 +7,7 @@
 
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 
-import { isOthersDashboard, myDashboardId } from "./boards.ts";
+import { curatedBoardPath, dashboardsPath, isOthersDashboard, myDashboardId } from "./boards.ts";
 import type { CuratedBoard } from "./curated-boards.ts";
 
 /** A stored board, as much of it as the sidebar reads. */
@@ -93,4 +93,37 @@ export function sidebarGroups({
     starred,
     fromLangWatch: curated.filter(({ templateId }) => !starredTemplateIds.has(templateId)),
   };
+}
+
+/** One starred dashboard as another product's sidebar links it. */
+export interface StarredLink {
+  readonly key: string;
+  readonly name: string;
+  readonly href: string;
+}
+
+/**
+ * Every star, My dashboard included, in the member's order, as links into Dashboards; a star
+ * on a From LangWatch board no longer offered is left out.
+ */
+export function starredLinks({
+  stars,
+  curated,
+  projectSlug,
+}: {
+  stars: readonly MemberStar[];
+  curated: readonly CuratedBoard[];
+  projectSlug: string;
+}): StarredLink[] {
+  const curatedById = new Map(curated.map((board) => [board.templateId, board]));
+  return stars.flatMap((star): StarredLink[] => {
+    if (star.kind === "board") {
+      const { id, name } = star.board;
+      return [{ key: `board-${id}`, name, href: dashboardsPath({ projectSlug, dashboardId: id }) }];
+    }
+    const board = curatedById.get(star.templateId);
+    if (!board) return [];
+    const href = curatedBoardPath({ projectSlug, templateId: board.templateId });
+    return [{ key: `template-${board.templateId}`, name: board.name, href }];
+  });
 }

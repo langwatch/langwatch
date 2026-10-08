@@ -211,7 +211,7 @@ ${ATTENTION_RULES}`,
   return <Panel><Note>Nothing got worse in this period.</Note></Panel>;`,
 });
 
-/** Top request it cannot serve: the product gap users hit most, with their own words. */
+/** Top request my agent cannot serve: the product gap users hit most, with their own words. */
 export const TOP_ASK_CODE = widgetCode({
   summary: "The topic users ask for most that my agent cannot serve, how often, and an example.",
   subtitle: "What people ask for most that the agent has no way to do",
@@ -231,7 +231,7 @@ export const TOP_ASK_CODE = widgetCode({
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 15, fontWeight: 500, color: C.orange }}>{top.topic}</div>
         <div style={{ fontSize: 12.5, color: C.subtle }}>
-          {count(num(top.gaps))} conversations asked for something it cannot do.
+          {count(num(top.gaps))} conversations asked for something my agent cannot do.
         </div>
         {top.example && (
           <div style={{ borderLeft: "2px solid " + C.border, paddingLeft: 8, fontSize: 12 }}>

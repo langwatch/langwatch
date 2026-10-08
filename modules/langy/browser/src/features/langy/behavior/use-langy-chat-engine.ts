@@ -10,6 +10,13 @@ import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
 
 /**
+ * At most one transcript re-render per window while a turn streams. Unthrottled, every chunk is a
+ * synchronous re-render, and a burst of frames (a relay catching up after a drop) nests past
+ * React's update limit: it throws inside the stream, and useChat reports the turn as failed.
+ */
+export const LANGY_STREAM_RENDER_THROTTLE_MS = 50;
+
+/**
  * The panel's chat ENGINE as one owned seam: the `useChat` transport state plus the
  * only two operations that may write to it from outside a live turn — hydrating a
  * stored history into it, and resetting it.
@@ -31,6 +38,7 @@ export function useLangyChatEngine({
     resumeStream,
   } = useChat({
     transport,
+    experimental_throttle: LANGY_STREAM_RENDER_THROTTLE_MS,
     onError: (error) => {
       // Global-handled errors (license / lite-member) are owned by their own
       // handler — leave them to it.

@@ -1,9 +1,10 @@
 /**
  * The widget editor on a board: the shared edit drawer with a live preview over the board's
- * period, Code, Queries, then "API / MCP" (how the member's own agent makes the same edit),
+ * period, Code, Queries, then "API / MCP" (how the member's own agent makes the widget),
  * with Langy's suggestions above the tabs when Langy is available.
  */
 
+import { LANGY_DOCK_WIDTH_PX } from "@langwatch/langy-contract";
 import { useState } from "react";
 
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
@@ -13,12 +14,15 @@ import { useBoardWidgetEditor } from "../../behavior/use-board-widget-editor.ts"
 import type { WidgetAsk } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
-import { widgetApiSnippet, widgetMcpSnippet } from "../../model/widget-api.ts";
+import { widgetApiSnippet, widgetCreatePrompt, widgetMcpSnippet } from "../../model/widget-api.ts";
 import { WidgetApiPanel } from "../blocks/widget-api-panel.tsx";
 import { WidgetLangyAsks } from "../blocks/widget-langy-asks.tsx";
 
 /** The preview is not grid-constrained in the drawer: a fixed, generous height. */
 const PREVIEW_HEIGHT_PX = 320;
+
+/** Langy's dock plus the drawer's own inset and a gap, so the two sit side by side. */
+const BESIDE_LANGY_PX = LANGY_DOCK_WIDTH_PX + 24;
 
 // The drawer shows frame output in the chart itself; no log panel.
 const noLog = () => void 0;
@@ -71,8 +75,9 @@ export function BoardWidgetEditor({
       isSaving={isSaving}
       onClose={onClose}
       onSave={() => onSave(editor.edited)}
-      // From the left, so Langy's panel docked on the right stays beside it, never under it.
+      // From the left and stopping short of Langy's dock, so the two never overlap.
       placement="start"
+      {...(asks ? { reserveEndPx: BESIDE_LANGY_PX } : {})}
       activeTab={tab}
       onTabChange={setTab}
       assist={asks && asks.length > 0 && <WidgetLangyAsks asks={asks} onAsk={onAsk} />}
@@ -82,6 +87,7 @@ export function BoardWidgetEditor({
           label: "API / MCP",
           content: (
             <WidgetApiPanel
+              createPrompt={widgetCreatePrompt({ dashboardId })}
               snippets={
                 ref && {
                   widgetId: ref.widgetId,

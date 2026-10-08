@@ -1,7 +1,7 @@
 /**
  * What a board tells Langy: the self-describing context a question rides with (AC16): which
  * board, what is on it and the period it reads over, and the drafts about the board or one
- * widget on it (AC120, AC140, AC142), including those from the widget editor. Pure.
+ * widget on it (AC120, AC140, AC142), and the editor's starting prompt. Pure.
  */
 
 import { Temporal } from "@langwatch/time";
@@ -334,7 +334,7 @@ export function widgetEditorContext({
   });
 }
 
-/** Langy beside the editor, with the widget attached and nothing drafted ("Edit code"). */
+/** Langy beside the editor, with the widget attached and nothing asked ("Edit code"). */
 export function widgetEditorOpened({
   widget,
   board,
@@ -347,8 +347,12 @@ export function widgetEditorOpened({
   return { context: [widgetEditorContext({ widget, board, period })] };
 }
 
-/** "Edit with Langy": Langy asks what the widget should show, then proposes and saves it. */
-export function widgetEditDraft({
+/**
+ * Building a widget with Langy, sent at once so Langy starts the conversation: a new widget's
+ * starting prompt, or "Edit with Langy" on a saved one. Langy asks what the member wants to
+ * see, then proposes the code and queries and saves only on their word.
+ */
+export function widgetBuildQuestion({
   widget,
   board,
   period,
@@ -357,10 +361,21 @@ export function widgetEditDraft({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
+  const others = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "nothing yet";
   const prompt =
-    `Edit "${widget.name}" with me. Ask what I want it to show, propose the change to its ` +
-    "code and queries, and save it only when I agree.";
-  return editorDraft({ prompt, widget, board, period });
+    widget.id === void 0
+      ? `I am building a new widget on my "${board.name}" dashboard, which already shows: ` +
+        `${others}. Ask me what I want this widget to show, then propose its code and ` +
+        "LangWatchQL queries, and save it only when I agree."
+      : `Edit my "${widget.name}" widget on my "${board.name}" dashboard with me. Ask me what ` +
+        "I want the widget to show, propose the change to its code and queries, and save it " +
+        "only when I agree.";
+  // A new widget's starter queries mean nothing in the chat; a saved one's are the subject.
+  const question =
+    widget.id === void 0
+      ? promptWithWindow({ prompt, period })
+      : widgetText({ prompt, widget, period });
+  return { question, context: [widgetEditorContext({ widget, board, period })] };
 }
 
 /** One change Langy suggests beside the editor, and why it helps. */
@@ -455,9 +470,22 @@ function widgetDraft({
   /** What rides with the draft: the board, or the widget open in the editor. */
   attached?: AnalyticsLangyContext;
 }): AnalyticsLangyAskRequest {
-  const draftWith = (sqls: readonly string[]) =>
+  return { draft: widgetText({ prompt, widget, period }), about, context: [attached] };
+}
+
+/** The prompt, the widget's name, description and queries cut to fit, then the window. */
+function widgetText({
+  prompt,
+  widget,
+  period,
+}: {
+  prompt: string;
+  widget: WidgetSubject;
+  period: BoardPeriod;
+}): string {
+  const textWith = (sqls: readonly string[]) =>
     promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });
   const sqls = widget.definition.queries.map(({ sql }) => sql);
-  const room = MAX_WIDGET_DRAFT_LENGTH - draftWith([]).length;
-  return { draft: draftWith(fittedSql({ sqls, room })), about, context: [attached] };
+  const room = MAX_WIDGET_DRAFT_LENGTH - textWith([]).length;
+  return textWith(fittedSql({ sqls, room }));
 }

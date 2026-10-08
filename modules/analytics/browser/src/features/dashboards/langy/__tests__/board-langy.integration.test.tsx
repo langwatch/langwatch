@@ -6,7 +6,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ import {
   renderDashboards,
 } from "../../__tests__/render-dashboards.test-helpers.tsx";
 import DashboardBoardScreen from "../../ui/sections/dashboard-board.screen.tsx";
+import { SUGGESTED_QUESTIONS } from "../model/board-langy.ts";
 
 const BOARD = {
   id: "board-1",
@@ -105,6 +106,19 @@ describe("Langy on a board", () => {
         expect(host.langyAsks).toHaveLength(1);
         expect(host.langyAsks[0]?.question).toBe("What needs attention?");
         expect(host.langyAsks[0]?.context[0]).toMatchObject({ label: "Weekly review" });
+      });
+    });
+
+    describe("when the empty board lists its suggested questions", () => {
+      /** @scenario "Boards: the suggested questions show in full at every width" */
+      it("shows each whole question in a wrapping list, none cut or scrolled", async () => {
+        openBoard({ server: inMemoryServer() });
+
+        const list = await screen.findByRole("list", { name: "Suggested questions" });
+        const chips = within(list).getAllByRole("button");
+        expect(chips.map((chip) => chip.textContent)).toEqual([...SUGGESTED_QUESTIONS]);
+        expect(getComputedStyle(list).overflowX).not.toBe("auto");
+        for (const chip of chips) expect(getComputedStyle(chip).whiteSpace).not.toBe("nowrap");
       });
     });
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { CURATED_BOARDS, curatedBoardById } from "../model/curated-boards.ts";
 
 describe("CURATED_BOARDS", () => {
-  /** @scenario "AC161 The sidebar lists Your dashboards, Starred, From LangWatch and Browse templates in order" */
+  /** @scenario "AC161 The sidebar lists Your dashboards, Starred and From LangWatch in order" */
   it("is Release check, Can I trust my numbers? and Where my agent breaks, in that order", () => {
     expect(CURATED_BOARDS.map(({ name }) => name)).toEqual([
       "Release check",

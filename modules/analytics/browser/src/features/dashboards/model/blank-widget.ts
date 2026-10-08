@@ -1,6 +1,6 @@
 /**
- * The blank widget "Skip" opens the editor on: the starter chart of traces per bucket, which
- * lands half wide below everything on the board once saved. Pure.
+ * The blank widget "I'll build it myself" opens the editor on: the starter chart of traces
+ * per bucket, which lands half wide below everything on the board once saved. Pure.
  * @see modules/dashboard/specs/dashboards-widget-flow.feature
  */
 

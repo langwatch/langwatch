@@ -107,6 +107,7 @@ import {
 } from "../../behavior/panel/use-langy-panel-transport.ts";
 import {
   useLangyGithubRedrive,
+  useLangyOutlivedTurnError,
   useLangyTurnFailure,
 } from "../../behavior/panel/use-langy-turn-failure.ts";
 import { useGuidedTour } from "../../behavior/use-guided-tour.ts";
@@ -396,6 +397,14 @@ function LangyPanel({
     messages: engine.messages,
     retryEngineTurn: engine.retryTurn,
     restoreDraftOnFailure,
+  });
+  useLangyOutlivedTurnError({
+    error: engine.error,
+    transcriptMessages: history.messages,
+    transcriptCursor: history.eventCursor,
+    isFetchingTranscript: history.isFetching,
+    clearError: engine.clearError,
+    applyHistoryToEngine: engine.applyHistoryToEngine,
   });
   const send = useLangyPanelSend({
     projectId,

@@ -56,9 +56,15 @@ Feature: Dashboards finder: templates and widgets filed by what the member wants
     Given "Add a widget"
     Then no widget made for coding agents, or reading coding-agent traces, is listed
 
+  @unit
+  Scenario: Copy: no question, title or category says a bare it
+    Then every category question, branch, catalogue question, widget title, template name and
+      job, and suggested question names its subject: "Can my agent hurt me?", never "Can it hurt me?"
+    # Owner list, 2026-10-08: never a bare "it" in questions or copy
+
   @integration
-  Scenario: Finder: Skip in Add a widget hands over to the widget editor
+  Scenario: Finder: Add a widget's I'll build it myself hands over to the widget editor
     Given "Add a widget" is open on a board
-    When the member presses "Skip"
+    When the member presses "I'll build it myself", spelled out on the button, not in a tooltip
     Then the picker hands over to the widget editor for a new widget
-    And no widget is added and Langy is asked nothing
+    And no widget is added, and the picker asks Langy nothing: the editor sends the starting prompt

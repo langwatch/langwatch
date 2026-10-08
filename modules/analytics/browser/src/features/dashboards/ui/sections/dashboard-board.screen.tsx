@@ -1,7 +1,7 @@
 /**
  * One stored board: its header, the ask bar, its widgets on the grid or the one empty board
  * view, and its one widget editor. "Add a widget", the footer and typing in the ask bar open
- * the picker, whose Skip opens the editor on a new widget.
+ * the picker, whose "I'll build it myself" opens the editor on a new widget.
  * @see modules/dashboard/specs/dashboards-v2.feature and dashboards-widget-flow.feature
  */
 

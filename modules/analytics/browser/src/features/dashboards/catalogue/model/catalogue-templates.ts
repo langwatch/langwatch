@@ -11,6 +11,7 @@ import {
   type Trunk,
 } from "./catalogue-labels.ts";
 import { CATALOGUE_WIDGETS } from "./catalogue-widgets.ts";
+import { DATA_REQUIREMENTS } from "./data-requirements.ts";
 
 export interface CatalogueTemplate {
   readonly id: string;
@@ -30,7 +31,10 @@ export interface CatalogueTemplate {
    * it makes covers the whole project.
    */
   readonly focusKind?: AgentKind;
-  /** What Langy is asked when a board is made from the template: a short written report. */
+  /**
+   * What Langy is asked when a board is made from the template: a short written report, then
+   * what the board needs that the project has not set up yet, with an offer to help.
+   */
   readonly reportPrompt: string;
 }
 
@@ -421,7 +425,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
   {
     id: "signoff",
     name: "Risk sign-off",
-    job: "Give risk the evidence it needs to sign a release off.",
+    job: "Give the risk team the evidence they need to sign a release off.",
     personas: ["risk"],
     trunk: "Protect",
     origin: "prototype",
@@ -431,7 +435,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
     byAgentKind: {},
     preloadFor: ["regulated"],
     reportPrompt:
-      'Write a short report on my "Risk sign-off" dashboard for the dashboard period. Give risk the evidence it needs to sign a release off. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can risk sign this release of my agent off? (2) Does my agent pass each policy check? (3) Is the human review queue under control? (4) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+      'Write a short report on my "Risk sign-off" dashboard for the dashboard period. Give the risk team the evidence they need to sign a release off. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) Can risk sign this release of my agent off? (2) Does my agent pass each policy check? (3) Is the human review queue under control? (4) Who changed my agent\'s prompts, models and graders, and when? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "customers",
@@ -553,7 +557,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
     byAgentKind: {},
     preloadFor: ["coding"],
     reportPrompt:
-      'Write a short report on my "What have I shipped" dashboard for the dashboard period. What my merged pull requests cost in coding-agent use. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does one merged pull request cost me? (2) How many pull requests did I merge each day? (3) Which of my merged pull requests cost far more than usual? (4) How much does a pull request cost after it opens (CI retries, review fixes)? (5) Which of my pull requests cost the most? (6) Is my output keeping up with my coding-agent spend? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
+      'Write a short report on my "What have I shipped" dashboard for the dashboard period. What my merged pull requests cost in coding-agent use. For each of these questions, answer in one or two sentences with the real numbers from LangWatchQL: (1) What does one merged pull request cost me? (2) How many pull requests did I merge each day? (3) Which of my merged pull requests cost far more than usual? (4) How much does a pull request cost while open (CI retries, review fixes)? (5) Which of my pull requests cost the most? (6) Is my output keeping up with my coding-agent spend? Then name the one thing that most needs attention, and why. If a question has no data for the period, say so rather than guessing.',
   },
   {
     id: "me-speed",
@@ -700,4 +704,48 @@ function focusTemplates({ byAgentKind, ...base }: AuthoredTemplate): CatalogueTe
 /** Every template, each base followed by its focus templates. */
 export const CATALOGUE_TEMPLATES: readonly CatalogueTemplate[] = AUTHORED_TEMPLATES.flatMap(
   (template) => [baseTemplate(template), ...focusTemplates(template)],
-);
+).map((template) => ({
+  ...template,
+  reportPrompt: `${template.reportPrompt} ${setupCheckFor(template.widgets)}`,
+}));
+const REQUIREMENTS = new Map(DATA_REQUIREMENTS.map((need) => [need.key, need] as const));
+const WIDGET_NEEDS = new Map(CATALOGUE_WIDGETS.map(({ id, requirements }) => [id, requirements]));
+
+/**
+ * What the board's widgets need that a member can send or turn on, each one's alternatives
+ * joined by "or". A need already implied by a narrower one is dropped, as is one met by plain
+ * traces or by something LangWatch itself has still to build: none is the member's to set up.
+ */
+export function templateSetupNeeds(widgets: readonly string[]): string[] {
+  const needs = widgets.flatMap((id) =>
+    (WIDGET_NEEDS.get(id) ?? []).flatMap((alternatives) => {
+      if (alternatives.includes("traces")) return [];
+      const settable = alternatives.flatMap((key) => {
+        const need = REQUIREMENTS.get(key);
+        return need && need.kind !== "feature" ? [need.name] : [];
+      });
+      return settable.length > 0 ? [settable.toSorted()] : [];
+    }),
+  );
+  const kept: string[][] = [];
+  for (const need of needs.toSorted((a, b) => a.length - b.length)) {
+    if (!kept.some((narrower) => isWithin({ narrower, need }))) kept.push(need);
+  }
+  return kept.map((need) => need.join(" or "));
+}
+
+/** Whether meeting `narrower` already meets `need`: each of its alternatives is one of need's. */
+const isWithin = ({ narrower, need }: { narrower: readonly string[]; need: readonly string[] }) =>
+  narrower.every((name) => need.includes(name));
+
+/** The report's last ask: find what the board needs that is not set up yet, and offer help. */
+function setupCheckFor(widgets: readonly string[]): string {
+  const needs = templateSetupNeeds(widgets);
+  const listed = needs.length > 0 ? ` It needs: ${needs.join("; ")}.` : "";
+  return [
+    `Then check what this dashboard needs that my project has not set up yet.${listed}`,
+    "Also look for fields its queries read that my traces lack, such as cost, user id or",
+    "evaluator results, and integrations I have not connected. Say plainly what is missing,",
+    "and offer to help me set up each piece.",
+  ].join(" ");
+}

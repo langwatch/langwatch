@@ -5,7 +5,7 @@ import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { SavedDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
@@ -286,6 +286,23 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
+/**
+ * The member's starred dashboards in every other product's sidebar, for a member who can reach
+ * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ */
+function StarredDashboardsGroup({
+  surface,
+  showExpanded,
+}: {
+  surface: SidebarSurface;
+  showExpanded: boolean;
+}) {
+  const { reachableProducts } = useReachableProducts();
+  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!reachableProducts.includes("dashboards")) return null;
+  return <StarredDashboards />;
+}
+
 function ProductSidebarBody({
   surface,
   showExpanded,
@@ -389,6 +406,7 @@ export function SidebarContent({
         <QuickSearchMenuItem showLabel={showExpanded} />
         <Box height={2} width="full" flexShrink={0} />
         <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
+        <StarredDashboardsGroup surface={surface} showExpanded={showExpanded} />
       </VStack>
 
       <Box width="full" paddingX={2}>

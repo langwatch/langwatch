@@ -53,6 +53,12 @@ export const dashboardSummarySchema = z
   .strict();
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 
+/**
+ * A member's own default board, made the first time they open Dashboards. No column marks it, so
+ * the name and its creator do; it starts in its creator's stars (dashboards-v2.feature AC160b).
+ */
+export const MY_DASHBOARD_NAME = "My dashboard";
+
 /** A From LangWatch template's id, as the browser's catalogue names it (`release`, `data`). */
 export const dashboardTemplateIdSchema = z.string().trim().min(1).max(100);
 

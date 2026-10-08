@@ -1,30 +1,27 @@
 /**
  * The Dashboards sidebar navigation draws, lent through `SavedDashboardsToken` (§10.1):
  * "Your dashboards" with its "+", My dashboard and the team's boards, then the member's
- * stars, then From LangWatch, then Browse templates. Analytics keeps the reads and writes.
+ * stars, then From LangWatch. Analytics keeps the reads and writes.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import type { SavedDashboardsProps } from "@langwatch/analytics-contract";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
   Button,
   HStack,
   IconButton,
-  Link as ChakraLink,
   Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { ChevronRight, LayoutTemplate, Plus, Square } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
-import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useCuratedFold } from "../../behavior/use-curated-fold.ts";
 import { useDuplicateCurated } from "../../behavior/use-duplicate-curated.ts";
@@ -35,9 +32,12 @@ import {
   dashboardsPath,
   type DashboardsPlace,
   dashboardsPlace,
-  dashboardTemplatesPath,
 } from "../../model/boards.ts";
-import { CURATED_BOARDS, type CuratedBoard } from "../../model/curated-boards.ts";
+import {
+  CURATED_BOARDS,
+  type CuratedBoard,
+  FROM_LANGWATCH_ABOUT,
+} from "../../model/curated-boards.ts";
 import {
   type SidebarBoard,
   type SidebarGroups,
@@ -50,6 +50,7 @@ import {
   SavedDashboardRow,
   type StarActions,
 } from "../blocks/saved-dashboard-row.tsx";
+import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
 
 const GROUP_LABEL_STYLE = {
   fontSize: "9px",
@@ -261,40 +262,40 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
     <VStack align="stretch" gap={0.5} width="full" marginTop={3.5}>
       <HStack paddingX={2} marginBottom={0.5} gap={1}>
         <Text {...GROUP_LABEL_STYLE}>Your dashboards</Text>
-        <NewDashboardMenu
-          isCreating={saved.isCreating}
-          onBlank={saved.createBoard}
-          onTemplate={() => host.navigate(dashboardTemplatesPath({ projectSlug }))}
-        />
+        <NewDashboardButton isCreating={saved.isCreating} onCreate={saved.createBoard} />
       </HStack>
 
       <BoardGroups groups={groups} place={place} onDelete={setPendingDelete} />
 
       {groups.fromLangWatch.length > 0 && (
         <>
-          <Button
-            variant="plain"
-            height="auto"
-            justifyContent="flex-start"
-            gap={1}
-            paddingX={2}
-            marginTop={1}
-            marginBottom={0.5}
-            {...GROUP_LABEL_STYLE}
-            _hover={{ color: "fg.muted" }}
-            aria-expanded={!fold.folded}
-            onClick={fold.toggle}
-          >
-            From LangWatch
-            <Box
-              as="span"
-              display="flex"
-              transition="transform 0.15s"
-              transform={fold.folded ? void 0 : "rotate(90deg)"}
+          <HStack gap={0} marginTop={1} marginBottom={0.5}>
+            <Button
+              variant="plain"
+              height="auto"
+              justifyContent="flex-start"
+              gap={1}
+              paddingX={2}
+              {...GROUP_LABEL_STYLE}
+              _hover={{ color: "fg.muted" }}
+              aria-expanded={!fold.folded}
+              onClick={fold.toggle}
             >
-              <ChevronRight size={9} aria-hidden />
+              From LangWatch
+              <Box
+                as="span"
+                display="flex"
+                transition="transform 0.15s"
+                transform={fold.folded ? void 0 : "rotate(90deg)"}
+              >
+                <ChevronRight size={9} aria-hidden />
+              </Box>
+            </Button>
+            {/* Negative margins keep the (i) inside the heading's own height. */}
+            <Box marginY="-4px" marginStart="-4px" display="flex">
+              <WidgetInfoTip name="From LangWatch" description={FROM_LANGWATCH_ABOUT} />
             </Box>
-          </Button>
+          </HStack>
           {!fold.folded && (
             <RowList label="From LangWatch">
               {groups.fromLangWatch.map((curated) => (
@@ -304,11 +305,6 @@ export function SavedDashboardsSection({ openPath }: SavedDashboardsProps) {
           )}
         </>
       )}
-
-      <BrowseTemplatesLink
-        href={dashboardTemplatesPath({ projectSlug })}
-        isActive={place.kind === "templates"}
-      />
 
       <ConfirmDialog
         open={pendingDelete !== void 0}
@@ -342,81 +338,33 @@ function RowList({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** The "+" anchored to the heading: a blank board, or the templates library. */
-function NewDashboardMenu({
+/**
+ * The "+" anchored to the heading creates a blank board at once. Templates stay one step away:
+ * the new board offers them, so the sidebar needs no menu or library link.
+ */
+function NewDashboardButton({
   isCreating,
-  onBlank,
-  onTemplate,
+  onCreate,
 }: {
   isCreating: boolean;
-  onBlank: () => void;
-  onTemplate: () => void;
+  onCreate: () => void;
 }) {
   return (
     <Box marginLeft="auto" display="flex">
-      <Menu.Root positioning={{ placement: "bottom-end" }}>
-        <Menu.Trigger asChild>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            minWidth={0}
-            boxSize={4}
-            color="fg.subtle"
-            _hover={{ color: "fg", background: "border/60" }}
-            aria-label="New dashboard"
-            title="New dashboard"
-            loading={isCreating}
-          >
-            <Plus size={12} aria-hidden />
-          </IconButton>
-        </Menu.Trigger>
-        <Menu.Content minWidth="190px">
-          <Menu.Item value="blank" onClick={onBlank}>
-            <HStack gap={2} fontSize="12.5px">
-              <Square size={13} aria-hidden />
-              Blank dashboard
-            </HStack>
-          </Menu.Item>
-          <Menu.Item value="template" onClick={onTemplate}>
-            <HStack gap={2} fontSize="12.5px">
-              <LayoutTemplate size={13} aria-hidden />
-              From a template
-            </HStack>
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        minWidth={0}
+        boxSize={4}
+        color="fg.subtle"
+        _hover={{ color: "fg", background: "border/60" }}
+        aria-label="New dashboard"
+        title="New dashboard"
+        loading={isCreating}
+        onClick={onCreate}
+      >
+        <Plus size={12} aria-hidden />
+      </IconButton>
     </Box>
-  );
-}
-
-function BrowseTemplatesLink({ href, isActive }: { href: string; isActive: boolean }) {
-  const host = useAnalyticsHost();
-  return (
-    <ChakraLink
-      href={href}
-      display="flex"
-      alignItems="center"
-      gap={2.5}
-      width="full"
-      marginTop={0.5}
-      borderRadius="lg"
-      paddingX={2}
-      paddingY="5px"
-      fontSize="13px"
-      fontWeight={isActive ? "medium" : "normal"}
-      color={isActive ? "fg" : "fg.subtle"}
-      background={isActive ? "border" : "transparent"}
-      textDecoration="none"
-      _hover={{ color: "fg", background: isActive ? "border" : "border/50" }}
-      aria-current={isActive ? "page" : void 0}
-      onClick={(event) => {
-        if (opensElsewhere(event)) return;
-        event.preventDefault();
-        host.navigate(href);
-      }}
-    >
-      <LayoutTemplate size={15} strokeWidth={1.9} aria-hidden />
-      Browse templates
-    </ChakraLink>
   );
 }

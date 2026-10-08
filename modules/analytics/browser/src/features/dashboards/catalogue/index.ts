@@ -38,6 +38,7 @@ export {
   CATALOGUE_TEMPLATES,
   type CatalogueTemplate,
   focusTemplateId,
+  templateSetupNeeds,
 } from "./model/catalogue-templates.ts";
 export {
   CATALOGUE_WIDGETS,

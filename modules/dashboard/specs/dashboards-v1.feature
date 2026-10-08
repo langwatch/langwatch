@@ -23,7 +23,7 @@ Feature: Dashboards v1
     Given the release_dashboards flag is on for the project
     When the member looks at the Dashboards product sidebar
     Then they see "Your dashboards" with My dashboard first, then Starred when they have stars,
-      then From LangWatch and Browse templates, each board with a menu
+      then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
 
   # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ Feature: Dashboards v1
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
-  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch, Browse templates) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Starred, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
   # AC 5: "Status tiles compare with the previous period" → Scenario: AC5 Status tiles compare with the previous period
   # AC 6: "Unconnected source shows a call to action" → Scenario: AC6 Unconnected source shows a call to action
   # AC 7: "Connected state comes from real data" → Scenario: AC7 Connected state comes from real data

@@ -12,12 +12,13 @@ import {
   VisuallyHidden,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Bot, Check, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
-import { AGENT_KIND_CHIP_LABELS } from "../../catalogue/index.ts";
+import { AGENT_KIND_CHIP_LABELS, TRUNK_QUESTIONS } from "../../catalogue/index.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
 import { TRUNK_ICONS, TRUNK_PALETTES } from "./catalogue-filters.tsx";
 import { TemplatePreview } from "./template-preview.tsx";
@@ -122,26 +123,44 @@ function TemplateBadges({
   );
 }
 
-/** The template's category as its coloured icon; its name is the hover and the spoken label. */
+/**
+ * The template's category as its coloured icon. Its name and one-line description show on
+ * hover and on focus, and are the spoken label.
+ */
 function TrunkBadge({ trunk }: { trunk: LibraryTemplate["trunk"] }) {
   const Icon = TRUNK_ICONS[trunk];
   return (
-    <Box
-      title={trunk}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      flexShrink={0}
-      width="24px"
-      height="24px"
-      borderRadius="md"
-      colorPalette={TRUNK_PALETTES[trunk]}
-      background="colorPalette.subtle"
-      color="colorPalette.fg"
+    <Tooltip
+      showArrow
+      content={
+        <Text as="span" fontSize="12px">
+          <Text as="span" fontWeight="semibold">
+            {trunk}
+          </Text>
+          {`: ${TRUNK_QUESTIONS[trunk]}`}
+        </Text>
+      }
     >
-      <Icon size={13} aria-hidden />
-      <VisuallyHidden>{trunk}</VisuallyHidden>
-    </Box>
+      <Box
+        tabIndex={0}
+        data-trunk-badge={trunk}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        flexShrink={0}
+        width="24px"
+        height="24px"
+        borderRadius="md"
+        colorPalette={TRUNK_PALETTES[trunk]}
+        background="colorPalette.subtle"
+        color="colorPalette.fg"
+        outline="none"
+        _focusVisible={{ boxShadow: "0 0 0 2px var(--chakra-colors-color-palette-solid)" }}
+      >
+        <Icon size={13} aria-hidden />
+        <VisuallyHidden>{`${trunk}: ${TRUNK_QUESTIONS[trunk]}`}</VisuallyHidden>
+      </Box>
+    </Tooltip>
   );
 }
 

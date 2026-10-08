@@ -11,7 +11,7 @@ import {
   boardSubject,
   MAX_WIDGET_DRAFT_LENGTH,
   widgetAskDraft,
-  widgetEditDraft,
+  widgetBuildQuestion,
   widgetMissingDataDraft,
   widgetPromptDraft,
   widgetSetupDraft,
@@ -168,21 +168,41 @@ describe("widgetMissingDataDraft", () => {
   });
 });
 
-describe("editor drafts", () => {
-  /** @scenario "Widget editor: Edit with Langy drafts the edit about that widget" */
-  it("drafts the edit about the board and the widget, with the widget attached", () => {
-    const request = widgetEditDraft({
+describe("editor drafts and starting prompts", () => {
+  /** @scenario "Widget editor: Edit with Langy sends Langy its starting prompt about that widget" */
+  it("sends the edit of a saved widget as a question, with the widget attached", () => {
+    const request = widgetBuildQuestion({
       widget: { id: "w-1", ...widget({}) },
       board: BOARD,
       period: PERIOD,
     });
 
-    expect(request.draft?.startsWith('Edit "Traffic" with me.')).toBe(true);
-    expect(request.about).toEqual({ ref: "board-1", itemRef: "w-1" });
+    expect(request.draft).toBeUndefined();
+    expect(request.question?.startsWith('Edit my "Traffic" widget on my "Weekly review"')).toBe(
+      true,
+    );
+    expect(request.question).toContain("Name: Traffic");
+    expect(request.question).toContain("Dashboard period:");
     expect(request.context).toEqual([
       expect.objectContaining({ kind: "dashboard", label: "Traffic" }),
     ]);
     expect(request.context[0]?.ref).toContain('widget "Traffic" (id w-1)');
+  });
+
+  /** @scenario "Widget editor: building a new widget with Langy sends Langy a starting prompt" */
+  it("sends a new widget's starting prompt: the board, what is on it, and what to show", () => {
+    const request = widgetBuildQuestion({ widget: widget({}), board: BOARD, period: PERIOD });
+
+    expect(request.draft).toBeUndefined();
+    expect(request.question).toContain(
+      'I am building a new widget on my "Weekly review" dashboard, which already shows: Traffic.',
+    );
+    expect(request.question).toContain("Ask me what I want this widget to show");
+    expect(request.question).toContain("save it only when I agree");
+    expect(request.question).toContain("Dashboard period:");
+    expect(request.question).not.toContain("Queries (LangWatchQL):");
+    expect(request.context[0]?.ref).toContain("not saved yet");
+    expect(request.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
   });
 
   /** @scenario "Widget editor: Langy's suggestions fit the widget's shape" */
