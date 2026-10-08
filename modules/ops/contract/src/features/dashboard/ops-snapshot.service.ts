@@ -1,6 +1,6 @@
+import type { OpsApiGetBadgeCountsOutput } from "../../ops.responses.ts";
 import type { DashboardData } from "./ops-dashboard.ts";
 import type { DetailSnapshot, LiveSnapshot } from "./ops-snapshot.ts";
-import type { OpsApiGetBadgeCountsOutput } from "./ops.responses.ts";
 
 export interface OpsSnapshotLease {
   isHeld: boolean;

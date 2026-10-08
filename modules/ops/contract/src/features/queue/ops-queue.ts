@@ -5,7 +5,7 @@ import {
   groupInfoSchema,
   parkedGroupInfoSchema,
   parkedTenantSchema,
-} from "./ops-dashboard.ts";
+} from "../dashboard/ops-dashboard.ts";
 
 export type {
   ErrorCluster,
@@ -13,7 +13,7 @@ export type {
   ParkedGroupInfo,
   QueueInfo,
   QueueSummaryInfo,
-} from "./ops-dashboard.ts";
+} from "../dashboard/ops-dashboard.ts";
 
 /** One page of a group's jobs. */
 export const opsQueueJobEnvelopeSchema = z.object({

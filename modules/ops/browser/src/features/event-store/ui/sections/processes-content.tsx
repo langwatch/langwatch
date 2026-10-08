@@ -1,12 +1,13 @@
 import { Center, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { nowInstant } from "@langwatch/time";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 import { ProcessFleetStrip } from "../blocks/process-fleet-strip.tsx";
+import { ProcessRecentActions as ProcessRecentActionsView } from "../blocks/process-recent-actions.tsx";
 import { ProcessFleetCard } from "../elements/process-fleet-card.tsx";
 import { ProcessInstanceDrawer } from "./process-instance-drawer.tsx";
 import { ProcessInstancesDrawer } from "./process-instances-drawer.tsx";
-import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 
 /** Strip→structure→detail. Both drawers addressed here (each own query key; still
  * shareable). */
@@ -58,3 +59,14 @@ export function ProcessesContent() {
 
 /** The address the every-process view carries, so the key is never empty. */
 const ALL_PROCESSES = "all";
+
+export function ProcessRecentActions() {
+  const query = api.ops.listProcessActions.useQuery({ limit: 20 }, {});
+
+  return (
+    <ProcessRecentActionsView
+      rows={query.data ?? []}
+      now={query.dataUpdatedAt || nowInstant().epochMilliseconds}
+    />
+  );
+}

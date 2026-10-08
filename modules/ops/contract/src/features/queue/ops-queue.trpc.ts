@@ -6,7 +6,24 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { groupInfoSchema } from "./ops-dashboard.ts";
+import {
+  opsGrafanaLinkConfigSchema,
+  opsPipelineRegistrationsSchema,
+  opsQueueCanaryRedrivenSchema,
+  opsQueueCanaryUnblockedSchema,
+  opsQueueDiscardedDlqGroupsSchema,
+  opsQueueDrainedGroupSchema,
+  opsQueueDrainedTenantSchema,
+  opsQueueMovedAllToDlqSchema,
+  opsQueueMovedToDlqSchema,
+  opsQueueNameListSchema,
+  opsQueueRedrivenDlqGroupsSchema,
+  opsQueueReplayedAllFromDlqSchema,
+  opsQueueReplayedFromDlqSchema,
+  opsQueueUnblockedAllSchema,
+  opsQueueUnblockedGroupSchema,
+} from "../../ops.responses.ts";
+import { groupInfoSchema } from "../dashboard/ops-dashboard.ts";
 import {
   opsBlockedSummarySchema,
   opsDrainQueueTenantInputSchema,
@@ -26,23 +43,6 @@ import {
   opsQueueTenantInputSchema,
   opsRetryBlockedQueueJobInputSchema,
 } from "./ops-queue.ts";
-import {
-  opsGrafanaLinkConfigSchema,
-  opsPipelineRegistrationsSchema,
-  opsQueueCanaryRedrivenSchema,
-  opsQueueCanaryUnblockedSchema,
-  opsQueueDiscardedDlqGroupsSchema,
-  opsQueueDrainedGroupSchema,
-  opsQueueDrainedTenantSchema,
-  opsQueueMovedAllToDlqSchema,
-  opsQueueMovedToDlqSchema,
-  opsQueueNameListSchema,
-  opsQueueRedrivenDlqGroupsSchema,
-  opsQueueReplayedAllFromDlqSchema,
-  opsQueueReplayedFromDlqSchema,
-  opsQueueUnblockedAllSchema,
-  opsQueueUnblockedGroupSchema,
-} from "./ops.responses.ts";
 
 export const opsQueueTrpc = defineTrpcContract("ops")
   .query("listGroups")

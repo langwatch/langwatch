@@ -6,19 +6,19 @@ import { searchProjectsResultSchema } from "@langwatch/project-contract";
  */
 import { z } from "zod";
 
-import { anomalySchema } from "./ops-anomaly.ts";
+import { anomalySchema } from "./features/dashboard/ops-anomaly.ts";
 import {
   aggregateEventViewSchema,
   aggregateDiscoverySchema,
   aggregateSearchResultSchema,
   projectionStateAtEventSchema,
-} from "./ops-event-log.ts";
+} from "./features/event-log/ops-event-log.ts";
 import {
   deadLetterCountSchema,
   deadOutboxMessageViewSchema,
   processInstanceRowSchema,
   processOutboxMessageViewSchema,
-} from "./ops-process.ts";
+} from "./features/process/ops-process.ts";
 import { opsScheduledJobSchema } from "./ops-scheduler.ts";
 
 /**

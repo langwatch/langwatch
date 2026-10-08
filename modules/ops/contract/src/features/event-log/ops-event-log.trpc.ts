@@ -6,18 +6,6 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { opsDismissAnomalyInputSchema } from "./ops-anomaly.ts";
-import {
-  opsComputeProjectionStateInputSchema,
-  opsDiscoverAggregatesInputSchema,
-  opsDryRunReplayInputSchema,
-  opsGetReplayRunInputSchema,
-  opsLoadAggregateEventsInputSchema,
-  opsSearchAggregatesInputSchema,
-  opsSearchTenantsInputSchema,
-  opsStartReplayInputSchema,
-} from "./ops-event-log.ts";
-import { replayHistoryEntrySchema, replayStatusSchema } from "./ops-replay.ts";
 import {
   opsAggregateDiscoverySchema,
   opsAggregateEventsSchema,
@@ -30,7 +18,19 @@ import {
   opsReplayCancelledSchema,
   opsReplayStartedSchema,
   opsTenantSearchSchema,
-} from "./ops.responses.ts";
+} from "../../ops.responses.ts";
+import { opsDismissAnomalyInputSchema } from "../dashboard/ops-anomaly.ts";
+import {
+  opsComputeProjectionStateInputSchema,
+  opsDiscoverAggregatesInputSchema,
+  opsDryRunReplayInputSchema,
+  opsGetReplayRunInputSchema,
+  opsLoadAggregateEventsInputSchema,
+  opsSearchAggregatesInputSchema,
+  opsSearchTenantsInputSchema,
+  opsStartReplayInputSchema,
+} from "./ops-event-log.ts";
+import { replayHistoryEntrySchema, replayStatusSchema } from "./ops-replay.ts";
 
 export const opsEventLogTrpc = defineTrpcContract("ops")
   .query("searchAggregates")

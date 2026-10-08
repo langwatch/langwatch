@@ -6,8 +6,6 @@
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
-import { dashboardDataSchema, queueSummaryInfoSchema } from "./ops-dashboard.ts";
-import { opsListParkedQueueGroupsInputSchema, opsParkedGroupsPageSchema } from "./ops-queue.ts";
 import {
   opsListPausedSchedulesInputSchema,
   opsListScheduledJobsInputSchema,
@@ -16,13 +14,22 @@ import {
   opsScheduledJobSchema,
   opsSetScheduleActiveInputSchema,
   schedulerAuditEntryViewSchema,
-} from "./ops-scheduler.ts";
-import { opsSignUpHealthInputSchema, signUpHealthSchema } from "./ops-sign-up-health.ts";
+} from "../../ops-scheduler.ts";
 import {
   opsApiGetBadgeCountsOutputSchema,
   opsPausedSchedulesPageSchema,
   opsScopeProbeSchema,
-} from "./ops.responses.ts";
+} from "../../ops.responses.ts";
+import {
+  opsListParkedQueueGroupsInputSchema,
+  opsParkedGroupsPageSchema,
+} from "../queue/ops-queue.ts";
+import {
+  dashboardDataSchema,
+  opsSignUpHealthInputSchema,
+  queueSummaryInfoSchema,
+  signUpHealthSchema,
+} from "./ops-dashboard.ts";
 
 export const opsDashboardTrpc = defineTrpcContract("ops")
   /**

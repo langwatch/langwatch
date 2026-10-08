@@ -7,6 +7,18 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  opsDeadLetterPageSchema,
+  opsProcessDiscardedDeadLettersSchema,
+  opsProcessDiscardedMessageSchema,
+  opsProcessInstancePageSchema,
+  opsProcessOutboxPageSchema,
+  opsProcessRedrivenDeadLettersSchema,
+  opsProcessRedrivenMessageSchema,
+  opsProcessReleasedLeaseSchema,
+  opsProcessRequeuedSchema,
+  opsProcessWokeSchema,
+} from "../../ops.responses.ts";
+import {
   aggregateProcessManagerSchema,
   deadLetterCountSchema,
   opsAggregateProcessManagersInputSchema,
@@ -27,18 +39,6 @@ import {
   processInstanceDetailSchema,
   processWakeRowSchema,
 } from "./ops-process.ts";
-import {
-  opsDeadLetterPageSchema,
-  opsProcessDiscardedDeadLettersSchema,
-  opsProcessDiscardedMessageSchema,
-  opsProcessInstancePageSchema,
-  opsProcessOutboxPageSchema,
-  opsProcessRedrivenDeadLettersSchema,
-  opsProcessRedrivenMessageSchema,
-  opsProcessReleasedLeaseSchema,
-  opsProcessRequeuedSchema,
-  opsProcessWokeSchema,
-} from "./ops.responses.ts";
 
 export const opsProcessTrpc = defineTrpcContract("ops")
   /**

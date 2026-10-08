@@ -1,6 +1,7 @@
 /** The registry of self-hosted installs (ADR-156, section 10), as the
  * admin console reads it. `licensing` is enterprise, so every shape here is
  * declared locally rather than imported from it (as `license-registry.ts`). */
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 const selfHostedInstanceActivitySchema = z.enum(["reporting", "quiet", "gone"]);
@@ -59,3 +60,14 @@ export const selfHostedInstanceDetailSchema = z.object({
   reports: z.array(selfHostedReportSummarySchema),
 });
 export type SelfHostedInstanceDetail = z.infer<typeof selfHostedInstanceDetailSchema>;
+
+/** Read only: an install reported every number here (ADR-156 §10). */
+export const selfHostedInstancesTrpc = defineTrpcContract("selfHostedInstances")
+  .query("getAll")
+  .withInput(listSelfHostedInstancesInputSchema)
+  .withOutput(selfHostedInstancePageSchema)
+
+  .query("getById")
+  .withInput(selfHostedInstanceIdInputSchema)
+  .withOutput(selfHostedInstanceDetailSchema)
+  .build();

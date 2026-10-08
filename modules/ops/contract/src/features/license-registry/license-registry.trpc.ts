@@ -12,7 +12,7 @@ import {
   issuedActivationCodeSchema,
   listActivationCodesInputSchema,
   revokeActivationCodeInputSchema,
-} from "./activation-code.ts";
+} from "../../activation-code.ts";
 import {
   changeLicenseSeatsInputSchema,
   issuedLicensePageSchema,

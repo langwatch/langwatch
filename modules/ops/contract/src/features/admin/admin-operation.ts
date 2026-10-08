@@ -4,8 +4,8 @@ import {
 } from "@langwatch/plans";
 import { z } from "zod";
 
+import type { OpsOperator } from "../../ops.responses.ts";
 import { adminAuditRequestSchema, adminResourceNameSchema } from "./admin.ts";
-import type { OpsOperator } from "./ops.responses.ts";
 
 export const adminOperationMethodSchema = z.enum([
   "getList",
