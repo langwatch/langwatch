@@ -5158,6 +5158,9 @@ function describeUpstreamStatus({
   const status = error.meta.upstreamStatus;
   if (typeof status !== "number") return whenAbsent;
   if (status === 401 || status === 403) return whenRejected;
+  if (status === 402) {
+    return "Its account has no credit left. Add credit with the provider, then try again.";
+  }
   if (status === 429) return "It's rate limiting us. Try again shortly.";
   if (status >= 500) return "It's having trouble. Try again in a moment.";
   return whenOther;

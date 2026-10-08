@@ -717,18 +717,6 @@ function geminiCredentials(
   };
 }
 
-/** Providers whose gateway credential is a single API key field. */
-const API_KEY_FIELD_BY_PROVIDER = new Map<string, string>([
-  ["anthropic", "ANTHROPIC_API_KEY"],
-  ["openai", "OPENAI_API_KEY"],
-  ["deepseek", "DEEPSEEK_API_KEY"],
-  ["xai", "XAI_API_KEY"],
-  ["cerebras", "CEREBRAS_API_KEY"],
-  ["doubleword", "DOUBLEWORD_API_KEY"],
-  ["groq", "GROQ_API_KEY"],
-  ["cloudflare", "CLOUDFLARE_API_KEY"],
-]);
-
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
   const customKeys = readCustomKeys(mp.customKeys).keys;
@@ -795,17 +783,20 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 }
 
 /**
- * Reads the API key of a provider whose credential is a single key. A
- * provider without a known field name takes its first `*_API_KEY` entry.
+ * Reads the API key of a provider whose credential is a single key: the
+ * field the provider registry declares for it, else the first `*_API_KEY`
+ * entry (custom rows and providers the registry does not list).
  */
 function apiKeyCredential(
   provider: string,
   customKeys: Record<string, unknown>,
 ): string {
-  const field = API_KEY_FIELD_BY_PROVIDER.get(provider);
-  const apiKey = field
-    ? customKeys[field]
-    : Object.entries(customKeys).find(([k]) => /_API_KEY$/.test(k))?.[1];
+  const field = modelProviders[provider as keyof typeof modelProviders]?.apiKey;
+  const declared = field?.endsWith("_API_KEY") ? customKeys[field] : undefined;
+  if (typeof declared === "string") return declared;
+  const apiKey = Object.entries(customKeys).find(([k]) =>
+    /_API_KEY$/.test(k),
+  )?.[1];
   return typeof apiKey === "string" ? apiKey : "";
 }
 

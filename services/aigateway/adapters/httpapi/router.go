@@ -1932,10 +1932,12 @@ func withFault(e herr.E) herr.E {
 }
 
 // writeUpstreamError forwards a provider's terminal response to the client.
-// The provider's native error body is written byte-for-byte when present, so
-// the client sees the exact upstream envelope under the upstream's real
-// status code (not a masked 502) and can tell terminal from retryable. When
-// the native body is unavailable, the minimal envelope still preserves the
+// The provider's native error body is written byte-for-byte when it is JSON
+// or came with its own Content-Type, so the client sees the exact upstream
+// envelope under the upstream's real status code (not a masked 502) and can
+// tell terminal from retryable. A body that is neither moves into the
+// minimal envelope's message, since it would otherwise be served as broken
+// JSON. When the native body is unavailable, the minimal envelope still preserves the
 // error's identity: the provider's own error type/code (insufficient_quota,
 // overloaded_error, ...) when the adapter parsed them, and a generic
 // provider_error only when nothing better is known. The originating provider
