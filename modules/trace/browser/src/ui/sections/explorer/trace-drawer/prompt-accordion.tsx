@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
@@ -164,7 +165,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             size="xs"
             variant="ghost"
             gap={1}
-            onClick={() => openDrawer("promptEditor", { promptId: rawHandle })}
+            onClick={() => openDrawer(PromptEditorDrawerToken, { promptId: rawHandle })}
           >
             <Icon as={LuPencil} boxSize={3} />
             Open prompt

@@ -72,7 +72,9 @@ vi.mock("@langwatch/browser-host/use-drawer", async (importOriginal) => {
       return {
         ...drawer,
         openDrawer: (...args: Parameters<typeof drawer.openDrawer>) => {
-          if (args[0] === "addOrEditDataset") harness.openHostDrawer(args[0], args[1]);
+          const target = args[0] as string | { key: string };
+          const name = typeof target === "string" ? target : target.key;
+          if (name === "addOrEditDataset") harness.openHostDrawer(args[0], args[1]);
           else drawer.openDrawer(...args);
         },
       };
@@ -94,6 +96,7 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   },
 }));
 vi.mock("@langwatch/dataset-client", () => ({
+  AddOrEditDatasetRoutedDrawerToken: { key: "addOrEditDataset" },
   datasetClient: {
     useUtils: () => ({
       dataset: { getAll: { invalidate: vi.fn() } },
@@ -311,7 +314,7 @@ describe("given the reader wants a new dataset from the drawer", () => {
       fireEvent.click(await screen.findByRole("button", { name: "New dataset" }));
 
       expect(harness.openHostDrawer).toHaveBeenCalledWith(
-        "addOrEditDataset",
+        expect.objectContaining({ key: "addOrEditDataset" }),
         expect.objectContaining({ onClose: expect.any(Function) }),
       );
     });

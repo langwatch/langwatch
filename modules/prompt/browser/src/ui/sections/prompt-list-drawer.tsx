@@ -4,7 +4,6 @@
  * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
 
-import type { UiPromptListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
@@ -18,6 +17,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import {
+  PromptEditorDrawerToken,
+  PromptListDrawerToken,
+  type PromptListDrawerProps,
+} from "@langwatch/prompt-client";
 import groupBy from "lodash-es/groupBy";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -26,7 +30,7 @@ import { LuArrowLeft } from "react-icons/lu";
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
 import { getDisplayHandle } from "../../prompt-reference.ts";
 
-export type PromptListDrawerProps = UiPromptListDrawerProps;
+export type { PromptListDrawerProps };
 
 /**
  * Drawer for selecting an existing prompt or creating a new one: saved
@@ -36,7 +40,7 @@ export type PromptListDrawerProps = UiPromptListDrawerProps;
 export function PromptListDrawer(props: PromptListDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
-  const flowCallbacks = getFlowCallbacks("promptList");
+  const flowCallbacks = getFlowCallbacks(PromptListDrawerToken);
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
@@ -47,7 +51,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   const onCreateNew =
     props.onCreateNew ??
     (flowCallbacks?.onCreateNew as PromptListDrawerProps["onCreateNew"]) ??
-    (() => openDrawer("promptEditor"));
+    (() => openDrawer(PromptEditorDrawerToken));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const { data: prompts, isLoading } = useAllPromptsForProject();

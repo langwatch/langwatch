@@ -13147,6 +13147,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../contract
@@ -15952,6 +15955,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/prompt-client':
+        specifier: workspace:*
+        version: link:../../prompt/client
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
@@ -16567,9 +16573,6 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../modules/experiment/contract
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../modules/feature-flag/contract

@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {
@@ -159,7 +160,7 @@ export function PromptsPanel({
 }: PromptsPanelProps) {
   const { openDrawer } = useDrawer();
   const onOpenPromptEditor = (handle: string) => {
-    openDrawer("promptEditor", { promptId: handle });
+    openDrawer(PromptEditorDrawerToken, { promptId: handle });
   };
 
   const fallbackRefs = useMemo(() => parseTracePromptIds(trace.attributes), [trace.attributes]);

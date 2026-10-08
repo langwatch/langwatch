@@ -9,7 +9,6 @@ import type {
   UiOperationsToken,
   UiTokenIdentity,
 } from "@langwatch/browser-host/declarations";
-import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
 import type { ComponentType } from "react";
 import type { output, ZodType } from "zod";
 
@@ -244,11 +243,7 @@ export class WebModule<
 
   withDrawers<const Drawers extends WebDrawers>(
     drawers: Drawers,
-    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never]
-      ? [never]
-      : [DrawersDifferingFromMap<Drawers>] extends [never]
-        ? []
-        : [drawerPropsDifferFromTheMap: DrawersDifferingFromMap<Drawers>]
+    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never] ? [never] : []
   ): WebModule<
     Name,
     Requirements,

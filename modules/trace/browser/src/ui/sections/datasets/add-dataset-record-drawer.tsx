@@ -4,6 +4,7 @@
 
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -165,7 +166,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
 
   // Dataset's editor is its own routed drawer: go there, and come back to the dataset it saved.
   const openDatasetEditor = () =>
-    openDrawer("addOrEditDataset", {
+    openDrawer(AddOrEditDatasetRoutedDrawerToken, {
       ...(selectedDataset
         ? {
             datasetToSave: {

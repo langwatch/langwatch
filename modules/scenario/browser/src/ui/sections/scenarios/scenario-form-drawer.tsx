@@ -24,6 +24,7 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import { scenarioClient } from "@langwatch/scenario-client";
 import {
   parseCallerVoiceConfig,
@@ -644,7 +645,7 @@ function useCreatePromptTarget({
   goBack: Dispatchers["goBack"];
 }) {
   return useCallback(() => {
-    setFlowCallbacks("promptEditor", {
+    setFlowCallbacks(PromptEditorDrawerToken, {
       onSave: (prompt: { id: string; name: string }) => {
         handleTargetChange({ type: "prompt", id: prompt.id });
         toaster.create({
@@ -654,7 +655,7 @@ function useCreatePromptTarget({
         });
       },
     });
-    openDrawer("promptEditor", { onClose: goBack });
+    openDrawer(PromptEditorDrawerToken, { onClose: goBack });
   }, [handleTargetChange, openDrawer, goBack]);
 }
 

@@ -3,6 +3,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { PromptEditorDrawerToken, PromptListDrawerToken } from "@langwatch/prompt-client";
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 
 import { promptApi } from "./behavior/prompt-api.ts";
@@ -22,18 +23,15 @@ export const promptWeb = defineBrowserModule("prompt")
       load: () => import("./ui/sections/prompt-studio/prompt-studio-screen.tsx"),
     },
   })
-  .withDrawers({
-    promptList: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompt-list-drawer.tsx")).PromptListDrawer,
-      }),
-    },
-    promptEditor: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompts/prompt-editor-drawer.tsx"))
-          .PromptEditorDrawer,
-      }),
-    },
+  .drawer(PromptListDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompt-list-drawer.tsx")).PromptListDrawer,
+    }),
+  })
+  .drawer(PromptEditorDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/prompt-editor-drawer.tsx")).PromptEditorDrawer,
+    }),
   })
   /** The prompt editor, embedded headless in the studio's signature node panel (§3.4 rule 7). */
   .withCapabilities({

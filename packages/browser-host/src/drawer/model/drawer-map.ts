@@ -1,21 +1,4 @@
-/**
- * The drawers one module opens and another owns, by name: the props each owner declared. A
- * module's own drawers stay typed from its `withDrawers` declaration instead. Like
- * `declarations.ts`, this is where a shape every browser package compiles against lives.
- */
-
-import type { ComponentType } from "react";
-
-import type { UiAddOrEditDatasetDrawerProps } from "../../declarations.ts";
-import type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./prompt-drawers.ts";
-
-/** Entries land owner by owner; until a drawer has one, its props read as an open record. */
-export type UiDrawerMap = {
-  /** Until trace opens `AddOrEditDatasetRoutedDrawerToken` (r-lends-4). */
-  addOrEditDataset: UiAddOrEditDatasetDrawerProps;
-  promptEditor: UiPromptEditorDrawerProps;
-  promptList: UiPromptListDrawerProps;
-};
+/** The flow callbacks a drawer flow registers, by drawer name or owner token. */
 
 /**
  * A callback of a drawer no map declares yet. A method type, so it compares bivariantly: a
@@ -33,36 +16,5 @@ export type DrawerCallbacksIn<Props> = {
   ]?: Props[K];
 };
 
-/** A drawer's props: its declared entry in `Map`, or an open record while it has none. */
-export type UiDrawerPropsOf<Map, Name extends string> = Name extends keyof Map
-  ? Map[Name]
-  : Record<string, unknown>;
-
-/** Every drawer's flow callbacks, by name: declared ones typed, the rest open. */
-export type UiFlowCallbacksStore = {
-  [Name in keyof UiDrawerMap]?: DrawerCallbacksIn<UiDrawerMap[Name]>;
-} & Record<string, UndeclaredDrawerCallbacks | undefined>;
-
-/**
- * A module's own drawers as a props map, read off what it registered: a component per name, or
- * the `{ load }` its `withDrawers` declares.
- */
-export type DrawerPropsMapOf<Drawers> = {
-  [Name in keyof Drawers]: Drawers[Name] extends ComponentType<infer Props>
-    ? Props
-    : Drawers[Name] extends { load: () => Promise<{ default: ComponentType<infer Props> }> }
-      ? Props
-      : never;
-};
-
-/**
- * Drawers whose registered props differ from their entry in `Map`: an owner's registration
- * checked against what the other modules open it with. `never` when every entry agrees.
- */
-export type DrawersDifferingFromMap<Drawers, Map = UiDrawerMap> = {
-  [Name in keyof Drawers & keyof Map]: [DrawerPropsMapOf<Drawers>[Name]] extends [Map[Name]]
-    ? [Map[Name]] extends [DrawerPropsMapOf<Drawers>[Name]]
-      ? never
-      : Name
-    : Name;
-}[keyof Drawers & keyof Map];
+/** Every drawer's flow callbacks, by name. */
+export type UiFlowCallbacksStore = Record<string, UndeclaredDrawerCallbacks | undefined>;

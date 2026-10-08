@@ -3,7 +3,6 @@
   "findings": {
     "packages/browser-host -> @langwatch/dataset-contract": 1,
     "packages/browser-host -> @langwatch/enterprise-licensing-contract": 1,
-    "packages/browser-host -> @langwatch/experiment-contract": 1,
     "packages/browser-host -> @langwatch/feature-flag-contract": 1,
     "packages/browser-host -> @langwatch/workflow-contract": 1,
     "packages/prisma-client -> @langwatch/api-key-contract": 1

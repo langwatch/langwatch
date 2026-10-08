@@ -3,6 +3,7 @@
  */
 
 import { setComplexProps, useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
@@ -87,7 +88,9 @@ export function useSyncPromptEditorMappings(): void {
   const { currentDrawer } = useDrawer();
   const targetId = useDrawerParams().targetId;
   const editedTargetId =
-    currentDrawer === "promptEditor" && typeof targetId === "string" ? targetId : undefined;
+    currentDrawer === PromptEditorDrawerToken.key && typeof targetId === "string"
+      ? targetId
+      : undefined;
   const { availableSources, inputMappings, isValid } = useEvaluationMappings(editedTargetId);
 
   useEffect(() => {

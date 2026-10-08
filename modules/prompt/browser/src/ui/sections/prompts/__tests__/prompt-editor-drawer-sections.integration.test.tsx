@@ -94,6 +94,7 @@ vi.mock("../../../../behavior/prompt-api.ts", () => ({
   },
 }));
 vi.mock("@langwatch/prompt-client", () => ({
+  PromptEditorDrawerToken: { key: "promptEditor" },
   promptClient: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     prompts: {

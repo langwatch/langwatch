@@ -1,4 +1,3 @@
-import type { UiPromptEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -17,6 +16,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { PromptEditorDrawerToken, type PromptEditorDrawerProps } from "@langwatch/prompt-client";
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
 import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import { type ReactNode, useCallback, useMemo } from "react";
@@ -47,7 +47,7 @@ import { PromptEditorHeader } from "../prompt-studio/prompt-editor-header.tsx";
 import { FormVariablesSection } from "../variables/form-variables-section.tsx";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 
-export type PromptEditorDrawerProps = UiPromptEditorDrawerProps;
+export type { PromptEditorDrawerProps };
 
 type EditorSave = ReturnType<typeof usePromptEditorSave>;
 type EditorMethods = ReturnType<typeof usePromptEditorForm>["methods"];
@@ -60,7 +60,7 @@ type EditorMethods = ReturnType<typeof usePromptEditorForm>["methods"];
 function useEditorOpenedWith(props: PromptEditorDrawerProps) {
   const { closeDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const flowCallbacks = getFlowCallbacks("promptEditor");
+  const flowCallbacks = getFlowCallbacks(PromptEditorDrawerToken);
   const drawerParams = useDrawerParams();
 
   return {

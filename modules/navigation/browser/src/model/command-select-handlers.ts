@@ -1,5 +1,7 @@
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { AddOrEditDatasetRoutedDrawerToken } from "@langwatch/dataset-client";
 import { InviteMemberDrawerToken } from "@langwatch/organization-client";
+import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
 
 import type { Command, CommandDrawerName, RecentItem, SearchResult } from "./command-bar-types.ts";
 
@@ -104,11 +106,11 @@ export function handleCommandSelect({
       break;
     case "action-new-prompt":
       ctx.close();
-      openDrawer("promptEditor");
+      openDrawerByToken(PromptEditorDrawerToken);
       break;
     case "action-new-dataset":
       ctx.close();
-      openDrawer("addOrEditDataset");
+      openDrawerByToken(AddOrEditDatasetRoutedDrawerToken);
       break;
     case "action-new-automation":
       ctx.close();
