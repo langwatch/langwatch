@@ -9,7 +9,7 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import type { ConnectedBillingRepository } from "../repositories/connected-billing.repository.ts";
+import type { ConnectedBillingRepository } from "../../../repositories/connected-billing.repository.ts";
 import type { ConnectedBillingService } from "./connected-billing.service.ts";
 import type { ConnectedCustomerFactsService } from "./connected-customer-facts.service.ts";
 import type { ConnectedMonthlyStatementService } from "./connected-monthly-statement.service.ts";

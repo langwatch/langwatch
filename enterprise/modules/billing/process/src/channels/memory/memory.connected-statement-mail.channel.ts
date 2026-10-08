@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ConnectedStatement } from "../../services/connected-monthly-statement.service.ts";
+import type { ConnectedStatement } from "../../features/connected-billing/services/connected-monthly-statement.service.ts";
 import { ConnectedStatementMailChannel } from "../connected-statement-mail.channel.ts";
 
 /** Keeps every statement handed over and sends nothing, where no mailer is composed. */

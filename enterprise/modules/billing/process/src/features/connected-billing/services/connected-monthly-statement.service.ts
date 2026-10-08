@@ -10,13 +10,13 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
-import type { ConnectedBillingRepository } from "../repositories/connected-billing.repository.ts";
+import type { ConnectedStatementMailChannel } from "../../../channels/connected-statement-mail.channel.ts";
+import type { ConnectedBillingRepository } from "../../../repositories/connected-billing.repository.ts";
 import {
   creditRemainingUsdCents,
   nextMonthStart,
   previousMonthStart,
-} from "../rules/connected-statement.rules.ts";
+} from "../../../rules/connected-statement.rules.ts";
 
 const logger = createLogger("langwatch:billing:connected-statement");
 

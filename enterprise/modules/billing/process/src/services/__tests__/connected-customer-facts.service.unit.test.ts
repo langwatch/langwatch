@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ConnectedCustomerPeers,
   ConnectedCustomerFactsService,
-} from "../connected-customer-facts.service.ts";
+} from "../../features/connected-billing/services/connected-customer-facts.service.ts";
 
 const ACME = "org-acme";
 const AUGUST = Temporal.Instant.from("2026-08-01T00:00:00Z");

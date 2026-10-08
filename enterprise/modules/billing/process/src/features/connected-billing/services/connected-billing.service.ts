@@ -27,12 +27,12 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
-import type { ConnectedInvoicingChannel } from "../channels/connected-invoicing.channel.ts";
+import type { ConnectedInvoicingChannel } from "../../../channels/connected-invoicing.channel.ts";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedBillingRepository,
   ConnectedCreditGrantRecord,
-} from "../repositories/connected-billing.repository.ts";
+} from "../../../repositories/connected-billing.repository.ts";
 
 /** Days after the term ends in which the last usage invoice can still draw the credit. */
 const CREDIT_GRANT_GRACE_DAYS = 14;

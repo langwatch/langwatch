@@ -8,7 +8,7 @@ import {
   type LicenseGenerator,
   type LicensePurchaseDelivery,
   type PurchasedCheckout,
-} from "../license-purchase.service.ts";
+} from "../../features/license-purchase/services/license-purchase.service.ts";
 
 /**
  * Spec: enterprise/modules/billing/specs/stripe-webhook.feature

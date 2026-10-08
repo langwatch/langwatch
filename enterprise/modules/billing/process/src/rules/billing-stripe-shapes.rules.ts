@@ -27,7 +27,7 @@ export type BillingSubscriptionItem = Readonly<{
 }>;
 
 /** The accrued amount at which the provider invoices mid-cycle, and whether that moves the anchor. */
-export type BillingThreshold = Readonly<{
+type BillingThreshold = Readonly<{
   amountGte: number | null;
   resetBillingCycleAnchor: boolean | null;
 }>;
@@ -72,7 +72,7 @@ export type BillingInvoicePreview = Readonly<{
 }>;
 
 /** A price a checkout sells, and how many; no quantity for a metered price. */
-export type BillingCheckoutLineItem = { price?: string; quantity?: number };
+type BillingCheckoutLineItem = { price?: string; quantity?: number };
 
 /**
  * A subscription checkout. The provider fixes the rest of every checkout alike:
@@ -104,7 +104,7 @@ export type BillingPurchasedLineItem = Readonly<{
   quantity: number | null;
 }>;
 
-export type BillingInvoiceStatus = "draft" | "open" | "paid" | "uncollectible" | "void";
+type BillingInvoiceStatus = "draft" | "open" | "paid" | "uncollectible" | "void";
 
 export type BillingInvoice = Readonly<{
   id: string;

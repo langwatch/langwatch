@@ -47,7 +47,7 @@ export type {
   PendingRenewal,
 } from "./repositories/connected-billing.repository.ts";
 export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
-export type { ConnectedBillingTerms } from "./services/connected-billing.service.ts";
+export type { ConnectedBillingTerms } from "./features/connected-billing/services/connected-billing.service.ts";
 export type {
   CommitDrawdown,
   ConnectedCustomer,
@@ -56,7 +56,7 @@ export type {
   MonthlyStatementRunSummary,
   StatementSeats,
   StatementSpendLine,
-} from "./services/connected-monthly-statement.service.ts";
+} from "./features/connected-billing/services/connected-monthly-statement.service.ts";
 export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
 export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
 /**
@@ -72,7 +72,7 @@ export type {
   LicenseFeaturesResolver,
   LicensePurchaseNotification,
   LicenseUnlockedFeatures,
-} from "./services/license-purchase.service.ts";
+} from "./features/license-purchase/services/license-purchase.service.ts";
 export type { UsageLimitEmailData } from "./services/billing-usage-notice.service.ts";
 export type { CheckoutCurrencyResolution } from "./services/stripe-customer-currency.service.ts";
 export type { SubscriptionItemUpdate } from "./rules/billing-stripe-shapes.rules.ts";

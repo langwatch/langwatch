@@ -18,7 +18,7 @@ import { stripeSubscriptionsChannels } from "../stripe-subscriptions-channels.re
 const STRIPE_API_VERSION = "2024-04-10";
 
 /** Every subject the webhook signing secret does not open. */
-export type HttpBillingStripeSubjects = Omit<BillingStripeChannels, "webhooks">;
+type HttpBillingStripeSubjects = Omit<BillingStripeChannels, "webhooks">;
 
 /**
  * Billing's one Stripe client, built here and nowhere else (Q69-4), and every

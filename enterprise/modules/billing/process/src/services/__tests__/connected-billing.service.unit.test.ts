@@ -6,12 +6,12 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
-import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
-import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 import {
   ConnectedBillingService,
   type ConnectedBillingTerms,
-} from "../connected-billing.service.ts";
+} from "../../features/connected-billing/services/connected-billing.service.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
 
 const at = (iso: string): Instant => Temporal.Instant.from(iso);
 

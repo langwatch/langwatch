@@ -6,9 +6,9 @@ import type { EmailContent, MailSender } from "@langwatch/mail";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { ConnectedMonthlyStatementService } from "../../../features/connected-billing/services/connected-monthly-statement.service.ts";
 import { MemoryBillingStore } from "../../../repositories/memory/memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "../../../repositories/memory/memory.connected-billing.repository.ts";
-import { ConnectedMonthlyStatementService } from "../../../services/connected-monthly-statement.service.ts";
 import { SesConnectedStatementMailChannel } from "../ses.connected-statement-mail.channel.ts";
 
 const AUGUST = Temporal.Instant.from("2026-08-01T00:00:00Z");

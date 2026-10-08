@@ -361,7 +361,7 @@ export const mergeWithExisting = (params: {
 };
 
 /** The account a sync reads: its mode, told by its key, and the two subjects it lists. */
-export type StripeCatalogueSource = Readonly<{
+type StripeCatalogueSource = Readonly<{
   environment: StripeEnvironment;
   prices: StripePricesChannel;
   meters: StripeMetersChannel;

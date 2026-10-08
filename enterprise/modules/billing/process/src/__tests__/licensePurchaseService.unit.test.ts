@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
-import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import {
   LicenseGenerator,
   LicensePurchaseDelivery,
   LicensePurchaseService,
-} from "../services/license-purchase.service.ts";
+} from "../features/license-purchase/services/license-purchase.service.ts";
+import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 
 /** The provider holding the four seats `checkout_1` bought. */
 function fourSeatsBought(): MemoryStripeSubscriptionsChannel {

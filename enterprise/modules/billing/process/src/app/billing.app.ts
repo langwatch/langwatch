@@ -59,6 +59,16 @@ import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
+import { ConnectedBillingOverviewService } from "../features/connected-billing/services/connected-billing-overview.service.ts";
+import { ConnectedBillingTickService } from "../features/connected-billing/services/connected-billing-tick.service.ts";
+import { ConnectedBillingService } from "../features/connected-billing/services/connected-billing.service.ts";
+import { ConnectedCustomerFactsService } from "../features/connected-billing/services/connected-customer-facts.service.ts";
+import { ConnectedMonthlyStatementService } from "../features/connected-billing/services/connected-monthly-statement.service.ts";
+import { ConnectedSeatChangeService } from "../features/connected-billing/services/connected-seat-change.service.ts";
+import { ConnectedUsageCeilingService } from "../features/connected-billing/services/connected-usage-ceiling.service.ts";
+import { LicensePurchaseDeliveryService } from "../features/license-purchase/services/license-purchase-delivery.service.ts";
+import { LicensePurchaseService } from "../features/license-purchase/services/license-purchase.service.ts";
+import { LicensingLicenseGeneratorService } from "../features/license-purchase/services/licensing-license-generator.service.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
@@ -74,19 +84,9 @@ import {
   type LicensePurchaseHandler,
 } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
-import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
-import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
-import { ConnectedBillingService } from "../services/connected-billing.service.ts";
-import { ConnectedCustomerFactsService } from "../services/connected-customer-facts.service.ts";
-import { ConnectedMonthlyStatementService } from "../services/connected-monthly-statement.service.ts";
-import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
-import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
-import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
-import { LicensePurchaseService } from "../services/license-purchase.service.ts";
-import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { PlanLimitAlertService } from "../services/plan-limit-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";

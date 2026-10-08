@@ -20,7 +20,7 @@ import type {
   ConnectedBillingRepository,
   ConnectedCreditGrantRecord,
   ConnectedSeatChangeRecord,
-} from "../repositories/connected-billing.repository.ts";
+} from "../../../repositories/connected-billing.repository.ts";
 import type { ConnectedCustomerFactsService } from "./connected-customer-facts.service.ts";
 
 export class ConnectedBillingOverviewService {

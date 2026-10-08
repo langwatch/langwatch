@@ -1,7 +1,7 @@
 import type { LicensePurchaseNotificationPayload } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 
-import type { LicenseEmailChannel } from "../channels/license-email.channel.ts";
+import type { LicenseEmailChannel } from "../../../channels/license-email.channel.ts";
 import {
   type LicenseEmailDelivery,
   LicensePurchaseDelivery,

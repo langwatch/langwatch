@@ -27,7 +27,7 @@ export type MemoryBillingOrganization = {
 };
 
 /** A membership as organization's shared OrganizationUser table shows it to billing. */
-export type MemoryBillingMember = {
+type MemoryBillingMember = {
   organizationId: string;
   userId: string;
   role: string;
@@ -35,7 +35,7 @@ export type MemoryBillingMember = {
 };
 
 /** A person as user's shared User table shows them to billing. */
-export type MemoryBillingUser = {
+type MemoryBillingUser = {
   id: string;
   name: string | null;
   email: string;
@@ -43,7 +43,7 @@ export type MemoryBillingUser = {
 };
 
 /** A project as project's shared table shows it to billing. */
-export type MemoryBillingProject = {
+type MemoryBillingProject = {
   id: string;
   name: string;
   organizationId: string;
@@ -52,7 +52,7 @@ export type MemoryBillingProject = {
 };
 
 /** One request's row in gateway's shared spend ledger, at its latest status. */
-export type MemoryBillingSpendRow = {
+type MemoryBillingSpendRow = {
   tenantId: string;
   requestType: string;
   status: string;

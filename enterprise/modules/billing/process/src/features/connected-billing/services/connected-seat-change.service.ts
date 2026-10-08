@@ -13,17 +13,17 @@ import { Temporal } from "@langwatch/time";
 import type {
   ConnectedInvoicingChannel,
   ProviderInvoice,
-} from "../channels/connected-invoicing.channel.ts";
+} from "../../../channels/connected-invoicing.channel.ts";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedBillingRepository,
   ConnectedSeatChangeRecord,
-} from "../repositories/connected-billing.repository.ts";
+} from "../../../repositories/connected-billing.repository.ts";
 import {
   daysBetween,
   proratedSeatUnitAmountCents,
   seatInvoiceDescription,
-} from "../rules/connected-seat-proration.rules.ts";
+} from "../../../rules/connected-seat-proration.rules.ts";
 
 const logger = createLogger("langwatch:billing:connectedSeatChange");
 

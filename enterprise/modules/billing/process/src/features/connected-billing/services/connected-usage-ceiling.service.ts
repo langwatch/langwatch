@@ -4,12 +4,12 @@ import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 
-import type { BillingGatewaySpendRepository } from "../repositories/billing-gateway-spend.repository.ts";
+import type { BillingGatewaySpendRepository } from "../../../repositories/billing-gateway-spend.repository.ts";
 import {
   billingMonthWindowMs,
   nanoUsdToInstantEvalMeterUnits,
   usdCentsToInstantEvalMeterUnits,
-} from "../rules/instant-eval-meter.rules.ts";
+} from "../../../rules/instant-eval-meter.rules.ts";
 
 type ConnectedUsageCeilingPeers = Readonly<{
   licensing: Pick<LicensingApi, "getContractTerms">;

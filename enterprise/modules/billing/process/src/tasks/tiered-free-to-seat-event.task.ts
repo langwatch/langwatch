@@ -6,7 +6,7 @@ import type { BillingLifecycleAnnouncerService } from "../services/billing-lifec
 const logger = createLogger("langwatch:task:tiered-free-to-seat-event");
 
 /** Organisations read per page; the scan pages by id, never loading them all (round 49). */
-export const TIERED_FREE_PAGE_SIZE = 500;
+const TIERED_FREE_PAGE_SIZE = 500;
 
 /** The one read this migration makes, through organization's shared table (R40). */
 export type TieredFreeToSeatEventMigrationDatabase = {

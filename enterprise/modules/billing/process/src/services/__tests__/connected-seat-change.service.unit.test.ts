@@ -5,10 +5,10 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
+import { ConnectedSeatChangeService } from "../../features/connected-billing/services/connected-seat-change.service.ts";
 import type { ConnectedBillingAccountRecord } from "../../repositories/connected-billing.repository.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "../../repositories/memory/memory.connected-billing.repository.ts";
-import { ConnectedSeatChangeService } from "../connected-seat-change.service.ts";
 
 const at = (iso: string): Instant => Temporal.Instant.from(iso);
 const CHANGED_AT = "2026-07-04T10:00:00Z";

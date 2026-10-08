@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 
-import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
+import type { StripeSubscriptionsChannel } from "../../../channels/stripe-subscriptions.channel.ts";
 import {
   NullBillingErrorReporter,
   type BillingErrorReporter,
-} from "./billing-error-reporter.service.ts";
+} from "../../../services/billing-error-reporter.service.ts";
 
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
 
