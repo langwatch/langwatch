@@ -16,12 +16,24 @@ import { WEBHOOK_GOVERNANCE_DELIVERY_REQUESTED_EVENT_TYPE } from "@langwatch/web
 import { describe, expect, it } from "vitest";
 
 import { MemorySqsWebhookDestinationChannel } from "../../channels/memory/memory.sqs-webhook-destination.channel.ts";
-import { MemoryWebhookDispatchChannel } from "../../channels/memory/memory.webhook-dispatch.channel.ts";
 import { MemoryWebhookRepositories } from "../../repositories/memory/memory.webhook.repositories.ts";
 import { GOVERNANCE_EVENTS_PROCESS_NAME } from "../../rules/webhook-delivery-contract.rules.ts";
 import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../webhook-destination-dispatch.service.ts";
+import type { WebhookSendInput } from "../webhook-egress.service.ts";
 import { WebhookGovernanceDeliveryService } from "../webhook-governance-delivery.service.ts";
+
+/** Stands in for the egress: keeps every send it was handed and answers 200. */
+function recordingEgress() {
+  const sent: WebhookSendInput[] = [];
+  return {
+    sent,
+    send: async (input: WebhookSendInput) => {
+      sent.push(input);
+      return { status: 200, body: "", eventId: input.eventId ?? `memory-dispatch-${sent.length}` };
+    },
+  };
+}
 
 const ORGANIZATION_ID = "organization-1";
 const PROJECT_ID = "project-1";
@@ -40,7 +52,7 @@ const created: RecordVkLifecycleCommandData = {
 function worker() {
   const store = InMemoryProcessStore.createForTesting();
   const { endpoints } = MemoryWebhookRepositories.create();
-  const receiver = MemoryWebhookDispatchChannel.create();
+  const receiver = recordingEgress();
   let clock = Date.now();
   const applier = WebhookGovernanceDeliveryService.create({
     processStore: store,
