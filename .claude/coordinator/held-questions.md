@@ -530,3 +530,4 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
 7. E7 `annotation:record-existing-facts`: (a, rec) remove it (no consumer since R40; scans every project in memory), a partial reversal of R24 EF-1; (b) keep.
 8. E8 UP-5 drain age: (a, rec) derive from the release manifest that first names the drain's upcast steps, after merge.
    Coordinator default if unanswered: start the reduced wave 0 (MIG-ROSTER+STEP-RUN, MIG-LANES, MIG-COMPAT-CI, MIG-HYGIENE, MIG-REHEARSAL), which needs none of E1 to E8.
+9. DS-3 tokens for scim, licensing and billing sit in their contracts (no `-client` package exists), following billing-components.ts; §10.1 says a token lives in its owner's client. (a, rec) create scim-client, licensing-client and billing-client in a later lane and move the tokens; (b) record contracts as the home for modules without a client.
