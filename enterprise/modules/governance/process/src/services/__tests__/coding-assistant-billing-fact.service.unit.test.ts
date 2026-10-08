@@ -10,7 +10,7 @@ function world({
   seed,
   failing = false,
 }: {
-  seed: { organizationId: string; config: unknown }[];
+  seed: { organizationId: string; config: unknown; enabled?: boolean }[];
   failing?: boolean;
 }) {
   const sent: RecordCodingAssistantBillingCommand[] = [];
@@ -61,11 +61,24 @@ describe("CodingAssistantBillingFactService", () => {
       expect(sent.every((command) => command.data.recordedAtMs === AT)).toBe(true);
     });
 
-    it("records the source as not billed once its config is disabled", async () => {
-      const { facts, sent, policies } = world({
-        seed: [{ organizationId: "org-1", config: { assistantKind: "codex", bundledPlan: false } }],
+    it("records the source as not billed when no config exists", async () => {
+      const { facts, sent } = world({ seed: [] });
+
+      await facts.recordForOrganization({ organizationId: "org-1" });
+
+      expect(billedBySource(sent, "org-1").codex).toBe(false);
+    });
+
+    it("records the source as not billed when its config is disabled", async () => {
+      const { facts, sent } = world({
+        seed: [
+          {
+            organizationId: "org-1",
+            config: { assistantKind: "codex", bundledPlan: false },
+            enabled: false,
+          },
+        ],
       });
-      policies.replace({ organizationId: "org-1", configs: [] });
 
       await facts.recordForOrganization({ organizationId: "org-1" });
 
