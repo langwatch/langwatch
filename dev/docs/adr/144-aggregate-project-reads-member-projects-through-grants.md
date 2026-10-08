@@ -131,8 +131,8 @@ on the Postgres side.
    Grant ids are deterministic KSUIDs derived from the pair, so a replay or
    a repeated run is idempotent. The reconciler runs on four triggers: rule
    created or edited, personal workspace created or reactivated, department
-   assigned, and a nightly sweep per organisation that catches anything the
-   triggers missed. We choose materialisation over read-time evaluation
+   assigned, and a nightly sweep, one scheduled job per aggregate, that
+   catches anything the triggers missed. We choose materialisation over read-time evaluation
    because the grant row is the thing ADR-143, tasks#904 and ADR-166's
    `findReaders` reuse; a read-time rule would give those callers nothing.
    (Blocks A and E.)
@@ -231,7 +231,7 @@ on the Postgres side.
 | `AGGREGATE_RULE_KINDS` | `"all-personal" \| "personal-by-department" \| "explicit"` | discriminator of `Project.aggregateRule` |
 | `AGGREGATE_DEFAULT_RULE` | `{ kind: "all-personal" }` | preselected on creation |
 | `ADMIN_WORKSPACE_VIEW_DEDUP_MS` | `300000` (5 × 60 × 1000) | existing list-view audit dedup window, reused |
-| `AGGREGATE_RECONCILE_SWEEP` | nightly, per organisation | catch-up for missed triggers |
+| `AGGREGATE_RECONCILE_SWEEP` | nightly at 03:17 UTC (`17 3 * * *`), one `ScheduledJob` per aggregate | catch-up for missed triggers |
 
 ## Invariants
 
