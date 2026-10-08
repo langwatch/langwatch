@@ -4,7 +4,8 @@ import {
   type ClickHouseCloseableClient,
 } from "./connection.ts";
 import type { AbortSignalLike } from "./query.ts";
-import { ConcurrencyLimiter, QueueFullError, type LimiterStats } from "./rateLimit.ts";
+import { ConcurrencyLimiter, type LimiterStats } from "./rateLimit.ts";
+import { createStatementWait, statementRefusal } from "./statementWait.ts";
 import {
   checkStatementTenantScope,
   describeTenantScopeViolation,
@@ -17,10 +18,6 @@ import {
 } from "./vendorClient.ts";
 
 declare const performance: { now(): number };
-declare const AbortController: new () => { abort(): void; signal: AbortSignalLike };
-declare const AbortSignal: { any(signals: AbortSignalLike[]): AbortSignalLike };
-declare function setTimeout(callback: () => void, milliseconds: number): { unref?(): void };
-declare function clearTimeout(timer: { unref?(): void }): void;
 
 export const DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
 export const DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS = 1_500;
@@ -251,52 +248,6 @@ function statementQueueDepth<Client extends ClickHouseVendorClient>(
   );
 }
 
-/**
- * What a statement that never got a slot throws: an overload error, counted as
- * shed, when the queue was full or the wait timed out; otherwise its own error.
- */
-function shedStatementError<Client extends ClickHouseVendorClient>({
-  error,
-  timedOut,
-  operation,
-  startedAt,
-  timeoutMs,
-  maxQueued,
-  options,
-}: {
-  error: unknown;
-  timedOut: boolean;
-  operation: ClickHouseStatementOperation;
-  startedAt: number;
-  timeoutMs: number;
-  maxQueued: number;
-  options: ClickHouseStatementLimitOptions<Client>;
-}): unknown {
-  const { input, telemetry, overloadErrorFactory, logger } = options;
-  if (error instanceof QueueFullError) {
-    telemetry.incrementStatementsShed({ instance: input.instance, operation });
-    logger?.warn(
-      { instance: input.instance, operation, maxQueued },
-      "Refused a ClickHouse statement: concurrency wait queue full",
-    );
-    return overloadErrorFactory.create({ cause: error });
-  }
-  if (timedOut) {
-    telemetry.incrementStatementsShed({ instance: input.instance, operation });
-    logger?.warn(
-      {
-        instance: input.instance,
-        operation,
-        waitedMs: Math.round(performance.now() - startedAt),
-        timeoutMs,
-      },
-      "Refused a ClickHouse statement: waited too long for a slot",
-    );
-    return overloadErrorFactory.create({ cause: error });
-  }
-  return error;
-}
-
 /** Bounds every vendor statement method while preserving the caller's cancellation signal. */
 export function withClickHouseStatementLimit<Client extends ClickHouseVendorClient>(
   options: ClickHouseStatementLimitOptions<Client>,
@@ -325,7 +276,8 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
   }): Promise<unknown> => {
     const startedAt = performance.now();
     let admitted = false;
-    const wait = armStatementWait({ limiter, input, params, timeoutMs });
+    const wait = createStatementWait({ signal: signalOf(params), waitTimeoutMs: timeoutMs });
+    wait.armIfSaturated(limiter.stats().inFlight >= input.maxOpenConnections);
     try {
       return await limiter.run({
         signal: wait.signal,
@@ -341,16 +293,19 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
         },
       });
     } catch (error) {
-      if (admitted) throw error;
-      throw shedStatementError({
+      const refused = statementRefusal({
         error,
-        timedOut: wait.hasTimedOut(),
-        operation,
+        isAdmitted: admitted,
+        hasTimedOut: wait.hasTimedOut(),
         startedAt,
-        timeoutMs,
-        maxQueued,
-        options,
+        waitTimeoutMs: timeoutMs,
+        logger,
+        subject: "a ClickHouse statement",
+        logFields: { instance: input.instance, operation },
+        createOverloadError: (cause) => options.overloadErrorFactory.create({ cause }),
+        onShed: () => telemetry.incrementStatementsShed({ instance: input.instance, operation }),
       });
+      throw refused === undefined ? error : refused.refusal;
     } finally {
       wait.dispose();
     }
@@ -441,45 +396,6 @@ export function createVendorClientResiliencePolicy(
   options: VendorClientResilienceOptions = {},
 ): VendorClientPolicy {
   return VendorClientResiliencePolicy.create(options);
-}
-
-interface ArmedWait {
-  signal: AbortSignalLike | undefined;
-  hasTimedOut(): boolean;
-  dispose(): void;
-}
-
-function armStatementWait({
-  limiter,
-  input,
-  params,
-  timeoutMs,
-}: {
-  limiter: ConcurrencyLimiter;
-  input: ClickHouseClientCreationInput;
-  params: unknown;
-  timeoutMs: number;
-}): ArmedWait {
-  const signal = signalOf(params);
-  if (limiter.stats().inFlight < input.maxOpenConnections) return unarmedWait(signal);
-
-  const controller = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  timer.unref?.();
-
-  return {
-    signal: signal === undefined ? controller.signal : AbortSignal.any([signal, controller.signal]),
-    hasTimedOut: () => timedOut,
-    dispose: () => clearTimeout(timer),
-  };
-}
-
-function unarmedWait(signal: AbortSignalLike | undefined): ArmedWait {
-  return { signal, hasTimedOut: () => false, dispose: () => undefined };
 }
 
 function recordOf(value: unknown): Record<string, unknown> {

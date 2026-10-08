@@ -6,6 +6,7 @@ import type { AnalyticsRepositories, LangWatchQlSupply } from "../analytics.repo
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../clickhouse/clickhouse.analytics-recency.repository.ts";
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse/clickhouse.analytics-sessions.repository.ts";
+import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse/clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
@@ -37,7 +38,15 @@ export class LiveAnalyticsRepositories {
     const resolveClient = (tenantId: string) => sessions.resolve(tenantId);
     return {
       sessions,
-      analytics: ClickHouseAnalyticsRepository.create({ resolveClient }),
+      analytics: {
+        open: ({ tenantConcurrency }) =>
+          ClickHouseAnalyticsRepository.create({
+            resolveClient,
+            statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({
+              maxConcurrent: tenantConcurrency,
+            }),
+          }),
+      },
       evaluations: {
         open: ({ defaultRetentionDays }) =>
           ClickHouseAnalyticsEvaluationRepository.create({ resolveClient, defaultRetentionDays }),

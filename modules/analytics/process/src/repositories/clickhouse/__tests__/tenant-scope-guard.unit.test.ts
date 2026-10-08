@@ -144,6 +144,36 @@ describe("tenant scope guard vs the timeseries builders", () => {
     expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
   });
 
+  it("passes buildEvalSlimTimeseriesQuery grouped by verdict", () => {
+    // The verdict bucket lands in the SELECT list above the latest-version
+    // dedup, whose tenant predicate sits two subqueries deep.
+    const { sql, params } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-a",
+      ...dates,
+      series: [
+        { metric: "evaluations.evaluation_runs", aggregation: "cardinality" } as AnalyticsSeries,
+      ],
+      groupBy: "evaluations.evaluation_passed",
+      timeScale: "full",
+    });
+
+    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+  });
+
+  it("passes buildSlimTimeseriesQuery grouped by error state with filters", () => {
+    const { sql, params } = buildSlimTimeseriesQuery({
+      projectId: "tenant-a",
+      ...dates,
+      series: [{ metric: "metadata.trace_id", aggregation: "cardinality" } as AnalyticsSeries],
+      groupBy: "error.has_error",
+      timeScale: 60,
+      filters: { "metadata.user_id": ["user-1"] },
+      excludeOrigins: ["simulation"],
+    });
+
+    expect(checkTenantScope({ sql, params, tenantId: "tenant-a" })).toBeNull();
+  });
+
   it("refuses a filter on the eval slim, which the router sends to evaluation_runs", () => {
     expect(() =>
       buildEvalSlimTimeseriesQuery({
@@ -154,5 +184,22 @@ describe("tenant scope guard vs the timeseries builders", () => {
         filters: { "metadata.key": ["a", "b"] },
       }),
     ).toThrow(/Eval slim builder cannot serve filter "metadata.key"/);
+  });
+});
+
+describe("buildEvalSlimTimeseriesQuery percentiles", () => {
+  describe("when serving a percentile of evaluation_score", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-a",
+      ...dates,
+      series: [{ metric: "evaluations.evaluation_score", aggregation: "p90" } as AnalyticsSeries],
+      timeScale: 60,
+    });
+
+    /** @scenario Dashboard percentiles use a bounded-memory estimator */
+    it("uses the bounded-memory t-digest estimator", () => {
+      expect(sql).toContain("quantileTDigest(0.9)(");
+      expect(sql).not.toContain("quantileExact");
+    });
   });
 });

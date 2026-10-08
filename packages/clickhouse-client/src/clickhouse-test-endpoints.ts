@@ -128,16 +128,19 @@ export async function startTestClickHouseEndpoints({
   suite,
   names,
   environment,
+  serverMemoryBytes,
 }: {
   suite: string;
   names: string[];
   /** The test process's environment, read once by the caller (native server or containers). */
   environment: Readonly<Record<string, string | undefined>>;
+  /** Containers only: replaces the 1 GiB server cap, for a suite seeding more than it fits. */
+  serverMemoryBytes?: number;
 }): Promise<TestClickHouseEndpoint[]> {
   const baseUrl = nativeClickHouseBaseUrl(environment);
   return baseUrl
     ? startNativeEndpoints({ suite, names, baseUrl })
-    : startContainerEndpoints({ suite, names });
+    : startContainerEndpoints({ suite, names, serverMemoryBytes });
 }
 
 /** One database per endpoint on the shared native server. */
@@ -170,10 +173,21 @@ async function startNativeEndpoints({
 async function startContainerEndpoints({
   suite,
   names,
+  serverMemoryBytes,
 }: {
   suite: string;
   names: string[];
+  serverMemoryBytes?: number;
 }): Promise<TestClickHouseEndpoint[]> {
+  const tuning = serverMemoryBytes
+    ? {
+        ...TEST_CLICKHOUSE_TUNING,
+        content: TEST_CLICKHOUSE_TUNING.content.replace(
+          /<max_server_memory_usage>\d+<\/max_server_memory_usage>/,
+          `<max_server_memory_usage>${serverMemoryBytes}</max_server_memory_usage>`,
+        ),
+      }
+    : TEST_CLICKHOUSE_TUNING;
   const started = await Promise.all(
     names.map(async (name): Promise<[string, StartedClickHouseContainer]> => [
       name,
@@ -182,9 +196,12 @@ async function startContainerEndpoints({
           "langwatch.test": "true",
           [`langwatch.test.${suite}`]: name,
           ...TEST_CLICKHOUSE_TUNING_LABEL,
+          ...(serverMemoryBytes
+            ? { "langwatch.test.clickhouse-memory": String(serverMemoryBytes) }
+            : {}),
         })
         .withReuse()
-        .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING])
+        .withCopyContentToContainer([tuning])
         .withStartupTimeout(120_000)
         .start(),
     ]),

@@ -337,7 +337,9 @@ export class AnalyticsModule
       sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
     const analytics = AnalyticsServiceClass.create({
-      repository: setup.repositories.analytics,
+      repository: setup.repositories.analytics.open({
+        tenantConcurrency: setup.config.tenantAnalyticsConcurrency,
+      }),
       evaluationRepository: evaluations.open({
         defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
       }),

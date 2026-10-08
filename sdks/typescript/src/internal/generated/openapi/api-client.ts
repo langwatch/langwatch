@@ -967,7 +967,7 @@ export interface paths {
         put?: never;
         /**
          * Create a dashboard widget
-         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
+         * @description Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon and an optional prompt Langy is drafted with when asked about it. `source` records where the widget came from; without it, the widget is recorded as made through the API. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.
          */
         post: operations["postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets"];
         delete?: never;
@@ -999,7 +999,7 @@ export interface paths {
         head?: never;
         /**
          * Update a dashboard widget
-         * @description Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.
+         * @description Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.
          */
         patch: operations["patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId"];
         trace?: never;
@@ -7806,6 +7806,7 @@ export interface operations {
                     groupByKey?: string;
                     timeScale?: "full" | number;
                     timeZone: string;
+                    shouldSkipPreviousPeriod?: boolean;
                 };
             };
         };
@@ -8323,6 +8324,7 @@ export interface operations {
                     groupByKey?: string;
                     timeScale?: "full" | number;
                     timeZone: string;
+                    shouldSkipPreviousPeriod?: boolean;
                 };
             };
         };
@@ -8388,7 +8390,7 @@ export interface operations {
                         start: string | number;
                         end: string | number;
                     };
-                    granularitySeconds?: 1 | 60 | 3600;
+                    granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
                 };
             };
         };
@@ -8425,6 +8427,25 @@ export interface operations {
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
+                        completeness?: {
+                            /** @enum {string} */
+                            state: "complete" | "partial" | "missing" | "no_traffic";
+                            unit: string;
+                            total: number;
+                            fields: {
+                                field: string;
+                                label: string;
+                                present: number;
+                            }[];
+                            buckets?: {
+                                start: string;
+                                n: number;
+                            }[];
+                            unpriced?: {
+                                count: number;
+                                models: string[];
+                            };
+                        };
                     };
                 };
             };
@@ -12594,6 +12615,22 @@ export interface operations {
                                         default?: string | number | boolean;
                                     }[];
                                 }[];
+                                description?: string;
+                                prompt?: string;
+                                source?: {
+                                    /** @constant */
+                                    kind: "catalogue";
+                                    catalogueId: string;
+                                } | {
+                                    /** @constant */
+                                    kind: "langy";
+                                } | {
+                                    /** @constant */
+                                    kind: "code";
+                                } | {
+                                    /** @constant */
+                                    kind: "api";
+                                };
                             };
                             createdAt: string;
                             updatedAt: string;
@@ -12729,6 +12766,22 @@ export interface operations {
                             default?: string | number | boolean;
                         }[];
                     }[];
+                    description?: string;
+                    prompt?: string;
+                    source?: {
+                        /** @constant */
+                        kind: "catalogue";
+                        catalogueId: string;
+                    } | {
+                        /** @constant */
+                        kind: "langy";
+                    } | {
+                        /** @constant */
+                        kind: "code";
+                    } | {
+                        /** @constant */
+                        kind: "api";
+                    };
                 };
             };
         };
@@ -12755,6 +12808,22 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -12899,6 +12968,22 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -13208,6 +13293,21 @@ export interface operations {
                             default?: string | number | boolean;
                         }[];
                     }[];
+                    description?: string;
+                    source?: {
+                        /** @constant */
+                        kind: "catalogue";
+                        catalogueId: string;
+                    } | {
+                        /** @constant */
+                        kind: "langy";
+                    } | {
+                        /** @constant */
+                        kind: "code";
+                    } | {
+                        /** @constant */
+                        kind: "api";
+                    };
                 };
             };
         };
@@ -13234,6 +13334,22 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
                         };
                         createdAt: string;
                         updatedAt: string;
@@ -13408,6 +13524,22 @@ export interface operations {
                                     default?: string | number | boolean;
                                 }[];
                             }[];
+                            description?: string;
+                            prompt?: string;
+                            source?: {
+                                /** @constant */
+                                kind: "catalogue";
+                                catalogueId: string;
+                            } | {
+                                /** @constant */
+                                kind: "langy";
+                            } | {
+                                /** @constant */
+                                kind: "code";
+                            } | {
+                                /** @constant */
+                                kind: "api";
+                            };
                         };
                         createdAt: string;
                         updatedAt: string;

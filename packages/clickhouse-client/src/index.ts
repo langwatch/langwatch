@@ -125,6 +125,8 @@ export {
   parseRoutingTable,
   UnknownTenantError,
 } from "./tenancy.ts";
+export type { TenantStatementLimiterOptions } from "./tenantStatementLimit.ts";
+export { TenantStatementLimiter } from "./tenantStatementLimit.ts";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
 export {
   StatementReporter,

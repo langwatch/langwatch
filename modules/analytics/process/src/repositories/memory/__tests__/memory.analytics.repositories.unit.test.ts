@@ -174,7 +174,7 @@ describe("the analytics memory tier", () => {
   });
 
   it("answers a timeseries read with empty periods", async () => {
-    const { analytics } = memoryTier();
+    const analytics = memoryTier().analytics.open({ tenantConcurrency: 1 });
     const input: AnalyticsTimeseriesInput = {
       projectId: "project-1",
       startDate: OCCURRED_AT_MS,

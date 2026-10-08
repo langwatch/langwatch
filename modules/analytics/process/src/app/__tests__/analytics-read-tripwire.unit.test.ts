@@ -83,7 +83,10 @@ async function harness(tripwireOn: boolean) {
         getPlatformDefaultRetentionDays: () => 30,
       }),
     },
-    repositories: { ...MemoryAnalyticsRepositories.create(), analytics: repository },
+    repositories: {
+      ...MemoryAnalyticsRepositories.create(),
+      analytics: { open: () => repository },
+    },
     config: {
       langwatchQl: {
         url: void 0,
@@ -94,6 +97,7 @@ async function harness(tripwireOn: boolean) {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
       },
+      tenantAnalyticsConcurrency: 4,
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },

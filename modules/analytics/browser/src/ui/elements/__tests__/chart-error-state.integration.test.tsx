@@ -2,20 +2,30 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ChartErrorState } from "../chart-error-state.tsx";
+import { ChartErrorIndicator, ChartErrorState } from "../chart-error-state.tsx";
 
 afterEach(cleanup);
+
+const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
 
 /** A tRPC error envelope carrying a handled payload, as the boundary sends it. */
 function handledError(code: string) {
   return {
     message: code,
-    data: { error: { code, httpStatus: 500, fault: "platform", tips: [] } },
+    data: {
+      error: {
+        code,
+        httpStatus: 422,
+        fault: "customer",
+        traceId: TRACE_ID,
+        tips: ["Add filters to reduce the amount of data scanned"],
+      },
+    },
   };
 }
 
@@ -41,7 +51,7 @@ describe("<ChartErrorState />", () => {
 
       // An unhandled failure has no copy of its own, so the caller's
       // fallback names what the user was looking at.
-      expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load this chart")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
       expect(screen.queryByText(/no data/i)).not.toBeInTheDocument();
     });
@@ -59,17 +69,43 @@ describe("<ChartErrorState />", () => {
     });
   });
 
-  describe("when the failure is a handled error", () => {
-    /**
-     * THE CODE SLUG is the one thing a package can still pin here — the
-     * presentation registry is `platform/app`'s and doesn't travel, so this
-     * asserts only the failed action, never the slug (#5984).
-     */
-    it("names the action that failed and never the code slug", () => {
-      renderChartErrorState({ error: handledError("query_timeout") });
+  describe("when the failure is a handled error the registry knows", () => {
+    /** @scenario "A failed chart panel shows a compact message and a Retry" */
+    it("shows the registry headline and advice, never the code slug or the tips", () => {
+      renderChartErrorState({ error: handledError("query_memory_exceeded") });
 
-      expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
-      expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
+      const alert = screen.getByRole("alert");
+      expect(within(alert).getByText("This search was too large")).toBeInTheDocument();
+      expect(
+        within(alert).getByText("Narrow the time range, add a filter, or select fewer fields."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("query_memory_exceeded")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Add filters to reduce the amount of data scanned"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A failed chart panel shows a compact message and a Retry" */
+    it("keeps the error id reachable", () => {
+      renderChartErrorState({ error: handledError("query_memory_exceeded") });
+
+      expect(
+        within(screen.getByRole("alert")).getByTitle(`Error ID: ${TRACE_ID}`),
+      ).toBeInTheDocument();
+    });
+  });
+});
+
+describe("<ChartErrorIndicator />", () => {
+  describe("when the query has failed", () => {
+    it("says it could not load, holds no button, and carries the copy for assistive technology", () => {
+      renderWithDesignSystem(<ChartErrorIndicator error={handledError("query_memory_exceeded")} />);
+
+      const indicator = screen.getByTestId("chart-error-indicator");
+      expect(within(indicator).getByText("Couldn't load")).toBeInTheDocument();
+      expect(indicator).toHaveTextContent("This search was too large");
+      expect(indicator).not.toHaveTextContent("query_memory_exceeded");
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
     });
   });
 });

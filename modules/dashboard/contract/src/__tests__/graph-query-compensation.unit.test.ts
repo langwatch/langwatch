@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { CustomGraphInput } from "../custom-graph.ts";
-import { resolveGraphTimeScale, withGroupedPipeline } from "../graph-query-compensation.ts";
+import {
+  resolveGraphTimeScale,
+  shouldSkipPreviousPeriod,
+  withGroupedPipeline,
+} from "../graph-query-compensation.ts";
 
 function makeInput(overrides: Partial<CustomGraphInput> = {}): CustomGraphInput {
   return {
@@ -220,6 +224,27 @@ describe("withGroupedPipeline", () => {
       const input = makeInput({ graphType: "bar", groupBy: "metadata.model" });
 
       expect(withGroupedPipeline(input)).toBe(input);
+    });
+  });
+});
+
+describe("shouldSkipPreviousPeriod", () => {
+  describe("given a chart that draws the previous period only when asked", () => {
+    /** @scenario "A panel that hides the previous period does not scan it" */
+    it("skips it when includePrevious is off", () => {
+      expect(shouldSkipPreviousPeriod({ graphType: "line", includePrevious: false })).toBe(true);
+    });
+
+    it("keeps it when includePrevious is on", () => {
+      expect(shouldSkipPreviousPeriod({ graphType: "area", includePrevious: true })).toBe(false);
+    });
+  });
+
+  describe("given a summary, pie or donut chart", () => {
+    it("keeps the previous period, which these charts always compare against", () => {
+      for (const graphType of ["summary", "pie", "donnut"] as const) {
+        expect(shouldSkipPreviousPeriod({ graphType, includePrevious: false })).toBe(false);
+      }
     });
   });
 });

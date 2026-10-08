@@ -3,9 +3,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
 
+import { useRetryFailedAnalytics } from "../../behavior/analytics-feedback.ts";
 import { useAnalyticsFeedbacks } from "../../behavior/use-analytics-documents.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
+import { ChartErrorState } from "../elements/chart-error-state.tsx";
 
 function voteGlyph(vote: number | null | undefined): string {
   if (vote === 1) return "👍";
@@ -17,11 +19,20 @@ function voteGlyph(vote: number | null | undefined): string {
 export const FeedbacksTable = () => {
   const feedbacks = useAnalyticsFeedbacks();
   const host = useAnalyticsHost();
+  const retryFailedAnalytics = useRetryFailedAnalytics();
   const openTrace = (traceId: string) =>
     host.setQuery(traceDetailsAddress({ current: host.route().query, traceId }));
 
   if (feedbacks.isLoading) return <Box>Loading...</Box>;
-  if (feedbacks.error) return <Box>An error occurred</Box>;
+  if (feedbacks.error && !feedbacks.data) {
+    return (
+      <ChartErrorState
+        error={feedbacks.error}
+        onRetry={retryFailedAnalytics}
+        fallbackTitle="Couldn't load feedback"
+      />
+    );
+  }
 
   return (
     <VStack align="start" gap={4}>
