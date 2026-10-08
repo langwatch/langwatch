@@ -1,4 +1,5 @@
-import { defineProcessModule } from "@langwatch/process";
+import type { BillingApi, BillingServerConfig } from "@langwatch/enterprise-billing-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 /**
@@ -33,7 +34,11 @@ import { subscriptionTrpcTransport } from "./transport/subscription.trpc.ts";
  * Billing as an installed module: the connected-billing, currency and subscription
  * doors and the Stripe callback; the factories below serve today's callers.
  */
-export const billingProcessModule = defineProcessModule("billing")
+export const billingProcessModule: PublishedProcessModule<
+  "billing",
+  BillingApi,
+  BillingServerConfig
+> = defineProcessModule("billing")
   .withRepositories(billingRepositories)
   .withApi(BillingModule)
   .withTransports(

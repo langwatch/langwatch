@@ -1,5 +1,6 @@
 import { bindRestCredential } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { LicensingApi, LicensingServerConfig } from "@langwatch/enterprise-licensing-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { LicensingModule } from "./app/licensing.app.ts";
@@ -14,7 +15,11 @@ import { connectHostedRest } from "./transport/connect-hosted.rest.ts";
 import { connectTrpcTransport } from "./transport/connect.trpc.ts";
 import { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 
-export const licensingProcessModule = defineProcessModule("licensing")
+export const licensingProcessModule: PublishedProcessModule<
+  "licensing",
+  LicensingApi,
+  LicensingServerConfig
+> = defineProcessModule("licensing")
   .withRepositories(licensingRepositories)
   .withApi(LicensingModule)
   .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest)

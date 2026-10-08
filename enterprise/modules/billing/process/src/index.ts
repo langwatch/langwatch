@@ -25,10 +25,7 @@ export {
   type ReportUsageForMonthCommandDeps,
 } from "./eventing/report-usage-for-month.commands.ts";
 export type { BillingReportOrganization } from "./repositories/billing-report-organization.repository.ts";
-export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
-export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export type { BillingOrganizationCacheRedis } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
-export { BillingReportingPipeline } from "./eventing/billing-reporting.pipeline.ts";
 export { BillingSubscriptionNotifier } from "./channels/billing-subscription-notifier.channel.ts";
 export { billingSubscriptionNotifierChannels } from "./channels/billing-subscription-notifier-channels.registry.ts";
 export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts";
@@ -46,7 +43,6 @@ export type {
   ConnectedSeatChangeRecord,
   PendingRenewal,
 } from "./repositories/connected-billing.repository.ts";
-export type { ConnectedBillingDatabase } from "./repositories/prisma/prisma.connected-billing.repository.ts";
 export type { ConnectedBillingTerms } from "./features/connected-billing/services/connected-billing.service.ts";
 export type {
   CommitDrawdown,
@@ -84,12 +80,6 @@ export type {
 
 // The Stripe webhook, moved off
 // `platform/app/src/server/app-layer/billing/`.
-export type {
-  LicensePurchaseHandler,
-  WebhookService,
-} from "./services/billing-stripe-webhook.service.ts";
-export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
-export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";
 export { billingWebhookHostChannels } from "./channels/billing-webhook-host-channels.registry.ts";
 export type {
@@ -113,8 +103,3 @@ export {
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
 export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptions-report.repository.ts";
-
-// The rows this module owns, and the two tiers behind them. A process selects
-// one tier and is handed every row; it constructs no repository itself.
-export type { BillingRepositories } from "./repositories/billing.repositories.ts";
-export type { PostgresBillingRepositories } from "./repositories/prisma/prisma.billing.repositories.ts";
