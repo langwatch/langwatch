@@ -9,7 +9,7 @@ import {
   traceContextChip,
 } from "../../../../behavior/langy/langy-context-chips.ts";
 import { useLangyContextTarget } from "../../../../behavior/langy/use-langy-context-target.ts";
-import { ScenarioRoleProvider } from "../../../../behavior/scenario-role.store.tsx";
+import { ScenarioRoleProvider } from "../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { type DrawerViewMode, useShikiAdapter, useTraceDrawer } from "../../../../index.ts";
 import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
 import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";

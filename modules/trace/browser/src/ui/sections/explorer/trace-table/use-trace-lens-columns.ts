@@ -2,7 +2,10 @@ import { parseEvalColumnId } from "@langwatch/trace-contract";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
-import { timeColumnSizing, useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
+import {
+  timeColumnSizing,
+  useTimeFormatStore,
+} from "../../../../features/explorer/behavior/time-format.store.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { addColumnColumnDef } from "./add-column-header.tsx";
 import { getTraceColumnDef } from "./columns.ts";

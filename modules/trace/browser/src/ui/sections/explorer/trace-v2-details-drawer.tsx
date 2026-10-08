@@ -2,8 +2,8 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 import type React from "react";
 
 import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
+import { useTraceDrawerUrlHydrator } from "../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-url-hydrator.ts";
 import { isSharedTracePath } from "../../../model/shared-trace-path.ts";
-import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator.ts";
 import { TraceV2DrawerShell, type TraceV2DrawerShellProps } from "./trace-drawer/index.ts";
 
 /**

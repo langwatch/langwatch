@@ -60,9 +60,9 @@ vi.mock("../../../../errors/index.ts", () => ({
 }));
 
 import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
-import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store.ts";
 import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { useAnnotationSessionStore } from "../../../../../../features/annotation/behavior/annotation-session.store.ts";
+import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { EditModeBar } from "../edit-mode-bar.tsx";
 
 function renderBar() {

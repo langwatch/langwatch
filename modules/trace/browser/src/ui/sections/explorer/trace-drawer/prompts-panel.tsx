@@ -24,14 +24,14 @@ import {
 } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { useSpansFull } from "../../../../features/span/ui/sections/hooks/use-spans-full.ts";
+import { usePromptByHandle } from "../../../../features/trace-drawer/ui/sections/hooks/use-prompt-by-handle.ts";
 import type { PromptReference } from "../../../../model/prompt-attributes.ts";
 import {
   extractPromptReference,
   parseTracePromptIds,
   promptReferenceKey,
 } from "../../../../model/prompt-attributes.ts";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
-import { useSpansFull } from "../hooks/use-spans-full.ts";
 
 interface PromptsPanelProps {
   trace: TraceHeader;

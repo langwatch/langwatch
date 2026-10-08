@@ -23,7 +23,7 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawerParams: () => host.params,
 }));
 
-vi.mock("../../hooks/use-open-trace-drawer.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts", () => ({
   useOpenTraceDrawer: () => host.openTrace,
 }));
 

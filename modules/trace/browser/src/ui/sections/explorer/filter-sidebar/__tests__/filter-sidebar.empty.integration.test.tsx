@@ -27,7 +27,7 @@ vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: mockHasAnyTraces }),
 }));
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({
     data: mockDescriptors,
     isLoading: mockFacetsLoading,
@@ -36,7 +36,7 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
 
 // The counts read: mocked out here so these render tests keep proving what the
 // discovery alone puts on the rail.
-vi.mock("../../hooks/use-filtered-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-filtered-trace-facets.ts", () => ({
   useFilteredTraceFacets: () => ({
     data: undefined,
     isPlaceholderData: false,
@@ -45,22 +45,25 @@ vi.mock("../../hooks/use-filtered-trace-facets.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
+vi.mock("../../../../../features/explorer/behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({ density: "comfortable" }),
 }));
-vi.mock("../../../../../behavior/facet-visibility.store.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({
-      showFacet: vi.fn(),
-      hideFacet: vi.fn(),
-      resetAll: vi.fn(),
-      hydrateFromStorage: vi.fn(),
-    }),
-  selectVisibilityFor: () => ({ hidden: [], shown: [] }),
-}));
+vi.mock(
+  "../../../../../features/facet/behavior/facet-visibility.store.ts",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    useFacetVisibilityStore: (selector: (state: Record<string, unknown>) => unknown) =>
+      selector({
+        showFacet: vi.fn(),
+        hideFacet: vi.fn(),
+        resetAll: vi.fn(),
+        hydrateFromStorage: vi.fn(),
+      }),
+    selectVisibilityFor: () => ({ hidden: [], shown: [] }),
+  }),
+);
 vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof actualModule0>();
   return {
@@ -95,7 +98,7 @@ vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/facet-lens.store.ts", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>
     selector({
       lens: { sectionOrder: [], groupOrder: [] },

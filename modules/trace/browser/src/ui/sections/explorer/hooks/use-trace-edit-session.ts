@@ -4,7 +4,7 @@ import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
-} from "../../../../behavior/trace-edit.store.ts";
+} from "../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { useTraceEditOverlay } from "./use-trace-edit-overlay.ts";
 
 /**

@@ -26,10 +26,10 @@ vi.mock("../../trace-drawer/index.ts", () => ({
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
 import { drawerChrome } from "../../../../../behavior/drawer-chrome.store.ts";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
+import { useOpenTraceDrawer } from "../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts";
 import { traceWeb } from "../../../../../trace.web.ts";
 import type { TraceListItem } from "../../types/trace.ts";
-import { useOpenTraceDrawer } from "../use-open-trace-drawer.ts";
 
 const PAGE = "/my-project/simulations";
 const TRACE = "trace-1";

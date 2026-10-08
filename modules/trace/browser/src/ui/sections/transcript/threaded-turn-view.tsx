@@ -4,7 +4,7 @@ import { type ChatLayout, type ConversationTurn } from "@langwatch/trace-contrac
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuUser } from "react-icons/lu";
 
-import { useIsScenarioRole } from "../../../behavior/scenario-role.store.tsx";
+import { useIsScenarioRole } from "../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { summarizeTurn } from "../../../model/transcript/turns.ts";
 import { getRolePalette, ROLE_ICONS, ROLE_LABELS } from "../../blocks/transcript/role-chip.tsx";
 import { FlatTurnView } from "./flat-turn-view.tsx";

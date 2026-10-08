@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 
 // The header's translate hook dispatches through tRPC; these tests pin
 // container chrome, so stub it to the identity passthrough.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,

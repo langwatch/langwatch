@@ -9,9 +9,9 @@ import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({ canManageAnnotations: true }));
 
-vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
-    "../../../../../../behavior/scenario-role.store.tsx",
+    "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
   );
   return { ...actual, useIsScenarioRole: () => false };
 });
@@ -58,8 +58,8 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
-import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
+import { useAnnotationDraftStore } from "../../../../../../features/annotation/behavior/annotation-draft.store.ts";
+import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";

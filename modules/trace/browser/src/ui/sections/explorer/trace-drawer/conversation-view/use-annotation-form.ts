@@ -13,10 +13,10 @@ import {
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useMemo, useState } from "react";
 
-import { useAnnotationQueueSessionStore } from "../../../../../behavior/annotation-queue-session.store.ts";
-import { useAnnotationSessionStore } from "../../../../../behavior/annotation-session.store.ts";
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { useAnnotationQueueSessionStore } from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
+import { useAnnotationSessionStore } from "../../../../../features/annotation/behavior/annotation-session.store.ts";
 import { showErrorToast } from "../../../errors/index.ts";
 import { useAnnotationInvalidation } from "../../../use-annotation-invalidation.ts";
 

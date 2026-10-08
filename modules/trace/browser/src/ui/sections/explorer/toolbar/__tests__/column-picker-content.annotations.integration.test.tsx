@@ -18,7 +18,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-evaluator-options.ts", () => ({
+vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
@@ -36,7 +36,7 @@ vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../../behavior/time-format.store.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/time-format.store.ts", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>
     selector({ format: "relative", setFormat: vi.fn() }),
 }));

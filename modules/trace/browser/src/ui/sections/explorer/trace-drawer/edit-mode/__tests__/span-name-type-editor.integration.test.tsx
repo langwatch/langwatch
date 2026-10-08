@@ -11,7 +11,7 @@ import {
   buildTraceEditPatch,
   selectIsTraceEditDirty,
   useTraceEditStore,
-} from "../../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { SpanNameTypeEditor } from "../span-name-type-editor.tsx";
 
 const CAPTURED_NAME = "handler";

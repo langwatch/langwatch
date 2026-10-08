@@ -13,9 +13,13 @@ import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
-import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { useAnchoredAnnotations } from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
+import { useTraceEvaluations } from "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-evaluations.ts";
+import { useTraceEvents } from "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-events.ts";
+import { useTraceHeaderCanonical } from "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
 import { changedTraceMetadataKeys } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
@@ -29,11 +33,7 @@ import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/tra
 import { PrivacyDroppedNotice } from "../../../privacy-dropped-notice.tsx";
 import { RedactedField } from "../../../redacted-field.tsx";
 import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
-import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
 import { useAppliedTraceEditPatch } from "../../hooks/use-trace-edit-overlay.ts";
-import { useTraceEvaluations } from "../../hooks/use-trace-evaluations.ts";
-import { useTraceEvents } from "../../hooks/use-trace-events.ts";
-import { useTraceHeaderCanonical } from "../../hooks/use-trace-header.ts";
 import { useTraceResources } from "../../hooks/use-trace-resources.ts";
 import { commentCountsBySection } from "../anchored-comments/section-comments.ts";
 import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";

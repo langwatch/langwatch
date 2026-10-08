@@ -3,7 +3,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 
 import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import { useTraceEditStore } from "../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**

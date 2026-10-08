@@ -3,7 +3,7 @@ import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { IconType } from "react-icons";
 import { LuBot, LuCode, LuSettings, LuUser, LuWrench } from "react-icons/lu";
 
-import { useIsScenarioRole } from "../../../behavior/scenario-role.store.tsx";
+import { useIsScenarioRole } from "../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 
 export const ROLE_LABELS: Record<string, string> = {
   system: "SYSTEM",

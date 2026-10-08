@@ -19,13 +19,13 @@ import { BookOpen } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 
-import type { FacetGroupDef } from "../../../../behavior/facet-constants.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import type { FacetGroupDef } from "../../../../features/facet/behavior/facet-constants.ts";
 import {
   FACET_GROUPS,
   getFacetGroupId,
   GROUP_ICONS,
-} from "../../../../behavior/facet-constants.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
+} from "../../../../features/facet/behavior/facet-constants.ts";
 import { getFacetIcon } from "../filter-sidebar/utils.ts";
 
 interface SuggestionDropdownProps {

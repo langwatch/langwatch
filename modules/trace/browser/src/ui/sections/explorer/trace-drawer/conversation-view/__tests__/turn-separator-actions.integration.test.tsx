@@ -12,9 +12,9 @@ const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
 }));
 
-vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
-    "../../../../../../behavior/scenario-role.store.tsx",
+    "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
   );
   return { ...actual, useIsScenarioRole: () => false };
 });
@@ -57,13 +57,13 @@ import {
   openTraceDrawerAt,
   setWindowAddress,
 } from "../../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../../behavior/annotation-queue-session.store.ts";
-import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
-import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
+import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
+import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";

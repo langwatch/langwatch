@@ -38,26 +38,29 @@ vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
-  useAnchoredAnnotations: () => ({
-    commentsAt: () => [],
-    all: mocks.comments,
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
+  () => ({
+    useAnchoredAnnotations: () => ({
+      commentsAt: () => [],
+      all: mocks.comments,
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 vi.mock("../../../hooks/use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({ traceId: "trace-1" }),
 }));
 
-vi.mock("../../../hooks/use-span-langwatch-signals.ts", () => ({
+vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-langwatch-signals.ts", () => ({
   useSpanLangwatchSignals: () => ({
     signalsBySpanId: new Map(),
     isFetched: true,
   }),
 }));
 
-vi.mock("../../../hooks/use-span-logs.ts", () => ({
+vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-logs.ts", () => ({
   useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
 }));
 

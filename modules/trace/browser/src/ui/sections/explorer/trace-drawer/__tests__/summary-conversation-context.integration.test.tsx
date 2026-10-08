@@ -24,13 +24,16 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
   useTraceDrawer: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
-  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
-}));
+vi.mock(
+  "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
+  () => ({
+    useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+  }),
+);
 
 // The panel-level translate toggle dispatches through tRPC; stub it to an
 // identity passthrough so these tests don't need a tRPC client.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -39,13 +42,34 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
-  useConversationContext: (conversationId: string | null, traceId: string) => ({
-    conversationId,
-    total: 2,
-    position: 2,
-    turns: [
-      {
+vi.mock(
+  "../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts",
+  () => ({
+    useConversationContext: (conversationId: string | null, traceId: string) => ({
+      conversationId,
+      total: 2,
+      position: 2,
+      turns: [
+        {
+          traceId: "trace_prev",
+          timestamp: 1,
+          name: "prev",
+          rootSpanType: null,
+          status: "ok",
+          input: "earlier question",
+          output: "earlier answer",
+        },
+        {
+          traceId,
+          timestamp: 2,
+          name: "curr",
+          rootSpanType: null,
+          status: "ok",
+          input: "current question",
+          output: "current answer",
+        },
+      ],
+      previous: {
         traceId: "trace_prev",
         timestamp: 1,
         name: "prev",
@@ -54,29 +78,11 @@ vi.mock("../../hooks/use-conversation-context.ts", () => ({
         input: "earlier question",
         output: "earlier answer",
       },
-      {
-        traceId,
-        timestamp: 2,
-        name: "curr",
-        rootSpanType: null,
-        status: "ok",
-        input: "current question",
-        output: "current answer",
-      },
-    ],
-    previous: {
-      traceId: "trace_prev",
-      timestamp: 1,
-      name: "prev",
-      rootSpanType: null,
-      status: "ok",
-      input: "earlier question",
-      output: "earlier answer",
-    },
-    next: null,
-    isLoading: false,
+      next: null,
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 import { ConversationContext } from "../conversation-context.tsx";
 

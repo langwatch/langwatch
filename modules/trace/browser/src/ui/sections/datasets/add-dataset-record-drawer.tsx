@@ -11,7 +11,6 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
-import { useAnnotationQueueSessionStore } from "../../../behavior/annotation-queue-session.store.ts";
 import { useDatasets } from "../../../behavior/reads/use-project-reads.ts";
 import { useTracesWithSpans } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
@@ -20,6 +19,7 @@ import {
   useCreateDatasetRecord,
   useInvalidateDatasets,
 } from "../../../behavior/writes/use-trace-writes.ts";
+import { useAnnotationQueueSessionStore } from "../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { Drawer } from "../drawer.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";

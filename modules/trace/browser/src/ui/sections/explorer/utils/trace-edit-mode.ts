@@ -2,7 +2,7 @@ import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
-} from "../../../../behavior/trace-edit.store.ts";
+} from "../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { isUneditableViewMode, TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 
 /**

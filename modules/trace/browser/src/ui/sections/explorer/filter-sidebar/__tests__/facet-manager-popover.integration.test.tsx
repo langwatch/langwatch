@@ -5,7 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
+import type { NumericMode } from "../../../../../features/explorer/behavior/numeric-mode.store.ts";
 import { FacetManagerPopover } from "../facet-manager-popover.tsx";
 
 const LABELS: Record<string, string> = {

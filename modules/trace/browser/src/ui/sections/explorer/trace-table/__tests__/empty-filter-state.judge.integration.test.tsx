@@ -12,17 +12,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
-import { useSearchSubmitRequestStore } from "../../../../../behavior/search-submit-request.store.ts";
+import { useSearchSubmitRequestStore } from "../../../../../features/explorer/behavior/search-submit-request.store.ts";
 import { EmptyFilterState } from "../empty-filter-state.tsx";
 
 const QUERY = 'status:error AND eval:"is the user annoyed"';
 
-vi.mock("../../hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ instantEval: null }),
 }));
 
 let mockChips: { runId: string | null; question: string }[] = [];
-vi.mock("../../hooks/use-instant-eval-runs.ts", () => ({
+vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: mockChips }),
 }));
 

@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectTraceInputBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { EditableIOField } from "./editable-io-field.tsx";
 
 /**

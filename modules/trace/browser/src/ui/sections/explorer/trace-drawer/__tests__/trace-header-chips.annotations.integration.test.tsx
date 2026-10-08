@@ -13,27 +13,30 @@ const mocks = vi.hoisted(() => ({
   annotations: [] as unknown[],
 }));
 
-vi.mock("../../hooks/use-trace-header-chips.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header-chips.ts", () => ({
   useTraceHeaderChips: () => ({ chips: [] }),
 }));
 
-vi.mock("../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: { items: [{ traceId: "trace-2" }] } }),
 }));
 
-vi.mock("../../hooks/use-conversation-annotations.ts", () => ({
-  useConversationAnnotations: () => ({
-    byTrace: new Map(),
-    byAnchor: new Map(),
-    all: mocks.annotations,
-    hasAny: mocks.annotations.length > 0,
-    isLoading: false,
+vi.mock(
+  "../../../../../features/conversation/ui/sections/hooks/use-conversation-annotations.ts",
+  () => ({
+    useConversationAnnotations: () => ({
+      byTrace: new Map(),
+      byAnchor: new Map(),
+      all: mocks.annotations,
+      hasAny: mocks.annotations.length > 0,
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 // The trace as the reader sees it, which is what tells a comment left on a
 // span the trace still has from one left on a span a correction removed.
-vi.mock("../../hooks/use-span-tree.ts", () => ({
+vi.mock("../../../../../features/span/ui/sections/hooks/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [{ spanId: "span-7", name: "web_search" }] }),
 }));
 

@@ -5,13 +5,13 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-syste
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
-import {
-  isSessionMarked,
-  useAnnotationQueueSessionStore,
-} from "../../../../../behavior/annotation-queue-session.store.ts";
 import { useTraceAnnotations } from "../../../../../behavior/reads/use-annotation-reads.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { readableDate } from "../../../../../model/display-formatters.ts";
 import {
   HoverActionButton,

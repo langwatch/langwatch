@@ -2,7 +2,7 @@ import { ORIGIN_DISPLAY } from "@langwatch/trace-contract";
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
-import { FACET_COLORS } from "../../../../../behavior/facet-constants.ts";
+import { FACET_COLORS } from "../../../../../features/facet/behavior/facet-constants.ts";
 import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells.tsx";
 import type { TraceListItem } from "../../types/trace.ts";
 import { facetLabel, paletteFromColor } from "../utils.ts";

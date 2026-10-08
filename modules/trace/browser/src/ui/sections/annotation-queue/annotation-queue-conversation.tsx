@@ -11,8 +11,8 @@ import type { AnnotationQueueConversationProps } from "@langwatch/trace-contract
 import { useCallback, useMemo } from "react";
 
 import { useTraceById } from "../../../behavior/reads/use-trace-mapping-reads.ts";
-import { useConversationTurns } from "../explorer/hooks/use-conversation-turns.ts";
-import { useDrawerProjectId } from "../explorer/hooks/use-drawer-project-id.ts";
+import { useConversationTurns } from "../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts";
+import { useDrawerProjectId } from "../../../features/trace-drawer/ui/sections/hooks/use-drawer-project-id.ts";
 import { ConversationView } from "../explorer/trace-drawer/conversation-view/conversation-view.tsx";
 import { legacyTraceToTurn } from "../explorer/utils/legacy-trace-to-turn.ts";
 import { IsolatedErrorBoundary } from "../isolated-error-boundary.tsx";

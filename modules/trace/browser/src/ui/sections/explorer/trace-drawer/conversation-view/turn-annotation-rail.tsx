@@ -1,14 +1,14 @@
 import { Button, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Edit3 } from "lucide-react";
 
+import { useRequiredSession } from "../../../../../behavior/auth-session.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   type AnnotationDraft,
   isTurnRailDraft,
   type OpenAnnotationDraftParams,
   useAnnotationDraftStore,
-} from "../../../../../behavior/annotation-draft.store.ts";
-import { useRequiredSession } from "../../../../../behavior/auth-session.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+} from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { useScoreNamesById } from "../../../use-score-names-by-id.ts";
 import { AnnotationCard } from "./annotation-card.tsx";

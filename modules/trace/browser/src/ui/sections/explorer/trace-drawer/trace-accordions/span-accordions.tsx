@@ -13,6 +13,9 @@ import { LuCircleX } from "react-icons/lu";
 
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import { useAnchoredAnnotations } from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+import { useSpanDetail } from "../../../../../features/span/ui/sections/hooks/use-span-detail.ts";
+import { useSpanLogs } from "../../../../../features/span/ui/sections/hooks/use-span-logs.ts";
 import {
   logEventTone,
   summarizeLogEvent,
@@ -27,9 +30,6 @@ import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/tra
 import { UnmappedCostSuggestion } from "../../../../elements/explorer/trace-drawer/trace-accordions/unmapped-cost-suggestion.tsx";
 import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../../../content-privacy-markers.tsx";
 import { RedactedField } from "../../../redacted-field.tsx";
-import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
-import { useSpanDetail } from "../../hooks/use-span-detail.ts";
-import { useSpanLogs } from "../../hooks/use-span-logs.ts";
 import { useTraceResources } from "../../hooks/use-trace-resources.ts";
 import { commentCountsBySection } from "../anchored-comments/section-comments.ts";
 import { type AttributeComments, AttributeTable } from "../attribute-table.tsx";

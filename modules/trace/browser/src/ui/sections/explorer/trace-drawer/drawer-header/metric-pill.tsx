@@ -4,7 +4,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback } from "react";
 import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 
-import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store.ts";
+import type { PinnedAttribute } from "../../../../../features/facet/behavior/pinned-attributes.store.ts";
 import { useCopyToClipboard } from "../../../../../index.ts";
 import { TooltipRow } from "../../../../elements/explorer/shared/tooltip-row.tsx";
 

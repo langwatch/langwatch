@@ -6,7 +6,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import {
   CorrectedFieldFrame,
   CorrectedScalar,

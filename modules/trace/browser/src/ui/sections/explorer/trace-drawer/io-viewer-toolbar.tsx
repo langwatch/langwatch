@@ -3,10 +3,10 @@ import type { ChatLayout } from "@langwatch/trace-contract/transcript";
 import { useMemo, useRef } from "react";
 
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+import type { TraceAnchor } from "../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+import type { useTextTranslation } from "../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
 import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
-import type { TraceAnchor } from "../hooks/use-anchored-annotations.ts";
-import type { useTextTranslation } from "../hooks/use-text-translation.ts";
 import { type IOAction, useIOActions } from "./io-actions.tsx";
 import { formatSelectOptions } from "./io-format-options.ts";
 import { CopyButton } from "./io-toolbar-buttons.tsx";

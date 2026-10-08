@@ -26,9 +26,9 @@ import {
   useTracePinRead,
   useUnpinTrace,
 } from "../../../../../behavior/writes/use-trace-writes.ts";
+import { useConversationTurns } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
 import { enterTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 interface TraceOverflowMenuProps {

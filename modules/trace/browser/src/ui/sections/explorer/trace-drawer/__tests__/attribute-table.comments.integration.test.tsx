@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock(
-  "../../../../../behavior/lent-annotation-form.tsx",
+  "../../../../../features/annotation/behavior/lent-annotation-form.tsx",
   () => import("../../../__tests__/lent-annotation-form.stand-in.tsx"),
 );
 

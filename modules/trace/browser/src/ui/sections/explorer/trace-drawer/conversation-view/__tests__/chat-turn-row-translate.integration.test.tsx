@@ -9,9 +9,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+vi.mock("../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx", async () => {
   const actual = await vi.importActual<typeof scenarioRolesModule>(
-    "../../../../../../behavior/scenario-role.store.tsx",
+    "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx",
   );
   return { ...actual, useIsScenarioRole: () => false };
 });
@@ -84,7 +84,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 
 import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
-import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
+import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import type { TraceListItem } from "../../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";

@@ -11,9 +11,12 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
     selector({ viewMode: "summary" }),
 }));
 
-vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
-  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
-}));
+vi.mock(
+  "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
+  () => ({
+    useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+  }),
+);
 
 // RedactedInline looks up org permissions for the settings link.
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -84,7 +87,7 @@ const turnsState = {
 
 // The panel-level translate toggle dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to an identity passthrough.
-vi.mock("../../hooks/use-text-translation.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
     isActive: false,
@@ -93,9 +96,12 @@ vi.mock("../../hooks/use-text-translation.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-conversation-context.ts", () => ({
-  useConversationContext: () => turnsState,
-}));
+vi.mock(
+  "../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts",
+  () => ({
+    useConversationContext: () => turnsState,
+  }),
+);
 
 import { ConversationContext } from "../conversation-context.tsx";
 

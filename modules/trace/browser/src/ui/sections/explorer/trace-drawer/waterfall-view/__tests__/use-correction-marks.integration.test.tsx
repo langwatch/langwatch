@@ -19,7 +19,7 @@ vi.mock("../../../../../../behavior/trace-drawer.ts", () => ({
   useTraceDrawer: (selector: (s: unknown) => unknown) => selector({ isEditing: harness.isEditing }),
 }));
 
-vi.mock("../../../../../../behavior/trace-edit.store.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/trace-edit.store.ts", () => ({
   useTraceEditStore: (selector: (s: unknown) => unknown) =>
     selector({ overlayView: harness.overlayView, basePatch: null }),
 }));

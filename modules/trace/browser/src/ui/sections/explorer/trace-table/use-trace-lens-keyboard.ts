@@ -2,7 +2,7 @@ import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import type React from "react";
 import { useCallback, useState } from "react";
 
-import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer.ts";
+import { useOpenTraceDrawer } from "../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts";
 import type { TraceListItem } from "../types/trace.ts";
 
 interface TraceLensKeyboard {

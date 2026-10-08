@@ -1,7 +1,7 @@
 import { Text } from "@langwatch/design-system/primitives";
 import type React from "react";
 
-import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
+import { useExplorerCounts } from "../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts";
 
 /**
  * The sidebar's total: the same number the pagination line shows, from the

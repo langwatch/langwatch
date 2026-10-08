@@ -31,13 +31,16 @@ vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
 
 // The trace's comments are read once per surface. This suite is about the
 // correction, so the surface reads none.
-vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
-  useAnchoredAnnotations: () => ({
-    commentsAt: () => [],
-    all: [],
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
+  () => ({
+    useAnchoredAnnotations: () => ({
+      commentsAt: () => [],
+      all: [],
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 // The comment action on each row carries its own composer, which reads over
 // tRPC. It has its own tests; this suite is about the correction.
@@ -45,21 +48,24 @@ vi.mock("../../anchored-comments/anchor-comment-button.tsx", () => ({
   AnchorCommentButton: () => null,
 }));
 
-vi.mock("../../../hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
-vi.mock("../../../hooks/use-trace-events.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-events.ts", () => ({
   useTraceEvents: () => ({ events: [], isLoading: false }),
 }));
 
-vi.mock("../../../hooks/use-trace-evaluations.ts", () => ({
-  useTraceEvaluations: () => ({
-    rich: [],
-    pendingCount: 0,
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-evaluations.ts",
+  () => ({
+    useTraceEvaluations: () => ({
+      rich: [],
+      pendingCount: 0,
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   useTraceResources: () => ({
@@ -79,7 +85,7 @@ import {
 import {
   buildTraceEditPatch,
   useTraceEditStore,
-} from "../../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { TraceSummaryAccordions } from "../trace-summary-accordions.tsx";
 
 const TRACE_ID = "trace-1";

@@ -29,7 +29,7 @@ import { useEffect, useRef } from "react";
 import {
   COLUMN_DRAG_THRESHOLD_PX,
   useColumnEducationStore,
-} from "../../../../behavior/column-education.store.ts";
+} from "../../../../features/explorer/behavior/column-education.store.ts";
 import { ColumnResizeGrip } from "../../../elements/explorer/trace-table/column-resize-grip.tsx";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells.tsx";
 

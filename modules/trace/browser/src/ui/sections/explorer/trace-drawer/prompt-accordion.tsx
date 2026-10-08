@@ -15,8 +15,8 @@ import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
+import { usePromptByHandle } from "../../../../features/trace-drawer/ui/sections/hooks/use-prompt-by-handle.ts";
 import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
-import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
 
 export { hasPromptMetadata };
 

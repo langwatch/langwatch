@@ -16,12 +16,16 @@ import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useMemo, useState } from "react";
 
+import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
-} from "../../../../../behavior/annotation-queue-session.store.ts";
-import { useIsScenarioRole } from "../../../../../behavior/scenario-role.store.tsx";
-import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
+} from "../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
+import { useIsScenarioRole } from "../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import { formatRelativeTimeAgo } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
@@ -29,10 +33,6 @@ import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/
 import { Markdown } from "../../../markdown.tsx";
 import { RedactedInline } from "../../../redacted-field.tsx";
 import { TraceMediaStrip } from "../../../traces/trace-media-strip.tsx";
-import {
-  type UseTextTranslationResult,
-  useTextTranslation,
-} from "../../hooks/use-text-translation.ts";
 import {
   Bubble,
   type BubbleSide,

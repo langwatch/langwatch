@@ -3,7 +3,7 @@ import { Box, VStack } from "@langwatch/design-system/primitives";
 import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";
 
-import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store.ts";
+import type { PinnedAttribute } from "../../../../../features/facet/behavior/pinned-attributes.store.ts";
 import { PinnedMetricPill } from "./metric-pill.tsx";
 
 export type PinCategory = "identity" | "run" | "tag" | "custom";

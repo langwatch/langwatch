@@ -38,18 +38,21 @@ vi.mock("../../../../../behavior/explorer.store.ts", () => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/density.store.ts", async (importOriginal) => ({
+vi.mock("../../../../../features/explorer/behavior/density.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useDensityStore: (selector: (state: unknown) => unknown) => selector({ density: mockDensity }),
 }));
-vi.mock("../../../../../behavior/refresh-ui.store.ts", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useRefreshUIStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      pulse: vi.fn(),
-      setReplacingData: mockSetReplacingData,
-    }),
-}));
+vi.mock(
+  "../../../../../features/explorer/behavior/refresh-ui.store.ts",
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    useRefreshUIStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        pulse: vi.fn(),
+        setReplacingData: mockSetReplacingData,
+      }),
+  }),
+);
 
 // ─── Module under test ────────────────────────────────────────────────────────
 import { useViewSwitchingDim } from "../use-view-switching-dim.ts";

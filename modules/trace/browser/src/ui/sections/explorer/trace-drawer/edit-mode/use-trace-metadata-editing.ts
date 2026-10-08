@@ -7,7 +7,7 @@ import { useCallback, useMemo } from "react";
 import {
   selectTraceMetadataBaseline,
   useTraceEditStore,
-} from "../../../../../behavior/trace-edit.store.ts";
+} from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import type { AttributeEditing } from "../attribute-table.tsx";
 
 type StoredMetadata = NonNullable<

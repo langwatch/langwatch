@@ -12,12 +12,12 @@ import "@testing-library/jest-dom/vitest";
 // level. This suite renders FacetSection without a tRPC provider, so stub the
 // hook out — server search has its own dedicated suite
 // (FacetSection.serverSearch.integration.test.tsx).
-vi.mock("../../../../ui/sections/explorer/hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../features/facet/ui/sections/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
-import { useFacetLensStore } from "../../../facet-lens.store.ts";
 import type { FacetItem, FacetValueState } from "../types.ts";
 
 beforeEach(() => {

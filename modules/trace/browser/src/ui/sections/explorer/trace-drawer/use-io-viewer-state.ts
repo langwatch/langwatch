@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-import { useChatLayoutPref } from "../../../../behavior/chat-layout-pref.store.ts";
+import { useChatLayoutPref } from "../../../../features/trace-drawer/behavior/chat-layout-pref.store.ts";
 
 export type ViewFormat = "pretty" | "text" | "json" | "markdown";
 export type MarkdownSubmode = "rendered" | "source";

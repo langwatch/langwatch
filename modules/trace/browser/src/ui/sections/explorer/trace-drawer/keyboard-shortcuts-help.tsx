@@ -20,8 +20,8 @@ import {
   LuNavigation,
 } from "react-icons/lu";
 
+import { TRACE_DRAWER_HELP_GROUPS } from "../../../../features/trace-drawer/ui/sections/hooks/trace-drawer-shortcut-table.ts";
 import { Dialog } from "../../dialog.tsx";
-import { TRACE_DRAWER_HELP_GROUPS } from "../hooks/trace-drawer-shortcut-table.ts";
 
 type GroupAccent = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 

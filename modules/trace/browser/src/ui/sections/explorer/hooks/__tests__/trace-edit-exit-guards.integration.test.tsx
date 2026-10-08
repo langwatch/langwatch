@@ -61,8 +61,10 @@ const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar
 const { drawerChrome, getTraceDrawer, useTraceEditStore } = await import("../../../../../index.ts");
 const { setWindowAddress } = await import("../../../../../__tests__/window-location-router.ts");
 const { guardTraceEditExit } = await import("../../utils/trace-edit-mode.ts");
-const { useTraceDrawerNavigation } = await import("../use-trace-drawer-navigation.ts");
-const { useTraceDrawerUrlHydrator } = await import("../use-trace-drawer-url-hydrator.ts");
+const { useTraceDrawerNavigation } =
+  await import("../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts");
+const { useTraceDrawerUrlHydrator } =
+  await import("../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-url-hydrator.ts");
 
 const TRACE = "trace-1";
 const EARLIER_TRACE = "trace-0";

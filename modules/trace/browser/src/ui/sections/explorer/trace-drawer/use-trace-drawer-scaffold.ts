@@ -4,14 +4,14 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useConversationContext } from "../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts";
+import { useConversationPrefetch } from "../../../../features/conversation/ui/sections/hooks/use-conversation-prefetch.ts";
+import { usePrefetchSpanDetail } from "../../../../features/span/ui/sections/hooks/use-prefetch-span-detail.ts";
+import { useSpanTreeWithCaptured } from "../../../../features/span/ui/sections/hooks/use-span-tree.ts";
+import { useTraceDrawerNavigation } from "../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts";
+import { useTraceDrawerShortcuts } from "../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-shortcuts.ts";
+import { useTraceHeader } from "../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts";
 import { TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
-import { useConversationContext } from "../hooks/use-conversation-context.ts";
-import { useConversationPrefetch } from "../hooks/use-conversation-prefetch.ts";
-import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
-import { useSpanTreeWithCaptured } from "../hooks/use-span-tree.ts";
-import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
-import { useTraceDrawerShortcuts } from "../hooks/use-trace-drawer-shortcuts.ts";
-import { useTraceHeader } from "../hooks/use-trace-header.ts";
 import { useTraceRefresh } from "../hooks/use-trace-refresh.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 

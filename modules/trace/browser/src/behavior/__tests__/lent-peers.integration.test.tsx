@@ -18,7 +18,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   useUiDeclarations: () => declarations.current,
 }));
 
-import { AnnotateBody } from "../lent-annotation-form.tsx";
+import { AnnotateBody } from "../../features/annotation/behavior/lent-annotation-form.tsx";
 import { LentMediaPart } from "../lent-media-part.tsx";
 
 const peerLends = uiDeclarations([

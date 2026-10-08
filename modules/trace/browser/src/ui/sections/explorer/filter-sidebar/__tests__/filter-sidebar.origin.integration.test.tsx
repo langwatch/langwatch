@@ -27,11 +27,11 @@ vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
 
 const descriptors = vi.hoisted(() => [] as unknown[]);
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: descriptors, isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-filtered-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-filtered-trace-facets.ts", () => ({
   useFilteredTraceFacets: () => ({
     data: descriptors,
     isPlaceholderData: false,
@@ -40,7 +40,7 @@ vi.mock("../../hooks/use-filtered-trace-facets.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false, isFetching: false }),
 }));
 

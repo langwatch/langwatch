@@ -3,18 +3,18 @@ import { Box, Flex, Icon, IconButton, Input, Text } from "@langwatch/design-syst
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
 
-import { useFindAutoFocusInput } from "../../behavior/find-auto-focus-input.ts";
-import { useFindMatchCycling } from "../../behavior/find-match-cycling.ts";
-import { useFindScrollTraceIntoView } from "../../behavior/find-scroll-trace-into-view.ts";
+import { useTraceList } from "../../features/explorer/ui/sections/hooks/use-trace-list.ts";
+import { useFindAutoFocusInput } from "../../features/find/behavior/find-auto-focus-input.ts";
+import { useFindMatchCycling } from "../../features/find/behavior/find-match-cycling.ts";
+import { useFindScrollTraceIntoView } from "../../features/find/behavior/find-scroll-trace-into-view.ts";
 import {
   MIN_QUERY_LENGTH,
   useTraceSearchIndex,
   type TraceSearchItem,
-} from "../../behavior/find-search-index.ts";
-import { useFindStore } from "../../behavior/find-store.ts";
+} from "../../features/find/behavior/find-search-index.ts";
+import { useFindStore } from "../../features/find/behavior/find-store.ts";
 import { FindMatchCounter } from "../elements/find-match-counter.tsx";
 import { FindMatchHighlight } from "../elements/find-match-highlight.tsx";
-import { useTraceList } from "./explorer/hooks/use-trace-list.ts";
 
 type TraceFindBarProps = {
   traces: TraceSearchItem[];

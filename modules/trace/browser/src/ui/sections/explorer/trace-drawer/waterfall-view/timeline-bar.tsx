@@ -2,7 +2,7 @@ import { Box, Flex } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { memo, useCallback } from "react";
 
-import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
+import { useSpanHoverStore } from "../../../../../features/trace-drawer/behavior/span-hover.store.ts";
 import {
   BAR_HEIGHT,
   GROUP_ROW_HEIGHT,

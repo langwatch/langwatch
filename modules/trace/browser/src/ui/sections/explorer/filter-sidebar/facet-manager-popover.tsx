@@ -44,14 +44,14 @@ import {
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useUIStore } from "../../../../behavior/ui.store.ts";
+import type { NumericMode } from "../../../../features/explorer/behavior/numeric-mode.store.ts";
 import {
   FACET_PERSPECTIVES,
   getFacetGroupId,
   orderedGroupDefsForPerspective,
-} from "../../../../behavior/facet-constants.ts";
-import { useFacetLensStore } from "../../../../behavior/facet-lens.store.ts";
-import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
-import { useUIStore } from "../../../../behavior/ui.store.ts";
+} from "../../../../features/facet/behavior/facet-constants.ts";
+import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
 
 // Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
 // TracesPage). Below this + a little slack the "shown / total" count chip

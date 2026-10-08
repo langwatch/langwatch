@@ -21,7 +21,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/use-span-detail.ts", () => ({
+vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-detail.ts", () => ({
   useSpanDetail: () => ({
     data: mockDetailState.current,
     isLoading: false,
@@ -45,18 +45,21 @@ vi.mock("../../../hooks/use-trace-resources.ts", () => ({
 
 // SpanAccordions reads the trace's comments to count them on each section;
 // this test renders without a tRPC provider and no comment is in play here.
-vi.mock("../../../hooks/use-anchored-annotations.ts", () => ({
-  useAnchoredAnnotations: () => ({
-    commentsAt: () => [],
-    all: [],
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
+  () => ({
+    useAnchoredAnnotations: () => ({
+      commentsAt: () => [],
+      all: [],
+      isLoading: false,
+    }),
   }),
-}));
+);
 
 // SpanAccordions joins log content onto spans via a tRPC query; this test
 // renders without that provider, so stub the hook to the no-logs state.
 // Log enrichment is out of scope for the cost suggestion.
-vi.mock("../../../hooks/use-span-logs.ts", () => ({
+vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-logs.ts", () => ({
   useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
 }));
 

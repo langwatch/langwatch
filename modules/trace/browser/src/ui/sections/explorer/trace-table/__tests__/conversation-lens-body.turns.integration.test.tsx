@@ -24,8 +24,10 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), currentDrawer: null, closeDrawer: vi.fn() }),
   useDrawerParams: () => ({}),
 }));
-vi.mock("../../hooks/use-open-trace-drawer.ts", () => ({ useOpenTraceDrawer: () => vi.fn() }));
-vi.mock("../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts", () => ({
+  useOpenTraceDrawer: () => vi.fn(),
+}));
+vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: harness.turns }),
 }));
 vi.mock("../../utils/map-trace-list-payload.ts", () => ({

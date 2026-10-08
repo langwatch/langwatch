@@ -35,7 +35,7 @@ vi.mock("../use-trace-query-args.ts", () => ({
 }));
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
-import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { useAppliedTraceEditPatch, useTraceEditOverlay } from "../use-trace-edit-overlay.ts";
 
 const patch = (name: string): TraceEditOverlayPatch => ({

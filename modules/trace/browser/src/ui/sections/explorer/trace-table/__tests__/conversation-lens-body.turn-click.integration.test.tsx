@@ -41,7 +41,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => {
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
-vi.mock("../../hooks/span-tree-paged-query.ts", () => ({
+vi.mock("../../../../../features/span/ui/sections/hooks/span-tree-paged-query.ts", () => ({
   spanTreeQueryKey: (input: unknown) => ["spanTree", input],
   spanTreeQueryFn: () => () => undefined,
 }));
@@ -57,7 +57,7 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   }),
   useDrawerParams: () => ({}),
 }));
-vi.mock("../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: harness.turns }),
 }));
 vi.mock("../../utils/map-trace-list-payload.ts", () => ({

@@ -7,11 +7,11 @@ import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronsDownUp, LuChevronsUpDown, LuSparkles } from "react-icons/lu";
 
-import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { useAnchoredAnnotations } from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+import { useSpanLangwatchSignals } from "../../../../../features/span/ui/sections/hooks/use-span-langwatch-signals.ts";
+import { useSpanLogs } from "../../../../../features/span/ui/sections/hooks/use-span-logs.ts";
+import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations.ts";
-import { useSpanLangwatchSignals } from "../../hooks/use-span-langwatch-signals.ts";
-import { useSpanLogs } from "../../hooks/use-span-logs.ts";
 import { useTraceQueryArgs } from "../../hooks/use-trace-query-args.ts";
 import { GroupRow } from "./group-row.tsx";
 import { GroupTimelineBar, TimelineBar } from "./timeline-bar.tsx";

@@ -150,7 +150,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 
-import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store.ts";
+import { useAnnotationQueueSessionStore } from "../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */

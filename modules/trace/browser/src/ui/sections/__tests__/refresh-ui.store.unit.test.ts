@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useRefreshUIStore } from "../../../behavior/refresh-ui.store.ts";
+import { useRefreshUIStore } from "../../../features/explorer/behavior/refresh-ui.store.ts";
 
 beforeEach(() => {
   vi.useFakeTimers();

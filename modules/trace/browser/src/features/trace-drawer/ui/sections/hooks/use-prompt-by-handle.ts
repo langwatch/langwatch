@@ -1,0 +1,31 @@
+import { promptClient } from "@langwatch/prompt-client";
+
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import { useIsReadOnlyTrace } from "../../../../../ui/elements/explorer/context/trace-viewer-context.tsx";
+
+/**
+ * Live lookup of a prompt's *current* version by id-or-handle.
+ */
+export function usePromptByHandle(handle: string | null | undefined) {
+  const { project } = useOrganizationTeamProject();
+  const isReadOnly = useIsReadOnlyTrace();
+  const lookup = promptClient.prompts.getByIdOrHandle.useQuery(
+    {
+      idOrHandle: handle ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!handle && !isReadOnly,
+      retry: false,
+    },
+  );
+  return {
+    ...lookup,
+    latestVersion: lookup.data?.version ?? null,
+    // Friendly human-readable handle (e.g. "pizza-prompt") when the SDK
+    // emitted the opaque slug-id form (`prompt_xxx`). Null when the prompt
+    // never had a handle or the lookup hasn't resolved yet.
+    resolvedHandle: lookup.data?.handle ?? null,
+    missing: !!handle && lookup.isError,
+  };
+}

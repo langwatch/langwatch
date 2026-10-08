@@ -40,12 +40,15 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
 
 vi.mock("../../../../../../behavior/trace-api.ts", () => ({ api: { useUtils: () => utils } }));
 
-vi.mock("../../../hooks/use-conversation-context.ts", () => ({
-  useConversationContext: () => ({
-    turns: conversation.turns,
-    isLoading: conversation.isLoading,
+vi.mock(
+  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts",
+  () => ({
+    useConversationContext: () => ({
+      turns: conversation.turns,
+      isLoading: conversation.isLoading,
+    }),
   }),
-}));
+);
 
 const SESSION_TURNS = [
   { traceId: "turn-1", timestamp: 1_000, totalTokens: 1_000, totalCost: 0.5 },

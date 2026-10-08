@@ -19,7 +19,7 @@ vi.mock("../../../../elements/explorer/context/trace-viewer-context.tsx", () => 
 vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
   useTraceDrawer: (selector: (state: typeof storeState) => unknown) => selector(storeState),
 }));
-vi.mock("../use-drawer-project-id.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-drawer-project-id.ts", () => ({
   useDrawerProjectId: () => "p1",
 }));
 

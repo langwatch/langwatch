@@ -30,6 +30,10 @@ import {
   useState,
 } from "react";
 
+import { useConversationAnnotations } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-annotations.ts";
+import { useConversationTurnEvents } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-turn-events.ts";
+import { useConversationTurns } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts";
+import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts";
 import {
   isTurnRailDraft,
   RenderedMarkdown,
@@ -44,10 +48,6 @@ import {
   useScrollFocusedTurnIntoView,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/focused-turn.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import { useConversationAnnotations } from "../../hooks/use-conversation-annotations.ts";
-import { useConversationTurnEvents } from "../../hooks/use-conversation-turn-events.ts";
-import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
-import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
 import type { TraceListItem } from "../../types/trace.ts";
 import { AnnotatedTurnRow } from "./annotated-turn-row.tsx";
 import { SystemPromptBanner } from "./system-prompt-banner.tsx";

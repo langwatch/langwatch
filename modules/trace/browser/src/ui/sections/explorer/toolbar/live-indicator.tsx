@@ -6,8 +6,11 @@ import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
-import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
-import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
+import {
+  type LiveUpdatesMode,
+  useSseStatusStore,
+} from "../../../../features/explorer/behavior/sse-status.store.ts";
+import { useTraceListRefresh } from "../../../../features/explorer/ui/sections/hooks/use-trace-list-refresh.ts";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },

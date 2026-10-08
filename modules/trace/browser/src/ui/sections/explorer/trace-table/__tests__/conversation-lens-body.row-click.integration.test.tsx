@@ -32,7 +32,7 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
 
 // The expanded row's turns come from their own conversation-scoped query;
 // nothing here needs them to land, only whether the row asked to expand.
-vi.mock("../../hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 

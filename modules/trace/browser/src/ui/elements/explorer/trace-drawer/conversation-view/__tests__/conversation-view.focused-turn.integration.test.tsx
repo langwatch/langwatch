@@ -16,30 +16,42 @@ const mocks = vi.hoisted(() => {
   return { thread, turns: thread };
 });
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turns.ts", () => ({
-  useConversationTurns: () => ({
-    data: { items: mocks.turns },
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts",
+  () => ({
+    useConversationTurns: () => ({
+      data: { items: mocks.turns },
+      isLoading: false,
+    }),
   }),
-}));
+);
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-annotations.ts", () => ({
-  useConversationAnnotations: () => ({
-    byTrace: new Map(),
-    byAnchor: new Map(),
-    all: [],
-    hasAny: false,
-    isLoading: false,
+vi.mock(
+  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-annotations.ts",
+  () => ({
+    useConversationAnnotations: () => ({
+      byTrace: new Map(),
+      byAnchor: new Map(),
+      all: [],
+      hasAny: false,
+      isLoading: false,
+    }),
   }),
-}));
+);
 
-vi.mock("../../../../../sections/explorer/hooks/use-trace-drawer-navigation.ts", () => ({
-  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
-}));
+vi.mock(
+  "../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
+  () => ({
+    useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+  }),
+);
 
-vi.mock("../../../../../sections/explorer/hooks/use-conversation-turn-events.ts", () => ({
-  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
-}));
+vi.mock(
+  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turn-events.ts",
+  () => ({
+    useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+  }),
+);
 
 vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,

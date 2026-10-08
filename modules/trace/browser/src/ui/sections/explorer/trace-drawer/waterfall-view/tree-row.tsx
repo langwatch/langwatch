@@ -13,8 +13,8 @@ import {
   LuTriangleAlert,
 } from "react-icons/lu";
 
-import { useSpanHoverStore } from "../../../../../behavior/span-hover.store.ts";
-import { useSpanPulseStore } from "../../../../../behavior/span-pulse.store.ts";
+import { useSpanHoverStore } from "../../../../../features/trace-drawer/behavior/span-hover.store.ts";
+import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
 import { isSkillSpan } from "../../../../../model/transcript/skill-invocation.ts";
 import { LangwatchSignalBadges } from "../../../../elements/explorer/trace-drawer/langwatch-signal-badges.tsx";
 import { TipCell } from "../../../../elements/explorer/trace-drawer/waterfall-view/tip-cell.tsx";

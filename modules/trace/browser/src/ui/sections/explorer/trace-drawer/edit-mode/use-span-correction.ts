@@ -1,8 +1,8 @@
 import type { SpanDetail, TraceEditSpanField } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
+import { useSpanDetailCanonical } from "../../../../../features/span/ui/sections/hooks/use-span-detail.ts";
 import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { useSpanDetailCanonical } from "../../hooks/use-span-detail.ts";
 import { useAppliedTraceEditPatch } from "../../hooks/use-trace-edit-overlay.ts";
 
 /**

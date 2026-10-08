@@ -4,10 +4,10 @@ import { forwardRef, useState } from "react";
 import { LuMessageSquare } from "react-icons/lu";
 
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import type { TraceAnchor } from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
-import type { TraceAnchor } from "../../hooks/use-anchored-annotations.ts";
 import { AnnotationPopover } from "../conversation-view/annotation-popover.tsx";
 import { AnchorCommentThread } from "./anchor-comment-thread.tsx";
 

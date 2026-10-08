@@ -44,7 +44,7 @@ let visibleIdsResult = {
 
 // useVisibleTraceIds is in hooks/ (same level as useTraceFreshness), so
 // from __tests__/ the path to reach it is ../useVisibleTraceIds.
-vi.mock("../use-visible-trace-ids.ts", () => ({
+vi.mock("../../../../../features/explorer/ui/sections/hooks/use-visible-trace-ids.ts", () => ({
   useVisibleTraceIds: () => visibleIdsResult,
 }));
 
@@ -104,7 +104,7 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
 // Mutable live-updates mode — mutated in beforeEach / test body.
 let liveUpdatesMode: "live" | "ask" | "paused" = "live";
 
-vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/sse-status.store.ts", () => ({
   useSseStatusStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -125,7 +125,7 @@ vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
 // Track pulse calls per traceId.
 const pulseMock = vi.fn();
 
-vi.mock("../../../../../behavior/row-pulse.store.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/row-pulse.store.ts", () => ({
   useRowPulseStore: (selector: (s: { pulse: typeof pulseMock }) => unknown) =>
     selector({ pulse: pulseMock }),
 }));

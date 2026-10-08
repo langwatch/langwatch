@@ -2,10 +2,10 @@ import { nowInstant } from "@langwatch/time";
 
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useDrawerProjectId } from "../../../../features/trace-drawer/ui/sections/hooks/use-drawer-project-id.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
 import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness.ts";
 import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context.tsx";
-import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 /**
  * Shared base wiring for the per-trace tRPC queries fired off the open drawer (header,

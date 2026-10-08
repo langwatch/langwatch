@@ -16,13 +16,16 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
-vi.mock("../../hooks/use-instant-eval-access.ts", () => ({
-  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: "enable" }),
-}));
+vi.mock(
+  "../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-access.ts",
+  () => ({
+    useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: "enable" }),
+  }),
+);
 
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
 // query) at the top level. This suite renders SearchBar without a tRPC
@@ -36,7 +39,7 @@ vi.mock("../use-submit-search.ts", () => ({
   }),
 }));
 
-vi.mock("../../hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/ui/sections/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 

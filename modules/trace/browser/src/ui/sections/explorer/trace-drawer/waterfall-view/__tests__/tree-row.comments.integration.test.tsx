@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock(
-  "../../../../../../behavior/lent-annotation-form.tsx",
+  "../../../../../../features/annotation/behavior/lent-annotation-form.tsx",
   () => import("../../../../__tests__/lent-annotation-form.stand-in.tsx"),
 );
 
@@ -66,7 +66,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import { useSpanHoverStore } from "../../../../../../behavior/span-hover.store.ts";
+import { useSpanHoverStore } from "../../../../../../features/trace-drawer/behavior/span-hover.store.ts";
 import { TreeRow } from "../tree-row.tsx";
 import type { WaterfallTreeNode } from "../types.ts";
 

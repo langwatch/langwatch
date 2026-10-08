@@ -14,7 +14,7 @@ vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useAppliedTraceEditPatch: () => overlayData.current?.patch ?? null,
 }));
 
-vi.mock("../../../hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
@@ -23,13 +23,13 @@ vi.mock("react-router", async (importOriginal) => ({
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-vi.mock("../../../hooks/use-spans-full.ts", () => ({
+vi.mock("../../../../../../features/span/ui/sections/hooks/use-spans-full.ts", () => ({
   useSpansFullCanonical: () => ({ data: undefined }),
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));
 
 import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
-import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
+import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { EditedOriginalToggle } from "../edited-original-toggle.tsx";
 
 const patch: TraceEditOverlayPatch = {

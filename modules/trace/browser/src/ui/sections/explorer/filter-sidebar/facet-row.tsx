@@ -6,7 +6,7 @@ import {
   type FacetItem,
   type FacetValueState,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
 import { formatCount, paletteFromColor } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;

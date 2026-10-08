@@ -5,7 +5,7 @@ import {
   FACET_DEFAULTS,
   FACET_VALUE_ORDER,
   VIBRANT_FIELDS,
-} from "../../../../../behavior/facet-constants.ts";
+} from "../../../../../features/facet/behavior/facet-constants.ts";
 import { buildFacetItems, orderValues } from "../hooks/use-filter-sidebar-data.ts";
 
 /** A verdict facet as discover hands it over: counts, no order, no colour. */

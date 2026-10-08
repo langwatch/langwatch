@@ -5,13 +5,13 @@ import type { RestrictedAttribute } from "@langwatch/trace-contract";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { LuCheck, LuCopy, LuEye, LuLock, LuPin, LuPinOff } from "react-icons/lu";
 
-import type { PinnedAttributeSource } from "../../../../behavior/pinned-attributes.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { PinnedAttributeSource } from "../../../../features/facet/behavior/pinned-attributes.store.ts";
+import { usePinnedAttributes } from "../../../../features/facet/ui/sections/hooks/use-pinned-attributes.ts";
 import { sameAttributeValue, useCopyToClipboard } from "../../../../index.ts";
 import { FormatSelect } from "../../../blocks/explorer/trace-drawer/format-select.tsx";
 import { PinnedAwareJsonView } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import type { AnnotationByTrace } from "../../use-annotations-by-trace-ids.ts";
-import { usePinnedAttributes } from "../hooks/use-pinned-attributes.ts";
 import { AnchorCommentButton } from "./anchored-comments/anchor-comment-button.tsx";
 import {
   API_KEY_ATTRIBUTE_LABEL,

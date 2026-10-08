@@ -2,7 +2,10 @@
 import { clearReaderUiStorage, setUiStorageReader } from "@langwatch/browser-host/storage";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { timeColumnSizing, useTimeFormatStore } from "../../../behavior/time-format.store.ts";
+import {
+  timeColumnSizing,
+  useTimeFormatStore,
+} from "../../../features/explorer/behavior/time-format.store.ts";
 
 const READER = "reader-1";
 const STORAGE_KEY = `langwatch:user:${READER}:trace:time-format`;
