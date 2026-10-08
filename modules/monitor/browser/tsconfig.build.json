@@ -3,12 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
-    "paths": {
-      "@langwatch/monitor-browser": ["./src/online-evaluations.ts"]
-    }
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/online-evaluations.ts", "./src/monitor.web.ts"],
+  "files": ["./src/monitor.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
