@@ -561,8 +561,13 @@ export class GovernanceModule implements GovernanceRestApi {
     );
     this.codingAssistantBilling = CodingAssistantBillingFactService.create({
       policies: repositories.costAttributionPolicies,
-      record: (command) =>
-        this.codingAssistantBillingSender("recordCodingAssistantBilling").send(command),
+      // The command's schema is the event data with the envelope merged in, never a wrapper.
+      record: ({ tenantId, occurredAt, data }) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").send({
+          tenantId,
+          occurredAt,
+          ...data,
+        }),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
