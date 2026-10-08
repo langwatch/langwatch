@@ -49,9 +49,9 @@ async function harness(flagAnswer: boolean) {
         requestBound: ({ key }) => Promise.resolve(resolveRequestBound(key, "ENTERPRISE")),
       }),
       traces: createApiFixture<TraceApi>(),
-      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {

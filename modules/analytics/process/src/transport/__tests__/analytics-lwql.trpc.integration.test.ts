@@ -41,9 +41,9 @@ async function callerFor({ switchOn, held }: { switchOn: boolean; held: readonly
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org-1" }),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>(),
-      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {

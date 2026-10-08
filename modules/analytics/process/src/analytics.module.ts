@@ -3,6 +3,7 @@ import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest"
 import { defineProcessModule } from "@langwatch/process";
 
 import { AnalyticsModule } from "./app/analytics.app.ts";
+import { analyticsChannels } from "./channels/analytics-channels.registry.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import { analyticsRepositories } from "./repositories/analytics-repositories.registry.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
@@ -14,6 +15,7 @@ import { queryRest } from "./transport/query.rest.ts";
 
 export const analyticsProcessModule = defineProcessModule("analytics")
   .withRepositories(analyticsRepositories)
+  .withChannels(analyticsChannels)
   .withApi(AnalyticsModule)
   .withTransports(
     analyticsRest,

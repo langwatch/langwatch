@@ -42,9 +42,9 @@ async function appOver() {
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>({ translateLegacyFilters }),
-      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: {
       ...MemoryAnalyticsRepositories.create(),
       sessions: ClickHouseAnalyticsSessionsRepository.create(clickhouse),

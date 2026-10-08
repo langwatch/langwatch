@@ -53,13 +53,13 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
+import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -204,8 +204,6 @@ type AnalyticsDependencies = Readonly<{
   traces: typeof TraceApi;
   /** The owner of the platform retention default an evaluation row is stamped with. */
   retention: typeof DataRetentionApi;
-  /** Holds the budget, judges a synchronous query's eval columns and records the spend. */
-  instantEvals: typeof InstantEvalApi;
 }>;
 
 type LwqlProvisioningOperations = Readonly<{
@@ -277,7 +275,8 @@ type AnalyticsSetup = FeatureSetup<
   AnalyticsDependencies,
   never,
   AnalyticsServerConfig,
-  AnalyticsRepositories
+  AnalyticsRepositories,
+  AnalyticsChannels
 >;
 
 /**
@@ -328,8 +327,6 @@ export class AnalyticsModule
     /** Every app-function value is one of this peer's traces, rendered by it. */
     traces: TraceApi,
     retention: DataRetentionApi,
-    /** Judges a query's eval columns: the one accepted cycle (Alex, 2026-10-06, "Judge cycle"). */
-    instantEvals: InstantEvalApi,
   };
   static readonly config = analyticsServerConfig;
   /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
@@ -405,7 +402,7 @@ export class AnalyticsModule
       executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
       database: connection?.database ?? DEFAULT_LWQL_DATABASE,
       hydration,
-      judging: setup.dependencies.instantEvals,
+      judging: setup.channels.judge,
     });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     const app = new AnalyticsModule(

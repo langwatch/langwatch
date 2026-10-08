@@ -45,9 +45,9 @@ async function harness() {
           Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),
       }),
       traces: createApiFixture<TraceApi>(),
-      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>(),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: MemoryAnalyticsRepositories.create(),
     config: {
       langwatchQl: {

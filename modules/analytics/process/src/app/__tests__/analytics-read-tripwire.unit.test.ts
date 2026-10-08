@@ -80,11 +80,11 @@ async function harness(tripwireOn: boolean) {
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),
       traces: createApiFixture<TraceApi>(),
-      instantEvals: createApiFixture<InstantEvalApi>(),
       retention: createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
       }),
     },
+    channels: { judge: createApiFixture<InstantEvalApi>() },
     repositories: { ...MemoryAnalyticsRepositories.create(), analytics: repository },
     config: {
       langwatchQl: {

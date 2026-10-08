@@ -24,7 +24,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Its judging is specified in modules/instant-eval/specs/instant-eval-pipeline.feature,
     classifier.feature and instant-eval-cost.feature.
   - Analytics reaches the judge through InstantEvalApi.judgeQuery, which holds the budget,
-    judges and records the spend once (Alex, 2026-10-06, "Judge cycle": one accepted cycle).
+    judges and records the spend once (Alex, 2026-10-08, round 34: through a channel bound to InstantEvalApi, no peer).
     Cutting a conversation to the judge's budget is @unimplemented: hydration does not yet
     know the judge's limits.
 
