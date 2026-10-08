@@ -51,7 +51,95 @@ const ARCHIVED_AGENT = {
   },
 };
 
+/** Answers each path from its own table and records every call, as a host mount would. */
+class RoutedRpc extends UiRpc {
+  readonly calls: { path: string; input: unknown }[] = [];
+
+  constructor(private readonly bodies: Record<string, unknown>) {
+    super();
+  }
+
+  async query(path: string, input: unknown): Promise<unknown> {
+    this.calls.push({ path, input });
+    return this.bodies[path];
+  }
+
+  async mutate(path: string, input: unknown): Promise<unknown> {
+    return this.query(path, input);
+  }
+
+  subscribe(): UiRpcSubscription {
+    return { unsubscribe: () => undefined };
+  }
+}
+
+const WORKFLOW_AGENT = {
+  ...ARCHIVED_AGENT,
+  id: "agent_2",
+  type: "workflow",
+  archivedAt: null,
+  workflowId: "workflow_1",
+  config: { name: "Studio", workflow_id: "workflow_1" },
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: false,
+};
+
+const REFERENCE = { id: "agent_2", projectId: "project_1" };
+
 describe("the by-path agent client", () => {
+  /** @scenario "The archive dialog names the linked workflow through Workflow" */
+  describe("when the archive dialog asks for the linked workflow", () => {
+    it("names it from Workflow's own list for the agent's project", async () => {
+      const rpc = new RoutedRpc({
+        "agents.getById": WORKFLOW_AGENT,
+        "workflow.getAll": [
+          { id: "workflow_0", name: "Other" },
+          { id: "workflow_1", name: "Answering workflow" },
+        ],
+      });
+
+      const related = await TrpcAgentClient.create(rpc).relatedEntities(REFERENCE);
+
+      expect(related).toEqual({ workflow: { id: "workflow_1", name: "Answering workflow" } });
+      expect(rpc.calls).toContainEqual({
+        path: "workflow.getAll",
+        input: { projectId: "project_1" },
+      });
+    });
+
+    it("names none when the graph is archived or missing from that list", async () => {
+      const rpc = new RoutedRpc({
+        "agents.getById": WORKFLOW_AGENT,
+        "workflow.getAll": [{ id: "workflow_0", name: "Other" }],
+      });
+
+      const related = await TrpcAgentClient.create(rpc).relatedEntities(REFERENCE);
+
+      expect(related).toEqual({ workflow: null });
+    });
+
+    it("asks Workflow nothing for an agent without a graph", async () => {
+      const rpc = new RoutedRpc({
+        "agents.getById": {
+          ...ARCHIVED_AGENT,
+          archivedAt: null,
+          inputFields: [],
+          outputFields: [],
+          fieldsResolved: true,
+        },
+      });
+
+      const related = await TrpcAgentClient.create(rpc).relatedEntities({
+        id: "agent_1",
+        projectId: "project_1",
+      });
+
+      expect(related).toEqual({ workflow: null });
+      expect(rpc.calls.map((call) => call.path)).toEqual(["agents.getById"]);
+    });
+  });
+
   describe("when an agent is deleted", () => {
     it("reads the archived row whose dates arrived as strings", async () => {
       const client = TrpcAgentClient.create(new JsonRpc(ARCHIVED_AGENT));

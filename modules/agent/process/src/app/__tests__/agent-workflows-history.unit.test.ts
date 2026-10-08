@@ -93,33 +93,6 @@ describe("AgentModule workflow and audit ownership", () => {
     },
   );
 
-  it("returns the related Workflow identity", async () => {
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({
-        listSummaries: async () => [{ id: "workflow_1", name: "Answering workflow" }],
-      }),
-    });
-    await repositories.agents.create(workflowAgent);
-
-    expect(await app.relatedEntities(reference)).toEqual({
-      workflow: { id: "workflow_1", name: "Answering workflow" },
-    });
-  });
-
-  it("scopes the related Workflow query and preserves an absent summary", async () => {
-    const listSummaries = vi.fn(async () => []);
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ listSummaries }),
-    });
-    await repositories.agents.create(workflowAgent);
-
-    expect(await app.relatedEntities(reference)).toEqual({ workflow: null });
-    expect(listSummaries).toHaveBeenCalledWith({
-      projectId: reference.projectId,
-      workflowIds: ["workflow_1"],
-    });
-  });
-
   /** @scenario "Cascade archive uses the workflow owner" */
   it("archives the linked graph and Agent together", async () => {
     const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));

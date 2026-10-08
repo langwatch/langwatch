@@ -96,7 +96,7 @@ Feature: Agents package boundary
 
   @unit @agents
   Scenario: Linked workflow behaviour uses the injected Workflow API
-    Given an agent operation needs to read, copy or archive a linked workflow
+    Given an agent operation needs to copy or archive a linked workflow
     When AgentModule performs the operation
     Then it invokes the complete WorkflowApi supplied by the composition root
     And Agents server imports no Workflows server or repository implementation

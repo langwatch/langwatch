@@ -49,7 +49,6 @@ const agentApi = createApiFixture<AgentApi>({
   create: mockMethod(),
   update: mockMethod(),
   archive: mockMethod(),
-  relatedEntities: mockMethod(),
   cascadeArchive: mockMethod(),
   getCopies: mockMethod(),
   getSourceOfCopy: mockMethod(),

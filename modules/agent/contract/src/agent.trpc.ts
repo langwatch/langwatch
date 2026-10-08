@@ -12,7 +12,6 @@ import {
   agentHistoryEntrySchema,
   agentPushToCopiesSchema,
   agentSyncFromSourceSchema,
-  relatedAgentEntitiesSchema,
   agentWithLegacyCopyCountSchema,
   httpProxyResultSchema,
 } from "./agent.queries.ts";
@@ -41,10 +40,6 @@ export const agentTrpc = defineTrpcContract("agents")
   .mutation("update")
   .withInput(updateAgentCommandSchema)
   .withOutput(agentWithFieldsSchema)
-
-  .query("getRelatedEntities")
-  .withInput(agentApiAgentInputSchema)
-  .withOutput(relatedAgentEntitiesSchema)
 
   .mutation("cascadeArchive")
   .withInput(agentApiAgentInputSchema)

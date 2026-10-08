@@ -17,7 +17,6 @@ import type {
   AgentPage,
   AgentOverview,
   AgentOverviewPage,
-  RelatedAgentEntities,
   AgentCreationWindowInput,
 } from "./agent.queries.ts";
 import type * as agentQueriesModule from "./agent.queries.ts";
@@ -128,7 +127,6 @@ export interface AgentApi {
   create(input: CreateAgentCommand): Promise<AgentWithFields>;
   update(input: UpdateAgentCommand): Promise<AgentWithFields>;
   archive(input: ArchiveAgentCommand): Promise<Agent>;
-  relatedEntities(input: { id: string; projectId: string }): Promise<RelatedAgentEntities>;
   cascadeArchive(
     input: ArchiveAgentCommand,
   ): Promise<{ agent: Agent; archivedWorkflow: { id: string } | null }>;

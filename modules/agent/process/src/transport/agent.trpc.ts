@@ -38,10 +38,6 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .withPermission("evaluations:manage")
     .handle(async ({ app, input }) => agentWithFieldsWithoutSecrets(await app.update(input)))
 
-    .procedure("getRelatedEntities")
-    .withPermission("evaluations:view")
-    .handle(({ app, input }) => app.relatedEntities(input))
-
     .procedure("cascadeArchive")
     .withPermission("evaluations:manage")
     .handle(({ app, input }) => app.cascadeArchive(input))

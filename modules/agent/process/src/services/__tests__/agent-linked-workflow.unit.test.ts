@@ -8,12 +8,10 @@ import {
 } from "../../app/__tests__/agent.fixture.ts";
 
 async function setup() {
-  const listSummaries = vi.fn(async () => [{ id: "workflow_1", name: "Linked workflow" }]);
   const copy = vi.fn(async () => agentWorkflowCopyFixture());
   const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));
   const deleteUncommitted = vi.fn(async () => {});
   const workflows = createApiFixture<WorkflowApi>({
-    listSummaries,
     copy,
     archiveLinked,
     deleteUncommitted,
@@ -28,22 +26,14 @@ async function setup() {
     workflowId: "workflow_1",
   });
 
-  return { ...fixture, listSummaries, copy, archiveLinked, deleteUncommitted };
+  return { ...fixture, copy, archiveLinked, deleteUncommitted };
 }
 
 describe("AgentModule linked workflow operations", () => {
   /** @scenario "Linked workflow behaviour uses the injected Workflow API" */
-  it("reads, copies and archives through the Workflow API", async () => {
+  it("copies and archives through the Workflow API", async () => {
     const fixture = await setup();
     const { app } = fixture;
-
-    expect(await app.relatedEntities({ id: "agent_workflow", projectId: "project_1" })).toEqual({
-      workflow: { id: "workflow_1", name: "Linked workflow" },
-    });
-    expect(fixture.listSummaries).toHaveBeenCalledWith({
-      projectId: "project_1",
-      workflowIds: ["workflow_1"],
-    });
 
     const copied = await app.copy({
       sourceAgentId: "agent_workflow",

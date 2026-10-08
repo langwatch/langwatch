@@ -53,7 +53,6 @@ import {
   type AgentCallResult,
   type AgentHistoryEntry,
   type AgentCopy,
-  type RelatedAgentEntities,
   type AgentReferenceState,
   type AgentOverviewPage,
   type AgentPage,
@@ -281,16 +280,6 @@ export class AgentModule implements AgentApi {
   }
   getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]> {
     return this.#agents.getConnectedByNameAndEnvironment(input);
-  }
-
-  async relatedEntities(input: GetAgentInput): Promise<RelatedAgentEntities> {
-    const agent = await this.#agents.getById(input);
-    const workflowIds = findLinkedWorkflowIds(agent);
-    const workflows =
-      workflowIds.length > 0
-        ? await this.#workflows.listSummaries({ projectId: input.projectId, workflowIds })
-        : [];
-    return { workflow: workflows[0] ?? null };
   }
 
   async cascadeArchive(input: GetAgentInput): Promise<{

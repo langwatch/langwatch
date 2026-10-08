@@ -11,6 +11,14 @@ Feature: Agent coordinates linked workflows and history through their owners
     And a graph belonging to another project is not returned
 
   @unit @agents
+  Scenario: The archive dialog names the linked workflow through Workflow
+    Given a workflow agent points to a graph in its project
+    When the Agents screen asks what archiving the agent will also archive
+    Then the browser reads the graph's name from Workflow's own list for that project
+    And an agent without a graph, or whose graph is archived or missing, names no workflow
+    And Agent's server reads no workflow name for it
+
+  @unit @agents
   Scenario: Cascade archive uses the workflow owner
     Given a workflow agent points to a live graph
     When AgentModule cascade-archives the agent
