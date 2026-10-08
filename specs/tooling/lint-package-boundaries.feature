@@ -55,6 +55,13 @@ Feature: The package-boundaries lint rule
     Then it reports contractRuntime with the import specifier
 
   @unit
+  Scenario: A contract may read eventing's table list and no other eventing entry
+    Given a contract package source file
+    When it imports `@langwatch/eventing/tables`, then `@langwatch/eventing` and `@langwatch/eventing/server`
+    Then the tables subpath is accepted
+    And each other eventing entry is reported as contractRuntime
+
+  @unit
   Scenario: A module library importing a runtime or implementation is reported as libraryRuntime
     Given a module's portable library that imports node, react, a framework package, its own process or browser package, or another module's contract
     When the package-boundaries rule runs over it

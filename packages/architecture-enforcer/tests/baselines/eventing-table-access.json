@@ -1,6 +1,4 @@
 {
-  "record": "dev/docs/ARCHITECTURE.md §7, the event tables are eventing's (Alex, 2026-09-29). Shrink-only: lower a count in the change that removes the access.",
-  "findings": {
-    "data-retention|modules/data-retention/contract/src/retention-tables.ts|named:event_log": 1
-  }
+  "record": "dev/docs/ARCHITECTURE.md \u00a77, the event tables are eventing's (Alex, 2026-09-29). Shrink-only: lower a count in the change that removes the access.",
+  "findings": {}
 }

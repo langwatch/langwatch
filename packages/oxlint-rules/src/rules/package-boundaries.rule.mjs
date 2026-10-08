@@ -13,6 +13,8 @@ const BROWSER_RUNTIME =
   /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|browser)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process|process-stores)(?:\/|$))/;
+/** The one eventing subpath a contract may read: its plain-data table list (ET-2, 2026-10-08). */
+const CONTRACT_PLAIN_DATA = /^@langwatch\/eventing\/tables$/;
 /** The raw store clients: a module client never takes one (§3.4). */
 const STORE_CLIENT = /^@langwatch\/(?:prisma-client|clickhouse-client|redis-client)(?:\/|$)/;
 /** The browser runtime a module client may take: React and browser-host (Alex, 2026-10-06). */
@@ -144,6 +146,7 @@ function runtimeFinding(file, specifier) {
   const node = NODE_RUNTIME.test(specifier);
   const server = SERVER_RUNTIME.test(specifier);
   const browser = BROWSER_RUNTIME.test(specifier);
+  if (file.role === "contract" && CONTRACT_PLAIN_DATA.test(specifier)) return undefined;
   if (file.role === "contract" && (node || server || browser)) return "contractRuntime";
   if (file.role === "browser" && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";

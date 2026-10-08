@@ -188,6 +188,21 @@ describe("given package-boundaries", () => {
     });
   });
 
+  describe("when a contract package imports eventing", () => {
+    /** @scenario "A contract may read eventing's table list and no other eventing entry" */
+    it("accepts the tables subpath and reports every other eventing entry as contractRuntime", () => {
+      const contract = "modules/agent/contract/src/agent.commands.ts";
+      const runtimeIds = (specifier) =>
+        report(contract, `import { X } from "${specifier}";`)
+          .map((entry) => entry.messageId)
+          .filter((id) => id === "contractRuntime");
+
+      expect(runtimeIds("@langwatch/eventing/tables")).toEqual([]);
+      expect(runtimeIds("@langwatch/eventing")).toEqual(["contractRuntime"]);
+      expect(runtimeIds("@langwatch/eventing/server")).toEqual(["contractRuntime"]);
+    });
+  });
+
   describe("when a module library imports a runtime or an implementation package", () => {
     /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
     it("reports libraryRuntime for node, react, framework and implementation packages", () => {

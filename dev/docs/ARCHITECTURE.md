@@ -78,7 +78,9 @@ imported the rest of the way down, never from the top. This stays strict and gai
 hosting helpers move where a contract may import them (Alex, 2026-10-05). Until they do, analytics' and
 trace's contracts import `@langwatch/api/dates` and gateway's `@langwatch/api/hosting`.
 A contract may also import `@langwatch/span-normalisation`, the span attribute vocabulary and
-canonicalisers that trace and analytics share; it never stores what it normalises (Alex, 2026-10-07).
+canonicalisers that trace and analytics share; it never stores what it normalises (Alex, 2026-10-07). It may
+also import `@langwatch/eventing/tables`, eventing's plain-data table list, and nothing else from
+eventing, so a contract keys a map by an event table without naming it (Alex, 2026-10-08, ET-2).
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
   the `moduleApi` token factory, module ids, UI tokens and
