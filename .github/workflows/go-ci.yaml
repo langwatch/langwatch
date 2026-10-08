@@ -295,6 +295,14 @@ jobs:
       # Through the Makefile, so the check CI runs and the check a developer
       # runs cannot drift apart.
       - run: make herrgen-check
+      # The README generator's extractor runs inside the enforcer, so that
+      # closure is the whole install. The REST cross-check needs the app
+      # installed and runs in langwatch-app-ci's lint job instead.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/architecture-enforcer..."
+      - name: Generated READMEs are current
+        run: pnpm check:readmes
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch
