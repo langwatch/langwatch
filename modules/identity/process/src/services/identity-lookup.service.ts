@@ -32,12 +32,13 @@ import type { IdentityRateLimitRepository } from "../repositories/identity-rate-
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type { LinkProposalService } from "./link-proposal.service.ts";
+import type { SignInRouterService } from "./signin-router.service.ts";
 
 export interface IdentityLookupServiceDeps {
   reads: IdentityLookupRepository;
   history: IdentityHistoryRepository;
-  /** The auth screens' own router, so this answer cannot drift from theirs. */
-  router: Pick<AuthApi, "route">;
+  /** The router auth asks through `routeSignIn`, so this answer cannot drift from its screens. */
+  router: Pick<SignInRouterService, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
   links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
   auditLog: AuditLogApi;

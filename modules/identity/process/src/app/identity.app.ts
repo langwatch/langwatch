@@ -866,7 +866,7 @@ export class IdentityModule
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
         history: identityHistory,
-        router: setup.dependencies.auth,
+        router: signInRouter,
         identity: () => identity,
         links: LinkProposalService.create({
           guards: LinkProposalGuardsService.create({
