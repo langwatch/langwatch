@@ -1,3 +1,5 @@
+import { parseJsonStringValues } from "@langwatch/span-normalisation";
+
 import { safeUnflatten } from "../features/attribute/trace-attribute-unflatten.ts";
 import type { NormalizedAttributes } from "../trace.spans.ts";
 
@@ -140,73 +142,12 @@ const reconstructFlattenedArrays = (attrs: NormalizedAttributes): NormalizedAttr
   return result;
 };
 
-/**
- * Maximum string size to attempt synchronous JSON parsing.
- * Strings larger than this are left as-is to avoid blocking the event loop.
- */
-const MAX_JSON_PARSE_SIZE = 2_000_000;
-
 // Fix invalid JSON escapes from PII redaction tokens; targets \< and \>
-// introduced when replacement lands after backslash
+// (span-normalisation's copy is private; this one stays for its unit test)
 /** @internal Exported for unit testing */
 function sanitizeInvalidJsonEscapes(json: string): string {
   return json.replace(/\\([<>])/g, "$1");
 }
-
-/** Parses string values that look like JSON; scalars pass through unchanged. */
-/** @internal Exported for unit testing */
-const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttributes => {
-  const result: NormalizedAttributes = {};
-
-  for (const [key, value] of Object.entries(attrs)) {
-    result[key] = typeof value === "string" ? parseJsonStringValue(value) : value;
-  }
-
-  return result;
-};
-
-/** Whether a trimmed string is worth handing to `JSON.parse` at all. */
-const looksLikeJson = (trimmed: string): boolean => {
-  if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
-    return false;
-  }
-
-  const isObjectLiteral = trimmed.startsWith("{") && trimmed.endsWith("}");
-  if (isObjectLiteral) {
-    return true;
-  }
-
-  const isArrayLiteral = trimmed.startsWith("[") && trimmed.endsWith("]");
-
-  return isArrayLiteral;
-};
-
-/**
- * One string value, parsed when it is JSON. PII redaction can introduce invalid escapes like
- * `\<US_DRIVER_LICENSE>` because it replaces content with `<PII_TYPE>` tokens inside JSON
- * strings, so a failed parse is retried against the sanitized text before giving up.
- */
-const parseJsonStringValue = (value: string): unknown => {
-  const trimmed = value.trim();
-  if (!looksLikeJson(trimmed)) {
-    return value;
-  }
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const sanitized = sanitizeInvalidJsonEscapes(trimmed);
-    if (sanitized === trimmed) {
-      return value;
-    }
-
-    try {
-      return JSON.parse(sanitized);
-    } catch {
-      return value;
-    }
-  }
-};
 
 /** OTLP attribute shaping: flattened-array reconstruction and JSON-string parsing. */
 export class OtlpAttributeFlatteningService {
