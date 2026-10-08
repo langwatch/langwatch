@@ -1,5 +1,6 @@
 import type { Dataset } from "@langwatch/dataset-contract";
 import type { Experiment, SaveExperimentInput } from "@langwatch/experiment-contract";
+import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import type { StudioWorkflow, WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -144,6 +145,77 @@ describe("ExperimentCopyService", () => {
       const [saved] = experiments.saved;
       expect(saved?.name).toBe("Support classifier (copy)");
       expect(saved?.workbenchState).toEqual({ name: "Support classifier (copy)", datasets: [] });
+    });
+  });
+
+  describe("given a workbench whose prompt target is on Instant Evals", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
+    it("refuses the copy, naming the target, and saves nothing", async () => {
+      const experiments = new (class extends Experiments {
+        override getById(): Promise<Experiment> {
+          return Promise.resolve({
+            ...V3_SOURCE,
+            workbenchState: {
+              ...(V3_SOURCE.workbenchState as object),
+              targets: [
+                {
+                  id: "target_1",
+                  type: "prompt",
+                  localPromptConfig: { llm: { model: INSTANT_EVAL_JUDGE_MODEL_ID } },
+                },
+              ],
+            },
+          });
+        }
+      })();
+      const copies = ExperimentCopyService.create({
+        experiments,
+        links: new GoneWorkflows(),
+        workflowAuthoring: new Authoring(),
+        dataset: new Datasets(),
+        permissions: new Probe(true),
+        slugify: (value) => value,
+      });
+
+      await expect(
+        copies.copyToProject({ ...COPY, copyDatasets: true }, { id: "user-1" }),
+      ).rejects.toMatchObject({
+        code: "instant_eval_judge_only_model",
+        meta: { places: ["target 1"] },
+      });
+      expect(experiments.saved).toEqual([]);
+    });
+
+    /** @scenario "A workbench whose evaluators judge on Instant Evals still saves" */
+    it("copies a workbench whose only Instant Evals is an evaluator column", async () => {
+      const experiments = new (class extends Experiments {
+        override getById(): Promise<Experiment> {
+          return Promise.resolve({
+            ...V3_SOURCE,
+            workbenchState: {
+              ...(V3_SOURCE.workbenchState as object),
+              evaluators: [
+                {
+                  id: "judge",
+                  localEvaluatorConfig: { settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID } },
+                },
+              ],
+            },
+          });
+        }
+      })();
+      const copies = ExperimentCopyService.create({
+        experiments,
+        links: new GoneWorkflows(),
+        workflowAuthoring: new Authoring(),
+        dataset: new Datasets(),
+        permissions: new Probe(true),
+        slugify: (value) => value,
+      });
+
+      await copies.copyToProject(COPY, { id: "user-1" });
+
+      expect(experiments.saved).toHaveLength(1);
     });
   });
 

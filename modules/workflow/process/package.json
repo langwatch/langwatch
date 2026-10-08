@@ -62,6 +62,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/instant-eval-judge-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",

@@ -48,6 +48,28 @@ describe("refuseInstantEvalJudgeModel", () => {
   });
 
   it("passes any other model", () => {
-    expect(schema.safeParse("openai/gpt-5-mini").success).toBe(true);
+    expect(schema.validate("openai/gpt-5-mini")).toBe(true);
+  });
+});
+
+describe("InstantEvalJudgeOnlyModelError", () => {
+  describe("when the save names where Instant Evals sits", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
+    it("names each place in its message and its meta", () => {
+      const error = new InstantEvalJudgeOnlyModelError({
+        places: ['node "Answer"', "target 2"],
+      });
+
+      expect(error.message).toBe(
+        `${INSTANT_EVAL_JUDGE_ONLY_MESSAGE} Pick another model for node "Answer", target 2.`,
+      );
+      expect(error.meta).toEqual({ places: ['node "Answer"', "target 2"] });
+    });
+  });
+
+  describe("when it names no place", () => {
+    it("keeps the plain message", () => {
+      expect(new InstantEvalJudgeOnlyModelError().message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
+    });
   });
 });

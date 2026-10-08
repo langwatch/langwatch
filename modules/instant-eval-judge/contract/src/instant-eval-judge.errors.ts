@@ -48,14 +48,22 @@ export class InstantEvalFreeBudgetExhaustedError extends HandledError {
 export const INSTANT_EVAL_JUDGE_ONLY_MESSAGE =
   "Instant Evals works only as an evaluator judge model.";
 
-/** A save named Instant Evals as the model of something that is not an evaluator judge. */
+/**
+ * A save named Instant Evals as the model of something that is not an evaluator judge.
+ * `places` names where it sits in a graph or a workbench, so the reader knows what to change.
+ */
 export class InstantEvalJudgeOnlyModelError extends HandledError {
   declare readonly code: "instant_eval_judge_only_model";
 
-  constructor() {
-    super("instant_eval_judge_only_model", INSTANT_EVAL_JUDGE_ONLY_MESSAGE, {
+  constructor({ places = [] }: { places?: readonly string[] } = {}) {
+    const message =
+      places.length > 0
+        ? `${INSTANT_EVAL_JUDGE_ONLY_MESSAGE} Pick another model for ${places.join(", ")}.`
+        : INSTANT_EVAL_JUDGE_ONLY_MESSAGE;
+    super("instant_eval_judge_only_model", message, {
       httpStatus: 422,
       fault: "customer",
+      ...(places.length > 0 ? { meta: { places: [...places] } } : {}),
     });
     this.name = "InstantEvalJudgeOnlyModelError";
   }

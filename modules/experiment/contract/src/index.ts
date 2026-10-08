@@ -20,6 +20,7 @@ export * from "./experiment.errors.ts";
 export * from "./experiment.api.ts";
 export * from "./experiment.config.ts";
 export * from "./human-readable-id.ts";
+export * from "./instant-eval-judge-model-targets.ts";
 export * from "./workbench/connected-agent-target.ts";
 export * from "./workbench/empty-row-detection.ts";
 export * from "./workbench/execution-scope.ts";

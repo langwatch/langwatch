@@ -5,6 +5,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
+  assertNoInstantEvalJudgeModelTargets,
   ExperimentPermissionDeniedError,
   ExperimentWorkflowNotFoundError,
   type Experiment,
@@ -172,6 +173,7 @@ export class ExperimentCopyService {
     sourceProjectId: string;
     copyDatasets?: boolean;
   }): Promise<ExperimentCopied> {
+    assertNoInstantEvalJudgeModelTargets({ state: experiment.workbenchState });
     const workbenchState = JSON.parse(JSON.stringify(experiment.workbenchState ?? {})) as Record<
       string,
       unknown

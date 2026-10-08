@@ -4,6 +4,7 @@
  */
 
 import {
+  assertNoInstantEvalJudgeModelTargets,
   commitWorkbenchVersionInputSchema,
   createEvaluationsV3InputSchema,
   ExperimentNotFoundError,
@@ -111,6 +112,7 @@ export class ExperimentWorkbenchService {
   async saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {
     const command = saveWorkbenchStateInputSchema.parse(input);
     const state = parseWorkbenchState(command.state);
+    assertNoInstantEvalJudgeModelTargets({ state });
     const target = await this.repository.resolveWorkbenchSaveTarget(command);
     if (target.kind === "create") {
       return this.createEvaluationsV3({
@@ -149,6 +151,7 @@ export class ExperimentWorkbenchService {
   async createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> {
     const command = createEvaluationsV3InputSchema.parse(input);
     const state = parseWorkbenchState(command.state);
+    assertNoInstantEvalJudgeModelTargets({ state });
     await this.references.assertAllExist({ projectId: command.projectId, state });
     const id = command.id ?? this.newId();
     const name =
