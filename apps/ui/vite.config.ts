@@ -301,6 +301,10 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
         },
         output: {
           manualChunks(id: string) {
+            // Every `import()` calls the preload helper. Left unassigned, Rolldown
+            // puts it in the first manual chunk that uses it (shiki), so the entry
+            // imported 600 kB of highlighter on every page just to lazy-load a screen.
+            if (id.includes("vite/preload-helper")) return "preload-helper";
             // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
             // module (dependency-free) so its guard test can exercise the real logic.
             return shikiManualChunk(id);
