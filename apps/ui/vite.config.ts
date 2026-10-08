@@ -14,6 +14,7 @@ import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { havenHmrGate } from "./vite/havenHmrGate";
+import { mailPreview } from "./vite/mail-preview";
 import { fetchPublicConfigFromApi } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
@@ -226,6 +227,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
       havenHmrGate(),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
+      mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
     ],

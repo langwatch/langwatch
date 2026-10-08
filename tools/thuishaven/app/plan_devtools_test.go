@@ -38,61 +38,20 @@ func TestDeveloperToolLanesAreNotPlannedByDefault(t *testing.T) {
 	}
 }
 
-// Each tool is handed the port haven allocated for its hostname, because both
-// otherwise bind a fixed default (6006, 5566) that a second worktree would find
-// busy — and vite, left to itself, quietly moves to the next free port, leaving
-// the routed hostname pointing at nothing.
+// The UI's dev server, not haven, starts each tool on its first visit and stops
+// it once idle (apps/ui/vite/dormant-dev-tool.ts), so `pnpm dev` gets the same
+// behaviour. Selecting a tool only routes its hostname to the port the ui lane
+// is told to hold.
 //
 // @scenario "Adding both developer tools is one command and it sticks"
-func TestDeveloperToolLanesRunTheirOwnPackageOnTheAllocatedPort(t *testing.T) {
-	sel := domain.DefaultSelection()
-	sel.DesignSystem, sel.MailRoom = true, true
-	children := devToolsPlan(t, sel)
-
-	t.Run("when the Storybook lane is selected", func(t *testing.T) {
-		child, ok := findChild(children, "design-system")
-		if !ok {
-			t.Fatal("no design-system lane was planned for a selection that asked for one")
-		}
-		for _, want := range []string{DesignSystemPackage, "storybook", "--port 46006", "--ci"} {
-			if !strings.Contains(child.Shell, want) {
-				t.Errorf("design-system lane runs %q, want %q in it", child.Shell, want)
-			}
-		}
-	})
-
-	t.Run("when the mail studio lane is selected", func(t *testing.T) {
-		child, ok := findChild(children, "mail-room")
-		if !ok {
-			t.Fatal("no mail-room lane was planned for a selection that asked for one")
-		}
-		for _, want := range []string{MailPackage, "dev", "--port 45566", "--strictPort"} {
-			if !strings.Contains(child.Shell, want) {
-				t.Errorf("mail-room lane runs %q, want %q in it", child.Shell, want)
-			}
-		}
-	})
-}
-
-// Both tools load the stack's own environment, so the studio renders templates
-// against this worktree's URLs rather than whatever a bare .env last said.
-//
-// @scenario "Adding both developer tools is one command and it sticks"
-func TestDeveloperToolLanesCarryTheStackEnvironment(t *testing.T) {
+func TestSelectedDeveloperToolsAreNotHavenLanes(t *testing.T) {
 	sel := domain.DefaultSelection()
 	sel.DesignSystem, sel.MailRoom = true, true
 	children := devToolsPlan(t, sel)
 
 	for _, lane := range []string{"design-system", "mail-room"} {
-		child, ok := findChild(children, lane)
-		if !ok {
-			t.Fatalf("no %q lane was planned", lane)
-		}
-		env := strings.Join(child.Env, "\n")
-		for _, want := range []string{"LANGWATCH_SLUG=test", "NODE_ENV=development"} {
-			if !strings.Contains(env, want) {
-				t.Errorf("%s lane env %v lacks %q", lane, child.Env, want)
-			}
+		if child, ok := findChild(children, lane); ok {
+			t.Errorf("haven planned a %q lane running %q; the ui lane's dev server owns the tool", lane, child.Shell)
 		}
 	}
 }

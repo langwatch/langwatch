@@ -1,85 +1,94 @@
-import { spawn, type ChildProcess } from "child_process";
-import net from "net";
+import type { IncomingMessage, ServerResponse } from "http";
 import path from "path";
 
 import type { Plugin } from "vite";
 
+import {
+  DEV_TOOLS_IDLE_ENV,
+  idleBoundMs,
+  startDormantTool,
+  type DormantTool,
+} from "./dormant-dev-tool";
+
 /**
  * `/design-system` frames the design system's Storybook on its own origin,
  * because Storybook emits root-absolute module addresses that collide with
- * this application's Vite. It starts on the first visit, never at boot.
+ * this application's Vite. It starts on the first visit and stops once idle.
  */
 
 const ROUTE = "/design-system";
 
 export function designSystemStorybook(options: { appPort: number }): Plugin {
   const port = Number(process.env.LANGWATCH_STORYBOOK_PORT ?? options.appPort + 5);
-  const storybookUrl = `http://localhost:${port}`;
-  let child: ChildProcess | undefined;
-  let starting = false;
-
-  async function ensureStarted(): Promise<void> {
-    if (child ?? starting) return;
-    if (await isListening(port)) return;
-    starting = true;
-    const repoRoot = path.resolve(import.meta.dirname, "../../..");
-    child = spawn(
-      "pnpm",
-      ["-s", "--filter", "@langwatch/design-system", "storybook", "--port", String(port), "--ci"],
-      { cwd: repoRoot, stdio: ["ignore", "ignore", "inherit"], env: process.env },
-    );
-    child.on("exit", () => {
-      child = undefined;
-      starting = false;
-    });
-  }
+  const storybookUrl = `http://127.0.0.1:${port}`;
 
   return {
     name: "langwatch-design-system-storybook",
     apply: "serve",
     configureServer(server) {
+      const { logger } = server.config;
       if (process.env.LANGWATCH_SKIP_STORYBOOK === "1") {
-        server.config.logger.info(`  ✓ storybook: skipped (LANGWATCH_SKIP_STORYBOOK=1)`);
+        logger.info(`  ✓ storybook: skipped (LANGWATCH_SKIP_STORYBOOK=1)`);
         return;
       }
-      server.config.logger.info(`  ✓ storybook: ${ROUTE} (starts on first visit, :${port})`);
-
-      server.middlewares.use(ROUTE, (req, res, next) => {
-        const url = req.url ?? "/";
-        if (url.startsWith("/status")) {
-          void ensureStarted();
-          void isListening(port).then((ready) => {
-            res.setHeader("content-type", "application/json");
-            res.setHeader("cache-control", "no-store");
-            res.end(JSON.stringify({ ready, url: storybookUrl }));
-          });
-          return;
-        }
-        const isRouteItself = url === "/" || url.startsWith("/?") || url.startsWith("/#");
-        if (!isRouteItself) return next();
-        void ensureStarted();
-        res.setHeader("content-type", "text/html; charset=utf-8");
-        res.setHeader("cache-control", "no-store");
-        res.end(shell({ storybookUrl }));
+      const tool = startDormantTool({
+        name: "storybook",
+        port,
+        cwd: path.resolve(import.meta.dirname, "../../.."),
+        command: ({ port: inner }) => ({
+          file: "pnpm",
+          args: [
+            "-s",
+            "--filter",
+            "@langwatch/design-system",
+            "storybook",
+            "--port",
+            String(inner),
+            "--ci",
+          ],
+        }),
+        idleAfterMs: idleBoundMs({ value: process.env[DEV_TOOLS_IDLE_ENV] }),
+        log: (line) => logger.info(`  ${line}`),
       });
-
-      server.httpServer?.on("close", () => child?.kill());
+      logger.info(`  ✓ storybook: ${ROUTE} and ${storybookUrl} (starts on first visit)`);
+      server.middlewares.use(ROUTE, (req, res, next) =>
+        serveRoute({ req, res, next, tool, storybookUrl }),
+      );
+      server.httpServer?.on("close", () => tool.close());
     },
   };
 }
 
-function isListening(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = net.connect({ port, host: "127.0.0.1" });
-    const done = (answer: boolean) => {
-      socket.destroy();
-      resolve(answer);
-    };
-    socket.setTimeout(400);
-    socket.on("connect", () => done(true));
-    socket.on("timeout", () => done(false));
-    socket.on("error", () => done(false));
-  });
+/** The page itself wakes Storybook; its status poll only reports, so an open tab never
+ * restarts it. */
+function serveRoute({
+  req,
+  res,
+  next,
+  tool,
+  storybookUrl,
+}: {
+  req: IncomingMessage;
+  res: ServerResponse;
+  next: () => void;
+  tool: DormantTool;
+  storybookUrl: string;
+}): void {
+  const url = req.url ?? "/";
+  res.setHeader("cache-control", "no-store");
+  if (url.startsWith("/status")) {
+    const state = tool.state();
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({ ready: state === "ready" || state === "external", url: storybookUrl }),
+    );
+    return;
+  }
+  const isRouteItself = url === "/" || url.startsWith("/?") || url.startsWith("/#");
+  if (!isRouteItself) return next();
+  if (req.method === "GET") tool.wake();
+  res.setHeader("content-type", "text/html; charset=utf-8");
+  res.end(shell({ storybookUrl }));
 }
 
 /**

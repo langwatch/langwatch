@@ -283,3 +283,44 @@ Feature: The local development process topology
     When a restart takes it down
     Then it is given the chance to finish before anything forces it
     And a process that ignores SIGTERM is still killed once the grace period elapses
+
+  # --- Developer tools start on the first visit and stop once idle ---
+
+  # Storybook and the mail preview used to run until the dev server stopped,
+  # pnpm wrappers and compiler helpers included. The ui lane's dev server holds
+  # each tool's port (apps/ui/vite/dormant-dev-tool.ts), with or without haven;
+  # haven only routes a hostname to that port.
+
+  @unit
+  Scenario: A developer tool stays dormant until someone visits it
+    Given the ui lane's dev server is running
+    When nobody has opened Storybook or the mail preview
+    Then neither tool's process is running
+    And each tool's port still answers
+    When someone opens the tool's page
+    Then the tool starts and the page is served by it
+
+  @unit
+  Scenario: A health probe does not wake a dormant developer tool
+    Given a dormant developer tool
+    When a health checker, Vite's ping or a HEAD request reaches the tool's port
+    Then the probe gets an answer
+    And the tool stays dormant
+
+  @unit
+  Scenario: Concurrent first visits start one developer tool
+    Given a dormant developer tool
+    When several first visits arrive at once
+    Then the tool is started once and every visit is served by it
+
+  @unit
+  Scenario: An idle developer tool is shut down with its whole process chain
+    Given a developer tool that was visited and then left idle past the idle bound
+    Then the dev server stops the tool's whole process group, pnpm wrappers included
+    And the next visit starts it again
+
+  @unit
+  Scenario: A pinned developer tool stays running when idle
+    Given the developer pinned the tools open with "LANGWATCH_DEV_TOOLS_IDLE=off"
+    When a visited tool sits idle
+    Then it keeps running

@@ -133,7 +133,6 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
 	out := []Child{p.frontChild(mono, isOneProcess)}
 	out = append(out, p.goLanes(mono)...)
-	out = append(out, p.devToolChildren()...)
 	if opts.Selection.Langevals {
 		out = append(out, p.langevalsChild())
 	}
@@ -373,37 +372,6 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	}
 }
 
-// devToolChildren is the two developer tools. Neither is a Node LANE — nothing
-// in the product degrades without them — so they are planned like the Go
-// services: only when the worktree has selected them, and never counted among
-// the three. Each is handed the port haven allocated for its hostname, on the
-// command line, because both tools otherwise bind a fixed default that a
-// second worktree would find busy.
-func (p *childPlan) devToolChildren() []Child {
-	var out []Child
-	if p.opts.Selection.DesignSystem {
-		out = append(out, Child{
-			Name: domain.DesignSystemService, Dir: p.repoDir, Color: palette[8], LogPath: p.logPath(domain.DesignSystemService),
-			Shell: fmt.Sprintf("pnpm --silent --filter %s storybook --port %d --ci",
-				DesignSystemPackage, p.port(domain.DesignSystemService)),
-			Env: p.nodeEnv(domain.DesignSystemService),
-		})
-	}
-	if p.opts.Selection.MailRoom {
-		out = append(out, Child{
-			Name: domain.MailRoomService, Dir: p.repoDir, Color: palette[9], LogPath: p.logPath(domain.MailRoomService),
-			// --strictPort: vite silently moves to the next free port otherwise,
-			// which would leave mail-room.<slug> routed to nothing at all.
-			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
-			// this machine, and the proxy and the port probe both dial IPv4.
-			Shell: fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort",
-				MailPackage, p.port(domain.MailRoomService)),
-			Env: p.nodeEnv(domain.MailRoomService),
-		})
-	}
-	return out
-}
-
 // backendChild is the api lane.
 func (p *childPlan) backendChild() Child {
 	return Child{
@@ -489,20 +457,6 @@ const (
 	GatewayAddrEnv = "LANGWATCH_GO_AIGATEWAY_ADDR"
 	NLPAddrEnv     = "LANGWATCH_GO_NLPGO_ADDR"
 	IDPAddrEnv     = "LANGWATCH_GO_IDPSIM_ADDR"
-)
-
-// The two developer tools a stack can optionally supervise, by workspace
-// package name. They are tools rather than parts of the product — nothing the
-// application does depends on either — so they stay in their own packages and
-// haven only runs them for a worktree that asked (`haven up +design-system
-// +mail-room`).
-const (
-	// DesignSystemPackage owns the component workshop (Storybook), routed at
-	// design-system.<slug>.
-	DesignSystemPackage = "@langwatch/design-system"
-	// MailPackage owns the studio that previews every transactional message,
-	// routed at mail-room.<slug>. Its `dev` script is the studio's Vite server.
-	MailPackage = "@langwatch/mail"
 )
 
 // UIDirRel is where the browser application lives inside the workspace. Only
