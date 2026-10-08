@@ -13,7 +13,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const HELPER = path.join(REPO_ROOT, "dev/scripts/lib/load-dev-env.sh");
@@ -31,10 +31,6 @@ for (const name of ["go", "air"]) {
 }
 
 const repoEnvName = `.env.load-dev-env-test-${process.pid}`;
-fs.writeFileSync(
-  path.join(REPO_ROOT, repoEnvName),
-  "LOAD_DEV_ENV_TEST=from-make\n",
-);
 
 function loadWithSh(envFile: string): { out: string; status: number } {
   const script = `. "${HELPER}" && load_dev_env "$1"; s=$?; echo "$LOAD_DEV_ENV_TEST"; exit $s`;
@@ -59,12 +55,19 @@ function runMake(target: string): string {
     {
       cwd: REPO_ROOT,
       encoding: "utf8",
-      env: { PATH: `${fakeBin}:/usr/bin:/bin`, SHELL: "/bin/sh" },
+      env: { PATH: `${fakeBin}:/usr/bin:/bin` },
     },
   );
 }
 
 describe("load-dev-env.sh", () => {
+  beforeAll(() => {
+    fs.writeFileSync(
+      path.join(REPO_ROOT, repoEnvName),
+      "LOAD_DEV_ENV_TEST=from-make\n",
+    );
+  });
+
   afterAll(() => {
     fs.rmSync(workDir, { recursive: true, force: true });
     fs.rmSync(path.join(REPO_ROOT, repoEnvName), { force: true });
@@ -80,6 +83,19 @@ describe("load-dev-env.sh", () => {
   describe("when DEV_ENV_FILE is an absolute path with a space", () => {
     it("exports the variables of that file", () => {
       expect(loadWithSh(path.join(workDir, ".env")).out).toBe("loaded");
+    });
+  });
+
+  describe("when the env file loads", () => {
+    it("exports only the file's variables", () => {
+      const script = `. "${HELPER}" && load_dev_env .env && env`;
+      const env = execFileSync("/bin/sh", ["-c", script], {
+        cwd: workDir,
+        encoding: "utf8",
+        env: { PATH: "/usr/bin:/bin" },
+      });
+      expect(env).toContain("LOAD_DEV_ENV_TEST=loaded");
+      expect(env).not.toMatch(/^_load_dev_env/m);
     });
   });
 

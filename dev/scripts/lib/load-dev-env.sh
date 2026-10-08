@@ -9,8 +9,9 @@ load_dev_env() {
 	esac
 	set -a
 	. "$_load_dev_env_file"
-	_load_dev_env_status=$?
+	# The status goes in $1, not a variable: under set -a it would be exported.
+	set -- "$?"
 	set +a
 	unset _load_dev_env_file
-	return "$_load_dev_env_status"
+	return "$1"
 }
