@@ -83,14 +83,27 @@ type Peer<Token> =
     : Token extends SupplyToken<infer Api, infer Name>
       ? { readonly [Key in Name]: Api }
       : Record<never, never>;
+type TokenPeers<Tokens> = Intersection<{ [Key in keyof Tokens]: Peer<Tokens[Key]> }[keyof Tokens]>;
 type ModulePeers<Module> = Module extends { readonly dependencies: infer Dependencies }
-  ? Intersection<{ [Key in keyof Dependencies]: Peer<Dependencies[Key]> }[keyof Dependencies]>
+  ? TokenPeers<Dependencies>
+  : Record<never, never>;
+/** The tier's own keys: the built type also carries the registry's widened shape (record §5). */
+type TierBinds<Provider> = Provider extends { readonly binds: infer Binds }
+  ? TokenPeers<{ [Key in keyof Binds as string extends Key ? never : Key]: Binds[Key] }>
+  : Record<never, never>;
+/** The `*Api` tokens the chosen tier's channels bind: a fixture must stand in for each. */
+type ModuleBoundPeers<Module> = Module extends {
+  readonly channelRegistry: {
+    readonly definitions: { readonly live: infer Live; readonly memory: infer Memory };
+  };
+}
+  ? TierBinds<Module extends { readonly tier: "memory" } ? Memory : Live>
   : Record<never, never>;
 export type RequiredPeers<Modules extends readonly SupplyModule[]> = Simplify<
   Intersection<
     Modules[number] extends infer Module
       ? Module extends unknown
-        ? ModulePeers<Module>
+        ? ModulePeers<Module> & ModuleBoundPeers<Module>
         : never
       : never
   >

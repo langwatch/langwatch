@@ -22,6 +22,9 @@ import {
   project,
   projectModule,
   repositoryModule,
+  scoringModule,
+  verdictModule,
+  verdicts,
   type ProjectApi,
 } from "../tests/process-supply.fixtures.ts";
 
@@ -137,6 +140,18 @@ expectTypeOf<MissingNames<typeof suppliedTokenReady>>().toEqualTypeOf<never>();
 void (() => suppliedTokenReady.boot());
 // @ts-expect-error a supplied token keeps its declared API type
 void missingSupplyToken.provide({ licenseSource: { resolve: () => 42 } });
+
+const missingBound = createApp({ role: "api" }).withModules([scoringModule]);
+expectTypeOf<MissingNames<typeof missingBound>>().toEqualTypeOf<"peer.instant-eval">();
+// @ts-expect-error a token a channel binds is a peer the process must supply
+void missingBound.boot();
+const standingInForBound = missingBound.provide({ "instant-eval": verdicts });
+expectTypeOf<MissingNames<typeof standingInForBound>>().toEqualTypeOf<never>();
+void (() => standingInForBound.boot());
+const installedBoundOwner = missingBound.withModules([verdictModule]);
+expectTypeOf<MissingNames<typeof installedBoundOwner>>().toEqualTypeOf<never>();
+// @ts-expect-error a stand-in for a bound token keeps its declared API type
+void missingBound.provide({ "instant-eval": { judge: () => 42 } });
 
 expectTypeOf(packageEntry.createApp).toEqualTypeOf(createApp);
 expectTypeOf(packageEntry.createApp).toEqualTypeOf(supplyEntry.createApp);

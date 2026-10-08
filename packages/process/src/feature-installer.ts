@@ -1058,7 +1058,7 @@ function declaredReads<const Reads extends readonly string[]>(
   return Object.freeze([...(app.reads ?? [])]);
 }
 
-class DefinedFeatureBuilder<Name extends ModuleName, Channels = never> {
+class DefinedFeatureBuilder<Name extends ModuleName, Channels = never, Registry = undefined> {
   constructor(
     private readonly name: Name,
     private readonly channels?: AnyChannelRegistry,
@@ -1066,14 +1066,18 @@ class DefinedFeatureBuilder<Name extends ModuleName, Channels = never> {
 
   withRepositories<const Live extends AnyProvider, const Memory extends AnyProvider>(
     repositories: RepositoryRegistry<Live, Memory>,
-  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory, Channels> {
+  ): RepositoryDefinedFeatureBuilder<Name, Live, Memory, Channels, Registry> {
     return new RepositoryDefinedFeatureBuilder(this.name, repositories, this.channels);
   }
 
   /** This module's channels, built by the container on the tier the stores state (record §5). */
   withChannels<const Live extends AnyProvider, const Memory extends AnyProvider>(
     channels: ChannelRegistry<Live, Memory>,
-  ): DefinedFeatureBuilder<Name, ChannelsFor<ChannelRegistry<Live, Memory>>> {
+  ): DefinedFeatureBuilder<
+    Name,
+    ChannelsFor<ChannelRegistry<Live, Memory>>,
+    ChannelRegistry<Live, Memory>
+  > {
     return new DefinedFeatureBuilder(this.name, channels);
   }
 
@@ -1085,7 +1089,7 @@ class DefinedFeatureBuilder<Name extends ModuleName, Channels = never> {
     const Reads extends readonly string[],
   >(
     app: AppDefinition<Dependencies, Members, Config, App, Channels> & { readonly reads: Reads },
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>;
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads, Registry>;
   withApi<
     Dependencies extends TokenMap,
     Members,
@@ -1096,21 +1100,21 @@ class DefinedFeatureBuilder<Name extends ModuleName, Channels = never> {
     app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App, Channels> & {
       readonly reads: Reads;
     },
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, Reads, Registry>;
   withApi<Dependencies extends TokenMap, Members, App, const Reads extends readonly string[]>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App, Channels> & {
       readonly reads: Reads;
     },
-  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>;
+  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads, Registry>;
   withApi<Dependencies extends TokenMap, Members, Config, App>(
     app: AppDefinition<Dependencies, Members, Config, App, Channels>,
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly []>;
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, readonly [], Registry>;
   withApi<Dependencies extends TokenMap, Members, Slice extends ConfigSlice, App>(
     app: DeclaredConfigAppDefinition<Dependencies, Members, Slice, App, Channels>,
-  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly []>;
+  ): ConfiguredAppBuilder<Name, Dependencies, Members, ConfigOf<Slice>, App, readonly [], Registry>;
   withApi<Dependencies extends TokenMap, Members, App>(
     app: AppDefinitionWithoutConfig<Dependencies, Members, App, Channels>,
-  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly []>;
+  ): UnconfiguredAppBuilder<Name, Dependencies, Members, App, readonly [], Registry>;
   withApi(
     app:
       | AppDefinition<TokenMap, unknown, unknown, unknown, Channels>
@@ -1184,6 +1188,11 @@ type RepositoryAppDefinitionWithoutConfig<
     ) => Created | Promise<Created>;
   }>;
 
+/** The registry named in `.withChannels(...)`, typed, so the root reads what its tiers bind. */
+type ChannelsDeclared<Registry> = [Registry] extends [undefined]
+  ? unknown
+  : Readonly<{ readonly channelRegistry: Registry }>;
+
 /** The registries a module named on its installer, handed to the app builder together. */
 type ModuleRegistries<Live extends AnyProvider, Memory extends AnyProvider> = Readonly<{
   repositories: RepositoryRegistry<Live, Memory>;
@@ -1195,6 +1204,7 @@ class RepositoryDefinedFeatureBuilder<
   Live extends AnyProvider,
   Memory extends AnyProvider,
   Channels = never,
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
@@ -1215,7 +1225,8 @@ class RepositoryDefinedFeatureBuilder<
     Name,
     Live,
     Memory,
-    ChannelsFor<ChannelRegistry<ChannelLive, ChannelMemory>>
+    ChannelsFor<ChannelRegistry<ChannelLive, ChannelMemory>>,
+    ChannelRegistry<ChannelLive, ChannelMemory>
   > {
     return new RepositoryDefinedFeatureBuilder(this.name, this.repositories, channels);
   }
@@ -1237,7 +1248,18 @@ class RepositoryDefinedFeatureBuilder<
       Created,
       Channels
     > & { readonly reads: Reads },
-  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads, Created>;
+  ): RepositoryAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    Config,
+    App,
+    Reads,
+    Created,
+    Registry
+  >;
   withApi<
     Dependencies extends TokenMap,
     Members extends object,
@@ -1261,7 +1283,8 @@ class RepositoryDefinedFeatureBuilder<
     Members,
     App,
     Reads,
-    Created
+    Created,
+    Registry
   >;
   withApi<Dependencies extends TokenMap, Members extends object, Config, App, Created extends App>(
     app: RepositoryAppDefinition<
@@ -1282,7 +1305,8 @@ class RepositoryDefinedFeatureBuilder<
     Config,
     App,
     readonly [],
-    Created
+    Created,
+    Registry
   >;
   withApi<
     Dependencies extends TokenMap,
@@ -1306,7 +1330,8 @@ class RepositoryDefinedFeatureBuilder<
     Members,
     App,
     readonly [],
-    Created
+    Created,
+    Registry
   >;
   withApi<
     Dependencies extends TokenMap,
@@ -1334,7 +1359,8 @@ class RepositoryDefinedFeatureBuilder<
     ConfigOf<Slice>,
     App,
     Reads,
-    Created
+    Created,
+    Registry
   >;
   withApi<
     Dependencies extends TokenMap,
@@ -1361,7 +1387,8 @@ class RepositoryDefinedFeatureBuilder<
     ConfigOf<Slice>,
     App,
     readonly [],
-    Created
+    Created,
+    Registry
   >;
   withApi(
     app:
@@ -1417,6 +1444,7 @@ class RepositoryAppBuilder<
   App,
   Reads extends readonly string[] = readonly [],
   Created extends App = App,
+  Registry = undefined,
 > {
   private readonly repositories: RepositoryRegistry<Live, Memory>;
   private readonly channels: AnyChannelRegistry | undefined;
@@ -1441,7 +1469,18 @@ class RepositoryAppBuilder<
     ...transports: Transports
   ): ModuleContributions<
     ReturnType<
-      RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Members,
+        Config,
+        App,
+        Reads,
+        Created,
+        Registry
+      >["build"]
     > & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
@@ -1454,7 +1493,18 @@ class RepositoryAppBuilder<
   > {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Members,
+          Config,
+          App,
+          Reads,
+          Created,
+          Registry
+        >["build"]
       > & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
@@ -1475,7 +1525,18 @@ class RepositoryAppBuilder<
   withWorkers(...workers: readonly unknown[]) {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Members,
+          Config,
+          App,
+          Reads,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
@@ -1489,7 +1550,18 @@ class RepositoryAppBuilder<
   withTasks(...tasks: readonly unknown[]) {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Members,
+          Config,
+          App,
+          Reads,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
@@ -1503,7 +1575,18 @@ class RepositoryAppBuilder<
   withMigrations(...steps: readonly unknown[]) {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Members,
+          Config,
+          App,
+          Reads,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
@@ -1527,7 +1610,7 @@ class RepositoryAppBuilder<
   > & {
     readonly repositoryRegistry: RepositoryRegistry<Live, Memory>;
     readonly members: readonly Reads[number][];
-  } {
+  } & ChannelsDeclared<Registry> {
     const app = this.app;
     const registry = this.repositories;
     const name = this.name;
@@ -1561,7 +1644,7 @@ class RepositoryAppBuilder<
       )
       .provides(app.contract)
       .build();
-    return declaringChannels(
+    const declared = declaringChannels(
       {
         ...setup,
         // The name is the literal the module was declared with, which is the key
@@ -1571,7 +1654,7 @@ class RepositoryAppBuilder<
         // handed to the app and to this module's eventing declaration alike. A
         // second read would give the two halves separate objects over the same
         // rows, and a memory tier two separate databases.
-        install: async (args) => {
+        install: async (args: FeatureInstallArguments<Members>) => {
           if (!args.repositorySelection) {
             throw new Error(`Module "${name}" was installed without a repository tier.`);
           }
@@ -1585,6 +1668,7 @@ class RepositoryAppBuilder<
       },
       this.channels,
     );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 
   /**
@@ -1596,7 +1680,18 @@ class RepositoryAppBuilder<
     eventing: FeatureEventing<ModuleRepositories<Live, Memory>, App, unknown, Definition>,
   ): ModuleContributions<
     ReturnType<
-      RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+      RepositoryAppBuilder<
+        Name,
+        Live,
+        Memory,
+        Dependencies,
+        Members,
+        Config,
+        App,
+        Reads,
+        Created,
+        Registry
+      >["build"]
     >,
     ModuleRepositories<Live, Memory>,
     App,
@@ -1606,7 +1701,18 @@ class RepositoryAppBuilder<
   > {
     return withContributions<
       ReturnType<
-        RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
+        RepositoryAppBuilder<
+          Name,
+          Live,
+          Memory,
+          Dependencies,
+          Members,
+          Config,
+          App,
+          Reads,
+          Created,
+          Registry
+        >["build"]
       >,
       ModuleRepositories<Live, Memory>,
       App,
@@ -1626,6 +1732,7 @@ class RepositoryUnconfiguredAppBuilder<
   App,
   Reads extends readonly string[] = readonly [],
   Created extends App = App,
+  Registry = undefined,
 > extends RepositoryAppBuilder<
   Name,
   Live,
@@ -1635,7 +1742,8 @@ class RepositoryUnconfiguredAppBuilder<
   undefined,
   App,
   Reads,
-  Created
+  Created,
+  Registry
 > {
   constructor(
     name: Name,
@@ -1675,6 +1783,7 @@ class ConfiguredAppBuilder<
   Config,
   App,
   Reads extends readonly string[] = readonly [],
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
@@ -1692,7 +1801,9 @@ class ConfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
+    ReturnType<
+      ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads, Registry>["build"]
+    > & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
@@ -1702,7 +1813,9 @@ class ConfiguredAppBuilder<
     Members
   > {
     return withContributions<
-      ReturnType<ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads>["build"]> & {
+      ReturnType<
+        ConfiguredAppBuilder<Name, Dependencies, Members, Config, App, Reads, Registry>["build"]
+      > & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
@@ -1757,7 +1870,7 @@ class ConfiguredAppBuilder<
     undefined,
     undefined,
     Name
-  > & { readonly members: readonly Reads[number][] } {
+  > & { readonly members: readonly Reads[number][] } & ChannelsDeclared<Registry> {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<Config>()
@@ -1775,7 +1888,7 @@ class ConfiguredAppBuilder<
       )
       .provides(app.contract)
       .build();
-    return declaringChannels(
+    const declared = declaringChannels(
       {
         ...declaration,
         name: this.name,
@@ -1786,6 +1899,7 @@ class ConfiguredAppBuilder<
       },
       this.channels,
     );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 }
 
@@ -1795,6 +1909,7 @@ class UnconfiguredAppBuilder<
   Members,
   App,
   Reads extends readonly string[] = readonly [],
+  Registry = undefined,
 > {
   constructor(
     private readonly name: Name,
@@ -1812,7 +1927,9 @@ class UnconfiguredAppBuilder<
   withTransports<const Transports extends readonly FeatureTransportDescriptor[]>(
     ...transports: Transports
   ): ModuleContributions<
-    ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
+    ReturnType<
+      UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads, Registry>["build"]
+    > & {
       readonly transports: readonly FeatureTransportDescriptor[];
       readonly namespace: PublicNamespace<Name>;
     },
@@ -1822,7 +1939,9 @@ class UnconfiguredAppBuilder<
     Members
   > {
     return withContributions<
-      ReturnType<UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads>["build"]> & {
+      ReturnType<
+        UnconfiguredAppBuilder<Name, Dependencies, Members, App, Reads, Registry>["build"]
+      > & {
         readonly transports: readonly FeatureTransportDescriptor[];
         readonly namespace: PublicNamespace<Name>;
       },
@@ -1877,7 +1996,7 @@ class UnconfiguredAppBuilder<
     undefined,
     undefined,
     Name
-  > & { readonly members: readonly Reads[number][] } {
+  > & { readonly members: readonly Reads[number][] } & ChannelsDeclared<Registry> {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
       .withConfigType<undefined>()
@@ -1895,7 +2014,7 @@ class UnconfiguredAppBuilder<
       )
       .provides(app.contract)
       .build();
-    return declaringChannels(
+    const declared = declaringChannels(
       {
         ...declaration,
         name: this.name,
@@ -1906,6 +2025,7 @@ class UnconfiguredAppBuilder<
       },
       this.channels,
     );
+    return declared as typeof declared & ChannelsDeclared<Registry>;
   }
 }
 

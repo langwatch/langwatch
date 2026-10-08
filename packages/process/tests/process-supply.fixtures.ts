@@ -2,6 +2,7 @@ import { Config } from "@langwatch/config";
 import { moduleApi, supplyToken } from "@langwatch/module";
 import { z } from "zod";
 
+import { type BoundApis, defineChannels } from "../src/channel-registry.ts";
 import {
   defineProcessModule,
   type FeatureSetup,
@@ -261,3 +262,67 @@ export const licenseSource = { resolve: () => "pro" } satisfies LicenseSource;
 export const licenseConsumerModule = defineProcessModule("entitlement")
   .withApi(LicenseConsumerApp)
   .build();
+
+export interface VerdictApi {
+  judge(text: string): string;
+}
+export const VerdictApi = moduleApi<VerdictApi>()("instant-eval");
+
+interface VerdictChannels {
+  readonly verdicts: Pick<VerdictApi, "judge">;
+}
+
+/** Binds the judge's Api without listing it as a dependency: only a stand-in can fill it. */
+class BoundVerdictChannels {
+  static readonly requires = [] as const;
+  static readonly binds = { verdicts: VerdictApi } as const;
+
+  static create({
+    bound,
+  }: {
+    bound: BoundApis<typeof BoundVerdictChannels.binds>;
+  }): VerdictChannels {
+    return { verdicts: { judge: (text) => bound.verdicts.judge(text) } };
+  }
+}
+
+export interface ScoringApi {
+  score(text: string): string;
+}
+export const ScoringApi = moduleApi<ScoringApi>()("analytics");
+
+class ScoringApp implements ScoringApi {
+  static readonly contract = ScoringApi;
+  static readonly dependencies = {};
+
+  static create({
+    channels,
+  }: FeatureSetup<Record<never, never>, never, undefined, never, VerdictChannels>): ScoringApp {
+    return new ScoringApp(channels.verdicts);
+  }
+
+  private constructor(private readonly verdicts: VerdictChannels["verdicts"]) {}
+
+  score(text: string): string {
+    return `scored ${this.verdicts.judge(text)}`;
+  }
+}
+
+export const scoringModule = defineProcessModule("analytics")
+  .withChannels(defineChannels({ live: BoundVerdictChannels, memory: BoundVerdictChannels }))
+  .withApi(ScoringApp)
+  .build();
+
+/** The judge's own module: installing it satisfies the binding without a stand-in. */
+class VerdictApp implements VerdictApi {
+  static readonly contract = VerdictApi;
+  static readonly dependencies = {};
+  static create(_setup?: Readonly<{ config: undefined }>): VerdictApp {
+    return new VerdictApp();
+  }
+  judge(text: string): string {
+    return `judged ${text}`;
+  }
+}
+export const verdictModule = defineProcessModule("instant-eval").withApi(VerdictApp).build();
+export const verdicts: VerdictApi = VerdictApp.create();
