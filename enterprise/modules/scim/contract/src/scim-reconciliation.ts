@@ -11,7 +11,6 @@ import { z } from "zod";
 
 /** Whether the reader has something to do, not how far along the sync is. */
 export const scimSyncToneSchema = z.enum(["waiting", "working", "attention", "ended"]);
-export type ScimSyncTone = z.infer<typeof scimSyncToneSchema>;
 
 export const scimSyncStatusCopySchema = z
   .object({ headline: z.string(), waitingFor: z.string(), tone: scimSyncToneSchema })

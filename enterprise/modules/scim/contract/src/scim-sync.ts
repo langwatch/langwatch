@@ -15,8 +15,8 @@ export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
  * nothing like a working one.
  */
 export const SCIM_SYNC_STATES = ["TOKEN_ISSUED", "SYNCING", "ERROR", "REVOKED"] as const;
-export const scimSyncStateSchema = z.enum(SCIM_SYNC_STATES);
-export type ScimSyncLifecycleState = z.infer<typeof scimSyncStateSchema>;
+export const scimSyncLifecycleStateSchema = z.enum(SCIM_SYNC_STATES);
+export type ScimSyncLifecycleState = z.infer<typeof scimSyncLifecycleStateSchema>;
 
 /** What a push did to one person, as the directory asked for it. */
 export const SCIM_USER_OPS = ["create", "update", "deactivate"] as const;

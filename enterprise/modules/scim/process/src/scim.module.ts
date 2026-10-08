@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The SCIM feature's installer: one application, four declared doors.
+ * The SCIM feature's installer: one application, six declared doors.
  * `ScimModule` declares what it reads off the process and which peer modules it
  * depends on; a process that supplies both installs this and mounts what it wants.
  */
@@ -10,8 +10,8 @@ import {
   organizationCredentialOfRequest,
   scimCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import type { ScimApi, ScimServerConfig } from "@langwatch/enterprise-scim-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { ScimModule } from "./app/scim.app.ts";

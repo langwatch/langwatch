@@ -2,12 +2,13 @@
 
 import type { RestIdentity } from "@langwatch/api/hosting";
 /**
- * The SCIM feature's application: what its four doors call.
+ * The SCIM feature's application: what its six doors call.
  *
  * Two of them mint and retire provisioning tokens — the settings page over
  * tRPC, and the management REST family an identity team scripts against — a
  * third speaks SCIM 2.0 to an identity provider, and a fourth relays a
- * directory's log stream. Before this, the tRPC door declared a context slice
+ * directory's log stream; the last two read reconciliation and oversight over
+ * tRPC. Before this, the tRPC door declared a context slice
  * for itself while the REST families took a `scim` resolver and the webhook
  * took the service as a call argument: three descriptions of one bag, none
  * reachable from the others.
@@ -16,7 +17,7 @@ import type { RestIdentity } from "@langwatch/api/hosting";
  * through it. What this object adds is that they are reached through ONE
  * thing, so a rule about minting a token — which connection it binds to, what
  * is returned once and never again — and a rule about which tenant a push
- * provisions have one place to live rather than four.
+ * provisions have one place to live rather than six.
  */
 import { recordScimCredential } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * One SCIM application over a fake directory service, for the transport tests:
- * the same object the four doors are mounted on, so what a test drives is the
+ * the same object the six doors are mounted on, so what a test drives is the
  * declaration and the application, never a stand-in for either.
  *
  * Built through {@link ScimModule.createWithService}, not {@link ScimModule.create}:
