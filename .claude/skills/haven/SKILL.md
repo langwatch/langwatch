@@ -14,7 +14,11 @@ reference is `tools/thuishaven/README.md`; the processes and flags are in
 guessing a flag.
 
 Run it from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.mk`);
-`make haven install` puts plain `haven` on your PATH.
+`make haven install` puts plain `haven` on your PATH and installs what the machine
+needs. With no TTY it runs `haven install --yes` (no prompts; on macOS also the
+native tier: `brew install grafana prometheus loki grafana/grafana/alloy` and the
+pinned ClickHouse and Tempo downloads). colima is optional. Re-running is a no-op;
+`haven install --list --agent` reports without installing.
 
 ## As an agent
 

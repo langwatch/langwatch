@@ -208,3 +208,22 @@ Feature: haven install checks the machine's prerequisites
       When the second one fails to install
       Then the failure is reported naming the prerequisite
       And the run stops rather than reporting a success it did not get
+
+  Rule: On macOS the install brings the native tier, and a container runtime is optional
+
+    Scenario: macOS install fetches the native tier and colima stays optional
+      Given a Mac with Homebrew and no observability tools or pinned binaries
+      When the developer runs "haven install --yes"
+      Then grafana, prometheus, loki and grafana/grafana/alloy are installed through Homebrew
+      And the pinned ClickHouse and Tempo releases are downloaded and their sha256 verified
+      And the container runtime is reported optional, never required
+
+    Scenario: A second install run fetches nothing
+      Given the pinned ClickHouse and Tempo binaries are already on disk
+      When the developer runs "haven install" again
+      Then nothing is downloaded and the row reads as installed with both versions
+
+    Scenario: Linux install keeps today's catalogue
+      Given a Linux machine
+      When the developer runs "haven install"
+      Then the observability tools and the pinned binaries are reported not applicable

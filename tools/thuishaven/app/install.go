@@ -41,6 +41,8 @@ type PrereqTools interface {
 	Install(ctx context.Context, command string) error
 	// Sysctl reads one kernel setting (`sysctl -n name`), trimmed.
 	Sysctl(ctx context.Context, name string) (string, error)
+	// Fetch downloads a pinned release to dest and verifies its sha256.
+	Fetch(ctx context.Context, a domain.PinnedArtifact, dest string) error
 }
 
 // platform is the GOOS prerequisites are planned for: the pinned one, else
@@ -88,6 +90,9 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	}
 	if c.Key == "somaxconn" {
 		return o.probeSomaxconn(ctx)
+	}
+	if c.Key == "native-binaries" {
+		return o.probeNativeBinaries()
 	}
 	if c.FormulaIsAuthority {
 		// haven starts this one with `brew services`, so brew's answer is the
@@ -156,6 +161,41 @@ func (o *Orchestrator) probeSomaxconn(ctx context.Context) domain.Found {
 		return domain.Found{Present: true, Detail: "kern.ipc.somaxconn unreadable, not checked"}
 	}
 	return domain.Found{Present: n >= domain.SomaxconnFloor, Detail: "kern.ipc.somaxconn=" + out}
+}
+
+// nativeBinaries is the pinned ClickHouse and Tempo for this machine, at the
+// paths `haven up` looks for them.
+func (o *Orchestrator) nativeBinaries() []domain.NativePinnedBinary {
+	return domain.NativePinnedBinaries(o.cfg.Home, o.platform(), runtime.GOARCH)
+}
+
+// probeNativeBinaries reports present once every pinned binary is on disk.
+func (o *Orchestrator) probeNativeBinaries() domain.Found {
+	all := o.nativeBinaries()
+	missing := domain.MissingPinnedBinaries(all, fileExists)
+	if len(missing) > 0 {
+		return domain.Found{}
+	}
+	detail := make([]string, 0, len(all))
+	for _, b := range all {
+		detail = append(detail, b.Name+" "+b.Version)
+	}
+	return domain.Found{Present: true, Detail: strings.Join(detail, ", ")}
+}
+
+// fetchNativeBinaries downloads and verifies whichever pinned binary is missing.
+func (o *Orchestrator) fetchNativeBinaries(ctx context.Context) error {
+	for _, b := range domain.MissingPinnedBinaries(o.nativeBinaries(), fileExists) {
+		if err := o.prereqTools().Fetch(ctx, b.Artifact, b.Dest); err != nil {
+			return fmt.Errorf("%s %s: %w", b.Name, b.Version, err)
+		}
+	}
+	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // probePortless folds the proxy's two questions — is one resolvable, and is
@@ -407,6 +447,9 @@ func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, co
 	if p.Key == "golangci-lint" {
 		return o.installGolangciLint(ctx)
 	}
+	if p.Key == "native-binaries" {
+		return o.fetchNativeBinaries(ctx)
+	}
 	return o.prereqTools().Install(ctx, command)
 }
 
@@ -564,4 +607,7 @@ func (nullPrereqTools) Install(context.Context, string) error {
 }
 func (nullPrereqTools) Sysctl(context.Context, string) (string, error) {
 	return "", fmt.Errorf("no sysctl reader is wired in")
+}
+func (nullPrereqTools) Fetch(context.Context, domain.PinnedArtifact, string) error {
+	return fmt.Errorf("no downloader is wired in")
 }

@@ -76,8 +76,13 @@ portless if missing, trusts its CA, starts the proxy — every step idempotent.
 `make haven install` (optional) go-installs the binary so plain `haven ...`
 works everywhere, and then runs `haven install`, which checks the machine for
 everything else haven drives — node, pnpm, go, the brew formulae behind the
-shared Postgres and Redis, a container runtime — and offers to install what is
-missing. Nothing is installed without being ticked, and anything declined with
+shared Postgres and Redis, on macOS the native tier (Grafana, Prometheus, Loki
+and Alloy from Homebrew, the pinned ClickHouse and Tempo downloads), and an
+optional container runtime (colima only backs the container fallback, `haven
+play` and sandboxed langy) — and offers to install what is missing. With no
+terminal (`make haven install` from an agent) it runs `--yes`: no prompts, one
+line per step, already-installed rows left alone, and only a missing required
+prerequisite fails. In a terminal nothing is installed without being ticked, and anything declined with
 "never" is remembered for the machine (`haven install --reset-skips` undoes
 that). Hostname routing is opt-in — `pnpm dev` uses the plain `PORT` scheme:
 

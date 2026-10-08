@@ -44,7 +44,7 @@ func New(havenHome string, artifact domain.PinnedArtifact, limits domain.ClickHo
 }
 
 func (s *Server) binaryPath() string {
-	return filepath.Join(s.home, "bin", domain.ClickHouseNativeVersion, "clickhouse")
+	return domain.ClickHouseNativeBinary(s.home)
 }
 func (s *Server) configPath() string   { return filepath.Join(s.home, "config.xml") }
 func (s *Server) endpointPath() string { return filepath.Join(s.home, "endpoint.json") }

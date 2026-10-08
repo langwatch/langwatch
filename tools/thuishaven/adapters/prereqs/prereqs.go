@@ -14,6 +14,9 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/pinnedrelease"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Tools is the real implementation.
@@ -83,6 +86,12 @@ func (t *Tools) Install(ctx context.Context, command string) error {
 	err := cmd.Run()
 	// Whatever just happened, the cached formula list is now a lie.
 	t.once, t.formulae = sync.Once{}, nil
+	return err
+}
+
+// Fetch downloads and verifies one pinned release, as `haven up` would.
+func (t *Tools) Fetch(ctx context.Context, a domain.PinnedArtifact, dest string) error {
+	_, err := pinnedrelease.Ensure(ctx, a, dest)
 	return err
 }
 

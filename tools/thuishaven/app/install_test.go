@@ -29,6 +29,13 @@ type fakeTools struct {
 	failOn   string
 	// sysctl answers Sysctl by name; an absent name is an unreadable setting.
 	sysctl map[string]string
+	// fetched records every pinned download asked for, by destination.
+	fetched []string
+}
+
+func (f *fakeTools) Fetch(_ context.Context, _ domain.PinnedArtifact, dest string) error {
+	f.fetched = append(f.fetched, dest)
+	return nil
 }
 
 func (f *fakeTools) Sysctl(_ context.Context, name string) (string, error) {

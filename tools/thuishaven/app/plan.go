@@ -230,6 +230,9 @@ func (p *childPlan) nodeEnv(lane string) []string {
 		p.o.compileCacheEnv(p.st.Slug))
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+		if v := os.Getenv("LANGWATCH_DEV_TOOLS_IDLE"); v != "" {
+			env = append(env, "LANGWATCH_DEV_TOOLS_IDLE="+v)
+		}
 	}
 	return env
 }

@@ -1,4 +1,7 @@
-# =============================================================================
+# With no terminal (an agent, CI) it runs `--yes`: installs what haven needs,
+# asks nothing; a human gets the picker.
+#
+# `|| true` because the check is advice.	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) install; else go run $(HAVEN_PKG) install --yes; fi || true# =============================================================================
 # THUISHAVEN — hostname-based local dev
 # =============================================================================
 # Included from the repo-root Makefile (`include dev/haven.mk`, last line).
@@ -61,6 +64,9 @@ endif
 # yet, so the freshly installed name does not resolve — and the check would be
 # skipped on the one machine that needed it most.
 #
+# With no terminal (an agent, CI) it runs `--yes`: installs what haven needs
+# (on macOS the native tier too) and asks nothing; a human gets the picker.
+#
 # `|| true` because the check is advice. A declined install, or no terminal to
 # ask in, must not fail a target whose own job — installing the binary — is
 # already done.
@@ -70,7 +76,7 @@ ifeq ($(strip $(HAVEN_ARGS)),)
 else ifeq ($(strip $(HAVEN_ARGS)),install)
 	@$(MAKE) --no-print-directory haven-web || echo "haven-web did not build; the hub and stack homes will name 'make haven-web' until it does"
 	@go install $(HAVEN_PKG)
-	@go run $(HAVEN_PKG) install || true
+	@if [ -t 0 ] && [ -t 1 ]; then go run $(HAVEN_PKG) install; else go run $(HAVEN_PKG) install --yes; fi || true
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
