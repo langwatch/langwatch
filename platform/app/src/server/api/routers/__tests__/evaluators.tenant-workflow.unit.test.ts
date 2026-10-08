@@ -9,7 +9,7 @@ import { evaluatorsRouter } from "../evaluators";
 vi.mock("../../../license-enforcement", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../license-enforcement")>();
-  return { ...actual, enforceLicenseLimit: vi.fn() };
+  return { ...actual, enforceCreationLimit: vi.fn() };
 });
 
 // Mutations audit through the global prisma, not ctx.prisma — unmocked, the

@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import { detectColdScan } from "~/server/app-layer/clients/clickhouse/cold-scan-detector";
 import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
+import { CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
 import {
   getClickHouseMaxOpenConnections,
@@ -57,9 +57,10 @@ export const CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
  * error becomes a typed `HandledError` with remediation, which queries count as
  * cold scans (the table list is this schema's knowledge, pinned to the
  * migrations by `cold-scan-detector.coverage.unit.test.ts`), and the
- * transient-message list — still owned by
- * `event-sourcing/services/errorHandling.ts`, which keeps this layer and the
- * outer group-queue classifier reading the same list forever.
+ * statement-retry message list, owned by
+ * `event-sourcing/services/errorHandling.ts` next to the group-queue
+ * classifier's list it is derived from (minus MEMORY_LIMIT_EXCEEDED, which
+ * only the queue retries).
  */
 export function createResilientClickHouseClient({
   client,
@@ -83,7 +84,7 @@ export function createResilientClickHouseClient({
     maxRetries,
     baseDelayMs,
     maxDelayMs,
-    transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
     // The package's ports take named arguments; these platform functions are
     // older and positional, and both have callers of their own. Adapting here
     // is this function's job — it is the seam between what the platform has and

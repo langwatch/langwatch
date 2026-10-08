@@ -789,6 +789,7 @@ export function initializeDefaultApp(options?: {
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
   );
 
   const planProvider = config.isSaas
@@ -2750,6 +2751,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
+      testSimulationReads,
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,
