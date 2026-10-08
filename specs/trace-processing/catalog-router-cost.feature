@@ -29,3 +29,27 @@ Feature: Router models are never billed a negative cost
     Given the model catalog prices "nvidia/switchyard" at -1 per token
     When the cost for model "nvidia/switchyard" is matched
     Then no registry entry is returned
+
+  # Every path that writes a cost reads the same registry: the gateway spend
+  # rating, the trace span cost and the evaluation cell cost. The span path
+  # already drops a cost that is not above zero; the other two did not, so a
+  # call routed through nvidia/switchyard rated at minus 1,500 dollars for
+  # 1,000 input and 500 output tokens.
+
+  @unit
+  Scenario: A router call through the gateway never lowers spend
+    Given the model catalog prices a router at -1 per token
+    When a gateway request to that router is rated
+    Then the spend it records is not below zero
+
+  @unit
+  Scenario: A router span on a trace is never costed below zero
+    Given the model catalog prices a router at -1 per token
+    When the cost of a span naming that router is computed
+    Then the cost is not below zero
+
+  @unit
+  Scenario: An evaluation cell run on a router is never costed below zero
+    Given the model catalog prices a router at -1 per token
+    When the cost of an evaluation cell that ran that router is computed
+    Then the cost is not below zero

@@ -18,10 +18,13 @@ vi.mock("~/server/tracer/collector/cost", async () => {
     // Keep the real estimateCost (pure arithmetic) and stub only the
     // DB-backed model-cost lookup.
     estimateCost: actual.estimateCost,
+    matchModelCostWithFallbacks: actual.matchModelCostWithFallbacks,
     getMatchingLLMModelCost,
   };
 });
 
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import { priceMetrics } from "../orchestrator";
 
 const MODEL_COST = {
@@ -87,6 +90,44 @@ describe("priceMetrics", () => {
         completion_tokens: 50,
       });
       expect(cost).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * The upstream catalog prices a model router at -1 per token, since a router
+ * has no rate of its own. Every router in the catalog is listed here by id.
+ */
+const ROUTERS = [
+  "openrouter/auto",
+  "openrouter/auto-beta",
+  "openrouter/fusion",
+  "openrouter/pareto-code",
+  "openrouter/bodybuilder",
+  "nvidia/switchyard",
+  "typesafe/jev-router",
+];
+
+describe("priceMetrics for a variable-price router", () => {
+  beforeEach(() => {
+    // The lookup reads the real static registry, which is where a router's
+    // catalog rate would come from; only the database half is left out.
+    getMatchingLLMModelCost.mockReset();
+    getMatchingLLMModelCost.mockImplementation(
+      async (_projectId: string, model: string) =>
+        matchModelCostWithFallbacks(model, getStaticModelCosts()),
+    );
+  });
+
+  describe("given an evaluation cell that ran a router", () => {
+    /** @scenario An evaluation cell run on a router is never costed below zero */
+    it.each(ROUTERS)("never costs %s below zero", async (model) => {
+      const cost = await priceMetrics("project-1", {
+        model,
+        prompt_tokens: 1000,
+        completion_tokens: 500,
+      });
+      expect(cost ?? 0).toBeGreaterThanOrEqual(0);
     });
   });
 });

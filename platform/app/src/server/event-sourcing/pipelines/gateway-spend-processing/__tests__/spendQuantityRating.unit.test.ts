@@ -283,3 +283,30 @@ describe("rateSpendNanoUsd", () => {
     });
   });
 });
+
+/**
+ * The upstream catalog prices a model router at -1 per token, since a router
+ * has no rate of its own. Every router in the catalog is listed here by id.
+ */
+const ROUTERS = [
+  "openrouter/auto",
+  "openrouter/auto-beta",
+  "openrouter/fusion",
+  "openrouter/pareto-code",
+  "openrouter/bodybuilder",
+  "nvidia/switchyard",
+  "typesafe/jev-router",
+];
+
+describe("rateSpendNanoUsd for a variable-price router", () => {
+  describe("given a gateway request routed through a router", () => {
+    /** @scenario A router call through the gateway never lowers spend */
+    it.each(ROUTERS)("never rates %s below zero", (model) => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model,
+        usage: usage({ input_tokens: 1000, output_tokens: 500 }),
+      });
+      expect(costNanoUsd).toBeGreaterThanOrEqual(0);
+    });
+  });
+});
