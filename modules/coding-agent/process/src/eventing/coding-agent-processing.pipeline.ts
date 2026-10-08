@@ -41,6 +41,7 @@ import {
 import { z } from "zod";
 
 import type { CodingAgentModule } from "../app/coding-agent.app.ts";
+import type { CodingAgentPullRequestMappingBackfill } from "../features/pull-requests/services/coding-agent-pull-request-mapping-backfill.service.ts";
 import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
@@ -51,7 +52,6 @@ import {
   EventingCodingAgentTraceSessionAppendService,
   EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
-import type { CodingAgentPullRequestMappingBackfill } from "../services/coding-agent-pull-request-mapping-backfill.service.ts";
 import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import type { CodingAgentProjectActivity } from "../services/coding-agent-session-seen.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";

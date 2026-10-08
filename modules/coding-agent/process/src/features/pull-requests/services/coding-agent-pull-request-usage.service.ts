@@ -3,7 +3,7 @@ import type {
   CodingAgentSessionBranchRecord,
 } from "@langwatch/coding-agent-contract";
 
-import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-event.repository.ts";
+import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
 
 export type CodingAgentUsageRow = {
   projectId: string;

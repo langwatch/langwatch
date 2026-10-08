@@ -18,8 +18,6 @@ import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
 import { MemoryAuthzAuditTrailRepository } from "../memory/memory.authz-audit-trail.repository.ts";
-import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
-import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../memory/memory.authz-lineage-epoch.repository.ts";
@@ -30,8 +28,12 @@ import { MemoryAuthzMigrationRepository } from "../memory/memory.authz-migration
 import { MemoryAuthzPlatformGrantRepository } from "../memory/memory.authz-platform-grant.repository.ts";
 import { MemoryAuthzReadRepository } from "../memory/memory.authz-read.repository.ts";
 import { MemoryAuthzRevocationRepository } from "../memory/memory.authz-revocation.repository.ts";
-import { MemoryAuthzSessionVersionRepository } from "../memory/memory.authz-session-version.repository.ts";
 import { MemoryAuthzUserStandingRepository } from "../memory/memory.authz-user-standing.repository.ts";
+import {
+  MemoryAuthzCutoverRepository,
+  MemoryAuthzEpochRepository,
+  MemoryAuthzSessionVersionRepository,
+} from "../memory/memory.authz.repositories.ts";
 import { PrismaAuthzManagedGrantRepository } from "../prisma/prisma.authz-managed-grant.repository.ts";
 
 const ORGANIZATION_ID = "org_contract";

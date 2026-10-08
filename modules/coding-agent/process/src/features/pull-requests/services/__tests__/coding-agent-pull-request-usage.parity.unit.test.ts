@@ -21,10 +21,10 @@ import {
   branchSession,
   pullRequest,
   session,
-} from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { SessionModelTotalsRow } from "../../repositories/coding-agent-session-event.repository.ts";
-import type { CodingAgentBillingPolicy } from "../coding-agent-cost-attribution.service.ts";
-import { CodingAgentFeatureService } from "../coding-agent.service.ts";
+} from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
+import type { SessionModelTotalsRow } from "../../../../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentBillingPolicy } from "../../../../services/coding-agent-cost-attribution.service.ts";
+import { CodingAgentFeatureService } from "../../../../services/coding-agent.service.ts";
 
 const HOUR = 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 5, 1);

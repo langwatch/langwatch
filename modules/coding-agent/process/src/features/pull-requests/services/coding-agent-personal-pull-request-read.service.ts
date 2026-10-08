@@ -11,12 +11,14 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   CodingAgentSessionEventRepository,
   SessionModelTotalsRow,
-} from "../repositories/coding-agent-session-event.repository.ts";
+} from "../../../repositories/coding-agent-session-event.repository.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
-} from "../rules/coding-agent-pull-request.rules.ts";
-import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
+} from "../../../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentClock } from "../../../services/coding-agent-clock.service.ts";
+import type { CodingAgentSessionCandidatesService } from "../../../services/coding-agent-session-candidates.service.ts";
+import type { CodingAgentSessionReadService } from "../../../services/coding-agent-session-read.service.ts";
 import type {
   CodingAgentPersonalPullRequestValuesService,
   CodingAgentPersonalRepositoryGroup,
@@ -24,8 +26,6 @@ import type {
 import type { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 import type { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
 import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
-import type { CodingAgentSessionCandidatesService } from "./coding-agent-session-candidates.service.ts";
-import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 
 export const USAGE_SESSION_WINDOW_MS = 180 * 24 * 60 * 60 * 1000;
 const PERSONAL_SESSION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;

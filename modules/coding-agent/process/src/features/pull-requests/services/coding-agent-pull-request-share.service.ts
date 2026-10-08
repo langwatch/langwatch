@@ -1,7 +1,7 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
 
-import { MAX_USAGE_CONTEXTS } from "../eventing/coding-agent-session-state.projection.ts";
-import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-event.repository.ts";
+import { MAX_USAGE_CONTEXTS } from "../../../eventing/coding-agent-session-state.projection.ts";
+import type { SessionModelTotalsRow } from "../../../repositories/coding-agent-session-event.repository.ts";
 import {
   allocateCounters,
   isStampedOnRepository,
@@ -10,7 +10,7 @@ import {
   type StampedUsage,
   tokensOf,
   weighing,
-} from "../rules/coding-agent-pull-request-share.rules.ts";
+} from "../../../rules/coding-agent-pull-request-share.rules.ts";
 import type {
   AssignablePullRequest,
   CodingAgentPullRequestAssignmentService,

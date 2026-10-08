@@ -4,7 +4,6 @@
  */
 export * from "./authz.ts";
 export * from "./authz.admission.ts";
-export { newAuthzGrantId } from "./authz-grant-id.ts";
 export * from "./authz.grant-management.ts";
 export * from "./authz.commands.ts";
 export * from "./authz-platform-operators.commands.ts";

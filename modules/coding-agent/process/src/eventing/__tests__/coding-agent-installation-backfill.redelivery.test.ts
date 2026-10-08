@@ -23,7 +23,7 @@ import {
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import type { CodingAgentPullRequestMappingBackfill } from "../../services/coding-agent-pull-request-mapping-backfill.service.ts";
+import type { CodingAgentPullRequestMappingBackfill } from "../../features/pull-requests/services/coding-agent-pull-request-mapping-backfill.service.ts";
 import { CodingAgentFeatureService } from "../../services/coding-agent.service.ts";
 
 const LANE = "coding_agent_processing.codingAgentInstallationBackfill";

@@ -2,13 +2,12 @@ import { AskChip } from "@langwatch/design-system/ask-chip";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
-import { GuidedOnboardingOffer } from "../../../../behavior/lent-peers.tsx";
+import { GuidedOnboardingOffer, InlineCommandPalette } from "../../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
-import { selectLangySuggestions } from "../../langy/langy-home-suggestions.ts";
 
 import "./homeHeroScroll.css";
+import { selectLangySuggestions } from "../../langy/langy-home-suggestions.ts";
 import { ContinueLine } from "./continue-line.tsx";
-import { HeroAskField } from "./hero-ask-field.tsx";
 import { OnboardAgentPill } from "./onboard-agent-pill.tsx";
 import { useConversationOpen } from "./use-conversation-open.ts";
 import { useProjectReach } from "./use-project-reach.ts";
@@ -143,4 +142,9 @@ export function LangyHomeHero() {
       </VStack>
     </VStack>
   );
+}
+
+/** The landing hero's ask field: navigation's palette, inline; shared by home and governance. */
+export function HeroAskField({ placeholder }: { placeholder: string }) {
+  return <InlineCommandPalette placeholder={placeholder} />;
 }

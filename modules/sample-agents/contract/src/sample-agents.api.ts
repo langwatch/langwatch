@@ -1,3 +1,4 @@
+import { Config, type ConfigOf, publicBaseUrl } from "@langwatch/config";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
@@ -43,3 +44,10 @@ export class HotelBotDeclinedError extends HandledError {
     this.name = "HotelBotDeclinedError";
   }
 }
+
+/** Sample agents' settings: only the shared deployment origin its trace collector posts to. */
+export const sampleAgentsConfig = Config.define(() => ({
+  publicBaseUrl,
+}));
+
+export type SampleAgentsServerConfig = ConfigOf<typeof sampleAgentsConfig>;
