@@ -29,6 +29,14 @@ Feature: Chart CI lifecycle and e2e matrix
     And a Secret that does not render at all is reported as found=missing
 
   @regression
+  Scenario: Only an upgrade-only hook may read a main-phase Secret the install render creates (tasks#894)
+    Given a hook Job reads a Secret that renders in the main phase
+    When the Job's hook runs on an install phase (pre-install or post-install)
+    Then lifecycle.sh reports it as found=main-phase
+    When the Job's hook runs only on pre-upgrade and pre-rollback, and the install render creates that Secret
+    Then lifecycle.sh accepts it, because the previous release already holds the Secret
+
+  @regression
   Scenario: Every pre-upgrade hook resource also runs on pre-rollback (tasks#894)
     Given the chart renders resources carrying helm.sh/hook annotations
     When lifecycle.sh reads the hook phases of every such resource

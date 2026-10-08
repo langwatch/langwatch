@@ -16,10 +16,12 @@
 #   2. Every Secret a hook Job reads through a secretKeyRef / envFrom.secretRef
 #      / volume must, likewise, be a lower-weight hook that runs in every phase
 #      the Job does — otherwise the secretKeyRef resolves to nothing and the
-#      pod wedges in CreateContainerConfigError. On the chart as shipped this
-#      arm checks ZERO dependencies (no hook Job reads a Secret today); it
-#      exists as a forward guard so the invariant holds the day one does. Proof
-#      that it fires lives in the scratch repro cited in the PR body.
+#      pod wedges in CreateContainerConfigError. One narrow exemption: a hook
+#      that runs on NO install phase (pre-/post-install) may read a main-phase
+#      Secret the install render also creates, because on upgrade and rollback
+#      the previous release already holds that Secret. The LWQL access-render
+#      Job relies on exactly that. test_hook_secret_exemption_is_upgrade_only
+#      proves an install-phase hook reading a main-phase Secret still fails.
 #   3. Every hook resource that runs on `pre-upgrade` must also run on
 #      `pre-rollback`. A rollback moves the release the same way an upgrade
 #      does and Helm fires its own event pair for it; a hook registered for the
@@ -64,6 +66,10 @@ VALUES_ALLOWLIST=(
   # (a list). `.Values.ingress.host | default "<your-ingress-host>"` is a
   # human-facing placeholder in the post-install notes, not a wired value.
   "ingress.host"
+  # The gateway subchart's own Service port; ingress.yaml reads it to route.
+  "gateway.service"
+  # Named only in a _helpers.tpl comment, as the ClickHouse subchart's value path.
+  "lwqlAccess.secretName"
 )
 
 # SUBCHARTS (the names that invariant 5 treats as subcharts) is derived from
@@ -237,6 +243,13 @@ def resolve_dep(idx, kind, name, job_phases, job_weight):
     return "ok"
 
 
+INSTALL_PHASES = {"pre-install", "post-install"}
+
+
+def rendered_secrets(path):
+    return {d["metadata"]["name"] for d in load_docs([path]) if d["kind"] == "Secret"}
+
+
 def check_hook_deps(kind_wanted):
     """kind_wanted: 'ServiceAccount' or 'Secret'.
 
@@ -247,8 +260,10 @@ def check_hook_deps(kind_wanted):
     in, since the same Job can pass in one and fail in the other.
     """
     renders = [("install", sys.argv[2]), ("upgrade", sys.argv[3])]
+    install_secrets = rendered_secrets(sys.argv[2])
     bad = 0
     checked = 0
+    exempt = 0
     for render_name, path in renders:
         docs = load_docs([path])
         idx = index(docs)
@@ -265,6 +280,13 @@ def check_hook_deps(kind_wanted):
             for name in needs:
                 checked += 1
                 status = resolve_dep(idx, kind_wanted, name, set(jphases), jweight)
+                # A hook with no install phase only fires once a release exists,
+                # so a main-phase Secret the install render creates is already
+                # there. An install-phase hook gets no such pass.
+                if (kind_wanted == "Secret" and status == "main-phase"
+                        and not (set(jphases) & INSTALL_PHASES) and name in install_secrets):
+                    exempt += 1
+                    continue
                 phase = ",".join(sorted(jphases))
                 if status != "ok":
                     print("FAIL [hook-dep]: render=%s job=%s phase=%s needs=%s/%s found=%s"
@@ -272,8 +294,10 @@ def check_hook_deps(kind_wanted):
                     bad += 1
     if bad:
         return 1
-    print("ok   [hook-%s] %d hook-Job %s dependencies (across install and upgrade) are lower-weight hooks covering every phase"
-          % (kind_wanted.lower(), checked, kind_wanted))
+    note = (" (%d upgrade-only reads of an install-rendered Secret exempt)" % exempt
+            if kind_wanted == "Secret" else "")
+    print("ok   [hook-%s] %d hook-Job %s dependencies (across install and upgrade) are lower-weight hooks covering every phase%s"
+          % (kind_wanted.lower(), checked, kind_wanted, note))
     return 0
 
 
@@ -417,6 +441,58 @@ test_hook_secret_refs_are_lower_weight_hooks() {
   run_check "hook-secret" hook-secret "$INSTALL_RENDER" "$UPGRADE_RENDER"
 }
 
+# Fixture renders, not the chart: the same Job and main-phase Secret, once as an
+# install-phase hook (must still fail) and once upgrade-only (exempt).
+fixture_render() {
+  # $1 out, $2 hook phases (empty: the Job renders in the main phase)
+  local hook_annotations=""
+  if [ -n "$2" ]; then
+    hook_annotations="  annotations:
+    helm.sh/hook: $2
+    helm.sh/hook-weight: \"5\""
+  fi
+  cat >"$1" <<FIXEOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fixture-secret
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fixture-job
+${hook_annotations}
+spec:
+  template:
+    spec:
+      containers:
+        - name: c
+          envFrom:
+            - secretRef:
+                name: fixture-secret
+FIXEOF
+}
+
+# @scenario "Only an upgrade-only hook may read a main-phase Secret the install render creates (tasks#894)"
+test_hook_secret_exemption_is_upgrade_only() {
+  local install_hook="$WORKDIR/fixture-install-hook.yaml"
+  local install_main="$WORKDIR/fixture-install-main.yaml"
+  local upgrade_hook="$WORKDIR/fixture-upgrade-hook.yaml"
+  fixture_render "$install_hook" "pre-install,pre-upgrade,pre-rollback"
+  fixture_render "$install_main" ""
+  fixture_render "$upgrade_hook" "pre-upgrade,pre-rollback"
+  if python3 "$CHECKS" hook-secret "$install_hook" "$install_hook" >/dev/null; then
+    fail "hook-secret-exemption" "an install-phase hook reading a main-phase Secret passed"
+  else
+    echo "ok   [hook-secret-exemption] an install-phase hook reading a main-phase Secret fails"
+  fi
+  if python3 "$CHECKS" hook-secret "$install_main" "$upgrade_hook" >/dev/null; then
+    echo "ok   [hook-secret-exemption] an upgrade-only hook reading an install-rendered Secret passes"
+  else
+    fail "hook-secret-exemption" "an upgrade-only hook reading an install-rendered Secret failed"
+  fi
+}
+
 # @scenario "Every pre-upgrade hook resource also runs on pre-rollback (tasks#894)"
 test_pre_upgrade_hooks_also_run_pre_rollback() {
   run_check "pre-rollback" pre-rollback "$INSTALL_RENDER" "$UPGRADE_RENDER"
@@ -434,6 +510,7 @@ test_subchart_mounts_are_not_parent_extra_volumes() {
 
 test_hook_service_account_is_a_lower_weight_hook
 test_hook_secret_refs_are_lower_weight_hooks
+test_hook_secret_exemption_is_upgrade_only
 test_pre_upgrade_hooks_also_run_pre_rollback
 test_templates_reference_only_declared_values
 test_subchart_mounts_are_not_parent_extra_volumes
