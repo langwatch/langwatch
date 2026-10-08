@@ -70,7 +70,7 @@ import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { Unpacked } from "../../utils/types";
 import { Delayed } from "../Delayed";
 import { usePeriodSelector } from "../PeriodSelector";
-import { ChartErrorState } from "./ChartErrorState";
+import { ChartErrorIndicator, ChartErrorState } from "./ChartErrorState";
 import { ChartTooltip } from "./ChartTooltip";
 import { formatChartDate } from "./formatChartDate";
 import { SummaryMetric } from "./SummaryMetric";
@@ -78,6 +78,7 @@ import {
   formatSeriesGroupName,
   formatSingleSeriesName,
 } from "./seriesGroupName";
+import { useRetryFailedAnalytics } from "./useRetryFailedAnalytics";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -398,6 +399,8 @@ const CustomGraph_ = React.memo(
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
+    const retryFailedAnalytics = useRetryFailedAnalytics();
+
     // The stale-data retry badge is a one-line `title` tooltip — a string-only
     // slot, which is exactly what `describeError` exists for.
     const timeseriesErrorDescription = describeError({
@@ -637,6 +640,10 @@ const CustomGraph_ = React.memo(
       // other graph type keeps it.
       const showChartSkeleton =
         timeseries.isLoading && input.graphType !== "summary";
+      // A row of figures often sits inside a tab header or a small card, so
+      // it draws its own compact error state per figure (see the summary
+      // branch) instead of the panel one.
+      const isSummaryFigures = input.graphType === "summary";
 
       return (
         <Box width="full" height="full" position="relative">
@@ -668,10 +675,11 @@ const CustomGraph_ = React.memo(
               <Spinner position="absolute" right={4} top={4} />
             </Delayed>
           )}
-          {timeseries.error && !timeseries.data ? (
+          {timeseries.error && !timeseries.data && !isSummaryFigures ? (
             <ChartErrorState
               error={timeseries.error}
-              onRetry={() => void timeseries.refetch()}
+              onRetry={retryFailedAnalytics}
+              minHeight={`${height_}px`}
             />
           ) : (
             <>
@@ -689,11 +697,11 @@ const CustomGraph_ = React.memo(
                     padding: 0,
                   }}
                   aria-label="Retry loading chart data"
-                  onClick={() => void timeseries.refetch()}
+                  onClick={retryFailedAnalytics}
                   title={timeseriesErrorDescription}
                 >
                   <Badge colorPalette="red" variant="solid" fontSize="xs">
-                    Refresh failed — click to retry
+                    Refresh failed, click to retry
                   </Badge>
                 </button>
               )}
@@ -719,7 +727,7 @@ const CustomGraph_ = React.memo(
                         ))}
                       </HStack>
                       <Text textStyle="xs" color="fg.subtle">
-                        No data — try adjusting the date range
+                        No data. Try adjusting the date range
                       </Text>
                     </VStack>
                   ))
@@ -764,6 +772,13 @@ const CustomGraph_ = React.memo(
           width="full"
         >
           <Flex paddingBottom={3} width="full" gap={0}>
+            {timeseries.error && !timeseries.data && (
+              <SummaryErrorFigures
+                error={timeseries.error}
+                labels={Object.values(seriesSet).map((series) => series.name)}
+                titleProps={titleProps}
+              />
+            )}
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
                 <SummaryMetric
@@ -1750,4 +1765,33 @@ function MonitorGraph({
       </ResponsiveContainer>
     </Box>
   );
+}
+
+/**
+ * A failed row of figures. One figure keeps its label, so a tab header still
+ * says which tab it is; a row of several collapses to one indicator, since
+ * repeating it per figure widens the card past its column on narrow screens
+ * and says the same thing several times.
+ */
+function SummaryErrorFigures({
+  error,
+  labels,
+  titleProps,
+}: {
+  error: unknown;
+  labels: string[];
+  titleProps?: React.ComponentProps<typeof SummaryMetric>["titleProps"];
+}) {
+  const indicator = <ChartErrorIndicator error={error} />;
+  const [onlyLabel] = labels;
+  if (labels.length === 1 && onlyLabel !== undefined) {
+    return (
+      <SummaryMetric
+        label={onlyLabel}
+        titleProps={titleProps}
+        valueSlot={indicator}
+      />
+    );
+  }
+  return indicator;
 }

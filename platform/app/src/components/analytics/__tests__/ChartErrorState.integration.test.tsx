@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { ChartErrorState } from "../ChartErrorState";
+import { ChartErrorIndicator, ChartErrorState } from "../ChartErrorState";
 
 afterEach(cleanup);
 
@@ -45,7 +45,7 @@ describe("<ChartErrorState />", () => {
 
       // An unhandled failure has no copy of its own, so the caller's
       // fallback names what the user was looking at.
-      expect(screen.getByText("Failed to load chart data")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load this chart")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /retry/i }),
       ).toBeInTheDocument();
@@ -76,6 +76,20 @@ describe("<ChartErrorState />", () => {
         ),
       ).toBeInTheDocument();
       expect(screen.queryByText("query_timeout")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the panel has no room for the full state", () => {
+    it("renders a compact indicator with no button in it", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <ChartErrorIndicator error={handledError("query_memory_exceeded")} />
+        </ChakraProvider>,
+      );
+
+      expect(screen.getByText("Couldn't load")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
   });
 });

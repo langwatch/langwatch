@@ -77,7 +77,9 @@ function DocumentsMetrics() {
 
   const count = documents.data?.totalUniqueDocuments;
 
-  if (!count || count === 0) {
+  // A failed query says nothing about whether there are documents, so the
+  // section stays up and its panels show the error with a Retry.
+  if (!documents.error && (!count || count === 0)) {
     return null;
   }
 
