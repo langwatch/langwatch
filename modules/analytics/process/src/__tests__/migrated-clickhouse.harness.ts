@@ -31,7 +31,8 @@ const endpoints = new Map<string, MigratedClickHouse>();
  */
 export async function startMigratedClickHouse({
   name = "schema",
-}: { name?: string } = {}): Promise<MigratedClickHouse> {
+  serverMemoryBytes,
+}: { name?: string; serverMemoryBytes?: number } = {}): Promise<MigratedClickHouse> {
   const existing = endpoints.get(name);
   if (existing) return existing;
 
@@ -39,6 +40,7 @@ export async function startMigratedClickHouse({
     suite: MIGRATED_ENDPOINT_SUITE,
     names: [name],
     environment: process.env,
+    serverMemoryBytes,
   });
   if (!provisioned)
     throw new Error("No ClickHouse endpoint was provisioned for the migrated suite");

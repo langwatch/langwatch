@@ -175,9 +175,11 @@ describe("dashboard panels under a memory cap", () => {
   };
 
   beforeAll(async () => {
-    // Its own endpoint: in CI that is its own container, so suites sharing the
-    // default one cannot push the 1 GiB server over while the seed runs.
-    ch = (await startMigratedClickHouse({ name: "memory-budget" })).client;
+    // Its own container with room for the seed: the 1 GiB default sits near its
+    // limit once the schema is migrated. The panel caps below are what the test checks.
+    ch = (
+      await startMigratedClickHouse({ name: "memory-budget", serverMemoryBytes: 4 * 1024 ** 3 })
+    ).client;
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
