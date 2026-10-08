@@ -5,6 +5,7 @@ import {
   resolveAudioOutputRate,
   resolveCacheWrite1hRate,
 } from "../llmModelCost";
+import { llmModels } from "../loadModelCatalog";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -205,9 +206,14 @@ describe("hour-long cache write rate", () => {
 
     /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
     it("leaves models from other providers without one", () => {
+      // A provider whose own catalog entry states an hour-long price (such
+      // as Doubleword) carries that price; no other provider gets a derived one.
+      const catalogStates1h = (modelId: string) =>
+        llmModels.models[modelId]?.pricing?.inputCacheWrite1hPerToken != null;
       const others = costs.filter(
         (c) =>
           !/^~?anthropic\//.test(c.model) &&
+          !catalogStates1h(c.model) &&
           c.cacheCreation1hCostPerToken !== undefined,
       );
       expect(others).toEqual([]);

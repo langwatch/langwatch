@@ -57,7 +57,7 @@ describe("given the committed model catalog", () => {
     /** @scenario Latest-mini resolves to the fast tier of each provider */
     it.each([
       ["openai", "openai/gpt-6-luna"],
-      ["anthropic", "anthropic/claude-sonnet-5"],
+      ["anthropic", "anthropic/claude-sonnet-5-5"],
       ["gemini", "gemini/gemini-3.5-flash-lite"],
     ])("resolves %s/latest-mini to the newest fast-tier model", (provider, expected) => {
       expect(resolveLatestAlias(`${provider}/latest-mini`)).toBe(expected);

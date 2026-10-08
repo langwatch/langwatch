@@ -41,7 +41,9 @@ const overlayModels = (
  * Models the catalog prices at zero on purpose.
  *
  * Codex bills the user's ChatGPT plan. Every `openrouter/` id is a router
- * rather than a model: the price comes from whichever model it picks.
+ * rather than a model: the price comes from whichever model it picks. Routers
+ * under any other prefix are recognised by their rate, see
+ * `isVariablePriceRouter`.
  */
 const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
 
@@ -56,12 +58,26 @@ const KNOWN_UNPRICED: Record<string, string> = {
     "Music generation billed per 30-second clip at $0.04. Both upstream sources report zero per token and the catalog has no per-clip unit.",
   "gemini/lyria-3-pro-preview":
     "Music generation billed per song at $0.08, same missing per-clip unit.",
+  "inclusionai/ling-3.1-flash":
+    "The upstream source lists it at zero per token and there is no published rate to correct it with, so no price is set here.",
   "stealth/space-bunny-alpha":
     "Anonymous preview model offered free of charge upstream, so zero per token is its real rate.",
 };
 
+/**
+ * A router picks another model per request, so it has no rate of its own.
+ * The upstream source marks that with a negative rate (-1), whatever the
+ * vendor prefix: OpenRouter's own routers carry it, and so do routers other
+ * vendors publish under their own name.
+ */
+const isVariablePriceRouter = (entry: LLMModelEntry | undefined) =>
+  Object.values(entry?.pricing ?? {}).some(
+    (rate) => typeof rate === "number" && rate < 0,
+  );
+
 const isPricedElsewhere = (modelId: string) =>
-  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId));
+  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId)) ||
+  isVariablePriceRouter(llmModels.models[modelId]);
 
 /** One unit of every quantity the cost path can price. */
 const ONE_OF_EVERYTHING = {
