@@ -16,6 +16,7 @@ import {
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
 
+import type { RecordAgentArchivedCommandData } from "../../eventing/agent-lifecycle.commands.ts";
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentModule } from "../agent.app.ts";
@@ -98,8 +99,19 @@ export function createAgentAppFixture(
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
   });
+  const archivedFacts: RecordAgentArchivedCommandData[] = [];
+  app.connectLifecycleCommands({
+    recordAgentArchived: {
+      send: async (payload) => {
+        archivedFacts.push(payload);
+      },
+      sendBatch: async () => {},
+      close: async () => {},
+      waitUntilReady: async () => {},
+    },
+  });
 
-  return { app, repositories, resources };
+  return { app, repositories, resources, archivedFacts };
 }
 
 export function agentWorkflowCopyFixture(workflowId = "workflow_copy", projectId = "project_2") {

@@ -94,9 +94,9 @@ describe("AgentModule workflow and audit ownership", () => {
   );
 
   /** @scenario "Cascade archive uses the workflow owner" */
-  it("archives the linked graph and Agent together", async () => {
+  it("archives the Agent and records the archive naming the linked graph for Workflow", async () => {
     const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));
-    const { app, repositories } = createAgentAppFixture({
+    const { app, repositories, archivedFacts } = createAgentAppFixture({
       workflows: createApiFixture<WorkflowApi>({ archiveLinked }),
     });
     await repositories.agents.create(workflowAgent);
@@ -108,10 +108,22 @@ describe("AgentModule workflow and audit ownership", () => {
     expect((await repositories.agents.getByIdIncludingArchived(reference)).archivedAt).toEqual(
       result.agent.archivedAt,
     );
-    expect(archiveLinked).toHaveBeenCalledWith({
-      workflowId: "workflow_1",
-      projectId: reference.projectId,
-    });
+    expect(archiveLinked).not.toHaveBeenCalled();
+    expect(archivedFacts).toMatchObject([
+      { agentId: reference.id, projectId: reference.projectId, cascadedWorkflowId: "workflow_1" },
+    ]);
+  });
+
+  /** @scenario "A plain archive records the agent archived with no graph to cascade" */
+  it("records the archive with no graph when the agent is archived alone", async () => {
+    const { app, repositories, archivedFacts } = createAgentAppFixture();
+    await repositories.agents.create(workflowAgent);
+
+    await app.archive(reference);
+
+    expect(archivedFacts).toMatchObject([
+      { agentId: reference.id, projectId: reference.projectId, cascadedWorkflowId: null },
+    ]);
   });
 
   async function history() {

@@ -61,16 +61,21 @@ import {
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  type AgentLifecyclePipeline,
+  buildAgentLifecyclePipeline,
+} from "../eventing/agent-lifecycle.pipeline.ts";
 import type { AgentRepositories } from "../repositories/agent.repositories.ts";
 import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
@@ -133,6 +138,8 @@ export class AgentModule implements AgentApi {
   readonly #users: UserApi;
   readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
+  readonly #lifecycle = buildAgentLifecyclePipeline();
+  #lifecycleCommands: EventingCommands<AgentLifecyclePipeline> | undefined;
 
   private constructor({ repositories, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
@@ -222,8 +229,10 @@ export class AgentModule implements AgentApi {
     return this.#withFields(await this.#agents.update(await this.#httpSecrets.forUpdate(input)));
   }
 
-  archive(input: GetAgentInput): Promise<Agent> {
-    return this.#agents.archive(input);
+  async archive(input: GetAgentInput): Promise<Agent> {
+    const agent = await this.#agents.archive(input);
+    await this.#recordArchived({ agent, cascadedWorkflowId: null });
+    return agent;
   }
   exists(input: GetAgentInput): Promise<boolean> {
     return this.#agents.exists(input);
@@ -288,12 +297,34 @@ export class AgentModule implements AgentApi {
       id: string;
     } | null;
   }> {
-    const agent = await this.#agents.getById(input);
-    const [workflowId] = findLinkedWorkflowIds(agent);
-    const archivedWorkflow = workflowId
-      ? await this.#workflows.archiveLinked({ workflowId, projectId: input.projectId })
-      : null;
-    return { agent: await this.#agents.archive(input), archivedWorkflow };
+    const [workflowId] = findLinkedWorkflowIds(await this.#agents.getById(input));
+    const agent = await this.#agents.archive(input);
+    // Workflow archives the graph from its own side on the fact, seconds later (plan §7, R7).
+    await this.#recordArchived({ agent, cascadedWorkflowId: workflowId ?? null });
+    return { agent, archivedWorkflow: workflowId ? { id: workflowId } : null };
+  }
+
+  /** The agent lifecycle pipeline this module registers, built once with the module. */
+  lifecyclePipeline(): AgentLifecyclePipeline {
+    return this.#lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<AgentLifecyclePipeline>): void {
+    this.#lifecycleCommands = commands;
+  }
+
+  async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
+    if (!this.#lifecycleCommands) {
+      throw new Error("agent_lifecycle pipeline senders are not connected yet");
+    }
+    await this.#lifecycleCommands.recordAgentArchived.send({
+      tenantId: input.agent.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      agentId: input.agent.id,
+      projectId: input.agent.projectId,
+      cascadedWorkflowId: input.cascadedWorkflowId,
+    });
   }
 
   async getCopies(input: AgentCopiesInput): Promise<AgentCopy[]> {

@@ -88,8 +88,8 @@ const WORKFLOW_AGENT = {
 const REFERENCE = { id: "agent_2", projectId: "project_1" };
 
 describe("the by-path agent client", () => {
-  /** @scenario "The archive dialog names the linked workflow through Workflow" */
   describe("when the archive dialog asks for the linked workflow", () => {
+    /** @scenario "The archive dialog names the linked workflow through Workflow" */
     it("names it from Workflow's own list for the agent's project", async () => {
       const rpc = new RoutedRpc({
         "agents.getById": WORKFLOW_AGENT,

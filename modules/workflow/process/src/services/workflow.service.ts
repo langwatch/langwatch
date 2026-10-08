@@ -85,6 +85,15 @@ export class WorkflowService {
     return this.options.repository.deleteUncommitted(input);
   }
 
+  /** Archives a live graph; an archived or missing one is left alone, so redelivery is harmless. */
+  async archiveIfLive(input: WorkflowReference): Promise<void> {
+    const live = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+    });
+    if (live) await this.options.repository.archiveLinked(input);
+  }
+
   static create(options: WorkflowServiceOptions): WorkflowService {
     return new WorkflowService(options);
   }

@@ -6,6 +6,7 @@ import {
 import { defineProcessModule } from "@langwatch/process";
 
 import { WorkflowModule } from "#app/workflow.app";
+import { workflowAgentArchiveCascadeEventing } from "#eventing/workflow-agent-archive-cascade.pipeline";
 import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
@@ -31,6 +32,7 @@ export const workflowProcessModule = defineProcessModule("workflow")
   )
   .withEventing(workflowNlpLambdaCleanupEventing)
   .withEventing(workflowLifecycleEventing)
+  .withEventing(workflowAgentArchiveCascadeEventing)
   .withTasks(({ repositories, dependencies }) => [
     WorkflowHttpCredentialsBackfillTask.create({
       workflows: repositories.workflows,

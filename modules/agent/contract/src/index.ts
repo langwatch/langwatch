@@ -1,5 +1,6 @@
 export * from "./agent.ts";
 export * from "./agent.commands.ts";
+export * from "./agent-lifecycle.events.ts";
 export * from "./agent.errors.ts";
 export * from "./agent.queries.ts";
 export * from "./agent.schemas.ts";

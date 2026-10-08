@@ -478,3 +478,21 @@ Feature: Workflow service boundary
     Given a key that can trigger workflows but not read the workflow
     When it starts a run
     Then it is refused before the trigger is reached
+
+  @unit
+  Scenario: Agent's archived fact archives the graph it cascades to
+    Given Agent records an agent archived naming a live graph of the project
+    When Workflow's peer subscriber handles the fact
+    Then the graph is archived in that project and no other graph changes
+
+  @unit
+  Scenario: An agent archived fact naming no live graph archives nothing
+    Given Agent records an agent archived naming no graph, or a graph already archived or missing
+    When Workflow's peer subscriber handles the fact
+    Then no graph changes and the handler succeeds
+
+  @unit
+  Scenario: A redelivered agent archived fact is harmless
+    Given Workflow already archived the graph for an agent archived fact
+    When the same fact is delivered again
+    Then both deliveries share one deduplication id and the graph is not archived a second time

@@ -31,7 +31,7 @@ async function setup() {
 
 describe("AgentModule linked workflow operations", () => {
   /** @scenario "Linked workflow behaviour uses the injected Workflow API" */
-  it("copies and archives through the Workflow API", async () => {
+  it("copies through the Workflow API and records the archive for Workflow to cascade", async () => {
     const fixture = await setup();
     const { app } = fixture;
 
@@ -55,10 +55,10 @@ describe("AgentModule linked workflow operations", () => {
     ).toMatchObject({ workflowId: "workflow_copy", copiedFromAgentId: "agent_workflow" });
 
     const archived = await app.cascadeArchive({ id: "agent_workflow", projectId: "project_1" });
-    expect(fixture.archiveLinked).toHaveBeenCalledWith({
-      workflowId: "workflow_1",
-      projectId: "project_1",
-    });
+    expect(fixture.archiveLinked).not.toHaveBeenCalled();
+    expect(fixture.archivedFacts).toMatchObject([
+      { agentId: "agent_workflow", projectId: "project_1", cascadedWorkflowId: "workflow_1" },
+    ]);
     expect(archived.archivedWorkflow).toEqual({ id: "workflow_1" });
     expect(archived.agent.archivedAt).toBeInstanceOf(Date);
   });

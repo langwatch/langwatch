@@ -22,8 +22,15 @@ Feature: Agent coordinates linked workflows and history through their owners
   Scenario: Cascade archive uses the workflow owner
     Given a workflow agent points to a live graph
     When AgentModule cascade-archives the agent
-    Then WorkflowApi archives the graph in the same project
-    And the agent is archived and the affected workflow is reported
+    Then the agent is archived and the linked workflow is reported
+    And Agent records the agent archived, naming the graph for Workflow to archive from its own side
+    And Agent calls no Workflow operation to archive it
+
+  @unit @agents
+  Scenario: A plain archive records the agent archived with no graph to cascade
+    Given a workflow agent points to a live graph
+    When AgentModule archives the agent alone
+    Then Agent records the agent archived naming no graph
 
   @unit @agents
   Scenario: A workflow copy owns its copied graph

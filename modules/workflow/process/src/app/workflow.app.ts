@@ -102,6 +102,10 @@ import type {
   WorkflowStudioStream,
 } from "../channels/nlp-lambda.channel.ts";
 import {
+  buildWorkflowAgentArchiveCascadePipeline,
+  type WorkflowAgentArchiveCascadePipeline,
+} from "../eventing/workflow-agent-archive-cascade.pipeline.ts";
+import {
   buildWorkflowLifecyclePipeline,
   type WorkflowLifecyclePipeline,
 } from "../eventing/workflow-lifecycle.pipeline.ts";
@@ -884,6 +888,11 @@ export class WorkflowModule implements WorkflowApi {
   /** Binds the built lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<WorkflowLifecyclePipeline>): void {
     this.#lifecycleCommands = commands;
+  }
+
+  /** Archives an agent's graph once agent records the archive, from workflow's own side (§9). */
+  agentArchiveCascadePipeline(): WorkflowAgentArchiveCascadePipeline {
+    return buildWorkflowAgentArchiveCascadePipeline({ workflows: this.#infrastructure.workflows });
   }
 
   /** Copies a workflow into another project, attributed to its caller. */
