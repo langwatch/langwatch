@@ -11,8 +11,8 @@ import type { UiScopeOrganization } from "@langwatch/organization-contract";
 import { useQueries } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 
+import type { UiFeatureApiTransport } from "../features/ui-scope/behavior/ui-scope-queries.ts";
 import { uiCopyCandidates, uiCopyTargets, type UiCopyCandidate } from "../model/ui-copy-targets.ts";
-import type { UiFeatureApiTransport } from "./ui-scope-queries.ts";
 
 export const UI_EFFECTIVE_PERMISSIONS_PROCEDURE = "authz.effectivePermissions";
 

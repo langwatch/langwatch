@@ -49,14 +49,20 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { GroupIdentity } from "../features/group/services/group-identity.service.ts";
+import { OrganizationGroupService } from "../features/group/services/organization-group.service.ts";
+import type { PersonalWorkspaceDiagnostics } from "../features/personal-workspace/services/personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceIdentity } from "../features/personal-workspace/services/personal-workspace-identity.service.ts";
+import {
+  PersonalWorkspaceService,
+  type PersonalWorkspaceNotices,
+} from "../features/personal-workspace/services/personal-workspace.service.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type {
   OrganizationRepository,
   OrganizationTeamProject,
 } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
-import type { GroupIdentity } from "./group-identity.service.ts";
-import { OrganizationGroupService } from "./organization-group.service.ts";
 import {
   OrganizationSettingsService,
   type OrganizationSettingsNotices,
@@ -64,18 +70,12 @@ import {
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";
 import { OrganizationTeamService } from "./organization-team.service.ts";
-import type { PersonalWorkspaceDiagnostics } from "./personal-workspace-diagnostics.service.ts";
-import type { PersonalWorkspaceIdentity } from "./personal-workspace-identity.service.ts";
-import {
-  PersonalWorkspaceService,
-  type PersonalWorkspaceNotices,
-} from "./personal-workspace.service.ts";
 import type { TeamIdentity } from "./team-identity.service.ts";
 
 export type { OrganizationSettingsNotices };
 
 /** What the organization service is built from. */
-export type OrganizationServiceDependencies = {
+type OrganizationServiceDependencies = {
   repository: OrganizationRepository;
   teams: TeamRepository;
   groups: GroupRepository;

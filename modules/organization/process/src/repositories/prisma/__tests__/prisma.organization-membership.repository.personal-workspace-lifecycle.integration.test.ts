@@ -16,7 +16,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PersonalWorkspaceIdentityService } from "../../../services/personal-workspace-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 

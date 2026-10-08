@@ -25,7 +25,7 @@ export type { TeamRoleValue } from "./rules/member-role-constraints.rules.ts";
 export type {
   PersonalTeamScopeReader,
   PersonalTeamGrantScope,
-} from "./services/personal-team-scope.service.ts";
+} from "./features/personal-workspace/services/personal-team-scope.service.ts";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -36,9 +36,9 @@ export type {
   OrganizationMemberWithUser,
   UpdateMemberRoleResult,
 } from "./repositories/organization-membership.repository.ts";
-export type { PersonalWorkspaceDiagnostics } from "./services/personal-workspace-diagnostics.service.ts";
-export type { PersonalWorkspaceIdentity } from "./services/personal-workspace-identity.service.ts";
-export type { GroupIdentity } from "./services/group-identity.service.ts";
+export type { PersonalWorkspaceDiagnostics } from "./features/personal-workspace/services/personal-workspace-diagnostics.service.ts";
+export type { PersonalWorkspaceIdentity } from "./features/personal-workspace/services/personal-workspace-identity.service.ts";
+export type { GroupIdentity } from "./features/group/services/group-identity.service.ts";
 export type { TeamIdentity } from "./services/team-identity.service.ts";
 export type {
   StoredOrganizationSettings,
@@ -70,7 +70,7 @@ export type {
   OrganizationInvitations,
   OrganizationInviteWithOrganization,
   OrganizationInvitesCreated,
-} from "./services/organization-invitations.service.ts";
+} from "./features/invite/services/organization-invitations.service.ts";
 export type { OrganizationJoinRequests } from "./services/organization-join-requests.service.ts";
 export type { OrganizationSignals } from "./services/organization-signals.service.ts";
 export { groupsRest } from "./transport/group.rest.ts";

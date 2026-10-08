@@ -22,12 +22,12 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { GroupIdentityService } from "../features/group/services/group-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
-import { GroupIdentityService } from "../services/group-identity.service.ts";
 import { OrganizationService } from "../services/organization.service.ts";
-import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;

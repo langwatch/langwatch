@@ -9,13 +9,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { GroupIdentity } from "../../features/group/services/group-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import type { GroupRepository } from "../../repositories/group.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type { TeamRepository } from "../../repositories/team.repository.ts";
-import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationService } from "../organization.service.ts";
-import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 const T0 = Temporal.Instant.from("2026-09-01T00:00:00Z");

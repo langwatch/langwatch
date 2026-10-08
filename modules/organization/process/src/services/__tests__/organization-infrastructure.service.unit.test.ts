@@ -27,6 +27,8 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import type { GroupIdentity } from "../../features/group/services/group-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import type * as groupRepositoryModule from "../../repositories/group.repository.ts";
 import {
   OrganizationRepository,
@@ -35,9 +37,7 @@ import {
   type StoredOrganizationSettings,
 } from "../../repositories/organization.repository.ts";
 import { TeamRepository } from "../../repositories/team.repository.ts";
-import type { GroupIdentity } from "../group-identity.service.ts";
 import { OrganizationService } from "../organization.service.ts";
-import type { PersonalWorkspaceIdentity } from "../personal-workspace-identity.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {

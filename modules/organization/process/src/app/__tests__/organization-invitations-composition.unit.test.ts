@@ -11,10 +11,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { RecordSeatLimitReachedCommandData } from "../../eventing/seat-limit.events.ts";
+import { InviteSendThrottleService } from "../../features/invite/services/invite-send-throttle.service.ts";
+import type { InviteService } from "../../features/invite/services/invite.service.ts";
+import { OrganizationInvitationsService } from "../../features/invite/services/organization-invitations.service.ts";
 import { MemoryOrganizationRepositories } from "../../repositories/memory/memory.organization.repositories.ts";
-import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
-import type { InviteService } from "../../services/invite.service.ts";
-import { OrganizationInvitationsService } from "../../services/organization-invitations.service.ts";
 import type { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 import { OrganizationModule } from "../organization.app.ts";
 import { organizationModuleSetup } from "./support/organization-module-setup.ts";

@@ -148,18 +148,27 @@ import {
   buildSeatLimitPipeline,
   type SeatLimitDefinition,
 } from "../eventing/seat-limit.pipeline.ts";
+import { GroupIdentityService } from "../features/group/services/group-identity.service.ts";
+import type { GroupIdentity } from "../features/group/services/group-identity.service.ts";
+import { OrganizationGroupScopeService } from "../features/group/services/organization-group-scope.service.ts";
+import { InviteCreationThrottleService } from "../features/invite/services/invite-creation-throttle.service.ts";
+import { InviteSeatCensusService } from "../features/invite/services/invite-seat-census.service.ts";
+import { InviteSendThrottleService } from "../features/invite/services/invite-send-throttle.service.ts";
+import { InviteService } from "../features/invite/services/invite.service.ts";
+import { OrganizationInvitationDoorService } from "../features/invite/services/organization-invitation-door.service.ts";
+import { OrganizationInvitationsService } from "../features/invite/services/organization-invitations.service.ts";
+import type { OrganizationInvitations } from "../features/invite/services/organization-invitations.service.ts";
+import { PersonalTeamScopeService } from "../features/personal-workspace/services/personal-team-scope.service.ts";
+import { PersonalWorkspaceDiagnosticsService } from "../features/personal-workspace/services/personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceDiagnostics } from "../features/personal-workspace/services/personal-workspace-diagnostics.service.ts";
+import { PersonalWorkspaceIdentityService } from "../features/personal-workspace/services/personal-workspace-identity.service.ts";
+import type { PersonalWorkspaceIdentity } from "../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type { OrganizationTeamProject } from "../repositories/organization.repository.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import { GroupIdentityService } from "../services/group-identity.service.ts";
-import type { GroupIdentity } from "../services/group-identity.service.ts";
-import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
-import { InviteSeatCensusService } from "../services/invite-seat-census.service.ts";
-import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
-import { InviteService } from "../services/invite.service.ts";
 import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationCeremonyService } from "../services/organization-ceremony.service.ts";
@@ -167,11 +176,7 @@ import type { OrganizationCeremony } from "../services/organization-ceremony.ser
 import { OrganizationDirectoryService } from "../services/organization-directory.service.ts";
 import type { OrganizationDirectory } from "../services/organization-directory.service.ts";
 import { OrganizationGrantCeilingService } from "../services/organization-grant-ceiling.service.ts";
-import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
-import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
-import { OrganizationInvitationsService } from "../services/organization-invitations.service.ts";
-import type { OrganizationInvitations } from "../services/organization-invitations.service.ts";
 import { OrganizationJoinRequestsService } from "../services/organization-join-requests.service.ts";
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
@@ -191,11 +196,6 @@ import type { OrganizationSignals } from "../services/organization-signals.servi
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import type { OrganizationDemoProject } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
-import { PersonalTeamScopeService } from "../services/personal-team-scope.service.ts";
-import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
-import type { PersonalWorkspaceDiagnostics } from "../services/personal-workspace-diagnostics.service.ts";
-import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
-import type { PersonalWorkspaceIdentity } from "../services/personal-workspace-identity.service.ts";
 import { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
 import { SignUpPolicyService } from "../services/sign-up-policy.service.ts";
 import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";

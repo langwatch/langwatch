@@ -8,7 +8,11 @@ import type {
 } from "@langwatch/onboarding-contract";
 import type { Instant } from "@langwatch/time";
 
-import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
+import type {
+  GroupDetail,
+  GroupListItem,
+  GroupMembershipView,
+} from "./features/group/group.responses.ts";
 import type {
   AddOrganizationGroupGrantInput,
   ApplyOrganizationGroupEditsInput,
@@ -25,8 +29,26 @@ import type {
   ListOrganizationGroupsInput,
   RenameOrganizationGroupInput,
   RemoveOrganizationGroupGrantInput,
-} from "./group.ts";
-import type { OrganizationJoinOrigin, OrganizationJoinSetting } from "./join-setting.ts";
+} from "./features/group/group.ts";
+import type { TeamWithProjects } from "./features/team/team.responses.ts";
+import type {
+  CreateOrganizationTeamWithMembersInput,
+  CreateOrganizationTeamInput,
+  AddOrganizationTeamMemberInput,
+  GetOrganizationTeamByIdInput,
+  GetOrganizationTeamBySlugForMemberInput,
+  GetOrganizationTeamInput,
+  GetOrganizationTeamWithMembersInput,
+  ListOrganizationTeamAccessInput,
+  ListOrganizationTeamsInput,
+  ListOrganizationTeamsWithMembersInput,
+  OrganizationTeam,
+  OrganizationTeamPage,
+  OrganizationTeamAccess,
+  OrganizationTeamWithMembers,
+  RemoveOrganizationTeamMemberInput,
+  UpdateOrganizationTeamWithMembersInput,
+} from "./features/team/team.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
@@ -68,6 +90,10 @@ import type {
   OrganizationIntent,
   UpdateOrganizationSettingsInput,
   UpdateOrganizationSettingsResult,
+  OrganizationJoinOrigin,
+  OrganizationJoinSetting,
+  SignInSecurityPolicy,
+  SignUpVerdict,
 } from "./organization.ts";
 import type * as organizationModule from "./organization.ts";
 import type {
@@ -79,27 +105,6 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
-import type { SignInSecurityPolicy } from "./sign-in-security-policy.ts";
-import type { SignUpVerdict } from "./sign-up-policy.ts";
-import type { TeamWithProjects } from "./team.responses.ts";
-import type {
-  CreateOrganizationTeamWithMembersInput,
-  CreateOrganizationTeamInput,
-  AddOrganizationTeamMemberInput,
-  GetOrganizationTeamByIdInput,
-  GetOrganizationTeamBySlugForMemberInput,
-  GetOrganizationTeamInput,
-  GetOrganizationTeamWithMembersInput,
-  ListOrganizationTeamAccessInput,
-  ListOrganizationTeamsInput,
-  ListOrganizationTeamsWithMembersInput,
-  OrganizationTeam,
-  OrganizationTeamPage,
-  OrganizationTeamAccess,
-  OrganizationTeamWithMembers,
-  RemoveOrganizationTeamMemberInput,
-  UpdateOrganizationTeamWithMembersInput,
-} from "./team.ts";
 
 export interface OrganizationCaller {
   readonly id: string;

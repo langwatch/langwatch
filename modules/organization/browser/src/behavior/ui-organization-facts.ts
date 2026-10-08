@@ -13,7 +13,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useQuery } from "@tanstack/react-query";
 
-import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-scope-queries.ts";
+import { UI_ORGANIZATIONS_PROCEDURE } from "../features/ui-scope/behavior/ui-scope-queries.ts";
 
 /** Re-exported for the shell's `organizationFacts` declaration readers. */
 export { UI_ORGANIZATIONS_PROCEDURE };

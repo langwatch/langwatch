@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { GroupIdentityService } from "../group-identity.service.ts";
-import { PersonalWorkspaceIdentityService } from "../personal-workspace-identity.service.ts";
+import { GroupIdentityService } from "../../features/group/services/group-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../features/personal-workspace/services/personal-workspace-identity.service.ts";
 import { TeamIdentityService } from "../team-identity.service.ts";
 
 /**

@@ -10,12 +10,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { UiFeatureApiTransport } from "../../features/ui-scope/behavior/ui-scope-queries";
 import {
   createBrowserUiCopyTargets,
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,
   useUiCopyTargetsReading,
 } from "../copy-targets-capability";
-import type { UiFeatureApiTransport } from "../ui-scope-queries";
 
 const GRAPH: readonly UiScopeOrganization[] = [
   {
