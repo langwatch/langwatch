@@ -11,11 +11,11 @@ import { governanceIngestionSourceSchema } from "@langwatch/enterprise-governanc
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { observed, rollupFold } from "../eventing/__tests__/governance-cost-rollup.fixtures.ts";
-import { azureCostEvents } from "../rules/azure-cost-management.rules.ts";
 import {
   type GovernanceCostRollupState,
   governanceCostRollupTotals,
-} from "../rules/governance-cost-rollup-cell.rules.ts";
+} from "../features/cost/rules/governance-cost-rollup-cell.rules.ts";
+import { azureCostEvents } from "../features/microsoft/rules/azure-cost-management.rules.ts";
 import { createWorkerService } from "./support/puller-test-ports.ts";
 
 const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({

@@ -28,7 +28,7 @@ import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.
 import {
   DatabricksGeniePullerService,
   PAID_GENIE_BILL_UNREADABLE,
-} from "../databricks-genie-puller.service.ts";
+} from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;

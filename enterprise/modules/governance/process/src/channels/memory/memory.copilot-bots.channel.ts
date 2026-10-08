@@ -4,7 +4,7 @@ import {
   type AgentListing,
   type AgentListingRefusal,
   agentsRefused,
-} from "../../rules/agent-listing.rules.ts";
+} from "../../features/agents/rules/agent-listing.rules.ts";
 import type { CopilotBotsChannel, CopilotBotsRead } from "../copilot-bots.channel.ts";
 
 const UNREACHABLE: AgentListingRefusal = { reason: "unreachable", status: null };

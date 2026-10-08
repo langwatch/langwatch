@@ -13,7 +13,7 @@ import {
   warehouseCostParameters,
   warehouseCostRows,
   withWarehouseCost,
-} from "../databricks-genie-warehouse-cost.rules.ts";
+} from "../../features/databricks-genie/rules/databricks-genie-warehouse-cost.rules.ts";
 
 const chunk = { fromMs: Date.UTC(2026, 0, 1, 10, 37), toMs: Date.UTC(2026, 0, 1, 12, 5) };
 

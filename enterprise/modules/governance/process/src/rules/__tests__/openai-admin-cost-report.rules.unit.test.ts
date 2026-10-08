@@ -9,7 +9,7 @@ import {
   reportUrl,
   stoppedShortResult,
   usdCostEvent,
-} from "../openai-admin-cost-report.rules.ts";
+} from "../../features/ingestion-pull/rules/openai-admin-cost-report.rules.ts";
 
 const cursor: ParsedCursor = {
   windowStart: "2026-01-01T00:00:00.000Z",

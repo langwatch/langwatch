@@ -6,7 +6,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   type AgentMetadata,
   mergeAgentMetadata,
-} from "../../rules/discovered-agent-metadata.rules.ts";
+} from "../../features/agents/rules/discovered-agent-metadata.rules.ts";
 import {
   DiscoveredAgentRepository,
   type DiscoveredAgentRow,

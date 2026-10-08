@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PersonaHomeService } from "../persona-home.service.ts";
+import { PersonaHomeService } from "../../features/personal/services/persona-home.service.ts";
 
 const freePlan: Plan = {
   planSource: "subscription",

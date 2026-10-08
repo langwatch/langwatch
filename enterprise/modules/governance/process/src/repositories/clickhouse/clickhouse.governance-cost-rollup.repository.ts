@@ -1,7 +1,7 @@
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
-} from "../../rules/governance-cost-rollup-cell.rules.ts";
+} from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Port of main's `governanceCostRollup.clickhouse.repository.ts` reads. */
 import {

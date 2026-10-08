@@ -23,7 +23,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { PersonalUsageKeyService } from "../personal-usage-key.service.ts";
+import { PersonalUsageKeyService } from "../../features/personal/services/personal-usage-key.service.ts";
 
 const ORGANIZATION_ID = "org-1";
 

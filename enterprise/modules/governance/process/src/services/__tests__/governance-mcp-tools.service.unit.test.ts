@@ -11,13 +11,13 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
 import {
   type GovernanceMcpServer,
   GovernanceMcpToolsService,
 } from "../governance-mcp-tools.service.ts";
-import { PersonalIngestionKeyService } from "../personal-ingestion-key.service.ts";
 
 type RegisteredTool = (args: Record<string, unknown>) => Promise<{
   content: { type: "text"; text: string }[];

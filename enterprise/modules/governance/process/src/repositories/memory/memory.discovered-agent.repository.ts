@@ -3,7 +3,7 @@
 import { generate } from "@langwatch/ksuid";
 import { Temporal, type Instant } from "@langwatch/time";
 
-import { mergeAgentMetadata } from "../../rules/discovered-agent-metadata.rules.ts";
+import { mergeAgentMetadata } from "../../features/agents/rules/discovered-agent-metadata.rules.ts";
 import {
   DiscoveredAgentRepository,
   type DiscoveredAgentRow,

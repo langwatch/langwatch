@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { agentListingRequests, listableAgentSources } from "../agent-listing-request.rules.ts";
+import {
+  agentListingRequests,
+  listableAgentSources,
+} from "../../features/agents/rules/agent-listing-request.rules.ts";
 
 const source = (over: Partial<{ id: string; name: string; sourceType: string }>) => ({
   id: "src-1",

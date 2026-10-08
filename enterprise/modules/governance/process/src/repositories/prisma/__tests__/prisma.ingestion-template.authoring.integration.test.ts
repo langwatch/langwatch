@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
-import { IngestionTemplateService } from "../../../services/ingestion-template.service.ts";
+import { IngestionTemplateService } from "../../../features/ingestion-source/services/ingestion-template.service.ts";
 import { PrismaIngestionTemplateRepository } from "../prisma.ingestion-template.repository.ts";
 
 /**

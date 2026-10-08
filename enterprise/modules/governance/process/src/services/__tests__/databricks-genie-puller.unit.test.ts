@@ -9,7 +9,7 @@ import type {
 import {
   DatabricksGeniePullerService,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../databricks-genie-puller.service.ts";
+} from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";

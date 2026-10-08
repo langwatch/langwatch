@@ -13,9 +13,9 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
-import { PersonalIngestionKeyService } from "../personal-ingestion-key.service.ts";
 
 function apiKey(overrides: Partial<ApiKey>): ApiKey {
   return {

@@ -6,7 +6,7 @@ import type { Encryption } from "@langwatch/process-stores";
 import {
   isSealedCredentials,
   SEALED_CREDENTIALS_PREFIX,
-} from "../../rules/ingestion-credentials.rules.ts";
+} from "../../features/ingestion-pull/rules/ingestion-credentials.rules.ts";
 
 const logger = createLogger("langwatch:governance:ingestion-credentials");
 

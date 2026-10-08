@@ -3,16 +3,16 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  IngestionPullLifecycleChannel,
+  IngestionPullTenantResolver,
+} from "../../features/ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
+import { IngestionPullLifecycleService } from "../../features/ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
 import {
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleSource,
 } from "../../repositories/ingestion-pull-lifecycle.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../governance-policy.service.ts";
-import type {
-  IngestionPullLifecycleChannel,
-  IngestionPullTenantResolver,
-} from "../ingestion-pull-lifecycle.service.ts";
-import { IngestionPullLifecycleService } from "../ingestion-pull-lifecycle.service.ts";
 
 const source = (
   overrides: Partial<IngestionPullLifecycleSource> = {},

@@ -8,6 +8,7 @@ import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi, TraceSummaryData } from "@langwatch/trace-contract";
 
+import { ocsfActorFields } from "../features/ingestion-pull/rules/ocsf-pull-event-mapping.rules.ts";
 import type {
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
@@ -15,7 +16,6 @@ import type {
   GovernanceOcsfEventWriter,
 } from "../repositories/governance.repositories.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../rules/ocsf-codes.rules.ts";
-import { ocsfActorFields } from "../rules/ocsf-pull-event-mapping.rules.ts";
 import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
 
 /** The trace summary fields a governance-origin trace's KPI and OCSF rows are built from. */

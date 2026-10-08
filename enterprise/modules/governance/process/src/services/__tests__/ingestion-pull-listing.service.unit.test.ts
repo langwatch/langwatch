@@ -5,14 +5,14 @@ import {
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import type { AgentSyncResult } from "../agent-discovery.service.ts";
+import type { AgentSyncResult } from "../../features/agents/services/agent-discovery.service.ts";
+import type { PeopleSyncResult } from "../../features/identity/services/person-listing.service.ts";
 import type {
   IngestionPullListingOutcome,
   IngestionPullListingOutcomeChannel,
   IngestionPullListingRefusal,
-} from "../ingestion-pull-listing.service.ts";
-import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
-import type { PeopleSyncResult } from "../person-listing.service.ts";
+} from "../../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import { IngestionPullListingService } from "../../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
 
 class RecordingOutcomes implements IngestionPullListingOutcomeChannel {
   readonly recorded: { kind: string; input: IngestionPullListingOutcome }[] = [];

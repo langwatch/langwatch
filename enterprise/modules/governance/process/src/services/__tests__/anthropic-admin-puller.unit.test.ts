@@ -6,7 +6,7 @@ import type {
   GovernanceHttpClient,
   GovernanceHttpResponse,
 } from "../../channels/governance-http.channel.ts";
-import { AnthropicAdminPullerService } from "../anthropic-admin-puller.service.ts";
+import { AnthropicAdminPullerService } from "../../features/ingestion-pull/services/anthropic-admin-puller.service.ts";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {

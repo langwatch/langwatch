@@ -3,7 +3,7 @@
 import { ProviderSignInError } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { refusalFromThrown } from "../provider-listing.rules.ts";
+import { refusalFromThrown } from "../../features/agents/rules/provider-listing.rules.ts";
 
 describe("refusalFromThrown", () => {
   describe("given a sign-in the provider refused", () => {

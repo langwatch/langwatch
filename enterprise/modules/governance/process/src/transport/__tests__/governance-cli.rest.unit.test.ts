@@ -32,18 +32,18 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { cliDoorRefusal } from "../../rules/governance-cli-answer.rules.ts";
+import { cliDoorRefusal } from "../../features/cli/rules/governance-cli-answer.rules.ts";
+import { GovernanceCliAccessService } from "../../features/cli/services/governance-cli-access.service.ts";
+import { GovernanceCliActivityService } from "../../features/cli/services/governance-cli-activity.service.ts";
+import { GovernanceCliCredentialService } from "../../features/cli/services/governance-cli-credentials.service.ts";
+import type { DefaultGovernanceCliBootstrapService } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { GovernanceCliService } from "../../features/cli/services/governance-cli.service.ts";
+import type { ActivityMonitorService } from "../../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import type { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import type { IngestionTemplateService } from "../../features/ingestion-source/services/ingestion-template.service.ts";
+import type { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import type { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
-import { GovernanceCliAccessService } from "../../services/governance-cli-access.service.ts";
-import { GovernanceCliActivityService } from "../../services/governance-cli-activity.service.ts";
-import { GovernanceCliCredentialService } from "../../services/governance-cli-credentials.service.ts";
-import type { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
-import { GovernanceCliService } from "../../services/governance-cli.service.ts";
 import type { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
-import type { ActivityMonitorService } from "../../services/ingestion-source-activity.service.ts";
-import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
-import type { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
-import type { PersonalIngestionKeyService } from "../../services/personal-ingestion-key.service.ts";
 import { governanceCliRest } from "../governance-cli.rest.ts";
 
 const USER_ID = "user_1";

@@ -1,8 +1,8 @@
 import type { RecordCodingAssistantBillingCommand } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
+import { CodingAssistantBillingFactService } from "../../features/cost/services/coding-assistant-billing-fact.service.ts";
 import { MemoryCostAttributionPolicyRepository } from "../../repositories/memory/memory.cost-attribution-policy.repository.ts";
-import { CodingAssistantBillingFactService } from "../coding-assistant-billing-fact.service.ts";
 
 const AT = 1_760_000_000_000;
 

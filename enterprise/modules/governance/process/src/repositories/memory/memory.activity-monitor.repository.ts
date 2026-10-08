@@ -7,7 +7,10 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { toEpochMs } from "@langwatch/time";
 
-import type { DepartmentDirectory, SourceTeam } from "../../rules/activity-monitor-spend.rules.ts";
+import type {
+  DepartmentDirectory,
+  SourceTeam,
+} from "../../features/cost/rules/activity-monitor-spend.rules.ts";
 import type {
   ActivityMonitorRepository,
   AnomalyBreakdown,

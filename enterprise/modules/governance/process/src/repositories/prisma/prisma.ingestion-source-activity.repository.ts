@@ -16,7 +16,10 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 
-import type { DepartmentDirectory, SourceTeam } from "../../rules/activity-monitor-spend.rules.ts";
+import type {
+  DepartmentDirectory,
+  SourceTeam,
+} from "../../features/cost/rules/activity-monitor-spend.rules.ts";
 import type {
   ActivityMonitorRepository,
   AnomalyBreakdown,

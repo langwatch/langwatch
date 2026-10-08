@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { peopleRefused, type PeopleListing } from "../../rules/people-listing.rules.ts";
+import {
+  peopleRefused,
+  type PeopleListing,
+} from "../../features/identity/rules/people-listing.rules.ts";
 import type {
   MicrosoftDirectoryChannel,
   MicrosoftDirectoryRead,

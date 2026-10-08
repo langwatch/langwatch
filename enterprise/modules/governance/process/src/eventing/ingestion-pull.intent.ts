@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import type { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
-import type { IngestionPullService } from "../services/ingestion-pull.service.ts";
+import type { IngestionPullListingService } from "../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import type { IngestionPullService } from "../features/ingestion-pull/services/ingestion-pull.service.ts";
 
 export const INGESTION_PULL_PROCESS_INTENT_TYPES = {
   RUN: "run",

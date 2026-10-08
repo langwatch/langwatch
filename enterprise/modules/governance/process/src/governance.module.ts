@@ -20,8 +20,8 @@ import { GOVERNANCE_COST_CHARGE_PROJECTION_NAME } from "./eventing/governance-co
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
+import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./features/cost/rules/governance-cost-summary.rules.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
-import { GOVERNANCE_SETTLING_WINDOW_DAYS } from "./rules/governance-cost-summary.rules.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";

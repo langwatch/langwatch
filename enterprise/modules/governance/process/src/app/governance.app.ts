@@ -200,105 +200,105 @@ import {
   PulledUsageEventingAdapter,
   type PulledUsageDefinition,
 } from "../eventing/pulled-usage.pipeline.ts";
+import { AgentDiscoveryService } from "../features/agents/services/agent-discovery.service.ts";
+import { GovernanceAgentSyncService } from "../features/agents/services/governance-agent-sync.service.ts";
+import { GovernanceAgentsScreenService } from "../features/agents/services/governance-agents-screen.service.ts";
+import { cliDoorRefusal } from "../features/cli/rules/governance-cli-answer.rules.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../features/cli/services/cli-session-inventory.service.ts";
+import {
+  GovernanceCliAccessService,
+  type GovernanceCliAccessApi,
+} from "../features/cli/services/governance-cli-access.service.ts";
+import {
+  GovernanceCliActivityService,
+  type GovernanceCliActivityApi,
+} from "../features/cli/services/governance-cli-activity.service.ts";
+import {
+  GovernanceCliCredentialService,
+  type GovernanceCliCredentialApi,
+} from "../features/cli/services/governance-cli-credentials.service.ts";
+import { DefaultGovernanceCliBootstrapService } from "../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { GovernanceCliService } from "../features/cli/services/governance-cli.service.ts";
+import { CanonicalCostExtractorService } from "../features/cost/services/canonical-cost-extractor.service.ts";
+import { CodingAssistantBillingFactService } from "../features/cost/services/coding-assistant-billing-fact.service.ts";
+import { CostRollupDayComparerService } from "../features/cost/services/cost-rollup-day-comparer.service.ts";
+import { GovernanceCostBreakdownService } from "../features/cost/services/governance-cost-breakdown.service.ts";
+import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
+import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
+import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
+import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
+import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
+import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
+import { IdentityMatchSuggestionService } from "../features/identity/services/identity-match-suggestion.service.ts";
+import { IdentityMatchService } from "../features/identity/services/identity-match.service.ts";
+import { PersonDiscoveryService } from "../features/identity/services/person-discovery.service.ts";
+import { PersonListingService } from "../features/identity/services/person-listing.service.ts";
+import { SuppressionSnapshotService } from "../features/identity/services/suppression-snapshot.service.ts";
+import { GovernanceIngestAccessService } from "../features/ingest/services/governance-ingest-access.service.ts";
+import { GovernanceIngestPrincipalService } from "../features/ingest/services/governance-ingest-principal.service.ts";
+import { GovernanceIngestReceiverService } from "../features/ingest/services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestService } from "../features/ingest/services/governance-ingest.service.ts";
+import { QuarantineFillEvaluatorService } from "../features/ingest/services/quarantine-fill.service.ts";
+import { ProjectQuarantineTenantResolverService } from "../features/ingest/services/quarantine-tenant.service.ts";
+import { nextIngestionPullRunAt } from "../features/ingestion-pull/rules/ingestion-pull-schedule.rules.ts";
+import { toPullLifecycleSource } from "../features/ingestion-pull/rules/pull-schedule.rules.ts";
+import { ratePulledUsage } from "../features/ingestion-pull/rules/pulled-usage-rate.rules.ts";
+import { AnthropicAdminPullerService } from "../features/ingestion-pull/services/anthropic-admin-puller.service.ts";
+import { IngestionPullLifecycleService } from "../features/ingestion-pull/services/ingestion-pull-lifecycle.service.ts";
+import { IngestionPullListingService } from "../features/ingestion-pull/services/ingestion-pull-listing.service.ts";
+import { IngestionPullLogService } from "../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import { IngestionPullMetricsService } from "../features/ingestion-pull/services/ingestion-pull-metrics.service.ts";
+import { IngestionPullWorkerService } from "../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import type { PulledUsageDispatcher } from "../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
+import { IngestionPullService } from "../features/ingestion-pull/services/ingestion-pull.service.ts";
+import { OpenAiAdminPullerService } from "../features/ingestion-pull/services/openai-admin-puller.service.ts";
+import { OpenAiComplianceReferencePullerService } from "../features/ingestion-pull/services/openai-compliance-puller.service.ts";
+import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
+import { PulledUsagePricingService } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../features/ingestion-pull/services/puller-registry.service.ts";
+import { S3PollingPullerService } from "../features/ingestion-pull/services/s3-puller.service.ts";
+import {
+  ActivityMonitorService,
+  type ActivityMonitorTraces,
+} from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
+import { IngestionSourceReadService } from "../features/ingestion-source/services/ingestion-source-read.service.ts";
+import {
+  IngestionSecretConfiguration,
+  IngestionSecretService,
+} from "../features/ingestion-source/services/ingestion-source-secret.service.ts";
+import { IngestionSourceService } from "../features/ingestion-source/services/ingestion-source.service.ts";
+import { IngestionTemplateService } from "../features/ingestion-source/services/ingestion-template.service.ts";
+import { SourceCredentialAccessService } from "../features/ingestion-source/services/source-credential-access.service.ts";
+import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
+import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
+import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
+import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
+import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
-import { cliDoorRefusal } from "../rules/governance-cli-answer.rules.ts";
-import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
-import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
-import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
-import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
 import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
-import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
-import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
-import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
-import { CodingAssistantBillingFactService } from "../services/coding-assistant-billing-fact.service.ts";
-import { CostRollupDayComparerService } from "../services/cost-rollup-day-comparer.service.ts";
-import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
-import { DepartmentService } from "../services/department.service.ts";
-import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
-import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
-import { GovernanceAgentSyncService } from "../services/governance-agent-sync.service.ts";
-import { GovernanceAgentsScreenService } from "../services/governance-agents-screen.service.ts";
-import {
-  GovernanceCliAccessService,
-  type GovernanceCliAccessApi,
-} from "../services/governance-cli-access.service.ts";
-import {
-  GovernanceCliActivityService,
-  type GovernanceCliActivityApi,
-} from "../services/governance-cli-activity.service.ts";
-import {
-  GovernanceCliCredentialService,
-  type GovernanceCliCredentialApi,
-} from "../services/governance-cli-credentials.service.ts";
-import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
-import { GovernanceCliService } from "../services/governance-cli.service.ts";
-import { GovernanceCostBreakdownService } from "../services/governance-cost-breakdown.service.ts";
-import { GovernanceCostNoticesService } from "../services/governance-cost-notices.service.ts";
-import { GovernanceCostSummaryService } from "../services/governance-cost-summary.service.ts";
-import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
-import { GovernanceIngestPrincipalService } from "../services/governance-ingest-principal.service.ts";
-import { GovernanceIngestReceiverService } from "../services/governance-ingest-receiver.service.ts";
-import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
-import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { GovernancePlanGateService } from "../services/governance-plan-gate.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { GovernanceTenantHistoryService } from "../services/governance-tenant-history.service.ts";
 import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
-import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
-import { IdentityMatchService } from "../services/identity-match.service.ts";
-import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
-import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
-import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
-import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
-import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
-import type { PulledUsageDispatcher } from "../services/ingestion-pull-worker.service.ts";
-import { IngestionPullService } from "../services/ingestion-pull.service.ts";
-import {
-  ActivityMonitorService,
-  type ActivityMonitorTraces,
-} from "../services/ingestion-source-activity.service.ts";
-import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
-import {
-  IngestionSecretConfiguration,
-  IngestionSecretService,
-} from "../services/ingestion-source-secret.service.ts";
-import { IngestionSourceService } from "../services/ingestion-source.service.ts";
-import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
-import { OpenAiAdminPullerService } from "../services/openai-admin-puller.service.ts";
-import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
 import { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
-import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
-import { PersonListingService } from "../services/person-listing.service.ts";
-import { PersonaHomeService } from "../services/persona-home.service.ts";
-import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
-import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
-import { PersonalUsageKeyService } from "../services/personal-usage-key.service.ts";
-import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
-import { PullDestinationService } from "../services/pull-destination.service.ts";
-import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
-import { PullerRegistryService } from "../services/puller-registry.service.ts";
-import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
-import { ProjectQuarantineTenantResolverService } from "../services/quarantine-tenant.service.ts";
-import { S3PollingPullerService } from "../services/s3-puller.service.ts";
-import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
 import {
   SpendSpikeAnomalyEvaluatorService,
   type SpendSpikeEvaluationSummary,
 } from "../services/spend-spike-anomaly-evaluator.service.ts";
-import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 
 const logger = createLogger("langwatch:governance");
 

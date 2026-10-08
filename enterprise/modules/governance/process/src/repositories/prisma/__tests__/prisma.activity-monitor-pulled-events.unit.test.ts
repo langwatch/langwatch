@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const query = vi.fn();
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
-import type { ActivityMonitorTraces } from "../../../services/ingestion-source-activity.service.ts";
+import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type { GovernanceClickHouseResolver } from "../../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {

@@ -16,8 +16,8 @@ import type {
   GovernanceHttpClient,
   GovernanceHttpResponse,
 } from "../../channels/governance-http.channel.ts";
-import type { PulledUsageRateInput } from "../../rules/pulled-usage-rate.rules.ts";
-import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import type { PulledUsageRateInput } from "../../features/ingestion-pull/rules/pulled-usage-rate.rules.ts";
+import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 /** The reason a failed run leaves behind is a log line, so the log is captured. */
@@ -39,8 +39,8 @@ import {
 import type * as observabilityModule from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import { OpenAiAdminPullerService } from "../openai-admin-puller.service.ts";
-import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
+import { OpenAiAdminPullerService } from "../../features/ingestion-pull/services/openai-admin-puller.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
 
 class StubHttp implements GovernanceHttpClient {
   async fetch(

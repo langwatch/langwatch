@@ -7,7 +7,10 @@ import { Temporal } from "@langwatch/time";
 // Real mapper imported to catch bugs (hand-copied contracts missed them).
 import { describe, expect, it } from "vitest";
 
-import { mapToOcsfRow, ocsfActorFields } from "../../rules/ocsf-pull-event-mapping.rules.ts";
+import {
+  mapToOcsfRow,
+  ocsfActorFields,
+} from "../../features/ingestion-pull/rules/ocsf-pull-event-mapping.rules.ts";
 
 const baseEvent: NormalizedPullEvent = {
   source_event_id: "evt-123",

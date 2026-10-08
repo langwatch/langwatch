@@ -27,8 +27,8 @@ import {
   agentsRefused,
   refusalFromStatus,
   refusalFromThrown,
-} from "../../rules/agent-listing.rules.ts";
-import { genieSpacesAsAgents } from "../../rules/genie-spaces.rules.ts";
+} from "../../features/agents/rules/agent-listing.rules.ts";
+import { genieSpacesAsAgents } from "../../features/databricks-genie/rules/genie-spaces.rules.ts";
 
 vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({
   ssrfSafeFetch: vi.fn(),

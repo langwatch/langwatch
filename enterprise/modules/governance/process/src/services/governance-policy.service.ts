@@ -1,7 +1,7 @@
 import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 
+import { isSourceBilledByConfigs } from "../features/cost/rules/coding-assistant-billing.rules.ts";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
-import { isSourceBilledByConfigs } from "../rules/coding-assistant-billing.rules.ts";
 
 export interface GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void;

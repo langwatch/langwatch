@@ -8,7 +8,7 @@ import type { TraceDailySpendGroup } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
-import type { ActivityMonitorTraces } from "../../../services/ingestion-source-activity.service.ts";
+import type { ActivityMonitorTraces } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,

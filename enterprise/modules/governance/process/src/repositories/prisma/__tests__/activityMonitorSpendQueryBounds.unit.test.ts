@@ -9,7 +9,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
-import type { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
+import type { ActivityMonitorService } from "../../../features/ingestion-source/services/ingestion-source-activity.service.ts";
 
 const NOW = Date.UTC(2026, 1, 1);
 

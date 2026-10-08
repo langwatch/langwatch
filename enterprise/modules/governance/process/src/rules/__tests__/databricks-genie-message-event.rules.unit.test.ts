@@ -7,13 +7,13 @@ import {
   messageEvent,
   messagesPageSchema,
   scimUserSchema,
-} from "../databricks-genie-message-event.rules.ts";
+} from "../../features/databricks-genie/rules/databricks-genie-message-event.rules.ts";
 import {
   conversationWalkPlan,
   earlierOf,
   genieEpochMs,
   spaceWalkPlan,
-} from "../databricks-genie-sweep.rules.ts";
+} from "../../features/databricks-genie/rules/databricks-genie-sweep.rules.ts";
 
 const message = messagesPageSchema.parse({
   messages: [

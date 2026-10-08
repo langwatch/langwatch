@@ -12,13 +12,13 @@ import { HttpAdminApiUsersChannel } from "../../channels/http/http.admin-api-use
 import { HttpDatabricksScimUsersChannel } from "../../channels/http/http.databricks-scim-users.channel.ts";
 import { HttpMicrosoftDirectoryChannel } from "../../channels/http/http.microsoft-directory.channel.ts";
 import { HttpProviderSignInChannel } from "../../channels/http/http.provider-sign-in.channel.ts";
+import { erasureDigest } from "../../features/identity/rules/erasure-digest.rules.ts";
+import { ErasureSuppressionService } from "../../features/identity/services/erasure-suppression.service.ts";
+import { PersonDiscoveryService } from "../../features/identity/services/person-discovery.service.ts";
+import { PersonListingService } from "../../features/identity/services/person-listing.service.ts";
+import { SourceCredentialAccessService } from "../../features/ingestion-source/services/source-credential-access.service.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
-import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
-import { PersonDiscoveryService } from "../person-discovery.service.ts";
-import { PersonListingService } from "../person-listing.service.ts";
-import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 
 const ORG = "org_people_sync";
 const NOW = Temporal.Instant.from("2026-09-09T12:00:00.000Z");

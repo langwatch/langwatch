@@ -4,11 +4,11 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import { erasureDigest } from "../../features/identity/rules/erasure-digest.rules.ts";
+import { partitionSuppressedEvents } from "../../features/identity/rules/erasure-suppression.rules.ts";
+import { ErasureSuppressionService } from "../../features/identity/services/erasure-suppression.service.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { PrismaErasedIdentifierSuppressionRepository } from "../../repositories/prisma/prisma.erased-identifier-suppression.repository.ts";
-import { erasureDigest } from "../../rules/erasure-digest.rules.ts";
-import { partitionSuppressedEvents } from "../../rules/erasure-suppression.rules.ts";
-import { ErasureSuppressionService } from "../erasure-suppression.service.ts";
 
 const SECRET = "a".repeat(32);
 const ERASED = "leaver@acme.test";

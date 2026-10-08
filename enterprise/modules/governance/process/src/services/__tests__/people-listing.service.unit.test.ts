@@ -25,13 +25,13 @@ import {
   directoryUsersAsPeople,
   HttpMicrosoftDirectoryChannel,
 } from "../../channels/http/http.microsoft-directory.channel.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../rules/microsoft-graph-directory.rules.ts";
 import {
   listingDay,
   peopleListed,
   peopleRefused,
   personListingEvents,
-} from "../../rules/people-listing.rules.ts";
+} from "../../features/identity/rules/people-listing.rules.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 
 const fetchMock = vi.fn();
 

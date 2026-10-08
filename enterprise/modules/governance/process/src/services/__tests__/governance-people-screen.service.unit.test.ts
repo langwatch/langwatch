@@ -6,14 +6,14 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { DepartmentService } from "../../features/identity/services/department.service.ts";
+import { GovernancePeopleScreenService } from "../../features/identity/services/governance-people-screen.service.ts";
 import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 import { MemoryDiscoveredPersonRepository } from "../../repositories/memory/memory.discovered-person.repository.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIdentityMatchSuggestionRepository } from "../../repositories/memory/memory.identity-match-suggestion.repository.ts";
 import { MemoryIdentityMatchRepository } from "../../repositories/memory/memory.identity-match.repository.ts";
-import { DepartmentService } from "../department.service.ts";
-import { GovernancePeopleScreenService } from "../governance-people-screen.service.ts";
 
 const ORG = "org_1";
 const SEEN = Temporal.Instant.from("2026-09-01T00:00:00Z");

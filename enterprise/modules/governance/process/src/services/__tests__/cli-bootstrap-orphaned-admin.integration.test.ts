@@ -13,10 +13,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createSupportContactOrganizations } from "../../__tests__/testing.ts";
 import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
+import type { CliAdminContactReader } from "../../features/cli/services/cli-admin-contact.service.ts";
+import type { CliBudgetOverviewReader } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
+import { DefaultGovernanceCliBootstrapService } from "../../features/cli/services/governance-cli-tool-bootstrap.service.ts";
 import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
-import type { CliAdminContactReader } from "../cli-admin-contact.service.ts";
-import type { CliBudgetOverviewReader } from "../governance-cli-tool-bootstrap.service.ts";
-import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 import { OrganizationSupportContactService } from "../organization-support-contact.service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;

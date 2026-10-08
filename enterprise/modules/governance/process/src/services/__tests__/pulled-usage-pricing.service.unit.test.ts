@@ -13,7 +13,7 @@ import {
   type PulledUsageRateReader,
   PulledUsagePricingService,
   type PulledUsagePriceInput,
-} from "../pulled-usage-pricing.service.ts";
+} from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
 
 const QUANTITIES = {
   tokensInput: 120_000,

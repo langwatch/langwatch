@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { agentsRefused, type AgentListing } from "../../rules/agent-listing.rules.ts";
+import {
+  agentsRefused,
+  type AgentListing,
+} from "../../features/agents/rules/agent-listing.rules.ts";
 import type { GenieSpacesChannel } from "../genie-spaces.channel.ts";
 
 /** Genie in memory: a workspace answers what a test seeded, and one nothing seeded is unreachable. */

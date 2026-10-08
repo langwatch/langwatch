@@ -8,7 +8,7 @@ import {
   type OtlpFixed64,
   type OtlpKeyValue,
   type OtlpLogsRequest,
-} from "../canonical-cost-extractor.service.ts";
+} from "../../features/cost/services/canonical-cost-extractor.service.ts";
 
 const extractor = CanonicalCostExtractorService.create();
 

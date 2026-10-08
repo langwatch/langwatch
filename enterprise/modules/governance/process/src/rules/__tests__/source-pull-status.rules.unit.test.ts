@@ -2,7 +2,7 @@
 import { PULL_REFUSED_ERROR_CODE } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { sourcePullStatus } from "../source-pull-status.rules.ts";
+import { sourcePullStatus } from "../../features/ingestion-pull/rules/source-pull-status.rules.ts";
 
 const failed = (error: string, code: string | null = null) => ({
   LastRunAt: Date.UTC(2026, 0, 2),

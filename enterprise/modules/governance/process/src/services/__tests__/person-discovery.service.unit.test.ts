@@ -4,10 +4,10 @@ import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contr
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { PersonDiscoveryService } from "../../features/identity/services/person-discovery.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
 import { DISCOVERED_PERSON_KIND } from "../../repositories/discovered-person.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../rules/microsoft-graph-directory.rules.ts";
-import { PersonDiscoveryService } from "../person-discovery.service.ts";
 
 const ORG = "org_discovery";
 const OID = "f6481ec4-0000-4000-8000-2a8f29bb1c4a";

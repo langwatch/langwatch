@@ -7,18 +7,18 @@ import {
   adminWorkspaceKindSchema,
   recordWorkspaceViewResultSchema,
 } from "./admin-workspace-view-audit.ts";
-import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
-import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
-import { governanceSetupStateSchema } from "./governance.ts";
-import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
-import { personaResolutionSchema } from "./persona-home.ts";
-import { governanceBudgetOverviewForUserSchema } from "./personal-budget-overview.ts";
-import { personalUsageRollupSchema } from "./personal-usage.ts";
+import { cliBootstrapResultSchema } from "./features/cli/cli-bootstrap.ts";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   quarantineFillStatsSchema,
-} from "./quarantine-fill.ts";
+} from "./features/ingestion/quarantine-fill.ts";
+import { personaResolutionSchema } from "./features/personal/persona-home.ts";
+import { governanceBudgetOverviewForUserSchema } from "./features/personal/personal-budget-overview.ts";
+import { personalUsageRollupSchema } from "./features/personal/personal-usage.ts";
+import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
+import { governanceSetupStateSchema } from "./governance.ts";
+import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
 
 const organizationScope = z.object({ organizationId: z.string() });
 

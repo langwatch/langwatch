@@ -16,19 +16,19 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
-import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
-import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
-import { CanonicalCostExtractorService } from "../../services/canonical-cost-extractor.service.ts";
-import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
-import { GovernanceIngestPrincipalService } from "../../services/governance-ingest-principal.service.ts";
+import { CanonicalCostExtractorService } from "../../features/cost/services/canonical-cost-extractor.service.ts";
+import { GovernanceIngestAccessService } from "../../features/ingest/services/governance-ingest-access.service.ts";
+import { GovernanceIngestPrincipalService } from "../../features/ingest/services/governance-ingest-principal.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
   type GovernanceIngestMetricCollectionChannel,
   type GovernanceIngestTraceCollection,
-} from "../../services/governance-ingest-receiver.service.ts";
-import { GovernanceIngestService } from "../../services/governance-ingest.service.ts";
-import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
+} from "../../features/ingest/services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestService } from "../../features/ingest/services/governance-ingest.service.ts";
+import type { IngestionSourceService } from "../../features/ingestion-source/services/ingestion-source.service.ts";
+import type { GovernanceRateLimitRepository } from "../../repositories/governance-rate-limit.repository.ts";
+import { MemoryGovernanceRateLimitRepository } from "../../repositories/memory/memory.governance-rate-limit.repository.ts";
 import { governanceIngestRest } from "../governance-ingest.rest.ts";
 
 const SECRET = "lw_is_abcdef123";

@@ -2,8 +2,8 @@ import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { IngestionPullRunStatusProjection } from "../eventing/ingestion-pull-run-status.projection.ts";
-import type { PulledUsageRateReader } from "../services/pulled-usage-pricing.service.ts";
-import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
+import type { PulledUsageRateReader } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsagePricingService } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
 
 class FixedRate implements PulledUsageRateReader {
   rate() {

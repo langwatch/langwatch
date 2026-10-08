@@ -27,12 +27,12 @@ import {
   type DiscoveredAgentRecord,
   refusalFromStatus,
   refusalFromThrown,
-} from "../../rules/agent-listing.rules.ts";
+} from "../../features/agents/rules/agent-listing.rules.ts";
 import {
   DATAVERSE_API_VERSION,
   dataverseHeaders,
   isEnvironmentOrigin,
-} from "../../rules/dataverse-environment-service.rules.ts";
+} from "../../features/microsoft/rules/dataverse-environment-service.rules.ts";
 import type { CopilotBotsChannel, CopilotBotsRead } from "../copilot-bots.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 

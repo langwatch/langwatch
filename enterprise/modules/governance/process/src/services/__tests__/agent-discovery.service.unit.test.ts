@@ -11,11 +11,11 @@ import type {
 import { HttpCopilotBotsChannel } from "../../channels/http/http.copilot-bots.channel.ts";
 import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
 import { HttpProviderSignInChannel } from "../../channels/http/http.provider-sign-in.channel.ts";
+import { AgentDiscoveryService } from "../../features/agents/services/agent-discovery.service.ts";
+import { SourceCredentialAccessService } from "../../features/ingestion-source/services/source-credential-access.service.ts";
 import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memory.discovered-agent.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
-import { AgentDiscoveryService } from "../agent-discovery.service.ts";
-import { SourceCredentialAccessService } from "../source-credential-access.service.ts";
 
 const ORG = "org_agent_sync";
 const NOW = Temporal.Instant.from("2026-09-09T00:00:00.000Z");

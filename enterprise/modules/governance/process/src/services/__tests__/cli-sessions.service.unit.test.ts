@@ -3,7 +3,7 @@ import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../../features/cli/services/cli-session-inventory.service.ts";
 
 const records: CliTokenRecordEntry[] = [
   {

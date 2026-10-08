@@ -6,7 +6,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
+import { DefaultGovernanceCliTokenRevocationService } from "../../features/cli/services/cli-token-revocation.service.ts";
 
 describe("CliTokenRevocationService.revokeForUser", () => {
   describe("when a person is deactivated", () => {

@@ -9,7 +9,7 @@ import {
   paidGenieBillParameters,
   paidGenieBillRows,
   startOfDayMs,
-} from "../databricks-genie-paid-bill.rules.ts";
+} from "../../features/databricks-genie/rules/databricks-genie-paid-bill.rules.ts";
 
 const usdRow: PaidGenieBillRow = {
   runAs: "alice@example.test",

@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import { nextCronFireAt, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import type { CostRollupDayComparer } from "../services/cost-rollup-day-comparer.service.ts";
+import type { CostRollupDayComparer } from "../features/cost/services/cost-rollup-day-comparer.service.ts";
 import {
   COST_ROLLUP_WATCH_MAX_ATTEMPTS,
   CostRollupWatchIntent,

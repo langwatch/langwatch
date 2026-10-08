@@ -8,6 +8,15 @@ import { PROJECT_KIND, type InternalProject, type ProjectApi } from "@langwatch/
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  type DepartmentOrganizations,
+  type DepartmentProjects,
+  DepartmentService,
+} from "../features/identity/services/department.service.ts";
+import {
+  ActivityMonitorService,
+  type ActivityMonitorTraces,
+} from "../features/ingestion-source/services/ingestion-source-activity.service.ts";
 import type { GovernanceClickHouseResolver } from "../repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import {
   PrismaDepartmentRepository,
@@ -17,15 +26,6 @@ import {
   PrismaActivityMonitorRepository,
   type ActivityMonitorDatabase,
 } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
-import {
-  type DepartmentOrganizations,
-  type DepartmentProjects,
-  DepartmentService,
-} from "../services/department.service.ts";
-import {
-  ActivityMonitorService,
-  type ActivityMonitorTraces,
-} from "../services/ingestion-source-activity.service.ts";
 
 function internalGovernanceProject(id: string): InternalProject {
   return {

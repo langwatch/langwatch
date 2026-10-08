@@ -6,7 +6,10 @@ import type {
   RecentAnomalyRow,
 } from "@langwatch/enterprise-governance-contract";
 
-import type { DepartmentDirectory, SourceTeam } from "../rules/activity-monitor-spend.rules.ts";
+import type {
+  DepartmentDirectory,
+  SourceTeam,
+} from "../features/cost/rules/activity-monitor-spend.rules.ts";
 
 /** Open anomaly alerts counted per severity. */
 export type AnomalyBreakdown = { critical: number; warning: number; info: number };

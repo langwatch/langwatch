@@ -20,7 +20,7 @@ import {
   stampLogOriginAttrs,
   stampMetricOriginAttrs,
   stampOriginAttrs,
-} from "../governance-ingest-payload.rules.ts";
+} from "../../features/ingest/rules/governance-ingest-payload.rules.ts";
 
 const source = {
   id: "src_1",

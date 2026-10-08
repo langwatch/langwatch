@@ -10,18 +10,18 @@ import {
   TENANT_ID,
 } from "../../eventing/__tests__/governance-cost-rollup.fixtures.ts";
 import { GovernanceCostChargeMapProjection } from "../../eventing/governance-cost-charge.projection.ts";
-import type { GovernanceCostChargeRow } from "../../repositories/governance-cost-charge.repository.ts";
-import type { GovernanceCostRollupRow } from "../../repositories/governance-cost-rollup.repository.ts";
-import { MemoryGovernanceCostChargeRepository } from "../../repositories/memory/memory.governance-cost-charge.repository.ts";
 import {
   compareCostRollupDay,
   computeCostRollupLagMs,
   deriveCostRollupCells,
-} from "../cost-rollup-day-comparison.rules.ts";
+} from "../../features/cost/rules/cost-rollup-day-comparison.rules.ts";
 import {
   governanceCostRollupTotals,
   type GovernanceCostRollupState,
-} from "../governance-cost-rollup-cell.rules.ts";
+} from "../../features/cost/rules/governance-cost-rollup-cell.rules.ts";
+import type { GovernanceCostChargeRow } from "../../repositories/governance-cost-charge.repository.ts";
+import type { GovernanceCostRollupRow } from "../../repositories/governance-cost-rollup.repository.ts";
+import { MemoryGovernanceCostChargeRepository } from "../../repositories/memory/memory.governance-cost-charge.repository.ts";
 
 const DAY = "2026-09-01";
 

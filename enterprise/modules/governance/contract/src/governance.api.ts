@@ -24,19 +24,14 @@ import type {
   CreateAnomalyRuleInput,
   UpdateAnomalyRuleInput,
 } from "./anomaly-rule.ts";
-import type { CliBootstrapResult } from "./cli-bootstrap.ts";
+import type { Department, DepartmentAssignments } from "./department.ts";
+import type { CliBootstrapResult } from "./features/cli/cli-bootstrap.ts";
 import type {
   CliSessionCard,
   CliSessionRevocation,
   CliUserInput,
   RevokeCliSessionInput,
-} from "./cli-sessions.ts";
-import type { Department, DepartmentAssignments } from "./department.ts";
-import type {
-  AgentListingRequestResult,
-  AgentSyncSourceListing,
-  GovernanceAgentRow,
-} from "./governance-agents.ts";
+} from "./features/cli/cli-sessions.ts";
 import type {
   GovernanceCliBudgetStatusAnswer,
   GovernanceCliBootstrapAnswer,
@@ -57,7 +52,7 @@ import type {
   GovernanceCliSourceEventsRequest,
   GovernanceCliSourceRequest,
   GovernanceCliSourcesRequest,
-} from "./governance-cli-rest.schemas.ts";
+} from "./features/cli/governance-cli-rest.schemas.ts";
 import type {
   GovernanceCostDayRecords,
   GovernanceCostModelBreakdown,
@@ -66,25 +61,17 @@ import type {
   GovernanceCostSummary,
   GovernanceCostWindowInput,
   GovernanceSpenderBreakdown,
-} from "./governance-cost.ts";
+} from "./features/cost/governance-cost.ts";
 import type {
   GovernanceIngestOtlpInput,
   GovernanceIngestResponse,
   GovernanceIngestWebhookInput,
-} from "./governance-ingest-rest.schemas.ts";
-import type {
-  IdentityMatchConfirmed,
-  IdentityMatchRun,
-  PeopleScreenPerson,
-  PeopleScreenSuggestion,
-} from "./governance-people.ts";
-import type { GovernanceActorWorkspace } from "./governance.responses.ts";
-import type { GovernanceSetupState } from "./governance.ts";
+} from "./features/ingestion/governance-ingest-rest.schemas.ts";
 import type {
   PersonalIngestionKeyListing,
   PersonalIngestionKeyMint,
   RotatedIngestionKey,
-} from "./ingestion-key.trpc.ts";
+} from "./features/ingestion/ingestion-key.trpc.ts";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -98,32 +85,51 @@ import type {
   SpendByUserRow,
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
-} from "./ingestion-source-activity.queries.ts";
-import type { IssuedIngestionKey } from "./ingestion-source-key.commands.ts";
-import type { IngestionSourceDto, OttlStarterTemplate } from "./ingestion-source.ts";
+} from "./features/ingestion/ingestion-source-activity.queries.ts";
+import type { IssuedIngestionKey } from "./features/ingestion/ingestion-source-key.commands.ts";
+import type {
+  IngestionSourceDto,
+  OttlStarterTemplate,
+} from "./features/ingestion/ingestion-source.ts";
 import type {
   IngestionSourceCreateInput,
   IngestionSourceUpdateInput,
-} from "./ingestion-sources.trpc.ts";
+} from "./features/ingestion/ingestion-sources.trpc.ts";
 import type {
   ArchiveIngestionTemplateInput,
   CloneIngestionTemplateInput,
   CreateIngestionTemplateInput,
   IngestionTemplate,
   UpdateIngestionTemplateOttlInput,
-} from "./ingestion-template.ts";
-import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
-import type { OttlValidationResult } from "./ottl.ts";
-import type { PersonaResolution } from "./persona-home.ts";
-import type { GovernanceBudgetOverviewForUser } from "./personal-budget-overview.ts";
+} from "./features/ingestion/ingestion-template.ts";
+import type { OttlValidationResult } from "./features/ingestion/ottl.ts";
+import type {
+  QuarantineFillInput,
+  QuarantineFillStats,
+} from "./features/ingestion/quarantine-fill.ts";
+import type { PersonaResolution } from "./features/personal/persona-home.ts";
+import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
   MePersonalCredential,
   MeUsage,
   PersonalUsageQueryInput,
   PersonalUsageRollup,
   PersonalUsageWindow,
-} from "./personal-usage.ts";
-import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill.ts";
+} from "./features/personal/personal-usage.ts";
+import type {
+  AgentListingRequestResult,
+  AgentSyncSourceListing,
+  GovernanceAgentRow,
+} from "./governance-agents.ts";
+import type {
+  IdentityMatchConfirmed,
+  IdentityMatchRun,
+  PeopleScreenPerson,
+  PeopleScreenSuggestion,
+} from "./governance-people.ts";
+import type { GovernanceActorWorkspace } from "./governance.responses.ts";
+import type { GovernanceSetupState } from "./governance.ts";
+import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
 import type { OrganizationSessionPolicyShape, SessionCeilingApplied } from "./session-policy.ts";
 
 /**

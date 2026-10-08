@@ -12,12 +12,12 @@ import {
   agentsRefused,
   refusalFromStatus,
   refusalFromThrown,
-} from "../../rules/agent-listing.rules.ts";
+} from "../../features/agents/rules/agent-listing.rules.ts";
 import {
   GENIE_SPACES_PATH,
   genieSpacesAsAgents,
   walkGenieSpaces,
-} from "../../rules/genie-spaces.rules.ts";
+} from "../../features/databricks-genie/rules/genie-spaces.rules.ts";
 import type { GenieSpacesChannel } from "../genie-spaces.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
