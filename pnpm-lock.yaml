@@ -3266,6 +3266,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -3321,6 +3324,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
