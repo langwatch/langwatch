@@ -20,17 +20,17 @@ import {
   instantEvalSkipResultOf,
 } from "../../../rules/instant-eval-judge-result.rules.ts";
 
-type EvaluationInstantEvalJudgeDeps = Readonly<{
+type EvaluationJudgingDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judge">;
   /** The shared augmenter every judge's result runs through, so a leak is never hidden. */
   evaluators: Pick<EvaluatorApi, "augmentResult">;
 }>;
 
-export class EvaluationInstantEvalJudgeService {
-  private constructor(private readonly deps: EvaluationInstantEvalJudgeDeps) {}
+export class EvaluationJudgingService {
+  private constructor(private readonly deps: EvaluationJudgingDeps) {}
 
-  static create(deps: EvaluationInstantEvalJudgeDeps): EvaluationInstantEvalJudgeService {
-    return new EvaluationInstantEvalJudgeService(deps);
+  static create(deps: EvaluationJudgingDeps): EvaluationJudgingService {
+    return new EvaluationJudgingService(deps);
   }
 
   async answer({

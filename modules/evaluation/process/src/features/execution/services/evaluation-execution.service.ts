@@ -31,7 +31,7 @@ import type { LangevalsEvaluatorService } from "../../evaluators/services/langev
 import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
 import { EvaluationCustomEvaluationService } from "./evaluation-custom-evaluation.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
-import { EvaluationInstantEvalJudgeService } from "./evaluation-instant-eval-judge.service.ts";
+import { EvaluationJudgingService } from "./evaluation-judging.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
@@ -114,12 +114,12 @@ export class EvaluationExecutionService {
   }
 
   private readonly evaluationData: EvaluationDataService;
-  private readonly instantEvals: EvaluationInstantEvalJudgeService;
+  private readonly instantEvals: EvaluationJudgingService;
   private readonly customEvaluations: EvaluationCustomEvaluationService;
 
   private constructor(private readonly deps: EvaluationExecutionDeps) {
     this.evaluationData = EvaluationDataService.create(deps);
-    this.instantEvals = EvaluationInstantEvalJudgeService.create(deps);
+    this.instantEvals = EvaluationJudgingService.create(deps);
     this.customEvaluations = EvaluationCustomEvaluationService.create(deps);
   }
 
