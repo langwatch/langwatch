@@ -63,7 +63,6 @@ vi.mock("../../../behavior/automation-session.ts", () => ({
     organization: { id: "org-1" },
     team: { slug: "team-1" },
   }),
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
   useAppBaseUrl: () => "https://app.langwatch.ai",
   useCloseAddressedDrawer: () => mockCloseAddressedDrawer,
 }));
