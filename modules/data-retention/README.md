@@ -6,13 +6,13 @@ Data retention: the retention policy per scope, the pins that keep data past it,
 
 ## At a glance
 
-|                |                                                                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Classification | core (`modules/catalogue.json`)                                                                                                 |
-| Subjects       | data-retention                                                                                                                  |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                        |
-| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:99` (23 operations) |
-| Installed by   | api, worker, tasks (process); ui (browser)                                                                                      |
+|                |                                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                                                  |
+| Subjects       | data-retention                                                                                                                   |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                         |
+| Api token      | `DataRetentionApi` = `moduleApi<DataRetentionApi>()("data-retention")`, `contract/src/data-retention.api.ts:100` (23 operations) |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                                                       |
 
 ## What data-retention owns
 

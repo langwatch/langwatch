@@ -101,6 +101,22 @@ export class DataRetentionService {
     }
   }
 
+  /** The organisation the target's own row places it in; refuses a target no row places. */
+  async getScopeOrganizationId({ scope }: { scope: ScopeAssignment }): Promise<string> {
+    if (scope.scopeType === "ORGANIZATION") {
+      return scope.scopeId;
+    }
+    const organizationId =
+      scope.scopeType === "TEAM"
+        ? await this.options.projectScopes.findTeamOrganizationId({ teamId: scope.scopeId })
+        : (await this.findProjectContext(scope.scopeId))?.organizationId;
+    if (!organizationId) {
+      throw new ScopeTargetNotFoundError("Scope target not found.");
+    }
+
+    return organizationId;
+  }
+
   async previewScopeRemoval(input: {
     organizationId: string;
     scope: ScopeAssignment;

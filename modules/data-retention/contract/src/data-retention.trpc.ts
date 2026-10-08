@@ -37,10 +37,13 @@ export const retentionScopeTargetInputSchema = z.object({
   scope: retentionScopeInputSchema,
 });
 
-/** A scope write names the organisation the page sits in; the target must sit there too. */
+/**
+ * A scope write may name the organisation the page sits in, and the target must sit there too;
+ * without one the server reads it from the target the door approved (RETENTION-ORG, 2026-10-09).
+ */
 export const retentionScopeWriteInputSchema = z.object({
   ...retentionScopeTargetInputSchema.shape,
-  organizationId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
 });
 
 export const retentionTriggerRetroactiveInputSchema = z.strictObject({
@@ -60,7 +63,8 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
 
   /**
    * Set one category's retention at one scope. The door asks the permission on
-   * `scope`; `projectId` is not acted on, and the plan gate reads `organizationId`.
+   * `scope`; `projectId` is not acted on, and the plan gate reads `organizationId`, or the
+   * target's own organisation when none is named.
    */
   .mutation("setForScope")
   .withInput(

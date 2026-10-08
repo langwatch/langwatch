@@ -118,7 +118,7 @@ getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number>
 
 #### `getPolicySnapshot`
 
-The retention settings surface. The door authorises each scope write on its target; these refuse a target outside `organizationId` and plan-gate on it.
+The retention settings surface. The door authorises each scope write on its target; these refuse a target outside `organizationId` and plan-gate on it. Without `organizationId` they take the organisation the approved target's own row places it in.
 
 ```typescript
 getPolicySnapshot(input: { projectId: string } & RetentionCallerInput): Promise<RetentionPolicySnapshot>;
@@ -133,19 +133,19 @@ getScopeStorageUsage(input: { projectId: string; scope: ScopeAssignment } & Rete
 #### `previewScopeRemoval`
 
 ```typescript
-previewScopeRemoval(input: { organizationId: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<ResolvedRetention>;
+previewScopeRemoval(input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput): Promise<ResolvedRetention>;
 ```
 
 #### `changeScopeRetention`
 
 ```typescript
-changeScopeRetention(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
+changeScopeRetention(input: { organizationId?: string; scope: ScopeAssignment; category: RetentionCategory; retentionDays: number; } & RetentionCallerInput): Promise<RetentionPolicy>;
 ```
 
 #### `removeForScope`
 
 ```typescript
-removeForScope(input: { organizationId: string; scope: ScopeAssignment; category: RetentionCategory; } & RetentionCallerInput): Promise<void>;
+removeForScope(input: { organizationId?: string; scope: ScopeAssignment; category: RetentionCategory; } & RetentionCallerInput): Promise<void>;
 ```
 
 #### `applyRetentionToExistingData`
@@ -170,7 +170,7 @@ None: this module declares no REST family.
 
 ### `dataRetention`
 
-Contract `../contract/src/data-retention.trpc.ts:51`, router `src/transport/data-retention.trpc.ts:28`.
+Contract `../contract/src/data-retention.trpc.ts:54`, router `src/transport/data-retention.trpc.ts:28`.
 
 | Procedure                                | Kind     | Gate                        | Input                                    | Output                                   |
 | ---------------------------------------- | -------- | --------------------------- | ---------------------------------------- | ---------------------------------------- |
@@ -192,14 +192,14 @@ interface Input {
 type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:44
 
 // dataRetention.setForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:67
+// Input: inline, ../contract/src/data-retention.trpc.ts:71
 interface Input {
   projectId: string;
   scope: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
   };
-  organizationId: string;
+  organizationId?: string;
   category: "traces" | "scenarios" | "experiments";
   retentionDays: 0 | number;
 }
@@ -216,14 +216,14 @@ interface Output {
 }
 
 // dataRetention.previewScopeRemoval
-// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:41
+// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:44
 interface Input {
   projectId: string;
   scope: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
   };
-  organizationId: string;
+  organizationId?: string;
 }
 // Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:189
 interface Output {
@@ -233,19 +233,19 @@ interface Output {
 }
 
 // dataRetention.removeForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:87
+// Input: inline, ../contract/src/data-retention.trpc.ts:91
 interface Input {
   projectId: string;
   scope: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
   };
-  organizationId: string;
+  organizationId?: string;
   category: "traces" | "scenarios" | "experiments";
 }
 
 // dataRetention.triggerRetroactiveUpdate
-// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:46
+// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:49
 interface Input {
   projectId: string;
   category: "traces" | "scenarios" | "experiments";
@@ -261,7 +261,7 @@ interface Output {
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/data-retention.trpc.ts:97
+// Output: inline, ../contract/src/data-retention.trpc.ts:101
 type Output = {
   mutationId: string;
   table: string;

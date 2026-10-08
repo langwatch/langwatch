@@ -57,7 +57,8 @@ export interface DataRetentionApi {
 
   /**
    * The retention settings surface. The door authorises each scope write on its
-   * target; these refuse a target outside `organizationId` and plan-gate on it.
+   * target; these refuse a target outside `organizationId` and plan-gate on it. Without
+   * `organizationId` they take the organisation the approved target's own row places it in.
    */
   getPolicySnapshot(
     input: { projectId: string } & RetentionCallerInput,
@@ -66,11 +67,11 @@ export interface DataRetentionApi {
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<RetentionStorageUsage>;
   previewScopeRemoval(
-    input: { organizationId: string; scope: ScopeAssignment } & RetentionCallerInput,
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention>;
   changeScopeRetention(
     input: {
-      organizationId: string;
+      organizationId?: string;
       scope: ScopeAssignment;
       category: RetentionCategory;
       retentionDays: number;
@@ -78,7 +79,7 @@ export interface DataRetentionApi {
   ): Promise<RetentionPolicy>;
   removeForScope(
     input: {
-      organizationId: string;
+      organizationId?: string;
       scope: ScopeAssignment;
       category: RetentionCategory;
     } & RetentionCallerInput,

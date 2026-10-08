@@ -9,6 +9,7 @@ import {
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -255,6 +256,76 @@ describe("given an administrator of acme naming acme", () => {
         .catch((error: unknown) => error);
 
       expect(codeOf(failure)).toBe("data_retention_not_on_plan");
+    });
+  });
+});
+
+type Scope = Parameters<typeof write>[0];
+
+/** Main's body shape: the scope alone, the organisation left for the server to read. */
+const unnamed = (scope: Scope) => ({ ...write(scope), organizationId: undefined });
+
+describe("given a scope write that names no organisation", () => {
+  describe("when acme is on the free plan and the team sits in acme", () => {
+    /** @scenario "A scope write without its organisation is plan-gated on the target's own organisation, as on main" */
+    it("refuses the team write as a paid capability, asking the plan of acme", async () => {
+      const free = createDataRetentionTestEntitlement({ free: true, type: "FREE" });
+      const plansAsked: string[] = [];
+      const entitlement = createApiFixture<EntitlementApi>({
+        getActivePlan: async (input) => {
+          plansAsked.push(input.organizationId);
+
+          return free.getActivePlan(input);
+        },
+      });
+
+      const failure = await door({ app: retentionApp(entitlement) })
+        .call.setForScope(unnamed({ scopeType: "TEAM", scopeId: PLATFORM }))
+        .catch((error: unknown) => error);
+
+      expect(codeOf(failure)).toBe("data_retention_not_on_plan");
+      expect(plansAsked).toEqual([ACME]);
+    });
+  });
+
+  describe("when a project member sets, previews and removes their project's retention", () => {
+    /** @scenario "A scope write without its organisation acts on the target's own organisation" */
+    it("asks project:update each time and writes, then removes, the override in acme", async () => {
+      const { call, asked, app } = door({
+        permitted: (permission) => permission !== "organization:manage",
+      });
+      const scope: Scope = { scopeType: "PROJECT", scopeId: WEB_APP };
+
+      await call.setForScope(unnamed(scope));
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([
+        expect.objectContaining({ scopeType: "PROJECT", scopeId: WEB_APP, organizationId: ACME }),
+      ]);
+      await call.previewScopeRemoval({ projectId: WEB_APP, scope });
+      await call.removeForScope({ projectId: WEB_APP, scope, category: "traces" });
+
+      expect(asked).toEqual(
+        Array(3).fill({ permission: "project:update", scope: { tier: "project", id: WEB_APP } }),
+      );
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([]);
+    });
+  });
+
+  describe("when no row places the team", () => {
+    /** @scenario "A scope write without its organisation whose target has no row is refused as not found" */
+    it("refuses setting, previewing and removing it, and writes nothing", async () => {
+      const { call, app } = door();
+      const scope: Scope = { scopeType: "TEAM", scopeId: "team-unknown" };
+
+      const refusals = await Promise.all([
+        call.setForScope(unnamed(scope)).catch((error: unknown) => error),
+        call.previewScopeRemoval({ projectId: WEB_APP, scope }).catch((error: unknown) => error),
+        call
+          .removeForScope({ projectId: WEB_APP, scope, category: "traces" })
+          .catch((error: unknown) => error),
+      ]);
+
+      expect(refusals.map(codeOf)).toEqual(Array(3).fill("data_retention_scope_target_not_found"));
+      await expect(app.listOrganizationRules({ organizationId: ACME })).resolves.toEqual([]);
     });
   });
 });
