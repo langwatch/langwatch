@@ -3,7 +3,7 @@
  * Onboarding and the Langy gate save a first provider in one write through the guided form.
  * @see specs/model-providers/onboarding-flow.feature
  */
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -164,6 +164,29 @@ describe("saving a first provider from onboarding or the Langy gate", () => {
 
         expect(savedAfterWrites).toEqual([1]);
         expect(writes()[0]?.customKeys).toMatchObject({ OPENAI_API_KEY: TYPED_KEY });
+      });
+
+      /** @scenario "A default chat model picked in the setup card saves with the provider" */
+      it("saves a picked default chat model as that provider's full model id", async () => {
+        renderWithModelProviderHost(guidedForm("openai"), host());
+        const pills = within(
+          screen.getByRole("group", { name: "Default chat model" }),
+        ).getAllByRole("button");
+        // Not the recommended first pill, so the pick itself is what gets saved.
+        const picked = pills.at(-1);
+        const pickedModel = picked?.textContent?.trim();
+        expect(pills.length).toBeGreaterThan(1);
+        if (!picked) throw new Error("no default chat model pills rendered");
+        await userEvent.click(picked);
+
+        await connectWith({ OPENAI_API_KEY: TYPED_KEY, OPENAI_BASE_URL: BASE_URL });
+
+        expect(writes()).toHaveLength(1);
+        const defaults = assignRole.mock.calls
+          .map(([input]) => input as Record<string, unknown>)
+          .filter((input) => input.role === "DEFAULT")
+          .map((input) => input.model);
+        expect(defaults).toEqual([`openai/${pickedModel}`]);
       });
 
       it("probes the same credentials it then saves", async () => {

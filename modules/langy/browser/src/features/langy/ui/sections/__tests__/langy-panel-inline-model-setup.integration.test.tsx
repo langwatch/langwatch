@@ -252,6 +252,8 @@ describe("given a project with no model and a question handed to Langy from a pa
       expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
       expect(sendMessage).not.toHaveBeenCalled();
       expect(useLangyStore.getState().pendingPrompt).toBe("Set up my first evaluator");
+      expect(screen.getByText("Set up my first evaluator")).toBeInTheDocument();
+      expect(screen.getByText("Langy sends this once a model is set up.")).toBeInTheDocument();
 
       resolvedDefaultRef.current = {
         data: { model: "gpt-5-mini" },
