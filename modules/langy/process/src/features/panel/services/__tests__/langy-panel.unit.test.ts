@@ -4,21 +4,25 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { LangyPanelAccessService } from "../../features/panel/services/langy-panel-access.service.ts";
+import { MemoryLangyRepositories } from "../../../../repositories/memory/memory.langy.repositories.ts";
+import type { LangyService } from "../../../../services/langy.service.ts";
+import { LangyUiActionPageService } from "../../../ui-action/services/langy-ui-action-page.service.ts";
+import { LangyPanelAccessService } from "../langy-panel-access.service.ts";
 import {
   LangyPanelConversationService,
   type LangyPanelConversationMembers,
-} from "../../features/panel/services/langy-panel-conversation.service.ts";
-import { LangyPanelEgressService } from "../../features/panel/services/langy-panel-egress.service.ts";
+} from "../langy-panel-conversation.service.ts";
+import { LangyPanelEgressService } from "../langy-panel-egress.service.ts";
 import {
   LangyPanelLocalService,
   type LangyPanelLocalMembers,
-} from "../../features/panel/services/langy-panel-local.service.ts";
-import { LangyUiActionPageService } from "../../features/ui-action/services/langy-ui-action-page.service.ts";
-import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import type { LangyService } from "../langy.service.ts";
+} from "../langy-panel-local.service.ts";
+import {
+  LangyPanelTurnStreamService,
+  type LangyPanelTurnStreamMembers,
+} from "../langy-panel-turn-stream.service.ts";
 
 type UiActions = NonNullable<LangyPanelConversationMembers["uiActions"]>;
 
@@ -43,8 +47,6 @@ function panel(
     turnBounds: createApiFixture<LangyPanelConversationMembers["turnBounds"]>(),
     rateLimits: { check: async () => ({ allowed: true }) },
     presence: createApiFixture<PresenceApi>(),
-    turnAccess: repositories.turnAccess,
-    openBuffer: () => repositories.tokenBuffer.openBlocking(),
     uiActions: LangyUiActionPageService.create({ uiActions: repositories.uiActions }),
     ...overrides,
   });
@@ -228,5 +230,44 @@ describe("LangyPanelLocalService", () => {
       service.setCodeAccessPreference({ caller, projectId, preference: "github" }),
     ).resolves.toEqual({ preference: "github" });
     expect(written).toEqual([{ userId: "user_1", preference: "github" }]);
+  });
+});
+
+describe("LangyPanelTurnStreamService", () => {
+  const turn = { caller, projectId, conversationId: "conv_1", turnId: "turn_1" };
+
+  function turnStream({ isActor }: { isActor: boolean }) {
+    const findByIdVisible = vi.fn(async () => null);
+    const openBuffer = vi.fn<LangyPanelTurnStreamMembers["openBuffer"]>(() => {
+      throw new Error("buffer opened");
+    });
+    const service = LangyPanelTurnStreamService.create({
+      access: access(),
+      langy: createApiFixture<LangyPanelTurnStreamMembers["langy"]>({ findByIdVisible }),
+      turnAccess: createApiFixture<LangyPanelTurnStreamMembers["turnAccess"]>({
+        isTurnActor: async () => isActor,
+      }),
+      openBuffer,
+    });
+    return { service, findByIdVisible, openBuffer };
+  }
+
+  /** @scenario "Attaching to a turn in someone else's conversation answers not found" */
+  it("answers a stranger's attach with not found and opens no buffer", async () => {
+    const { service, openBuffer } = turnStream({ isActor: false });
+
+    await expect(service.watchTurnStream(turn).next()).rejects.toMatchObject({
+      code: "langy_conversation_not_found",
+    });
+    expect(openBuffer).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "The person who started a turn attaches before its conversation is visible" */
+  it("lets the turn's actor through without reading the conversation", async () => {
+    const { service, findByIdVisible, openBuffer } = turnStream({ isActor: true });
+
+    await expect(service.watchTurnStream(turn).next()).rejects.toThrow("buffer opened");
+    expect(openBuffer).toHaveBeenCalledOnce();
+    expect(findByIdVisible).not.toHaveBeenCalled();
   });
 });

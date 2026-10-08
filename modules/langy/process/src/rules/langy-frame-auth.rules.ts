@@ -1,30 +1,12 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
+import type { LangyFrameEnvelope } from "./langy-relay-frame.rules.ts";
+
+/** The signed-over material: the envelope without its MAC. Its payload is re-signed verbatim. */
+export type LangyFrameSigned = Omit<LangyFrameEnvelope, "mac">;
+
 /** The stable identity every frame is bound to. */
-interface LangyFrameIdentity {
-  projectId: string;
-  userId: string;
-  conversationId: string;
-  turnId: string;
-}
-
-/** The signed-over material: identity + this frame's nonce + its exact payload bytes. */
-export interface LangyFrameSigned extends LangyFrameIdentity {
-  /** 16 random bytes, hex — unique per frame; the relay dedups on it. */
-  frameNonce: string;
-  /**
-   * The exact payload string the worker serialised and signed. Verification
-   * re-signs THESE bytes verbatim — the relay must not re-serialise before
-   * checking, or a lossless round-trip difference would break the MAC.
-   */
-  payload: string;
-}
-
-/** A frame on the wire: the signed material plus its MAC. */
-export interface LangyFrameEnvelope extends LangyFrameSigned {
-  /** hex HMAC-SHA256 over the length-prefixed signing input. */
-  mac: string;
-}
+type LangyFrameIdentity = Omit<LangyFrameSigned, "frameNonce" | "payload">;
 
 /** Langy authenticated frame contract (specs/langy/langy-frame-auth.vectors.json).
  * Per-frame HMAC proves identity (Go worker signs, Hono relay verifies). Key (runToken) is

@@ -4,7 +4,11 @@
  * @see specs/langy/langy-followup-suggestions.feature
  */
 
-import type { FeatureNode, LangyFeatureMap } from "../../../model/langy-feature-map.ts";
+import type { FeatureNode } from "../../../model/langy-feature-map.ts";
+import {
+  featureForCliToolName,
+  featuresConsuming,
+} from "../../../model/shared/langy/feature-map.ts";
 import { countResults } from "./langy-cli-result-document.ts";
 
 /** A settled tool call from the turn, as the UI already models it. */
@@ -58,13 +62,10 @@ const UNOFFERABLE_KINDS: ReadonlySet<string> = new Set(["evaluators", "prompts"]
  * kind this result produced, minus the feature that produced it (a trace search does
  * not offer to search traces).
  */
-export function followUpsForResult(
-  result: SettledToolResult,
-  featureMap?: Pick<LangyFeatureMap, "featureForCliToolName" | "featuresConsuming">,
-): FollowUpSuggestion[] {
+export function followUpsForResult(result: SettledToolResult): FollowUpSuggestion[] {
   if (result.state !== "output-available") return [];
 
-  const source = featureMap?.featureForCliToolName(result.name);
+  const source = featureForCliToolName(result.name);
   if (!source || source.produces.length === 0) return [];
   if (countResults(result.output) === 0) return [];
 
@@ -73,7 +74,7 @@ export function followUpsForResult(
 
   for (const kind of source.produces) {
     if (UNOFFERABLE_KINDS.has(kind)) continue;
-    suggestions.push(...kindSuggestions({ kind, source, result, featureMap, seen }));
+    suggestions.push(...kindSuggestions({ kind, source, result, seen }));
   }
   return suggestions;
 }
@@ -82,17 +83,15 @@ function kindSuggestions({
   kind,
   source,
   result,
-  featureMap,
   seen,
 }: {
   kind: string;
   source: FeatureNode;
   result: SettledToolResult;
-  featureMap?: Pick<LangyFeatureMap, "featuresConsuming">;
   seen: Set<string>;
 }): FollowUpSuggestion[] {
   const suggestions: FollowUpSuggestion[] = [];
-  for (const consumer of featureMap?.featuresConsuming(kind) ?? []) {
+  for (const consumer of featuresConsuming(kind)) {
     if (consumer.id === source.id) continue;
 
     const label = SUGGESTION_LABEL[consumer.id];
@@ -120,16 +119,14 @@ function kindSuggestions({
  */
 export function deriveFollowUps({
   results,
-  featureMap,
 }: {
   results: SettledToolResult[];
-  featureMap?: Pick<LangyFeatureMap, "featureForCliToolName" | "featuresConsuming">;
 }): FollowUpSuggestion[] {
   const suggestions: FollowUpSuggestion[] = [];
   const seen = new Set<string>();
 
   for (const result of results) {
-    for (const suggestion of followUpsForResult(result, featureMap)) {
+    for (const suggestion of followUpsForResult(result)) {
       if (seen.has(suggestion.id)) continue;
       seen.add(suggestion.id);
       suggestions.push(suggestion);

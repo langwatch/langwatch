@@ -9,7 +9,6 @@ import {
   type LangyConversationMessagesDto,
   type LangyPanelCall,
   type LangyPanelCaller,
-  type LangyStreamEntry,
   type langyConversationUpdateFrameSchema,
   type langyContinueConversationInputSchema,
   type langyPanelConversationInputSchema,
@@ -22,7 +21,6 @@ import {
   type langyRecordFeedbackInputSchema,
   type langyRenameInputSchema,
   type langyStopTurnPanelInputSchema,
-  type langyTurnStreamInputSchema,
   type langyClaimUiActionInputSchema,
   type langyCompleteUiActionInputSchema,
   type langyWarmWorkerInputSchema,
@@ -42,10 +40,6 @@ import { LangyConversationUpdateStreamService } from "../../conversation/service
 import type { LangyTurnsBoundsService } from "../../turn/services/langy-turns-bounds.service.ts";
 import type { LangyUiActionPageService } from "../../ui-action/services/langy-ui-action-page.service.ts";
 import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
-import {
-  LangyPanelTurnStreamService,
-  type LangyPanelTurnStreamMembers,
-} from "./langy-panel-turn-stream.service.ts";
 
 const logger = createLogger("langwatch:langy:panel");
 
@@ -76,8 +70,6 @@ export type LangyPanelConversationMembers = Readonly<{
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
   rateLimits: LangyRateLimitRepository;
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
-  turnAccess: LangyPanelTurnStreamMembers["turnAccess"];
-  openBuffer: LangyPanelTurnStreamMembers["openBuffer"];
   uiActions: Pick<LangyUiActionPageService, "claim" | "complete">;
 }>;
 
@@ -381,13 +373,6 @@ export class LangyPanelConversationService {
     } finally {
       this.members.presence.cleanupTenantEmitter(input.projectId);
     }
-  }
-
-  /** One turn's live edge; "no such turn" and "not yours" answer the same not-found. */
-  watchTurnStream(
-    input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncGenerator<LangyStreamEntry> {
-    return LangyPanelTurnStreamService.create(this.members).watchTurnStream(input);
   }
 
   private async startTurn(

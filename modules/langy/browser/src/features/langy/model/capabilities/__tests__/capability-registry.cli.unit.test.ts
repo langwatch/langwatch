@@ -5,14 +5,14 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
   withDecidedCard,
-} from "../capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
+import { FEATURES } from "../../../../../model/shared/langy/feature-map.ts";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {

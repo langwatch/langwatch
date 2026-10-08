@@ -5,14 +5,14 @@
 import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { extractPlatformUrl } from "@langwatch/langy-contract";
 
-import { isSerializedDocumentLine } from "../../../../../model/langy-capability-registry.ts";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractResourceName,
   extractToolText,
+  isSerializedDocumentLine,
   summaryLines,
-} from "../../../model/capabilities/capability-registry.ts";
+} from "../../../../../model/langy-capability-registry.ts";
 import { LangyCapabilityCard } from "./langy-capability-card.tsx";
 
 /** Keys a scenario or simulation run reports its state under. */

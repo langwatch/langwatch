@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { resolveCliCapability } from "../../../../model/langy-capability-registry.ts";
 import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
@@ -32,7 +33,6 @@ import {
   toolCallsFrom,
   useLangyDevLog,
 } from "../../behavior/stores/langy-dev-log.ts";
-import { resolveCliCapability } from "../../model/capabilities/capability-registry.ts";
 
 const MotionBox = motion.create(Box);
 

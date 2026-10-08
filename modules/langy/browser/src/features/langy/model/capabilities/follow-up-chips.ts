@@ -1,3 +1,9 @@
+import {
+  buildSurfaceHref,
+  SURFACE_BY_FEATURE,
+  SURFACE_LABEL,
+} from "../../../../model/langy-capability-registry.ts";
+import { followUpsForResult } from "../../../tools/model/langy-cli-follow-ups.ts";
 /**
  * Turning a settled tool call into the follow-up chips to draw beneath its card.
  * @see specs/langy/langy-followup-suggestions.feature
@@ -10,8 +16,6 @@ import type {
   TraceSearchQuery,
   UnstatedWindow,
 } from "../../../transcript/model/langy-trace-explorer-link.ts";
-import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry.ts";
-import { followUpsForResult } from "./cli-follow-ups.ts";
 
 /**
  * At most this many chips under one card. Beyond three the row stops reading as

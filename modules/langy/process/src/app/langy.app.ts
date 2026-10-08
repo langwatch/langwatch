@@ -144,6 +144,7 @@ import { LangyPanelAccessService } from "../features/panel/services/langy-panel-
 import { LangyPanelConversationService } from "../features/panel/services/langy-panel-conversation.service.ts";
 import { LangyPanelEgressService } from "../features/panel/services/langy-panel-egress.service.ts";
 import { LangyPanelLocalService } from "../features/panel/services/langy-panel-local.service.ts";
+import { LangyPanelTurnStreamService } from "../features/panel/services/langy-panel-turn-stream.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../features/session-key/services/langy-session-key-reap.service.ts";
 import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
@@ -212,6 +213,7 @@ type LangyAppDependencies = {
   sockets: LocalControlConnectionService;
   sessionKeyDoor: RestIdentity;
   panelConversations: LangyPanelConversationService;
+  panelTurnStream: LangyPanelTurnStreamService;
   panelLocal: LangyPanelLocalService;
   panelEgress: LangyPanelEgressService;
   /** The pipeline's senders, bound once the process registers it (§9). */
@@ -477,9 +479,13 @@ export class LangyModule implements LangyApiContract {
         turnBounds,
         rateLimits: setup.repositories.rateLimits,
         presence: setup.dependencies.presence,
+        uiActions: LangyUiActionPageService.create({ uiActions: setup.repositories.uiActions }),
+      }),
+      panelTurnStream: LangyPanelTurnStreamService.create({
+        access,
+        langy,
         turnAccess: setup.repositories.turnAccess,
         openBuffer: () => setup.repositories.tokenBuffer.openBlocking(),
-        uiActions: LangyUiActionPageService.create({ uiActions: setup.repositories.uiActions }),
       }),
       panelLocal: LangyPanelLocalService.create({
         access,
@@ -1072,7 +1078,7 @@ export class LangyModule implements LangyApiContract {
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
   ): AsyncIterable<LangyStreamEntry> {
-    return this.dependencies.panelConversations.watchTurnStream(input);
+    return this.dependencies.panelTurnStream.watchTurnStream(input);
   }
 
   getPanelLocalRecord(

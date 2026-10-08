@@ -9,6 +9,7 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { resolveCapability } from "../../../../../../model/langy-capability-registry.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -17,7 +18,6 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
 
 const navigateMock = vi.fn();

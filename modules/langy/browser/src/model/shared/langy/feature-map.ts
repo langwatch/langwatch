@@ -5,9 +5,3 @@ const featureMap = createLangyFeatureMap(rawFeatureMap);
 
 export const { FEATURES, featureForCliCommand, featureForCliToolName, featuresConsuming } =
   featureMap;
-
-export type {
-  FeatureNode,
-  LangyFeatureMap,
-  LangyFeatureMapSource,
-} from "../../langy-feature-map.ts";

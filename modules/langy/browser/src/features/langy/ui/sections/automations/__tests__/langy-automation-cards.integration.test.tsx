@@ -10,6 +10,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolveCapability } from "../../../../../../model/langy-capability-registry.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -19,7 +20,6 @@ import {
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
 import type { useLangySlackConnections } from "../../../../behavior/use-langy-automation-data.ts";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { LangyFailedStepCard } from "../../langy-failed-step-card.tsx";
 import { type LangySend, LangySendProvider } from "../../langy-send-context.tsx";
 import { LangyAutomationCard } from "../langy-automation-card.tsx";

@@ -12,6 +12,7 @@ import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolveCapability } from "../../../../../../model/langy-capability-registry.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -21,7 +22,6 @@ import {
   type LangyRouteReading,
 } from "../../../../../../model/langy-host.ts";
 import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
-import { resolveCapability } from "../../../../model/capabilities/capability-registry.ts";
 import { type LangySend, LangySendProvider } from "../../langy-send-context.tsx";
 import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
 
