@@ -15,7 +15,10 @@ describe("instantEvalJudgeOf", () => {
           evaluatorType: "langevals/llm_boolean",
           settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is it polite?" },
         }),
-      ).toEqual({ evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } });
+      ).toEqual({
+        kind: "instant_eval",
+        judge: { evaluatorType: "langevals/llm_boolean", settings: { prompt: "is it polite?" } },
+      });
     });
   });
 
@@ -27,8 +30,11 @@ describe("instantEvalJudgeOf", () => {
           settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "rate it", min: 1, max: 5 },
         }),
       ).toEqual({
-        evaluatorType: "langevals/llm_score",
-        settings: { prompt: "rate it", min: 1, max: 5 },
+        kind: "instant_eval",
+        judge: {
+          evaluatorType: "langevals/llm_score",
+          settings: { prompt: "rate it", min: 1, max: 5 },
+        },
       });
     });
   });
@@ -46,8 +52,11 @@ describe("instantEvalJudgeOf", () => {
           settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
         }),
       ).toEqual({
-        evaluatorType: "langevals/llm_category",
-        settings: { prompt: defaults.prompt?.default, categories: defaults.categories?.default },
+        kind: "instant_eval",
+        judge: {
+          evaluatorType: "langevals/llm_category",
+          settings: { prompt: defaults.prompt?.default, categories: defaults.categories?.default },
+        },
       });
     });
   });
@@ -59,7 +68,7 @@ describe("instantEvalJudgeOf", () => {
           evaluatorType: "langevals/llm_boolean",
           settings: { model: "openai/gpt-5-mini", prompt: "is it polite?" },
         }),
-      ).toBeNull();
+      ).toEqual({ kind: "runs_as_today" });
     });
   });
 
@@ -70,7 +79,7 @@ describe("instantEvalJudgeOf", () => {
           evaluatorType: "openai/moderation",
           settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
         }),
-      ).toBeNull();
+      ).toEqual({ kind: "runs_as_today" });
     });
   });
 
@@ -78,7 +87,7 @@ describe("instantEvalJudgeOf", () => {
     it("answers nothing", () => {
       expect(
         instantEvalJudgeOf({ evaluatorType: "langevals/llm_boolean", settings: undefined }),
-      ).toBeNull();
+      ).toEqual({ kind: "runs_as_today" });
     });
   });
 });

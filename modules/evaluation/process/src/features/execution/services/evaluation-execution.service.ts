@@ -334,8 +334,15 @@ export class EvaluationExecutionService {
     const droppedCategories = trace?.privacy?.droppedCategories ?? [];
 
     // Before any provider lookup, so a project with no model provider can judge too.
-    const judge = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
-    if (judge) return this.instantEvals.answer({ ...params, judge, data, droppedCategories });
+    const dispatch = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
+    if (dispatch.kind === "instant_eval") {
+      return this.instantEvals.answer({
+        ...params,
+        judge: dispatch.judge,
+        data,
+        droppedCategories,
+      });
+    }
 
     // Native (in-process) evaluators skip the analysis service; both they and
     // the remote ones run through the shared augmenter so redaction or drop at

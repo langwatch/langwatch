@@ -31,11 +31,12 @@ function traceOf(projectId: string): Trace {
   return {
     trace_id: "trace-evaluation-test",
     project_id: projectId,
+    metadata: {},
     input: { value: "where is my order?" },
     output: { value: "it ships tomorrow" },
-    timestamps: { started_at: 0, inserted_at: 0 },
+    timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
     spans: [],
-  } as unknown as Trace;
+  };
 }
 
 /** The monitor's command handler, the judge calls it made, and the cost rows it wrote. */

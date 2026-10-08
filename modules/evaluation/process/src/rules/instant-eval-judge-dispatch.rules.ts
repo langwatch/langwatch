@@ -12,15 +12,15 @@ import type {
   InstantEvalJudgeInputs,
 } from "./instant-eval-judge-question.rules.ts";
 
-/** The judge Instant Evals answers for these settings, or null when the evaluator runs as today. */
+/** The judge Instant Evals answers for these settings, or `runs_as_today` for any other. */
 export function instantEvalJudgeOf({
   evaluatorType,
   settings,
 }: {
   evaluatorType: string;
   settings: Record<string, unknown> | undefined;
-}): InstantEvalJudge | null {
-  if (settings?.model !== INSTANT_EVAL_JUDGE_MODEL_ID) return null;
+}): { kind: "instant_eval"; judge: InstantEvalJudge } | { kind: "runs_as_today" } {
+  if (settings?.model !== INSTANT_EVAL_JUDGE_MODEL_ID) return { kind: "runs_as_today" };
 
   const prompt = textOr({
     value: settings.prompt,
@@ -28,29 +28,27 @@ export function instantEvalJudgeOf({
   });
   switch (evaluatorType) {
     case "langevals/llm_boolean":
-      return { evaluatorType, settings: { prompt } };
+      return { kind: "instant_eval", judge: { evaluatorType, settings: { prompt } } };
     case "langevals/llm_score":
       return {
-        evaluatorType,
-        settings: {
-          prompt,
-          ...(typeof settings.min === "number" ? { min: settings.min } : {}),
-          ...(typeof settings.max === "number" ? { max: settings.max } : {}),
+        kind: "instant_eval",
+        judge: {
+          evaluatorType,
+          settings: {
+            prompt,
+            ...(typeof settings.min === "number" ? { min: settings.min } : {}),
+            ...(typeof settings.max === "number" ? { max: settings.max } : {}),
+          },
         },
       };
-    case "langevals/llm_category":
-      return {
-        evaluatorType,
-        settings: {
-          prompt,
-          categories:
-            categoriesOf(settings.categories) ??
-            categoriesOf(defaultOf({ evaluatorType, key: "categories" })) ??
-            [],
-        },
-      };
+    case "langevals/llm_category": {
+      const saved = findCategories(settings.categories);
+      const categories =
+        saved.length > 0 ? saved : findCategories(defaultOf({ evaluatorType, key: "categories" }));
+      return { kind: "instant_eval", judge: { evaluatorType, settings: { prompt, categories } } };
+    }
     default:
-      return null;
+      return { kind: "runs_as_today" };
   }
 }
 
@@ -63,12 +61,10 @@ function defaultOf({ evaluatorType, key }: { evaluatorType: string; key: string 
 
 /** The judge's mapped fields as text: structured values as JSON, each context as its text. */
 export function instantEvalJudgeInputsOf(data: Record<string, unknown>): InstantEvalJudgeInputs {
-  const input = textOf(data.input);
-  const output = textOf(data.output);
   const contexts = contextsOf(data.contexts);
   return {
-    ...(input === undefined ? {} : { input }),
-    ...(output === undefined ? {} : { output }),
+    ...(data.input === undefined || data.input === null ? {} : { input: textOf(data.input) }),
+    ...(data.output === undefined || data.output === null ? {} : { output: textOf(data.output) }),
     ...(contexts.length === 0 ? {} : { contexts }),
   };
 }
@@ -78,19 +74,18 @@ function textOr({ value, fallback }: { value: unknown; fallback: unknown }): str
   return typeof fallback === "string" ? fallback : "";
 }
 
-function categoriesOf(value: unknown): { name: string; description: string }[] | undefined {
-  if (!Array.isArray(value) || value.length === 0) return undefined;
-  const categories = value.flatMap((category: unknown) => {
+function findCategories(value: unknown): { name: string; description: string }[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((category: unknown) => {
     if (!category || typeof category !== "object") return [];
     const { name, description } = category as { name?: unknown; description?: unknown };
     if (typeof name !== "string") return [];
     return [{ name, description: typeof description === "string" ? description : "" }];
   });
-  return categories.length > 0 ? categories : undefined;
 }
 
-function textOf(value: unknown): string | undefined {
-  if (value === undefined || value === null) return undefined;
+/** A present mapped value as text; the caller leaves absent ones out. */
+function textOf(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 

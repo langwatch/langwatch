@@ -76,7 +76,7 @@ export class EvaluationInstantEvalJudgeService {
     signal?: AbortSignal | undefined;
   }): Promise<SingleEvaluationResult> {
     const guardrailSkip = instantEvalGuardrailSkipOf({ direction: guardrailDirection });
-    if (guardrailSkip) return guardrailSkip;
+    if (guardrailSkip.kind === "skipped") return guardrailSkip.result;
 
     const inputs = instantEvalJudgeInputsOf(mappedData);
     const request = buildInstantEvalJudgeRequest({ judge, inputs });

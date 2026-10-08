@@ -40,11 +40,12 @@ function buildTrace(): Trace {
   return {
     trace_id: "trace-1",
     project_id: PROJECT_ID,
+    metadata: {},
     input: { value: "hello" },
     output: { value: "hi, how can I help?" },
-    timestamps: { started_at: Date.now(), inserted_at: Date.now() },
+    timestamps: { started_at: Date.now(), inserted_at: Date.now(), updated_at: Date.now() },
     spans: [],
-  } as unknown as Trace;
+  };
 }
 
 function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {

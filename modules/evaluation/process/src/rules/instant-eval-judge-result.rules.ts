@@ -95,7 +95,9 @@ export function instantEvalJudgeResult({
   }
 }
 
-/** The one place a reason Instant Evals did not judge is worded: skipped, or an error that alerts. */
+/**
+ * The one place a reason Instant Evals did not judge is worded: skipped, or an error that alerts.
+ */
 export function instantEvalSkipResultOf(
   reason: InstantEvalJudgeSkipReason,
 ): SingleEvaluationResult {

@@ -12,13 +12,13 @@ import { instantEvalSkipResultOf } from "./instant-eval-judge-result.rules.ts";
 
 const SKIPPED_GUARDRAIL_DIRECTION: GuardrailCheckDirection = "stream_chunk";
 
-/** The skipped result for a check Instant Evals never judges, or null when the judge runs. */
+/** The skipped result for a check Instant Evals never judges, or `judged` when the judge runs. */
 export function instantEvalGuardrailSkipOf({
   direction,
 }: {
   direction: GuardrailCheckDirection | undefined;
-}): SingleEvaluationResult | null {
-  if (direction !== SKIPPED_GUARDRAIL_DIRECTION) return null;
+}): { kind: "skipped"; result: SingleEvaluationResult } | { kind: "judged" } {
+  if (direction !== SKIPPED_GUARDRAIL_DIRECTION) return { kind: "judged" };
 
-  return instantEvalSkipResultOf("guardrail_stream_chunk");
+  return { kind: "skipped", result: instantEvalSkipResultOf("guardrail_stream_chunk") };
 }

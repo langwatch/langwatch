@@ -8,21 +8,24 @@ describe("instantEvalGuardrailSkipOf", () => {
       const result = instantEvalGuardrailSkipOf({ direction: "stream_chunk" });
 
       expect(result).toEqual({
-        status: "skipped",
-        details: expect.stringContaining("stream_chunk"),
+        kind: "skipped",
+        result: {
+          status: "skipped",
+          details: expect.stringContaining("stream_chunk"),
+        },
       });
     });
   });
 
   describe.each(["request", "response"] as const)("given a %s guardrail check", (direction) => {
     it("answers nothing, so the judge runs", () => {
-      expect(instantEvalGuardrailSkipOf({ direction })).toBeNull();
+      expect(instantEvalGuardrailSkipOf({ direction })).toEqual({ kind: "judged" });
     });
   });
 
   describe("given a judge that is not a guardrail check", () => {
     it("answers nothing, so the judge runs", () => {
-      expect(instantEvalGuardrailSkipOf({ direction: undefined })).toBeNull();
+      expect(instantEvalGuardrailSkipOf({ direction: undefined })).toEqual({ kind: "judged" });
     });
   });
 });
