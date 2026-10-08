@@ -185,6 +185,7 @@ class ApiSurface {
         ? { authorizeDocument: selected.bundle.authorizeDocument }
         : {}),
     });
+    this.#rest?.assertEveryRouteDeclared();
     const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
     const mux = HttpMux.create({ reporter: composition.logger })
       .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))

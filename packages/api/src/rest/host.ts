@@ -14,6 +14,7 @@ import type {
   MountableTransport,
 } from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
+import { allRegisteredRoutes } from "../route-registry.ts";
 import {
   claimsNoPrefix,
   middlewareScopesOf,
@@ -42,6 +43,7 @@ const restDeprecationLog: RestDeprecationLog = {
   deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
 };
 import type { RestAuditSink, RestIdentity } from "../hosting/api-door.ts";
+import { assertEveryRouteDeclared } from "./security.ts";
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
@@ -156,6 +158,15 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     this.app.route("/", family);
 
     return family;
+  }
+
+  /**
+   * Refuses to serve while this application answers a route no declaration registered,
+   * naming each one. Reads only the REST application: tRPC, websocket and raw HTTP
+   * never mount here.
+   */
+  assertEveryRouteDeclared(): void {
+    assertEveryRouteDeclared({ app: this.app, registry: allRegisteredRoutes() });
   }
 
   /**

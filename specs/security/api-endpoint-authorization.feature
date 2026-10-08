@@ -51,6 +51,13 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then each one is registered through SecuredApp with a declared policy
       And any route that bypassed the builder fails this assertion
 
+    @integration
+    Scenario: Every installed route declares a permission or a named exception
+      Given the route registry of the booted API process
+      When every installed route's policy is read
+      Then each names at least one permission or carries a written reason for answering without one
+      And the sweep names the method and path of every route that does neither
+
     @unit
     Scenario: A mounted route with no declared policy stops the boot
       Given the composed REST router of the API process
@@ -60,6 +67,15 @@ Feature: Hono API endpoint authorization and tenant isolation
       # The CI cross-check only sees the composition the description task can
       # build. This is the same check on the router the process actually
       # serves, so a path CI never composed cannot answer unguarded.
+
+    @unit
+    Scenario: The REST host refuses to serve a route nothing declared
+      Given a REST host with its declared families mounted
+      When a route is added to its application outside any declaration
+      Then the host refuses to start serving
+      And the refusal names the method and path of that route
+      # The check reads only the REST host's application: tRPC, websocket
+      # and raw HTTP mount on their own, so it never refuses their routes.
 
     @unit
     Scenario: A tRPC procedure with no access declaration fails the sweep
