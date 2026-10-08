@@ -67,6 +67,9 @@ Feature: Continuous profiling — where the CPU actually went
 
   Rule: The local stack serves profiles without extra setup
 
+    On the native macOS tier there is no Pyroscope, so the haven viewer's
+    profiles tab reads nothing there; the container tier serves profiles.
+
     The shared LGTM stack already runs Pyroscope and already provisions a
     Pyroscope datasource. A developer should get flame graphs from the same
     "make haven up" that gives them traces, without learning a new address.

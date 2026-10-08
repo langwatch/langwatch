@@ -3,6 +3,10 @@ Feature: Local observability stack for debugging
   I want the app's and services' logs, traces, and metrics in one queryable place
   So that I can correlate what happened without hunting across scattered stdout
 
+  On macOS the stack runs natively by default (Grafana, Prometheus, Loki, Tempo,
+  Alloy); elsewhere, or as a fallback, it runs as the otel-lgtm container on
+  colima. Pyroscope runs only on the container tier.
+
   Background:
     Given the local observability stack is running
     And local dev is pointed at the collector
