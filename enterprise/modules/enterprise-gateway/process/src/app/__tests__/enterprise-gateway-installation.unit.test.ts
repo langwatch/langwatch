@@ -38,7 +38,7 @@ describe("enterprise gateway installation", () => {
   /** @scenario "The enterprise gateway serves routing policies and personal virtual keys" */
   it("serves routingPolicy and personalVirtualKeys", () => {
     expect(
-      enterpriseGatewayProcessModule.transports.map((transport) => transport.namespace),
+      (enterpriseGatewayProcessModule.transports ?? []).map((transport) => transport.namespace),
     ).toEqual(["routingPolicy", "personalVirtualKeys"]);
   });
 

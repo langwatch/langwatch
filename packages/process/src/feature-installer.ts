@@ -402,7 +402,7 @@ export interface PublishedProcessModule<
   Members = object,
 > extends InstallableServerFeature<Members, Name, Config> {
   readonly members: readonly string[];
-  readonly transports: readonly FeatureTransportDescriptor[];
+  readonly transports?: readonly FeatureTransportDescriptor[];
   readonly types: Readonly<{
     config: Config;
     provided: Api;

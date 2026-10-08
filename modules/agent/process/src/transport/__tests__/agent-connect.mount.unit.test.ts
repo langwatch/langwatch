@@ -86,7 +86,7 @@ describe("the connected agents' socket", () => {
   it("is declared among the agent module's transports at main's path", () => {
     expect(CONNECT_PATH).toBe("/api/v1/agents/connect");
     expect(
-      agentProcessModule.transports.some((transport) => transport.protocol === "websocket"),
+      agentProcessModule.transports?.some((transport) => transport.protocol === "websocket"),
     ).toBe(true);
   });
 
