@@ -25,7 +25,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { showErrorToast } from "~/features/errors";
+import { reloadingWriteOptions } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
@@ -251,13 +251,8 @@ function useSavedViewsInternal() {
   const reloadViews = useCallback(() => {
     void utils.savedViews.getAll.invalidate({ projectId });
   }, [utils.savedViews.getAll, projectId]);
-  const writeOptions = (fallbackTitle: string) => ({
-    onSuccess: reloadViews,
-    onError: (error: unknown) => {
-      showErrorToast({ error, fallbackTitle });
-      reloadViews();
-    },
-  });
+  const writeOptions = (fallbackTitle: string) =>
+    reloadingWriteOptions({ fallbackTitle, reload: reloadViews });
   const createMutation = api.savedViews.create.useMutation(
     writeOptions("Couldn't save the view"),
   );

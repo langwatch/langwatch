@@ -24,7 +24,9 @@ vi.mock("~/utils/trpcError", () => ({
     isHandledByGlobalHandler(error as never),
 }));
 
-const { showErrorToast } = await import("../showErrorToast");
+const { reloadingWriteOptions, showErrorToast } = await import(
+  "../showErrorToast"
+);
 
 const handledError = (
   error: Record<string, unknown> | null,
@@ -283,6 +285,32 @@ describe("showErrorToast", () => {
         duration?: number;
       };
       expect(toast.duration).toBe(12000);
+    });
+  });
+});
+
+describe("reloadingWriteOptions", () => {
+  describe("when the write succeeds", () => {
+    it("reloads and shows no toast", () => {
+      const reload = vi.fn();
+
+      reloadingWriteOptions({ fallbackTitle: "Couldn't save", reload }).onSuccess();
+
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the server refuses the write", () => {
+    it("toasts under the fallback title and reloads", () => {
+      const reload = vi.fn();
+
+      reloadingWriteOptions({ fallbackTitle: "Couldn't save", reload }).onError(
+        handledError(null),
+      );
+
+      expect(create.mock.calls[0]![0].title).toBe("Couldn't save");
+      expect(reload).toHaveBeenCalledTimes(1);
     });
   });
 });

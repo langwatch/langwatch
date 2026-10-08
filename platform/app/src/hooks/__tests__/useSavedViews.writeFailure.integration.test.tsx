@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type MutationName = "create" | "rename" | "delete" | "reorder";
 
-const { mutationFor, invalidate, setData, showErrorToast, refusal } =
+const { mutationFor, invalidate, setData, toast, refusal } =
   vi.hoisted(() => {
     const refusal = new Error("aggregate_project_is_read_only");
     const options: Partial<
@@ -35,7 +35,7 @@ const { mutationFor, invalidate, setData, showErrorToast, refusal } =
       mutationFor,
       invalidate: vi.fn(),
       setData: vi.fn(),
-      showErrorToast: vi.fn(),
+      toast: vi.fn<(args: { title?: string; type?: string }) => void>(),
       refusal,
     };
   });
@@ -57,7 +57,9 @@ vi.mock("../useFilterParams", () => ({
   useFilterParams: () => ({ filters: {} }),
 }));
 
-vi.mock("~/features/errors", () => ({ showErrorToast }));
+// The toast goes through the real `showErrorToast`, so the title asserted is
+// the one the user reads: a refusal with no code falls back to the change's own.
+vi.mock("~/components/ui/toaster", () => ({ toaster: { create: toast } }));
 
 vi.mock("../../utils/api", () => ({
   api: {
@@ -149,10 +151,12 @@ describe("useSavedViews()", () => {
         act(() => change.act(result.current));
 
         expect(setData).toHaveBeenCalled();
-        expect(showErrorToast).toHaveBeenCalledWith({
-          error: refusal,
-          fallbackTitle: change.fallbackTitle,
-        });
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: change.fallbackTitle,
+            type: "error",
+          }),
+        );
         expect(invalidate).toHaveBeenCalledWith({ projectId: "test-project" });
       });
     });

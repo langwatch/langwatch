@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { showErrorToast } from "~/features/errors";
+import { reloadingWriteOptions } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../stores/explorerStore";
@@ -78,23 +78,18 @@ function useLensWriteMutations(projectId: string | undefined) {
       void utils.savedViews.getAll.invalidate({ projectId, kind: KIND });
     }
   };
-  const lensWriteOptions = (fallbackTitle: string) => ({
-    onSuccess: reloadLenses,
-    onError: (error: unknown) => {
-      showErrorToast({ error, fallbackTitle });
-      reloadLenses();
-    },
-  });
+  const lensWriteOptions = (fallbackTitle: string) =>
+    reloadingWriteOptions({ fallbackTitle, reload: reloadLenses });
+  const createOptions = lensWriteOptions("Couldn't save the lens");
 
   const createMutation = api.savedViews.create.useMutation({
-    onSuccess: reloadLenses,
+    onSuccess: createOptions.onSuccess,
     onError: (error, { id: lensId }) => {
       const fallbackLensId = lensId && fallbackLensIdsRef.current.get(lensId);
       if (lensId && fallbackLensId) {
         discardRefusedLens({ lensId, fallbackLensId });
       }
-      showErrorToast({ error, fallbackTitle: "Couldn't save the lens" });
-      reloadLenses();
+      createOptions.onError(error);
     },
     onSettled: (_data, _error, { id: lensId }) => {
       if (lensId) fallbackLensIdsRef.current.delete(lensId);
