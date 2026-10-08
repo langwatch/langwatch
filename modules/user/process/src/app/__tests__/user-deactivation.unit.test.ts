@@ -21,10 +21,11 @@ const SELF = { id: "user_1", email: "person@example.test" };
 const SYSTEM = { type: "system", id: null } as const;
 
 async function account(app: ReturnType<typeof createUserTestApp>) {
-  return app.createCredentialUser({
+  return app.registerCredentialAccount({
     name: "Person",
     email: SELF.email,
-    passwordHash: "hashed:first",
+    password: "first",
+    addressConfirmed: false,
   });
 }
 
@@ -60,15 +61,17 @@ describe("user.deactivate", () => {
         dependencies: { authz: createUserTestAuthorization(operators) },
       });
       const customer = await account(app);
-      const op = await app.createCredentialUser({
+      const op = await app.registerCredentialAccount({
         name: "Op",
         email: "op@example.test",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
-      const gone = await app.createCredentialUser({
+      const gone = await app.registerCredentialAccount({
         name: "C",
         email: "c@example.test",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
       operators.add(op.id);
       await app.deactivate({ id: gone.id, actor: SYSTEM });
@@ -112,10 +115,11 @@ describe("user.deactivate", () => {
         dependencies: { authz: createUserTestAuthorization(operators) },
       });
       const operator = await account(app);
-      const other = await app.createCredentialUser({
+      const other = await app.registerCredentialAccount({
         name: "Other",
         email: "other@example.test",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
       operators.add(operator.id).add(other.id);
 
@@ -135,10 +139,11 @@ describe("user.deactivate", () => {
         dependencies: { authz: createUserTestAuthorization(operators) },
       });
       const first = await account(app);
-      const second = await app.createCredentialUser({
+      const second = await app.registerCredentialAccount({
         name: "Second",
         email: "second@example.test",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
       operators.add(first.id).add(second.id);
 
@@ -182,10 +187,11 @@ describe("user.deactivate", () => {
         dependencies: { authz: createUserTestAuthorization(operators) },
       });
       const customer = await account(app);
-      const op = await app.createCredentialUser({
+      const op = await app.registerCredentialAccount({
         name: "Op",
         email: "op@example.test",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
       operators.add(op.id);
       recorded.length = 0;

@@ -163,23 +163,11 @@ describe("UserService", () => {
     });
   });
 
-  it("creates credential and passkey accounts under the deployment's issuer", async () => {
+  it("creates passkey accounts under the deployment's issuer", async () => {
     const { service, repository } = createService();
 
-    await service.createCredentialUser({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
-    });
     await service.createPasskeyUser({ email: "passkey@example.com" });
 
-    expect(repository.createCredentialUser).toHaveBeenCalledWith({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
-      issuer: ISSUER,
-      emailVerified: false,
-    });
     expect(repository.createPasskeyUser).toHaveBeenCalledWith({
       email: "passkey@example.com",
       issuer: ISSUER,

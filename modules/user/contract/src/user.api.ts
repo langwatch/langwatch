@@ -14,7 +14,6 @@ import type {
 } from "./user.schemas.ts";
 import type {
   AdoptUnconfirmedAccountOutcome,
-  CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
   CreatedUser,
@@ -41,7 +40,6 @@ import type {
   UserLifecycleChangeInput,
   UserFullProfile,
   UserProfilesInput,
-  UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
   UserProfile,
   UserSsoStatus,
@@ -92,7 +90,6 @@ export interface UserApi {
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
   /** Mints an account whose only sign-in method is the passkey about to be registered. */
   createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   /**
@@ -104,7 +101,6 @@ export interface UserApi {
   registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
-  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
   /** Whether to offer this person a passkey or two-step verification now, on this session. */
   getPasskeyOffer(
     input: UserIdInput & { sessionId: string | null },

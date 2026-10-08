@@ -9,7 +9,6 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
-import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
 
 import { userProcessModule } from "../../user.module.ts";
@@ -71,10 +70,11 @@ describe("user app installation", () => {
       const app = runtime.service(UserApi);
       expect(runtime.module(userProcessModule).provided).toBe(app);
 
-      const created = await app.createCredentialUser({
+      const created = await app.registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(app.findById({ id: created.id })).resolves.toMatchObject({
@@ -91,13 +91,13 @@ describe("user app installation", () => {
 
     try {
       const app = runtime.service(UserApi);
-      // The real bcrypt hasher this app builds from its own reads, not a
-      // fake one: a rotation must verify against the SAME stored format the
-      // credential row was minted with.
-      const created = await app.createCredentialUser({
+      // The app mints the row with its own bcrypt hasher, so a rotation must
+      // verify against the same stored format.
+      const created = await app.registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: await hash("first", 10),
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(
@@ -124,10 +124,11 @@ describe("user app installation", () => {
     const second = await process("api").boot();
 
     try {
-      const created = await first.service(UserApi).createCredentialUser({
+      const created = await first.service(UserApi).registerCredentialAccount({
         name: "Ada",
         email: "ada@example.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
 
       await expect(second.service(UserApi).findById({ id: created.id })).resolves.toBeNull();

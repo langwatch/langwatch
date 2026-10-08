@@ -41,14 +41,15 @@ describe("user's created fact", () => {
       const { app, database } = appOverStore();
 
       const directory = await app.create({ name: "Dir", email: "dir@example.com" });
-      const credential = await app.createCredentialUser({
+      const credential = await app.registerCredentialAccount({
         name: "Cred",
         email: "cred@example.com",
-        passwordHash: "hashed:first",
+        password: "first",
+        addressConfirmed: false,
       });
       const passkey = await app.createPasskeyUser({ email: "key@example.com" });
 
-      expect(database.factOutbox()).toEqual(
+      expect(database.factOutbox().filter(({ type }) => type === "recordCreated")).toEqual(
         [directory.id, credential.id, passkey.id].map((userId) => ({
           type: "recordCreated",
           data: { tenantId: userId, userId, occurredAt: expect.any(Number) },

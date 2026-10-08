@@ -80,9 +80,6 @@ export class TestUserApi implements UserApi {
   create: UserApi["create"] = (input) =>
     this.overrides.create?.(input) ?? this.unimplemented("create");
 
-  createCredentialUser: UserApi["createCredentialUser"] = (input) =>
-    this.overrides.createCredentialUser?.(input) ?? this.unimplemented("createCredentialUser");
-
   createPasskeyUser: UserApi["createPasskeyUser"] = (input) =>
     this.overrides.createPasskeyUser?.(input) ?? this.unimplemented("createPasskeyUser");
 
@@ -95,9 +92,6 @@ export class TestUserApi implements UserApi {
 
   setFirstPassword: UserApi["setFirstPassword"] = (input) =>
     this.overrides.setFirstPassword?.(input) ?? this.unimplemented("setFirstPassword");
-
-  getPasskeyNudgeStatus: UserApi["getPasskeyNudgeStatus"] = (input) =>
-    this.overrides.getPasskeyNudgeStatus?.(input) ?? this.unimplemented("getPasskeyNudgeStatus");
 
   getPasskeyOffer: UserApi["getPasskeyOffer"] = (input) =>
     this.overrides.getPasskeyOffer?.(input) ?? this.unimplemented("getPasskeyOffer");

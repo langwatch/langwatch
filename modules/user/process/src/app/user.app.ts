@@ -16,7 +16,6 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
-  CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
   CreatedUser,
@@ -42,7 +41,6 @@ import type {
   UserIdInput,
   UserLifecycleChangeInput,
   UserLinkedAccount,
-  UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
   UserPasswordRotationOutcome,
   UserProfile,
@@ -386,12 +384,6 @@ export class UserModule implements UserApi {
 
   // -- credentials -----------------------------------------------------------
 
-  /** Mints an account that signs in with a password. */
-  async createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
-    const { id } = await this.#users.createCredentialUser(input);
-    return { id };
-  }
-
   /** Confirms an unfinished account and drops its pre-proof sign-in methods, as one step. */
   adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome> {
     return this.#users.adoptUnconfirmedAccount(input);
@@ -435,11 +427,6 @@ export class UserModule implements UserApi {
   /** Sets a first password on an account that has none. */
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
     return this.#users.setFirstPassword(input);
-  }
-
-  /** Whether this deployment still owes the user a passkey offer, and when. */
-  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
-    return this.#users.getPasskeyNudgeStatus(input);
   }
 
   /**

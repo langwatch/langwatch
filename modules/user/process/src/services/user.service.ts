@@ -193,14 +193,6 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
-  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
-    return this.repository.createCredentialUser({
-      ...createCredentialUserInputSchema.parse(input),
-      issuer: this.credentialIssuer,
-      emailVerified: false,
-    });
-  }
-
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a
    * spent mailbox proof confirmed the address.
