@@ -6,7 +6,7 @@ The server half of [annotation](../README.md). Annotations on traces: comments, 
 
 ## Installation
 
-`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withTasks(…)`, `src/annotation.module.ts:15`.
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withTasks(…).withMigrations(…)`, `src/annotation.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -349,6 +349,18 @@ Contract `../contract/src/annotation.trpc.ts:53`, router `src/transport/annotati
 None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
+
+### Pipeline `annotation_lifecycle` (aggregate `annotation`)
+
+Declared at `src/eventing/annotation-lifecycle.pipeline.ts:26`. Events: `annotationCreatedEventSchema`, `annotationUpdatedEventSchema`, `annotationDeletedEventSchema`, `annotationScoreDefinedEventSchema`, `annotationScoreRenamedEventSchema`.
+
+| Kind    | Name                      | Handles | Declared at                                        |
+| ------- | ------------------------- | ------- | -------------------------------------------------- |
+| command | `recordAnnotationCreated` | –       | `src/eventing/annotation-lifecycle.pipeline.ts:37` |
+| command | `recordAnnotationUpdated` | –       | `src/eventing/annotation-lifecycle.pipeline.ts:38` |
+| command | `recordAnnotationDeleted` | –       | `src/eventing/annotation-lifecycle.pipeline.ts:39` |
+| command | `recordScoreDefined`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:40` |
+| command | `recordScoreRenamed`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:41` |
 
 ### Tasks
 

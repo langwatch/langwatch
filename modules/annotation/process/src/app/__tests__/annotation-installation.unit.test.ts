@@ -3,6 +3,8 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
+import { EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
@@ -27,6 +29,14 @@ function process() {
   return createApp({ role: "api" })
     .withModules([annotationProcessModule])
     .withStores(memoryStores())
+    .withEventing(
+      new EventSourcing({
+        eventStore: EventStoreMemory.createForTesting(),
+        executionTarget: "api",
+        consumersEnabled: false,
+        processManagerMode: "producer-only",
+      }),
+    )
     .provide({
       project: createAnnotationTestProjects(),
       organization: createAnnotationTestOrganizations(),
