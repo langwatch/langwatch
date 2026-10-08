@@ -47,3 +47,27 @@ Feature: Analytics panel error state
     When the documents section renders
     Then the total documents tab header shows the compact indicator
     And the documents table shows the compact panel message with a Retry
+
+  @integration @regression
+  Scenario: A failed documents section stays visible and does not refetch on its own
+    Given the top used documents query always fails with "This search was too large"
+    When the documents section renders and a few seconds pass
+    Then the section and its error state with a Retry stay on screen
+    And the query is not fetched again on its own
+    When the user clicks Retry
+    Then exactly one more request is sent
+    And the section and its Retry stay on screen while it runs
+
+  @unit @regression
+  Scenario: A panel read that runs out of ClickHouse memory fails with the handled memory error
+    Given ClickHouse refuses an analytics panel read with code 241
+    When the analytics repository reads that panel
+    Then it fails with "query_memory_exceeded", status 422 and a customer fault
+    And the raw ClickHouse error is kept as its reason
+
+  @integration
+  Scenario: A failed topics panel shows the error state with a Retry
+    Given the topic counts query has failed
+    When the Top Topics panel renders
+    Then it shows the compact panel message in place of the loading bars
+    And its Retry fetches the topic counts again

@@ -15,16 +15,17 @@ export const DocumentsCountsTable = ({ params }: { params?: TopUsedDocumentsPara
   const documents = useTopUsedDocuments(params);
   const retryFailedAnalytics = useRetryFailedAnalytics();
 
-  if (documents.isLoading) return <Box>Loading...</Box>;
-  if (documents.error && !documents.data) {
+  if (documents.failure && !documents.data) {
     return (
       <ChartErrorState
-        error={documents.error}
+        error={documents.failure}
         onRetry={retryFailedAnalytics}
+        isRetrying={documents.isRetrying}
         fallbackTitle={DOCUMENTS_FALLBACK_TITLE}
       />
     );
   }
+  if (documents.isLoading) return <Box>Loading...</Box>;
 
   return (
     <VStack align="start" gap={4}>
@@ -76,8 +77,10 @@ export const DocumentsCountsTable = ({ params }: { params?: TopUsedDocumentsPara
 export const DocumentsCountsSummary = ({ params }: { params?: TopUsedDocumentsParams } = {}) => {
   const documents = useTopUsedDocuments(params);
 
-  if (documents.error && !documents.data) {
-    return <ChartErrorIndicator error={documents.error} fallbackTitle={DOCUMENTS_FALLBACK_TITLE} />;
+  if (documents.failure && !documents.data) {
+    return (
+      <ChartErrorIndicator error={documents.failure} fallbackTitle={DOCUMENTS_FALLBACK_TITLE} />
+    );
   }
 
   const count = documents.data?.totalUniqueDocuments;
