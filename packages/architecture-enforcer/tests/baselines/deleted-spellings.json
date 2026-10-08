@@ -3,8 +3,7 @@
   "findings": {
     "`*-composition.build.ts` files": 1,
     "`reads(...)` statics and `static readonly reads`": 22,
-    "`refusing*` twins": 9,
-    "absence classes (`Logged*Absence`, `Absent*`)": 3,
+    "absence classes (`Logged*Absence`, `Absent*`)": 1,
     "browser-host's `*-drawers.ts` props files": 1,
     "createProcess": 2,
     "declared(\"<name>\")": 19,
@@ -20,7 +19,6 @@
     "per-module `use-feature-flag.ts` copies": 2,
     "ProcessMembers": 59,
     "public-app-config.projection.ts": 1,
-    "RestErrorHandler": 4,
     "setup.members": 6,
     "storesBackedMembers": 8,
     "SupplyToken": 19,

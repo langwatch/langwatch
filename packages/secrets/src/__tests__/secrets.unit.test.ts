@@ -10,7 +10,7 @@ import { secretLogRedactPaths } from "../redact.ts";
 import { SecretsResolver } from "../resolver.ts";
 import { Secret } from "../secret.ts";
 import {
-  AbsentSecretError,
+  SecretNotSetError,
   SealedSecretsError,
   SecretClaimedTwiceError,
   SecretsPreflightError,
@@ -64,7 +64,7 @@ describe("the scoped resolver", () => {
 
   it("refuses a required absence by its one id, passes an optional one as undefined", async () => {
     const scoped = SecretsResolver.over(chain).scopeTo("x", [missing, maybe]);
-    await expect(scoped.into(missing, (v) => v)).rejects.toThrowError(AbsentSecretError);
+    await expect(scoped.into(missing, (v) => v)).rejects.toThrowError(SecretNotSetError);
     await expect(scoped.into(maybe, (v) => v)).resolves.toBeUndefined();
   });
 

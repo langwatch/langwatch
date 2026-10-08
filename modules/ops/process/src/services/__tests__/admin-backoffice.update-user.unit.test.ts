@@ -153,7 +153,7 @@ describe("AdminBackofficeService user create", () => {
   );
 });
 
-class RefusingAudit extends AdminAuditSink {
+class FailingAudit extends AdminAuditSink {
   async record(): Promise<void> {
     throw new Error("audit log unavailable");
   }
@@ -194,7 +194,7 @@ describe("AdminBackofficeService audit before write", () => {
           deactivate: record("users.deactivate"),
           updateProfile: record("users.updateProfile"),
         }),
-        audit: new RefusingAudit(),
+        audit: new FailingAudit(),
       });
 
       await expect(

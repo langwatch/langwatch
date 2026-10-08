@@ -331,7 +331,7 @@ describe("the application chrome", () => {
   });
 
   describe("when the graph refuses the read", () => {
-    class RefusingRpc extends GraphRpc {
+    class FailingRpc extends GraphRpc {
       override query(): Promise<unknown> {
         return Promise.reject(new Error("refused"));
       }
@@ -339,7 +339,7 @@ describe("the application chrome", () => {
 
     /** @scenario A graph that refused the read is not a graph still reading */
     it("draws the refusal rather than a chrome still reading", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() });
+      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.queryByTestId("probe")).toBeNull();
@@ -347,7 +347,7 @@ describe("the application chrome", () => {
 
     /** @scenario The landing address says a refused read failed rather than waiting on it */
     it("says the workspace could not be opened on the landing address", async () => {
-      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() }, { path: "/", pattern: "/" });
+      renderChrome({ ...CAPABILITIES, rpc: new FailingRpc() }, { path: "/", pattern: "/" });
 
       await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
       expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
@@ -389,7 +389,7 @@ describe("the application chrome", () => {
 
   describe("when the workspace read is refused", () => {
     it("says the workspace could not be opened and offers to try again", async () => {
-      class RefusingRpc extends GraphRpc {
+      class FailingRpc extends GraphRpc {
         override query(): Promise<unknown> {
           return Promise.reject(new Error("the workspace graph refused"));
         }
@@ -404,7 +404,7 @@ describe("the application chrome", () => {
           <QueryClientProvider
             client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
           >
-            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new RefusingRpc() }}>
+            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new FailingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
                   <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>

@@ -163,7 +163,6 @@ export {
   recordScimCredential,
   resolvePersonalCaller,
   type RestBrowserCaller,
-  type RestErrorHandler,
   type RestResolvedScimCredential,
   scimCredentialOfRequest,
 } from "./credential.ts";
