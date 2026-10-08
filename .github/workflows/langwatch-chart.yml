@@ -491,14 +491,13 @@ jobs:
       - run: ${{ matrix.script }}
         env:
           KEEP_CLUSTER: "true"
-          E2E_SKIP_APP_BUILD: ${{ matrix.skip_app_build }}
           CLUSTER_NAME: ${{ matrix.cluster }}
       - name: Show pod status on failure
         if: failure()
         run: |
-          # Every leg's suites run in namespace lw-test; the external leg's
-          # secret-guard suite also uses lwql-secret-guard. Dump each that exists.
-          for NS in $(kubectl get ns -o name 2>/dev/null | grep -oE 'lw-test|lw-overlay|lwql-secret-guard' | sort -u); do
+          # The e2e.sh legs run in namespace lw-test, the overlays leg in
+          # lw-overlay. Dump each that exists.
+          for NS in $(kubectl get ns -o name 2>/dev/null | grep -oE 'lw-test|lw-overlay' | sort -u); do
             echo "===== namespace ${NS} ====="
             kubectl -n "$NS" get pods -o wide 2>/dev/null || true
             kubectl -n "$NS" get events --sort-by='.lastTimestamp' 2>/dev/null | tail -30 || true
