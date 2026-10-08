@@ -2,6 +2,7 @@ import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, IRange, languages, Position } from "monaco-editor";
 
 import type { PyMember, PyModule } from "./python-api.types.ts";
+import { PYTHON_BUILTINS } from "./python-builtins.catalogue.ts";
 import {
   ATTR_ACCESS,
   type ContractRef,
@@ -12,7 +13,6 @@ import {
   scanImports,
 } from "./python-provider.shared.ts";
 import {
-  PYTHON_BUILTINS,
   PYTHON_KEYWORDS,
   PYTHON_STDLIB_MODULE_BY_NAME,
   PYTHON_STDLIB_MODULE_NAMES,

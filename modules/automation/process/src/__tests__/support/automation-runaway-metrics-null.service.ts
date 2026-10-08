@@ -1,4 +1,4 @@
-import { AutomationRunawayMetricsSink } from "./automation-runaway.service.ts";
+import { AutomationRunawayMetricsSink } from "../../features/runaway/services/automation-runaway.service.ts";
 
 /** Records nothing. The default for a process that publishes no containment metrics. */
 export class AutomationRunawayMetricsNullService extends AutomationRunawayMetricsSink {

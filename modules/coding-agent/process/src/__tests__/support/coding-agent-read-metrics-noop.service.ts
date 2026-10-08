@@ -1,4 +1,4 @@
-import type { CodingAgentReadMetrics } from "../repositories/coding-agent-session.repository.ts";
+import type { CodingAgentReadMetrics } from "../../repositories/coding-agent-session.repository.ts";
 
 export class NoopCodingAgentReadMetricsService implements CodingAgentReadMetrics {
   static create(): NoopCodingAgentReadMetricsService {

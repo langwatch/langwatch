@@ -110,10 +110,3 @@ export type SuiteRunProcessingEvent =
   | SuiteRunItemStartedEvent
   | SuiteRunItemCompletedEvent
   | SuiteRunItemRegradedEvent;
-
-export {
-  isSuiteRunItemCompletedEvent,
-  isSuiteRunItemRegradedEvent,
-  isSuiteRunItemStartedEvent,
-  isSuiteRunStartedEvent,
-} from "./suite-run.event-guards.ts";
