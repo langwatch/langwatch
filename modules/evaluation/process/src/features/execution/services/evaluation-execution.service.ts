@@ -15,18 +15,12 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
   isNativeEvaluatorType,
-  getCodeEvaluatorId,
-  isCodeEvaluatorCheckType,
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import {
-  maxCausalityDepthOfSpans,
-  extractParentTraceForNlpgo,
-} from "../../../rules/evaluation-causality.rules.ts";
+import { maxCausalityDepthOfSpans } from "../../../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../../../rules/evaluation-execution-result.rules.ts";
 import { evaluationRenderBudget } from "../../../rules/evaluation-render-budget.rules.ts";
 import { hasThreadMappings } from "../../../rules/evaluation-thread-mapping-service.rules.ts";
@@ -36,6 +30,7 @@ import { EvaluationDataService } from "../../../services/evaluation-data.service
 import type { EvaluatorModelEnvService } from "../../evaluators/services/evaluator-model-env.service.ts";
 import type { LangevalsEvaluatorService } from "../../evaluators/services/langevals-evaluator.service.ts";
 import type { WorkflowEvaluationService } from "../../evaluators/services/workflow-evaluation.service.ts";
+import { EvaluationCustomEvaluationService } from "./evaluation-custom-evaluation.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
 import { EvaluationInstantEvalJudgeService } from "./evaluation-instant-eval-judge.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
@@ -122,10 +117,12 @@ export class EvaluationExecutionService {
 
   private readonly evaluationData: EvaluationDataService;
   private readonly instantEvals: EvaluationInstantEvalJudgeService;
+  private readonly customEvaluations: EvaluationCustomEvaluationService;
 
   private constructor(private readonly deps: EvaluationExecutionDeps) {
     this.evaluationData = EvaluationDataService.create(deps);
     this.instantEvals = EvaluationInstantEvalJudgeService.create(deps);
+    this.customEvaluations = EvaluationCustomEvaluationService.create(deps);
   }
 
   /** The command carries its mappings as JSON; the engine reads them parsed. */
@@ -315,7 +312,7 @@ export class EvaluationExecutionService {
     } = params;
 
     if (data.type === "custom") {
-      return this.runCustomOrCodeEvaluation({
+      return this.customEvaluations.run({
         projectId,
         evaluatorType,
         data: data.data,
@@ -381,43 +378,6 @@ export class EvaluationExecutionService {
     });
   }
 
-  /** A code evaluator answers in-process; anything else custom is a workflow run. */
-  private async runCustomOrCodeEvaluation({
-    projectId,
-    evaluatorType,
-    data,
-    trace,
-    workflowId,
-    parentCausalityDepth,
-  }: {
-    projectId: string;
-    evaluatorType: string;
-    data: Record<string, unknown>;
-    trace?: Trace;
-    workflowId?: string | null;
-    parentCausalityDepth?: number;
-  }): Promise<SingleEvaluationResult> {
-    if (isCodeEvaluatorCheckType(evaluatorType)) {
-      return this.deps.evaluators.executeCode({
-        projectId,
-        evaluatorId: getCodeEvaluatorId(evaluatorType),
-        data,
-        traceId: trace?.trace_id,
-        parentCausalityDepth,
-        parentTrace: extractParentTraceForNlpgo(trace),
-      });
-    }
-
-    return this.runCustomEvaluation({
-      projectId,
-      evaluatorType,
-      data,
-      trace,
-      workflowId,
-      parentCausalityDepth,
-    });
-  }
-
   /**
    * Native evaluators skip the analysis service; both they and the remote ones run through the
    * shared augmenter, so redaction or drop at ingestion never hides a leak from the result.
@@ -451,53 +411,5 @@ export class EvaluationExecutionService {
       droppedCategories,
       result: nativeResult,
     });
-  }
-
-  private async runCustomEvaluation({
-    projectId,
-    evaluatorType,
-    data,
-    trace,
-    workflowId,
-    parentCausalityDepth,
-  }: {
-    projectId: string;
-    evaluatorType: string;
-    data: Record<string, unknown>;
-    trace?: Trace;
-    workflowId?: string | null;
-    parentCausalityDepth?: number;
-  }): Promise<SingleEvaluationResult> {
-    const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
-
-    if (!resolvedWorkflowId) {
-      throw new EvaluatorConfigError("Workflow ID is required");
-    }
-
-    const requestBody: Record<string, unknown> = {
-      trace_id: trace?.trace_id,
-      do_not_trace: true,
-      ...data,
-    };
-
-    // W3C trace context: link the eval workflow's spans to the parent
-    // trace's root span so Studio's waterfall renders them as a child
-    // sub-tree (not a separate orphan trace, which is the 2026-05-14
-    // bug rchaves caught in prod).
-    const parentTrace = extractParentTraceForNlpgo(trace);
-
-    const response = await this.deps.workflowExecutor.run({
-      workflowId: resolvedWorkflowId,
-      projectId,
-      inputs: requestBody as Record<string, string>,
-      causalityDepth: parentCausalityDepth,
-      ...(parentTrace === undefined ? {} : { parentTrace }),
-    });
-
-    if (response.status !== "success") {
-      return { ...response.result, status: "error" } as SingleEvaluationResult;
-    }
-
-    return { ...response.result, status: "processed" };
   }
 }
