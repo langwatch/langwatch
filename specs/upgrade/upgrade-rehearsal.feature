@@ -31,10 +31,10 @@ Feature: The upgrade is rehearsed from real images before it ships
     And every span names the project's service and carries a trace id of 32 hex characters
 
   @unit
-  Scenario: Old projects with no privacy scope row after the upgrade reproduce R01
-    Given seeded projects of which some have no DataPrivacyProjectScope row after phase 1
+  Scenario: Old projects with no resolved privacy policy after the upgrade reproduce R01
+    Given seeded projects of which some resolve no privacy policy after phase 1
     When the findings are evaluated
-    Then R01 is "reproduced" and names the projects without a row
+    Then R01 is "reproduced" and names the projects whose privacy policy does not resolve
 
   @unit
   Scenario: A head worker that throws ProjectNotFoundError reproduces R02

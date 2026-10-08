@@ -55,6 +55,7 @@ export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.
 export { memoryStores } from "./memory-stores.ts";
 export { memorySessionState } from "./memory-session-state.ts";
 export {
+  privateTenantListing,
   cachedTenantDirectory,
   prismaTenantDirectory,
   type TenantDirectory,

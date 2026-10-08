@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
 import { EventingClickHouseEventExplorer } from "@langwatch/eventing/server";
+import { privateTenantListing } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { ClickHouseClickHouseRoutesRepository } from "../clickhouse/clickhouse.clickhouse-routes.repository.ts";
@@ -39,23 +40,34 @@ export const LiveOpsRepositories = {
     redis: RedisConnection;
     clickhouse: ClickHouseQueryClient;
     eventing: Pick<EventSourcing, "definitions">;
-  }>): OpsRepositories => ({
-    ...PostgresOpsRepositories.create({ prisma }),
-    migrationLease: RedisMigrationLeaseRepository.create({ redis }),
-    snapshots: RedisOpsSnapshotRepository.create(redis),
-    metrics: RedisOpsMetricsRepository.create({ redis }),
-    queues: QueueRedisRepository.create({ redis }),
-    blobStore: BlobStoreRedisRepository.create(redis),
-    replay: ReplayRedisRepository.create({ redis }),
-    replayRuntimes: LiveReplayRuntimeRepository.create({ redis, clickhouse, eventing }),
-    pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),
-    clickhouseRoutes: ClickHouseClickHouseRoutesRepository.create({ clickhouse }),
-    anomalyState: RedisAnomalyStateRepository.create(redis),
-    rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
-    storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
-    redisHealth: RedisRedisHealthRepository.create(redis),
-    clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
-    events: EventingClickHouseEventExplorer.create({ clickhouse }),
-    storageFootprint: ClickHouseStorageFootprintRepository.create({ clickhouse }),
-  }),
+  }>): OpsRepositories => {
+    const privateTenants = privateTenantListing({
+      prisma,
+      organizationIds: [...clickhouse.privateRoutes().keys()],
+    });
+    return {
+      ...PostgresOpsRepositories.create({ prisma }),
+      migrationLease: RedisMigrationLeaseRepository.create({ redis }),
+      snapshots: RedisOpsSnapshotRepository.create(redis),
+      metrics: RedisOpsMetricsRepository.create({ redis }),
+      queues: QueueRedisRepository.create({ redis }),
+      blobStore: BlobStoreRedisRepository.create(redis),
+      replay: ReplayRedisRepository.create({ redis }),
+      replayRuntimes: LiveReplayRuntimeRepository.create({
+        redis,
+        clickhouse,
+        eventing,
+        ...(privateTenants === undefined ? {} : { privateTenants }),
+      }),
+      pipelineDefinitions: EventingPipelineDefinitionsRepository.create({ eventing }),
+      clickhouseRoutes: ClickHouseClickHouseRoutesRepository.create({ clickhouse }),
+      anomalyState: RedisAnomalyStateRepository.create(redis),
+      rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
+      storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
+      redisHealth: RedisRedisHealthRepository.create(redis),
+      clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
+      events: EventingClickHouseEventExplorer.create({ clickhouse }),
+      storageFootprint: ClickHouseStorageFootprintRepository.create({ clickhouse }),
+    };
+  },
 };
