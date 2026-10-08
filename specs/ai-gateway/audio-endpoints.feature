@@ -238,12 +238,17 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
   # Group: Dogfood (proven with the Scenario voice harness)
   # ============================================================
 
-  # Exercised live on PR #6168 (OpenAI-model and ElevenLabs-model runs, both
-  # success: True); automation is tracked in issue #6180 and lands when the
-  # Scenario repo's voice CI points at the deployed gateway.
-  @e2e @unimplemented
+  # The cell lives in the Python SDK e2e tests
+  # (sdks/python/tests/e2e/test_scenario_voice_gateway_e2e.py). It runs only
+  # from the scenario-voice-gateway-cell workflow (workflow_dispatch) with a
+  # provisioned LangWatch virtual key (SCENARIO_VOICE_GATEWAY_VK), because it
+  # spends real provider money; absent that variable it skips naming it, so the
+  # per-push SDK CI never pays for it. Tracked in issue #6180.
+  # The OpenAI Realtime websocket is a deliberate exception and is out of scope here.
+  @e2e
   Scenario: Scenario's voice tests run end to end through the gateway
     Given OPENAI_BASE_URL pointing at the gateway and a virtual key as OPENAI_API_KEY
     When a Scenario voice test synthesizes user turns (TTS) and the judge transcribes segments (STT)
-    Then the run completes with result.success without any direct provider call
-    And the gateway shows the audio usage for the run
+    Then the run completes with result.success
+    And every /v1/audio/speech and /v1/audio/transcriptions request went to the gateway and none went to the provider directly
+    And the gateway answered each audio request with its own response headers
