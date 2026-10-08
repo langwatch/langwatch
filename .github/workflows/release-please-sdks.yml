@@ -105,9 +105,11 @@ jobs:
           BRANCH: ${{ steps.app.outputs.branch }}
         run: |
           set -euo pipefail
-          CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..."
+          CI=true pnpm install --frozen-lockfile --filter "@langwatch/upgrade..." --filter "@langwatch/architecture-enforcer..."
           git fetch -q origin 'refs/tags/langwatch@v*:refs/tags/langwatch@v*'
-          node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/stamp-release.ts
+          pnpm --filter @langwatch/architecture-enforcer print:table-owners --out "$RUNNER_TEMP/table-owners.json"
+          node --disable-warning=ExperimentalWarning --experimental-transform-types packages/upgrade/scripts/stamp-release.ts \
+            --table-owners "$RUNNER_TEMP/table-owners.json"
           version="$(jq -r '."."' .github/.release-please-manifest.json)"
           git add "packages/upgrade/releases/${version}.json"
           if git diff --cached --quiet; then echo "manifest ${version} unchanged"; exit 0; fi
