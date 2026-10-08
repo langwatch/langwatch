@@ -12697,21 +12697,18 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
-      '@langwatch/organization-contract':
-        specifier: workspace:*
-        version: link:../../organization/contract
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client

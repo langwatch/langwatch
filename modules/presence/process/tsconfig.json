@@ -31,19 +31,16 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../organization/contract/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"

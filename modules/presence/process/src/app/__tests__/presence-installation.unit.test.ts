@@ -1,17 +1,13 @@
 /**
- * The installer, booted the way a process boots it: memory sessions and settings, no peer, and
- * the one namespace it contributes; on the worker, its settings subscribers beside project's facts.
+ * The installer, booted the way a process boots it: memory sessions, a twin of the owners'
+ * settings rows, no peer, and the one namespace it contributes.
  * @see modules/presence/specs/presence.feature
  */
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { settingsFactOwner } from "../../eventing/__tests__/presence-settings.fixture.ts";
 import { presenceProcessModule } from "../../presence.module.ts";
 import { PresenceModule } from "../presence.app.ts";
 
@@ -22,41 +18,28 @@ const heartbeat = {
   user: { id: "user-1", name: "Ada", image: null },
 } as const;
 
-/** Presence over memory, no peer supplied; on the worker, it hosts the given eventing. */
-function composePresence(worker?: { eventing: EventSourcing }) {
-  const app = createApp({ role: worker ? "worker" : "api" })
-    .withModules([presenceProcessModule])
-    .withStores(memoryStores());
-  return worker ? app.withEventing(worker.eventing) : app;
-}
-
+/** Presence over memory, no peer supplied and no owners' rows handed in. */
 function bootPresence() {
-  return composePresence().boot();
-}
-
-/** A worker hosting presence's settings subscribers, and an append for project's facts. */
-async function bootPresenceWorker() {
-  const eventing = new EventSourcing({
-    eventStore: EventStoreMemory.createForTesting(),
-    processStore: InMemoryProcessStore.createForTesting(),
-    executionTarget: "worker",
-    consumersEnabled: true,
-  });
-  const append = settingsFactOwner(eventing);
-  const runtime = await composePresence({ eventing }).boot();
-  return { runtime, append, eventing };
+  return createApp({ role: "api" })
+    .withModules([presenceProcessModule])
+    .withStores(memoryStores())
+    .boot();
 }
 
 describe("given a process that installs presence", () => {
   describe("when it boots in the api role with no peer supplied", () => {
     /** @scenario "Presence keeps no project or user peer" */
-    it("names no peer and answers from its own fold, which knows no project yet", async () => {
+    it("names no peer it depends on", () => {
+      expect(PresenceModule.dependencies).toEqual({});
+    });
+
+    /** @scenario "Over memory stores presence answers from a twin of the owners' rows" */
+    it("answers from a twin of the owners' rows, which holds none, so lists no session", async () => {
       const runtime = await bootPresence();
 
       const presence = runtime.service(PresenceApi);
       await presence.update(heartbeat);
 
-      expect(PresenceModule.dependencies).toEqual({});
       await expect(presence.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
       await expect(presence.list({ projectId: "project-1" })).resolves.toEqual([]);
     });
@@ -149,41 +132,6 @@ describe("given a process that installs presence", () => {
       await expect(
         runtime.module(presenceProcessModule).provided.list({ projectId: "project-1" }),
       ).resolves.toEqual([]);
-    });
-  });
-
-  describe("when it boots in the worker role beside project's pipeline", () => {
-    /** @scenario "A heartbeat counts once presence has folded the project's creation" */
-    it("lists a heartbeat's session once the project's creation is folded", async () => {
-      const { runtime, append, eventing } = await bootPresenceWorker();
-      await runtime.start();
-      const presence = runtime.service(PresenceApi);
-
-      try {
-        await append(
-          {
-            type: PROJECT_CREATED_EVENT_TYPE,
-            data: {
-              tenantId: "project-1",
-              projectId: "project-1",
-              organizationId: "organization-1",
-              occurredAt: 10,
-            },
-          },
-          "event-created",
-        );
-        await vi.waitFor(async () =>
-          expect(await presence.isEnabledForProject({ projectId: "project-1" })).toBe(true),
-        );
-        await presence.update(heartbeat);
-
-        await expect(presence.list({ projectId: "project-1" })).resolves.toMatchObject([
-          { sessionId: "tab-1", user: { id: "user-1", name: "Ada" } },
-        ]);
-      } finally {
-        await runtime.stop();
-        await eventing.close();
-      }
     });
   });
 });

@@ -386,6 +386,7 @@ describe("Prisma table ownership lint", () => {
           "data-privacy",
           "instant-eval-judge",
           "nurturing",
+          "presence",
         ],
       ],
       [

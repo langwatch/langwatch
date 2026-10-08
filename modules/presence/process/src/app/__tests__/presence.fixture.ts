@@ -2,8 +2,8 @@ import { EventEmitter } from "node:events";
 
 /**
  * The presence graph as its tests need it: memory sessions, a fan-out that
- * records rather than publishes, and a settings fold seeded to the answer a test
- * asked for.
+ * records rather than publishes, and the owners' settings rows seeded to the answer a
+ * test asked for.
  */
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -33,41 +33,38 @@ export class TestPresenceEmitters implements PresenceEmitter {
   readonly cleanupTenantEmitter = vi.fn();
 }
 
-/** A settings fold where every project's creation and its own setting are recorded. */
-export async function createPresenceTestSettings(enabled = true): Promise<PresenceSettingsService> {
-  const repository = MemoryPresenceSettingsRepository.create();
-  await seedPresenceSettings({ repository, enabled });
-  return PresenceSettingsService.create({ repository });
-}
-
 const SEEDED_PROJECTS = ["project-1", "project-2", "project-a"] as const;
 
-async function seedPresenceSettings({
-  repository,
-  enabled,
-}: {
-  repository: MemoryPresenceSettingsRepository;
-  enabled: boolean;
-}): Promise<void> {
-  for (const projectId of SEEDED_PROJECTS) {
-    await repository.recordProjectSetting({
-      projectId,
-      organizationId: "organization-1",
-      presenceEnabled: enabled,
-      occurredAt: 1,
-    });
-  }
+/** Owners' rows where every seeded project sits in one team and organization, set as asked. */
+export function createPresenceTestSettingsRepository(
+  enabled = true,
+): MemoryPresenceSettingsRepository {
+  return MemoryPresenceSettingsRepository.create({
+    projects: new Map(
+      SEEDED_PROJECTS.map((projectId) => [
+        projectId,
+        { teamId: "team-1", presenceEnabled: enabled },
+      ]),
+    ),
+    teams: new Map([["team-1", { organizationId: "organization-1" }]]),
+    organizations: new Map([["organization-1", { presenceEnabled: true }]]),
+  });
 }
 
-/** Memory sessions beside a settings fold seeded as {@link createPresenceTestSettings} seeds it. */
+/** Settings over the owners' rows {@link createPresenceTestSettingsRepository} seeds. */
+export async function createPresenceTestSettings(enabled = true): Promise<PresenceSettingsService> {
+  return PresenceSettingsService.create({
+    repository: createPresenceTestSettingsRepository(enabled),
+  });
+}
+
+/** Memory sessions beside the owners' rows {@link createPresenceTestSettings} seeds. */
 export async function createPresenceTestRepositories(
   enabled = true,
 ): Promise<PresenceRepositories> {
-  const settings = MemoryPresenceSettingsRepository.create();
-  await seedPresenceSettings({ repository: settings, enabled });
   return {
     sessions: MemoryPresenceRepository.create(),
-    settings,
+    settings: createPresenceTestSettingsRepository(enabled),
     broadcast: presenceTestFabric({
       broadcast: new RecordingPresenceBroadcast(),
       emitters: new TestPresenceEmitters(),

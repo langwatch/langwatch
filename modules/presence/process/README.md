@@ -6,7 +6,7 @@ The server half of [presence](../README.md). Presence: who else is looking at th
 
 ## Installation
 
-`defineProcessModule("presence").withRepositories(presenceRepositories).withApi(PresenceModule).withTransports(presenceTrpcTransport).withEventing(presenceSettingsEventing)`, `src/presence.module.ts:15`.
+`defineProcessModule("presence").withRepositories(presenceRepositories).withApi(PresenceModule).withTransports(presenceTrpcTransport)`, `src/presence.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -125,15 +125,7 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-### Pipeline `presence_settings` (aggregate `global`)
-
-Declared at `src/eventing/presence-settings.pipeline.ts:37`.
-
-| Kind            | Name                                 | Handles                                                                                      | Declared at                                     |
-| --------------- | ------------------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| peer subscriber | `presenceProjectCreated`             | `lw.project.created` from [project](../../project/README.md)                                 | `src/eventing/presence-settings.pipeline.ts:44` |
-| peer subscriber | `presenceProjectSettingChanged`      | `lw.project.presence_setting_changed` from [project](../../project/README.md)                | `src/eventing/presence-settings.pipeline.ts:50` |
-| peer subscriber | `presenceOrganizationSettingChanged` | `lw.organization.presence_setting_changed` from [organization](../../organization/README.md) | `src/eventing/presence-settings.pipeline.ts:61` |
+None: presence declares no pipeline, process manager, subscriber or task.
 
 ## Configuration
 
