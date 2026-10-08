@@ -421,6 +421,7 @@ export class ScenarioModule implements ScenarioApi {
       generation: ScenarioGenerationService.create({
         bounds: generateBounds,
         modelProviders: setup.dependencies.modelProviders,
+        timeoutMs: setup.config.generateTimeoutMs,
       }),
       runExportDownloads: ScenarioRunExportDownloadService.create({
         auditLog: setup.dependencies.auditLog,
