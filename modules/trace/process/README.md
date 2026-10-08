@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:161`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:162`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -343,6 +343,14 @@ resolveApiKeyProtections(input: { projectId: string; principal: PrincipalRef | n
 
 ```typescript
 findExistingTraceIds(input: { projectId: string; traceIds: readonly string[]; }): Promise<string[]>;
+```
+
+#### `findTraceCosts`
+
+Each named trace's latest summary cost inside `occurredAt` (epoch ms); unknown ids absent.
+
+```typescript
+findTraceCosts(input: { projectId: string; traceIds: readonly string[]; occurredAt: { from: number; to: number }; }): Promise<TraceCost[]>;
 ```
 
 #### `loadTraces`
