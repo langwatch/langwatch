@@ -5,7 +5,7 @@ import {
 } from "@langwatch/ops-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import type { MigrationEnrollmentRecord } from "../../features/system-migrations/services/system-migrations.service.ts";
+import type { MigrationEnrollmentRecord } from "../../rules/system-migration-support.rules.ts";
 import type { SystemMigrationEnrollmentRepository } from "../system-migration-enrollment.repository.ts";
 
 /**

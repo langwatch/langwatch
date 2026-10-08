@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type SystemMigrationEnrollmentStore,
-  SystemMigrationsService,
-} from "../system-migrations.service.ts";
+import type { SystemMigrationEnrollmentStore } from "../../../../rules/system-migration-support.rules.ts";
+import { SystemMigrationsService } from "../system-migrations.service.ts";
 
 const MIGRATION = "authz-grants-genesis-import";
 

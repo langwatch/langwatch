@@ -1,6 +1,8 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { emailDomainsOf } from "@langwatch/feature-flag-contract";
-import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
+
+import { readableDate } from "../../../model/ops-formatters.ts";
 
 /**
  * Translating between stored and UI rule shapes for the targeting-rules
@@ -227,9 +229,4 @@ function toDateInputValue(stored: string): string {
   const parsed = toEpochMs(stored);
   if (Number.isNaN(parsed)) return "";
   return readableDate(parsed).toISOString().slice(0, 10);
-}
-
-/** The moment a screen prints, as the `Date` the Intl formatters take. */
-export function readableDate(value: TimeInput) {
-  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
 }

@@ -5,7 +5,7 @@ import {
 } from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { MigrationEnrollmentRecord } from "../../features/system-migrations/services/system-migrations.service.ts";
+import type { MigrationEnrollmentRecord } from "../../rules/system-migration-support.rules.ts";
 import type { SystemMigrationEnrollmentRepository } from "../system-migration-enrollment.repository.ts";
 
 /** Cloud rollout enrollment rows: which organizations each migration processes.

@@ -41,6 +41,8 @@ import type {
   DashboardData,
   GroupInfo,
   OpsSignUpHealthInput,
+  QueueInfo,
+  QueueSummaryInfo,
   SignUpHealth,
 } from "./features/dashboard/ops-dashboard.ts";
 import type { OpsSnapshotAbortSignal } from "./features/dashboard/ops-snapshot.service.ts";
@@ -96,8 +98,6 @@ import type {
   opsQueueGroupInputSchema,
   OpsQueueJobsPage,
   OpsQueueReconcileOutcome,
-  QueueInfo,
-  QueueSummaryInfo,
 } from "./features/queue/ops-queue.ts";
 import type {
   BugReport,

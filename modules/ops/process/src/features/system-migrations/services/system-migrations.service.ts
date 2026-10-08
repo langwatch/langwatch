@@ -26,12 +26,6 @@ import { SystemMigrationLookupService } from "./system-migration-lookup.service.
 import { SystemMigrationRollbackService } from "./system-migration-rollback.service.ts";
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
-export type {
-  MigrationEnrollmentRecord,
-  SystemMigrationEnrollmentStore,
-  SystemMigrationStateReader,
-} from "../../../rules/system-migration-support.rules.ts";
-
 const logger = createLogger("langwatch:ops:system-migrations");
 
 export class SystemMigrationsService {

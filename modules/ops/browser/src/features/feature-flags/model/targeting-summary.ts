@@ -2,7 +2,7 @@ import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
 import { emailDomainsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs } from "@langwatch/time";
 
-import { readableDate } from "./rule-editing.ts";
+import { readableDate } from "../../../model/ops-formatters.ts";
 
 /**
  * Summary of who a rule switched the flag on for, honoring first-match-wins

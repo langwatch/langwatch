@@ -3,6 +3,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import Redis from "ioredis";
 import { describe, expect, it, vi } from "vitest";
 
+import { scannedGroup, scannedQueue } from "../../../../__tests__/support/queue-scan.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../../../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryAnomalyStateRepository } from "../../../../repositories/memory/memory.anomaly-state.repository.ts";
 import { MemoryOpsStore } from "../../../../repositories/memory/memory.ops.store.ts";
@@ -11,7 +12,6 @@ import { ANOMALY_DETECTION_KILL_SWITCH_FLAG } from "../../../../rules/anomaly-co
 import { AnomalyDetectorService } from "../../../../services/anomaly-detector.service.ts";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
-import { scannedGroup, scannedQueue } from "./support/queue-scan.ts";
 
 /** A client that never connects; only what the writer's cycle reads is answered. */
 function metricsRedis(): Redis {
