@@ -1,39 +1,18 @@
-import type { FoldStateRead, ProjectionStoreContext } from "@langwatch/eventing";
+import { TraceAnnotationScoresReadRepository } from "../trace-annotation-scores.repository.ts";
 
-import {
-  type TraceAnnotationScoreFoldState,
-  TraceAnnotationScoresReadRepository,
-  type TraceAnnotationScoresRepository,
-} from "../trace-annotation-scores.repository.ts";
+/** A score definition as a test seeds it, with the project that owns it. */
+type SeededScore = { projectId: string; id: string; name: string };
 
-/** Trace's folded score names in memory: the latest state per tenant and score. */
-export class MemoryTraceAnnotationScoresRepository
-  extends TraceAnnotationScoresReadRepository
-  implements TraceAnnotationScoresRepository
-{
-  static create(): MemoryTraceAnnotationScoresRepository {
-    return new MemoryTraceAnnotationScoresRepository();
+/** Annotation's shared `AnnotationScore` rows in memory, seeded by a test; trace writes none. */
+export class MemoryTraceAnnotationScoresRepository extends TraceAnnotationScoresReadRepository {
+  static create({
+    scores = [],
+  }: { scores?: readonly SeededScore[] } = {}): MemoryTraceAnnotationScoresRepository {
+    return new MemoryTraceAnnotationScoresRepository(scores);
   }
 
-  private readonly rows = new Map<string, TraceAnnotationScoreFoldState>();
-
-  private constructor() {
+  private constructor(private readonly scores: readonly SeededScore[]) {
     super();
-  }
-
-  async get(
-    aggregateId: string,
-    context: ProjectionStoreContext,
-  ): Promise<FoldStateRead<TraceAnnotationScoreFoldState>> {
-    const state = this.rows.get(`${context.tenantId}/${aggregateId}`);
-    return state ? { kind: "folded", state } : { kind: "empty" };
-  }
-
-  async store(
-    state: TraceAnnotationScoreFoldState,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    this.rows.set(`${context.tenantId}/${state.scoreId || context.aggregateId}`, state);
   }
 
   async findScoreNames({
@@ -41,10 +20,8 @@ export class MemoryTraceAnnotationScoresRepository
   }: {
     projectId: string;
   }): Promise<{ id: string; name: string }[]> {
-    return [...this.rows.entries()]
-      .filter(([key]) => key.startsWith(`${projectId}/`))
-      .flatMap(([, state]) =>
-        state.name === null ? [] : [{ id: state.scoreId, name: state.name }],
-      );
+    return this.scores
+      .filter((score) => score.projectId === projectId)
+      .map(({ id, name }) => ({ id, name }));
   }
 }

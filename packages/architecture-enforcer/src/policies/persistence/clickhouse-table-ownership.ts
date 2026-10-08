@@ -133,23 +133,11 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       reason: SUBQUERY,
     },
     {
-      reader: "trace",
-      table: "evaluation_runs",
-      file: "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-facet-evaluator.repository.ts",
-      reason: SUBQUERY,
-    },
-    {
       reader: "evaluation",
       table: "trace_summaries",
       file: "modules/evaluation/process/src/repositories/clickhouse/monitor-performance.repository.ts",
       reason:
         "a JOIN inside evaluation's one statement; an *Api call can only return an unbounded id list",
-    },
-    {
-      reader: "trace",
-      table: "log_records",
-      file: "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts",
-      reason: SUBQUERY,
     },
   ],
   shared: [

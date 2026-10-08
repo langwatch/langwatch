@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ProjectionAnnotation } from "@langwatch/annotation-contract";
 import type {
   Protections,
   ProjectionFrom,
@@ -14,7 +15,6 @@ import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enr
  * specs/traces/trace-search-projection.feature against real infra. */
 import { compileProjection } from "../../../rules/trace-projection-compile.rules.ts";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
-import type { TraceAnnotationRow } from "../../trace-annotations.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "./open-protections.ts";
 import {
@@ -168,22 +168,20 @@ function makeQueryInput(
   };
 }
 
-/** A fake AnnotationService — no Postgres testcontainer here, so the service's
- *  own mapping (id -> name remap, ProjectedAnnotation shape) is exercised
- *  against canned rows instead of a real join. */
-/** Trace's annotation fold as the projection join reads it, seeded per test. */
-class FakeAnnotationFold {
-  rows: TraceAnnotationRow[] = [];
+/** Annotation's shared tables as the projection join reads them, seeded per test: no Postgres
+ *  here, so the join's id -> name remap is exercised against canned rows. */
+class FakeAnnotationReads {
+  rows: ProjectionAnnotation[] = [];
   scores: { id: string; name: string }[] = [];
   readonly reads = {
-    rows: { findForTraces: async (): Promise<TraceAnnotationRow[]> => this.rows },
+    rows: { findForTraces: async (): Promise<ProjectionAnnotation[]> => this.rows },
     scores: { findScoreNames: async () => this.scores },
   };
 }
 
 let ch: ClickHouseClient;
 let service: TraceLegacyReadClickHouseRepository;
-const annotations = new FakeAnnotationFold();
+const annotations = new FakeAnnotationReads();
 
 /**
  * Run the full surface pipeline against the real service: compile the
@@ -261,8 +259,7 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
         comment: "looks right",
         expectedOutput: null,
         scoreOptions: { [QUALITY_SCORE_ID]: { value: "5", reason: "accurate" } },
-        createdAt: now,
-        updatedAt: now,
+        createdAt: new Date(now),
         anchorKind: null,
         anchorId: null,
         anchorPath: null,
@@ -324,7 +321,7 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
   describe("given a select over annotation fields", () => {
     describe("when the page is projected", () => {
       /** @scenario "Select annotation fields returned as nested array" */
-      /** @scenario "Trace's legacy read attaches annotations from its own fold" */
+      /** @scenario "Trace's legacy read attaches annotations from annotation's tables" */
       it("returns annotations joined as a nested array", async () => {
         const rows = await projectedSearch({
           select: ["trace_id", "annotations.is_thumbs_up", "annotations.scores"],

@@ -1,44 +1,20 @@
-import type { FoldStateRead, ProjectionStoreContext } from "@langwatch/eventing";
+import type { ProjectionAnnotation } from "@langwatch/annotation-contract";
 
-import {
-  type TraceAnnotationContent,
-  type TraceAnnotationFoldState,
-  type TraceAnnotationRow,
-  TraceAnnotationsReadRepository,
-  type TraceAnnotationsRepository,
-} from "../trace-annotations.repository.ts";
+import { TraceAnnotationsReadRepository } from "../trace-annotations.repository.ts";
 
-function isLiveAnnotation(
-  state: TraceAnnotationFoldState,
-): state is TraceAnnotationFoldState & { content: TraceAnnotationContent } {
-  return !state.deleted && state.content !== null;
-}
+/** An annotation as a test seeds it, with the project that owns it. */
+type SeededAnnotation = ProjectionAnnotation & { projectId: string };
 
-/** Trace's folded annotations in memory: the latest state per tenant and annotation. */
-export class MemoryTraceAnnotationsRepository
-  extends TraceAnnotationsReadRepository
-  implements TraceAnnotationsRepository
-{
-  static create(): MemoryTraceAnnotationsRepository {
-    return new MemoryTraceAnnotationsRepository();
+/** Annotation's shared `Annotation` rows in memory, seeded by a test; trace writes none. */
+export class MemoryTraceAnnotationsRepository extends TraceAnnotationsReadRepository {
+  static create({
+    annotations = [],
+  }: { annotations?: readonly SeededAnnotation[] } = {}): MemoryTraceAnnotationsRepository {
+    return new MemoryTraceAnnotationsRepository(annotations);
   }
 
-  private readonly rows = new Map<string, TraceAnnotationFoldState>();
-
-  private constructor() {
+  private constructor(private readonly annotations: readonly SeededAnnotation[]) {
     super();
-  }
-
-  async get(
-    aggregateId: string,
-    context: ProjectionStoreContext,
-  ): Promise<FoldStateRead<TraceAnnotationFoldState>> {
-    const state = this.rows.get(`${context.tenantId}/${aggregateId}`);
-    return state ? { kind: "folded", state } : { kind: "empty" };
-  }
-
-  async store(state: TraceAnnotationFoldState, context: ProjectionStoreContext): Promise<void> {
-    this.rows.set(`${context.tenantId}/${state.annotationId || context.aggregateId}`, state);
   }
 
   async findForTraces({
@@ -47,14 +23,11 @@ export class MemoryTraceAnnotationsRepository
   }: {
     projectId: string;
     traceIds: string[];
-  }): Promise<TraceAnnotationRow[]> {
+  }): Promise<ProjectionAnnotation[]> {
     const wanted = new Set(traceIds);
-    return [...this.rows.entries()]
-      .filter(([key]) => key.startsWith(`${projectId}/`))
-      .map(([, state]) => state)
-      .filter(isLiveAnnotation)
-      .filter((state) => wanted.has(state.traceId))
-      .map((state) => ({ ...state.content, id: state.annotationId, traceId: state.traceId }))
-      .toSorted((a, b) => a.createdAt - b.createdAt);
+    return this.annotations
+      .filter((row) => row.projectId === projectId && wanted.has(row.traceId))
+      .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map(({ projectId: _projectId, ...row }) => row);
   }
 }

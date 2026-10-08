@@ -358,7 +358,7 @@ export interface ClickHouseTraceLegacyReadOptions {
    * at the platform default, which still bounds every read.
    */
   retentionDays?: RetentionDaysProvider | undefined;
-  /** Trace's fold of annotation's rows and score names (EF-1), read by the projection join. */
+  /** Annotation's rows and score names via its shared tables (R40), for the projection join. */
   annotations?:
     | {
         rows: Pick<TraceAnnotationsReadRepository, "findForTraces">;
@@ -2600,7 +2600,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
     if (!this.annotations) {
-      throw new Error("Trace's annotation fold is required for trace annotation projection");
+      throw new Error("Annotation's shared reads are required for trace annotation projection");
     }
     const [rows, scoreDefs] = await Promise.all([
       this.annotations.rows.findForTraces({ projectId, traceIds }),
@@ -2621,7 +2621,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           row.scoreOptions,
           scoreNameById,
         ),
-        created_at: row.createdAt,
+        created_at: row.createdAt.getTime(),
       });
       byTrace.set(row.traceId, list);
     }

@@ -18,7 +18,7 @@ export class TraceTopicNamingService {
   }
 
   /**
-   * Replace TopicId/SubTopicId facet values with friendly names from trace's topic fold.
+   * Replace TopicId/SubTopicId facet values with friendly names from topic's shared table.
    * The `value` field stays as the ID (used for filtering); `label` carries the name.
    */
   async enrichTopicNames(

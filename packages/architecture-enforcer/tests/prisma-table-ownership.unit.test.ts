@@ -379,6 +379,9 @@ describe("Prisma table ownership lint", () => {
       ["Project", "project", ["entitlement"]],
       ["OrganizationUser", "organization", ["authz"]],
       ["Organization", "organization", ["scim", "entitlement"]],
+      ["Topic", "topic", ["trace"]],
+      ["Annotation", "annotation", ["trace"]],
+      ["AnnotationScore", "annotation", ["trace"]],
     ]);
     expect(writes.map((item) => [item.reader, item.file.split("/").at(-1)])).toEqual([
       ["authz", "prisma.authz-admission.repository.ts"],

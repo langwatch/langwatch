@@ -7,8 +7,8 @@ import type { SpanStorageRepository } from "./span-storage.repository.ts";
 import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
 import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
-import type { TraceAnnotationScoresRepository } from "./trace-annotation-scores.repository.ts";
-import type { TraceAnnotationsRepository } from "./trace-annotations.repository.ts";
+import type { TraceAnnotationScoresReadRepository } from "./trace-annotation-scores.repository.ts";
+import type { TraceAnnotationsReadRepository } from "./trace-annotations.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
@@ -24,7 +24,7 @@ import type { TraceSpanDedupRepository } from "./trace-span-dedup.repository.ts"
 import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
-import type { TraceTopicNamesRepository } from "./trace-topic-names.repository.ts";
+import type { TraceTopicNamesReadRepository } from "./trace-topic-names.repository.ts";
 import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
 
 /**
@@ -47,11 +47,11 @@ export interface TraceRepositories {
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
   readonly summary: TraceSummaryRepository;
   readonly logRecords: LogRecordStorageRepository;
-  /** Topic's names as trace folded them; the list labels topic facets from it. */
-  readonly topicNames: TraceTopicNamesRepository;
-  /** Annotation's rows and score names as trace folded them; the legacy read attaches them. */
-  readonly annotations: TraceAnnotationsRepository;
-  readonly annotationScores: TraceAnnotationScoresRepository;
+  /** Topic's names read through topic's shared table; the list labels topic facets from it. */
+  readonly topicNames: TraceTopicNamesReadRepository;
+  /** Annotation's rows and score names, read through its shared tables for the legacy read. */
+  readonly annotations: TraceAnnotationsReadRepository;
+  readonly annotationScores: TraceAnnotationScoresReadRepository;
   readonly list: TraceListRepository;
   readonly sessionGroups: SessionGroupsRepository;
   /** Claim-check reads for fields the fold offloaded out of the summary. */

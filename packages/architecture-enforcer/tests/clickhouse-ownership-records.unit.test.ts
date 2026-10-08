@@ -280,7 +280,7 @@ describe("ClickHouse ownership records", () => {
         "automation_audit",
         "langy_messages",
       ]);
-      expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(5);
+      expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(3);
       expect(DECLARED_OWNERSHIP.shared.map((item) => item.table)).toEqual([
         "trace_analytics",
         "trace_analytics_rollup",

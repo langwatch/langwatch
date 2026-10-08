@@ -1,50 +1,18 @@
-import type { FoldStateRead, ProjectionStoreContext } from "@langwatch/eventing";
+import { TraceTopicNamesReadRepository } from "../trace-topic-names.repository.ts";
 
-import { topicNameChanges } from "../../rules/trace-topic-names.rules.ts";
-import {
-  type TraceTopicName,
-  type TraceTopicNamesFoldState,
-  TraceTopicNamesReadRepository,
-  type TraceTopicNamesRepository,
-} from "../trace-topic-names.repository.ts";
+/** A topic as a test seeds it, with the project that owns it. */
+type SeededTopic = { projectId: string; id: string; name: string };
 
-type Row = { topic: TraceTopicName; removed: boolean; lastEventOccurredAt: number };
-
-/** Trace's folded topic names in memory: one latest row per topic, as the replacing table reads. */
-export class MemoryTraceTopicNamesRepository
-  extends TraceTopicNamesReadRepository
-  implements TraceTopicNamesRepository
-{
-  static create(): MemoryTraceTopicNamesRepository {
-    return new MemoryTraceTopicNamesRepository();
+/** Topic's shared `Topic` rows in memory, seeded by a test; trace writes none. */
+export class MemoryTraceTopicNamesRepository extends TraceTopicNamesReadRepository {
+  static create({
+    topics = [],
+  }: { topics?: readonly SeededTopic[] } = {}): MemoryTraceTopicNamesRepository {
+    return new MemoryTraceTopicNamesRepository(topics);
   }
 
-  private readonly rows = new Map<string, Map<string, Row>>();
-
-  private constructor() {
+  private constructor(private readonly topics: readonly SeededTopic[]) {
     super();
-  }
-
-  async get(aggregateId: string): Promise<FoldStateRead<TraceTopicNamesFoldState>> {
-    const rows = this.rows.get(aggregateId);
-    if (!rows || rows.size === 0) return { kind: "empty" };
-    const all = [...rows.values()];
-    return {
-      kind: "folded",
-      state: {
-        topics: all.filter((row) => !row.removed).map((row) => row.topic),
-        LastEventOccurredAt: Math.max(...all.map((row) => row.lastEventOccurredAt)),
-      },
-    };
-  }
-
-  async store(state: TraceTopicNamesFoldState, context: ProjectionStoreContext): Promise<void> {
-    const rows = this.rows.get(context.tenantId) ?? new Map<string, Row>();
-    const previous = [...rows.values()].filter((row) => !row.removed).map((row) => row.topic);
-    for (const { topic, removed } of topicNameChanges({ previous, next: state.topics })) {
-      rows.set(topic.id, { topic, removed, lastEventOccurredAt: state.LastEventOccurredAt });
-    }
-    this.rows.set(context.tenantId, rows);
   }
 
   async findNamesByIds({
@@ -54,12 +22,11 @@ export class MemoryTraceTopicNamesRepository
     projectId: string;
     ids: string[];
   }): Promise<Map<string, string>> {
-    const rows = this.rows.get(projectId);
-    const names = new Map<string, string>();
-    for (const id of ids) {
-      const row = rows?.get(id);
-      if (row && !row.removed) names.set(id, row.topic.name);
-    }
-    return names;
+    const wanted = new Set(ids);
+    return new Map(
+      this.topics
+        .filter((topic) => topic.projectId === projectId && wanted.has(topic.id))
+        .map((topic) => [topic.id, topic.name]),
+    );
   }
 }

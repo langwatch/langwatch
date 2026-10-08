@@ -185,8 +185,6 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("audit_log");
       expect(pipelines).toContain("agent_lifecycle");
       expect(pipelines).toContain("annotation_lifecycle");
-      expect(pipelines).toContain("trace_topic_names");
-      expect(pipelines).toContain("trace_annotations");
       expect(pipelines).toContain("agent_workflow_fields");
       expect(pipelines).toContain("user_lifecycle");
       expect(pipelines).toContain("workflow_agent_archive_cascade");

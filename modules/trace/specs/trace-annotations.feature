@@ -1,54 +1,23 @@
-Feature: Trace keeps its own copy of annotations and their score names
-  Annotation owns annotations and records created, updated and deleted facts with their
-  content, and score-definition facts with their names. Trace folds them into its own
-  trace_annotations and trace_annotation_scores, so its legacy read attaches annotations and
-  names their scores with no annotation peer. Existing rows arrive by projection replay steps.
+Feature: Trace reads annotations and score names from annotation's shared tables
+  Annotation owns annotations and score definitions and declares its Annotation and
+  AnnotationScore tables shared for reading by trace, so trace keeps no copy of them. Trace's
+  legacy read attaches a page's annotations and names their scores from annotation's rows.
 
   @unit
-  Scenario: Trace folds an annotation and names its scores
-    Given annotation records a score definition and an annotation on a trace scoring it
-    When trace's annotation folds apply the facts
-    Then trace lists the annotation on that trace with its content
-    And trace names the score by its definition id
+  Scenario: Trace reads every annotation on a page's traces, oldest first, whatever its anchor
+    Given annotation holds annotations on a project's traces, one anchored to a span
+    When trace reads the annotations of those traces
+    Then trace asks only that project's rows on those traces, oldest first, with no anchor filter
+    And each annotation carries its content and its scores keyed by score definition id
 
   @unit
-  Scenario: The newest content wins whatever order the facts arrive in
-    Given annotation records an update of an annotation
-    When an older backfilled copy of the annotation arrives after the update
-    Then trace keeps the updated content
-
-  @unit
-  Scenario: A deleted annotation is not listed
-    Given trace holds an annotation on a trace
-    When annotation records that the annotation was deleted
-    Then trace lists no annotation on that trace
-
-  @unit
-  Scenario: A backfill racing a delete does not bring the annotation back
-    Given annotation records that an annotation was deleted
-    When a backfilled created fact for the same annotation arrives after the delete
-    Then trace lists no annotation on that trace
-
-  @unit
-  Scenario: A redelivered annotation fact leaves one annotation
-    Given annotation's created fact is delivered to trace twice
-    When trace's annotation fold applies both deliveries
-    Then trace lists the annotation once
-
-  @unit
-  Scenario: A renamed score names its old results
-    Given annotation records a score definition and then renames it
-    When trace's score fold applies both facts
-    Then trace names the score by its new name
+  Scenario: A soft-deleted score definition still names its old results
+    Given annotation holds a score definition it has soft-deleted
+    When trace reads the project's score names
+    Then trace asks every definition of that project, deleted ones included
 
   @integration
-  Scenario: Trace's legacy read attaches annotations from its own fold
-    Given trace's annotation fold holds an annotation scoring a named score
+  Scenario: Trace's legacy read attaches annotations from annotation's tables
+    Given annotation's tables hold an annotation scoring a named score
     When the legacy read projects the trace's annotations
-    Then the annotation carries its scores under the score's name, without asking annotation
-
-  @unit
-  Scenario: Trace's annotation folds are replayed over every annotation fact at deploy
-    Given annotation facts recorded before trace's annotation folds were installed on this deployment
-    When the deploy's background steps run once no old worker remains
-    Then trace's annotation and score folds are replayed from the start of annotation's log
+    Then the annotation carries its scores under the score's name
