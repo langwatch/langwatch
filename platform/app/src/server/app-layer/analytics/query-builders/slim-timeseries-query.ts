@@ -48,6 +48,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./_shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
@@ -269,24 +270,6 @@ function dedupedSlim({
 const SLIM_HAS_SIGNAL = "HasSignal";
 const SLIM_MATCHES_FILTERS = "MatchesFilters";
 
-/**
- * Slim columns the outer query reads off the deduped table, i.e. every
- * `ta.<Column>` the metric, group-by and period expressions mention. The
- * dedup keys are always present and never carried.
- */
-function referencedSlimColumns(expressions: readonly string[]): string[] {
-  const columns = new Set<string>(["OccurredAt"]);
-  const pattern = new RegExp(`\\b${ta}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
-  for (const expression of expressions) {
-    for (const match of expression.matchAll(pattern)) {
-      columns.add(match[1]!);
-    }
-  }
-  columns.delete("TenantId");
-  columns.delete("TraceId");
-  return Array.from(columns);
-}
-
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
 /**
@@ -501,7 +484,11 @@ export function buildSlimTimeseriesQuery(
     FROM ${dedupedSlim({
       alias: ta,
       dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
-      columns: referencedSlimColumns(selectExprs),
+      columns: referencedAliasColumns({
+        alias: ta,
+        expressions: selectExprs,
+        keyColumns: ["TenantId", "TraceId"],
+      }),
       filterPredicates,
     })}
     WHERE ${ta}.TenantId = {tenantId:String}

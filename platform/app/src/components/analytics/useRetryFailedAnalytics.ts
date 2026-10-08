@@ -1,6 +1,13 @@
+import type { Query } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { api } from "../../utils/api";
+
+/** The queries a Retry refetches: on screen and failed. */
+export const FAILED_ACTIVE_QUERIES = {
+  type: "active" as const,
+  predicate: (query: Pick<Query, "state">) => query.state.status === "error",
+};
 
 /**
  * Retries every analytics panel on screen whose query failed.
@@ -15,13 +22,14 @@ export function useRetryFailedAnalytics(): () => void {
   const utils = api.useUtils();
 
   return useCallback(() => {
-    const filters = {
-      type: "active" as const,
-      predicate: (query: { state: { status: string } }) =>
-        query.state.status === "error",
-    };
-    void utils.analytics.getTimeseries.refetch(undefined, filters);
-    void utils.analytics.topUsedDocuments.refetch(undefined, filters);
-    void utils.analytics.feedbacks.refetch(undefined, filters);
+    void utils.analytics.getTimeseries.refetch(
+      undefined,
+      FAILED_ACTIVE_QUERIES,
+    );
+    void utils.analytics.topUsedDocuments.refetch(
+      undefined,
+      FAILED_ACTIVE_QUERIES,
+    );
+    void utils.analytics.feedbacks.refetch(undefined, FAILED_ACTIVE_QUERIES);
   }, [utils]);
 }

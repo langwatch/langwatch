@@ -36,6 +36,7 @@ import {
   hasFilterValues,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./_shared";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
@@ -133,9 +134,14 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
 
 // isPercentile + percentileFor moved to _shared.
 
+/**
+ * Eval slim aggregation expression. Percentiles use `quantileTDigest`, like
+ * the trace slim builder: the read spans the whole range, and an exact
+ * quantile keeps every value of the group in memory.
+ */
 function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
-    return `quantileExact(${percentileFor(agg)})(${column})`;
+    return `quantileTDigest(${percentileFor(agg)})(${column})`;
   }
   switch (agg) {
     case "sum":
@@ -170,20 +176,13 @@ function dedupedSlim({
   dateClause: string;
   expressions: readonly string[];
 }): string {
-  const columns = new Set<string>(["OccurredAt"]);
-  const pattern = new RegExp(`\\b${alias}\\.([A-Za-z_][A-Za-z0-9_]*)`, "g");
-  for (const expression of expressions) {
-    for (const match of expression.matchAll(pattern)) {
-      columns.add(match[1]!);
-    }
-  }
-  columns.delete("TenantId");
-  columns.delete("EvaluationId");
+  const keyColumns = ["TenantId", "EvaluationId"];
+  const columns = referencedAliasColumns({ alias, expressions, keyColumns });
   return latestVersionSubquery({
     table: SLIM_TABLE,
     alias,
-    keyColumns: ["TenantId", "EvaluationId"],
-    columns: Array.from(columns, (name) => ({ name })),
+    keyColumns,
+    columns: columns.map((name) => ({ name })),
     where: `TenantId = {tenantId:String} ${dateClause}`,
   });
 }

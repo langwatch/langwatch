@@ -1,15 +1,11 @@
-import {
-  ConcurrencyLimiter,
-  QueueFullError,
-} from "@langwatch/clickhouse-client";
+import { ConcurrencyLimiter } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
-import { toError } from "~/utils/posthogErrorCapture";
 import {
   incrementClickHouseStatementsShed,
   observeClickHouseStatementWait,
   registerClickHouseLimiter,
 } from "./metrics";
+import { createStatementWait, statementRefusal } from "./statementWait";
 
 const logger = createLogger("langwatch:clickhouse:tenant-statement-limit");
 
@@ -132,11 +128,11 @@ export class TenantStatementLimiter {
     const limiter = this.limiterFor(tenantId);
     const queuedAt = performance.now();
     let isAdmitted = false;
-    const wait = createWaitBound({
+    const wait = createStatementWait({
       signal,
-      timeoutMs: this.waitTimeoutMs,
-      mustWait: limiter.stats().inFlight >= this.maxConcurrent,
+      waitTimeoutMs: this.waitTimeoutMs,
     });
+    wait.armIfSaturated(limiter.stats().inFlight >= this.maxConcurrent);
 
     try {
       return await limiter.run({
@@ -149,14 +145,17 @@ export class TenantStatementLimiter {
         },
       });
     } catch (error) {
-      const refusal = isAdmitted
-        ? undefined
-        : this.refusalFor({
-            error,
-            tenantId,
-            queuedAt,
-            hasTimedOut: wait.hasTimedOut(),
-          });
+      const refusal = statementRefusal({
+        error,
+        isAdmitted,
+        hasTimedOut: wait.hasTimedOut(),
+        queuedAt,
+        waitTimeoutMs: this.waitTimeoutMs,
+        logger,
+        subject: "an analytics statement for its tenant",
+        logFields: { tenantId },
+        onShed: this.shedRecorder(),
+      });
       throw refusal ?? error;
     } finally {
       wait.dispose();
@@ -174,42 +173,10 @@ export class TenantStatementLimiter {
     );
   }
 
-  /**
-   * A full queue and a wait that ran out are the same verdict: no turn for this
-   * statement. A caller cancelling its own request stays the cancellation it is.
-   */
-  private refusalFor({
-    error,
-    tenantId,
-    queuedAt,
-    hasTimedOut,
-  }: {
-    error: unknown;
-    tenantId: string;
-    queuedAt: number;
-    hasTimedOut: boolean;
-  }): ClickHouseOverloadedError | undefined {
-    if (error instanceof QueueFullError) {
-      logger.warn(
-        { tenantId, maxQueued: error.maxQueued },
-        "Refused an analytics statement: tenant wait queue full",
-      );
-    } else if (hasTimedOut) {
-      logger.warn(
-        {
-          tenantId,
-          waitedMs: Math.round(performance.now() - queuedAt),
-          timeoutMs: this.waitTimeoutMs,
-        },
-        "Refused an analytics statement: waited too long for the tenant's turn",
-      );
-    } else {
-      return undefined;
-    }
-    if (this.metricsInstance) {
-      incrementClickHouseStatementsShed(this.metricsInstance, "query");
-    }
-    return new ClickHouseOverloadedError({ reasons: [toError(error)] });
+  private shedRecorder(): (() => void) | undefined {
+    const instance = this.metricsInstance;
+    if (!instance) return undefined;
+    return () => incrementClickHouseStatementsShed(instance, "query");
   }
 
   /** Everything running and waiting across tenants, for the gauges. */
@@ -245,44 +212,6 @@ export class TenantStatementLimiter {
     }
     return limiter;
   }
-}
-
-/**
- * The time bound on one statement's wait. Only a statement that has to wait
- * gets a timer, so the common uncontended path allocates neither a timer nor a
- * composed signal. `hasTimedOut` is true only when OUR timer fired, so a caller
- * cancelling its own request is never relabelled as overload.
- */
-function createWaitBound({
-  signal,
-  timeoutMs,
-  mustWait,
-}: {
-  signal: AbortSignal | undefined;
-  timeoutMs: number;
-  mustWait: boolean;
-}): {
-  signal: AbortSignal | undefined;
-  hasTimedOut: () => boolean;
-  dispose: () => void;
-} {
-  if (!mustWait) {
-    return { signal, hasTimedOut: () => false, dispose: () => undefined };
-  }
-  const controller = new AbortController();
-  let hasFired = false;
-  const timer = setTimeout(() => {
-    hasFired = true;
-    controller.abort();
-  }, timeoutMs);
-  timer.unref?.();
-  return {
-    signal: signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal,
-    hasTimedOut: () => hasFired,
-    dispose: () => clearTimeout(timer),
-  };
 }
 
 /** The process-wide gate the analytics read repositories share. */

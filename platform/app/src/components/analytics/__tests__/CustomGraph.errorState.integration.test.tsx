@@ -69,6 +69,7 @@ import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "../DocumentsCountsTable";
+import { FAILED_ACTIVE_QUERIES } from "../useRetryFailedAnalytics";
 
 afterEach(cleanup);
 
@@ -173,14 +174,16 @@ describe("<CustomGraph /> when its query fails", () => {
 
       await user.click(screen.getByRole("button", { name: /retry/i }));
 
-      expect(refetchTimeseries).toHaveBeenCalledTimes(1);
-      const [input, filters] = refetchTimeseries.mock.calls[0]!;
-      expect(input).toBeUndefined();
-      expect(filters.type).toBe("active");
-      expect(filters.predicate({ state: { status: "error" } })).toBe(true);
-      expect(filters.predicate({ state: { status: "success" } })).toBe(false);
-      expect(refetchDocuments).toHaveBeenCalledTimes(1);
-      expect(refetchFeedbacks).toHaveBeenCalledTimes(1);
+      for (const refetch of [
+        refetchTimeseries,
+        refetchDocuments,
+        refetchFeedbacks,
+      ]) {
+        expect(refetch).toHaveBeenCalledExactlyOnceWith(
+          undefined,
+          FAILED_ACTIVE_QUERIES,
+        );
+      }
     });
   });
 

@@ -121,7 +121,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
 
   @unit
   Scenario: Dashboard percentiles use a bounded-memory estimator
-    When a slim trace panel asks for a median or p90
+    When a slim trace or evaluation panel asks for a median or p90
     Then the query uses a t-digest quantile, not an exact one
 
   @unit
