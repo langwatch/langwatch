@@ -180,6 +180,35 @@ describe("mintInstallationToken", () => {
     });
   });
 
+  describe("when a turn token is minted for the whole installation", () => {
+    /** @scenario "The minted token is scoped to the installation and self-expires" */
+    it("asks for the installation's repositories with write-only permissions and caches it under its expiry", async () => {
+      const redis = fakeRedis();
+      const storeToken = vi.spyOn(redis.tokenCache, "storeToken");
+      const svc = GithubAppTokenService.create({
+        api: liveApi("app-1", privateKey),
+        tokenCache: redis.tokenCache,
+      });
+      const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+      const fetchMock = vi.fn<typeof fetch>(async () =>
+        Response.json({ token: "ghs_turn", expires_at: expiresAt }, { status: 201 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await svc.mintInstallationToken({ installationId: "99" });
+
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        requestUrl(c[0]).includes("/app/installations/99/access_tokens"),
+      );
+      const body = JSON.parse(requestBody(mintCall?.[1]));
+      expect(body).toEqual({ permissions: { contents: "write", pull_requests: "write" } });
+      expect(Date.parse(result.expiresAt) - Date.now()).toBeLessThanOrEqual(60 * 60_000);
+      expect(storeToken).toHaveBeenCalledTimes(1);
+      expect(storeToken.mock.calls[0]?.[0].ttlSec).toBeGreaterThan(0);
+      expect(storeToken.mock.calls[0]?.[0].ttlSec).toBeLessThan(60 * 60);
+    });
+  });
+
   describe("when the same scope is requested twice", () => {
     it("serves the second from cache without a second mint", async () => {
       const redis = fakeRedis();
