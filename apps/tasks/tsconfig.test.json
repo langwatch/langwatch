@@ -141,6 +141,9 @@
       "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/instant-eval-judge/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/instant-eval/process/tsconfig.build.json"
     },
     {

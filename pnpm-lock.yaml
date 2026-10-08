@@ -1012,6 +1012,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -1839,6 +1842,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -2601,6 +2607,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../modules/instant-eval-judge/process
       '@langwatch/instant-eval-process':
         specifier: workspace:*
         version: link:../../modules/instant-eval/process
@@ -3076,9 +3085,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/instant-eval-contract':
+      '@langwatch/instant-eval-judge-contract':
         specifier: workspace:*
-        version: link:../../../../modules/instant-eval/contract
+        version: link:../../../../modules/instant-eval-judge/contract
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../../packages/internal-slack
@@ -3155,6 +3164,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../../../modules/instant-eval-judge/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -3915,6 +3927,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../../../modules/instant-eval/contract
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/instant-eval-judge/contract
       '@langwatch/internal-slack':
         specifier: workspace:*
         version: link:../../../../packages/internal-slack
@@ -8021,6 +8036,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8151,6 +8169,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval/contract
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/model-provider-client':
         specifier: workspace:*
         version: link:../../model-provider/client
@@ -9199,6 +9223,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9290,6 +9317,12 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
+      '@langwatch/evaluation-process':
+        specifier: workspace:*
+        version: link:../../evaluation/process
+      '@langwatch/instant-eval-process':
+        specifier: workspace:*
+        version: link:../../instant-eval/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9724,6 +9757,86 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  modules/instant-eval-judge/contract:
+    dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/instant-eval-judge/process:
+    dependencies:
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../packages/prisma-client
+      '@langwatch/process':
+        specifier: workspace:*
+        version: link:../../../packages/process
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+      undici:
+        specifier: 'catalog:'
+        version: 8.10.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   modules/instant-eval/contract:
     dependencies:
       '@langwatch/analytics-contract':
@@ -9741,12 +9854,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9787,9 +9900,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -9805,6 +9915,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -9832,9 +9945,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
-      '@langwatch/secrets':
+      '@langwatch/task':
         specifier: workspace:*
-        version: link:../../../packages/secrets
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9847,9 +9960,6 @@ importers:
       hono-openapi:
         specifier: 'catalog:'
         version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
-      undici:
-        specifier: 'catalog:'
-        version: 8.10.0
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -9857,6 +9967,9 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/process
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -12742,6 +12855,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-process':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/process
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores

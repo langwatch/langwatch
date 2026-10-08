@@ -10,7 +10,7 @@
 import type { ConnectedSpendView } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 

@@ -10,6 +10,7 @@ import { EvaluationApi, TraceNotEvaluatableError } from "@langwatch/evaluation-c
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
@@ -47,6 +48,7 @@ function process(
       evaluator: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({

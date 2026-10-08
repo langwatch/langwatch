@@ -30,6 +30,14 @@ class CustomLLMScoreSettings(LLMEvaluatorSettings):
         default="You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
         description="The system prompt to use for the LLM to run the evaluation",
     )
+    min: Optional[float] = Field(
+        default=None,
+        description="The lowest score the prompt asks for; unset reads as 0",
+    )
+    max: Optional[float] = Field(
+        default=None,
+        description="The highest score the prompt asks for; unset reads as 1",
+    )
 
 
 class CustomLLMScoreResult(EvaluationResult):

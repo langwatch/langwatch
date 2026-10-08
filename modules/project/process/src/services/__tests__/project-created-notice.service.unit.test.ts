@@ -71,8 +71,9 @@ function noticeOver() {
   const sent: RecordProjectCreatedCommandData[] = [];
   const presence: RecordProjectPresenceSettingChangedCommandData[] = [];
   const departments: RecordProjectDepartmentAssignedCommandData[] = [];
+  const logger = { error: vi.fn() };
   const notice = ProjectCreatedNoticeService.create({
-    logger: { error: vi.fn() },
+    logger,
     projects: {
       findIdsByOrganization: async () => Object.keys(admins),
       findWithTeam: async (id) => {
@@ -108,10 +109,41 @@ function noticeOver() {
     },
     recordProjectTraceSharingDisabled: { send: async () => undefined },
   });
-  return { notice, sent, presence, departments };
+  return { notice, sent, presence, departments, logger };
 }
 
 describe("ProjectCreatedNoticeService", () => {
+  /** @scenario "A failed project created fact logs the catch-up that recovers it" */
+  it("names the backfill-project-created task when recording a new project fails", async () => {
+    const { notice, logger } = noticeOver();
+    notice.connect({
+      recordProjectCreated: {
+        send: async () => {
+          throw new Error("event store down");
+        },
+      },
+      recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      recordPresenceSettingChanged: { send: async () => undefined },
+      recordProjectMoved: { send: async () => undefined },
+      recordProjectArchived: { send: async () => undefined },
+      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectTraceSharingDisabled: { send: async () => undefined },
+    });
+
+    await notice.created({
+      projectId: "project-1",
+      organizationId: "org-1",
+      createdByUserId: null,
+      teamId: "team-1",
+      isPersonal: false,
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1" }),
+      expect.stringContaining("backfill-project-created"),
+    );
+  });
+
   /** @scenario "A new project's created event names the organization's admin" */
   it("records a new project with the organization's admin at that moment", async () => {
     const { notice, sent } = noticeOver();

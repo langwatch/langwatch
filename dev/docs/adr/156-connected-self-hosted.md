@@ -481,6 +481,10 @@ judging with it and sends nothing to LangWatch. The Connect classifier answers
 per organization, so an install where no license names hosted judging builds
 the classifier and skips every question without opening a connection.
 
+Superseded in part by ADR-174 decision 14 (2026-10-07): only LangWatch Cloud
+reads `JEV_API_KEY`. A self-hosted install that sets one judges through the
+Connect classifier, or not at all.
+
 **Which organization may judge through it.** A service its license names is on
 unless an administrator switched it off. `Organization.connectServicesDisabled`
 records the refusals rather than the approvals, so a customer who bought hosted

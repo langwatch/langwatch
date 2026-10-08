@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -192,6 +193,7 @@ export function createEvaluationTestApp(
       monitors: MonitorApi;
       analytics: AnalyticsApi;
       datasets: DatasetApi;
+      judges: InstantEvalJudgeApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -213,6 +215,7 @@ export function createEvaluationTestApp(
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
+      judges: input.dependencies?.judges ?? createApiFixture<InstantEvalJudgeApi>(),
     },
     clustering:
       input.clustering ??

@@ -10,6 +10,7 @@ import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/datas
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
@@ -70,6 +71,7 @@ async function boot({
       evaluator: evaluators,
       monitor: monitors,
       dataset: datasets,
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({

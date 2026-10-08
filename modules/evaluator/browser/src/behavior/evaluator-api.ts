@@ -15,7 +15,7 @@ import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import type { monitorTrpc } from "@langwatch/monitor-contract";
 import type { projectTrpc } from "@langwatch/project-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
-import type { tracesTrpc } from "@langwatch/trace-contract";
+import type { tracesInstantEvalTrpc, tracesTrpc } from "@langwatch/trace-contract";
 import type { workflowTrpc } from "@langwatch/workflow-contract";
 
 /** An evaluator and a project, the input nine of these ten procedures take. */
@@ -80,6 +80,7 @@ export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> &
   ContractApiMap<typeof projectTrpc> &
   ContractApiMap<typeof secretTrpc> &
   ContractApiMap<typeof tracesTrpc> &
+  ContractApiMap<typeof tracesInstantEvalTrpc> &
   ContractApiMap<typeof workflowTrpc> &
   BorrowedProcedures;
 

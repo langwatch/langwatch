@@ -11,7 +11,8 @@ import {
   INSTANT_EVAL_SKIP_REASONS,
   instantEvalSkipped,
   type InstantEvalJudgement,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -19,7 +20,6 @@ import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
 } from "../channels/instant-eval-judge.channel.ts";
-import { INSTANT_EVAL_PRICING } from "../rules/instant-eval-pricing.rules.ts";
 
 /** How long an organization's opt-in is held: one read per run, no restart after a switch. */
 export const CONNECT_JUDGE_STATE_TTL_MS = 30_000;

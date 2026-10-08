@@ -9,6 +9,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { InstantEvalModule } from "./app/instant-eval.app.ts";
 import { instantEvalEventing } from "./eventing/instant-eval-processing.pipeline.ts";
 import { instantEvalRepositories } from "./repositories/instant-eval-repositories.registry.ts";
+import { InstantEvalJudgeSpendCatchUpTask } from "./tasks/instant-eval-judge-spend-catch-up.task.ts";
 import { instantEvalRest } from "./transport/instant-eval.rest.ts";
 
 export const instantEvalProcessModule = defineProcessModule("instant-eval")
@@ -23,4 +24,10 @@ export const instantEvalProcessModule = defineProcessModule("instant-eval")
       credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),
     ),
   ])
-  .withEventing(instantEvalEventing);
+  .withEventing(instantEvalEventing)
+  .withTasks(({ app, dependencies }) => [
+    InstantEvalJudgeSpendCatchUpTask.create({
+      organizations: dependencies.organizations,
+      instantEvals: app,
+    }),
+  ]);

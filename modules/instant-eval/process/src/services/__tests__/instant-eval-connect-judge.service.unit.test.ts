@@ -5,12 +5,12 @@
  */
 
 import type { ConnectClassifyAnswer } from "@langwatch/enterprise-licensing-contract";
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-judge-contract";
+import { INSTANT_EVAL_PRICING } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalJudgeKind } from "../../rules/instant-eval-judge-choice.rules.ts";
-import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import {
   CONNECT_JUDGE_STATE_TTL_MS,
   InstantEvalConnectJudgeService,
@@ -120,7 +120,7 @@ describe("the Connect judge", () => {
     const { judge, calls } = harness({ enabled: false });
 
     expect(
-      instantEvalJudgeKind({ classifier: undefined, hasOwnKey: false, isProduction: false }),
+      instantEvalJudgeKind({ classifier: undefined, hasCloudKey: false, isProduction: false }),
     ).toBe("connect");
     await expect(judge.classify(REQUEST)).resolves.toMatchObject({
       skippedReason: "classifier_not_configured",

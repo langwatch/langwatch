@@ -59,6 +59,11 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
     workflows: createApiFixture<WorkflowApi>({}),
     evaluators,
     workflowExecutor: { run: unused("workflowExecutor.run") },
+    judges: {
+      judge: () => {
+        throw new Error("no judge here is on Instant Evals");
+      },
+    },
     installEnvironment: {},
   };
 

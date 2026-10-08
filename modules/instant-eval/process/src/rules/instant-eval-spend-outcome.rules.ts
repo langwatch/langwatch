@@ -7,15 +7,13 @@
 
 import {
   INSTANT_EVAL_REQUEST_TYPE,
+  INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_SPEND_MODEL,
+  instantEvalRateVersion,
   type InstantEvalPricing,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
-
-import { INSTANT_EVAL_PRICING } from "./instant-eval-pricing.rules.ts";
-
-/** The model the ledger names for a judgement: the shipped classifier. */
-export const INSTANT_EVAL_SPEND_MODEL = "jev";
 
 /** USD to integer nano-USD, the spine's own unit, rounded once. */
 export const NANO_USD_PER_USD = 1_000_000_000;
@@ -72,15 +70,6 @@ export function instantEvalSpendRequestId({ runId }: { runId?: string }): string
 /** The hold a synchronous query takes on the free budget while it judges; one per query. */
 export function instantEvalQueryReservationId(): string {
   return `query:${generate(INSTANT_EVAL_QUERY_KSUID_RESOURCE).toString()}`;
-}
-
-/**
- * The rate identity stamped on the outcome. A judgement has no model registry,
- * so it stamps the two published numbers it was priced with: a price change
- * changes the stamp, which tells a replay from a re-rating.
- */
-export function instantEvalRateVersion(pricing: InstantEvalPricing = INSTANT_EVAL_PRICING): string {
-  return `instant_eval@${pricing.usdPerMillionInputTokens}x${pricing.markup}`;
 }
 
 export function usdToNanoUsd(usd: number): number {

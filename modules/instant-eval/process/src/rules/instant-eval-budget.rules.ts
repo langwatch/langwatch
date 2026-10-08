@@ -4,10 +4,9 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import { NANO_USD_PER_USD } from "./instant-eval-spend-outcome.rules.ts";
+import { INSTANT_EVAL_FREE_BUDGET_USD } from "@langwatch/instant-eval-judge-contract";
 
-/** What an organization without a paid plan may spend on Instant Evals, in USD. */
-export const INSTANT_EVAL_FREE_BUDGET_USD = 1;
+import { NANO_USD_PER_USD } from "./instant-eval-spend-outcome.rules.ts";
 
 export const INSTANT_EVAL_FREE_BUDGET_NANO_USD = INSTANT_EVAL_FREE_BUDGET_USD * NANO_USD_PER_USD;
 

@@ -1662,6 +1662,9 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       organizations: { getAllMembers: async () => [{ id: "user-1" }] },
       resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
       planLimitAlerts: { notifyPlanLimitReached: async () => {} },
+      billingOrganizations: {
+        getOrganizationForBilling: async () => ({ outcome: "not_usage_billed" }),
+      },
     });
     announcer.connect({
       recordSubscriptionChanged: { send: async () => {}, ...unused },
@@ -1672,6 +1675,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
         ...unused,
       },
       recordCheckoutCompleted: { send: async () => {}, ...unused },
+      recordUsageBillingChanged: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,

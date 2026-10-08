@@ -3356,7 +3356,7 @@ const presentations = {
   instant_eval_classifier_not_configured: {
     title: "Instant Evals need a judge on this installation",
     describe: () =>
-      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to add a judge key or connect it to LangWatch.",
+      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to connect it to LangWatch with a license that includes Instant Evals.",
   },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",

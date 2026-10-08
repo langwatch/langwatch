@@ -93,6 +93,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-process": "workspace:*",
     "@langwatch/identity-process": "workspace:*",
+    "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/instant-eval-process": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",

@@ -21,6 +21,7 @@ import {
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
 import { detectEnvironment, StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
+import { UsageBillingCatchUpTask } from "./tasks/usage-billing-catch-up.task.ts";
 import { billingStripeWebhookRest } from "./transport/billing-stripe-webhook.rest.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 import { currencyTrpcTransport } from "./transport/currency.trpc.ts";
@@ -42,7 +43,8 @@ export const billingProcessModule = defineProcessModule("billing")
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
-  .withTasks(async ({ secrets, config }) => [
+  .withTasks(async ({ app, dependencies, secrets, config }) => [
+    UsageBillingCatchUpTask.create({ organizations: dependencies.organizations, billing: app }),
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>
       StripePricesSyncTask.create({
         source: () => {

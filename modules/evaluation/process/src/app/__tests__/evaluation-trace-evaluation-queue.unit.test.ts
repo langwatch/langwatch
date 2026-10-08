@@ -9,6 +9,7 @@ import type {
   QueueSendOptions,
 } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
@@ -36,6 +37,7 @@ async function installed() {
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),

@@ -9,7 +9,7 @@ import type {
   InstantEvalJudgement,
   InstantEvalPricing,
   InstantEvalQuestion,
-} from "@langwatch/instant-eval-contract";
+} from "@langwatch/instant-eval-judge-contract";
 
 export interface InstantEvalClassifyRequest {
   /**
@@ -39,21 +39,4 @@ export interface InstantEvalJudgeChannel {
   close?(): Promise<void>;
   /** Whether it judges for this organization; absent judges for every one. */
   isAvailableForOrganization?(organizationId: string): Promise<boolean>;
-}
-
-/** What one classification asks the limiter for. */
-export interface InstantEvalPermit {
-  /** Estimated input tokens the request will send, text and questions. */
-  readonly tokens: number;
-  /** The project whose share of the rate the request draws on. */
-  readonly tenantId: string;
-}
-
-/**
- * Take the tokens a request needs, or wait until they are there. One method
- * deliberately: everything above cares about being allowed to send, not about
- * how many tokens are left.
- */
-export interface InstantEvalRateLimiterChannel {
-  acquire(permit: InstantEvalPermit, signal?: AbortSignal): Promise<void>;
 }

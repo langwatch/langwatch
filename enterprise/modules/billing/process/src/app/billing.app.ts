@@ -263,6 +263,7 @@ export class BillingModule
           organizations: setup.dependencies.organizations,
           resourceLimitAlerts,
           planLimitAlerts: BillingModule.#composePlanLimitAlerts(setup, notices),
+          billingOrganizations: setup.repositories.reportOrganizations,
         }),
         webhook: {
           host: billingWebhookHostChannels.slack.create({ notices }),
@@ -818,6 +819,20 @@ export class BillingModule
     return this.#lifecycle.pipeline;
   }
 
+  /** The usage-billing catch-up for one organization, for its hand-run task (ADR-174 decision 17). */
+  async catchUpUsageBilling({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ usageBilled: boolean }> {
+    if (!this.#lifecycle) {
+      throw new Error("This billing app was composed without a lifecycle pipeline");
+    }
+    return this.#lifecycle.usageBillingCaughtUp({ organizationId, isDryRun });
+  }
+
   /** Binds the lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<BillingLifecyclePipeline>): void {
     if (!this.#lifecycle) {
@@ -935,6 +950,8 @@ export class BillingModule
       termEndsAt: Temporal.Instant.from(input.termEndsAt),
       operatorId: staff.id,
     });
+    // Onboarding opens the account and its usage subscription, which the meter's rule reads.
+    await this.#lifecycle?.usageBillingChanged({ organizationId: input.organizationId });
     await this.#record({
       staff,
       action: "connectedBilling.onboard",

@@ -31,6 +31,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   "hosted-mcp": "hosted-mcps",
   identity: "identities",
   "instant-eval": "instant-evals",
+  "instant-eval-judge": "instant-eval-judges",
   integration: "integrations",
   langy: "langy",
   log: "logs",

@@ -5,7 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
-import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { BillableEventsTotalResult } from "../rules/billing-month.rules.ts";

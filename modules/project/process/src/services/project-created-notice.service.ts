@@ -87,21 +87,28 @@ export class ProjectCreatedNoticeService {
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
-        "recording the new project failed; the next deploy's key-map backfill writes its row",
+        "recording the new project failed; re-run the backfill-project-created task to record it",
       );
     }
   }
 
   /**
    * Records every project of one organization again, marked as backfilled. Idempotent: the
-   * event keeps its key, and every peer treats a repeat as the same fact.
+   * event keeps its key, and every peer treats a repeat as the same fact. A dry run counts the
+   * projects it would record, recording nothing.
    */
-  async recordExisting(input: Readonly<{ organizationId: string }>): Promise<number> {
+  async recordExisting(
+    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
+  ): Promise<number> {
     const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
     let recorded = 0;
     for (const projectId of projectIds) {
       const found = await this.dependencies.projects.findWithOrgAdmin(projectId);
       if (!found?.organizationId) continue;
+      if (input.isDryRun) {
+        recorded += 1;
+        continue;
+      }
       await this.#send({
         projectId,
         organizationId: found.organizationId,

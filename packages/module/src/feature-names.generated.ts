@@ -23,6 +23,7 @@ export const FEATURE_NAMES = [
   "hosted-mcp",
   "identity",
   "instant-eval",
+  "instant-eval-judge",
   "integration",
   "langy",
   "log",

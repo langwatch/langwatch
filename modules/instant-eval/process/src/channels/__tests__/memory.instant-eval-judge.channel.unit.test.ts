@@ -4,11 +4,16 @@
  * @see modules/instant-eval/specs/classifier.feature
  */
 
-import type { InstantEvalQuestion } from "@langwatch/instant-eval-contract";
+import {
+  estimateInstantEvalRequestTokens,
+  type InstantEvalQuestion,
+} from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
-import { estimateInstantEvalRequestTokens } from "../../rules/instant-eval-token-budget.rules.ts";
-import { DeterministicInstantEvalJudgeChannel } from "../memory/memory.instant-eval-judge.channel.ts";
+import {
+  DeterministicInstantEvalJudgeChannel,
+  MemoryInstantEvalJudgeChannel,
+} from "../memory/memory.instant-eval-judge.channel.ts";
 
 const questions: InstantEvalQuestion[] = [
   { id: "q1", kind: "boolean", instructions: "Is it polite?" },
@@ -58,5 +63,21 @@ describe("DeterministicInstantEvalJudgeChannel", () => {
 
     const probabilities = new Set(answers.map((answer) => answer.verdicts[0]?.probability));
     expect(probabilities.size).toBe(4);
+  });
+});
+
+describe("given a deployment with no judge", () => {
+  describe("when a question is asked", () => {
+    /** @scenario "The null classifier answers every question as skipped" */
+    it("skips it without sending anything", async () => {
+      const judgement = await MemoryInstantEvalJudgeChannel.create().classify();
+
+      expect(judgement).toEqual({
+        verdicts: [],
+        skippedReason: "classifier_not_configured",
+        inputTokens: 0,
+        isTextTruncated: false,
+      });
+    });
   });
 });

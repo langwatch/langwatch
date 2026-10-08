@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { EventingCommands } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { createLogger, type Logger } from "@langwatch/observability";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import {
   buildBillingLifecyclePipeline,
   type BillingLifecyclePipeline,
   type BuildBillingLifecyclePipelineInput,
 } from "../eventing/billing-lifecycle.pipeline.ts";
+import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
+import { usageBilledOf } from "../rules/usage-billed.rules.ts";
 
 const logger = createLogger("langwatch:billing:lifecycle");
+
+/** Attempts at a real usage-billing fact before billing logs it lost (ADR-174 decision 17). */
+export const USAGE_BILLING_SEND_ATTEMPTS = 3;
+const USAGE_BILLING_FIRST_PAUSE_MS = 200;
+
+const pauseFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 type BillingLifecycleAnnouncerDeps = Readonly<{
   /** The webhook subscription repository, read only for whether a live subscription remains. */
@@ -22,6 +30,14 @@ type BillingLifecycleAnnouncerDeps = Readonly<{
   resourceLimitAlerts: BuildBillingLifecyclePipelineInput["alerts"];
   /** The ops alert usage's limit-reached fact ends in, subscribed on the same pipeline. */
   planLimitAlerts: BuildBillingLifecyclePipelineInput["planLimitAlerts"];
+  /** The meter's own read of an organization, uncached, for the usage-billing fact. */
+  billingOrganizations: Pick<BillingReportOrganizationRepository, "getOrganizationForBilling">;
+  /** The clock a usage-billing fact is stamped by; a test names its own. */
+  now?: () => Instant;
+  /** The wait between usage-billing attempts; a test names its own. */
+  pause?: (ms: number) => Promise<void>;
+  /** Where a lost usage-billing fact is logged; a test names its own. */
+  logger?: Pick<Logger, "error">;
 }>;
 
 /**
@@ -60,6 +76,7 @@ export class BillingLifecycleAnnouncerService {
       organizationId,
       hasSubscription: () => Promise.resolve(true),
     });
+    await this.usageBillingChanged({ organizationId });
     await this.#record(organizationId, async (commands) => {
       const members = await this.deps.organizations.getAllMembers({ organizationId });
       await commands.recordSubscriptionStarted.send({
@@ -72,12 +89,92 @@ export class BillingLifecycleAnnouncerService {
   }
 
   /** Whether the organization still holds another live subscription is read after the cancel. */
-  subscriptionCancelled(input: { organizationId: string }): Promise<void> {
-    return this.#subscriptionChanged({
+  async subscriptionCancelled(input: { organizationId: string }): Promise<void> {
+    await this.#subscriptionChanged({
       ...input,
       hasSubscription: async () =>
         (await this.deps.subscriptions.findLastNonCancelled(input.organizationId)) != null,
     });
+    await this.usageBillingChanged(input);
+  }
+
+  /**
+   * Records whether the meter bills the organization, after a write that may change it committed.
+   * Each attempt re-stamps before it reads billing, so no fact out-stamps its answer. A Stripe
+   * redelivery never re-sends a lost fact, so a failed send is retried here, and a last failure
+   * names the catch-up that fixes it. Never throws (ADR-174 decision 17).
+   */
+  async usageBillingChanged({ organizationId }: { organizationId: string }): Promise<void> {
+    const pause = this.deps.pause ?? pauseFor;
+    for (let attempt = 1; attempt <= USAGE_BILLING_SEND_ATTEMPTS; attempt += 1) {
+      try {
+        if (!this.#commands) {
+          throw new Error("billing_lifecycle pipeline senders are not connected yet");
+        }
+        await this.#sendUsageBilling({
+          commands: this.#commands,
+          organizationId,
+          fromCatchUp: false,
+        });
+        return;
+      } catch (error) {
+        if (attempt === USAGE_BILLING_SEND_ATTEMPTS) {
+          (this.deps.logger ?? logger).error(
+            { error, organizationId },
+            "a usage-billing fact was not recorded; re-run usage-billing-catch-up",
+          );
+          return;
+        }
+        await pause(USAGE_BILLING_FIRST_PAUSE_MS * 2 ** (attempt - 1));
+      }
+    }
+  }
+
+  /**
+   * The usage-billing catch-up's fact for one organization, stamped when it reads billing and
+   * keyed by that read, so a re-run is a new fact (ADR-174 decision 17). Throws, unlike the
+   * real fact, so the hand-run task stops on the organization it could not record. A dry run
+   * reads billing and answers what it would record, recording nothing.
+   */
+  async usageBillingCaughtUp({
+    organizationId,
+    isDryRun = false,
+  }: {
+    organizationId: string;
+    isDryRun?: boolean;
+  }): Promise<{ usageBilled: boolean }> {
+    if (isDryRun) return this.#usageBilledOf({ organizationId });
+    if (!this.#commands) {
+      throw new Error("billing_lifecycle pipeline senders are not connected yet");
+    }
+    return this.#sendUsageBilling({ commands: this.#commands, organizationId, fromCatchUp: true });
+  }
+
+  /** Stamped before billing is read, and answered by the meter's one rule. */
+  async #sendUsageBilling({
+    commands,
+    organizationId,
+    fromCatchUp,
+  }: {
+    commands: EventingCommands<BillingLifecyclePipeline>;
+    organizationId: string;
+    fromCatchUp: boolean;
+  }): Promise<{ usageBilled: boolean }> {
+    const occurredAt = (this.deps.now ?? nowInstant)().epochMilliseconds;
+    const { usageBilled } = await this.#usageBilledOf({ organizationId });
+    await commands.recordUsageBillingChanged.send({
+      tenantId: organizationId,
+      occurredAt,
+      organizationId,
+      usageBilled,
+      fromCatchUp,
+    });
+    return { usageBilled };
+  }
+
+  async #usageBilledOf({ organizationId }: { organizationId: string }) {
+    const lookup = await this.deps.billingOrganizations.getOrganizationForBilling(organizationId);
+    return { usageBilled: usageBilledOf({ lookup }).usageBilled };
   }
 
   async checkoutCompleted(input: {

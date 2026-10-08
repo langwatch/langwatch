@@ -176,6 +176,8 @@ export type UiLlmConfigFieldProps = {
 export type UiLlmConfigPopoverProps = {
   values: LLMConfig;
   onChange: (llmConfig: LLMConfig) => void;
+  /** Models LangWatch serves itself, offered first even with no provider configured. */
+  builtInModels?: readonly { value: string; label: string }[];
 };
 
 /** A usage-against-limit row licensing lends: a limit type it names, or a caller's label. */

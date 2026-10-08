@@ -3534,6 +3534,34 @@ model DataPrivacyProjectScope {
   @@index([organizationId])
 }
 
+// The Instant Evals judge's copy of each project's organization, folded from project's
+// lw.project.created (ADR-174 decision 13). No relation to Project.
+model InstantEvalJudgeProject {
+  projectId      String   @id
+  organizationId String
+  createdAt      DateTime
+}
+
+// The judge's copy of whether an organization is usage-billed, folded from billing's event or
+// the catch-up. The newest occurredAt wins; a real fact wins a tie (ADR-174 decision 17).
+model InstantEvalJudgeUsageBilling {
+  organizationId String   @id
+  usageBilled    Boolean
+  occurredAt     DateTime
+  fromCatchUp    Boolean
+}
+
+// The judge's own spend, one row per request, never rewritten. The organization's total is
+// the sum of its rows; the key's leading organizationId serves that sum (ADR-174 decision 13).
+model InstantEvalJudgeSpend {
+  organizationId String
+  requestId      String
+  spendNanoUsd   BigInt
+  occurredAt     DateTime
+
+  @@id([organizationId, requestId])
+}
+
 enum CustomLLMModelCostScopeType {
   ORGANIZATION
   TEAM

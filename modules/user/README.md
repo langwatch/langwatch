@@ -11,7 +11,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | user, user-avatar                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:202` (60 operations) |
+| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:189` (58 operations) |
 | Other token    | `UserAvatarFileApi`, `process/src/transport/user-avatar.rest.ts:23`                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 
@@ -31,17 +31,14 @@ Anything else user needs belongs to another module and is reached through its `*
 
 ## Peers (static dependencies)
 
-| Name                | Token                  | Module                                                                      |
-| ------------------- | ---------------------- | --------------------------------------------------------------------------- |
-| `auth`              | `AuthApi`              | [auth](../auth/README.md)                                                   |
-| `authz`             | `AuthzApi`             | [authz](../authz/README.md)                                                 |
-| `enterpriseGateway` | `EnterpriseGatewayApi` | [enterprise-gateway](../../enterprise/modules/enterprise-gateway/README.md) |
-| `gateway`           | `GatewayApi`           | [gateway](../gateway/README.md)                                             |
-| `governance`        | `GovernanceRestApi`    | [governance](../../enterprise/modules/governance/README.md)                 |
-| `notifications`     | `NotificationService`  | [notification](../notification/README.md)                                   |
-| `organizations`     | `OrganizationApi`      | [organization](../organization/README.md)                                   |
-| `projects`          | `ProjectApi`           | [project](../project/README.md)                                             |
-| `storedObjects`     | `StoredObjectApi`      | [stored-object](../stored-object/README.md)                                 |
+| Name            | Token                 | Module                                      |
+| --------------- | --------------------- | ------------------------------------------- |
+| `auth`          | `AuthApi`             | [auth](../auth/README.md)                   |
+| `authz`         | `AuthzApi`            | [authz](../authz/README.md)                 |
+| `notifications` | `NotificationService` | [notification](../notification/README.md)   |
+| `organizations` | `OrganizationApi`     | [organization](../organization/README.md)   |
+| `projects`      | `ProjectApi`          | [project](../project/README.md)             |
+| `storedObjects` | `StoredObjectApi`     | [stored-object](../stored-object/README.md) |
 
 ## Who depends on user
 

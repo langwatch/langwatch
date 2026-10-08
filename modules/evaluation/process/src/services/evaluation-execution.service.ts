@@ -5,6 +5,7 @@ import {
   type EvaluationRunOutcome,
   type ExecuteEvaluationCommand,
   EvaluatorNotFoundError,
+  type GuardrailCheckDirection,
   type RunTraceEvaluationInput,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
@@ -17,6 +18,7 @@ import {
   getCodeEvaluatorId,
   isCodeEvaluatorCheckType,
 } from "@langwatch/evaluator-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -29,8 +31,10 @@ import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts
 import { evaluationRenderBudget } from "../rules/evaluation-render-budget.rules.ts";
 import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
 import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
+import { instantEvalJudgeOf } from "../rules/instant-eval-judge-dispatch.rules.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";
 import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
+import { EvaluationInstantEvalJudgeService } from "./evaluation-instant-eval-judge.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 import type { EvaluatorModelEnvService } from "./evaluator-model-env.service.ts";
 import type { LangevalsEvaluatorService } from "./langevals-evaluator.service.ts";
@@ -61,6 +65,8 @@ export interface EvaluationExecutionDeps {
   workflows: WorkflowApi;
   evaluators: EvaluatorApi;
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
+  /** Answers a judge whose model is Instant Evals (ADR-174 decision 1). */
+  judges: Pick<InstantEvalJudgeApi, "judge">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -115,9 +121,11 @@ export class EvaluationExecutionService {
   }
 
   private readonly evaluationData: EvaluationDataService;
+  private readonly instantEvals: EvaluationInstantEvalJudgeService;
 
   private constructor(private readonly deps: EvaluationExecutionDeps) {
     this.evaluationData = EvaluationDataService.create(deps);
+    this.instantEvals = EvaluationInstantEvalJudgeService.create(deps);
   }
 
   /** The command carries its mappings as JSON; the engine reads them parsed. */
@@ -273,6 +281,7 @@ export class EvaluationExecutionService {
     workflowId?: string | null;
     idempotencyKey?: string;
     signal?: AbortSignal | undefined;
+    guardrailDirection?: GuardrailCheckDirection | undefined;
   }): Promise<SingleEvaluationResult> {
     return this.runEvaluation(params);
   }
@@ -291,6 +300,7 @@ export class EvaluationExecutionService {
     parentCausalityDepth?: number;
     idempotencyKey?: string;
     signal?: AbortSignal | undefined;
+    guardrailDirection?: GuardrailCheckDirection | undefined;
   }): Promise<SingleEvaluationResult> {
     const {
       projectId,
@@ -322,6 +332,10 @@ export class EvaluationExecutionService {
     }
 
     const droppedCategories = trace?.privacy?.droppedCategories ?? [];
+
+    // Before any provider lookup, so a project with no model provider can judge too.
+    const judge = instantEvalJudgeOf({ evaluatorType: builtInType, settings });
+    if (judge) return this.instantEvals.answer({ ...params, judge, data, droppedCategories });
 
     // Native (in-process) evaluators skip the analysis service; both they and
     // the remote ones run through the shared augmenter so redaction or drop at

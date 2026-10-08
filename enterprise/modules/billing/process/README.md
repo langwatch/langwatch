@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:33`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withTasks(…)`, `src/billing.module.ts:34`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -177,15 +177,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `billing_lifecycle` (aggregate `billing_lifecycle`)
 
-Declared at `src/eventing/billing-lifecycle.pipeline.ts:57`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`.
+Declared at `src/eventing/billing-lifecycle.pipeline.ts:61`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`.
 
 | Kind            | Name                           | Handles               | Declared at                                     |
 | --------------- | ------------------------------ | --------------------- | ----------------------------------------------- |
-| command         | `recordSubscriptionChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:66` |
-| command         | `recordSubscriptionStarted`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:67` |
-| command         | `recordCheckoutCompleted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:68` |
-| peer subscriber | `organizationSeatLimitReached` | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:69` |
-| peer subscriber | `usageLimitReached`            | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:73` |
+| command         | `recordSubscriptionChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:71` |
+| command         | `recordSubscriptionStarted`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:72` |
+| command         | `recordCheckoutCompleted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:73` |
+| command         | `recordUsageBillingChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:74` |
+| peer subscriber | `organizationSeatLimitReached` | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:75` |
+| peer subscriber | `usageLimitReached`            | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:79` |
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
@@ -209,9 +210,10 @@ Declared at `src/eventing/connected-billing.pipeline.ts:52`.
 
 Run by the tasks process, before serve.
 
-| Task                 | Class                  | Declared at                                |
-| -------------------- | ---------------------- | ------------------------------------------ |
-| `stripe-prices-sync` | `StripePricesSyncTask` | `src/tasks/stripe-prices-sync.task.ts:467` |
+| Task                     | Class                     | Declared at                                   |
+| ------------------------ | ------------------------- | --------------------------------------------- |
+| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:22` |
+| `stripe-prices-sync`     | `StripePricesSyncTask`    | `src/tasks/stripe-prices-sync.task.ts:467`    |
 
 ## Configuration
 

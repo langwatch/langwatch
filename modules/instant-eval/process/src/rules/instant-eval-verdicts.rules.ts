@@ -5,7 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
-import type { InstantEvalVerdict } from "@langwatch/instant-eval-contract";
+import type { InstantEvalVerdict } from "@langwatch/instant-eval-judge-contract";
 
 import {
   INSTANT_EVAL_DEFAULT_THRESHOLD,

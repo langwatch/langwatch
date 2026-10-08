@@ -47,7 +47,12 @@ export type RunEvaluatorInput = Readonly<{
   workflowId?: string | null;
   /** Aborts the downstream judge once the caller's deadline passes or its answer is moot. */
   signal?: AbortSignal | undefined;
+  /** Set only on a guardrail check: which part of the call it judges (ADR-174 decision 16). */
+  guardrailDirection?: GuardrailCheckDirection | undefined;
 }>;
+
+/** The part of a gateway call a guardrail check judges, as the data plane names it. */
+export type GuardrailCheckDirection = "request" | "response" | "stream_chunk";
 
 /** One guardrail's evaluator run, bounded by the caller's signal and its own deadline. */
 export type GuardrailCheckInput = Readonly<{
@@ -55,6 +60,7 @@ export type GuardrailCheckInput = Readonly<{
   evaluatorType: string;
   settings: Record<string, unknown>;
   data: Readonly<{ input: string; output: string }>;
+  direction: GuardrailCheckDirection;
   /** The guardrail, and the monitor its cost is recorded against. */
   guardrail: Readonly<{ id: string; name: string; monitorId: string }>;
   signal?: AbortSignal | undefined;

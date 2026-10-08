@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/user.module.ts:14`.
+`defineProcessModule("user").withRepositories(userRepositories).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/user.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:76`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:70`; nothing else in this package is public.
 
 #### `findById`
 
@@ -368,12 +368,6 @@ findLastHomePath(input: UserIdInput): Promise<string | null>;
 setLastHomePath(input: SetUserHomePathInput): Promise<void>;
 ```
 
-#### `getPersonalBudget`
-
-```typescript
-getPersonalBudget(input: { userId: string; organizationId: string }): Promise<UserPersonalBudget>;
-```
-
 #### `requestBudgetIncrease`
 
 ```typescript
@@ -384,14 +378,6 @@ requestBudgetIncrease(input: UserApiRequestBudgetIncreaseInput & { userId: strin
 
 ```typescript
 getHomePagePickerState(input: { userId: string; organizationId: string; }): Promise<UserHomePagePickerState>;
-```
-
-#### `getPersonalUsage`
-
-One person's own AI usage, rolled up over a window, for `/api/me/usage`.
-
-```typescript
-getPersonalUsage(input: { projectId: string; credential: MePersonalCredential; window?: { startMs: number; endMs: number }; }): Promise<MeUsage>;
 ```
 
 #### `getKeyProject`
@@ -438,37 +424,24 @@ hasAnyAccount(): Promise<boolean>;
 
 ### `meRest`
 
-|             |                               |
-| ----------- | ----------------------------- |
-| Declared at | `src/transport/me.rest.ts:26` |
-| Base URL    | `/api/me`, twin `/api/v1/me`  |
-| Addressing  | dated                         |
-| Credential  | project                       |
-| Versions    | `2026-08-07`                  |
-
-#### `GET /usage` · `getApiMeUsage`
-
-Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.
-
-Permission `project:view`. Declared at `src/transport/me.rest.ts:30`.
-
-Answers at `/api/me/usage`, `/api/v1/me/usage`; also, undocumented, `/api/me/2026-08-07/usage`, `/api/v1/me/2026-08-07/usage`, `/api/me/latest/usage`, `/api/v1/me/latest/usage`.
-
-```typescript
-type Query = z.infer<typeof meUsageQuerySchema>; // ../contract/src/user-rest.schemas.ts:14
-type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/user-rest.schemas.ts:60
-```
+|             |                              |
+| ----------- | ---------------------------- |
+| Declared at | `src/transport/me.rest.ts:8` |
+| Base URL    | `/api/me`, twin `/api/v1/me` |
+| Addressing  | dated                        |
+| Credential  | project                      |
+| Versions    | `2026-08-07`                 |
 
 #### `GET /project` · `getApiMeProject`
 
 Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.
 
-Permission `project:view`. Declared at `src/transport/me.rest.ts:51`.
+Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
 
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 
 ```typescript
-type Response = z.infer<typeof meProjectResponseSchema>; // ../contract/src/user-rest.schemas.ts:72
+type Response = z.infer<typeof meProjectResponseSchema>; // ../contract/src/user-rest.schemas.ts:11
 ```
 
 ### `userAvatarRest`
@@ -487,7 +460,7 @@ Deferred scope: a key reads the avatars its own project stores, which the runtim
 Answers at `/api/user-avatar/:projectId/:userAvatarId`.
 
 ```typescript
-type Params = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:103
+type Params = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
 // Response: "bytes" (inline, src/transport/user-avatar.rest.ts:47)
 ```
 
@@ -495,7 +468,7 @@ type Params = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/use
 
 ### `user`
 
-Contract `../contract/src/user.trpc.ts:48`, router `src/transport/user.trpc.ts:46`.
+Contract `../contract/src/user.trpc.ts:47`, router `src/transport/user.trpc.ts:46`.
 
 | Procedure                             | Kind     | Gate                                                                                                                                                         | Input                                         | Output                                 |
 | ------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | -------------------------------------- |
@@ -523,7 +496,6 @@ Contract `../contract/src/user.trpc.ts:48`, router `src/transport/user.trpc.ts:4
 | `user.reactivate`                     | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant | `userApiUserInputSchema`                      | `userApiSuccessSchema`                 |
 | `user.setAvatar`                      | mutation | Permission `organization:view`                                                                                                                               | `userApiSetAvatarInputSchema`                 | `userAvatarResultSchema`               |
 | `user.removeAvatar`                   | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
-| `user.personalBudget`                 | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiPersonalBudgetSchema`          |
 | `user.requestBudgetIncrease`          | mutation | Permission `organization:view`                                                                                                                               | `userApiRequestBudgetIncreaseInputSchema`     | `userApiBudgetIncreaseRequestedSchema` |
 | `user.setLastHomePath`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetLastHomePathInputSchema`           | `userApiOkSchema`                      |
 | `user.homePagePickerState`            | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiHomePagePickerStateSchema`     |
@@ -536,13 +508,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `user_lifecycle` (aggregate `user_account`)
 
-Declared at `src/eventing/user-lifecycle.pipeline.ts:23`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`.
+Declared at `src/eventing/user-lifecycle.pipeline.ts:31`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`.
 
 | Kind    | Name                    | Handles | Declared at                                  |
 | ------- | ----------------------- | ------- | -------------------------------------------- |
-| command | `recordUserDeactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:28` |
-| command | `recordUserReactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:29` |
-| command | `recordUserRegistered`  | –       | `src/eventing/user-lifecycle.pipeline.ts:30` |
+| command | `recordUserDeactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:36` |
+| command | `recordUserReactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:37` |
+| command | `recordUserRegistered`  | –       | `src/eventing/user-lifecycle.pipeline.ts:38` |
 
 ## Configuration
 

@@ -418,6 +418,12 @@
       "path": "modules/instant-eval/contract/tsconfig.json"
     },
     {
+      "path": "modules/instant-eval-judge/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/instant-eval-judge/process/tsconfig.json"
+    },
+    {
       "path": "modules/instant-eval/process/tsconfig.json"
     },
     {

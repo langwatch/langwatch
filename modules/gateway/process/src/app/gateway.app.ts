@@ -52,6 +52,8 @@ import {
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
+  type GatewayConfirmedSpendPage,
+  type GatewayConfirmedSpendQuery,
   type GatewaySpendEventPage,
   type GatewayCaller,
   GatewayWindow,
@@ -164,6 +166,10 @@ import {
   type GatewayGovernanceEventsDefinition,
 } from "../eventing/gateway-governance-events.pipeline.ts";
 import {
+  buildGatewayInstantEvalJudgeSpendPipeline,
+  type GatewayInstantEvalJudgeSpendPipeline,
+} from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
+import {
   buildGatewayPulledUsageLedgerPipeline,
   type GatewayPulledUsageLedgerPipeline,
 } from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -215,6 +221,7 @@ import {
 } from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../services/gateway-instant-eval-judge-spend.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
@@ -1437,6 +1444,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
   }
 
+  /** gateway_instant_eval_judge_spend: the ledger row for each judge call (ADR-174 dec. 13). */
+  instantEvalJudgeSpendPipeline(): GatewayInstantEvalJudgeSpendPipeline {
+    return buildGatewayInstantEvalJudgeSpendPipeline({
+      spend: GatewayInstantEvalJudgeSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
+    });
+  }
+
   /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
   connectGovernanceEvents(
     commands: Readonly<Record<string, EventingCommandSender<unknown>>>,
@@ -2047,6 +2064,18 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     if (!service) return 0;
 
     return service.sumSpendNanoUsdByRequestType({
+      ...input,
+      tenantIds: [...input.tenantIds],
+    });
+  }
+
+  async listConfirmedSpendByRequestType(
+    input: GatewayConfirmedSpendQuery,
+  ): Promise<GatewayConfirmedSpendPage> {
+    const service = this.#dependencies.spendEvents;
+    // No ledger means nothing was ever recorded on it, so there is nothing to copy.
+    if (!service) return { rows: [], nextCursor: null };
+    return service.listConfirmedSpendByRequestType({
       ...input,
       tenantIds: [...input.tenantIds],
     });

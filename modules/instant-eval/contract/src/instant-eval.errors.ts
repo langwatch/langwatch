@@ -86,45 +86,6 @@ export class InstantEvalQuestionsTooLongError extends HandledError {
   }
 }
 
-/**
- * The classifier answered nothing for the whole query. `provider` fault: the
- * failing component is one we buy, and a page for it would reach the wrong
- * team. Some rows failing is not this — those are skipped cells.
- */
-export class InstantEvalClassifierUnavailableError extends HandledError {
-  declare readonly code: "instant_eval_classifier_unavailable";
-
-  constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "instant_eval_classifier_unavailable",
-      "The query ran, but the judgements it asked for could not be made right now.",
-      { httpStatus: 503, fault: "provider", ...options },
-    );
-    this.name = "InstantEvalClassifierUnavailableError";
-  }
-}
-
-/**
- * The organization has spent its free Instant Evals allowance. Refused before
- * anything is judged, so the budget is a ceiling rather than a later bill.
- */
-export class InstantEvalFreeBudgetExhaustedError extends HandledError {
-  declare readonly code: "instant_eval_free_budget_exhausted";
-
-  constructor({ spentUsd, budgetUsd }: { readonly spentUsd: number; readonly budgetUsd: number }) {
-    super(
-      "instant_eval_free_budget_exhausted",
-      "This organization has used its free Instant Evals allowance. Upgrade to a paid plan to keep judging.",
-      {
-        httpStatus: 402,
-        fault: "customer",
-        meta: { spentUsd, budgetUsd },
-      },
-    );
-    this.name = "InstantEvalFreeBudgetExhaustedError";
-  }
-}
-
 /** The project may not run Instant Evals at all. */
 export class InstantEvalNotEnabledError extends HandledError {
   declare readonly code: "instant_eval_not_enabled";
@@ -140,8 +101,8 @@ export class InstantEvalNotEnabledError extends HandledError {
 
 /**
  * The project is released for Instant Evals, but the deployment has no classifier that can judge
- * for its organization (no judge key, no hosted judging through Connect). The operator can act on
- * it, which is why it is not folded into `instant_eval_not_enabled`.
+ * for its organization: it is not LangWatch Cloud and has no hosted judging through Connect. The
+ * operator can act on it, which is why it is not folded into `instant_eval_not_enabled`.
  */
 export class InstantEvalClassifierNotConfiguredError extends HandledError {
   declare readonly code: "instant_eval_classifier_not_configured";

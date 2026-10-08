@@ -246,6 +246,10 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Trace's fold of governance's coding-assistant billing fact, one row per
   // (organizationId, sourceType); every read and write names its organization.
   TraceIngestSourceBilling: {},
+  // The Instant Evals judge's copies of usage billing and of its own spend (ADR-174
+  // decision 13). Every fold, sum and catch-up row names its organization.
+  InstantEvalJudgeUsageBilling: {},
+  InstantEvalJudgeSpend: {},
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
     // its inline (scopeType, scopeId) target (a team / project id unique

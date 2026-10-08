@@ -3,12 +3,12 @@
  * and no float decides it. @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
+import { INSTANT_EVAL_FREE_BUDGET_USD } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   freeInstantEvalStanding,
   INSTANT_EVAL_FREE_BUDGET_NANO_USD,
-  INSTANT_EVAL_FREE_BUDGET_USD,
   instantEvalBudgetRoomNanoUsd,
   instantEvalCommittedUsd,
   isWithinInstantEvalBudget,

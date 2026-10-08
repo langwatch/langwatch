@@ -11,6 +11,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     so the spend page, the budget debits and the billing meter read it with no new table.
   - The record is one confirmed outcome with no admission: the spine already accepts an outcome
     that states its own attribution, and a judgement has no in-flight phase to admit.
+  - A run or a query sends its record through the Instant Evals judge, which prices it, and gateway
+    writes the ledger row from the judge's priced fact (ADR-174 decision 13).
   - The customer price rides the record as its cost. Our own cost and the request count ride the
     metadata beside it, so the margin is recoverable without recomputing a rate that will change.
   - A Stripe meter, `langwatch_instant_eval_usd`, receives the month's price per organization.
@@ -22,18 +24,24 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     Scenario: A finished run is one confirmed spend record addressed by the run
       Given a run that judged two thousand input tokens over forty rows
       When its spend is recorded
-      Then one confirmed outcome is dispatched on the gateway spend pipeline
+      Then one spend record is sent through the Instant Evals judge
       And its request id is the run's own id under the instant eval prefix
-      And its request type is instant_eval, its model is the classifier's and it names no virtual key
+      And it carries the run's input tokens, its request count and the run
+
+    @unit
+    Scenario: A run's ledger row is written from the judge's priced record
+      Given a run's spend the Instant Evals judge priced
+      When gateway writes its ledger row
+      Then its request type is instant_eval, its model is the classifier's and it names no virtual key
       And its input tokens are the run's and its cost is the customer price in nano dollars
-      And its metadata carries our own cost and the request count
+      And its metadata carries our own cost, the request count and the run
 
     @unit
     Scenario: A synchronous query is one confirmed spend record with a fresh id
       Given a query that judged five hundred input tokens
       When its spend is recorded
-      Then one confirmed outcome is dispatched with a fresh instant eval query id
-      And its metadata names no run
+      Then one spend record is sent through the Instant Evals judge with a fresh instant eval query id
+      And it names no run
 
     @unit
     Scenario: A retried finish records the same request rather than a second one
@@ -65,7 +73,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
 
     @unit
     Scenario: A record that cannot be dispatched is raised, not dropped
-      Given a spend pipeline that refuses the outcome
+      Given an Instant Evals judge that cannot store the spend
       When a run's spend is recorded
       Then the failure is raised so the finish is delivered again
 

@@ -31,6 +31,7 @@ const checkInput = {
   evaluatorType: "langevals/basic",
   settings: {},
   data: { input: "hello", output: "" },
+  direction: "request" as const,
   guardrail: { id: "gr-pii", name: "PII", monitorId: "mon-pii" },
 };
 
@@ -94,5 +95,21 @@ describe("EvaluationGuardrailCheckService", () => {
         }),
       );
     });
+  });
+
+  describe("when the check names its direction", () => {
+    /** @scenario "A guardrail passes its direction to the evaluation" */
+    it.each(["request", "response", "stream_chunk"] as const)(
+      "runs the evaluation with the %s direction",
+      async (direction) => {
+        const { service, runEvaluation } = serviceRunning(async () => failing);
+
+        await service.check({ ...checkInput, direction });
+
+        expect(runEvaluation).toHaveBeenCalledWith(
+          expect.objectContaining({ guardrailDirection: direction }),
+        );
+      },
+    );
   });
 });

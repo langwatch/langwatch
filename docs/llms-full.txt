@@ -63788,11 +63788,7 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
-
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
-
-An install with its own judge key still turns Instant Evals on with `RELEASE_INSTANT_EVALS=1`, because no license names that judge.
+An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 When a sentence typed in trace search can't be judged, the popover under the search bar says why:
 
@@ -63801,7 +63797,7 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | Your license doesn't include Instant Evals | Contact us to add them to your license. |
 | Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
 | This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
-| Instant Evals are off on this install | The install judges with its own key, or has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+| Instant Evals are off on this install | The install has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
 
@@ -63926,7 +63922,6 @@ With a license that names hosted services, the install also runs the daily licen
 | Host | Component | When | What it carries | How to stop it |
 |---|---|---|---|---|
 | Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `api.typesafe.ai`, or `JEV_BASE_URL` | App, Workers | `JEV_API_KEY` is set. Instant Evals then use your own key and skip `gateway.langwatch.ai` | Content: the text being judged and the questions | Unset `JEV_API_KEY` |
 | `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
 | `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
 | `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
@@ -63971,7 +63966,7 @@ Both services run only when three things hold: the license names the service, no
 
 Instant Evals judge rows of an LWQL query or a trace search with a hosted model. The App or the Workers send the text being judged (a rendered trace or conversation) and the questions to `gateway.langwatch.ai/v1/instant-evals/classify`. Trace search also sends a typed sentence, the active query and the field list, to route the sentence to a filter.
 
-With `JEV_API_KEY` set, the same calls go to `api.typesafe.ai` with your own key instead, and no Instant Evals call goes to LangWatch. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
+A self-hosted install never judges with a key of its own, so no Instant Evals call goes anywhere else. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
 
 ### Managed models
 
@@ -69397,7 +69392,7 @@ An older migration, or a failed one this image does not ship, stops the run with
 
 ### What the upgrade does
 
-- **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. Today it applies all of the schema in the first pass and then runs each release's blocking steps in release order. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
+- **In release order.** From the release the ledger records to the release of the image, the upgrade plans each release's PostgreSQL migrations, then its ClickHouse migrations on every ClickHouse target (the shared one and each private dataplane), then its blocking data steps. An upgrade by one release applies its schema in one pass, then its blocking steps, as before. An upgrade across several releases steps through them: it says so, then for each release it names the release, applies the PostgreSQL migrations up to and including it, says how many it applied, and runs that release's blocking steps before it moves on, so a blocking step sees the PostgreSQL schema of its own release. While stepping, Prisma's own output is shown only when a migration fails. ClickHouse migrations step the same way: each release applies them on every ClickHouse target up to its own last one. Migrations the image ships that no release lists yet are applied in one pass at the end. A ClickHouse target that fails is reported after the others have run, and fails the upgrade.
 - **Its own record first.** The upgrade keeps its ledger, its lease and the list of running processes in their own PostgreSQL schema, `<your schema>_upgrade_ledger` (`public_upgrade_ledger` by default), which it creates before anything else. The database user in `DATABASE_URL` needs `CREATE` on the database for that; if it has none, create the schema beforehand with that user as its owner.
 - **Never below the floor.** Each release names a long-term-support floor. An installation older than the floor is refused by name (exit code `2`): upgrade to the floor release first, then to this one.
 - **Short locks and retries.** PostgreSQL statements run with a 10 second `lock_timeout`. A statement that waits longer fails instead of blocking your traffic. The upgrade makes up to 3 attempts at a failed schema apply (waiting 2 seconds, then 4), then exits; the previous version keeps serving, and running it again resumes where it stopped.

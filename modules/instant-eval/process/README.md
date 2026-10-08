@@ -6,13 +6,13 @@ The server half of [instant-eval](../README.md). Instant evaluations: the opt-in
 
 ## Installation
 
-`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withApi(InstantEvalModule).withTransports(instantEvalRest).withTransportFacts(…).withEventing(instantEvalEventing)`, `src/instant-eval.module.ts:14`.
+`defineProcessModule("instant-eval").withRepositories(instantEvalRepositories).withApi(InstantEvalModule).withTransports(instantEvalRest).withTransportFacts(…).withEventing(instantEvalEventing).withTasks(…)`, `src/instant-eval.module.ts:15`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:96`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -285,19 +285,22 @@ Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `inst
 | process manager     | `instantEval`                                                           | intents `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:84` |
 | Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                              | `src/eventing/instant-eval-processing.pipeline.ts:73` |
 
+### Tasks
+
+Run by the tasks process, before serve.
+
+| Task                                | Class                              | Declared at                                              |
+| ----------------------------------- | ---------------------------------- | -------------------------------------------------------- |
+| `instant-eval-judge-spend-catch-up` | `InstantEvalJudgeSpendCatchUpTask` | `src/tasks/instant-eval-judge-spend-catch-up.task.ts:21` |
+
 ## Configuration
 
-| Kind   | Leaf                    | Environment variable                    | Declared at                                 |
-| ------ | ----------------------- | --------------------------------------- | ------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval.app.ts:147`           |
-| config | `classifier`            | `INSTANT_EVAL_CLASSIFIER`               | `../contract/src/instant-eval.config.ts:12` |
-| config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval.config.ts:17` |
-| config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval.config.ts:25` |
-| config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval.config.ts:27` |
-| config | `tenantTokensPerSecond` | `INSTANT_EVAL_TENANT_TOKENS_PER_SECOND` | `../contract/src/instant-eval.config.ts:32` |
-| config | `isBounded`             | `INSTANT_EVAL_BOUNDED`                  | `../contract/src/instant-eval.config.ts:41` |
-| config | `queryTokenBudget`      | `INSTANT_EVAL_QUERY_TOKEN_BUDGET`       | `../contract/src/instant-eval.config.ts:43` |
-| config | `isSaas`                | `IS_SAAS`                               | `../contract/src/instant-eval.config.ts:48` |
-| config | `nodeEnvironment`       | `NODE_ENV`                              | `../contract/src/instant-eval.config.ts:50` |
+| Kind   | Leaf               | Environment variable              | Declared at                                 |
+| ------ | ------------------ | --------------------------------- | ------------------------------------------- |
+| config | `classifier`       | `INSTANT_EVAL_CLASSIFIER`         | `../contract/src/instant-eval.config.ts:10` |
+| config | `isBounded`        | `INSTANT_EVAL_BOUNDED`            | `../contract/src/instant-eval.config.ts:19` |
+| config | `queryTokenBudget` | `INSTANT_EVAL_QUERY_TOKEN_BUDGET` | `../contract/src/instant-eval.config.ts:21` |
+| config | `isSaas`           | `IS_SAAS`                         | `../contract/src/instant-eval.config.ts:26` |
+| config | `nodeEnvironment`  | `NODE_ENV`                        | `../contract/src/instant-eval.config.ts:28` |
 
 <!-- readme:generated:end -->

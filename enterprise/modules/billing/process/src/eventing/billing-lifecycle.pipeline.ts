@@ -17,15 +17,18 @@ import {
   RecordCheckoutCompletedCommand,
   RecordSubscriptionChangedCommand,
   RecordSubscriptionStartedCommand,
+  RecordUsageBillingChangedCommand,
 } from "./billing-lifecycle.commands.ts";
 import {
   checkoutCompletedEventSchema,
   subscriptionChangedEventSchema,
   subscriptionStartedEventSchema,
+  usageBillingChangedEventSchema,
   type BillingLifecycleEvent,
   type RecordCheckoutCompletedCommandData,
   type RecordSubscriptionChangedCommandData,
   type RecordSubscriptionStartedCommandData,
+  type RecordUsageBillingChangedCommandData,
 } from "./billing-lifecycle.events.ts";
 import {
   BILLING_PLAN_LIMIT_REACHED_SUBSCRIBER_NAME,
@@ -42,6 +45,7 @@ export type BillingLifecyclePipeline = StaticPipelineDefinition<
   | { name: "recordSubscriptionChanged"; payload: RecordSubscriptionChangedCommandData }
   | { name: "recordSubscriptionStarted"; payload: RecordSubscriptionStartedCommandData }
   | { name: "recordCheckoutCompleted"; payload: RecordCheckoutCompletedCommandData }
+  | { name: "recordUsageBillingChanged"; payload: RecordUsageBillingChangedCommandData }
 >;
 
 /** billing_lifecycle: billing records its facts; peers react from their own side (§9). */
@@ -62,10 +66,12 @@ export function buildBillingLifecyclePipeline({
       subscriptionChangedEventSchema,
       subscriptionStartedEventSchema,
       checkoutCompletedEventSchema,
+      usageBillingChangedEventSchema,
     ])
     .withCommand("recordSubscriptionChanged", RecordSubscriptionChangedCommand)
     .withCommand("recordSubscriptionStarted", RecordSubscriptionStartedCommand)
     .withCommand("recordCheckoutCompleted", RecordCheckoutCompletedCommand)
+    .withCommand("recordUsageBillingChanged", RecordUsageBillingChangedCommand)
     .withPeerSubscriber(
       BILLING_SEAT_LIMIT_REACHED_SUBSCRIBER_NAME,
       seatLimitReachedSubscriber({ alerts }),

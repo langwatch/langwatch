@@ -1225,6 +1225,23 @@ export interface LwqlPrismaRows {
     readonly archivedAt: "DateTime?";
     readonly updatedAt: "DateTime";
   };
+  readonly InstantEvalJudgeProject: {
+    readonly projectId: "String";
+    readonly organizationId: "String";
+    readonly createdAt: "DateTime";
+  };
+  readonly InstantEvalJudgeUsageBilling: {
+    readonly organizationId: "String";
+    readonly usageBilled: "Boolean";
+    readonly occurredAt: "DateTime";
+    readonly fromCatchUp: "Boolean";
+  };
+  readonly InstantEvalJudgeSpend: {
+    readonly organizationId: "String";
+    readonly requestId: "String";
+    readonly spendNanoUsd: "BigInt";
+    readonly occurredAt: "DateTime";
+  };
   readonly CustomLLMModelCost: {
     readonly id: "String";
     readonly organizationId: "String";

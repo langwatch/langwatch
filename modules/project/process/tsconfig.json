@@ -70,6 +70,9 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../instant-eval-judge/process/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {

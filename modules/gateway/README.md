@@ -6,15 +6,15 @@ The AI Gateway: virtual keys, gateway debits and the gateway's internal door, pl
 
 ## At a glance
 
-|                |                                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------ |
-| Classification | core (`modules/catalogue.json`)                                                                        |
-| Subjects       | gateway, gateway-debit, virtual-key                                                                    |
-| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                               |
-| Api token      | `GatewayApi` = `moduleApi<GatewayApi>()("gateway")`, `contract/src/gateway.api.ts:988` (99 operations) |
-| Other token    | `GatewayInternalDoorApi`, `process/src/transport/gateway-internal.rest.ts:99`                          |
-| Other token    | `GatewaySpendApi`, `process/src/transport/gateway-spend.rest.ts:52`                                    |
-| Installed by   | api, worker, tasks (process); ui (browser)                                                             |
+|                |                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
+| Classification | core (`modules/catalogue.json`)                                                                          |
+| Subjects       | gateway, gateway-debit, virtual-key                                                                      |
+| Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                 |
+| Api token      | `GatewayApi` = `moduleApi<GatewayApi>()("gateway")`, `contract/src/gateway.api.ts:1020` (100 operations) |
+| Other token    | `GatewayInternalDoorApi`, `process/src/transport/gateway-internal.rest.ts:99`                            |
+| Other token    | `GatewaySpendApi`, `process/src/transport/gateway-spend.rest.ts:52`                                      |
+| Installed by   | api, worker, tasks (process); ui (browser)                                                               |
 
 ## What gateway owns
 
@@ -24,7 +24,7 @@ The AI Gateway: virtual keys, gateway debits and the gateway's internal door, pl
 | ClickHouse table (writes)      | `gateway_budget_ledger_events`                                                                                                                                                                                                                                                                                                                | `process/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts:289`       |
 | ClickHouse table (writes)      | `gateway_spend`                                                                                                                                                                                                                                                                                                                               | `process/src/repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts:235` |
 | Stores required                | prisma, clickhouse, encryption, redis                                                                                                                                                                                                                                                                                                         | `process/src/repositories/live/live.gateway.repositories.ts:45`                         |
-| Secrets                        | `internalSecret` (LW_GATEWAY_INTERNAL_SECRET), `jwtSecret` (LW_GATEWAY_JWT_SECRET), `virtualKeyPepper` (LW_VIRTUAL_KEY_PEPPER)                                                                                                                                                                                                                | `process/src/app/gateway.app.ts:1132`                                                   |
+| Secrets                        | `internalSecret` (LW_GATEWAY_INTERNAL_SECRET), `jwtSecret` (LW_GATEWAY_JWT_SECRET), `virtualKeyPepper` (LW_VIRTUAL_KEY_PEPPER)                                                                                                                                                                                                                | `process/src/app/gateway.app.ts:1139`                                                   |
 | Config                         | `spendSettlementGraceMs` (LW_SPEND_SETTLEMENT_GRACE_MS), `internalUrl` (LW_GATEWAY_INTERNAL_URL), `controlPlaneUrl` (GATEWAY_CONTROL_PLANE_URL), `publicBaseUrl` (BASE_HOST), `baseUrl` (LW_GATEWAY_BASE_URL), `publicUrl` (LW_GATEWAY_PUBLIC_URL), `isSaas` (IS_SAAS), `allowLoopbackVoiceProviders` (VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS) | `contract/src/gateway.config.ts:25`                                                     |
 
 Anything else gateway needs belongs to another module and is reached through its `*Api`.

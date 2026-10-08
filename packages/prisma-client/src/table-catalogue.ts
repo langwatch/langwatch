@@ -89,6 +89,9 @@ export const prismaTableCatalogue = {
   "RetentionPolicy": "RetentionPolicy",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "DataPrivacyProjectScope": "DataPrivacyProjectScope",
+  "InstantEvalJudgeProject": "InstantEvalJudgeProject",
+  "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
+  "InstantEvalJudgeSpend": "InstantEvalJudgeSpend",
   "CustomLLMModelCost": "CustomLLMModelCost",
   "Workflow": "Workflow",
   "WorkflowVersion": "WorkflowVersion",
@@ -1611,6 +1614,23 @@ export const prismaModelFieldCatalogue = {
     "departmentRecordedAt",
     "archivedAt",
     "updatedAt"
+  ],
+  "InstantEvalJudgeProject": [
+    "projectId",
+    "organizationId",
+    "createdAt"
+  ],
+  "InstantEvalJudgeUsageBilling": [
+    "organizationId",
+    "usageBilled",
+    "occurredAt",
+    "fromCatchUp"
+  ],
+  "InstantEvalJudgeSpend": [
+    "organizationId",
+    "requestId",
+    "spendNanoUsd",
+    "occurredAt"
   ],
   "CustomLLMModelCost": [
     "id",
@@ -3172,6 +3192,9 @@ export const prismaRelationCatalogue = {
   "RetentionPolicy": {},
   "DataPrivacyPolicy": {},
   "DataPrivacyProjectScope": {},
+  "InstantEvalJudgeProject": {},
+  "InstantEvalJudgeUsageBilling": {},
+  "InstantEvalJudgeSpend": {},
   "CustomLLMModelCost": {},
   "Workflow": {
     "project": "Project",
