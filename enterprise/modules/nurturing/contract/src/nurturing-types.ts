@@ -1,5 +1,4 @@
 import { moduleApi } from "@langwatch/module";
-import { Secret } from "@langwatch/secrets/secret";
 
 import type { NurturingSignal } from "./nurturing-signals.ts";
 /**
@@ -186,8 +185,3 @@ export interface NurturingApi {
 }
 
 export const NurturingApi = moduleApi<NurturingApi>()("nurturing");
-
-export const nurturingSecrets = {
-  /** Customer.io's track API key; absent, no lifecycle signal is sent, as on main. */
-  customerIoApiKey: Secret.load("CUSTOMER_IO_API_KEY", { optional: true }),
-} as const;

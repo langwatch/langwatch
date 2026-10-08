@@ -1,4 +1,5 @@
 import { Config, posthogHost, posthogKey, type ConfigOf } from "@langwatch/config";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /** The PostHog target is shared deployment config: the same leaves ops reads. */
@@ -12,3 +13,8 @@ export const nurturingConfig = Config.define((c) => ({
 }));
 
 export type NurturingServerConfig = ConfigOf<typeof nurturingConfig>;
+
+export const nurturingSecrets = {
+  /** Customer.io's track API key; absent, no lifecycle signal is sent, as on main. */
+  customerIoApiKey: Secret.load("CUSTOMER_IO_API_KEY", { optional: true }),
+} as const;

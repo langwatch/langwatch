@@ -2,11 +2,11 @@
 import type { NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import { onboardingExperimentProperties } from "@langwatch/onboarding-contract";
 
-export type ActivationSignal = NurturingSignalOf<
+type ActivationSignal = NurturingSignalOf<
   "scenario_created" | "scenario_run_succeeded" | "first_trace_integrated" | "project_active_day"
 >;
 
-export type ActivationTrackInput = {
+type ActivationTrackInput = {
   userId: string;
   event: string;
   properties: Record<string, unknown>;
