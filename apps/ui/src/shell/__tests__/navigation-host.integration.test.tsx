@@ -20,6 +20,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -41,6 +42,7 @@ const ROOT: typeof LOADED = {
     ),
   },
 };
+const PROCESS: ProcessWebConfig = { mode: "test", deployment: "self-hosted", nlp: true };
 const { useOptionalNavigationHost } = ROOT.navigationHost;
 
 const ORGANIZATION_ID = "org_1";
@@ -192,7 +194,7 @@ function renderChrome(
         <UiCapabilityContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
-              <Route element={<UiAppChrome capabilities={ROOT} />}>
+              <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                 <Route path={address.pattern} element={<HostProbe />} />
               </Route>
             </Routes>
@@ -250,7 +252,7 @@ describe("the application chrome", () => {
           <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc, session }}>
             <UiDesignSystemShell>
               <Routes>
-                <Route element={<UiAppChrome capabilities={ROOT} />}>
+                <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                   <Route path="/:project/traces" element={<HostProbe />} />
                 </Route>
               </Routes>
@@ -364,7 +366,7 @@ describe("the application chrome", () => {
     render(
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <Routes>
-          <Route element={<UiAppChrome capabilities={ROOT} />}>
+          <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
             <Route path="/:project/traces" element={<HostProbe />} />
           </Route>
         </Routes>
@@ -405,7 +407,7 @@ describe("the application chrome", () => {
             <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new RefusingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
-                  <Route element={<UiAppChrome capabilities={ROOT} />}>
+                  <Route element={<UiAppChrome capabilities={ROOT} process={PROCESS} />}>
                     <Route path="/:project/traces" element={<HostProbe />} />
                   </Route>
                 </Routes>

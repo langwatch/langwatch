@@ -15,6 +15,7 @@ import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import type { NavigationScopeWrite, NavigationUser } from "@langwatch/navigation-contract";
@@ -84,8 +85,11 @@ export function UiNavigationHost({
   children,
   commandBar = false,
   capabilities,
+  process,
 }: {
   children: ReactNode;
+  /** The process owner's slice, handed down by the chrome. */
+  process: ProcessWebConfig;
   /** Auth's session and organization's scope, loaded before the shell rendered. */
   capabilities: UiRootCapabilities;
   /**
@@ -94,7 +98,7 @@ export function UiNavigationHost({
    */
   commandBar?: boolean;
 }) {
-  const { host, failure } = useNavigationHostReading({ commandBar, capabilities });
+  const { host, failure } = useNavigationHostReading({ commandBar, capabilities, process });
 
   if (failure.departing) return <LoadingScreen />;
   if (failure.copy) {
@@ -126,9 +130,11 @@ function useNavigationHostReading({
     presenceMenuItem,
     impersonationBanner,
   },
+  process,
 }: {
   commandBar: boolean;
   capabilities: UiRootCapabilities;
+  process: ProcessWebConfig;
 }) {
   const { session, navigation, documentTitle, route } = useUiCapabilities();
   const activeScope = useUiScope().activeScope();
@@ -193,7 +199,10 @@ function useNavigationHostReading({
   );
 
   const uiDeployment = useUiDeployment();
-  const deployment = useMemo(() => navigationDeploymentOf(uiDeployment), [uiDeployment]);
+  const deployment = useMemo(
+    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
+    [uiDeployment, process],
+  );
 
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);

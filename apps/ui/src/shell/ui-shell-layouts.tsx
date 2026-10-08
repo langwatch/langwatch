@@ -18,7 +18,7 @@ export function uiShellLayouts({
       const { default: UiAppChrome } = await import("./ui-app-chrome");
       return {
         default: function UiAppChromeOverCapabilities() {
-          return <UiAppChrome capabilities={root} />;
+          return <UiAppChrome capabilities={root} process={config.process} />;
         },
       };
     },
@@ -26,7 +26,7 @@ export function uiShellLayouts({
       const { default: UiAppChrome } = await import("./ui-app-chrome");
       return {
         default: function UiFullScreenOverCapabilities() {
-          return <UiAppChrome capabilities={root} fullScreen />;
+          return <UiAppChrome capabilities={root} process={config.process} fullScreen />;
         },
       };
     },
