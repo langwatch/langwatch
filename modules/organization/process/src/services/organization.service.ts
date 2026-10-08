@@ -1,29 +1,14 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
   type OrganizationJoinSetting,
   OrganizationService as OrganizationServiceContract,
-  OrganizationNotFoundError,
-  OrganizationS3SecretRequiredError,
-  PERSONAL_TEAM_ARCHIVE_REFUSAL,
-  PersonalTeamProtectedError,
-  TeamNotFoundError,
   UserNotInOrganizationError,
-  TeamSlugConflictError,
   claimOrganizationBillingCustomerInputSchema,
-  createOrganizationTeamInputSchema,
-  getOrganizationTeamInputSchema,
-  getOrganizationTeamByIdInputSchema,
-  getOrganizationTeamBySlugForMemberInputSchema,
   getOldestTeamInputSchema,
   getOrganizationBillingProfileInputSchema,
   getOrganizationIdByTeamIdInputSchema,
   getOrganizationMembersInputSchema,
-  getOrganizationSettingsInputSchema,
-  listOrganizationTeamsInputSchema,
-  updateOrganizationTeamInputSchema,
-  updateOrganizationSettingsInputSchema,
   type AddOrganizationTeamMemberInput,
   type ClaimOrganizationBillingCustomerInput,
   type CreateOrganizationTeamInput,
@@ -69,9 +54,13 @@ import type { OrganizationRepository } from "../repositories/organization.reposi
 import type { TeamRepository } from "../repositories/team.repository.ts";
 import type { GroupIdentity } from "./group-identity.service.ts";
 import { OrganizationGroupService } from "./organization-group.service.ts";
-import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
+import {
+  OrganizationSettingsService,
+  type OrganizationSettingsNotices,
+} from "./organization-settings.service.ts";
 import { OrganizationTeamAccessService } from "./organization-team-access.service.ts";
 import { OrganizationTeamMembersService } from "./organization-team-members.service.ts";
+import { OrganizationTeamService } from "./organization-team.service.ts";
 import type { PersonalWorkspaceDiagnostics } from "./personal-workspace-diagnostics.service.ts";
 import type { PersonalWorkspaceIdentity } from "./personal-workspace-identity.service.ts";
 import {
@@ -80,82 +69,45 @@ import {
 } from "./personal-workspace.service.ts";
 import type { TeamIdentity } from "./team-identity.service.ts";
 
-/** Where a stored presence switch is recorded, so presence folds it from its own side (§9). */
-export type OrganizationSettingsNotices = Pick<
-  OrganizationLifecycleNoticeService,
-  "presenceSettingChanged" | "recordStoredPresenceSetting"
->;
+export type { OrganizationSettingsNotices };
+
+/** What the organization service is built from. */
+export type OrganizationServiceDependencies = {
+  repository: OrganizationRepository;
+  teams: TeamRepository;
+  groups: GroupRepository;
+  identities: PersonalWorkspaceIdentity;
+  teamIdentities: TeamIdentity;
+  groupIdentities: GroupIdentity;
+  authz: AuthzApi;
+  grants: AuthzApi;
+  diagnostics?: PersonalWorkspaceDiagnostics;
+  /** Where a newly created personal workspace is recorded, so project records its project. */
+  notices?: PersonalWorkspaceNotices;
+  /** Where a changed presence switch is recorded, so presence folds it. */
+  settingsNotices?: OrganizationSettingsNotices;
+};
 
 export class OrganizationService extends OrganizationServiceContract {
   private readonly repository: OrganizationRepository;
   private readonly teams: TeamRepository;
-  private readonly groups: GroupRepository;
-  private readonly identities: PersonalWorkspaceIdentity;
-  private readonly teamIdentities: TeamIdentity;
-  private readonly groupIdentities: GroupIdentity;
-  private readonly authz: AuthzApi;
-  private readonly grants: AuthzApi;
-  private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined;
-  private readonly settingsNotices: OrganizationSettingsNotices | undefined;
 
-  private constructor({
-    repository,
-    teams,
-    groups,
-    identities,
-    teamIdentities,
-    groupIdentities,
-    authz,
-    grants,
-    diagnostics,
-    notices,
-    settingsNotices,
-  }: {
-    repository: OrganizationRepository;
-    teams: TeamRepository;
-    groups: GroupRepository;
-    identities: PersonalWorkspaceIdentity;
-    teamIdentities: TeamIdentity;
-    groupIdentities: GroupIdentity;
-    authz: AuthzApi;
-    grants: AuthzApi;
-    diagnostics: PersonalWorkspaceDiagnostics | undefined;
-    notices: PersonalWorkspaceNotices | undefined;
-    settingsNotices: OrganizationSettingsNotices | undefined;
-  }) {
+  private constructor(options: OrganizationServiceDependencies) {
     super();
-    this.settingsNotices = settingsNotices;
-    this.repository = repository;
-    this.teams = teams;
-    this.groups = groups;
-    this.identities = identities;
-    this.teamIdentities = teamIdentities;
-    this.groupIdentities = groupIdentities;
-    this.authz = authz;
-    this.grants = grants;
-    this.diagnostics = diagnostics;
-    this.groupService = OrganizationGroupService.create({
-      groups,
-      groupIdentities,
-      teams,
-      authz,
-      grants,
-    });
-    this.teamAccess = OrganizationTeamAccessService.create({ authz, groups, teams });
+    this.repository = options.repository;
+    this.teams = options.teams;
+    this.groupService = OrganizationGroupService.create(options);
+    this.teamAccess = OrganizationTeamAccessService.create(options);
     this.teamMembers = OrganizationTeamMembersService.create({
-      authz,
-      grants,
-      groups,
-      teams,
-      teamIdentities,
+      ...options,
       createTeam: (input) => this.createTeam(input),
     });
+    this.teamService = OrganizationTeamService.create(options);
+    this.settingsService = OrganizationSettingsService.create(options);
     this.personalWorkspaces = PersonalWorkspaceService.create({
-      repository,
-      identities,
-      grants,
-      diagnostics,
-      notices,
+      ...options,
+      diagnostics: options.diagnostics,
+      notices: options.notices,
     });
   }
 
@@ -166,6 +118,10 @@ export class OrganizationService extends OrganizationServiceContract {
   private readonly teamMembers: OrganizationTeamMembersService;
 
   private readonly personalWorkspaces: PersonalWorkspaceService;
+
+  private readonly teamService: OrganizationTeamService;
+
+  private readonly settingsService: OrganizationSettingsService;
 
   async isMember(input: {
     organizationId: string;
@@ -223,15 +179,8 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
-    const parsed = getOrganizationSettingsInputSchema.parse(input);
-    const stored = await this.repository.findStoredSettings(parsed.organizationId);
-    if (!stored) {
-      throw new OrganizationNotFoundError();
-    }
-
-    return stored;
+    return this.settingsService.getSettings(input);
   }
-
   /** How colleagues on a matching domain get in, where the organization keeps it. */
   getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting> {
     return this.repository.getJoinSetting(input);
@@ -317,73 +266,15 @@ export class OrganizationService extends OrganizationServiceContract {
     input: UpdateOrganizationSettingsInput,
     by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult> {
-    const parsed = updateOrganizationSettingsInputSchema.parse(input);
-    const keepsSecret = !!parsed.s3Endpoint && parsed.s3SecretAccessKey === undefined;
-    if (keepsSecret && !(await this.repository.hasStoredS3Secret(parsed.organizationId))) {
-      throw new OrganizationS3SecretRequiredError();
-    }
-    const stored =
-      parsed.traceSharingEnabled === false || parsed.presenceEnabled !== undefined
-        ? await this.repository.findStoredSettings(parsed.organizationId)
-        : null;
-    const wasSharingEnabled =
-      parsed.traceSharingEnabled === false && stored?.traceSharingEnabled === true;
-    await this.repository.updateSettings(parsed);
-    if (
-      stored &&
-      parsed.presenceEnabled !== undefined &&
-      parsed.presenceEnabled !== stored.presenceEnabled
-    ) {
-      this.settingsNotices?.presenceSettingChanged({
-        organizationId: parsed.organizationId,
-        presenceEnabled: parsed.presenceEnabled,
-        changedByUserId: by?.id ?? null,
-      });
-    }
-
-    return { traceShareRevocationRequired: wasSharingEnabled };
+    return this.settingsService.updateSettings(input, by);
   }
-
   /** The backfill's record of one organization's stored presence switch; keyed once per row. */
   async recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
-    const stored = await this.repository.findStoredSettings(input.organizationId);
-    if (!stored) return false;
-    if (!this.settingsNotices) throw new Error("organization settings notices are not wired");
-    await this.settingsNotices.recordStoredPresenceSetting({
-      organizationId: input.organizationId,
-      presenceEnabled: stored.presenceEnabled,
-    });
-    return true;
+    return this.settingsService.recordStoredPresenceSetting(input);
   }
 
-  static create(options: {
-    repository: OrganizationRepository;
-    teams: TeamRepository;
-    groups: GroupRepository;
-    identities: PersonalWorkspaceIdentity;
-    teamIdentities: TeamIdentity;
-    groupIdentities: GroupIdentity;
-    authz: AuthzApi;
-    grants: AuthzApi;
-    diagnostics?: PersonalWorkspaceDiagnostics;
-    /** Where a newly created personal workspace is recorded, so project records its project. */
-    notices?: PersonalWorkspaceNotices;
-    /** Where a changed presence switch is recorded, so presence folds it. */
-    settingsNotices?: OrganizationSettingsNotices;
-  }): OrganizationService {
-    return new OrganizationService({
-      repository: options.repository,
-      teams: options.teams,
-      groups: options.groups,
-      identities: options.identities,
-      teamIdentities: options.teamIdentities,
-      groupIdentities: options.groupIdentities,
-      authz: options.authz,
-      grants: options.grants,
-      diagnostics: options.diagnostics,
-      notices: options.notices,
-      settingsNotices: options.settingsNotices,
-    });
+  static create(options: OrganizationServiceDependencies): OrganizationService {
+    return new OrganizationService(options);
   }
 
   getOldestTeamId(input: GetOldestTeamInput): Promise<string> {
@@ -417,9 +308,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   /** As `/me` read it: the configured contact, else the longest-seated enabled administrator. */
   async findSupportContact(input: { organizationId: string }): Promise<string | null> {
-    const settings = await this.getSettings(input);
-    if (settings.supportContact) return settings.supportContact;
-    return this.repository.findFirstAdministratorEmail(input.organizationId);
+    return this.settingsService.findSupportContact(input);
   }
 
   getBillingProfile(
@@ -461,59 +350,29 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
-    const parsed = getOrganizationTeamInputSchema.parse(input);
-
-    return this.teams.get(parsed);
+    return this.teamService.getTeam(input);
   }
 
   findPersonalTeamOwners(
     input: Readonly<{ organizationId: string; teamIds: readonly string[] }>,
   ): Promise<{ teamId: string; ownerUserId: string | null }[]> {
-    if (input.teamIds.length === 0) return Promise.resolve([]);
-    return this.teams.findPersonalTeamOwners(input);
+    return this.teamService.findPersonalTeamOwners(input);
   }
 
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
-    return this.teams.listPage(listOrganizationTeamsInputSchema.parse(input));
+    return this.teamService.listTeams(input);
   }
 
   async createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {
-    const parsed = createOrganizationTeamInputSchema.parse(input);
-    const identity = this.teamIdentities.createTeam({ name: parsed.name });
-    const slugTaken = await this.teams
-      .getBySlug({ organizationId: parsed.organizationId, slug: identity.slug })
-      .then(
-        () => true,
-        (error: unknown) => {
-          if (HandledError.isHandled(error) && error.code === "team_not_found") return false;
-          throw error;
-        },
-      );
-    if (slugTaken) {
-      throw new TeamSlugConflictError();
-    }
-
-    return this.teams.create({
-      organizationId: parsed.organizationId,
-      name: parsed.name,
-      ...identity,
-    });
+    return this.teamService.createTeam(input);
   }
 
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
-    const parsed = updateOrganizationTeamInputSchema.parse(input);
-
-    return this.teams.update(parsed);
+    return this.teamService.updateTeam(input);
   }
 
   async archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
-    const parsed = getOrganizationTeamInputSchema.parse(input);
-    const team = await this.teams.get(parsed);
-    if (team.isPersonal) {
-      throw new PersonalTeamProtectedError(PERSONAL_TEAM_ARCHIVE_REFUSAL);
-    }
-
-    return this.teams.archive(parsed);
+    return this.teamService.archiveTeam(input);
   }
 
   addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void> {
@@ -525,25 +384,13 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam> {
-    const parsed = getOrganizationTeamByIdInputSchema.parse(input);
-
-    return this.teams.getById(parsed.teamId);
+    return this.teamService.getTeamById(input);
   }
 
   async getTeamBySlugForMember(
     input: GetOrganizationTeamBySlugForMemberInput,
   ): Promise<OrganizationTeam> {
-    const parsed = getOrganizationTeamBySlugForMemberInputSchema.parse(input);
-    const team = await this.teams.getBySlug(parsed);
-    const bindings = await this.authz.listTeamMemberBindings({
-      organizationId: parsed.organizationId,
-      teamIds: [team.id],
-    });
-    if (!(bindings.get(team.id) ?? []).some(({ userId }) => userId === parsed.userId)) {
-      throw new TeamNotFoundError(team.id);
-    }
-
-    return team;
+    return this.teamService.getTeamBySlugForMember(input);
   }
 
   getTeamWithMembers(

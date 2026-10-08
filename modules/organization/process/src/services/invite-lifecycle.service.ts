@@ -21,6 +21,7 @@ import {
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
+import { assertAssignmentsWithinInvitedSeat } from "../rules/invite-memberships.rules.ts";
 import { InviteCreationService } from "./invite-creation.service.ts";
 
 const logger = createLogger("langwatch:invites:lifecycle");
@@ -222,7 +223,7 @@ export class InviteLifecycleService {
   async createPaymentPendingInvite(
     input: CreatePaymentPendingInviteInput,
   ): Promise<OrganizationInvite> {
-    this.creation.assertAssignmentsWithinInvitedSeat(input);
+    assertAssignmentsWithinInvitedSeat(input);
     const inviteCode = generate(INVITE_CODE_KSUID_RESOURCE).toString();
 
     return this.invites.createPaymentPendingInvite({

@@ -1,58 +1,42 @@
-import type { LedgerActor } from "@langwatch/authorization";
-import {
-  newAuthzGrantId,
-  type AuthzApi,
-  type AuthzBindingForSynthesis,
-  type AuthzGrantCaller,
-  GrantScopeTier,
-} from "@langwatch/authz-contract";
+import { type AuthzGrantCaller } from "@langwatch/authz-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
  */
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import {
-  SsoTestArrivalCannotCreateOrganizationError,
-  type SsoTestArrivalStanding,
-} from "@langwatch/identity-contract";
-import { generate } from "@langwatch/ksuid";
+import { HandledError } from "@langwatch/handled-error";
+import type { SsoTestArrivalStanding } from "@langwatch/identity-contract";
 import {
   type OrganizationAdministrator,
   type OrganizationIntent,
-  type OrganizationFounding,
-  type OrganizationUser,
-  OrganizationUserRole,
-  PricingModel,
-  type TeamUserRole,
+  type OrganizationUserRole,
   type User,
-  CannotRemoveLastAdminError,
-  CannotRemoveSelfError,
   MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
-import slugify from "slugify";
 
 import type {
   AuditLogFilters,
-  CreateAndAssignResult,
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
-  OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
-import type { DeveloperAdmissionVia } from "../rules/admission-audit.rules.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
+import { enrichTeamWithGrants } from "../rules/team-grant-enrichment.rules.ts";
 import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
+import {
+  OrganizationMemberAdmissionService,
+  type OrganizationAdmissions,
+} from "./organization-member-admission.service.ts";
 import type {
   OrganizationGrantCache,
   OrganizationSeatRevocationNotice,
 } from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
+import { OrganizationProvisioningService } from "./organization-provisioning.service.ts";
 import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
@@ -67,89 +51,12 @@ export interface OrganizationTestArrivals {
   standingFor(args: { userId: string }): Promise<SsoTestArrivalStanding>;
 }
 
-/** The KSUID resources an organization and its first team are born under. */
-const ORGANIZATION_KSUID_RESOURCE = "organization";
-const TEAM_KSUID_RESOURCE = "team";
-
-/**
- * Pure function that returns a team enriched with a synthesized member entry
- * for the given user if they have a RoleBinding for this team or one of its
- * projects but no TeamUser row yet.
- */
-type TeamMembershipLike = {
-  userId: string;
-  teamId: string;
-  role: TeamUserRole;
-  assignedRoleId: string | null;
-  assignedRole?: unknown;
-  createdAt: OrganizationUser["createdAt"];
-  updatedAt: OrganizationUser["updatedAt"];
-};
-
 /**
  * The membership, provisioning and audit operations, over one repository and
  * four ports.
  */
-/** The grant half of an admission, answered by the authorization peer. */
-type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
-
 export class OrganizationMembershipService {
-  static enrichTeamWithGrants<
-    T extends {
-      members: TeamMembershipLike[];
-      id: string;
-      projects: { id: string }[];
-    },
-  >({
-    team,
-    userId,
-    userGrants,
-    organizationId,
-  }: {
-    team: T;
-    userId: string;
-    userGrants: AuthzBindingForSynthesis[];
-    organizationId: string;
-  }): T {
-    const teamProjectIds = new Set(team.projects.map((p) => p.id));
-    // TEAM scope takes precedence over PROJECT scope so the synthesized role is
-    // deterministic when a user has both kinds of binding for the same team.
-    const teamBinding = userGrants.find(
-      (b) =>
-        b.organizationId === organizationId &&
-        b.scopeType === GrantScopeTier.TEAM &&
-        b.scopeId === team.id,
-    );
-    const projectBinding = teamBinding
-      ? undefined
-      : userGrants.find(
-          (b) =>
-            b.organizationId === organizationId &&
-            b.scopeType === GrantScopeTier.PROJECT &&
-            teamProjectIds.has(b.scopeId),
-        );
-    const binding = teamBinding ?? projectBinding;
-    if (!binding) {
-      return team;
-    }
-
-    const bindingMember = {
-      userId,
-      teamId: team.id,
-      role: binding.role,
-      assignedRoleId: binding.customRoleId ?? null,
-      assignedRole: binding.customRole ?? null,
-      createdAt: toDate(nowInstant()),
-      updatedAt: toDate(nowInstant()),
-    };
-    const existingIndex = team.members.findIndex((m) => m.userId === userId);
-    const newMembers =
-      existingIndex >= 0
-        ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
-        : [...team.members, bindingMember];
-
-    return { ...team, members: newMembers };
-  }
+  static readonly enrichTeamWithGrants = enrichTeamWithGrants;
 
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
@@ -179,9 +86,13 @@ export class OrganizationMembershipService {
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
+    this.provisioning = OrganizationProvisioningService.create(dependencies);
+    this.admission = OrganizationMemberAdmissionService.create(dependencies);
   }
 
   private readonly roles: OrganizationMemberRoleService;
+  private readonly provisioning: OrganizationProvisioningService;
+  private readonly admission: OrganizationMemberAdmissionService;
 
   private get repo(): OrganizationMembershipRepository {
     return this.dependencies.repository;
@@ -217,186 +128,70 @@ export class OrganizationMembershipService {
     }
   }
 
-  /**
-   * Creates an organization with a default team and assigns the given user as
-   * admin.
-   * they are ledger facts (ADR-092 delivery-plan PR 2) — so they follow it,
-   */
-  async createAndAssign(params: {
-    userId: string;
-    orgName?: string;
-    phoneNumber?: string;
-    signUpData?: Record<string, unknown>;
-    primaryIntent?: OrganizationIntent | null;
-    userDisplayName?: string | null;
-  }): Promise<CreateAndAssignResult> {
-    // A TEST SIGN-IN IS NOT A SIGNUP, and this is the one door: onboarding's
-    // own mutation delegates here, so a check up there is one this call walks
-    // straight past. Creating an organization for the tester strands the real
-    // organization's setup inside a second, empty one.
-    const arrival = await this.dependencies.testArrivals.standingFor({ userId: params.userId });
-    if (arrival.testing) {
-      throw new SsoTestArrivalCannotCreateOrganizationError(
-        `session opened through connection ${arrival.connectionId}, which is not live`,
-      );
-    }
-
-    const orgName = params.orgName ?? params.userDisplayName ?? "My Organization";
-    const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
-    const orgSlug =
-      slugify(orgName, { lower: true, strict: true }) + "-" + orgId.substring(orgId.length - 6);
-
-    const teamId = generate(TEAM_KSUID_RESOURCE).toString();
-    const teamSlug =
-      slugify(orgName, { lower: true, strict: true }) + "-" + teamId.substring(teamId.length - 6);
-
-    const result = await this.repo.createAndAssign({
-      userId: params.userId,
-      orgId,
-      orgName,
-      orgSlug,
-      teamId,
-      teamSlug,
-      phoneNumber: params.phoneNumber,
-      signUpData: params.signUpData,
-      primaryIntent: params.primaryIntent,
-      pricingModel: PricingModel.SEAT_EVENT,
-    });
-
-    await this.dependencies.prompts.seedTagsForOrganization({
-      organizationId: result.organization.id,
-    });
-
-    return result;
+  createAndAssign(
+    params: Parameters<OrganizationProvisioningService["createAndAssign"]>[0],
+  ): ReturnType<OrganizationProvisioningService["createAndAssign"]> {
+    return this.provisioning.createAndAssign(params);
   }
 
-  /**
-   * Creates an organization with a default team and NO user attached: the
-   * self-hosted instance provisioning path ({@link createAndAssign} requires a
-   * member to assign, and this path runs before any user exists).
-   */
-  async createForProvisioning(params: {
-    name: string;
-    slug?: string;
-  }): Promise<CreateAndAssignResult> {
-    const orgId = generate(ORGANIZATION_KSUID_RESOURCE).toString();
-    const orgSlug =
-      params.slug ??
-      slugify(params.name, { lower: true, strict: true }) + "-" + orgId.substring(orgId.length - 6);
-
-    const teamId = generate(TEAM_KSUID_RESOURCE).toString();
-    const teamSlug =
-      slugify(params.name, { lower: true, strict: true }) +
-      "-" +
-      teamId.substring(teamId.length - 6);
-
-    const result = await this.repo.createForProvisioning({
-      orgId,
-      orgName: params.name,
-      orgSlug,
-      teamId,
-      teamSlug,
-      pricingModel: PricingModel.SEAT_EVENT,
-    });
-
-    try {
-      await this.dependencies.prompts.seedTagsForOrganization({
-        organizationId: result.organization.id,
-      });
-    } catch (error) {
-      // The caller has to see what actually went wrong, so a compensation
-      // that fails too is reported rather than raised over the top of it.
-      try {
-        await this.repo.deleteProvisionedOrganization(result.organization.id);
-      } catch (compensationError) {
-        this.dependencies.prompts.reportCompensationFailure(
-          compensationError instanceof Error
-            ? compensationError
-            : new Error(String(compensationError)),
-        );
-      }
-
-      throw error;
-    }
-
-    return result;
+  createForProvisioning(
+    params: Parameters<OrganizationProvisioningService["createForProvisioning"]>[0],
+  ): ReturnType<OrganizationProvisioningService["createForProvisioning"]> {
+    return this.provisioning.createForProvisioning(params);
   }
 
-  /**
-   * The organization a self-hosted licence is issued to, created with its
-   * first team exactly as provisioning creates one, then marked as a customer.
-   */
-  async createSelfHostedCustomer({
-    name,
-  }: {
-    name: string;
-  }): Promise<{ id: string; name: string }> {
-    const { organization } = await this.createForProvisioning({ name });
-    await this.repo.markSelfHostedCustomer(organization.id);
-
-    return organization;
+  createSelfHostedCustomer(
+    params: Parameters<OrganizationProvisioningService["createSelfHostedCustomer"]>[0],
+  ): ReturnType<OrganizationProvisioningService["createSelfHostedCustomer"]> {
+    return this.provisioning.createSelfHostedCustomer(params);
   }
 
-  /** Marks an existing organization as a self-hosted licence customer. */
-  markSelfHostedCustomer({ organizationId }: { organizationId: string }): Promise<void> {
-    return this.repo.markSelfHostedCustomer(organizationId);
+  markSelfHostedCustomer(
+    params: Parameters<OrganizationProvisioningService["markSelfHostedCustomer"]>[0],
+  ): ReturnType<OrganizationProvisioningService["markSelfHostedCustomer"]> {
+    return this.provisioning.markSelfHostedCustomer(params);
   }
 
-  findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
-    return this.repo.findSelfHostedCustomers();
+  findSelfHostedCustomers(): ReturnType<
+    OrganizationProvisioningService["findSelfHostedCustomers"]
+  > {
+    return this.provisioning.findSelfHostedCustomers();
   }
 
-  findFoundedBetween(input: {
-    fromMs: number;
-    toMs: number;
-    followUntilMs: number;
-  }): Promise<OrganizationFounding[]> {
-    return this.repo.findFoundedBetween(input);
+  findFoundedBetween(
+    params: Parameters<OrganizationProvisioningService["findFoundedBetween"]>[0],
+  ): ReturnType<OrganizationProvisioningService["findFoundedBetween"]> {
+    return this.provisioning.findFoundedBetween(params);
   }
 
-  findRepresentatives({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<{ userId: string; organizationName: string }[]> {
-    return this.repo.findRepresentatives(organizationId);
+  findRepresentatives(
+    params: Parameters<OrganizationProvisioningService["findRepresentatives"]>[0],
+  ): ReturnType<OrganizationProvisioningService["findRepresentatives"]> {
+    return this.provisioning.findRepresentatives(params);
   }
 
-  /** Every organization on the instance, for the instance-admin surface. */
-  async listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
-    return this.repo.findAllProvisioningSummaries();
+  listProvisioningSummaries(): ReturnType<
+    OrganizationProvisioningService["listProvisioningSummaries"]
+  > {
+    return this.provisioning.listProvisioningSummaries();
   }
 
-  /**
-   * Compensation for a provisioning run that created the organization but couldn't finish, whose
-   * slug would otherwise squat every retry as a 409. Provisioning is the only caller.
-   */
-  async deleteProvisionedOrganization({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<void> {
-    await this.repo.deleteProvisionedOrganization(organizationId);
+  deleteProvisionedOrganization(
+    params: Parameters<OrganizationProvisioningService["deleteProvisionedOrganization"]>[0],
+  ): ReturnType<OrganizationProvisioningService["deleteProvisionedOrganization"]> {
+    return this.provisioning.deleteProvisionedOrganization(params);
   }
 
-  /** One organization's provisioning summary, or null when the id is unknown. */
-  async findProvisioningSummary(
-    organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null> {
-    try {
-      return await this.repo.getProvisioningSummaryById(organizationId);
-    } catch (error) {
-      if (HandledError.isHandled(error) && error.code === "organization_not_found") return null;
-      throw error;
-    }
+  findProvisioningSummary(
+    params: Parameters<OrganizationProvisioningService["findProvisioningSummary"]>[0],
+  ): ReturnType<OrganizationProvisioningService["findProvisioningSummary"]> {
+    return this.provisioning.findProvisioningSummary(params);
   }
 
-  /** One organization's provisioning summary; an unknown id answers the door's `not_found`. */
-  async getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary> {
-    const summary = await this.findProvisioningSummary(organizationId);
-    if (!summary)
-      throw new NotFoundError("not_found", { resource: "Organization", id: organizationId });
-    return summary;
+  getProvisioningSummary(
+    params: Parameters<OrganizationProvisioningService["getProvisioningSummary"]>[0],
+  ): ReturnType<OrganizationProvisioningService["getProvisioningSummary"]> {
+    return this.provisioning.getProvisioningSummary(params);
   }
 
   /**
@@ -558,106 +353,22 @@ export class OrganizationMembershipService {
     return this.repo.countMembershipsForUser(input);
   }
 
-  /**
-   * Removes a user from an organization and all its teams.
-   */
-  async deleteMember(params: {
-    organizationId: string;
-    userId: string;
-    actingUserId?: string | null;
-  }): Promise<void> {
-    if (params.actingUserId != null && params.actingUserId === params.userId) {
-      throw new CannotRemoveSelfError();
-    }
-
-    await this.repo.getMembership({
-      organizationId: params.organizationId,
-      userId: params.userId,
-    });
-
-    return this.repo.deleteMember({
-      organizationId: params.organizationId,
-      userId: params.userId,
-      actingUserId: params.actingUserId ?? null,
-    });
+  deleteMember(
+    params: Parameters<OrganizationMemberAdmissionService["deleteMember"]>[0],
+  ): ReturnType<OrganizationMemberAdmissionService["deleteMember"]> {
+    return this.admission.deleteMember(params);
   }
 
-  /** Admits somebody on the joiner seat (ADR-171). A MEMBER row carries the
-   *  grant intent an unfinished admission resumes from, in the ledger's own
-   *  scheme (ADR-129); a DEVELOPER row is the whole admission, no grant. */
-  async createMembership({
-    organizationId,
-    userId,
-    admittedBy,
-    seat,
-    origin,
-  }: {
-    organizationId: string;
-    userId: string;
-    admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
-    seat?: "MEMBER" | "DEVELOPER";
-    origin?: "web" | "cli";
-  }): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
-    const grantId = newAuthzGrantId();
-    const admission = await this.repo.createMembership({
-      organizationId,
-      userId,
-      pendingAdmissionId: grantId,
-      via: admissionVia(admittedBy),
-      ...(seat === undefined ? {} : { seat }),
-      ...(origin === undefined ? {} : { origin }),
-    });
-    if (admission.outcome !== "created" || !admittedBy || admission.seat === "DEVELOPER") {
-      return admission;
-    }
-
-    // A join lands its grant here, audited to whoever admitted it: `join-request`
-    // is deliberately auditable, so an automatic join reads like a clicked one.
-    await this.dependencies.admissions.attachBindings({
-      organizationId,
-      bindings: [
-        {
-          bindingId: grantId,
-          principal: { userId },
-          role: "MEMBER",
-          customRoleId: null,
-          scopeType: "ORGANIZATION",
-          scopeId: organizationId,
-        },
-      ],
-      caller: { type: "system" },
-      actor: admittedBy.actor,
-      source: "join-request",
-      onDuplicate: "skip",
-      commandId: admittedBy.commandId,
-      requireProjection: true,
-    });
-    await this.dependencies.admissions.completeAdmission({ organizationId, userId, grantId });
-    return admission;
+  createMembership(
+    params: Parameters<OrganizationMemberAdmissionService["createMembership"]>[0],
+  ): ReturnType<OrganizationMemberAdmissionService["createMembership"]> {
+    return this.admission.createMembership(params);
   }
 
-  /** Refuses when taking this member out would leave the organization with no
-   *  administrator who can sign in — the one lockout nothing inside the product
-   *  can undo. Asked by callers whose own path writes the membership row. */
-  async assertRemovalKeepsAnAdministrator(params: {
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
-    const membership = await this.repo.getMembership(params).catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "member_not_found") return undefined;
-      throw error;
-    });
-    // Not a member, or not an administrator who can sign in: there is no
-    // administrator to lose, so there is nothing to refuse.
-    if (!membership) return;
-    if (membership.role !== OrganizationUserRole.ADMIN || membership.disabledAt !== null) return;
-
-    const administrators = await this.repo.findActiveAdministratorIds({
-      organizationId: params.organizationId,
-    });
-    if (administrators.some((administrator) => administrator !== params.userId)) return;
-
-    throw new CannotRemoveLastAdminError();
+  assertRemovalKeepsAnAdministrator(
+    params: Parameters<OrganizationMemberAdmissionService["assertRemovalKeepsAnAdministrator"]>[0],
+  ): ReturnType<OrganizationMemberAdmissionService["assertRemovalKeepsAnAdministrator"]> {
+    return this.admission.assertRemovalKeepsAnAdministrator(params);
   }
 
   /**
@@ -750,12 +461,4 @@ export class OrganizationMembershipService {
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
   }
-}
-
-/** The route an admission arrived by, as its audit row names it. */
-function admissionVia(
-  admittedBy: Readonly<{ actor: LedgerActor; commandId: string }> | undefined,
-): DeveloperAdmissionVia {
-  if (!admittedBy) return "sso";
-  return admittedBy.actor.type === "user" ? "join-request-approved" : "domain-join";
 }

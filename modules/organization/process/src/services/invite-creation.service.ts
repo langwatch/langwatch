@@ -9,12 +9,9 @@ import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
-  DeveloperSeatNoSharedAccessError,
-  LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
   PersonalWorkspaceNotManagedHereError,
-  TeamUserRole,
   type Organization,
   type OrganizationInvite,
   type OrganizationUser,
@@ -31,10 +28,12 @@ import {
   type CreateInvitesInviteInput,
   type InviteAssignableRoles,
   type InviteServiceDependencies,
-  type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
-import { classifyInvitesByMemberType } from "../rules/invite-memberships.rules.ts";
+import {
+  assertAssignmentsWithinInvitedSeat,
+  classifyInvitesByMemberType,
+} from "../rules/invite-memberships.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
 
 const logger = createLogger("langwatch:invites");
@@ -174,32 +173,6 @@ export class InviteCreationService {
   }
 
   /**
-   * A Lite Member seat allows only the Viewer team role, and a custom role needs a full seat, so
-   * an invitation can't promise more. Refused here, where the admin can act on it.
-   */
-  assertAssignmentsWithinInvitedSeat({
-    role,
-    teamAssignments,
-  }: {
-    role: OrganizationUserRole;
-    teamAssignments?: TeamAssignmentInput[];
-  }): void {
-    if (role === OrganizationUserRole.DEVELOPER) {
-      if ((teamAssignments ?? []).length > 0) throw new DeveloperSeatNoSharedAccessError();
-      return;
-    }
-    if (role !== OrganizationUserRole.EXTERNAL) {
-      return;
-    }
-
-    for (const assignment of teamAssignments ?? []) {
-      if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
-        throw new LiteMemberViewerOnlyError();
-      }
-    }
-  }
-
-  /**
    * Creates an invite record with PENDING status (DB-only, no email). Use this
    * inside transactions to avoid sending emails before commit.
    * @returns The created invite and its organization (for email sending later)
@@ -222,7 +195,7 @@ export class InviteCreationService {
     // batch path, so the seat rule is checked here rather than once per
     // caller: a Lite Member invited through the batch endpoint would
     // otherwise be promised a team role their seat cannot hold.
-    this.assertAssignmentsWithinInvitedSeat(input);
+    assertAssignmentsWithinInvitedSeat(input);
 
     return this.invites.createPendingInvite({
       email: input.email,
