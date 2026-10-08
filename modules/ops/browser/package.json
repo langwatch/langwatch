@@ -35,6 +35,7 @@
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prompt-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/rum-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@monaco-editor/react": "catalog:",
     "@opentelemetry/api": "catalog:",

@@ -3,7 +3,7 @@ import { readUiProcessConfig } from "@langwatch/browser/supply";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 
 import { browserModules } from "../browser-modules.generated.ts";
-import { claimedPublicConfig, uiFeatureConfigOf, type UiFeatureConfig } from "../ui-feature-config";
+import { uiFeatureConfigOf, type UiFeatureConfig } from "../ui-feature-config";
 
 /** The page's config as the api serves it: one slice per owner, by name. */
 export const servedConfig = {
@@ -40,11 +40,7 @@ export async function uiFeatureConfigFrom(served: PublicAppConfig): Promise<UiFe
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport({ query: () => Promise.resolve(null) })
-    .withInjectedConfig(() => claimedPublicConfig(served))
+    .withInjectedConfig(() => served)
     .render();
-  return uiFeatureConfigOf({
-    served,
-    process: readUiProcessConfig(served),
-    installed: installed.config,
-  });
+  return uiFeatureConfigOf({ process: readUiProcessConfig(served), installed: installed.config });
 }

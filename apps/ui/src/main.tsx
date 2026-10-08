@@ -50,7 +50,6 @@ import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
-  claimedPublicConfig,
   uiDeploymentOf,
   uiFeatureConfigOf,
   uiTelemetryOf,
@@ -277,9 +276,9 @@ export async function startUi(): Promise<void> {
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport(transport)
-    .withInjectedConfig(() => claimedPublicConfig(served))
+    .withInjectedConfig(() => served)
     .render();
-  const config = uiFeatureConfigOf({ served, process, installed: installed.config });
+  const config = uiFeatureConfigOf({ process, installed: installed.config });
 
   configureDocsRuntime({ mode: config.process.mode, hostname: window.location.hostname });
   UiRuntime.create({

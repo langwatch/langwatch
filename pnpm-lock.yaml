@@ -11266,6 +11266,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -11729,6 +11732,9 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/rum-contract':
+        specifier: workspace:*
+        version: link:../../rum/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

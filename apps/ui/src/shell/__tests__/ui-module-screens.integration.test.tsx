@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { servedConfig } from "../../__tests__/ui-feature-config.fixtures";
 import { browserModules } from "../../browser-modules.generated.ts";
-import { claimedPublicConfig } from "../../ui-feature-config";
 import type { UiRouteDescriptor } from "../ui-route-table";
 
 // The screen has its own suites; here it only has to report the view its
@@ -33,7 +32,7 @@ async function installModules() {
   return createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport({ query: () => Promise.resolve(null) })
-    .withInjectedConfig(() => claimedPublicConfig(servedConfig))
+    .withInjectedConfig(() => servedConfig)
     .render();
 }
 
@@ -156,6 +155,8 @@ describe("given the installed web modules", () => {
         billing: {},
         evaluator: { hasLangevals: true },
         gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
+        notification: { hasEmailProvider: true },
+        ops: { cloudOps: false, browserTracing: true, sampleRatio: 0.1 },
       });
     });
   });

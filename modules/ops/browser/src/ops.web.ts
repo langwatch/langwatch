@@ -5,8 +5,16 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { opsWebConfigSchema } from "@langwatch/ops-contract";
+import { rumWebConfigSchema } from "@langwatch/rum-contract";
 
 export const opsWeb = defineBrowserModule("ops")
+  // Ops answers for the rum slice too: the shell's telemetry reads both (R3).
+  .withConfig({ ops: opsWebConfigSchema, rum: rumWebConfigSchema }, ({ ops, rum }) => ({
+    browserTracing: rum.enabled,
+    sampleRatio: rum.sampleRatio,
+    ...ops,
+  }))
   .withHosts({
     requires: ["OpsHostApi", "CheckupHostApi"],
     mounts: {

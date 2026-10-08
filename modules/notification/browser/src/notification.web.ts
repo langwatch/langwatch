@@ -4,8 +4,12 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { notificationWebConfigSchema } from "@langwatch/notification-contract";
 
 export const notificationWeb = defineBrowserModule("notification")
+  .withConfig({ notification: notificationWebConfigSchema }, ({ notification }) => ({
+    hasEmailProvider: notification.email,
+  }))
   .withHosts({
     requires: ["NotificationHostApi"],
     mounts: {

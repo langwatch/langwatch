@@ -71,10 +71,10 @@ describe("browser feature configuration", () => {
       ).rejects.toMatchObject({ code: "browser_config_refused", module: "evaluator" });
     });
 
-    it("throws naming an owner still read by the shell", async () => {
+    it("refuses a slice one module claims beside its own, naming that module", async () => {
       await expect(
         uiFeatureConfigFrom({ ...servedConfig, rum: { ...servedConfig.rum, sampleRatio: 2 } }),
-      ).rejects.toThrow(/"rum"/);
+      ).rejects.toMatchObject({ code: "browser_config_refused", module: "ops" });
     });
   });
 
