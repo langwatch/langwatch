@@ -20,6 +20,7 @@ import type {
   TopDocumentsResult,
 } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { tenantAnalyticsLimiter } from "~/server/clickhouse/tenantStatementLimit";
 import type { FilterField } from "~/server/filters/types";
 import type { ElasticSearchEvent } from "~/server/tracer/types";
 import { AnalyticsClientUnavailableError } from "../errors";
@@ -149,20 +150,24 @@ export class LegacyAnalyticsBackendClickHouseRepository
     logger.debug({ sql, params }, "Executing topDocuments query");
 
     try {
-      const result = await client.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      const topDocs = await tenantAnalyticsLimiter.run({
+        tenantId: projectId,
+        task: async () => {
+          const result = await client.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
+          return (await result.json()) as Array<{
+            documentId: string;
+            count: string | number;
+            traceId: string;
+            content?: string;
+            total: string | number;
+          }>;
+        },
       });
-
-      const topDocs = (await result.json()) as Array<{
-        documentId: string;
-        count: string | number;
-        traceId: string;
-        content?: string;
-        total: string | number;
-      }>;
 
       // Every row carries the distinct-document total; no rows means none.
       const total = topDocs[0]?.total ?? 0;

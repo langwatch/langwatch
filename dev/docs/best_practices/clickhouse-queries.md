@@ -117,6 +117,10 @@ The two forms pick the same row. They differ only on two versions tied on `Updat
 
 The same reasoning applies to the rest of a whole-range query. Prefer aggregations, which spill, over `DISTINCT`, window functions and hash joins, which hold their whole input in memory. Prefer `quantileTDigest` over `quantileExact` for percentiles over a range.
 
+When a whole-range query cannot avoid a join whose hash side has one row per trace, return `join_algorithm: "grace_hash"` with a `max_bytes_in_join` budget and a lower `max_threads` in the builder's `settings` (see `SPAN_MODEL_PARTITION_SETTINGS`). The join then spills, and the merge of spilled aggregations, which takes memory per thread, stays bounded.
+
+Analytics panel reads also run through `tenantAnalyticsLimiter` (`src/server/clickhouse/tenantStatementLimit.ts`), which lets one project run `CLICKHOUSE_TENANT_ANALYTICS_CONCURRENCY` (default 4) of them at once per process, so a dashboard load queues its panels instead of running all of them together.
+
 ## Version Columns per Table
 
 | Table | Engine | Version Column | Dedup Key |

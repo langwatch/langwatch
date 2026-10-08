@@ -39,6 +39,9 @@ const RANGE_DAYS = 30;
 const RAG_TRACE_EVERY = 5;
 const RAG_DOCUMENT_COUNT = 2_000;
 
+/** The scaled-down `max_bytes_in_join` for a query that spills its join. */
+const SCALED_JOIN_BYTES = "30000000";
+
 const CAPPED_SETTINGS = {
   max_threads: 2,
   max_memory_usage: "150000000",
@@ -104,13 +107,26 @@ function buildPanelQuery(input: TimeseriesInputType) {
 
 async function runCapped<T>(
   ch: ClickHouseClient,
-  query: { sql: string; params: Record<string, unknown> },
+  query: {
+    sql: string;
+    params: Record<string, unknown>;
+    settings?: Record<string, string | number>;
+  },
 ): Promise<T[]> {
   const result = await ch.query({
     query: query.sql,
     query_params: query.params,
     format: "JSONEachRow",
-    clickhouse_settings: CAPPED_SETTINGS,
+    // The query's own settings first, as the repository merges them. The cap
+    // and the spill thresholds are scaled down with the data, the join budget
+    // of a spilling join included.
+    clickhouse_settings: {
+      ...query.settings,
+      ...CAPPED_SETTINGS,
+      ...(query.settings?.max_bytes_in_join
+        ? { max_bytes_in_join: SCALED_JOIN_BYTES }
+        : {}),
+    },
   });
   return result.json<T>();
 }
@@ -171,7 +187,7 @@ describe("dashboard panels under a memory cap", () => {
         INSERT INTO trace_summaries (ProjectionId, TenantId, TraceId, Version, Attributes, OccurredAt, UpdatedAt, TotalDurationMs, TimeToFirstTokenMs, SpanCount, ContainsErrorStatus, ContainsOKStatus, Models, TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount, TraceName)
         SELECT tid, {tenantId:String}, tid, '2026-09-01',
           map('langwatch.user_id', concat('user-', toString(t % 50000)), 'gen_ai.conversation.id', concat('thread-', toString(intDiv(t, 4)))),
-          occ, occ, (t * 13) % 60000, (t * 7) % 3000, 2, (t % 50) = 0, 1,
+          occ, occ, (t * 13) % 60000, (t * 7) % 3000, if(t % ${RAG_TRACE_EVERY} = 0, 2, 1), (t % 50) = 0, 1,
           [if(t % 3 = 0, 'gpt-5-mini', 'claude-sonnet-4')], 0.001 * (t % 7), 0, 1000 + t % 500, 200 + t % 300,
           concat('agent-', toString(t % 40))
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
@@ -189,6 +205,20 @@ describe("dashboard panels under a memory cap", () => {
           ''
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
         WHERE t % ${RAG_TRACE_EVERY} = 0
+      `,
+      query_params: params,
+    });
+
+    await ch.exec({
+      query: `
+        INSERT INTO stored_spans (ProjectionId, TenantId, TraceId, SpanId, Sampled, StartTime, EndTime, DurationMs, SpanName, SpanKind, ServiceName, SpanAttributes, ScopeName, Cost)
+        SELECT tid, {tenantId:String}, tid, concat(tid, '-llm'), 1, occ, occ + toIntervalMillisecond(400), 400, 'llm', 1, 'agent-service',
+          map('langwatch.span.type', 'llm',
+              'gen_ai.response.model', if(t % 3 = 0, 'gpt-5-mini', 'claude-sonnet-4'),
+              'gen_ai.usage.input_tokens', toString(1000 + t % 500),
+              'gen_ai.usage.output_tokens', toString(200 + t % 300)),
+          '', 0.001 * (t % 7)
+        FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
     });
@@ -357,6 +387,37 @@ describe("dashboard panels under a memory cap", () => {
       const rows = await runCapped<Record<string, unknown>>(ch, query);
       expect(rows.some((row) => row.period === "current")).toBe(true);
     }, 120_000);
+  });
+
+  describe("when the LLM calls chart groups traces by model", () => {
+    /** @scenario The model-grouped chart answers under a memory cap */
+    it("counts every current trace under its model within the cap", async () => {
+      const query = buildPanelQuery(
+        panelInput({
+          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+          timeScale: 1440,
+          groupBy: "metadata.model",
+          skipPreviousPeriod: true,
+        } as PanelInput),
+      );
+      expect(query.table).toBe("trace_summaries");
+
+      const rows = await runCapped<Record<string, unknown>>(ch, query);
+      const perModel = new Map<string, number>();
+      for (const row of rows.filter((r) => r.period === "current")) {
+        const model = String(row.group_key);
+        perModel.set(
+          model,
+          (perModel.get(model) ?? 0) + Number(seriesValue(row)),
+        );
+      }
+      expect([...perModel.keys()].sort()).toEqual([
+        "claude-sonnet-4",
+        "gpt-5-mini",
+      ]);
+      const total = [...perModel.values()].reduce((sum, n) => sum + n, 0);
+      expect(total).toBe(expected.currentTraces);
+    }, 180_000);
   });
 
   describe("when the documents panel ranks RAG documents", () => {

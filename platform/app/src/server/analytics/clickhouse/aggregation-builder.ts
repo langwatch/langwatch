@@ -1093,7 +1093,27 @@ export interface TimeseriesQueryInput {
 export interface BuiltQuery {
   sql: string;
   params: Record<string, unknown>;
+  /**
+   * ClickHouse settings this query shape needs on top of the analytics
+   * defaults. Callers merge them into `clickhouse_settings` after the defaults.
+   */
+  settings?: Record<string, string | number>;
 }
+
+/**
+ * Settings for a model-grouped query, which joins the deduped traces to the
+ * span-model partition: one row per trace and model on the hash side, so a
+ * plain hash join holds memory in proportion to the traces in range and
+ * cannot spill. A grace hash join splits that side into buckets on disk past
+ * `max_bytes_in_join`. Fewer threads bound the merge of the spilled span
+ * aggregation, which takes memory per thread; the panel runs slower (about
+ * 5s to 9s at 3M traces in range) instead of failing.
+ */
+export const SPAN_MODEL_PARTITION_SETTINGS = {
+  join_algorithm: "grace_hash",
+  max_bytes_in_join: 200_000_000,
+  max_threads: 4,
+} as const;
 
 /**
  * Build the HAVING clause for group_key filtering.
@@ -2395,6 +2415,9 @@ function buildArrayJoinTimeseriesQuery({
       ...groupKeyFilterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
+    ...(spanModelPartitioned
+      ? { settings: SPAN_MODEL_PARTITION_SETTINGS }
+      : {}),
   };
 }
 

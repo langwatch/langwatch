@@ -101,6 +101,13 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     And the trace, user and error counts match the seeded data
 
   @integration
+  Scenario: The model-grouped chart answers under a memory cap
+    Given about a million traces with one LLM span each
+    When the LLM calls chart grouped by model runs with a 150 MB per-query cap
+    Then it answers without a memory exceeded error, spilling its join to disk
+    And every current trace is counted under its model
+
+  @integration
   Scenario: The documents panel reads only the RAG contexts attribute
     Given about a million traces whose root spans carry RAG contexts and large message attributes
     When the top documents panel runs with a 150 MB per-query cap
@@ -119,8 +126,22 @@ Feature: ClickHouse Query Memory Safety Regression Tests
 
   @unit
   Scenario: A panel that hides the previous period does not scan it
-    When a panel asks to skip the previous period
-    Then the previous window is empty and the query reads only the current window
+    Given a chart that does not draw the previous period
+    When it loads its data
+    Then it asks to skip the previous period
+    And the previous window is empty and the query reads only the current window
+
+  @integration
+  Scenario: The documents section sends one request per window
+    When the documents summary and the documents table load on the analytics page
+    Then both query with the same window and filters, so they share one request
+
+  @unit
+  Scenario: A dashboard load runs a bounded number of panel queries at once
+    Given a project whose dashboard fires more panel queries than its concurrency limit
+    When the panels load
+    Then only the limit run at once in each app process and the rest wait their turn
+    And other projects' queries do not wait behind them
 
   @unit
   Scenario: The evaluations summary reads the slim evaluation table
