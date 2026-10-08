@@ -5,7 +5,6 @@ import type { PresenceProjectEvent } from "@langwatch/presence-contract";
  * @see modules/trace/specs/trace-tenant-broadcast-worker-composition.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -37,7 +36,7 @@ describe("the discover refresh push", () => {
       const service = TraceListService.create({
         repository: emptyRepository(),
         evaluations: createApiFixture<EvaluationApi>({}),
-        topicService: createApiFixture<TopicApi>({ getNamesByIds: async () => new Map() }),
+        topicNames: { findNamesByIds: async () => new Map() },
         facets: CLICKHOUSE_FACET_CATALOG,
         discoverUpdates: updates,
       });

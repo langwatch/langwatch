@@ -1,6 +1,5 @@
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   TRACE_LIST_MAX_OFFSET_ROWS,
@@ -20,6 +19,7 @@ import type {
 
 import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
+import type { TraceTopicNamesReadRepository } from "../repositories/trace-topic-names.repository.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {
@@ -87,18 +87,19 @@ export class TraceListService {
   static create({
     repository,
     evaluations,
-    topicService,
+    topicNames,
     facets,
     discoverUpdates,
   }: {
     repository: TraceListRead;
     evaluations: EvaluationApi;
-    topicService: TopicApi;
+    /** Trace's fold of topic's names; facet labels read it. */
+    topicNames: Pick<TraceTopicNamesReadRepository, "findNamesByIds">;
     facets: FacetCatalog;
     /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
     discoverUpdates: Pick<PresenceApi, "publishProjectEvent">;
   }): TraceListService {
-    const topicNaming = TraceTopicNamingService.create({ topicService });
+    const topicNaming = TraceTopicNamingService.create({ topicNames });
 
     return new TraceListService({
       repository,

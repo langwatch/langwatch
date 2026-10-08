@@ -4,7 +4,6 @@
  * window and the project's privacy policy.
  * @see specs/automations/worker-automation-settlement-conversion.feature
  */
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -20,7 +19,6 @@ import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
@@ -89,15 +87,7 @@ function compose({
   askedOrganizations?: string[];
 }) {
   const apis = new LocalFeatureApis();
-  for (const token of [
-    AnnotationApi,
-    AuthzApi,
-    DataRetentionApi,
-    EvaluationApi,
-    ModelProviderApi,
-    ShareApi,
-    TopicApi,
-  ]) {
+  for (const token of [AuthzApi, DataRetentionApi, EvaluationApi, ModelProviderApi, ShareApi]) {
     apis.declare(token);
   }
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
@@ -141,13 +131,11 @@ function compose({
       dataPrivacy,
       fallbackVisibilityDays: 14,
     },
-    annotations: apis.reference(AnnotationApi),
     dataRetention: apis.reference(DataRetentionApi),
     evaluations: apis.reference(EvaluationApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects,
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
     requestBounds: countingPlans,
     exportBounds: null,
   });

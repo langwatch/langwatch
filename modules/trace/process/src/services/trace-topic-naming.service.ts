@@ -4,18 +4,21 @@
  * cached facet's identity.
  */
 
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { CategoricalFacetResult } from "@langwatch/trace-contract";
 
-export class TraceTopicNamingService {
-  private constructor(private readonly topicService: TopicApi) {}
+import type { TraceTopicNamesReadRepository } from "../repositories/trace-topic-names.repository.ts";
 
-  static create({ topicService }: { topicService: TopicApi }): TraceTopicNamingService {
-    return new TraceTopicNamingService(topicService);
+type TopicNames = Pick<TraceTopicNamesReadRepository, "findNamesByIds">;
+
+export class TraceTopicNamingService {
+  private constructor(private readonly topicNames: TopicNames) {}
+
+  static create({ topicNames }: { topicNames: TopicNames }): TraceTopicNamingService {
+    return new TraceTopicNamingService(topicNames);
   }
 
   /**
-   * Replace TopicId/SubTopicId facet values with friendly names from Postgres.
+   * Replace TopicId/SubTopicId facet values with friendly names from trace's topic fold.
    * The `value` field stays as the ID (used for filtering); `label` carries the name.
    */
   async enrichTopicNames(
@@ -27,7 +30,7 @@ export class TraceTopicNamingService {
       return result;
     }
 
-    const names = await this.topicService.getNamesByIds({ projectId, ids });
+    const names = await this.topicNames.findNamesByIds({ projectId, ids });
 
     return {
       ...result,

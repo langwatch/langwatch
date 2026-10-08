@@ -38,6 +38,6 @@ Anything else topic needs belongs to another module and is reached through its `
 
 ## Who depends on topic
 
-[trace](../trace/README.md) (as a peer).
+No module names topic as a peer.
 
 <!-- readme:generated:end -->

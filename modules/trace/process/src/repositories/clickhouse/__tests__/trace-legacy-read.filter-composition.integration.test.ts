@@ -6,8 +6,6 @@
  * @see specs/traces/trace-filter-api.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -105,10 +103,10 @@ describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", ()
     repo = TraceLegacyReadClickHouseRepository.create({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
-      annotations: createApiFixture<AnnotationApi>({
-        listForProjection: async () => [],
-        listScoreNames: async () => [],
-      }),
+      annotations: {
+        rows: { findForTraces: async () => [] },
+        scores: { findScoreNames: async () => [] },
+      },
     });
     await ch.insert({
       table: "trace_summaries",

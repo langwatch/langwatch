@@ -45,6 +45,6 @@ Anything else annotation needs belongs to another module and is reached through 
 
 ## Who depends on annotation
 
-[audit-log](../audit-log/README.md), [automation](../automation/README.md), [ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
+[audit-log](../audit-log/README.md), [automation](../automation/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

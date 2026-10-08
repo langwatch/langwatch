@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
@@ -46,7 +45,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { type ShareViewer, ShareApi } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
   traceRecordSchema,
@@ -142,9 +140,9 @@ import {
   type TraceAttributedTrace,
   type TraceAttributedTraceDetail,
   type TraceAttributedValueComparison,
-  type TraceCost,
   type TraceAttributedValueSpend,
   type TraceAttributeMatch,
+  type TraceCost,
   type TraceDailyGroupSpend,
   type TraceDailySpendGroup,
   type TraceProjectValueSpend,
@@ -688,7 +686,6 @@ export interface TraceAppDependencies {
       occurredAt: number;
     }): Promise<unknown>;
   }>;
-  topics: TopicApi;
   broadcast: TracesTrpcEmitters;
   /** The unmapped-model hint the span detail carries; read after the span is protected. */
   spanCostSuggestions: TraceSpanCostSuggestion;
@@ -788,9 +785,7 @@ type TraceReaderCompositionOptions = {
   /** A test's summary store; absent, the summary is read off the trace_summaries row. */
   summaryStore?: FoldProjectionStore<TraceSummaryData> | undefined;
   projects: ProjectApi;
-  topics: TopicApi;
   modelProviders: ModelProviderApi;
-  annotations: AnnotationApi;
   dataRetention: DataRetentionApi;
   protections: TraceViewerProtectionOptions;
   /**
@@ -868,7 +863,6 @@ type TraceTreeCompositionOptions = {
 export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = {
-    annotations: AnnotationApi,
     /**
      * The API-key directory the deprecated `/api/trace/*` family resolves its
      * own credential through: it opts out of the framework door because a
@@ -889,7 +883,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     projects: ProjectApi,
     share: ShareApi,
     storedObjects: StoredObjectApi,
-    topics: TopicApi,
   };
   /** The span pipeline's settings and the shared public origin `platformUrl` links to. */
   static readonly config = traceConfig;
@@ -1020,7 +1013,10 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         retentionResolver: options.dataRetention,
-        annotations: options.annotations,
+        annotations: {
+          rows: options.repositories.annotations,
+          scores: options.repositories.annotationScores,
+        },
         blobResolutionDeps,
       }),
       editOverlay,
@@ -1030,7 +1026,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const list = TraceListService.create({
       repository: options.repositories.list,
       evaluations: options.evaluations,
-      topicService: options.topics,
+      topicNames: options.repositories.topicNames,
       facets: CLICKHOUSE_FACET_CATALOG,
       discoverUpdates: options.tenantBroadcast,
     });
@@ -1123,7 +1119,6 @@ export class TraceModule implements TraceApi, CollectorApp {
           await options.commands.removeAnnotation(input);
         },
       },
-      topics: options.topics,
       projects: options.projects,
       spanCostSuggestions: SpanCostSuggestionService.create({
         modelProviders: options.modelProviders,
@@ -2204,17 +2199,17 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   findExistingTraceIds(input: {
     projectId: string;
+    traceIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#dependencies.traces.existence.findExistingTraceIds(input);
+  }
+
   findTraceCosts(input: {
     projectId: string;
     traceIds: readonly string[];
     occurredAt: { from: number; to: number };
   }): Promise<TraceCost[]> {
     return this.#dependencies.traces.existence.findTraceCosts(input);
-  }
-
-    traceIds: readonly string[];
-  }): Promise<string[]> {
-    return this.#dependencies.traces.existence.findExistingTraceIds(input);
   }
 
   loadTraces(input: {

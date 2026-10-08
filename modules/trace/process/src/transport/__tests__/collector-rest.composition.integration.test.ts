@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -17,7 +16,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -51,7 +49,6 @@ const API_KEY_ID = "api-key-1";
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   for (const token of [
-    AnnotationApi,
     AuthzApi,
     DataPrivacyApi,
     DataRetentionApi,
@@ -60,13 +57,11 @@ function unreachablePeers() {
     ModelProviderApi,
     ProjectApi,
     ShareApi,
-    TopicApi,
   ]) {
     apis.declare(token);
   }
 
   return {
-    annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
@@ -75,7 +70,6 @@ function unreachablePeers() {
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
   };
 }
 
@@ -170,9 +164,7 @@ function deployment(access: CollectorAccess = {}) {
         fallbackVisibilityDays: 14,
       },
       projects: peers.projects,
-      topics: peers.topics,
       modelProviders: peers.modelProviders,
-      annotations: peers.annotations,
       dataRetention: peers.dataRetention,
       evaluations: peers.evaluations,
       share: peers.share,

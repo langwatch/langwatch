@@ -10,7 +10,6 @@ import {
  * is never read as a trace id.
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -38,7 +37,7 @@ function mount(
   const facetValues = TraceFacetValuesService.create({
     repository: createApiFixture<TraceListRead>({}, "list repository"),
     topicNaming: TraceTopicNamingService.create({
-      topicService: createApiFixture<TopicApi>({}, "topics"),
+      topicNames: { findNamesByIds: async () => new Map() },
     }),
     facets: CLICKHOUSE_FACET_CATALOG,
   });

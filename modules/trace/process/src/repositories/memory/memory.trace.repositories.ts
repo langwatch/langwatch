@@ -17,6 +17,8 @@ import { MemoryNullTraceListRepository } from "./memory.null-trace-list.reposito
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
+import { MemoryTraceAnnotationScoresRepository } from "./memory.trace-annotation-scores.repository.ts";
+import { MemoryTraceAnnotationsRepository } from "./memory.trace-annotations.repository.ts";
 import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
 import { MemoryTraceDerivationSpanRepository } from "./memory.trace-derivation-span.repository.ts";
 import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.repository.ts";
@@ -29,6 +31,7 @@ import { MemoryTraceSpanDedupRepository } from "./memory.trace-span-dedup.reposi
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
 import { MemoryTraceSummaryRepository } from "./memory.trace-summary.repository.ts";
+import { MemoryTraceTopicNamesRepository } from "./memory.trace-topic-names.repository.ts";
 import { MemoryTraceUsageCountRepository } from "./memory.trace-usage-count.repository.ts";
 
 /** No cache tier in memory: the durable store is already as fast as a cache. */
@@ -116,6 +119,9 @@ export class MemoryTraceRepositories {
       // process there is nothing to read back, so the memory tier answers
       // empty rather than pretending to hold logs.
       logRecords: new NullLogRecordStorageRepository(),
+      topicNames: MemoryTraceTopicNamesRepository.create(),
+      annotations: MemoryTraceAnnotationsRepository.create(),
+      annotationScores: MemoryTraceAnnotationScoresRepository.create(),
       // The list and the session rollup are ClickHouse aggregations over the
       // summary projection, which this tier does not fold: they answer empty
       // pages rather than a half-built rollup over the spans it does hold.

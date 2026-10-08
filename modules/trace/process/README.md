@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withApi(TraceModule).withTransports(tracesTrpcTransport, tracesInstantEvalTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).withTransportFacts(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceIngestSourceBillingEventing).withEventing(traceLogRecordsEventing).withMigrations(…)`, `src/trace.module.ts:35`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withApi(TraceModule).withTransports(tracesTrpcTransport, tracesInstantEvalTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).withTransportFacts(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceIngestSourceBillingEventing).withEventing(traceLogRecordsEventing).withEventing(traceTopicNamesEventing).withEventing(traceAnnotationsEventing).withMigrations(…)`, `src/trace.module.ts:44`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -1460,6 +1460,15 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `trace_annotations` (aggregate `global`)
+
+Declared at `src/eventing/trace-annotations.pipeline.ts:40`.
+
+| Kind                 | Name                                      | Handles | Declared at                                     |
+| -------------------- | ----------------------------------------- | ------- | ----------------------------------------------- |
+| peer fold projection | `≈ traceAnnotationsPeerFold(annotations)` | –       | `src/eventing/trace-annotations.pipeline.ts:46` |
+| peer fold projection | `≈ traceAnnotationScoresPeerFold(scores)` | –       | `src/eventing/trace-annotations.pipeline.ts:47` |
+
 ### Pipeline `trace_ingest_source_billing` (aggregate `global`)
 
 Declared at `src/eventing/trace-ingest-source-billing.pipeline.ts:31`.
@@ -1505,6 +1514,14 @@ Declared at `src/eventing/trace-project-milestones.pipeline.ts:21`. Events: `fir
 | ------- | --------------------- | ------- | ------------------------------------------------------ |
 | command | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:26` |
 | command | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
+
+### Pipeline `trace_topic_names` (aggregate `global`)
+
+Declared at `src/eventing/trace-topic-names.pipeline.ts:29`.
+
+| Kind                 | Name                               | Handles | Declared at                                     |
+| -------------------- | ---------------------------------- | ------- | ----------------------------------------------- |
+| peer fold projection | `≈ traceTopicNamesPeerFold(store)` | –       | `src/eventing/trace-topic-names.pipeline.ts:35` |
 
 ## Configuration
 

@@ -6,7 +6,6 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
  * @see specs/traces-v2/search.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import {
   explorerHiddenOrigins,
   LANGY_TRACE_ORIGIN,
@@ -85,7 +84,7 @@ async function facetsFor({
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: createApiFixture<EvaluationApi>({}),
-    topicService: createApiFixture<TopicApi>({ getNamesByIds: async () => new Map() }),
+    topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({
     tenantId: TENANT,

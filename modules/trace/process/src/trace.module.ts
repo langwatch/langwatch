@@ -7,6 +7,11 @@ import { defineProcessModule } from "@langwatch/process";
 import { defineProjectionReplayStep } from "@langwatch/upgrade/step";
 
 import { TraceModule } from "./app/trace.app.ts";
+import {
+  TRACE_ANNOTATION_SCORES_LANE,
+  TRACE_ANNOTATIONS_LANE,
+  traceAnnotationsEventing,
+} from "./eventing/trace-annotations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./eventing/trace-ingest-source-billing.pipeline.ts";
 import {
   TRACE_LOG_RECORD_STORAGE_LANE,
@@ -14,6 +19,10 @@ import {
 } from "./eventing/trace-log-records.pipeline.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
+import {
+  TRACE_TOPIC_NAMES_LANE,
+  traceTopicNamesEventing,
+} from "./eventing/trace-topic-names.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
@@ -77,12 +86,36 @@ export const traceProcessModule = defineProcessModule("trace")
   .withEventing(traceIngestSourceBillingEventing)
   // Worker-hosted: log's record fact mapped into trace's own stored_log_records (D-LOG).
   .withEventing(traceLogRecordsEventing)
+  // Worker-hosted: topic's names and annotation's rows folded into trace's tables (rounds 23, 24).
+  .withEventing(traceTopicNamesEventing)
+  .withEventing(traceAnnotationsEventing)
   // needsOldWritersGone: an old worker dispatching log's fact does not know the new lane.
   .withMigrations(({ replayer }) => [
     defineProjectionReplayStep({
       id: "trace:map-log-records",
       description: "Maps every log record log has recorded into trace's stored_log_records.",
       lane: TRACE_LOG_RECORD_STORAGE_LANE,
+      needsOldWritersGone: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "trace:fold-topic-names",
+      description: "Folds every topic model topic has recorded into trace's trace_topic_names.",
+      lane: TRACE_TOPIC_NAMES_LANE,
+      needsOldWritersGone: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "trace:fold-annotations",
+      description: "Folds every annotation fact annotation has recorded into trace_annotations.",
+      lane: TRACE_ANNOTATIONS_LANE,
+      needsOldWritersGone: true,
+      replayer,
+    }),
+    defineProjectionReplayStep({
+      id: "trace:fold-annotation-scores",
+      description: "Folds every score name annotation has recorded into trace_annotation_scores.",
+      lane: TRACE_ANNOTATION_SCORES_LANE,
       needsOldWritersGone: true,
       replayer,
     }),

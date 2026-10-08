@@ -23,7 +23,7 @@ function makeService() {
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
     evaluations: undefined as never,
-    topicService: undefined as never,
+    topicNames: undefined as never,
   });
   return { repository, service };
 }

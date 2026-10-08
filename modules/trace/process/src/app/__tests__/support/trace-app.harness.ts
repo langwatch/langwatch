@@ -16,7 +16,6 @@ export function createTraceAppHarness({
 } = {}): TraceModule {
   return TraceModule.fromDependencies({
     storedObjects: createApiFixture<TraceAppDependencies["storedObjects"]>({}, "storedObjects"),
-    topics: createApiFixture<TraceAppDependencies["topics"]>({}, "topics"),
     broadcast: createApiFixture<TraceAppDependencies["broadcast"]>({}, "broadcast"),
     spanCostSuggestions: createApiFixture<TraceAppDependencies["spanCostSuggestions"]>(
       {},
