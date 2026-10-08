@@ -793,6 +793,19 @@ export const app = secured.hono;
 
 // ============ Shared helpers ============
 
+/**
+ * Whether an errored evaluation result is a timeout the route should retry.
+ *
+ * `details` is typed as a required string, but an evaluator can return
+ * `status: "error"` with no `details` at runtime (observed in production).
+ * Reading it unguarded threw `TypeError: Cannot read properties of undefined`,
+ * which the dispatch's catch swallowed as a generic INTERNAL_ERROR and hid the
+ * real evaluator error (langwatch/tasks#8507). A missing `details` is treated
+ * as "not a timeout" so the original error result is returned to the caller.
+ */
+export const isTimeoutError = (result: { details?: string }): boolean =>
+  result.details?.toLowerCase().includes("timed out") ?? false;
+
 const batchEvaluationInputSchema = z.object({
   evaluation: z.string(),
   experimentSlug: z.string().optional(),
@@ -1439,10 +1452,7 @@ async function handleEvaluatorCall(
   try {
     result = await runEval();
 
-    if (
-      result.status === "error" &&
-      result.details.toLowerCase().includes("timed out")
-    ) {
+    if (result.status === "error" && isTimeoutError(result)) {
       result = await runEval();
     }
 
