@@ -9,9 +9,11 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
-import { MemoryOrganizationRepositories } from "../../../repositories/memory/memory.organization.repositories.ts";
+import { MemoryOrganizationDatabase } from "../../../repositories/memory/memory.organization.database.ts";
+import { memoryOrganizationRepositories } from "../../../repositories/memory/memory.organization.repositories.ts";
 import type { OrganizationModule } from "../../organization.app.ts";
 
 export type OrganizationModuleSetup = Parameters<typeof OrganizationModule.create>[0];
@@ -25,7 +27,10 @@ const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
  * What `OrganizationModule.create` receives at boot, over the memory tier of the module's own
  * registry. Every peer a suite does not name is a fixture that throws by name when touched.
  */
-export function organizationModuleSetup(peers: Partial<Peers> = {}): OrganizationModuleSetup {
+export function organizationModuleSetup(
+  peers: Partial<Peers> & { memory?: MemoryOrganizationDatabase } = {},
+): OrganizationModuleSetup {
+  const { memory = MemoryOrganizationDatabase.create() } = peers;
   return {
     dependencies: {
       projects: peers.projects ?? createApiFixture<ProjectApi>({}, "ProjectApi"),
@@ -45,6 +50,40 @@ export function organizationModuleSetup(peers: Partial<Peers> = {}): Organizatio
     },
     resources: new ResourceScope(),
     secrets: noSecrets,
-    repositories: MemoryOrganizationRepositories.create(),
+    repositories: memoryOrganizationRepositories({ memory }),
   };
+}
+
+/** One live project row in the memory store, as the `Project` share reads it. */
+export function seedMemoryProject({
+  memory,
+  id,
+  name,
+  slug = id,
+  teamId,
+  organizationId,
+  at = nowInstant(),
+}: {
+  memory: MemoryOrganizationDatabase;
+  id: string;
+  name: string;
+  slug?: string;
+  teamId: string;
+  organizationId: string;
+  at?: Instant;
+}): void {
+  memory.projects.set(id, {
+    id,
+    name,
+    slug,
+    apiKey: `sk-lw-${id}`,
+    teamId,
+    isPersonal: false,
+    ownerUserId: null,
+    organizationId,
+    archivedAt: null,
+    createdAt: at,
+    updatedAt: at,
+    personalFeatures: null,
+  });
 }

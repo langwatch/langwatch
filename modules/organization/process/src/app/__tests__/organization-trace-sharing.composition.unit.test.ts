@@ -3,15 +3,14 @@
  * setting commits, then organization records the fact naming every project; share revokes.
  * @see modules/organization/specs/organization-service.feature
  */
-import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { RecordTraceSharingDisabledCommandData } from "../../eventing/organization-lifecycle.events.ts";
+import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import type { OrganizationLifecycleSenders } from "../../services/organization-lifecycle-notice.service.ts";
 import { TestAuthzApi } from "../../transport/__tests__/support/test-authz-api.ts";
 import { OrganizationModule } from "../organization.app.ts";
-import { organizationModuleSetup } from "./support/organization-module-setup.ts";
+import { organizationModuleSetup, seedMemoryProject } from "./support/organization-module-setup.ts";
 
 const ORGANIZATION_ID = "org-1";
 const ADMIN = { id: "user-admin" };
@@ -44,7 +43,7 @@ function lifecycleSenders({
   };
 }
 
-/** An organization with trace sharing on and the two projects `listIdsByOrganization` names. */
+/** An organization with trace sharing on and two projects under its team. */
 async function application({ failing = false }: { failing?: boolean } = {}) {
   const permissions = TestAuthzApi.create({
     people: [{ id: ADMIN.id, name: "Ana", email: "ana@acme.test" }],
@@ -53,13 +52,8 @@ async function application({ failing = false }: { failing?: boolean } = {}) {
     data: RecordTraceSharingDisabledCommandData;
     sharingEnabledAtTheTime: boolean;
   }[] = [];
-  const setup = organizationModuleSetup({
-    permissions,
-    projects: createApiFixture<ProjectApi>(
-      { listIdsByOrganization: async () => ["project-1", "project-2"] },
-      "ProjectApi",
-    ),
-  });
+  const memory = MemoryOrganizationDatabase.create();
+  const setup = organizationModuleSetup({ permissions, memory });
   await setup.repositories.membership(permissions).createAndAssign({
     userId: ADMIN.id,
     orgId: ORGANIZATION_ID,
@@ -69,6 +63,9 @@ async function application({ failing = false }: { failing?: boolean } = {}) {
     teamSlug: "engineering",
     pricingModel: "SEAT_EVENT",
   });
+  for (const id of ["project-1", "project-2"]) {
+    seedMemoryProject({ memory, id, name: id, teamId: "team-1", organizationId: ORGANIZATION_ID });
+  }
   const app = await OrganizationModule.create(setup);
   app.connectLifecycle(
     lifecycleSenders({

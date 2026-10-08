@@ -50,7 +50,10 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { GroupRepository } from "../repositories/group.repository.ts";
-import type { OrganizationRepository } from "../repositories/organization.repository.ts";
+import type {
+  OrganizationRepository,
+  OrganizationTeamProject,
+} from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 import type { GroupIdentity } from "./group-identity.service.ts";
 import { OrganizationGroupService } from "./organization-group.service.ts";
@@ -150,6 +153,23 @@ export class OrganizationService {
    */
   listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage> {
     return this.repository.listAllIds(input);
+  }
+
+  /** Every project id under the organization's teams, archived included. */
+  listProjectIds(organizationId: string): Promise<string[]> {
+    return this.repository.findProjectIds(organizationId);
+  }
+
+  findProjectNames(projectIds: readonly string[]): Promise<{ id: string; name: string }[]> {
+    return this.repository.findProjectNames(projectIds);
+  }
+
+  listProjects(input: {
+    organizationId: string;
+    teamId?: string;
+    limit?: number;
+  }): Promise<OrganizationTeamProject[]> {
+    return this.repository.findProjects(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

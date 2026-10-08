@@ -6,7 +6,6 @@ import type {
   OnboardingInitializeOrganizationInput,
   OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
-import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
@@ -663,19 +662,6 @@ export interface OrganizationApi {
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures>;
-  findProject(id: string): Promise<Project | null>;
-  listProjectsByOrganization(
-    input: Readonly<{
-      organizationId: string;
-      page: number;
-      limit: number;
-      projectIds?: string[];
-      includeGovernance?: boolean;
-    }>,
-  ): Promise<PaginatedProjects>;
-  listProjectsByTeam(
-    input: Readonly<{ organizationId: string; teamId: string }>,
-  ): Promise<Project[]>;
 
   // -- the doors ------------------------------------------------------------
   //

@@ -195,6 +195,18 @@ class StubRepository extends OrganizationRepository {
     throw new Error("not used by this test");
   }
 
+  findProjectIds(): ReturnType<OrganizationRepository["findProjectIds"]> {
+    throw new Error("not used by this test");
+  }
+
+  findProjectNames(): ReturnType<OrganizationRepository["findProjectNames"]> {
+    throw new Error("not used by this test");
+  }
+
+  findProjects(): ReturnType<OrganizationRepository["findProjects"]> {
+    throw new Error("not used by this test");
+  }
+
   setPersonalWorkspaceFeaturesWithAudit(_input: {
     projectId: string;
     callerUserId: string;

@@ -29,6 +29,7 @@ import {
   type OrganizationTeamRest,
   type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
+import type { Project } from "@langwatch/project-contract";
 import type { z } from "zod";
 
 import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
@@ -42,13 +43,7 @@ export interface TeamManagementApi
   extends
     Pick<
       OrganizationApi,
-      | "listTeams"
-      | "createTeam"
-      | "getTeam"
-      | "archiveTeam"
-      | "addTeamMember"
-      | "removeTeamMember"
-      | "listProjectsByTeam"
+      "listTeams" | "createTeam" | "getTeam" | "archiveTeam" | "addTeamMember" | "removeTeamMember"
     >,
     Pick<AuthzApi, "listTeamMemberBindings"> {
   /**
@@ -57,6 +52,11 @@ export interface TeamManagementApi
    * which is what `updateTeamWithMembers` is for and why it is not this.
    */
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
+  /** The live projects in one of this organization's teams, newest first. */
+  listProjectsByTeam(input: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<Pick<Project, "id" | "name" | "slug" | "createdAt" | "updatedAt">[]>;
 }
 
 export const TeamManagementApi = moduleApi<TeamManagementApi>()("organization");

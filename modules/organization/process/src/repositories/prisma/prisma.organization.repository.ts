@@ -24,6 +24,7 @@ import {
   type OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -32,6 +33,7 @@ import {
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
+  type OrganizationTeamProject,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -602,6 +604,40 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       organizationId: project.team?.organizationId ?? null,
       personalFeatures: project.personalFeatures,
     };
+  }
+
+  async findProjectIds(organizationId: string): Promise<string[]> {
+    const rows = await this.database.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async findProjectNames(projectIds: readonly string[]): Promise<{ id: string; name: string }[]> {
+    if (projectIds.length === 0) return [];
+    return this.database.project.findMany({
+      where: { id: { in: [...projectIds] } },
+      select: { id: true, name: true },
+    });
+  }
+
+  async findProjects(input: {
+    organizationId: string;
+    teamId?: string;
+    limit?: number;
+  }): Promise<OrganizationTeamProject[]> {
+    return this.database.project.findMany({
+      where: {
+        archivedAt: null,
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        team: { organizationId: input.organizationId },
+        ...(input.teamId ? { teamId: input.teamId } : {}),
+      },
+      select: { id: true, name: true, slug: true, teamId: true, createdAt: true, updatedAt: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: input.limit,
+    });
   }
 
   async setPersonalWorkspaceFeaturesWithAudit(input: {

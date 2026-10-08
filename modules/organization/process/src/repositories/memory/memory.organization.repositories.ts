@@ -19,20 +19,27 @@ import { MemoryTeamRepository } from "./memory.team.repository.ts";
  */
 export const MemoryOrganizationRepositories = {
   requires: [] as const,
-  create: (): OrganizationRepositories => {
-    const memory = MemoryOrganizationDatabase.create();
-    return {
-      organization: MemoryOrganizationRepository.create({ memory }),
-      team: MemoryTeamRepository.create({ memory }),
-      group: MemoryGroupRepository.create({ memory }),
-      membership: () => MemoryOrganizationMembershipRepository.create({ memory }),
-      personalTeamScope: MemoryPersonalTeamScopeRepository.create({ memory }),
-      scopeGraph: MemoryScopeGraphRepository.create({ memory }),
-      signUpPolicy: MemorySignUpPolicyRepository.create({ memory }),
-      inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
-      invite: MemoryOrganizationInviteRepository.create({ memory }),
-      seats: MemoryOrganizationSeatRepository.create({ memory }),
-      userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
-    };
-  },
+  create: (): OrganizationRepositories =>
+    memoryOrganizationRepositories({ memory: MemoryOrganizationDatabase.create() }),
 };
+
+/** The memory registry over one given database, so a suite can seed rows the module only reads. */
+export function memoryOrganizationRepositories({
+  memory,
+}: {
+  memory: MemoryOrganizationDatabase;
+}): OrganizationRepositories {
+  return {
+    organization: MemoryOrganizationRepository.create({ memory }),
+    team: MemoryTeamRepository.create({ memory }),
+    group: MemoryGroupRepository.create({ memory }),
+    membership: () => MemoryOrganizationMembershipRepository.create({ memory }),
+    personalTeamScope: MemoryPersonalTeamScopeRepository.create({ memory }),
+    scopeGraph: MemoryScopeGraphRepository.create({ memory }),
+    signUpPolicy: MemorySignUpPolicyRepository.create({ memory }),
+    inviteRateLimit: MemoryOrganizationInviteRateLimitRepository.create(),
+    invite: MemoryOrganizationInviteRepository.create({ memory }),
+    seats: MemoryOrganizationSeatRepository.create({ memory }),
+    userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
+  };
+}

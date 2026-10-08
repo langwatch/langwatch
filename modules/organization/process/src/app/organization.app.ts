@@ -21,7 +21,7 @@ import type {
 /**
  * The organization feature's application: what its four tRPC doors (`organization.*`, `team.*`,
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
- * logic; most operations are the services' own, via {@link organizations} and {@link projects}.
+ * logic; most operations are the services' own, via {@link organizations}.
  */
 import {
   AuditTrailDeniedError,
@@ -125,7 +125,7 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
@@ -150,6 +150,7 @@ import {
 } from "../eventing/seat-limit.pipeline.ts";
 import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
+import type { OrganizationTeamProject } from "../repositories/organization.repository.ts";
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
@@ -235,9 +236,6 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
 // What the process composes this feature's application from
 // ---------------------------------------------------------------------------
 
-/** The three project reads an organization screen makes: what lives where. */
-type OrganizationProjectApi = ProjectApi;
-
 /** Who a write is attributed to. */
 export interface OrganizationCaller {
   readonly id: string;
@@ -252,7 +250,6 @@ export interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
   membership: OrganizationMembershipService;
   groups: OrganizationGroupScopeService;
-  projects: OrganizationProjectApi;
   /** The one permission service every door on this application asks. */
   permissions: AuthzApi;
   /** Mints the bootstrap admin service key a provisioned organization needs. */
@@ -298,8 +295,8 @@ export type OrganizationInfrastructure = Readonly<{
   demoProject: OrganizationDemoProject;
 }>;
 
-/** The page size the two project lookups read an organization at. */
-const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
+/** How many projects the two organization-wide project lookups read at most. */
+const TEAM_PROJECT_LIMIT = 1_000;
 
 /** What a team read says of one project: its name and address, never its keys. */
 function teamProjectOf({ id, name, slug }: { id: string; name: string; slug: string }) {
@@ -383,15 +380,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         standingFor: (args) => setup.dependencies.identity.ssoTestArrival().standingFor(args),
       },
     });
-    const groups = OrganizationGroupScopeService.create({
-      organizations,
-      projects: setup.dependencies.projects,
-    });
+    const groups = OrganizationGroupScopeService.create({ organizations });
     const application = new OrganizationModule({
       organizations,
       membership,
       groups,
-      projects: setup.dependencies.projects,
       permissions: setup.dependencies.permissions,
       apiKeys: setup.dependencies.apiKeys,
     });
@@ -756,7 +749,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }): Promise<void> {
     if (!result.traceShareRevocationRequired) return;
 
-    const projectIds = await this.#dependencies.projects.listIdsByOrganization({ organizationId });
+    const projectIds = await this.#dependencies.organizations.listProjectIds(organizationId);
     await this.#infrastructure.lifecycle.traceSharingDisabled({
       organizationId,
       projectIds,
@@ -1497,24 +1490,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
   }
 
-  // -- the projects an organization's teams hold -----------------------------
-
-  /** One project, or null when it does not exist. */
-  findProject(id: string): Promise<Project | null> {
-    return this.#dependencies.projects.findById(id);
-  }
-
-  /** The organization's projects, one page at a time. */
-  listProjectsByOrganization(input: {
-    organizationId: string;
-    page: number;
-    limit: number;
-    projectIds?: string[];
-    includeGovernance?: boolean;
-  }): Promise<PaginatedProjects> {
-    return this.#dependencies.projects.listByOrganization(input);
-  }
-
   // -- the doors -------------------------------------------------------------
   //
   // What each namespace calls once its transport has stated access. The
@@ -1791,15 +1766,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const callerCanManage = await this.#canManage({ organizationId: input.organizationId, by });
     const [teams, projects] = await Promise.all([
       this.listTeamsWithMembers({ organizationId: input.organizationId, callerCanManage }, by),
-      this.listProjectsByOrganization({
+      this.#dependencies.organizations.listProjects({
         organizationId: input.organizationId,
-        ...TEAM_PROJECT_PAGE,
+        limit: TEAM_PROJECT_LIMIT,
       }),
     ]);
 
     return teams.map((team) => ({
       ...team,
-      projects: projects.data.filter((project) => project.teamId === team.id).map(teamProjectOf),
+      projects: projects.filter((project) => project.teamId === team.id).map(teamProjectOf),
     }));
   }
 
@@ -1807,14 +1782,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationTeamAccess[]> {
-    const projects = await this.listProjectsByOrganization({
+    const projects = await this.#dependencies.organizations.listProjects({
       organizationId: input.organizationId,
-      ...TEAM_PROJECT_PAGE,
+      limit: TEAM_PROJECT_LIMIT,
     });
 
     return this.listTeamAccess({
       organizationId: input.organizationId,
-      projects: projects.data.map(({ id, name, teamId }) => ({ id, name, teamId })),
+      projects: projects.map(({ id, name, teamId }) => ({ id, name, teamId })),
     });
   }
 
@@ -2018,8 +1993,11 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   }
 
   /** The projects that live in one team. */
-  listProjectsByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
-    return this.#dependencies.projects.listByTeam(input);
+  listProjectsByTeam(input: {
+    organizationId: string;
+    teamId: string;
+  }): Promise<OrganizationTeamProject[]> {
+    return this.#dependencies.organizations.listProjects(input);
   }
 }
 

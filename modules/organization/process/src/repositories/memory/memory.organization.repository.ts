@@ -27,6 +27,7 @@ import {
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
+  type OrganizationTeamProject,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -457,6 +458,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organizationId: input.workspace.organizationId,
       archivedAt: null,
       createdAt: now,
+      updatedAt: now,
       personalFeatures: null,
     });
     const alreadyMember = this.memory.organizationUsers.some(
@@ -492,6 +494,44 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organizationId: project.organizationId,
       personalFeatures: project.personalFeatures,
     };
+  }
+
+  async findProjectIds(organizationId: string): Promise<string[]> {
+    return [...this.memory.projects.values()]
+      .filter((project) => project.organizationId === organizationId)
+      .map((project) => project.id);
+  }
+
+  async findProjectNames(projectIds: readonly string[]): Promise<{ id: string; name: string }[]> {
+    return projectIds.flatMap((id) => {
+      const project = this.memory.projects.get(id);
+      return project ? [{ id: project.id, name: project.name }] : [];
+    });
+  }
+
+  // shortcut: memory rows carry no project kind, so no governance project is excluded here.
+  async findProjects(input: {
+    organizationId: string;
+    teamId?: string;
+    limit?: number;
+  }): Promise<OrganizationTeamProject[]> {
+    return [...this.memory.projects.values()]
+      .filter(
+        (project) =>
+          project.organizationId === input.organizationId &&
+          project.archivedAt === null &&
+          (input.teamId === undefined || project.teamId === input.teamId),
+      )
+      .toSorted((a, b) => Temporal.Instant.compare(b.createdAt, a.createdAt))
+      .slice(0, input.limit)
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        slug: project.slug,
+        teamId: project.teamId,
+        createdAt: toDate(project.createdAt),
+        updatedAt: toDate(project.updatedAt),
+      }));
   }
 
   async setPersonalWorkspaceFeaturesWithAudit(input: {

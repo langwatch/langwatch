@@ -1,16 +1,17 @@
 import type { OrganizationGroupGrant } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { OrganizationService } from "./organization.service.ts";
 
-/** The two organization reads a group scope's name needs, from the process service. */
-type GroupScopeOrganizations = Pick<OrganizationService, "listTeams" | "getBillingProfile">;
+/** The organization reads a group scope's name needs, from the process service. */
+type GroupScopeOrganizations = Pick<
+  OrganizationService,
+  "listTeams" | "getBillingProfile" | "findProjectNames"
+>;
 
 /** Resolves the display names of group binding scopes for the group surfaces. */
 export class OrganizationGroupScopeService {
   static create(dependencies: {
     organizations: GroupScopeOrganizations;
-    projects: ProjectApi;
   }): OrganizationGroupScopeService {
     return new OrganizationGroupScopeService(dependencies);
   }
@@ -18,7 +19,6 @@ export class OrganizationGroupScopeService {
   private constructor(
     private readonly dependencies: {
       organizations: GroupScopeOrganizations;
-      projects: ProjectApi;
     },
   ) {}
 
@@ -43,20 +43,22 @@ export class OrganizationGroupScopeService {
 
     await Promise.all(
       uniqueBindings.map(async (binding) => {
-        if (binding.scopeType === "ORGANIZATION") {
-          const organization = await this.dependencies.organizations.getBillingProfile({
-            organizationId: input.organizationId,
-          });
-          names.set(binding.scopeId, organization.name);
-          return;
-        }
-
-        if (binding.scopeType === "TEAM") return;
-
-        const project = await this.dependencies.projects.findById(binding.scopeId);
-        if (project) names.set(binding.scopeId, project.name);
+        if (binding.scopeType !== "ORGANIZATION") return;
+        const organization = await this.dependencies.organizations.getBillingProfile({
+          organizationId: input.organizationId,
+        });
+        names.set(binding.scopeId, organization.name);
       }),
     );
+
+    // One read names every project grant; a project that no longer exists is left unnamed.
+    const projectIds = uniqueBindings.flatMap((binding) =>
+      binding.scopeType === "PROJECT" ? [binding.scopeId] : [],
+    );
+    if (projectIds.length > 0) {
+      const projects = await this.dependencies.organizations.findProjectNames(projectIds);
+      for (const project of projects) names.set(project.id, project.name);
+    }
 
     return names;
   }

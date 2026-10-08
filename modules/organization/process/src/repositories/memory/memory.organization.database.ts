@@ -172,6 +172,7 @@ interface MemoryProjectRow {
   organizationId: string | null;
   archivedAt: Instant | null;
   createdAt: Instant;
+  updatedAt: Instant;
   personalFeatures: PersonalFeatures | null;
 }
 

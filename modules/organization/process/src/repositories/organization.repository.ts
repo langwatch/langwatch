@@ -15,6 +15,7 @@ import type {
   SignInSecurityPolicy,
   OrganizationCurrency,
 } from "@langwatch/organization-contract";
+import type { Project } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 export type PersonalWorkspaceResourceIds = {
@@ -25,6 +26,12 @@ export type PersonalWorkspaceResourceIds = {
   projectApiKey: string;
   ownerBindingId: string;
 };
+
+/** What a team read shows of one project, read through the `Project` share. */
+export type OrganizationTeamProject = Pick<
+  Project,
+  "id" | "name" | "slug" | "teamId" | "createdAt" | "updatedAt"
+>;
 
 export type PersonalWorkspaceFeatureProject = {
   id: string;
@@ -193,6 +200,16 @@ export abstract class OrganizationRepository {
   abstract getPersonalWorkspaceFeatureProject(
     projectId: string,
   ): Promise<PersonalWorkspaceFeatureProject>;
+  /** Every project id under the organization's teams, archived included. */
+  abstract findProjectIds(organizationId: string): Promise<string[]>;
+  /** The id and name of each named project that exists; an unknown id is left out. */
+  abstract findProjectNames(projectIds: readonly string[]): Promise<Pick<Project, "id" | "name">[]>;
+  /** The organization's live projects, governance excluded, newest first; one team's when named. */
+  abstract findProjects(input: {
+    organizationId: string;
+    teamId?: string;
+    limit?: number;
+  }): Promise<OrganizationTeamProject[]>;
   abstract setPersonalWorkspaceFeaturesWithAudit(input: {
     projectId: string;
     callerUserId: string;

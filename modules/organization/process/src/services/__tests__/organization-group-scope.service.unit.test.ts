@@ -1,4 +1,3 @@
-import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -26,12 +25,14 @@ describe("OrganizationGroupScopeService.resolveBindingScopeNames", () => {
         const getTeam = vi.fn().mockRejectedValue(new Error("team not found"));
         const service = OrganizationGroupScopeService.create({
           organizations: createApiFixture<
-            Pick<OrganizationService, "listTeams" | "getTeam" | "getBillingProfile">
+            Pick<
+              OrganizationService,
+              "listTeams" | "getTeam" | "getBillingProfile" | "findProjectNames"
+            >
           >({
             listTeams,
             getTeam,
           }),
-          projects: createApiFixture<ProjectApi>(),
         });
 
         const names = await service.resolveBindingScopeNames({
