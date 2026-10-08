@@ -1,28 +1,47 @@
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
-  type StoredLogRecordWrite,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
 
-/** In-memory `stored_log_records`: one row per tenant and record id, as its ReplacingMergeTree. */
+/** A row as a test seeds it, with the tenant that owns it. */
+type SeededLogRecord = StoredLogRecordRow & { tenantId: string };
+
+function readTrace({
+  rows,
+  tenantId,
+  traceId,
+  limit,
+}: {
+  rows: readonly SeededLogRecord[];
+  tenantId: string;
+  traceId: string;
+  limit: number;
+}): StoredLogRecordRow[] {
+  return rows
+    .filter((row) => row.tenantId === tenantId && row.traceId === traceId)
+    .toSorted((left, right) => left.timeUnixMs - right.timeUnixMs)
+    .slice(0, limit)
+    .map(({ tenantId: _tenantId, ...row }) => row);
+}
+
+/** In-memory legacy `stored_log_records` and log's shared `log_records`, seeded by a test. */
 export class MemoryLogRecordStorageRepository extends LogRecordStorageRepository {
-  static create(): MemoryLogRecordStorageRepository {
-    return new MemoryLogRecordStorageRepository();
+  static create({
+    storedLogRecords = [],
+    logRecords = [],
+  }: {
+    storedLogRecords?: readonly SeededLogRecord[];
+    logRecords?: readonly SeededLogRecord[];
+  } = {}): MemoryLogRecordStorageRepository {
+    return new MemoryLogRecordStorageRepository(storedLogRecords, logRecords);
   }
 
-  private readonly rows = new Map<string, StoredLogRecordWrite & { retentionDays: number }>();
-
-  async insertLogRecords({
-    records,
-    retentionDays,
-  }: {
-    records: readonly StoredLogRecordWrite[];
-    retentionDays: number;
-  }): Promise<void> {
-    for (const record of records) {
-      this.rows.set(`${record.tenantId}\0${record.recordId}`, { ...record, retentionDays });
-    }
+  private constructor(
+    private readonly storedLogRecords: readonly SeededLogRecord[],
+    private readonly logRecords: readonly SeededLogRecord[],
+  ) {
+    super();
   }
 
   async findLogsByTraceId({
@@ -35,24 +54,19 @@ export class MemoryLogRecordStorageRepository extends LogRecordStorageRepository
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
-    return [...this.rows.values()]
-      .filter((row) => row.tenantId === tenantId && row.traceId === traceId)
-      .toSorted((left, right) => left.timeUnixMs - right.timeUnixMs)
-      .slice(0, limit)
-      .map((row) => ({
-        traceId: row.traceId,
-        spanId: row.spanId,
-        timeUnixMs: row.timeUnixMs,
-        body: row.body,
-        attributes: row.attributes,
-        resourceAttributes: row.resourceAttributes,
-        scopeName: row.scopeName,
-        scopeVersion: row.scopeVersion,
-      }));
+    return readTrace({ rows: this.storedLogRecords, tenantId, traceId, limit });
   }
 
-  /** Every stored row with the retention it was stamped with, for assertions. */
-  storedRows(): readonly (StoredLogRecordWrite & { retentionDays: number })[] {
-    return [...this.rows.values()];
+  async findLogRecordsByTraceId({
+    tenantId,
+    traceId,
+    limit = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return readTrace({ rows: this.logRecords, tenantId, traceId, limit });
   }
 }

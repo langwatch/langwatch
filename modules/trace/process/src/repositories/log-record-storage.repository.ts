@@ -3,21 +3,12 @@ import type { CanonicalTraceLogRecord } from "@langwatch/log-contract";
 /** Stored log record read by trace: log's trace-correlated read shape. */
 export type StoredLogRecordRow = CanonicalTraceLogRecord;
 
-/** One `stored_log_records` row trace writes from log's record fact, keyed by its record id. */
-export type StoredLogRecordWrite = StoredLogRecordRow & {
-  tenantId: string;
-  recordId: string;
-  severityNumber: number;
-  severityText: string;
-  acceptedAtMs: number;
-};
-
 // Ceiling on log rows one trace read materialises to avoid OOM in marathon sessions.
 export const TRACE_LOG_READ_CAP = 2000;
 
 export abstract class LogRecordStorageRepository {
   /**
-   * Reads every log record correlated to one trace, oldest first, capped at
+   * Reads every legacy `stored_log_records` row correlated to one trace, oldest first, capped at
    * {@link TRACE_LOG_READ_CAP} unless narrowed. Optional occurredAtMs hint enables
    * partition pruning on TimeUnixMs.
    */
@@ -33,14 +24,16 @@ export abstract class LogRecordStorageRepository {
     limit?: number;
   }): Promise<StoredLogRecordRow[]>;
 
-  /** Writes rows; idempotent per record, so a redelivered or replayed fact changes nothing. */
-  abstract insertLogRecords({
-    records,
-    retentionDays,
-  }: {
-    records: readonly StoredLogRecordWrite[];
-    retentionDays: number;
-  }): Promise<void>;
+  /**
+   * The same read over log's `log_records`, which log shares for reading with trace
+   * (clickhouse-table-ownership). Spec: modules/trace/specs/trace-log-record-read.feature
+   */
+  abstract findLogRecordsByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
 
   /**
    * Dedup and time-order rows read from both log stores during canonical cutover.
@@ -79,8 +72,12 @@ export class NullLogRecordStorageRepository implements LogRecordStorageRepositor
     return [];
   }
 
-  async insertLogRecords(_params: {
-    records: readonly StoredLogRecordWrite[];
-    retentionDays: number;
-  }): Promise<void> {}
+  async findLogRecordsByTraceId(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    return [];
+  }
 }

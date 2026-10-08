@@ -181,8 +181,16 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
     {
       table: "evaluation_runs",
       owner: "evaluation",
-      readers: ["analytics"],
-      reason: "analytics' evaluation metrics select over evaluation's runs (EF-5, 2026-10-07)",
+      readers: ["analytics", "trace"],
+      reason:
+        "analytics' evaluation metrics and trace's evaluation joins and facets select over evaluation's runs (EF-5; R40, 2026-10-07)",
+    },
+    {
+      table: "log_records",
+      owner: "log",
+      readers: ["trace"],
+      reason:
+        "trace's log read and session groups select over log's records, never a copy (R40, 2026-10-07)",
     },
   ],
 };

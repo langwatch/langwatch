@@ -13,10 +13,6 @@ import {
   traceAnnotationsEventing,
 } from "./eventing/trace-annotations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./eventing/trace-ingest-source-billing.pipeline.ts";
-import {
-  TRACE_LOG_RECORD_STORAGE_LANE,
-  traceLogRecordsEventing,
-} from "./eventing/trace-log-records.pipeline.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import {
@@ -84,20 +80,11 @@ export const traceProcessModule = defineProcessModule("trace")
   .withEventing(traceProcessingEventing)
   .withEventing(traceProjectMilestonesEventing)
   .withEventing(traceIngestSourceBillingEventing)
-  // Worker-hosted: log's record fact mapped into trace's own stored_log_records (D-LOG).
-  .withEventing(traceLogRecordsEventing)
   // Worker-hosted: topic's names and annotation's rows folded into trace's tables (rounds 23, 24).
   .withEventing(traceTopicNamesEventing)
   .withEventing(traceAnnotationsEventing)
-  // needsOldWritersGone: an old worker dispatching log's fact does not know the new lane.
+  // needsOldWritersGone: an old worker dispatching an owner's fact does not know the new lane.
   .withMigrations(({ replayer }) => [
-    defineProjectionReplayStep({
-      id: "trace:map-log-records",
-      description: "Maps every log record log has recorded into trace's stored_log_records.",
-      lane: TRACE_LOG_RECORD_STORAGE_LANE,
-      needsOldWritersGone: true,
-      replayer,
-    }),
     defineProjectionReplayStep({
       id: "trace:fold-topic-names",
       description: "Folds every topic model topic has recorded into trace's trace_topic_names.",

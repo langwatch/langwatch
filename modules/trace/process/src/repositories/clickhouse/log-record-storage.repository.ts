@@ -1,16 +1,15 @@
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, toDate } from "@langwatch/time";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
-  type StoredLogRecordWrite,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
-import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const logRecordRowSchema = z.looseObject({
@@ -28,18 +27,35 @@ const logRecordRowsSchema = z.array(logRecordRowSchema);
 
 const TABLE_NAME = "stored_log_records" as const;
 
+/** Log's canonical log table, shared for reading with trace (clickhouse-table-ownership). */
+const LOG_RECORDS_TABLE = "log_records" as const;
+
+/** log_records is read 14 days back and 2 days forward of the hint, as log read it. */
+const LOG_RECORDS_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
+const LOG_RECORDS_LOOKAHEAD_MS = 2 * 24 * 60 * 60 * 1000;
+
+const logRecordsRowSchema = z.object({
+  TraceId: z.string(),
+  SpanId: z.string(),
+  TimeUnixMs: z.union([z.number(), z.string()]),
+  BodyText: z.string().nullable(),
+  AttributesFlatJson: z.string(),
+  ResourceAttributesFlatJson: z.string(),
+  ScopeName: z.string(),
+  ScopeVersion: z.string(),
+  EventName: z.string(),
+});
+
+const logRecordsRowsSchema = z.array(logRecordsRowSchema);
+
+const flatAttributesSchema = z.record(z.string(), z.string());
+
 /**
  * Fallback lookback when no occurredAtMs hint: now-90d..now+2d.
  */
 const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
 const logger = createLogger("langwatch:app-layer:traces:log-record-storage-repository");
-
-const LOG_INSERT_SETTINGS = {
-  async_insert: 1,
-  wait_for_async_insert: 1,
-  input_format_json_throw_on_bad_escape_sequence: 0,
-} as const;
 
 function clickHouseTimestamp(epochMs: number): Date {
   return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
@@ -51,51 +67,6 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
   }
 
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
-
-  /**
-   * ProjectionId is log's record id and the version is its accepted instant, so a redelivered
-   * or replayed record lands as the same ReplacingMergeTree row.
-   */
-  async insertLogRecords({
-    records,
-    retentionDays,
-  }: {
-    records: readonly StoredLogRecordWrite[];
-    retentionDays: number;
-  }): Promise<void> {
-    const first = records[0];
-    if (!first) return;
-    EventUtils.validateTenantId(
-      { tenantId: first.tenantId },
-      "LogRecordStorageClickHouseRepository.insertLogRecords",
-    );
-    if (records.some((record) => record.tenantId !== first.tenantId)) {
-      throw new Error("insertLogRecords: every record in one insert must share a tenant");
-    }
-    const client = await this.resolveClient(first.tenantId);
-    await client.insert({
-      table: TABLE_NAME,
-      values: records.map((record) => ({
-        ProjectionId: record.recordId,
-        TenantId: record.tenantId,
-        TraceId: record.traceId,
-        SpanId: record.spanId,
-        TimeUnixMs: clickHouseTimestamp(record.timeUnixMs),
-        SeverityNumber: record.severityNumber,
-        SeverityText: record.severityText,
-        Body: record.body,
-        Attributes: record.attributes,
-        ResourceAttributes: record.resourceAttributes,
-        ScopeName: record.scopeName,
-        ScopeVersion: record.scopeVersion,
-        CreatedAt: clickHouseTimestamp(record.acceptedAtMs),
-        UpdatedAt: clickHouseTimestamp(record.acceptedAtMs),
-        _retention_days: retentionDays,
-      })),
-      format: "JSONEachRow",
-      clickhouse_settings: LOG_INSERT_SETTINGS,
-    });
-  }
 
   async findLogsByTraceId({
     tenantId,
@@ -198,6 +169,77 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
           scopeVersion: row.ScopeVersion ?? null,
         }));
       },
+    });
+  }
+  /** Log's newest version of each record correlated to the trace, oldest first. */
+  async findLogRecordsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "LogRecordStorageClickHouseRepository.findLogRecordsByTraceId",
+    );
+    const center =
+      typeof occurredAtMs === "number" && occurredAtMs > 0
+        ? occurredAtMs
+        : nowInstant().epochMilliseconds;
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          CorrelationTraceId AS TraceId,
+          CorrelationSpanId AS SpanId,
+          toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+          BodyText,
+          AttributesFlatJson,
+          ResourceAttributesFlatJson,
+          ScopeName,
+          ScopeVersion,
+          EventName
+        FROM ${LOG_RECORDS_TABLE} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND CorrelationTraceId = {traceId:String}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {from:DateTime64(3)}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {to:DateTime64(3)}
+        ORDER BY TimeUnixNano ASC, RecordId ASC
+        LIMIT {limit:UInt64}
+      `,
+      query_params: {
+        tenantId,
+        traceId,
+        from: clickHouseTimestamp(center - LOG_RECORDS_LOOKBACK_MS),
+        to: clickHouseTimestamp(center + LOG_RECORDS_LOOKAHEAD_MS),
+        limit,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = logRecordsRowsSchema.parse(await result.json());
+    if (rows.length >= limit) {
+      logger.warn({ tenantId, traceId, limit }, "Trace's log_records read hit its row cap");
+    }
+    return rows.map((row) => {
+      const attributes = flatAttributesSchema.parse(JSON.parse(row.AttributesFlatJson));
+      if (row.EventName && attributes["event.name"] === undefined) {
+        attributes["event.name"] = row.EventName;
+      }
+      return {
+        traceId: row.TraceId,
+        spanId: row.SpanId,
+        timeUnixMs: Number(row.TimeUnixMs),
+        body: row.BodyText ?? "",
+        attributes,
+        resourceAttributes: flatAttributesSchema.parse(JSON.parse(row.ResourceAttributesFlatJson)),
+        scopeName: row.ScopeName,
+        scopeVersion: row.ScopeVersion || null,
+      };
     });
   }
 }

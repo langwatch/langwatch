@@ -1,11 +1,9 @@
 /**
  * @vitest-environment node
- * Spec: modules/trace/specs/trace-log-record-storage.feature
+ * Spec: modules/trace/specs/trace-log-record-read.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { canonicalLogRecordFixture } from "../../../eventing/__tests__/trace-log-records.fixtures.ts";
-import { storedLogRecordOf } from "../../../eventing/trace-log-record-storage.projection.ts";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
@@ -30,24 +28,32 @@ const row: StoredLogRecordRow = {
 
 function makeService({ storedRows = [row] } = {}) {
   const getLogsByTraceId = vi.fn().mockResolvedValue(storedRows);
+  const getLogRecordsByTraceId = vi.fn().mockResolvedValue([]);
   const repository: LogRecordStorageRepository = {
     findLogsByTraceId: getLogsByTraceId,
-    insertLogRecords: vi.fn(),
+    findLogRecordsByTraceId: getLogRecordsByTraceId,
   };
   return {
     service: LogRecordStorageService.create({ repository }),
     getLogsByTraceId,
+    getLogRecordsByTraceId,
   };
 }
 
-function storedRowOf(overrides: Parameters<typeof canonicalLogRecordFixture>[0]) {
-  return storedLogRecordOf(canonicalLogRecordFixture(overrides));
+function recordOf({ body, timeUnixMs }: { body: string; timeUnixMs: number }) {
+  return {
+    ...row,
+    tenantId: "project-1",
+    timeUnixMs,
+    body,
+    attributes: { "event.name": body },
+  };
 }
 
 describe("LogRecordStorageService.getLogsByTraceId", () => {
   describe("when reading a trace's logs", () => {
     it("delegates to the repository with the tenant, trace, time hint, and row cap", async () => {
-      const { service, getLogsByTraceId } = makeService();
+      const { service, getLogsByTraceId, getLogRecordsByTraceId } = makeService();
 
       const result = await service.getLogsByTraceId({
         tenantId: "project_test",
@@ -56,12 +62,14 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
         limit: 250,
       });
 
-      expect(getLogsByTraceId).toHaveBeenCalledWith({
+      const query = {
         tenantId: "project_test",
         traceId: "trace-1",
         occurredAtMs: 1_700_000_000_000,
         limit: 250,
-      });
+      };
+      expect(getLogsByTraceId).toHaveBeenCalledWith(query);
+      expect(getLogRecordsByTraceId).toHaveBeenCalledWith(query);
       expect(result).toEqual([row]);
     });
 
@@ -76,23 +84,46 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
       });
     });
 
-    /** @scenario "Trace reads a trace's logs from its own stored log records" */
-    it("answers each record once, oldest first, from trace's own store", async () => {
-      const repository = MemoryLogRecordStorageRepository.create();
-      await repository.insertLogRecords({
-        records: [
-          storedRowOf({ recordId: "b".repeat(64), timeUnixMs: 2_000, bodyText: "later" }),
-          storedRowOf({ recordId: "a".repeat(64), timeUnixMs: 1_000, bodyText: "earlier" }),
-          // The pre-cutover writer's copy of the earlier record, under another id.
-          storedRowOf({ recordId: "c".repeat(64), timeUnixMs: 1_000, bodyText: "earlier" }),
+    /** @scenario "Trace reads a trace's logs from log's shared log records" */
+    it("answers log's records, oldest first", async () => {
+      const repository = MemoryLogRecordStorageRepository.create({
+        logRecords: [
+          recordOf({ body: "later", timeUnixMs: 2_000 }),
+          recordOf({ body: "earlier", timeUnixMs: 1_000 }),
         ],
-        retentionDays: 30,
       });
       const service = LogRecordStorageService.create({ repository });
 
       const rows = await service.getLogsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
 
       expect(rows.map((stored) => stored.body)).toEqual(["earlier", "later"]);
+    });
+
+    /** @scenario "A record only in the legacy stored log records stays readable" */
+    it("answers a legacy-only record beside log's records", async () => {
+      const repository = MemoryLogRecordStorageRepository.create({
+        storedLogRecords: [recordOf({ body: "before-cutover", timeUnixMs: 1_000 })],
+        logRecords: [recordOf({ body: "after-cutover", timeUnixMs: 2_000 })],
+      });
+      const service = LogRecordStorageService.create({ repository });
+
+      const rows = await service.getLogsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
+
+      expect(rows.map((stored) => stored.body)).toEqual(["before-cutover", "after-cutover"]);
+    });
+
+    /** @scenario "A record both tables hold is answered once, as log holds it" */
+    it("answers a record both tables hold once, with log's body", async () => {
+      const legacy = recordOf({ body: "same", timeUnixMs: 1_000 });
+      const repository = MemoryLogRecordStorageRepository.create({
+        storedLogRecords: [{ ...legacy, body: "legacy-body" }],
+        logRecords: [{ ...legacy, body: "log-body" }],
+      });
+      const service = LogRecordStorageService.create({ repository });
+
+      const rows = await service.getLogsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
+
+      expect(rows.map((stored) => stored.body)).toEqual(["log-body"]);
     });
   });
 });

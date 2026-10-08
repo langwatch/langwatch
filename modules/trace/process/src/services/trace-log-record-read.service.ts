@@ -4,8 +4,9 @@ import {
 } from "../repositories/log-record-storage.repository.ts";
 
 /**
- * The trace-correlated log read over trace's own `stored_log_records`: pre-cutover rows, and
- * every record since, mapped there from log's record fact by trace_log_records (D-LOG).
+ * The trace-correlated log read: log's `log_records`, read through log's share, and the legacy
+ * `stored_log_records` a release before the cutover wrote, read until those rows age out.
+ * Spec: modules/trace/specs/trace-log-record-read.feature
  */
 export class LogRecordStorageService {
   static create(options: { repository: LogRecordStorageRepository }): LogRecordStorageService {
@@ -34,13 +35,12 @@ export class LogRecordStorageService {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
-    const rows = await this.repository.findLogsByTraceId({
-      tenantId,
-      traceId,
-      occurredAtMs,
-      limit,
-    });
-    // A record written by the pre-cutover writer and mapped again carries two ProjectionIds.
-    return LogRecordStorageRepository.mergeStoredLogRows(rows, limit);
+    const query = { tenantId, traceId, occurredAtMs, limit };
+    const [legacy, logRecords] = await Promise.all([
+      this.repository.findLogsByTraceId(query),
+      this.repository.findLogRecordsByTraceId(query),
+    ]);
+    // Log's own row goes last, so it wins a record both stores hold.
+    return LogRecordStorageRepository.mergeStoredLogRows([...legacy, ...logRecords], limit);
   }
 }

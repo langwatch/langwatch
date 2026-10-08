@@ -213,10 +213,6 @@ import {
   buildTraceIngestSourceBillingPipeline,
   type TraceIngestSourceBillingPipeline,
 } from "../eventing/trace-ingest-source-billing.pipeline.ts";
-import {
-  buildTraceLogRecordsPipeline,
-  type TraceLogRecordsPipeline,
-} from "../eventing/trace-log-records.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
@@ -722,11 +718,6 @@ export interface TraceAppDependencies {
   ingestAllowance?: TraceIngestAllowanceService;
   /** Trace's fold of governance's billing fact; its pipeline folds, the OTLP door reads. */
   ingestSourceBilling?: TraceIngestSourceBillingService;
-  /** `stored_log_records` and the retention trace_log_records stamps on each mapped row. */
-  logRecordStorage?: {
-    repository: TraceRepositories["logRecords"];
-    retention: DataRetentionApi;
-  };
   /**
    * Where an ingested span goes. Absent on a process that composed no receiver,
    * and then the ingestion doors refuse by name rather than answering 200 to
@@ -1142,10 +1133,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         : {}),
       ...(options.ingestAllowance ? { ingestAllowance: options.ingestAllowance } : {}),
       ingestSourceBilling,
-      logRecordStorage: {
-        repository: options.repositories.logRecords,
-        retention: options.dataRetention,
-      },
       publicBaseUrl: options.publicBaseUrl,
       scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
         spans: options.repositories.derivationSpans,
@@ -1283,15 +1270,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the ingest source billing fold");
     }
     return buildTraceIngestSourceBillingPipeline({ billing });
-  }
-
-  /** trace_log_records: maps log's record fact into trace's own `stored_log_records` (D-LOG). */
-  logRecordsPipeline(): TraceLogRecordsPipeline {
-    const storage = this.#dependencies.logRecordStorage;
-    if (!storage) {
-      throw new TraceCapabilityUnavailableError("this process", "the log record map");
-    }
-    return buildTraceLogRecordsPipeline(storage);
   }
 
   #contentReader: TraceContentReadService;
