@@ -4,7 +4,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.product-analytics.channel.ts";
+import { MemoryProductAnalyticsChannel } from "../../channels/memory/memory.saas.channels.ts";
 import { MemorySaasRateLimitRepository } from "../../repositories/memory/memory.saas-rate-limit.repository.ts";
 import type { SaasRateLimitRepository } from "../../repositories/saas-rate-limit.repository.ts";
 import { LangWatchCloudService } from "../langwatch-cloud.service.ts";

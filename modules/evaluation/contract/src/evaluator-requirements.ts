@@ -1,8 +1,3 @@
-/**
- * The evaluator a type names, built-in or one of the project's custom workflows,
- * as a pure rule both evaluation's evaluate doors and experiment's dataset door read. Callers
- * pass each custom workflow's required fields, from workflow-contract's getWorkflowsRequiredFields.
- */
 import {
   AVAILABLE_EVALUATORS,
   EvaluatorNotFoundError,
@@ -10,6 +5,12 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+/**
+ * The evaluator a type names, built-in or one of the project's custom workflows,
+ * as a pure rule both evaluation's evaluate doors and experiment's dataset door read. Callers
+ * pass each custom workflow's required fields, from workflow-contract's getWorkflowsRequiredFields.
+ */
+import slugify from "slugify";
 
 export type EvaluatorIncludingCustom =
   | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
@@ -42,3 +43,17 @@ export const getEvaluatorIncludingCustom = ({
   if (!evaluator) throw new EvaluatorNotFoundError(checkType);
   return evaluator;
 };
+
+/**
+ * `customeval_{slug}`. The four pre-replaced characters and the three slugify options are a wire
+ * format: the derived id is the evaluator's key, so a name that slugs differently becomes two.
+ */
+export function deriveEvaluatorId({ name }: { name: string }): string {
+  const autoslug = slugify((name || "unnamed").replaceAll(/[:?&_]/g, "-"), {
+    lower: true,
+    strict: true,
+    replacement: "-",
+  }).replace(/[^a-z0-9]/g, "_");
+
+  return `customeval_${autoslug}`;
+}

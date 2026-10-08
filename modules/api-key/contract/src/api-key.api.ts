@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import type { CreateIngestionKeyInput } from "./api-key-rest.schemas.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
@@ -38,7 +39,20 @@ import type {
   RevokeApiKeyInput,
   UpdateApiKeyInput,
 } from "./api-key.ts";
-import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
+
+export const apiKeyVisibleProjectsInputSchema = z
+  .object({
+    apiKeyId: z.string().min(1),
+    organizationId: z.string().min(1),
+  })
+  .strict();
+export type ApiKeyVisibleProjectsInput = z.infer<typeof apiKeyVisibleProjectsInputSchema>;
+
+export const apiKeyVisibleProjectsSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("all") }).strict(),
+  z.object({ kind: z.literal("some"), ids: z.array(z.string().min(1)) }).strict(),
+]);
+export type ApiKeyVisibleProjects = z.infer<typeof apiKeyVisibleProjectsSchema>;
 
 /** The member a management call acts as, and the operator acting as them, if any. */
 export type ApiKeyManagementCaller = Readonly<{ id: string; impersonatorId?: string | undefined }>;

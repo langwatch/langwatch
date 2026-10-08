@@ -26,8 +26,8 @@ import {
 } from "../model/authorize-host.ts";
 import { cappedDeviceFlowPermissions, projectTokenInput } from "../model/project-token-input.ts";
 import { apiKeyApi } from "./api-key-api.ts";
+import { writeToClipboard } from "./api-key-host-mount.tsx";
 import { useApiKeyOrganizationGraph } from "./api-key-organization-graph.ts";
-import { writeToClipboard } from "./browser-clipboard.ts";
 import { authorizeMcpClient } from "./mcp-authorize-client.ts";
 
 /** Same order-sensitive derivation as the API Key family's mount. */

@@ -29,8 +29,10 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { MemoryAuditLogRepository } from "../../repositories/memory/memory.audit-log.repository.ts";
-import { MemoryAuditLogStore } from "../../repositories/memory/memory.audit-log.store.ts";
+import {
+  MemoryAuditLogRepository,
+  MemoryAuditLogStore,
+} from "../../repositories/memory/memory.audit-log.repository.ts";
 import { AuditLogService } from "../../services/audit-log.service.ts";
 import { buildAuditLogPipeline } from "../audit-log.pipeline.ts";
 

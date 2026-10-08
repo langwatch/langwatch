@@ -7,8 +7,10 @@
 import { generate } from "@langwatch/ksuid";
 import { describe, expect, it } from "vitest";
 
-import { MemoryAuditLogRepository } from "../../repositories/memory/memory.audit-log.repository.ts";
-import { MemoryAuditLogStore } from "../../repositories/memory/memory.audit-log.store.ts";
+import {
+  MemoryAuditLogRepository,
+  MemoryAuditLogStore,
+} from "../../repositories/memory/memory.audit-log.repository.ts";
 import { AuditLogService } from "../audit-log.service.ts";
 
 function keyedAuditLog() {

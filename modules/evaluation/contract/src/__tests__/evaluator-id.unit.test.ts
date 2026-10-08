@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { deriveEvaluatorId } from "../evaluator-id.ts";
+import { deriveEvaluatorId } from "../evaluator-requirements.ts";
 
 const derive = (name: string): string => deriveEvaluatorId({ name });
 

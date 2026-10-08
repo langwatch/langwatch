@@ -11,10 +11,20 @@ import {
   type RecordedSinceInput,
 } from "@langwatch/audit-log-contract";
 import { generate } from "@langwatch/ksuid";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
 
 import type { AuditLogRepository } from "../audit-log.repository.ts";
-import type { MemoryAuditLogRow, MemoryAuditLogStore } from "./memory.audit-log.store.ts";
+
+type MemoryAuditLogRow = AuditLogEntry & {
+  id: string;
+  createdAt: Instant;
+  idempotencyKey?: string;
+};
+
+/** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
+export class MemoryAuditLogStore {
+  readonly rows: MemoryAuditLogRow[] = [];
+}
 
 export class MemoryAuditLogRepository implements AuditLogRepository {
   private constructor(private readonly store: MemoryAuditLogStore) {}

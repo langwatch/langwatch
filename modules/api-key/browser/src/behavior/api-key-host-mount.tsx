@@ -30,10 +30,24 @@ import {
   type CliDeviceCodeLookup,
 } from "../model/api-key-host.ts";
 import { useApiKeyOrganizationGraph } from "./api-key-organization-graph.ts";
-import { writeToClipboard } from "./browser-clipboard.ts";
 import { approveCliDeviceCode, denyCliDeviceCode, lookupCliDeviceCode } from "./cli-device-flow.ts";
 
 const LEAD_SOURCE_STORAGE_KEY = "lw_attrib.leadSource";
+
+/**
+ * The one DOM ability neither port's capabilities carry: writing to the
+ * clipboard. Mirrors `@langwatch/browser-host`'s own `CopyButton`, which
+ * touches `navigator.clipboard` the same way rather than through a port.
+ */
+export async function writeToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Where a minted key is used when the deployment names no address of its own. */
 const DEFAULT_API_ENDPOINT = "https://app.langwatch.ai";
