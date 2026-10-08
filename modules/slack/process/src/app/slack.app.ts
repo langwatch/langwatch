@@ -16,8 +16,7 @@ import {
   type SlackManagedConnection,
 } from "@langwatch/slack-contract";
 
-import { HttpSlackWebApiChannel } from "../channels/http/http.slack-web-api.channel.ts";
-import { MemorySlackWebApiChannel } from "../channels/memory/memory.slack-web-api.channel.ts";
+import type { SlackChannels } from "../channels/slack.channels.ts";
 import type { SlackRepositories } from "../repositories/slack.repositories.ts";
 import { SlackConnectionClaimService } from "../services/slack-connection-claim.service.ts";
 import { SlackConnectionService } from "../services/slack-connection.service.ts";
@@ -26,7 +25,8 @@ type SlackSetup = FeatureSetup<
   typeof SlackModule.dependencies,
   never,
   undefined,
-  SlackRepositories
+  SlackRepositories,
+  SlackChannels
 >;
 
 /** A project's Slack connections and their claims; services carry the weight. */
@@ -59,8 +59,8 @@ export class SlackModule implements SlackApiContract {
   static async create({
     dependencies,
     repositories,
+    channels,
     secrets,
-    tier,
   }: SlackSetup): Promise<SlackModule> {
     const fingerprintKey =
       (await secrets.into(SlackModule.secrets.fingerprintKey, (value) => value ?? "")) ||
@@ -75,8 +75,7 @@ export class SlackModule implements SlackApiContract {
       projects: dependencies.projects,
       organizations: dependencies.organizations,
       authorization: dependencies.authorization,
-      webApi:
-        tier === "memory" ? MemorySlackWebApiChannel.create() : HttpSlackWebApiChannel.create(),
+      webApi: channels.webApi,
       fingerprintKey,
       previousFingerprintKey,
     });

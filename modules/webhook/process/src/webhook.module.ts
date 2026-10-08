@@ -2,6 +2,7 @@ import { defineProcessModule } from "@langwatch/process";
 import type { WebhookEnvelope, WebhookSpendEventRow } from "@langwatch/webhook-contract";
 
 import { WebhookModule } from "./app/webhook.app.ts";
+import { webhookChannels } from "./channels/webhook-channels.registry.ts";
 import { webhookDeliveryEventing } from "./eventing/webhook-delivery.pipeline.ts";
 import { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 import { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
@@ -14,6 +15,7 @@ export type { WebhookLiveDatabase } from "./repositories/prisma/prisma.webhook.r
 /** The canonical outbound-webhook feature declaration. */
 export const webhookProcessModule = defineProcessModule("webhook")
   .withRepositories(webhookRepositories)
+  .withChannels(webhookChannels)
   .withApi(WebhookModule)
   .withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest)
   .withEventing(webhookDeliveryEventing);

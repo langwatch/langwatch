@@ -1,5 +1,3 @@
-import { AwsClientConfiguration } from "@langwatch/aws-client";
-import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   EventingCommandSender,
@@ -26,12 +24,7 @@ import {
   WebhookEventNotFoundError,
 } from "@langwatch/webhook-contract";
 
-import { HttpDestinationChannel } from "../channels/http/http.destination.channel.ts";
-import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
-import {
-  SqsWebhookDestinationChannel,
-  sqsProxyResolver,
-} from "../channels/sqs/sqs.webhook-destination.channel.ts";
+import type { WebhookChannels } from "../channels/webhook.channels.ts";
 import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
@@ -154,7 +147,8 @@ type WebhookSetup = FeatureSetup<
   typeof WebhookModule.dependencies,
   never,
   WebhookServerConfig,
-  WebhookRepositories
+  WebhookRepositories,
+  WebhookChannels
 >;
 
 /** What the worker's delivery process manager is composed from; built only when consuming. */
@@ -182,23 +176,13 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
     const caps = WebhookDispatchCapService.create({ caps: input.repositories.dispatchCaps });
     const egress = WebhookEgressService.create({
       caps,
-      http: HttpDestinationChannel.create({
-        tls: { rejectUnauthorized: input.config.isSaas },
-      }),
-    });
-    const aws = AwsClientConfiguration.create({
-      outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.config.outboundProxy)),
+      http: input.channels.http,
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({
         egress,
         allowInsecureLocal: input.config.allowInsecureLocalUrls,
-        sqs:
-          input.tier === "memory"
-            ? MemorySqsWebhookDestinationChannel.create()
-            : SqsWebhookDestinationChannel.create({
-                awsClientConfig: (config) => aws.build(config),
-              }),
+        sqs: input.channels.sqs,
         caps,
       }),
     });
