@@ -8,6 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   combineQueries,
+  isRouteKind,
   parse,
   quoteAsPhrase,
   splitBareWords,
@@ -27,7 +28,6 @@ import {
 import {
   buildRouteContext,
   buildRouteQuestion,
-  isRouteKind,
   ROUTE_QUESTION_ID,
   type TraceSearchRouteQuestion,
 } from "../rules/trace-search-classifier-context.rules.ts";
@@ -176,7 +176,7 @@ export class TraceSearchRouterService {
     }
     const [known, isInstantEvalAvailable] = await Promise.all([
       this.knownSignals(input),
-      this.instantEvalReleased(input),
+      input.isInstantEvalAvailable ?? this.instantEvalReleased(input),
     ]);
     const context: RouteContext = {
       input,
@@ -186,7 +186,7 @@ export class TraceSearchRouterService {
       known,
       available: { isLangyAvailable: input.isLangyAvailable ?? true, isInstantEvalAvailable },
     };
-    const classified = await this.classify(context);
+    const classified = input.classified ?? (await this.classify(context));
     if (classified) {
       return this.applyClassified({ context, classified, decidedBy: "classifier" });
     }

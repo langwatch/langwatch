@@ -6,10 +6,8 @@
 
 import {
   SEARCH_FIELDS,
-  SEARCH_ROUTE_KINDS,
   type KnownProjectSignals,
   type RouteSearchAvailability,
-  type SearchRouteKind,
 } from "@langwatch/trace-contract";
 
 export const ROUTE_QUESTION_ID = "route";
@@ -108,9 +106,4 @@ export function buildRouteContext({
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
-}
-
-/** Whether the classifier's label is one of the routes we offer. */
-export function isRouteKind(value: unknown): value is SearchRouteKind {
-  return typeof value === "string" && (SEARCH_ROUTE_KINDS as readonly string[]).includes(value);
 }

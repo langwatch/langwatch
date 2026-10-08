@@ -10,6 +10,11 @@ export const SEARCH_ROUTE_KINDS = ["filter", "instant_eval", "free_text", "langy
 
 export type SearchRouteKind = (typeof SEARCH_ROUTE_KINDS)[number];
 
+/** Whether a classifier's label is one of the routes trace offers. */
+export function isRouteKind(value: unknown): value is SearchRouteKind {
+  return typeof value === "string" && (SEARCH_ROUTE_KINDS as readonly string[]).includes(value);
+}
+
 /** Who made the call: the classifier, the FAST model, or a fallback rule. */
 const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback"] as const;
 
@@ -60,6 +65,10 @@ export const routeSearchInputSchema = z.object({
   lensId: z.string().max(200).optional(),
   /** Whether the assistant route is open to this user. Defaults to true. */
   isLangyAvailable: z.boolean().optional(),
+  /** The route Instant Eval's classifier answered; absent when it had none. */
+  classified: z.enum(SEARCH_ROUTE_KINDS).optional(),
+  /** Whether Instant Evals are open to this project, as Instant Eval's door said. */
+  isInstantEvalAvailable: z.boolean().optional(),
 });
 
 export type RouteSearchInput = z.infer<typeof routeSearchInputSchema>;
