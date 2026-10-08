@@ -141,8 +141,8 @@ Feature: An aggregate project reads its member projects
 
   @integration
   Scenario: An admin creates an aggregate project from the new-project flow
-    When ana creates a project of kind aggregate from the LLM ops new-project flow
-    Then the project exists with the rule "all personal projects" preselected
+    When ana creates a project of kind aggregate and names no rule
+    Then the project exists with the rule "all personal projects", the answer the drawer preselects
     And it is attached to a team like any other project
 
   @integration
