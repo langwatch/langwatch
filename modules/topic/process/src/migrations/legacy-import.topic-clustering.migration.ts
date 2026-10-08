@@ -25,7 +25,7 @@ const SCHEDULE_SEED_DONE_KEY = "topic-clustering:schedule-seed:v1:done";
 /** Projects fetched (and bootstrapped) per round-trip. */
 const SCHEDULE_SEED_PAGE_SIZE = 500;
 
-export interface TopicClusteringBackfillSummary {
+interface TopicClusteringBackfillSummary {
   /** Bootstrap request accepted for a project that had no scheduled wake. */
   succeeded: number;
   /** Bootstrap request threw; the project was logged and left behind. */

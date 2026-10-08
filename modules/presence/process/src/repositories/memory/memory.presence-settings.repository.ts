@@ -3,9 +3,9 @@ import {
   PresenceSettingsRepository,
 } from "../presence-settings.repository.ts";
 
-export type MemoryPresenceProjectRow = { teamId: string; presenceEnabled: boolean };
-export type MemoryPresenceTeamRow = { organizationId: string };
-export type MemoryPresenceOrganizationRow = { presenceEnabled: boolean };
+type MemoryPresenceProjectRow = { teamId: string; presenceEnabled: boolean };
+type MemoryPresenceTeamRow = { organizationId: string };
+type MemoryPresenceOrganizationRow = { presenceEnabled: boolean };
 
 /** In-memory twin of the rows project and organization hold; a test hands them in. */
 export class MemoryPresenceSettingsRepository extends PresenceSettingsRepository {

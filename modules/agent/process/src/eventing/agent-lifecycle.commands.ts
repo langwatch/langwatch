@@ -14,8 +14,8 @@ import { z } from "zod";
 export const AGENT_LIFECYCLE_PIPELINE_NAME = "agent_lifecycle" as const;
 export const AGENT_AGGREGATE_TYPE = "agent" as const;
 
-export const AGENT_ARCHIVED_EVENT_VERSION = "2026-10-08" as const;
-export const RECORD_AGENT_ARCHIVED_COMMAND_TYPE = "lw.agent.record_archived" as const;
+const AGENT_ARCHIVED_EVENT_VERSION = "2026-10-08" as const;
+const RECORD_AGENT_ARCHIVED_COMMAND_TYPE = "lw.agent.record_archived" as const;
 
 export const agentArchivedEventSchema = z.object({
   ...EventSchema.shape,
@@ -23,7 +23,7 @@ export const agentArchivedEventSchema = z.object({
   version: z.literal(AGENT_ARCHIVED_EVENT_VERSION),
   data: agentArchivedEventDataSchema,
 });
-export type AgentArchivedEvent = z.infer<typeof agentArchivedEventSchema>;
+type AgentArchivedEvent = z.infer<typeof agentArchivedEventSchema>;
 export type AgentLifecycleEvent = AgentArchivedEvent;
 
 const recordAgentArchivedCommandDataSchema = withCommandEnvelope(agentArchivedEventDataSchema);

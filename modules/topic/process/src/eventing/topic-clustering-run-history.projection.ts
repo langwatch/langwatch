@@ -47,7 +47,7 @@ const topicClusteringRunHistoryProjectionEntrySchema = z.object({
   pages: z.number(),
 });
 
-export type TopicClusteringRunHistoryEntry = z.infer<
+type TopicClusteringRunHistoryEntry = z.infer<
   typeof topicClusteringRunHistoryProjectionEntrySchema
 >;
 

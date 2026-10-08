@@ -21,14 +21,14 @@ const logger = createLogger("langwatch:coding-agent:backfill");
  * Named as its own surface so a caller composes what the backfill uses rather
  * than the whole session-read graph.
  */
-export type CodingAgentSessionReads = Pick<CodingAgentSessionReadService, "listRecent">;
+type CodingAgentSessionReads = Pick<CodingAgentSessionReadService, "listRecent">;
 
 /**
  * The one project read the backfill makes, and the one field it reads back.
  * `ProjectApi` satisfies it; stating it this narrowly is what lets a
  * caller compose the backfill without the whole project graph.
  */
-export type CodingAgentBackfillProjects = {
+type CodingAgentBackfillProjects = {
   listByOrganization(input: {
     organizationId: string;
     page: number;

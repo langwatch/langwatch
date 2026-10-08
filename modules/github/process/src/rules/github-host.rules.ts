@@ -14,25 +14,25 @@ export type GithubHost = {
   normalize(repositoryHost: string): string;
 };
 
-export function hostNameOf({ configured }: { configured?: string }): string {
+function hostNameOf({ configured }: { configured?: string }): string {
   const host = (configured ?? "").trim().toLowerCase();
   return host === "" ? GITHUB_DOT_COM : host;
 }
 
-export function apiBaseOf({ host }: { host: string }): string {
+function apiBaseOf({ host }: { host: string }): string {
   return host === GITHUB_DOT_COM ? "https://api.github.com" : `https://${host}/api/v3`;
 }
 
-export function webBaseOf({ host }: { host: string }): string {
+function webBaseOf({ host }: { host: string }): string {
   return `https://${host}`;
 }
 
-export function appInstallUrlOf({ host, appSlug }: { host: string; appSlug: string }): string {
+function appInstallUrlOf({ host, appSlug }: { host: string; appSlug: string }): string {
   const segment = host === GITHUB_DOT_COM ? "apps" : "github-apps";
   return `https://${host}/${segment}/${encodeURIComponent(appSlug)}/installations/new`;
 }
 
-export function normalizeRepositoryHost({
+function normalizeRepositoryHost({
   host,
   repositoryHost,
 }: {
@@ -43,7 +43,7 @@ export function normalizeRepositoryHost({
   return lowered === "" ? host : lowered;
 }
 
-export function isMappableRepositoryHost({
+function isMappableRepositoryHost({
   host,
   repositoryHost,
 }: {

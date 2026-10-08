@@ -68,7 +68,7 @@ import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 import type { ApiKeyProjectsDoorApi } from "../transport/api-key-projects.rest.ts";
 
 /** Who performs an operation, whose membership is proved, and any operator acting as them. */
-export interface ApiKeyCaller {
+interface ApiKeyCaller {
   readonly id: string;
   readonly impersonatorId?: string | undefined;
 }
@@ -81,7 +81,7 @@ type ApiKeyDependencies = Readonly<{
 
 // Module dependencies from the process: repositories, peer APIs, the HMAC pepper's secrets.
 // This list is everything the module is built from.
-export type ApiKeySetup = Readonly<{
+type ApiKeySetup = Readonly<{
   repositories: ApiKeyRepositories;
   dependencies: Readonly<{
     authorization: AuthzApi;
@@ -94,7 +94,7 @@ export type ApiKeySetup = Readonly<{
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
-export type CreateApiKeyRequest = Readonly<{
+type CreateApiKeyRequest = Readonly<{
   organizationId: string;
   name: string;
   description?: string | undefined;
@@ -106,7 +106,7 @@ export type CreateApiKeyRequest = Readonly<{
   bindings: CreateApiKeyInput["bindings"];
 }>;
 
-export type UpdateApiKeyRequest = Readonly<{
+type UpdateApiKeyRequest = Readonly<{
   organizationId: string;
   apiKeyId: string;
   name?: string | undefined;

@@ -123,8 +123,6 @@ import {
   type ModelProviderConnectionRateLimiter,
 } from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
 
-export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
-
 /** The feature key the translation call is priced and routed under. */
 const TRANSLATE_FEATURE_KEY = "translate.text";
 
@@ -133,7 +131,7 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
  * so the cost-rule preview reads through the same request-scoped services as the rest of the
  * call, rather than a process singleton.
  */
-export type SpanReader = unknown;
+type SpanReader = unknown;
 
 /**
  * The collaborators the module composes in `create`: its registry, egress fence, identifier
@@ -172,7 +170,7 @@ export interface ModelProviderInfrastructure {
 }
 
 /** The identifier format this deployment mints a provider, default or cost in. */
-export interface ModelProviderIdFactory {
+interface ModelProviderIdFactory {
   generate(input: Readonly<{ type: "provider" | "default" | "cost" }>): string;
 }
 

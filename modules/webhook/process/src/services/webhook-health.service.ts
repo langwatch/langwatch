@@ -37,7 +37,7 @@ export interface WebhookEndpointHealthSource {
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
 }
 
-export interface WebhookHealthDeps {
+interface WebhookHealthDeps {
   endpoints: WebhookEndpointHealthSource;
   processStore: ProcessStore;
   now?: () => number;

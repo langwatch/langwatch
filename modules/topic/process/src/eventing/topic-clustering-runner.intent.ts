@@ -43,15 +43,15 @@ const PAYLOAD_KIND = {
 } as const;
 
 /** What one clustering page did; the run port's result. */
-export type ClusteringPageOutcome = TopicClusteringPageOutcome;
+type ClusteringPageOutcome = TopicClusteringPageOutcome;
 
 /** Identity of the outbox dispatch driving this page; keys topic dedupe. */
-export interface ClusteringRunContext {
+interface ClusteringRunContext {
   runId: string;
   page: number;
 }
 
-export interface ClusteringStoreSummary {
+interface ClusteringStoreSummary {
   topicsCount: number;
   subtopicsCount: number;
 }
@@ -70,7 +70,7 @@ type ClusteringRunOutcome =
  * projection already owns the model. Structural (implemented by the
  * legacy-import migration) so the runner never depends on its construction.
  */
-export interface TopicClusteringWritePathSeed {
+interface TopicClusteringWritePathSeed {
   seedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped">;
 }
 
@@ -321,7 +321,7 @@ const getProjectTopicClusteringModelProvider = async (
   return { model: topicClusteringModel, modelProvider };
 };
 
-export const batchClusterTraces = async ({
+const batchClusterTraces = async ({
   deps,
   projectId,
   traces,
@@ -373,7 +373,7 @@ export const batchClusterTraces = async ({
   };
 };
 
-export const incrementalClustering = async ({
+const incrementalClustering = async ({
   deps,
   projectId,
   traces,

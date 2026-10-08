@@ -82,18 +82,18 @@ import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost
  * read, which of those they may also price, and how each is named. Derived
  * from the service's own input rather than restated, so the two cannot drift.
  */
-export type CodingAgentCallerScope = Pick<
+type CodingAgentCallerScope = Pick<
   CodingAgentPersonalPullRequestUsageInput,
   "permittedProjectIds" | "costProjectIds" | "projects"
 >;
 
 /** Who a cross-project read is answered for. */
-export interface CodingAgentCaller {
+interface CodingAgentCaller {
   readonly id: string;
 }
 
 /** One pull request, addressed the way both doors address it. */
-export interface CodingAgentPullRequestRef {
+interface CodingAgentPullRequestRef {
   projectId: string;
   repositoryHost: string;
   repositoryFullName: string;
@@ -101,7 +101,7 @@ export interface CodingAgentPullRequestRef {
 }
 
 /** The scope reads the module answers through its project and authorization peers. */
-export interface CodingAgentScopeReads {
+interface CodingAgentScopeReads {
   /**
    * The organization a project belongs to, or undefined for an orphan project.
    * Derived here rather than taken from the client, so a caller cannot ask

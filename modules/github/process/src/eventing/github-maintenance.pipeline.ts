@@ -26,7 +26,7 @@ import {
   githubBranchRecheckWake,
 } from "./github-branch-recheck.process.ts";
 
-export interface GithubMaintenancePipelineDeps {
+interface GithubMaintenancePipelineDeps {
   /** The two sweep operations the schedule calls, so the pipeline mounts without the full app. */
   github: GithubBranchMaintenance;
   processStore: ProcessStore;

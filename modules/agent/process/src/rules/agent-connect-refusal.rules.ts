@@ -48,7 +48,7 @@ function refusedFrameOf(failure: Error): AgentConnectRefusal {
 }
 
 /** A door refusal the connect protocol answers as its own frame, or one it never framed. */
-export type ConnectRefusal =
+type ConnectRefusal =
   | Readonly<{
       framed: true;
       refusal: Readonly<{ reason: RefusedCode; message: string; meta?: Record<string, unknown> }>;

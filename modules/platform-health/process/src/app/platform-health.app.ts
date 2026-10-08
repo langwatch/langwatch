@@ -33,8 +33,6 @@ import {
   type SubsystemProbeCollaborators,
 } from "../services/subsystem-probe.service.ts";
 
-export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
-
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthModule.dependencies,
   PlatformHealthServerConfig,

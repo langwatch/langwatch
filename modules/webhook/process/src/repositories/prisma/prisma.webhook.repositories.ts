@@ -22,7 +22,7 @@ import {
 } from "./prisma.webhook-retention.repository.ts";
 
 /** Every model the live tier's Postgres repositories read, and nothing else. */
-export type WebhookLiveDatabase = WebhookEndpointDatabase & WebhookRetentionDatabase;
+type WebhookLiveDatabase = WebhookEndpointDatabase & WebhookRetentionDatabase;
 
 /** The endpoint identifier this deployment mints, in the module's own format. */
 class LiveWebhookIds implements WebhookId {

@@ -3,7 +3,7 @@ import type { WorkflowReference } from "@langwatch/workflow-contract";
 import type { WorkflowRepository } from "../repositories/workflow.repository.ts";
 
 /** What one pass did across the live workflows; the ledger keeps it. */
-export type WorkflowCurrentVersionBackfillReport = {
+type WorkflowCurrentVersionBackfillReport = {
   tenants: number;
   liveWorkflows: number;
   versionsRecorded: number;
