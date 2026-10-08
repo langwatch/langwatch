@@ -181,17 +181,5 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
-	if err := validateRequired(cfg); err != nil {
-		return Config{}, err
-	}
 	return cfg, nil
-}
-
-func validateRequired(_ Config) error {
-	// Soft requirements — nlpgo boots even when the gateway is
-	// unconfigured because the /go/proxy and LLM-block paths fail
-	// gracefully, and operators may run nlpgo before every project's
-	// model providers are set up. Any non-/go/* request gets a
-	// self-explaining 502 from goOnlyModeFallback (see httpapi).
-	return nil
 }

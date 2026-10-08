@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -391,11 +390,7 @@ func jsonEscape(s string) string {
 	return string(bytes.TrimSpace(b))
 }
 
-// guard against unused-imports warnings in the case the dispatcher
-// signature evolves
-var _ = errors.New
-
-// PlaygroundProxyFromDispatcher adapts the in-process aigateway
+// DispatcherShim adapts the in-process aigateway
 // dispatcher to the PlaygroundProxy interface this handler consumes.
 // It exists in this file (not cmd/root.go) so the cmd package doesn't
 // need access to playgroundProxyRequest/Response which we keep unexported

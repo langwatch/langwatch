@@ -46,7 +46,7 @@ func ResolveMaxAttachmentBytes(requested int64) int64 {
 	return requested
 }
 
-// Base64Len is the length of the padded base64 encoding of n bytes.
-func Base64Len(n int64) int64 {
+// base64Len is the length of the padded base64 encoding of n bytes.
+func base64Len(n int64) int64 {
 	return (n + 2) / 3 * 4
 }
