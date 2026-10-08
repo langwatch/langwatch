@@ -10,7 +10,6 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { LangySessionKeyRepository } from "../../../repositories/langy-session-key.repository.ts";
-import { LangySessionKeyReapService } from "./langy-session-key-reap.service.ts";
 
 /** Counts minted/revoked/reaped as one series with operation labels so dashboards read
  * minted-minus-revoked without joining (a port because App and worker export differently). */
@@ -166,18 +165,5 @@ export class LangySessionKeyService extends LangySessionKey {
     this.metrics.record({ operation: "revoked" });
 
     return "revoked";
-  }
-
-  /**
-   * The fleet-wide sweep, delegated rather than repeated. Two graphs run this reap — the App's
-   * registered pipeline and the packaged worker's — and only one of them reaches it through this
-   * service.
-   */
-  reapExpired(now = nowInstant()): Promise<number> {
-    return LangySessionKeyReapService.create({
-      repository: this.repository,
-      metrics: this.metrics,
-      now: () => now,
-    }).reap();
   }
 }

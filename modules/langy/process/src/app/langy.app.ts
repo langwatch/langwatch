@@ -124,7 +124,6 @@ import {
   type LangyGuidedOnboardingPipeline,
 } from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
-import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
@@ -146,7 +145,6 @@ import { LangyPanelEgressService } from "../features/panel/services/langy-panel-
 import { LangyPanelLocalService } from "../features/panel/services/langy-panel-local.service.ts";
 import { LangyPanelTurnStreamService } from "../features/panel/services/langy-panel-turn-stream.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../features/session-key/services/langy-session-key-metrics-otel.service.ts";
-import { LangySessionKeyReapService } from "../features/session-key/services/langy-session-key-reap.service.ts";
 import type { LangySessionKeyService } from "../features/session-key/services/langy-session-key.service.ts";
 import { LangyVirtualKeyGatewayService } from "../features/session-key/services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
@@ -199,8 +197,6 @@ type LangyAppDependencies = {
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
-  /** The maintenance sweep's own service: no aggregate, no commands, just the reap. */
-  sessionKeyReap: LangySessionKeyReapService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
   uiActionDoor: LangyUiActionDoorService;
@@ -451,10 +447,6 @@ export class LangyModule implements LangyApiContract {
       virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
         virtualKeys: built.credentials.virtualKeys,
       }),
-      sessionKeyReap: LangySessionKeyReapService.create({
-        repository: setup.repositories.sessionKeyReap,
-        metrics: LangySessionKeyMetricsOtelService.create(),
-      }),
       callers,
       localControl: { runtime, commands, workspace, baseHost: setup.config.publicBaseUrl },
       localWorker: LangyLocalWorkerService.create({
@@ -637,18 +629,11 @@ export class LangyModule implements LangyApiContract {
   }
 
   /**
-   * The pipeline `langy_maintenance` registers (ADR-144), ported from the
-   * deleted `LangyMaintenanceWorkerFeatureInstaller`. `deleteDispatchedBefore`
-   * is the installing process's own outbox prune, handed in by the seam.
+   * The pipeline `langy_maintenance` registers (ADR-144): a new project's
+   * virtual key, minted from project's created fact.
    */
-  maintenanceEventingPipeline(
-    deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">,
-  ): StaticPipelineDefinition<never> {
+  maintenanceEventingPipeline(): StaticPipelineDefinition<never> {
     return buildLangyMaintenancePipeline({
-      sessionKeyReap: {
-        reap: () => this.dependencies.sessionKeyReap.reap(),
-        deleteDispatchedBefore: deps.deleteDispatchedBefore,
-      },
       virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
     });
   }

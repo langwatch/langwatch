@@ -6,7 +6,7 @@ import {
 } from "@langwatch/authz-contract";
 import { LangySessionKeyScopeError } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { Temporal, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangySessionKeyMetrics } from "../../features/session-key/services/langy-session-key.service.ts";
@@ -21,9 +21,7 @@ import {
 
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;
-  reapedCount = 0;
   readonly revocations: { apiKeyId: string; revokedAt: Instant }[] = [];
-  readonly reaperCalls: { revokedAt: Instant; name: string }[] = [];
 
   async getProjectScope() {
     return { teamId: "team-1", organizationId: "organization-1" };
@@ -36,11 +34,6 @@ class SessionKeyRepository extends LangySessionKeyRepository {
 
   async revoke(apiKeyId: string, revokedAt: Instant): Promise<void> {
     this.revocations.push({ apiKeyId, revokedAt });
-  }
-
-  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
-    this.reaperCalls.push({ revokedAt: input.now, name: input.name });
-    return this.reapedCount;
   }
 }
 
@@ -314,7 +307,7 @@ describe("LangySessionKeyService", () => {
     });
   });
 
-  it("refuses a non-Langy key and reaps only expired session keys", async () => {
+  it("refuses a non-Langy key", async () => {
     const repository = new SessionKeyRepository();
     repository.key = {
       id: "key-1",
@@ -322,7 +315,6 @@ describe("LangySessionKeyService", () => {
       revokedAt: null,
       isScopedToProject: true,
     };
-    repository.reapedCount = 2;
     const metrics = new SessionKeyMetrics();
     const service = createService({
       repository,
@@ -334,16 +326,6 @@ describe("LangySessionKeyService", () => {
     await expect(
       service.revokeManaged({ apiKeyId: "key-1", projectId: "project-1" }),
     ).resolves.toBe("refused");
-    await expect(service.reapExpired(Temporal.Instant.from("2026-08-26T00:00:00Z"))).resolves.toBe(
-      2,
-    );
-    expect(repository.reaperCalls).toEqual([
-      {
-        revokedAt: Temporal.Instant.from("2026-08-26T00:00:00Z"),
-        name: expect.any(String),
-      },
-    ]);
-    expect(metrics.record).toHaveBeenCalledWith({ operation: "reaped", count: 2 });
     expect(LANGY_CANDIDATE_PERMISSIONS).toContain("project:view");
   });
 });

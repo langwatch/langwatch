@@ -7,7 +7,6 @@ import {
 } from "../clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import type { LangyDatabase } from "../prisma/langy-database.mapper.ts";
-import { PrismaLangySessionKeyReapRepository } from "../prisma/prisma.langy-session-key-reap.repository.ts";
 import { PrismaLangyRepositories } from "../prisma/prisma.langy.repositories.ts";
 import { RedisLangyRateLimitRepository } from "../redis/redis.langy-rate-limit.repository.ts";
 import { RedisLangyRepositories } from "../redis/redis.langy.repositories.ts";
@@ -29,7 +28,6 @@ export class LiveLangyRepositories {
   }>): LangyRepositories {
     return {
       ...PrismaLangyRepositories.create(prisma),
-      sessionKeyReap: PrismaLangySessionKeyReapRepository.create(prisma),
       ...RedisLangyRepositories.create(redis),
       analyticsEvents: LangyAnalyticsEventClickHouseRepository.overMember(clickhouse),
       rateLimits: RedisLangyRateLimitRepository.create(rateLimiter),

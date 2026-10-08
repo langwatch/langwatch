@@ -7,21 +7,14 @@ import {
   type LangySessionKeyRecord,
 } from "../langy-session-key.repository.ts";
 import type { LangyDatabase } from "./langy-database.mapper.ts";
-import { PrismaLangySessionKeyReapRepository } from "./prisma.langy-session-key-reap.repository.ts";
 
 export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
-  private constructor(
-    private readonly database: LangyDatabase,
-    private readonly reap: PrismaLangySessionKeyReapRepository,
-  ) {
+  private constructor(private readonly database: LangyDatabase) {
     super();
   }
 
   static create(database: LangyDatabase): PrismaLangySessionKeyRepository {
-    return new PrismaLangySessionKeyRepository(
-      database,
-      PrismaLangySessionKeyReapRepository.create(database),
-    );
+    return new PrismaLangySessionKeyRepository(database);
   }
 
   async getProjectScope(projectId: string): Promise<{
@@ -70,10 +63,5 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
       where: { id: apiKeyId },
       data: { revokedAt: toDate(revokedAt) },
     });
-  }
-
-  /** Delegated so the App's repository and a worker's narrow one run the identical UPDATE. */
-  revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
-    return this.reap.revokeExpiredByName(input);
   }
 }

@@ -7,21 +7,14 @@ import {
   type LangySessionKeyRecord,
 } from "../langy-session-key.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
-import { MemoryLangySessionKeyReapRepository } from "./memory.langy-session-key-reap.repository.ts";
 
 /** The memory twin of `PrismaLangySessionKeyRepository`, over the store's project and key rows. */
 export class MemoryLangySessionKeyRepository extends LangySessionKeyRepository {
   static create(store: LangyMemoryStore): MemoryLangySessionKeyRepository {
-    return new MemoryLangySessionKeyRepository(
-      store,
-      MemoryLangySessionKeyReapRepository.create(store),
-    );
+    return new MemoryLangySessionKeyRepository(store);
   }
 
-  private constructor(
-    private readonly store: LangyMemoryStore,
-    private readonly reap: MemoryLangySessionKeyReapRepository,
-  ) {
+  private constructor(private readonly store: LangyMemoryStore) {
     super();
   }
 
@@ -46,9 +39,5 @@ export class MemoryLangySessionKeyRepository extends LangySessionKeyRepository {
     const key = this.store.apiKeys.get(apiKeyId);
     if (!key) throw new ApiKeyNotFoundError(apiKeyId);
     key.revokedAt = revokedAt;
-  }
-
-  revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
-    return this.reap.revokeExpiredByName(input);
   }
 }
