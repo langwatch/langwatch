@@ -309,7 +309,7 @@ interface Output {
 // identity.myTestArrival
 // Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
 type Input = Record<string, unknown>;
-// Output: ssoTestArrivalStandingSchema, ../contract/src/sso-admission.ts:71
+// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:71
 type Output =
   | {
       testing: true;
@@ -389,30 +389,30 @@ Contract `../contract/src/features/join-request/join-request.trpc.ts:35`, router
 
 ```typescript
 // identity.joinRequests.lookup
-// Input: inline, ../contract/src/join-request.trpc.ts:42
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:42
 type Input = unknown;
-// Output: joinRequestLookupSchema, ../contract/src/join-request.trpc.ts:33
+// Output: joinRequestLookupSchema, ../contract/src/features/join-request/join-request.trpc.ts:33
 type Output = unknown;
 
 // identity.joinRequests.offer
-// Input: inline, ../contract/src/join-request.trpc.ts:47
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:47
 type Input = unknown;
-type Output = z.infer<typeof joinRequestLookupSchema>; // ../contract/src/join-request.trpc.ts:33
+type Output = z.infer<typeof joinRequestLookupSchema>; // ../contract/src/features/join-request/join-request.trpc.ts:33
 
 // identity.joinRequests.dismissOffer
-// Input: inline, ../contract/src/join-request.trpc.ts:52
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:52
 type Input = Record<string, unknown>;
-// Output: joinRequestWriteAckSchema, ../contract/src/join-request.responses.ts:63
+// Output: joinRequestWriteAckSchema, ../contract/src/features/join-request/join-request.responses.ts:63
 interface Output {
   success: true;
 }
 
 // identity.joinRequests.admitAutomatically
-// Input: joinRequestApiAdmitInputSchema, ../contract/src/join-request.trpc-schemas.ts:29
+// Input: joinRequestApiAdmitInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:29
 interface Input {
   origin?: "web" | "cli";
 }
-// Output: joinRequestAdmittedSchema, ../contract/src/join-request.responses.ts:35
+// Output: joinRequestAdmittedSchema, ../contract/src/features/join-request/join-request.responses.ts:35
 interface Output {
   organization: {
     organizationId: string;
@@ -422,9 +422,9 @@ interface Output {
 }
 
 // identity.joinRequests.mine
-// Input: inline, ../contract/src/join-request.trpc.ts:62
+// Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:62
 type Input = unknown;
-// Output: joinRequestMineSchema, ../contract/src/join-request.responses.ts:20
+// Output: joinRequestMineSchema, ../contract/src/features/join-request/join-request.responses.ts:20
 type Output = {
   joinRequestId: string;
   requestedAt: unknown;
@@ -433,30 +433,30 @@ type Output = {
 }[];
 
 // identity.joinRequests.request
-// Input: joinRequestApiRequestInputSchema, ../contract/src/join-request.trpc-schemas.ts:23
+// Input: joinRequestApiRequestInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:23
 interface Input {
   organizationId: string;
   origin?: "web" | "cli";
 }
-// Output: joinRequestFiledSchema, ../contract/src/join-request.responses.ts:26
+// Output: joinRequestFiledSchema, ../contract/src/features/join-request/join-request.responses.ts:26
 interface Output {
   joinRequestId: string;
   state: "PENDING" | "APPROVED";
 }
 
 // identity.joinRequests.withdraw
-// Input: joinRequestApiWithdrawInputSchema, ../contract/src/join-request.trpc-schemas.ts:33
+// Input: joinRequestApiWithdrawInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:33
 interface Input {
   joinRequestId: string;
 }
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
 
 // identity.joinRequests.pending
-// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/join-request.trpc-schemas.ts:10
+// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
 interface Input {
   organizationId: string;
 }
-// Output: joinRequestPendingSchema, ../contract/src/join-request.responses.ts:67
+// Output: joinRequestPendingSchema, ../contract/src/features/join-request/join-request.responses.ts:67
 type Output = {
   joinRequestId: string;
   requestedAt: unknown;
@@ -468,20 +468,20 @@ type Output = {
 }[];
 
 // identity.joinRequests.approve
-// Input: joinRequestApiDecisionInputSchema, ../contract/src/join-request.trpc-schemas.ts:39
+// Input: joinRequestApiDecisionInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
 interface Input {
   organizationId: string;
   joinRequestId: string;
 }
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
 
 // identity.joinRequests.reject
-type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/join-request.trpc-schemas.ts:39
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/join-request.responses.ts:63
+type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
 
 // identity.joinRequests.joining
-type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/join-request.trpc-schemas.ts:10
-// Output: joinRequestJoiningSchema, ../contract/src/join-request.responses.ts:79
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+// Output: joinRequestJoiningSchema, ../contract/src/features/join-request/join-request.responses.ts:79
 interface Output {
   domainJoin: "off" | "request" | "auto";
   joinDomains: string[];
@@ -489,14 +489,14 @@ interface Output {
 }
 
 // identity.joinRequests.setJoining
-// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/join-request.trpc-schemas.ts:46
+// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:46
 interface Input {
   organizationId: string;
   domainJoin: "off" | "request" | "auto";
   domains?: string[];
   joinerRole?: "MEMBER" | "DEVELOPER";
 }
-// Output: joinRequestJoiningChangedSchema, ../contract/src/join-request.responses.ts:89
+// Output: joinRequestJoiningChangedSchema, ../contract/src/features/join-request/join-request.responses.ts:89
 interface Output {
   previous: "off" | "request" | "auto";
   next: "off" | "request" | "auto";
@@ -507,8 +507,8 @@ interface Output {
 }
 
 // identity.joinRequests.automaticJoins
-type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/join-request.trpc-schemas.ts:10
-// Output: joinRequestAutomaticJoinsSchema, ../contract/src/join-request.responses.ts:50
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+// Output: joinRequestAutomaticJoinsSchema, ../contract/src/features/join-request/join-request.responses.ts:50
 type Output = {
   joinRequestId: string;
   userId: string;
@@ -518,12 +518,12 @@ type Output = {
 }[];
 
 // identity.joinRequests.getJoinAdmissions
-// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/join-request.trpc-schemas.ts:55
+// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:55
 interface Input {
   organizationId: string;
   userIds: string[];
 }
-// Output: inline, ../contract/src/join-request.trpc.ts:102
+// Output: inline, ../contract/src/features/join-request/join-request.trpc.ts:102
 type Output = {
   userId: string;
   domain: string;

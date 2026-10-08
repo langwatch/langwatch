@@ -383,7 +383,7 @@ Declared at `src/eventing/github-maintenance.pipeline.ts:42`.
 
 | Kind   | Leaf      | Environment variable       | Declared at                           |
 | ------ | --------- | -------------------------- | ------------------------------------- |
-| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:220`           |
+| secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:219`           |
 | config | `appId`   | `GITHUB_LANGY_APP_ID`      | `../contract/src/github.config.ts:11` |
 | config | `host`    | `GITHUB_LANGY_HOST`        | `../contract/src/github.config.ts:12` |
 | config | `appSlug` | `GITHUB_LANGY_APP_SLUG`    | `../contract/src/github.config.ts:13` |

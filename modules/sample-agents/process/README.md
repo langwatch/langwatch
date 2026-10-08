@@ -66,7 +66,7 @@ None: sample-agents declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf            | Environment variable | Declared at                                 |
 | ------ | --------------- | -------------------- | ------------------------------------------- |
-| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:31`           |
+| secret | `openAi`        | `OPENAI_API_KEY`     | `src/app/sample-agents.app.ts:30`           |
 | config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/sample-agents.config.ts:5` |
 
 <!-- readme:generated:end -->

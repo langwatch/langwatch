@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:95`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:101`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -184,6 +184,30 @@ revokeBrowserSession(input: { sessionId: string }): Promise<void>;
 
 ```typescript
 revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
+```
+
+#### `deactivateUser`
+
+Retires an account: user's write refuses the last active operator, then every browser session and CLI token ends, then user records the fact. A refused write ends nothing.
+
+```typescript
+deactivateUser(input: UserLifecycleChangeInput): Promise<UserProfile>;
+```
+
+#### `deactivateAccount`
+
+The same retirement, for oneself or by a platform operator who is not impersonating.
+
+```typescript
+deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
+```
+
+#### `changeUserEmail`
+
+Writes the address through user, then ends every session that cached the old one.
+
+```typescript
+changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
 ```
 
 #### `isWithinBudget`
@@ -603,7 +627,7 @@ type Response = unknown;
 
 ### `auth`
 
-Contract `../contract/src/auth.trpc.ts:27`, router `src/transport/auth.trpc.ts:81`.
+Contract `../contract/src/auth.trpc.ts:28`, router `src/transport/auth.trpc.ts:86`.
 
 | Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                            | Output                            |
 | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
@@ -615,6 +639,7 @@ Contract `../contract/src/auth.trpc.ts:27`, router `src/transport/auth.trpc.ts:8
 | `auth.myAddressConfirmation`     | query    | No permission: reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable                                                                               | inline                           | `addressConfirmationSchema`       |
 | `auth.sendMyAddressConfirmation` | mutation | No permission: sends the session user's own address confirmation; no tenant scope is involved                                                                                                                       | `frontDoorOwnAddressInputSchema` | `frontDoorOwnAddressSentSchema`   |
 | `auth.priorSession`              | query    | Public: classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing | inline                           | `priorSessionSchema`              |
+| `auth.deactivate`                | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant                                                        | `userApiUserInputSchema`         | `userApiSuccessSchema`            |
 
 ```typescript
 // auth.signUpEnrollment
@@ -631,7 +656,7 @@ interface Input {
   identifier: string | null;
   breakGlass?: boolean;
 }
-type Output = z.infer<typeof routingDecisionSchema>; // ../../identity/contract/src/signin-routing.ts:141
+type Output = z.infer<typeof routingDecisionSchema>; // ../../identity/contract/src/features/signin/signin-routing.ts:141
 
 // auth.requestSignUpVerification
 // Input: signUpVerificationInputSchema, ../contract/src/front-door.schemas.ts:26
@@ -669,7 +694,7 @@ interface Output {
 }
 
 // auth.myAddressConfirmation
-// Input: inline, ../contract/src/auth.trpc.ts:55
+// Input: inline, ../contract/src/auth.trpc.ts:56
 type Input = unknown;
 // Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:62
 interface Output {
@@ -690,7 +715,7 @@ interface Output {
 }
 
 // auth.priorSession
-// Input: inline, ../contract/src/auth.trpc.ts:64
+// Input: inline, ../contract/src/auth.trpc.ts:65
 type Input = unknown;
 // Output: priorSessionSchema, ../contract/src/front-door.responses.ts:72
 type Output =
@@ -701,6 +726,16 @@ type Output =
   | {
       kind: "unknown";
     };
+
+// auth.deactivate
+// Input: userApiUserInputSchema, ../../user/contract/src/user.schemas.ts:63
+interface Input {
+  userId: string;
+}
+// Output: userApiSuccessSchema, ../../user/contract/src/user.responses.ts:9
+interface Output {
+  success: true;
+}
 ```
 
 ### `signInSecurity`
@@ -790,7 +825,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable       | Declared at                                          |
 | ------ | ----------------------------- | -------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:204`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:216`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -800,8 +835,8 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`    | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`   | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`       | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:207`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:209`                            |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:219`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:221`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:19`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:21`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:22`                  |

@@ -6,7 +6,7 @@ The server half of [managed-provider](../README.md). Enterprise managed model pr
 
 ## Installation
 
-`defineProcessModule("managed-provider").withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:11`.
+`defineProcessModule("managed-provider").withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
