@@ -28,10 +28,10 @@ import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
-  type GatewaySpanIngestion,
   type GatewaySpendConfirmation,
   type ReserveInput,
 } from "../gateway-realtime-session.service.ts";
+import type { GatewaySpanIngestion } from "../gateway-realtime-settlement-span.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../model-catalog-gateway-spend-rating.service.ts";
 
 const PROJECT_ID = "project-1";

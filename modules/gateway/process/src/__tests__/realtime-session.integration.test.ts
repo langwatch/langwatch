@@ -37,12 +37,12 @@ import {
 } from "../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import {
-  type GatewaySpanIngestion,
   type GatewaySpendConfirmation,
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service.ts";
+import type { GatewaySpanIngestion } from "../services/gateway-realtime-settlement-span.service.ts";
 import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";

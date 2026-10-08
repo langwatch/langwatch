@@ -47,6 +47,20 @@ export const REALTIME_SETTLEMENT_REASONS = {
   orphaned: "gateway lost the session; closed at recorded usage",
 } as const;
 
+type ReportContext = {
+  session: GatewayRealtimeSession;
+  attribution: GatewayRealtimeSessionAttribution;
+  now: Instant;
+  durationMs: number;
+  usage: Partial<SpendUsage>;
+  source: GatewayRealtimeMetering | undefined;
+  collaborators: GatewayRealtimeSessionCollaborators;
+  receipt: (
+    status: GatewayRealtimeUsageReceipt["status"],
+    moved: { costNanoUsd: number; ownRecordNanoUsd?: number },
+  ) => Promise<GatewayRealtimeUsageReceipt>;
+};
+
 type RecordedReport = { status: "recorded" | "duplicate"; costNanoUsd: number };
 
 export class GatewayRealtimeSessionMeteringService {
@@ -91,21 +105,7 @@ export class GatewayRealtimeSessionMeteringService {
       session,
       collaborators,
     });
-    const receipt = async (
-      status: GatewayRealtimeUsageReceipt["status"],
-      moved: { costNanoUsd: number; ownRecordNanoUsd?: number },
-    ): Promise<GatewayRealtimeUsageReceipt> => ({
-      status,
-      costNanoUsd: moved.costNanoUsd,
-      sessionCostNanoUsd: session.reportedCostNanoUsd + moved.costNanoUsd,
-      budget: await this.budgetVerdict({
-        session,
-        attribution,
-        now,
-        unreportedNanoUsd: moved.ownRecordNanoUsd ?? 0,
-        collaborators,
-      }),
-    });
+    const receipt = this.receiptBuilder({ session, attribution, now, collaborators });
 
     if (session.status === "CLOSED" || session.status === "FAILED") {
       logger.info(
@@ -135,34 +135,88 @@ export class GatewayRealtimeSessionMeteringService {
       return receipt("recorded", { costNanoUsd: 0 });
     }
 
+    const report: ReportContext = {
+      session,
+      attribution,
+      now,
+      durationMs,
+      usage,
+      source: params.source,
+      collaborators,
+      receipt,
+    };
     if (keyed) {
-      const recorded = await this.recordReport({
-        session,
-        reportKey: storedReportKey({ reportKey: params.reportKey ?? REALTIME_FINAL_REPORT_KEY }),
-        usage,
-        model: reportModelOf({ session, model: params.model, pricedAs: params.pricedAs }),
-        attribution,
-        now,
-        collaborators,
+      return this.reportKeyedUsage({
+        ...report,
+        reportKey: params.reportKey,
+        model: params.model,
+        pricedAs: params.pricedAs,
+        final: params.final === true,
       });
-      const moved = { costNanoUsd: recorded.status === "recorded" ? recorded.costNanoUsd : 0 };
-      if (!params.final) return receipt(recorded.status, moved);
-
-      await this.sessions.closeAndConfirmRealtimeSession({
-        session,
-        usage: {},
-        occurredAt: now,
-        durationMs,
-        reason: closeReasonOf(params.source),
-        attribution,
-        collaborators,
-      });
-
-      return receipt("closed", moved);
     }
 
-    // The session total, or a bare close. Reports are read only when some were recorded, so
-    // a session that never sent one closes on exactly the read path it always did.
+    return this.reportSessionTotal(report);
+  }
+
+  private receiptBuilder(params: {
+    session: GatewayRealtimeSession;
+    attribution: GatewayRealtimeSessionAttribution;
+    now: Instant;
+    collaborators: GatewayRealtimeSessionCollaborators;
+  }): ReportContext["receipt"] {
+    const { session } = params;
+
+    return async (status, moved) => ({
+      status,
+      costNanoUsd: moved.costNanoUsd,
+      sessionCostNanoUsd: session.reportedCostNanoUsd + moved.costNanoUsd,
+      budget: await this.budgetVerdict({
+        ...params,
+        unreportedNanoUsd: moved.ownRecordNanoUsd ?? 0,
+      }),
+    });
+  }
+
+  private async reportKeyedUsage(
+    params: ReportContext & {
+      reportKey: string | undefined;
+      model: string | undefined;
+      pricedAs: "transcription" | undefined;
+      final: boolean;
+    },
+  ): Promise<GatewayRealtimeUsageReceipt> {
+    const { session, attribution, now, collaborators, receipt } = params;
+    const recorded = await this.recordReport({
+      session,
+      reportKey: storedReportKey({ reportKey: params.reportKey ?? REALTIME_FINAL_REPORT_KEY }),
+      usage: params.usage,
+      model: reportModelOf({ session, model: params.model, pricedAs: params.pricedAs }),
+      attribution,
+      now,
+      collaborators,
+    });
+    const moved = { costNanoUsd: recorded.status === "recorded" ? recorded.costNanoUsd : 0 };
+    if (!params.final) return receipt(recorded.status, moved);
+
+    await this.sessions.closeAndConfirmRealtimeSession({
+      session,
+      usage: {},
+      occurredAt: now,
+      durationMs: params.durationMs,
+      reason: closeReasonOf(params.source),
+      attribution,
+      collaborators,
+    });
+
+    return receipt("closed", moved);
+  }
+
+  /**
+   * The session total, or a bare close. Reports are read only when some were recorded, so
+   * a session that never sent one closes on exactly the read path it always did.
+   */
+  private async reportSessionTotal(params: ReportContext): Promise<GatewayRealtimeUsageReceipt> {
+    const { session, attribution, collaborators } = params;
     const reports =
       session.reportCount > 0
         ? await collaborators.sessions.findReports({
@@ -173,11 +227,11 @@ export class GatewayRealtimeSessionMeteringService {
     const closed = await this.sessions.closeAndConfirmRealtimeSession({
       session,
       usage: remainingRealtimeUsage({
-        total: usage,
+        total: params.usage,
         reported: sumRealtimeUsage({ usages: reports.map((report) => report.usage) }),
       }),
-      occurredAt: now,
-      durationMs,
+      occurredAt: params.now,
+      durationMs: params.durationMs,
       reason: closeReasonOf(params.source),
       attribution,
       reports,
@@ -185,7 +239,7 @@ export class GatewayRealtimeSessionMeteringService {
     });
     const ownRecordNanoUsd = closed.closed ? closed.costNanoUsd : 0;
 
-    return receipt("closed", { costNanoUsd: ownRecordNanoUsd, ownRecordNanoUsd });
+    return params.receipt("closed", { costNanoUsd: ownRecordNanoUsd, ownRecordNanoUsd });
   }
 
   /**

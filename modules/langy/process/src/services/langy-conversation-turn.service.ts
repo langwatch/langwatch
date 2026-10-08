@@ -6,7 +6,6 @@ import type {
   LangyMessageRole,
 } from "@langwatch/langy-contract";
 import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 
 import type { LangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
@@ -16,14 +15,8 @@ import {
   type LangyFinalPartsService,
   type LangyFinalToolCall,
 } from "./langy-final-parts.service.ts";
-import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
-
-/**
- * Everything one turn writes to the log: the user's message, the acceptance, each tool call,
- * the plan, the failure, the handoff to a worker and the final parts. The assistant message id
- * is derived from the turn id, so however many times finalize lands it dedups.
- */
-const turnServiceLogger = createLogger("langwatch:langy:conversation-service");
+import { LangyTurnAccountReaderService } from "./langy-turn-account-reader.service.ts";
+import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
 
 type LangyConversationTurnOptions = {
   repository: LangyConversationRepository;
@@ -33,73 +26,23 @@ type LangyConversationTurnOptions = {
   turnOrder: LangyTurnOrderReader | null;
 };
 
+/**
+ * Everything one turn writes to the log: the user's message, the acceptance, each tool call,
+ * the plan, the failure, the handoff to a worker and the final parts. The assistant message id
+ * is derived from the turn id, so however many times finalize lands it dedups.
+ */
 export class LangyConversationTurnService {
   static create(deps: LangyConversationTurnOptions): LangyConversationTurnService {
     return new LangyConversationTurnService(deps);
   }
 
-  private constructor(private readonly deps: LangyConversationTurnOptions) {}
+  private readonly accounts: LangyTurnAccountReaderService;
 
-  /**
-   * The turn's own account of what happened, folded off its live stream.
-   * Read here since two paths finalize a turn (relay + agent HTTP post)
-   * and whichever lands first wins. Best effort: a failed read still records what it can.
-   */
-  private async readTurnOrder(at: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyTurnSegment[]> {
-    if (!this.deps.turnOrder) {
-      return [];
-    }
-
-    try {
-      return await this.deps.turnOrder.readTurnOrder(at);
-    } catch (error) {
-      turnServiceLogger.warn(
-        { ...at, error },
-        "could not read a turn's order; recording its calls before its reply",
-      );
-
-      return [];
-    }
-  }
-
-  /**
-   * The parts a failed turn left on its live stream. Best effort like the order read: a lapsed
-   * buffer or a failed read records the failure without a message, which is what a failed turn
-   * always recorded.
-   */
-  private async failedTurnParts(at: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyMessagePart[]> {
-    if (!this.deps.turnOrder) {
-      return [];
-    }
-
-    try {
-      const account = await this.deps.turnOrder.readTurnAccount(at);
-      const saidSomething = account.order.some(
-        (segment) => segment.kind === "text" && segment.text.trim() !== "",
-      );
-      if (account.toolCalls.length === 0 && !saidSomething) {
-        return [];
-      }
-
-      return this.deps.finalParts.build({
-        text: account.closingText,
-        toolCalls: account.toolCalls,
-        ...(account.order.length > 0 ? { order: account.order } : {}),
-      });
-    } catch (error) {
-      turnServiceLogger.warn(
-        { ...at, error },
-        "could not read a failed turn's account; recording the failure without a message",
-      );
-
-      return [];
-    }
+  private constructor(private readonly deps: LangyConversationTurnOptions) {
+    this.accounts = LangyTurnAccountReaderService.create({
+      turnOrder: deps.turnOrder,
+      finalParts: deps.finalParts,
+    });
   }
 
   /**
@@ -370,7 +313,7 @@ export class LangyConversationTurnService {
       // A turn that did something before it failed (wrote a plan, ran calls, said a paragraph)
       // keeps it as its message, so a reload or a retry still shows it. A turn with nothing to
       // show fails without a message.
-      const parts = await this.failedTurnParts({ conversationId, turnId });
+      const parts = await this.accounts.failedTurnParts({ conversationId, turnId });
       if (parts.length > 0) {
         await this.finalizeTurn({
           projectId,
@@ -389,7 +332,7 @@ export class LangyConversationTurnService {
       return;
     }
 
-    const order = await this.readTurnOrder({ conversationId, turnId });
+    const order = await this.accounts.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
       conversationId,

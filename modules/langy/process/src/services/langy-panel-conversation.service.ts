@@ -2,21 +2,16 @@ import { ValidationError } from "@langwatch/handled-error";
 import {
   LANGY_CONVERSATION_STATUS,
   LangyConversationNotFoundError,
-  langyConversationStatusSchema,
-  langyConversationUpdateFrameSchema,
   langyMessageRoleSchema,
   LangyRateLimitedError,
-  isLangyConversationUpdateVisibleToUser,
-  type LangyConversationDetail,
   type LangyConversationDetailDto,
   type LangyConversationEventPageDto,
-  type LangyConversationListItem,
-  type LangyConversationListItemDto,
   type LangyConversationListPageDto,
   type LangyConversationMessagesDto,
   type LangyPanelCall,
   type LangyPanelCaller,
   type LangyStreamEntry,
+  type langyConversationUpdateFrameSchema,
   type langyContinueConversationInputSchema,
   type langyPanelConversationInputSchema,
   type langyPanelCreateConversationInputSchema,
@@ -39,8 +34,10 @@ import type { z } from "zod";
 
 import type { LangyTurnAccessRepository } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyRateLimitRepository } from "../repositories/langy-rate-limit.repository.ts";
-import { deriveSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
+import { isPart, toDetailDto, toListItemDto } from "../rules/langy-panel-conversation-dto.rules.ts";
+import { turnHealthOf } from "../rules/langy-turn-settlement.rules.ts";
 import type { TurnHealth } from "../rules/langy-turn-settlement.rules.ts";
+import { LangyConversationUpdateStreamService } from "./langy-conversation-update-stream.service.ts";
 import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
 import type { OpenLangyTurnBuffer } from "./langy-turn-settlement-waiter.service.ts";
 import { LangyTurnTailService } from "./langy-turn-tail.service.ts";
@@ -50,7 +47,6 @@ import type { LangyService } from "./langy.service.ts";
 
 const logger = createLogger("langwatch:langy:panel");
 
-/** Main's per-user budgets for the panel: sends, and the looser one a panel-open warm spends. */
 const MESSAGES_PER_MINUTE = 30;
 const WARMS_PER_MINUTE = 60;
 
@@ -375,23 +371,11 @@ export class LangyPanelConversationService {
     await this.members.access.assertPanelAccess(input);
     const emitter = this.members.presence.getTenantEmitter(input.projectId);
     try {
-      for await (const payload of listen({
+      yield* LangyConversationUpdateStreamService.create().streamVisibleFrames({
         emitter,
-        event: "langy_conversation_updated",
+        userId: input.caller.userId,
         signal: input.signal,
-      })) {
-        const frame = langyConversationUpdateFrameSchema.safeParse(payload);
-        if (
-          !frame.success ||
-          !isLangyConversationUpdateVisibleToUser({
-            eventPayload: frame.data.event,
-            userId: input.caller.userId,
-          })
-        ) {
-          continue;
-        }
-        yield frame.data;
-      }
+      });
     } finally {
       this.members.presence.cleanupTenantEmitter(input.projectId);
     }
@@ -510,70 +494,6 @@ export class LangyPanelConversationService {
         .catch(() => null),
     ]);
     if (!conversation || !liveness) return null;
-    return {
-      isStale: liveness.stale,
-      terminal:
-        deriveSyntheticTerminal({
-          status: conversation.status,
-          lastError: conversation.lastError,
-          heartbeatStale: liveness.stale,
-        }) ?? null,
-    };
-  }
-}
-
-function toListItemDto(item: LangyConversationListItem): LangyConversationListItemDto {
-  return {
-    id: item.id,
-    title: item.title,
-    isShared: item.isShared,
-    isOwn: item.isOwn,
-    messageCount: item.messageCount,
-    lastActivityAtMs: item.lastActivityAt.epochMilliseconds,
-  };
-}
-
-/** The fold status is a free string column: an unexpected value reads as active. */
-function toDetailDto(detail: LangyConversationDetail): LangyConversationDetailDto {
-  return {
-    ...toListItemDto(detail),
-    status: langyConversationStatusSchema.catch("active").parse(detail.status),
-  };
-}
-
-function isPart(part: unknown): part is Record<string, unknown> {
-  return typeof part === "object" && part !== null && !Array.isArray(part);
-}
-
-/** Each emission's first argument, until the signal aborts; the listener is always removed. */
-async function* listen(input: {
-  emitter: ReturnType<PresenceApi["getTenantEmitter"]>;
-  event: string;
-  signal: AbortSignal | undefined;
-}): AsyncGenerator<unknown> {
-  const queued: unknown[] = [];
-  let wake: (() => void) | null = null;
-  const onEvent = (...args: unknown[]) => {
-    queued.push(args[0]);
-    wake?.();
-  };
-  const onAbort = () => wake?.();
-  input.emitter.on(input.event, onEvent);
-  input.signal?.addEventListener("abort", onAbort, { once: true });
-  try {
-    while (!input.signal?.aborted) {
-      const next = queued.shift();
-      if (next !== undefined) {
-        yield next;
-        continue;
-      }
-      await new Promise<void>((resolve) => {
-        wake = resolve;
-      });
-      wake = null;
-    }
-  } finally {
-    input.emitter.off(input.event, onEvent);
-    input.signal?.removeEventListener("abort", onAbort);
+    return turnHealthOf({ conversation, liveness });
   }
 }

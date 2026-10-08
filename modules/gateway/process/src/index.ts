@@ -147,7 +147,7 @@ export type {
 } from "./services/virtual-key-authorization.service.ts";
 export type { GatewayConfigAssembly } from "./rules/gateway-config-wire.rules.ts";
 export type { GatewayVirtualKeyCrypto } from "./services/virtual-key-crypto.service.ts";
-export type { GatewaySpanIngestion } from "./services/gateway-realtime-session.service.ts";
+export type { GatewaySpanIngestion } from "./services/gateway-realtime-settlement-span.service.ts";
 export type { GatewaySpendConfirmation } from "./services/gateway-realtime-session.service.ts";
 export type { GatewaySpendRating } from "./services/model-catalog-gateway-spend-rating.service.ts";
 
