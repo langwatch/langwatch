@@ -123,7 +123,7 @@ The shape decides reload cost; the trigger decides how often it is paid.
 
 - **Serialise.** One reload at a time. Changes during a reload queue into exactly one follow-up.
 - **Gate on the agent's turn, not the clock.** haven already installs hooks per worktree. It adds
-  `PostToolUse` on `Edit|Write|MultiEdit` (hold, renewed per write, 60 s cap) and `Stop` (release
+  `PostToolUse` on `Edit|Write|MultiEdit` (hold, renewed per write, 10 min cap) and `Stop` (release
   this session's hold). The backend reloads when no session holds and the quiet window has
   passed. A human's editor never holds, so humans keep 750 ms. It reuses `.haven-hmr-gate`, so
   Vite and the backend share one gate.
@@ -192,7 +192,8 @@ In `dev/scripts/dev-supervisor.mjs` (proof: `dev/scripts/reload-burst.mjs`, run 
   like), derived from the `package.json` graph.
 - **The agent-turn hold.** A restart waits while the `.haven-hmr-gate` marker
   (`apps/ui/.haven-hmr-gate`, unix-ms expiry, `LANGWATCH_DEV_HOLD_MARKER` overrides), is in the
-  future, at most 60 s. The supervisor only reads it.
+  future, at most 10 minutes from when the hold began (60 s until 2026-10-09: a turn
+  outlived it). The supervisor only reads it.
 - **Not in step 1:** link-before-drop. Two whole-process backends cannot share a port, so a
   failed boot still takes the old one down (it is the crashed-boot wait that keeps the lane
   alive). It belongs to B1.
@@ -206,7 +207,7 @@ to `.claude/settings.local.json`:
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "hooks": [{ "type": "command", "command": "haven hmr on --ttl 60s" }]
+        "hooks": [{ "type": "command", "command": "haven hmr on --ttl 10m" }]
       }
     ],
     "Stop": [{ "hooks": [{ "type": "command", "command": "haven hmr off" }] }]
@@ -215,6 +216,16 @@ to `.claude/settings.local.json`:
 ```
 
 One marker serves every session in the worktree, so one session's `Stop` releases another's hold.
+`haven hmr on` never shortens a later expiry another session wrote.
+
+## Step 3, as shipped (2026-10-09)
+
+The split stack's api lane (`pnpm --filter @langwatch/dev-runtime dev`) runs the B1 host
+without the UI: `app.entrypoint.ts --backend-only` under `dev-supervisor.mjs --watch` with
+`LANGWATCH_DEV_RELOAD=module`. The host re-links what an edit reaches in-process, so the pid
+survives a source edit. The supervisor restarts the process only for a `package.json`, a file
+in the host's own `src/`, or a non-zero exit after `backend ready`; a bad edit never exits the
+host. `LANGWATCH_DEV_RELOAD=process` is the escape hatch: the whole-process restart per change.
 
 ## Risks
 

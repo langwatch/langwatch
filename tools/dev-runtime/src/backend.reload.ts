@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 
 import type { EvaluatedModules } from "vite/module-runner";
 
-/** The agent-turn hold (`.haven-hmr-gate`) defers a reload at most this long. ADR-168. */
-const MAX_HOLD_MS = 60_000;
+/** The agent-turn hold (`.haven-hmr-gate`) defers a reload at most this long: a whole agent
+ * turn, yet bounded so a crashed agent's marker cannot hold forever. ADR-168. */
+const MAX_HOLD_MS = 600_000;
 /** How often a held reload looks at whether the hold was released. */
 const HOLD_POLL_MS = 500;
 

@@ -181,7 +181,56 @@ Feature: The local development process topology
     When the quiet window elapses
     Then no restart happens while the marker holds
     And exactly one restart happens once the marker is released or expires
-    And a hold never defers a restart past 60 seconds
+
+  # A turn renews the marker on every write and can run for minutes, so a
+  # one-minute cap reloaded mid-turn. The cap is now ten minutes: a whole turn,
+  # yet bounded, so a crashed agent that never released its marker cannot
+  # hold the backend forever. The supervisor and the in-process host share it.
+  @unit
+  Scenario: A hold lasts as long as the agent turn is active
+    Given the api lane reloading in-process
+    And the agent-turn hold marker is renewed for five minutes
+    When the quiet window elapses
+    Then no reload happens while the marker holds
+    And exactly one reload happens once the marker is released
+
+  @unit
+  Scenario: A hold expires after the cap
+    Given the backend lane running under a debounced watch
+    And the agent-turn hold marker names an expiry that never passes
+    When the quiet window elapses
+    Then exactly one reload happens once ten minutes have passed since the hold began
+
+  # --- The api lane reloads in-process (ADR-168, B1) ---
+
+  # Restarting the whole process for every edit left a shared checkout's api
+  # booting most of the time. The api lane now loads api and worker through a
+  # Vite module runner and re-links only what an edit reaches; the supervisor
+  # keeps the process, and LANGWATCH_DEV_RELOAD=process restores the old restart.
+  @unit
+  Scenario: A module edit reloads in-process without a new process
+    Given the api lane reloading in-process under the supervisor
+    When a backend source file the runner loaded changes
+    Then only that module and the modules importing it are evaluated again
+    And the supervisor does not restart the process, so its pid stays the same
+
+  # Node loaded a package.json's resolution and the host's own source natively,
+  # so no module runner can drop them: those still need a new process.
+  @unit
+  Scenario: Only what Node loaded natively restarts the in-process api lane
+    Given the api lane reloading in-process under the supervisor
+    When a package.json or a file of the host's own source changes
+    Then the supervisor restarts the process
+    And a module edit elsewhere is left to the in-process reload
+
+  # A bad edit never exits an in-process host (the old generation keeps
+  # serving), so an exit after it said "backend ready" is a crash.
+  @unit
+  Scenario: An in-process api lane that crashes after booting is started again
+    Given the api lane reloading in-process under the supervisor
+    And the process has said it is ready
+    When the process exits non-zero
+    Then the supervisor starts it again after the quiet window, without waiting for a change
 
   # Only the packages the backend can load matter. pnpm resolves declared
   # dependencies only, so a workspace package that no backend dependency reaches

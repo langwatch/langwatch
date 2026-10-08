@@ -45,9 +45,10 @@ const envMs = ({ name, fallback }: { name: string; fallback: number }): number =
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 };
-const isWatching = !["0", "false", "off"].includes(
-  (process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase(),
-);
+// LANGWATCH_DEV_RELOAD=process hands every reload to the supervisor's whole-process restart.
+const isWatching =
+  !["0", "false", "off"].includes((process.env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase()) &&
+  process.env.LANGWATCH_DEV_RELOAD?.trim() !== "process";
 
 let ui: ViteDevServer | undefined;
 let backendVite: ViteDevServer | undefined;
@@ -233,11 +234,13 @@ function watchBackend({ onFile }: { onFile: (file: string) => void }): void {
   }
 }
 
-/** Starts the UI, then the first backend generation, then the watch. */
-export async function bootApp(): Promise<void> {
-  // The HMR gate marker resolves against cwd (apps/ui/vite/havenHmrGate.ts).
-  process.chdir(UI_ROOT);
-  ui = await startUi();
+/** Starts the UI (not in the api lane), then the first backend generation, then the watch. */
+export async function bootApp({ withUi }: { withUi: boolean }): Promise<void> {
+  if (withUi) {
+    // The HMR gate marker resolves against cwd (apps/ui/vite/havenHmrGate.ts).
+    process.chdir(UI_ROOT);
+    ui = await startUi();
+  }
   backendVite = await startBackendVite();
   const ssr = backendVite.environments.ssr;
   runner = createServerModuleRunner(ssr, { hmr: false });

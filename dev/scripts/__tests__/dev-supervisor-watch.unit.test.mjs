@@ -15,6 +15,7 @@ import {
   createDebouncer,
   createReloadQueue,
   holdRemainingMs,
+  needsNewProcess,
   resolveBundleConfig,
   resolveWatchConfig,
   shouldIgnoreWatchPath,
@@ -444,6 +445,7 @@ void describe("createDebouncer quiet window, max wait and hold", () => {
     assert.deepEqual(fired, [["a.ts"]]);
   });
 
+  /** @scenario "A hold expires after the cap" */
   void it("does not hold past the cap", async () => {
     const fired = [];
     const debouncer = createDebouncer({
@@ -459,6 +461,24 @@ void describe("createDebouncer quiet window, max wait and hold", () => {
   });
 });
 
+void describe("needsNewProcess for a child that reloads in-process", () => {
+  /** @scenario "A module edit reloads in-process without a new process" */
+  void it("leaves a module edit to the child, so the pid stays the same", () => {
+    const relativePath = "../../modules/trace/process/src/services/trace.service.ts";
+    assert.equal(needsNewProcess({ relativePath, reloadsInChild: true }), false);
+    assert.equal(needsNewProcess({ relativePath, reloadsInChild: false }), true);
+  });
+
+  /** @scenario "Only what Node loaded natively restarts the in-process api lane" */
+  void it("restarts for a package.json or the host's own source, never for ignored churn", () => {
+    const needs = (relativePath) => needsNewProcess({ relativePath, reloadsInChild: true });
+    assert.equal(needs("../../packages/api/package.json"), true);
+    assert.equal(needs("src/backend.reload.ts"), true);
+    assert.equal(needs("../../packages/api/not-a-package.json"), false);
+    assert.equal(needs("src/__tests__/backend.reload.unit.test.ts"), false);
+  });
+});
+
 void describe("holdRemainingMs", () => {
   void it("reads the expiry the marker carries, capped, and 0 for absent or stale", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hold-"));
@@ -467,8 +487,10 @@ void describe("holdRemainingMs", () => {
     fs.writeFileSync(marker, "5000\n");
     assert.equal(holdRemainingMs({ marker, now: 4000 }), 1000);
     assert.equal(holdRemainingMs({ marker, now: 6000 }), 0);
-    fs.writeFileSync(marker, String(10 * 60_000));
-    assert.equal(holdRemainingMs({ marker, now: 0 }), 60_000);
+    fs.writeFileSync(marker, String(5 * 60_000));
+    assert.equal(holdRemainingMs({ marker, now: 0 }), 5 * 60_000, "a turn-long hold is honoured");
+    fs.writeFileSync(marker, String(60 * 60_000));
+    assert.equal(holdRemainingMs({ marker, now: 0 }), 10 * 60_000, "capped at ten minutes");
     fs.writeFileSync(marker, "garbage");
     assert.equal(holdRemainingMs({ marker }), 0);
     fs.rmSync(dir, { recursive: true, force: true });

@@ -13,15 +13,15 @@ runs each app's own `main.ts`, and the helm chart runs api, worker and tasks as 
 
 **Status of ADR-168** (`dev/docs/adr/168-one-process-dev-with-debounced-module-reload.md`):
 `Proposed`, dated 2026-09-30. Its step 1 (the supervisor trigger fixes) and B1 (the host)
-have landed as a trial; the four open questions at the foot of the ADR are Alex's, not
-answered. Teach it as a trial. Do not call it the accepted design, and do not make a
-change that depends on it being the default.
+have landed. Since 2026-10-09, at Alex's direction, the split stack's api lane reloads
+in-process by default (ADR-168 "Step 3, as shipped"); the one-process `app` lane is still a
+trial, and the four open questions at the foot of the ADR are Alex's, not answered.
 
 ## The two shapes
 
 | Shape               | Node processes                                                   | Start                                                           | Reload                                                          |
 | ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
-| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | `dev-supervisor.mjs --watch` restarts the whole backend process |
+| Split (default)     | `ui` lane (Vite) + `backend` lane (api and worker in one `node`) | `pnpm dev`                                                      | re-links only what a change reaches, in process (see below)     |
 | One process (trial) | one `app` lane: Vite, api and worker                             | `LANGWATCH_DEV_ONE_PROCESS=1 pnpm dev`, or `pnpm dev:one` alone | re-links only what a change reaches, in process                 |
 
 - `pnpm dev` is `dev-supervisor.mjs` over `dev/scripts/dev-stack.sh`, which runs the lanes
@@ -40,8 +40,12 @@ change that depends on it being the default.
 
 - `app.entrypoint.main.ts`: starts the UI's Vite server (`apps/ui/vite.config.ts`,
   unchanged, `/api` still proxied) and loads api and worker through a Vite module runner.
-- `backend.entrypoint.main.ts`: the split shape's backend, api and worker in one Node
-  process; prints `backend ready` so the supervisor knows a boot settled.
+- `app.entrypoint.ts --backend-only`: the split shape's api lane (`pnpm --filter
+  @langwatch/dev-runtime dev`), the same host without the UI's Vite server. The supervisor
+  keeps the process: it restarts it only for a `package.json`, a file in the host's own
+  `src/` (Node loaded both natively), or a crash after `backend ready`.
+- `backend.entrypoint.main.ts`: api and worker in one Node process with no reload
+  (`pnpm start`, and the `LANGWATCH_DEV_RELOAD=process` fallback's boot shape).
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
   (`staleModuleIds`) and drops only those; honours the agent-turn hold.
 - `backend.process.ts`: `startBackend` boots the worker first, then the api;
@@ -60,9 +64,10 @@ generation serving. A failed boot waits for the next change. Each generation log
 | `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` | quiet window before a reload (2000)                                 |
 | `LANGWATCH_DEV_WATCH_MAX_WAIT_MS` | never defer longer than this after the first change (30000)         |
 | `LANGWATCH_DEV_HOLD_MARKER`       | override the `apps/ui/.haven-hmr-gate` marker path                  |
+| `LANGWATCH_DEV_RELOAD=process`    | api lane: back to the supervisor's whole-process restart per change |
 
-The hold marker is what `haven hmr on --ttl 60s` writes during an agent turn; a reload
-waits for it, at most 60 s. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
+The hold marker is what `haven hmr on --ttl 10m` writes during an agent turn (the hooks are
+opt-in, ADR-168); a reload waits for it, at most 10 minutes from when the hold began. A skipped change is `.md`, `.mdx`, `.feature`, a `tsconfig*.json`,
 a `.json` outside `src/`, or a package the watched command cannot reach. The authority for
 these is `dev/scripts/dev-supervisor.mjs` and ADR-168 "Step 1, as shipped".
 
@@ -77,11 +82,11 @@ two `PORT`s (5570, 5580, ...). A held port stops the launcher with a line saying
 
 - A reload storm after a burst of agent writes: raise the debounce, or turn the hold hook
   on (`haven hmr on`); the log names the changed files per generation.
-- `fatal boot failure` after an edit: the old generation is gone in the split shape (two
-  Node processes cannot share a port), and the supervisor waits for the next change.
-  Fix the file; do not restart the lane.
-- Memory growing over many generations (one-process only): note `rssMiB` per
-  `backend ready` line; a restart is the guardrail. Report it, since it is an ADR-168 risk.
+- `backend did not link` after an edit: the old generation keeps serving. `boot failed;
+  waiting for a change`: the old one is drained and the next change retries. Fix the file;
+  do not restart the lane.
+- Memory growing over many generations: note `rssMiB` per `backend ready` line; a restart
+  is the guardrail. Report it, since it is an ADR-168 risk.
 
 ## Where to read next
 

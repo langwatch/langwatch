@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "dev": "LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "dev": "LANGWATCH_DEV_RELOAD=${LANGWATCH_DEV_RELOAD:-module} LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts --backend-only",
     "predev:one": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev:one": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",

@@ -32,6 +32,10 @@ func (o *Orchestrator) RunHMR(ctx context.Context, lwDir string, args []string) 
 			}
 		}
 		expiry := o.sys.Now().Add(ttl).UnixMilli()
+		// One marker serves every session in the worktree: never cut another session's longer hold short.
+		if current, ok := o.store.ReadHMRGate(lwDir); ok && current > expiry {
+			expiry = current
+		}
 		if err := o.store.WriteHMRGate(lwDir, expiry); err != nil {
 			return err
 		}
