@@ -19,6 +19,7 @@ import {
   type UnpinTraceInput,
   unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
+import type { FoldStateRead } from "@langwatch/eventing";
 import {
   TeamNotFoundError,
   type OrganizationApi,
@@ -27,17 +28,23 @@ import {
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
-import type { DataRetentionProjectScopeRepository } from "../repositories/data-retention-project-scope.repository.ts";
+import type { DataRetentionProjectScopeState } from "../repositories/data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "../repositories/data-retention.repository.ts";
 import type { PinnedTraceRepository } from "../repositories/pinned-trace.repository.ts";
 import type { RetroactiveRetentionRepository } from "../repositories/retroactive-retention.repository.ts";
 import type { StorageMeterService } from "./storage-meter.service.ts";
 
+/** The read side of the project-scope fold: this service never writes it. */
+type ProjectScopeReader = {
+  get(aggregateId: string): Promise<FoldStateRead<DataRetentionProjectScopeState>>;
+  findProjectIds(input: { organizationId: string; teamId?: string }): Promise<string[]>;
+};
+
 type DataRetentionServiceOptions = Readonly<{
   policies: DataRetentionRepository;
   pins: PinnedTraceRepository;
   /** Where each project sits, folded from project's facts: no project peer (Q151 Q1). */
-  projectScopes: Pick<DataRetentionProjectScopeRepository, "get" | "findProjectIds">;
+  projectScopes: ProjectScopeReader;
   organizations: OrganizationApi;
   defaultRetentionDays: number;
   /**

@@ -2,9 +2,13 @@ import type { ScenarioApi, SimulationRunData } from "@langwatch/scenario-contrac
 import { TERMINAL_STATUSES } from "@langwatch/scenario-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 
-import type { SuiteRunProcessingRepository } from "../repositories/suite-run-processing.repository.ts";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import type { SuiteRunItemCommandsService } from "./suite-run-item-commands.service.ts";
+
+/** The read side of suite-run processing: replay never opens the fold store. */
+type OpenRunReader = {
+  findOpenRuns(input: { tenantId: string }): Promise<SuiteRunStateData[]>;
+};
 
 type SuiteRunItemSenders = Pick<
   SuiteRunItemCommandsService,
@@ -31,7 +35,7 @@ export type SuiteRunReplayReport = {
 export class SuiteRunReplayService {
   static create(deps: {
     suites: Pick<SuiteRepository, "findProjectIdsHoldingSuites">;
-    runs: Pick<SuiteRunProcessingRepository, "findOpenRuns">;
+    runs: OpenRunReader;
     scenarios: Pick<ScenarioApi, "getRunDataForBatchRun">;
     runItems: SuiteRunItemSenders;
   }): SuiteRunReplayService {
