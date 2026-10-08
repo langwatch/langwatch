@@ -29,6 +29,7 @@ import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRuntime } from "@langwatch/browser/runtime";
 import { UiShell } from "@langwatch/browser/shell";
+import { readUiProcessConfig } from "@langwatch/browser/supply";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
@@ -49,8 +50,9 @@ import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 import { lentFirstTouchAttribution } from "./shell/use-analytics-identity";
 import {
-  parseUiFeatureConfig,
+  claimedPublicConfig,
   uiDeploymentOf,
+  uiFeatureConfigOf,
   uiTelemetryOf,
   type UiFeatureConfig,
 } from "./ui-feature-config";
@@ -226,7 +228,7 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: uiShellLayouts(rootCapabilities),
+          shellLayouts: uiShellLayouts({ root: rootCapabilities, config }),
           errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },
@@ -261,21 +263,23 @@ class BrowserUiShell extends UiShell {
  */
 export async function startUi(): Promise<void> {
   const served = readPublicAppConfig(document);
-  const config = parseUiFeatureConfig(served);
+  // The framework's own slice: the transport is built before the supply renders.
+  const process = readUiProcessConfig(served);
   // Every answer's session version reaches the watch the shell invalidates reads from.
   const sessionVersions = SessionVersionWatch.create();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
-    isDevelopment: config.process.mode === "development",
+    isDevelopment: process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
     .withModules(browserModules)
     .withTransport(transport)
-    .withInjectedConfig(() => served)
+    .withInjectedConfig(() => claimedPublicConfig(served))
     .render();
+  const config = uiFeatureConfigOf({ served, process, installed: installed.config });
 
   configureDocsRuntime({ mode: config.process.mode, hostname: window.location.hostname });
   UiRuntime.create({

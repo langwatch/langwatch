@@ -5,12 +5,17 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { evaluationWebConfigSchema } from "@langwatch/evaluation-contract";
 import { EvaluatorSettingsFormToken } from "@langwatch/evaluator-client";
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 
 export const evaluatorWeb = defineBrowserModule("evaluator")
+  // Evaluator is the browser half that answers for the evaluation slice (plan decision 1).
+  .withConfig({ evaluation: evaluationWebConfigSchema }, ({ evaluation }) => ({
+    hasLangevals: evaluation.langevals,
+  }))
   .withApi(evaluatorApi, { contracts: [evaluatorTrpc] })
   .withHosts({
     requires: ["EvaluatorHostApi"],

@@ -175,13 +175,13 @@ Feature: A browser cannot boot without what its web modules declared
 
   Rule: every installed module's configuration slice has a source, and the compiler says so
 
-    @unit @unimplemented
+    @unit
     Scenario: A module whose settings have no projection fails the build
       Given a module declaring web settings
       When it declares no projection from the injected configuration
       Then the build fails, naming the module
 
-    @unit @unimplemented
+    @unit
     Scenario: A projection naming a field the injected configuration does not carry fails the build
       Given a module projecting a field the public configuration does not declare
       Then the build fails, naming the module and the field
@@ -208,7 +208,7 @@ Feature: A browser cannot boot without what its web modules declared
       When the browser boots
       Then every slice is parsed before the first render
 
-    @unit @unimplemented
+    @unit
     Scenario: A key no module claims is still refused
       Given an injected configuration carrying a key the schema does not declare
       When it is read

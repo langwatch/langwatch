@@ -6,11 +6,13 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
+  billingWebConfigSchema,
   ContactSalesToken,
   SeatProrationPreviewToken,
 } from "@langwatch/enterprise-billing-contract";
 
 export const billingWeb = defineBrowserModule("billing")
+  .withConfig({ billing: billingWebConfigSchema }, ({ billing }) => billing)
   .withHosts({
     requires: ["BillingHostApi"],
     mounts: { BillingHostApi: { load: () => import("./behavior/billing-host-mount.tsx") } },

@@ -4,6 +4,7 @@
  */
 
 import {
+  authWebConfigSchema,
   PasskeyCeremoniesToken,
   SignInMethodLinkingToken,
   SsoTestSignInToken,
@@ -12,6 +13,14 @@ import {
 import { defineBrowserModule } from "@langwatch/browser";
 
 export const authWeb = defineBrowserModule("auth")
+  // The deployment fields auth's slice answers, named as the shell's deployment reads them.
+  .withConfig({ auth: authWebConfigSchema }, ({ auth }) => ({
+    ...(auth.publicUrl ? { publicUrl: auth.publicUrl } : {}),
+    ...(auth.authProvider ? { authProvider: auth.authProvider } : {}),
+    passkeysEnabled: auth.passkeys,
+    emailPasswordEnabled: auth.emailPasswordEnabled,
+    signUpMode: auth.signUpMode,
+  }))
   .withScreens({
     // Placed by the application's route table until a top-level anchor accepts
     // declared routes; the loader is this module's either way.

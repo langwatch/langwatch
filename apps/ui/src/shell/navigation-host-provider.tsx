@@ -5,7 +5,12 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
+import {
+  useUiCapabilities,
+  useUiDeployment,
+  useUiRpc,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
@@ -21,7 +26,7 @@ import {
   type NavigationAccountMenu,
   type NavigationLangy,
 } from "./navigation-host";
-import { readNavigationDeployment } from "./navigation-host-deployment";
+import { navigationDeploymentOf } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";
 import {
   openableTeamsOf,
@@ -187,7 +192,8 @@ function useNavigationHostReading({
     [organization, currentUser?.id, organizationRole, scopeCapability],
   );
 
-  const deployment = useMemo(readNavigationDeployment, []);
+  const uiDeployment = useUiDeployment();
+  const deployment = useMemo(() => navigationDeploymentOf(uiDeployment), [uiDeployment]);
 
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);

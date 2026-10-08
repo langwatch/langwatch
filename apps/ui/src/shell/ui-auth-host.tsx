@@ -10,12 +10,11 @@ import type {
   AuthRouteReading,
 } from "@langwatch/auth-contract";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
 import { useMemo, type ComponentType } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 
-import { parseUiFeatureConfig, type UiFeatureConfig } from "../ui-feature-config";
+import type { UiFeatureConfig } from "../ui-feature-config";
 import type { UiRootCapabilities } from "./ui-root-capabilities";
 
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
@@ -24,16 +23,16 @@ function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
     BASE_HOST: config.auth.publicUrl ?? config.process.appBaseUrl ?? window.location.origin,
     DEMO_PROJECT_SLUG: config.authz.demoProjectSlug,
     NODE_ENV: config.process.mode,
-    PASSKEYS_ENABLED: config.auth.passkeys,
-    HAS_EMAIL_PROVIDER_KEY: config.notification.email,
+    PASSKEYS_ENABLED: config.auth.passkeysEnabled,
+    HAS_EMAIL_PROVIDER_KEY: config.notification.hasEmailProvider,
     IS_SAAS: config.process.deployment === "saas",
     GATEWAY_BASE_URL: config.gateway.gatewayBaseUrl,
     POSTHOG_KEY: config.ops.posthog?.key,
     POSTHOG_HOST: config.ops.posthog?.host,
-    RUM_ENABLED: config.rum.enabled,
-    RUM_SAMPLE_RATIO: config.rum.sampleRatio,
+    RUM_ENABLED: config.ops.browserTracing,
+    RUM_SAMPLE_RATIO: config.ops.sampleRatio,
     HAS_LANGWATCH_NLP_SERVICE: config.process.nlp,
-    HAS_LANGEVALS_ENDPOINT: config.evaluation.langevals,
+    HAS_LANGEVALS_ENDPOINT: config.evaluator.hasLangevals,
     STRIPE_LICENSE_PAYMENT_LINK_URL: config.billing.licensePaymentUrl,
     NEXTAUTH_PROVIDER: config.auth.authProvider,
     SIGN_UP_MODE: config.auth.signUpMode,
@@ -41,7 +40,13 @@ function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
 }
 
 /** The auth layout: auth's host port answered from the shell's own readings. */
-export function uiAuthHost(auth: UiRootCapabilities["authHost"]): ComponentType {
+export function uiAuthHost({
+  auth,
+  config,
+}: {
+  auth: UiRootCapabilities["authHost"];
+  config: UiFeatureConfig;
+}): ComponentType {
   class ShellAuthHost extends auth.AuthHostApi {
     constructor(
       private readonly config: UiFeatureConfig,
@@ -69,7 +74,6 @@ export function uiAuthHost(auth: UiRootCapabilities["authHost"]): ComponentType 
     const location = useLocation();
     const params = useParams();
     const [search] = useSearchParams();
-    const [config] = useMemo(() => [parseUiFeatureConfig(readPublicAppConfig(document))], []);
 
     const host = useMemo(() => {
       const reading: AuthRouteReading = {
@@ -80,7 +84,7 @@ export function uiAuthHost(auth: UiRootCapabilities["authHost"]): ComponentType 
       return new ShellAuthHost(config, reading, (failure) =>
         capabilities?.feedback?.failed(failure),
       );
-    }, [config, location.pathname, params, search, capabilities]);
+    }, [location.pathname, params, search, capabilities]);
 
     return (
       <auth.AuthHostProvider value={host}>

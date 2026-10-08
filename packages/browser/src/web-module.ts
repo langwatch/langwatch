@@ -108,8 +108,20 @@ type EmptyDeclaration = Readonly<{
   capabilities: Empty;
 }>;
 
-/** The page's config slices a module reads, each by its owner's name and that owner's schema. */
-export type WebModuleConfig = Readonly<{ slices: Readonly<Record<string, ZodType>> }>;
+/**
+ * The page's config slices a module claims, each by its owner's name and that
+ * owner's schema, and the projection its installed value is made from. The
+ * projection's parameter is `never` so any typed projection is stored as-is.
+ */
+export type WebModuleConfig = Readonly<{
+  slices: Readonly<Record<string, ZodType>>;
+  project: (parsed: never) => unknown;
+}>;
+
+/** What a projection reads: each claimed owner's slice, parsed by that owner's schema. */
+export type ClaimedConfigSlices<Slices extends Readonly<Record<string, ZodType>>> = {
+  readonly [Owner in keyof Slices]: output<Slices[Owner]>;
+};
 
 export type WebModuleInstallation = Readonly<{
   name: string;
@@ -343,21 +355,20 @@ export class WebModule<
     });
   }
 
-  withConfig<const Slices extends Readonly<Record<string, ZodType>>>(
+  /** Claims `slices` and installs `project`'s answer as this module's config (rulings R1). */
+  withConfig<const Slices extends Readonly<Record<string, ZodType>>, Value>(
     slices: Slices,
+    project: (parsed: ClaimedConfigSlices<Slices>) => Value,
   ): WebModule<
     Name,
     Merge<Requirements, RequirementFields<"injected-config">>,
-    Merge<
-      Config,
-      { readonly [Key in Name]: { readonly [Owner in keyof Slices]: output<Slices[Owner]> } }
-    >,
+    Merge<Config, { readonly [Key in Name]: Value }>,
     Declaration,
     Precise
   > {
     return this.#next({
       ...this.#installation,
-      config: { slices },
+      config: { slices, project },
       requirements: mergeNames(this.#installation.requirements, ["injected-config"]),
     });
   }
