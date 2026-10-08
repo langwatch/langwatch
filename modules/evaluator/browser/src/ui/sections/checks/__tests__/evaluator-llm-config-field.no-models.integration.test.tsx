@@ -40,14 +40,12 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
         useQuery: () => ({ data: state.providers, isLoading: false }),
       },
     },
-    traces: {
-      instantEval: {
-        access: {
-          useQuery: () => ({
-            data: { released: state.optedIn, offer: "enable" },
-            isLoading: false,
-          }),
-        },
+    instantEval: {
+      access: {
+        useQuery: () => ({
+          data: { released: state.optedIn, offer: "enable" },
+          isLoading: false,
+        }),
       },
     },
   },

@@ -2,15 +2,17 @@
  * The Explorer's request as the run service reads it, and a run row as the
  * chip reads it. Spec: specs/traces-v2/instant-eval-search.feature
  */
-import type { InstantEvalRunWire } from "@langwatch/instant-eval-contract";
-import type { ExplorerInstantEvalRunInput } from "@langwatch/trace-contract";
+import type {
+  ExplorerInstantEvalRunInput,
+  InstantEvalRunWire,
+} from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   explorerJudgedFilter,
   toExplorerRunInput,
   toExplorerRunProgress,
-} from "../trace-instant-eval-run.rules.ts";
+} from "../instant-eval-explorer-run.rules.ts";
 
 const request = (
   overrides: Partial<ExplorerInstantEvalRunInput> = {},

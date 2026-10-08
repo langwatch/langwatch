@@ -28,13 +28,7 @@ import {
 } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import {
-  InstantEvalApi,
-  type InstantEvalEstimateWire,
-  type InstantEvalOptInAccess,
-  type InstantEvalRunProgress,
-  type InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
+import { InstantEvalApi, type InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -127,7 +121,6 @@ import {
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
-  type ExplorerInstantEvalRunInput,
   explorerHiddenOrigins,
   FilterParseError,
   type LangWatchQLTraceFilter,
@@ -1349,46 +1342,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         : null;
   }
 
-  estimateExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire> {
-    return this.#instantEvals().estimateRun(input);
-  }
-
-  startExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().startRun(input);
-  }
-
-  cancelExplorerEvalRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().cancelRun(input);
-  }
-
-  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
-    return this.#instantEvals().getRun(input);
-  }
-
-  getExplorerEvalAccess(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals().getAccess(input);
-  }
-
-  enableExplorerEvals(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals().enable(input);
-  }
-
   /**
    * The runs a query's `eval` chips claim, checked against the project. A
    * process composed without the Instant Eval peer can check none, so every
@@ -1458,16 +1411,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     const names = (settled?: PromiseSettledResult<FacetValuesResult>): string[] =>
       settled?.status === "fulfilled" ? settled.value.values.map((entry) => entry.value) : [];
     return { evaluators: names(evaluators), events: names(events) };
-  }
-
-  #instantEvals(): TraceInstantEvalRunService {
-    if (!this.#explorerEvals) {
-      throw new Error(
-        "An Explorer Instant Eval asked for the Instant Eval peer, but this process composed Trace without it",
-      );
-    }
-
-    return this.#explorerEvals;
   }
 
   extractInlineMediaFromEvent(input: {

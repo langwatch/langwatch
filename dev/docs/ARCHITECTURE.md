@@ -1792,11 +1792,11 @@ sync-all-openapi` regenerates all four, and the `openapi-clients` CI job fails o
   relay, like every other turn, and the any-project Lambda credential stays in the control plane:
   `AgentTestTurnJob` carries `executeSyncRoute` from the same rule as simulation jobs
   (`WorkflowApi.hasPerProjectEngines`); self-hosted stays direct (Alex, 2026-10-05).
-- The instant-eval opt-in procedures `access` and `enable` are declared in trace's contract under
-  `traces.instantEval` as two `TraceApi` operations that forward to `InstantEvalApi`, as
-  `trace-instant-eval-run.service.ts` already does; instant-eval's process takes `@langwatch/authz-contract`
-  (coordinator, L7 R1 and S1, 2026-10-05). `traces.instantEval.enable` is audited against the organization,
-  as on main, through E10's declared target (Alex, 2026-10-05); never a hand-rolled audit write.
+- The Explorer's Instant Eval procedures, the opt-in `access` and `enable` included, are `instantEval.*`,
+  declared in instant-eval's contract and served by instant-eval (Alex 2026-10-08, round 36 D4, superseding
+  L7 R1); instant-eval's process takes `@langwatch/authz-contract` (S1, 2026-10-05). `instantEval.enable` is
+  audited against the organization, as on main, through E10's declared target (Alex, 2026-10-05); never a
+  hand-rolled audit write.
 - Parameters the evaluator overrides are refused everywhere, not on REST only as on main: the monitor service
   refuses them with 422 `monitor_parameters_unused` at every door, so the UI create form must not send them
   (Alex, 2026-10-05).
@@ -2910,7 +2910,6 @@ the left, the target.
 | `secrets.into({ … }, build)` (§6)                                                                                           | nested `secrets.into(handle, …)`                                                                                                                                                                   |
 | `hostedStores(stores)` (§4)                                                                                                 | `hostedMembers(stores)`                                                                                                                                                                            |
 | "store client" (`the clickhouse client`)                                                                                    | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                          |
-| `instantEval.*`, served by instant-eval (Alex 2026-10-08, round 36 D4)                                                      | `traces.instantEval.*`, served by trace (`traces-instant-eval.trpc.ts:20`)                                                                                                                         |
 | "Admin" (`ssoAdmin()`; Alex 2026-10-08, round 39 DS-A)                                                                      | the "backoffice" spelling §15 deletes, still in the UI shell route table and billing                                                                                                               |
 | the licence in a licensing-owned table, cleared through `LicensingApi.removeLicense` (Alex 2026-10-08, rounds 37 D6 and 42) | `OrganizationApi.setLicense` / `clearLicense` over organization's columns (`organization.api.ts:565-574`)                                                                                          |
 

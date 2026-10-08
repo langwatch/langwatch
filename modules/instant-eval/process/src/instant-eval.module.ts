@@ -11,11 +11,12 @@ import { instantEvalEventing } from "./eventing/instant-eval-processing.pipeline
 import { instantEvalRepositories } from "./repositories/instant-eval-repositories.registry.ts";
 import { InstantEvalJudgeSpendCatchUpTask } from "./tasks/instant-eval-judge-spend-catch-up.task.ts";
 import { instantEvalRest } from "./transport/instant-eval.rest.ts";
+import { instantEvalTrpcTransport } from "./transport/instant-eval.trpc.ts";
 
 export const instantEvalProcessModule = defineProcessModule("instant-eval")
   .withRepositories(instantEvalRepositories)
   .withApi(InstantEvalModule)
-  .withTransports(instantEvalRest)
+  .withTransports(instantEvalRest, instantEvalTrpcTransport)
   // Every route of the family runs the statement as the KEY's own cut of the
   // project's content, so the door resolves the credential once and the
   // handlers never reach for it.

@@ -5,11 +5,9 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
+import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contract";
 import { nowInstant } from "@langwatch/time";
-import {
-  type ExplorerInstantEvalProgress,
-  isExplorerInstantEvalRunActive,
-} from "@langwatch/trace-contract";
+import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
@@ -35,7 +33,7 @@ export function useInstantEvalRunWatch(): void {
 
   const results = api.useQueries((t) =>
     runIds.map((runId) => {
-      return t.traces.instantEval.get(
+      return t.instantEval.get(
         { projectId, runId },
         {
           enabled: !!projectId,

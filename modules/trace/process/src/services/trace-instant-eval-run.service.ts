@@ -1,25 +1,11 @@
 /**
- * The Explorer's Instant Evals, over the run service another module owns: the
- * search bar's vocabulary in, the run's counters out. The statement, the
- * budget and the judging are all the peer's.
+ * The runs an Explorer read's `eval` chips name, checked against the run
+ * service another module owns. Starting, pricing and reading runs are the peer's.
  */
-import type {
-  InstantEvalApi,
-  InstantEvalEstimateWire,
-  InstantEvalOptInAccess,
-  InstantEvalRunProgress,
-  InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
-import type {
-  ExplorerInstantEvalRunInput,
-  ResolvedInstantEvalRun,
-} from "@langwatch/trace-contract";
+import type { InstantEvalApi, InstantEvalRunReference } from "@langwatch/instant-eval-contract";
+import type { ResolvedInstantEvalRun } from "@langwatch/trace-contract";
 
-import {
-  toExplorerRunInput,
-  toExplorerRunProgress,
-  toResolvedInstantEvalRun,
-} from "../rules/trace-instant-eval-run.rules.ts";
+import { toResolvedInstantEvalRun } from "../rules/trace-instant-eval-run.rules.ts";
 
 /** What this service is composed from: the peer that owns the runs. */
 interface TraceInstantEvalRunDeps {
@@ -34,61 +20,6 @@ export class TraceInstantEvalRunService {
   #instantEvals: InstantEvalApi;
   private constructor(instantEvals: InstantEvalApi) {
     this.#instantEvals = instantEvals;
-  }
-
-  /** What the run would read and what judging it would cost, judging nothing. */
-  estimateRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire> {
-    return this.#instantEvals.estimateRun({
-      projectId: input.request.projectId,
-      actor: { kind: "member", userId: input.userId },
-      input: toExplorerRunInput(input.request),
-    });
-  }
-
-  async startRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress> {
-    const run = await this.#instantEvals.createRun({
-      projectId: input.request.projectId,
-      actor: { kind: "member", userId: input.userId },
-      input: toExplorerRunInput(input.request),
-    });
-
-    return toExplorerRunProgress(run);
-  }
-
-  async cancelRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress> {
-    const run = await this.#instantEvals.cancelRun({
-      projectId: input.projectId,
-      runId: input.runId,
-      ...(input.requestedByUserId === undefined
-        ? {}
-        : { requestedByUserId: input.requestedByUserId }),
-    });
-
-    return toExplorerRunProgress(run);
-  }
-
-  /** What the refusal popover offers; the peer resolves the project's organization. */
-  getAccess(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals.getOptInAccess(input);
-  }
-
-  /** The organization's own switch; the route has already asked `organization:manage`. */
-  enable(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
-    return this.#instantEvals.optIn(input);
-  }
-
-  async getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress> {
-    return toExplorerRunProgress(await this.#instantEvals.getRun(input));
   }
 
   /**

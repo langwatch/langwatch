@@ -208,7 +208,7 @@ function useInstantEvalStarter({
   applyChip: (args: PendingRoute & { runId: string }) => void;
   startRun: (args: PendingRoute & { seq: number }) => void;
 } {
-  const start = api.traces.instantEval.start.useMutation();
+  const start = api.instantEval.start.useMutation();
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
   const recordSearchNotice = useFilterStore((s) => s.recordSearchNotice);
@@ -278,7 +278,7 @@ function useInstantEvalSwitch({
   route: (args: { payload: InstantEvalRoutePayload; seq: number }) => void;
   outcome: Pick<ReturnType<typeof useInstantEvalOutcome>, "setRefusal" | "searchWordsInstead">;
 }): { enableInstantEvals: () => void; dismissRefusal: () => void; isEnabling: boolean } {
-  const enable = api.traces.instantEval.enable.useMutation();
+  const enable = api.instantEval.enable.useMutation();
   const utils = api.useUtils();
   const { setRefusal, searchWordsInstead } = outcome;
 
@@ -290,8 +290,8 @@ function useInstantEvalSwitch({
       { projectId: held.projectId },
       {
         onSuccess: (access) => {
-          utils.traces.instantEval.access.setData({ projectId: held.projectId }, access);
-          void utils.traces.instantEval.access.invalidate();
+          utils.instantEval.access.setData({ projectId: held.projectId }, access);
+          void utils.instantEval.access.invalidate();
           if (seq !== seqRef.current) return;
           heldRef.current = null;
           setRefusal(null);
@@ -358,7 +358,7 @@ export function useInstantEvalRoute({
   /** What the access read offers a refused reader; absent while it loads. */
   optInOffer?: ExplorerInstantEvalOptInAccess["offer"] | undefined;
 }): InstantEvalRouteState {
-  const estimate = api.traces.instantEval.estimate.useMutation();
+  const estimate = api.instantEval.estimate.useMutation();
   const outcome = useInstantEvalOutcome();
   const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
   const seqRef = useRef(0);

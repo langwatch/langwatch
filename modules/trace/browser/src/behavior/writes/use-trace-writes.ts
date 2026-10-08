@@ -75,8 +75,8 @@ export function useUpdateDatasetMapping() {
 
 export function useCancelInstantEval() {
   const utils = api.useUtils();
-  return api.traces.instantEval.cancel.useMutation({
-    onSuccess: () => void utils.traces.instantEval.get.invalidate(),
+  return api.instantEval.cancel.useMutation({
+    onSuccess: () => void utils.instantEval.get.invalidate(),
   });
 }
 

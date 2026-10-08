@@ -31,7 +31,7 @@ export function useInstantEvalJudgeModels({
     organizationId,
     enabled: !!projectId && !!organizationId,
   });
-  const access = evaluatorApi.traces.instantEval.access.useQuery(
+  const access = evaluatorApi.instantEval.access.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
   );

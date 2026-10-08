@@ -6,11 +6,9 @@
  */
 
 import { defineSlice } from "@langwatch/browser-host/global-store";
+import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contract";
 import { nowInstant } from "@langwatch/time";
-import {
-  type ExplorerInstantEvalProgress,
-  isExplorerInstantEvalRunActive,
-} from "@langwatch/trace-contract";
+import { isExplorerInstantEvalRunActive } from "@langwatch/trace-contract";
 
 /**
  * Where a run is, as the page shows it. Counters can still move after the

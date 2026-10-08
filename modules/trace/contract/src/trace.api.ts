@@ -1,10 +1,5 @@
 import type { PrincipalRef } from "@langwatch/authorization";
-import type {
-  InstantEvalEstimateWire,
-  InstantEvalOptInAccess,
-  InstantEvalRunProgress,
-  InstantEvalRunReference,
-} from "@langwatch/instant-eval-contract";
+import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
@@ -34,7 +29,6 @@ import type {
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
-import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
@@ -819,37 +813,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
     userAgent: string | null;
   }): Promise<SharedTraceDto>;
 
-  /**
-   * The Explorer's Instant Eval, priced. The shorthand it sends is turned into
-   * the statement a CLI caller would write, judging nothing.
-   */
-  estimateExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalEstimateWire>;
-  /** The same shorthand, accepted and queued. Answers the run's counters. */
-  startExplorerEvalRun(input: {
-    request: ExplorerInstantEvalRunInput;
-    userId: string;
-  }): Promise<InstantEvalRunProgress>;
-  /** Asks a run to stop. A run that already finished is refused by name. */
-  cancelExplorerEvalRun(input: {
-    projectId: string;
-    runId: string;
-    requestedByUserId?: string;
-  }): Promise<InstantEvalRunProgress>;
-  /** One run's counters, which is all a chip and a progress bar read. */
-  getExplorerEvalRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunProgress>;
-  /** Whether the Explorer may judge, and what its refusal popover offers this member. */
-  getExplorerEvalAccess(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess>;
-  /** The organization's own switch, thrown from the popover; the organization is the project's. */
-  enableExplorerEvals(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<InstantEvalOptInAccess>;
   /**
    * The runs a query's `eval` chips claim, checked against the project and
    * dated for the compiler. A claim the project does not own is dropped, so

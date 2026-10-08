@@ -28,7 +28,7 @@ export function useInstantEvalAccess({
     "release_instant_evals",
     { projectId, organizationId, enabled: !!projectId && !!organizationId },
   );
-  const access = api.traces.instantEval.access.useQuery(
+  const access = api.instantEval.access.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
   );

@@ -5,6 +5,8 @@ import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contrac
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import {
+  type ExplorerInstantEvalProgress,
+  type ExplorerInstantEvalRunInput,
   type InstantEvalActor,
   type InstantEvalApi as InstantEvalApiContract,
   InstantEvalApi,
@@ -51,6 +53,10 @@ import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.stor
 import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import {
+  toExplorerRunInput,
+  toExplorerRunProgress,
+} from "../rules/instant-eval-explorer-run.rules.ts";
+import {
   type InstantEvalJudgeKind,
   instantEvalJudgeKind,
   instantEvalJudgeRoute,
@@ -95,6 +101,7 @@ import {
   type InstantEvalSpendPeers,
 } from "../services/instant-eval-spend.service.ts";
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
+import type { InstantEvalBrowserApi } from "../transport/instant-eval.trpc.ts";
 
 /** The project's organization and team, which every judgement's spend is billed against. */
 function spendAttributionOf(
@@ -137,7 +144,7 @@ type InstantEvalSetup = FeatureSetup<
   InstantEvalRepositories
 >;
 
-export class InstantEvalModule implements InstantEvalApiContract {
+export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBrowserApi {
   static readonly contract = InstantEvalApi;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -548,6 +555,49 @@ export class InstantEvalModule implements InstantEvalApiContract {
 
   optIn(input: { projectId: string; userId: string }): Promise<InstantEvalOptInAccess> {
     return this.optIns.optIn(input);
+  }
+
+  instantEvals(): InstantEvalApiContract {
+    return this;
+  }
+
+  estimateExplorerRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<InstantEvalEstimateWire> {
+    return this.estimateRun({
+      projectId: input.request.projectId,
+      actor: { kind: "member", userId: input.userId },
+      input: toExplorerRunInput(input.request),
+    });
+  }
+
+  async startExplorerRun(input: {
+    request: ExplorerInstantEvalRunInput;
+    userId: string;
+  }): Promise<ExplorerInstantEvalProgress> {
+    const run = await this.createRun({
+      projectId: input.request.projectId,
+      actor: { kind: "member", userId: input.userId },
+      input: toExplorerRunInput(input.request),
+    });
+
+    return toExplorerRunProgress(run);
+  }
+
+  async cancelExplorerRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId: string;
+  }): Promise<ExplorerInstantEvalProgress> {
+    return toExplorerRunProgress(await this.cancelRun(input));
+  }
+
+  async getExplorerRun(input: {
+    projectId: string;
+    runId: string;
+  }): Promise<ExplorerInstantEvalProgress> {
+    return toExplorerRunProgress(await this.getRun(input));
   }
 
   async findRuns(input: {

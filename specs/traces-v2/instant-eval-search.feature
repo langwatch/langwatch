@@ -151,8 +151,36 @@ Feature: Instant Evals inside the Trace Explorer
     @unit
     Scenario: Switching Instant Eval on is audited against the organization
       Given an organization manager on a project
-      When they switch Instant Eval on through traces.instantEval.enable
+      When they switch Instant Eval on through instantEval.enable
       Then the audit row names the project's organization as its scope and its target
+
+  Rule: Instant Eval serves the Explorer's procedures under its own namespace
+
+    # Round 36 D4: the namespace moves with its owner; traces.instantEval.* is no longer served.
+
+    @unit
+    Scenario: The Explorer's six procedures are served under instantEval
+      When the instant-eval tRPC contract is read
+      Then it declares estimate, start, cancel, get, access and enable under instantEval
+      And trace's tRPC contracts declare no instantEval procedure
+
+    @unit
+    Scenario: Spending on a run asks analytics:manage
+      Given a member without analytics:manage on the project
+      When they ask instantEval.estimate, instantEval.start or instantEval.cancel
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: Reading a run asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.get or instantEval.access
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: The opt-in switch asks organization:manage through the project
+      Given a member of the project without organization:manage on its organization
+      When they ask instantEval.enable
+      Then it is refused as forbidden and nothing is switched or audited
 
   Rule: An eval chip filters by a run's verdicts
 

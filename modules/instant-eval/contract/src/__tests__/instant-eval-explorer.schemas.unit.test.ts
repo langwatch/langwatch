@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { explorerInstantEvalRunSchema } from "../trace-instant-eval.schemas.ts";
+import { explorerInstantEvalRunSchema } from "../instant-eval-explorer.schemas.ts";
 
 const request = {
   projectId: "project-1",

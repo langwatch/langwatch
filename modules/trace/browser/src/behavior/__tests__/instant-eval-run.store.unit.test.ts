@@ -5,7 +5,7 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
-import type { ExplorerInstantEvalProgress } from "@langwatch/trace-contract";
+import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
