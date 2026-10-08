@@ -18,6 +18,9 @@
   "scripts": {
     "typecheck": "tsc -b"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "typescript": "catalog:"
   }

@@ -12,14 +12,6 @@
       "langwatch-declaration-source": "./src/navigation.web.ts",
       "types": "./dist/navigation.web.d.ts",
       "default": "./src/navigation.web.ts"
-    },
-    "./chrome": {
-      "types": "./dist/ui/index.d.ts",
-      "default": "./src/ui/index.ts"
-    },
-    "./navigation": {
-      "types": "./dist/navigation.d.ts",
-      "default": "./src/navigation.ts"
     }
   },
   "scripts": {

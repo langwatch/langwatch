@@ -156,7 +156,7 @@ export function lintPolicies(
   return violations
     .map((violation) => ({
       ...violation,
-      file: relative(root, violation.file) || violation.file,
+      file: relative(root, resolve(root, violation.file)) || violation.file,
     }))
     .toSorted((a, b) =>
       `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(`${b.file}:${b.line ?? 0}:${b.policy}`),

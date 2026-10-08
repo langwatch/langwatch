@@ -11279,6 +11279,10 @@ importers:
         version: 7.0.2
 
   modules/navigation/contract:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
