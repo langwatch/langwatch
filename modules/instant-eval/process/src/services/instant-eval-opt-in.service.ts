@@ -1,14 +1,16 @@
 /**
  * An organization's own switch for Instant Evals (main #8348): a self-serve
  * organization on the hosted service throws it from the refusal popover; an
- * enterprise one, or a self-hosted install, is offered a word with us instead.
+ * enterprise one is offered a word with us, and a self-hosted install is told why (main #8416).
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
+import type { ConnectServiceState } from "@langwatch/enterprise-licensing-contract";
 import {
   type InstantEvalOptInAccess,
   type InstantEvalOptInOffer,
   InstantEvalOptInNotOfferedError,
+  type SelfHostedInstantEvalOffer,
 } from "@langwatch/instant-eval-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
@@ -21,6 +23,8 @@ export interface InstantEvalOptInPeers {
   isSaas(): boolean;
   /** Where the deployment's judge runs; asked on a self-hosted install only. */
   judgeRoute(): Promise<InstantEvalJudgeRoute>;
+  /** Whether the organization's license names Instant Evals, and whether an admin left them on. */
+  licenseStateOf(organizationId: string): Promise<ConnectServiceState>;
   isEnterprisePlan(organizationId: string): Promise<boolean>;
   /** The authority the switch's route declares (`organization:manage`), asked of the reader. */
   mayManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean>;
@@ -86,9 +90,24 @@ export class InstantEvalOptInService {
     organizationId: string;
     userId: string;
   }): Promise<InstantEvalOptInOffer> {
+    if (!this.peers.isSaas()) return this.selfHostedOffer(organizationId);
     if (!(await this.switchOffered(organizationId))) return "contact_us";
     if (!(await this.peers.mayManageOrganization({ userId, organizationId }))) return "ask_admin";
     return "enable";
+  }
+
+  /**
+   * Why a self-hosted install is not released, from its judge and its license; the plan is
+   * never read. Entitled and switched on leaves a credential it cannot present (main #8416).
+   */
+  private async selfHostedOffer(organizationId: string): Promise<SelfHostedInstantEvalOffer> {
+    const route = await this.peers.judgeRoute();
+    if (route === "off" || route === "own_key") return "ask_operator";
+    if (route === "disconnected") return "not_connected";
+    const license = await this.peers.licenseStateOf(organizationId);
+    if (!license.isEntitled) return "not_in_license";
+    if (!license.isSwitchedOn) return "switched_off";
+    return "not_connected";
   }
 
   /** The organization's half of the offer: the hosted service, and not an enterprise plan. */

@@ -18,6 +18,7 @@ import { AnnualEventsBillingThresholdService } from "./annual-events-billing-thr
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
+  type LicenseClearer,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
@@ -45,6 +46,7 @@ type BillingCheckoutCompletionOptions = {
     prices: StripePriceMap;
   };
   inviteApprover?: InviteApprover;
+  licenses: LicenseClearer;
   host: BillingWebhookHost;
   retention: SeatRetentionRules;
   /** Records the checkout and subscription changes for peers; absent where none is composed. */
@@ -80,6 +82,7 @@ export class BillingCheckoutCompletionService {
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository: options.subscriptionRepository,
       organizationRepository: options.organizationRepository,
+      licenses: options.licenses,
       stripeSubscriptions: options.stripeSubscriptions,
       itemCalculator: options.itemCalculator,
       host: options.host,

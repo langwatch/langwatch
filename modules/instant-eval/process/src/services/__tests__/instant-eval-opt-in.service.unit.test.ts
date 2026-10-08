@@ -16,6 +16,7 @@ function service(overrides: Partial<InstantEvalOptInPeers> = {}) {
     findOrganizationId: async () => "organization-1",
     isSaas: () => true,
     judgeRoute: async () => "own_key",
+    licenseStateOf: async () => ({ isEntitled: false, isSwitchedOn: false }),
     isEnterprisePlan: async () => false,
     mayManageOrganization: async () => true,
     isReleased: async () => false,
@@ -94,14 +95,29 @@ describe("given an organization on an enterprise plan", () => {
 
 describe("given a self-hosted install", () => {
   describe("when the popover asks what to offer", () => {
-    it("offers a word with us without reading the plan", async () => {
-      const { optIns } = service({
-        isSaas: () => false,
-        isEnterprisePlan: () => {
-          throw new Error("the plan was read");
-        },
+    /** @scenario "A self-hosted install is told why from its judge and its license, and the plan is not read" */
+    it("names its license, its admin's switch, its connection or its operator", async () => {
+      const offerOf = async (peers: Partial<InstantEvalOptInPeers>) => {
+        const { optIns } = service({
+          isSaas: () => false,
+          judgeRoute: async () => "connect",
+          isEnterprisePlan: () => {
+            throw new Error("the plan was read");
+          },
+          ...peers,
+        });
+        return (await optIns.getAccess(asked)).offer;
+      };
+      const license = (isEntitled: boolean, isSwitchedOn: boolean) => ({
+        licenseStateOf: async () => ({ isEntitled, isSwitchedOn }),
       });
-      await expect(optIns.getAccess(asked)).resolves.toMatchObject({ offer: "contact_us" });
+
+      expect(await offerOf(license(false, false))).toBe("not_in_license");
+      expect(await offerOf(license(true, false))).toBe("switched_off");
+      expect(await offerOf(license(true, true))).toBe("not_connected");
+      expect(await offerOf({ judgeRoute: async () => "disconnected" })).toBe("not_connected");
+      expect(await offerOf({ judgeRoute: async () => "own_key" })).toBe("ask_operator");
+      expect(await offerOf({ judgeRoute: async () => "off" })).toBe("ask_operator");
     });
   });
 

@@ -28,6 +28,7 @@ import {
   type ConnectDeploymentView,
   type DomainClaimLicenseAuthority,
   type ConnectService,
+  type ConnectServiceState,
   type ConnectStatus,
   type InstanceIdentityView,
   type ContractTerms,
@@ -640,6 +641,13 @@ export class LicensingModule implements LicensingApiContract {
     service: ConnectService;
   }): Promise<boolean> {
     return this.#install.isServiceEnabled(input);
+  }
+
+  getConnectServiceState(input: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState> {
+    return this.#install.getServiceState(input);
   }
 
   classifyThroughConnect(input: {

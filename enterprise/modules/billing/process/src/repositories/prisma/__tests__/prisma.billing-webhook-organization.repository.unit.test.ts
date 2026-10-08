@@ -57,22 +57,6 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
     });
   });
 
-  describe("when a paid subscription retires a trial licence", () => {
-    /** @scenario "A paid subscription retires the trial licence and both dates derived from it" */
-    it("clears the key and both dates derived from it", async () => {
-      const { adapter, updates } = organizationDouble([{ id: "organization-1", name: "Acme" }]);
-
-      await adapter.clearTrialLicense("organization-1");
-
-      expect(updates).toEqual([
-        {
-          where: { id: "organization-1" },
-          data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-        },
-      ]);
-    });
-  });
-
   describe("when the webhook needs the organization's display name", () => {
     /** @scenario "The webhook resolves a Stripe customer to one organization, and to none where there is none" */
     it("answers the name, and nothing for an organization that is gone", async () => {

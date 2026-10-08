@@ -17,6 +17,7 @@ import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
  * the payment-success sync that reconciles quantities, retention and the seat policy.
  */
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities, planQuantitiesOf } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
@@ -44,6 +45,8 @@ const waitForStripeConsistency = () =>
 type BillingSubscriptionLifecycleOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
+  /** Clears a trial's licence once its subscription activates; organization owns the row. */
+  licenses: LicenseClearer;
   stripeSubscriptions: Pick<StripeSubscriptionsChannel, "getSubscription" | "cancelSubscription">;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
@@ -58,6 +61,9 @@ type BillingSubscriptionLifecycleOptions = {
   >;
 };
 
+/** The one organization operation a subscription activation needs for a trial's licence. */
+export type LicenseClearer = Pick<OrganizationApi, "clearLicense">;
+
 /** The two data-retention operations seat provisioning reads and writes. */
 export type SeatRetentionRules = Pick<DataRetentionApi, "listOrganizationRules" | "setForScope">;
 
@@ -68,6 +74,7 @@ export class BillingSubscriptionLifecycleService {
 
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
+  private readonly licenses: LicenseClearer;
   private readonly stripeSubscriptions: BillingSubscriptionLifecycleOptions["stripeSubscriptions"];
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
@@ -78,6 +85,7 @@ export class BillingSubscriptionLifecycleService {
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
+    this.licenses = options.licenses;
     this.stripeSubscriptions = options.stripeSubscriptions;
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
@@ -474,6 +482,6 @@ export class BillingSubscriptionLifecycleService {
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,
     );
-    await this.organizationRepository.clearTrialLicense(updatedSubscription.organizationId);
+    await this.licenses.clearLicense({ organizationId: updatedSubscription.organizationId });
   }
 }

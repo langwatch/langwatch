@@ -119,10 +119,11 @@ Feature: Stripe webhook handling grants and removes plans correctly
     Then only that organization's invoicing currency changes
 
   @unit
-  Scenario: A paid subscription retires the trial licence and both dates derived from it
+  Scenario: A paid subscription asks organization to retire the trial licence
     Given an organization holding a trial licence
     When a paid subscription activates
-    Then the licence key and both dates derived from it are cleared together
+    Then billing asks organization to clear that organization's licence and nothing else
+    And organization clears the key and both dates derived from it together
 
   @unit
   Scenario: An activation carries the organization's trial licence to the webhook

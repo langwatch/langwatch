@@ -1,3 +1,5 @@
+import { type Instant, Temporal } from "@langwatch/time";
+
 import type { LicenseMintRequest } from "../services/license-mint.service.ts";
 
 const USAGE =
@@ -14,15 +16,14 @@ function parseQuota(flag: string, value: string): number {
   return parsed;
 }
 
-/** `new Date("2025-02-31")` rolls forward to March; the round trip refuses it. */
-function parseExpiresAt(value: string): Date {
-  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Date(`${value}T00:00:00.000Z`)
-    : new Date(Number.NaN);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+/** A calendar date read as midnight UTC; "2025-02-31" is refused, never rolled forward. */
+function parseExpiresAt(value: string): Instant {
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new RangeError(value);
+    return Temporal.Instant.from(`${value}T00:00:00Z`);
+  } catch {
     throw new Error(`--expires-at must be a calendar date as YYYY-MM-DD, got: ${value}\n${USAGE}`);
   }
-  return parsed;
 }
 
 /** Main's generate-license flags, read into a mint request; the plan defaults to ENTERPRISE. */

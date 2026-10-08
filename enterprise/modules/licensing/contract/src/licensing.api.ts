@@ -19,6 +19,7 @@ import type {
   ActivationAnswer,
   ConnectClassifyAnswer,
   ConnectDeploymentView,
+  ConnectServiceState,
   ConnectStatus,
   InstanceIdentityView,
   LicenseRefreshOutcome,
@@ -184,6 +185,11 @@ export interface LicensingApi {
     organizationId: string;
     service: ConnectService;
   }): Promise<boolean>;
+  /** Whether the license names one hosted service, and whether it is still on; no network call. */
+  getConnectServiceState(input: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState>;
   /**
    * Judges one text on LangWatch for an install that holds a license. The
    * install has no judge key of its own, so the judgement happens there and is

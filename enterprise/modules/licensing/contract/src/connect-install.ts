@@ -216,6 +216,14 @@ export interface InstanceIdentityView {
   readonly hostnameOptOut: boolean;
 }
 
+/** One hosted service's answer in its two halves, since each refusal has its own remedy. */
+export interface ConnectServiceState {
+  /** The license names the service. */
+  readonly isEntitled: boolean;
+  /** Named, and no organization admin switched it off. */
+  readonly isSwitchedOn: boolean;
+}
+
 /** What the deployment decided about Connect, and whether any license here names a hosted service. */
 export interface ConnectDeploymentView {
   /** False where LANGWATCH_CONNECT_DISABLED is set: the install opens no connection to LangWatch. */

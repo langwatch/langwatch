@@ -1,5 +1,6 @@
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -126,6 +127,7 @@ function billingApp({
     webhook: {
       host: MemoryBillingWebhookHostChannel.create(),
       retention: createApiFixture<SeatRetentionRules>({}),
+      licenses: createApiFixture<OrganizationApi>({}),
     },
   });
   return { app, asked: registry.asked, audited: registry.audited, repositories, stripe };

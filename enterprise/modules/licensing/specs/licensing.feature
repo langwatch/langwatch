@@ -204,6 +204,14 @@ Feature: Enterprise licensing lifecycle
       Then it passes the gateway's door and is refused as connect_service_not_entitled
 
   @unit
+  Scenario: A hosted service's state names which half said no
+    Given an organization whose license may or may not name a hosted service
+    And an administrator may have switched that service off
+    When licensing is asked for that service's state
+    Then it answers whether the license names it and whether it is still on, without calling LangWatch
+    And a deployment with Connect switched off answers neither
+
+  @unit
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

@@ -370,6 +370,8 @@ export class InstantEvalModule implements InstantEvalApiContract {
             isConnectPermitted:
               kind === "connect" && (await licensing.getConnectDeployment()).permitted,
           }),
+        licenseStateOf: (organizationId) =>
+          licensing.getConnectServiceState({ organizationId, service: "instant_evals" }),
         isEnterprisePlan: async (organizationId) =>
           isEnterpriseTier((await plans.getActivePlan({ organizationId })).type),
         mayManageOrganization: ({ userId, organizationId }) =>

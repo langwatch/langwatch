@@ -18,6 +18,7 @@ import {
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
+  type LicenseClearer,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
@@ -101,6 +102,7 @@ export class EEWebhookService implements WebhookService {
     stripeSubscriptions,
     itemCalculator,
     inviteApprover,
+    licenses,
     licensePurchaseHandler,
     licensePaymentLinkId,
     host,
@@ -113,6 +115,8 @@ export class EEWebhookService implements WebhookService {
     stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
+    /** Clears a trial's licence once its subscription activates; organization owns the row. */
+    licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;
@@ -136,6 +140,7 @@ export class EEWebhookService implements WebhookService {
       stripeSubscriptions,
       itemCalculator,
       inviteApprover,
+      licenses,
       host,
       retention,
       ...(announcer ? { announcer } : {}),
@@ -143,6 +148,7 @@ export class EEWebhookService implements WebhookService {
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
       organizationRepository,
+      licenses,
       stripeSubscriptions,
       itemCalculator,
       host,
@@ -157,6 +163,7 @@ export class EEWebhookService implements WebhookService {
     stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
+    licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
     host: BillingWebhookHost;

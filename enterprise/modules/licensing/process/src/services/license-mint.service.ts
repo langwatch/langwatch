@@ -3,7 +3,7 @@ import {
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 import type { IssuedLicenseRepository } from "../repositories/issued-license.repository.ts";
 
@@ -14,7 +14,7 @@ export type LicenseMintRequest = Readonly<{
   maxMembers?: number;
   maxMembersLite?: number;
   maxMessagesPerMonth?: number;
-  expiresAt?: Date;
+  expiresAt?: Instant;
   email?: string;
 }>;
 
@@ -62,7 +62,7 @@ export class LicenseMintService {
       ...(request.maxMessagesPerMonth === undefined
         ? {}
         : { maxMessagesPerMonth: request.maxMessagesPerMonth }),
-      ...(request.expiresAt === undefined ? {} : { expiresAt: request.expiresAt }),
+      ...(request.expiresAt === undefined ? {} : { expiresAt: toDate(request.expiresAt) }),
     });
 
     const row = await this.peers.licenses.recordIssuedLicense({

@@ -4,26 +4,26 @@ import { parseGenerateLicenseArgs } from "../generate-license-args.rules.ts";
 
 describe("parseGenerateLicenseArgs", () => {
   it("reads main's flags, upper-casing the plan", () => {
-    expect(
-      parseGenerateLicenseArgs([
-        "--org-id",
-        "org-acme",
-        "--plan",
-        "growth",
-        "--max-members",
-        "12",
-        "--expires-at",
-        "2030-02-05",
-        "--email",
-        "ops@example.com",
-      ]),
-    ).toEqual({
+    const { expiresAt, ...request } = parseGenerateLicenseArgs([
+      "--org-id",
+      "org-acme",
+      "--plan",
+      "growth",
+      "--max-members",
+      "12",
+      "--expires-at",
+      "2030-02-05",
+      "--email",
+      "ops@example.com",
+    ]);
+
+    expect(request).toEqual({
       organizationId: "org-acme",
       planType: "GROWTH",
       maxMembers: 12,
-      expiresAt: new Date("2030-02-05T00:00:00.000Z"),
       email: "ops@example.com",
     });
+    expect(expiresAt?.toString()).toBe("2030-02-05T00:00:00Z");
   });
 
   it("defaults the plan to ENTERPRISE", () => {

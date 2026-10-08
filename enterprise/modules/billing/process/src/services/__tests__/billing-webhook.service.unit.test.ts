@@ -4,6 +4,8 @@ import {
 } from "@langwatch/data-retention-contract";
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { traced } from "@langwatch/observability/node";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
@@ -64,7 +66,6 @@ const createMockOrganizationRepository = (): {
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
   updateCurrency: vi.fn(),
-  clearTrialLicense: vi.fn(),
 });
 
 const createMockItemCalculator = () => ({
@@ -162,6 +163,14 @@ const subscriptionsTwin = (...held: BillingSubscription[]) => {
   return twin;
 };
 
+/** The trial licences the lifecycle asked organization to clear, in order. */
+const clearedLicenses: { organizationId: string }[] = [];
+const licenses = createApiFixture<OrganizationApi>({
+  clearLicense: async (input) => {
+    clearedLicenses.push(input);
+  },
+});
+
 describe("EEWebhookService", () => {
   let subRepo: ReturnType<typeof createMockBillingSubscription>;
   let orgRepo: ReturnType<typeof createMockOrganizationRepository>;
@@ -173,12 +182,14 @@ describe("EEWebhookService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    clearedLicenses.length = 0;
     subRepo = createMockBillingSubscription();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
     stripeSubscriptions = subscriptionsTwin();
     host = createMockHost();
     service = EEWebhookService.create({
+      licenses,
       subscriptionRepository: subRepo,
       organizationRepository: orgRepo,
       stripeSubscriptions,
@@ -308,6 +319,7 @@ describe("EEWebhookService", () => {
         const published = () =>
           traced(
             EEWebhookService.create({
+              licenses,
               subscriptionRepository: subRepo,
               organizationRepository: orgRepo,
               stripeSubscriptions,
@@ -359,6 +371,7 @@ describe("EEWebhookService", () => {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
         service = EEWebhookService.create({
+          licenses,
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
           stripeSubscriptions,
@@ -620,13 +633,33 @@ describe("EEWebhookService", () => {
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
-        expect(orgRepo.clearTrialLicense).toHaveBeenCalledWith("org_123");
+        expect(clearedLicenses).toEqual([{ organizationId: "org_123" }]);
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             type: "confirmed",
             organizationId: "org_123",
           }),
         );
+      });
+
+      /** @scenario "A paid subscription asks organization to retire the trial licence" */
+      it("asks organization to clear only that organization's licence", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: { name: "Acme", license: "trial-license-key" },
+          }),
+        });
+
+        const promise = service.handleInvoicePaymentSucceeded({ subscriptionId: "sub_stripe_1" });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(clearedLicenses).toEqual([{ organizationId: "org_123" }]);
       });
     });
 
@@ -666,6 +699,7 @@ describe("EEWebhookService", () => {
           stripeSubscription({ id: "sub_old_2" }),
         );
         service = EEWebhookService.create({
+          licenses,
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
           stripeSubscriptions: localStripe,
@@ -717,6 +751,7 @@ describe("EEWebhookService", () => {
         const localStripe = subscriptionsTwin();
         localStripe.refuse({ operation: "cancelSubscription", error: new Error("Stripe error") });
         service = EEWebhookService.create({
+          licenses,
           subscriptionRepository: subRepo,
           organizationRepository: orgRepo,
           stripeSubscriptions: localStripe,
@@ -1639,6 +1674,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordCheckoutCompleted: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
+      licenses,
       subscriptionRepository: subRepo,
       organizationRepository: createMockOrganizationRepository(),
       stripeSubscriptions: subscriptionsTwin(),

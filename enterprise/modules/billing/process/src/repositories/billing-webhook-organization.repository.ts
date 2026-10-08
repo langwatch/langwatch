@@ -8,6 +8,4 @@ export abstract class BillingWebhookOrganizationRepository {
   abstract findNameById(organizationId: string): Promise<{ id: string; name: string } | null>;
 
   abstract updateCurrency(input: { organizationId: string; currency: string }): Promise<void>;
-
-  abstract clearTrialLicense(organizationId: string): Promise<void>;
 }

@@ -40,15 +40,4 @@ export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOr
       data: { currency: input.currency as Currency },
     });
   }
-
-  /**
-   * Clears the trial licence AND the two dates derived from it. Leaving the
-   * dates behind is what made an expired trial keep answering as validated.
-   */
-  async clearTrialLicense(organizationId: string): Promise<void> {
-    await this.database.organization.update({
-      where: { id: organizationId },
-      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-    });
-  }
 }

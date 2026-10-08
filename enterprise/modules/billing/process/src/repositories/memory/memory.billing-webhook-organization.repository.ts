@@ -33,9 +33,4 @@ export class MemoryBillingWebhookOrganizationRepository extends BillingWebhookOr
     const organization = this.store.organizations.get(input.organizationId);
     if (organization) organization.currency = input.currency;
   }
-
-  async clearTrialLicense(organizationId: string): Promise<void> {
-    const organization = this.store.organizations.get(organizationId);
-    if (organization) organization.license = null;
-  }
 }
