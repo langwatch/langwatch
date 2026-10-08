@@ -4,14 +4,13 @@
  * that carry several scopes, which a provider row and a default-model config both do.
  */
 
-import { type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
-
 import {
+  type ScopeFilterValue,
   isScopeInFilter,
   resolveScopeFilter,
   type ResolvedScopeFilter,
   type ScopeHierarchy,
-} from "./authz/scope-picker/scope-filter-address.ts";
+} from "@langwatch/design-system/scope-filter";
 
 /**
  * Re-exported so the rest of this package imports the authz surface from one place instead of

@@ -133,10 +133,7 @@ describe("given the shared scope-picker surface", () => {
       );
       // The pure fan over rows delegates to the surface's predicate. The component is the
       // design system's ScopeFilter, the same one every page renders.
-      expect(local.map((file) => path.basename(file))).toEqual([
-        "api-key-scope-filter.ts",
-        "scope-filter-address.ts",
-      ]);
+      expect(local.map((file) => path.basename(file))).toEqual(["api-key-scope-filter.ts"]);
     });
   });
 });

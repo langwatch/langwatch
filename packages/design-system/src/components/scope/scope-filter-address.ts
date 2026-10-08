@@ -1,4 +1,4 @@
-import type { AvailableScopes, ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import type { AvailableScopes, ScopeFilterValue } from "./scope-filter.tsx";
 
 // Scope filter as address and predicate; pure shared function; stale link reads all.
 

@@ -4,16 +4,16 @@
  * they are about the contract rather than about the router, so they travel with the pure half.
  */
 
-import type { AvailableScopes } from "@langwatch/design-system/scope-filter";
 import { describe, expect, it } from "vitest";
 
+import type { AvailableScopes } from "../src/components/scope/scope-filter.tsx";
 import {
   isScopeInFilter,
   resolveScopeFilter,
   scopeFilterAddressWrite,
   scopeFilterFromAddress,
   scopeHierarchyOf,
-} from "../../../../model/scope-picker/scope-filter-address.ts";
+} from "../src/components/scope/scope-filter.tsx";
 
 const available: AvailableScopes = {
   organization: { id: "org_1", name: "Acme" },

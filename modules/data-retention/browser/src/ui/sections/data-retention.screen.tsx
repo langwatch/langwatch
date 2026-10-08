@@ -23,7 +23,15 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
-import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+import {
+  ScopeFilter,
+  type ScopeFilterValue,
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "@langwatch/design-system/scope-filter";
 import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -33,13 +41,6 @@ import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
-import {
-  isScopeInFilter,
-  resolveScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,

@@ -207,3 +207,5 @@ function scopeTypePrefix(scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"): string
   if (scopeType === "TEAM") return "Team";
   return "Project";
 }
+
+export * from "./scope-filter-address.ts";
