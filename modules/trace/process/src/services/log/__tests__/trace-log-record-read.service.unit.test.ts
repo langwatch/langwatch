@@ -1,11 +1,16 @@
-import type { LogApi } from "@langwatch/log-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+/**
+ * @vitest-environment node
+ * Spec: modules/trace/specs/trace-log-record-storage.feature
+ */
 import { describe, expect, it, vi } from "vitest";
 
+import { canonicalLogRecordFixture } from "../../../eventing/__tests__/trace-log-records.fixtures.ts";
+import { storedLogRecordOf } from "../../../eventing/trace-log-record-storage.projection.ts";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "../../../repositories/log-record-storage.repository.ts";
+import { MemoryLogRecordStorageRepository } from "../../../repositories/memory/memory.log-record-storage.repository.ts";
 import { LogRecordStorageService } from "../../trace-log-record-read.service.ts";
 
 const row: StoredLogRecordRow = {
@@ -23,25 +28,20 @@ const row: StoredLogRecordRow = {
   scopeVersion: null,
 };
 
-const canonicalRow: StoredLogRecordRow = {
-  ...row,
-  timeUnixMs: 1_700_000_000_500,
-  body: "user_prompt",
-  attributes: { "event.name": "user_prompt", prompt: "hi" },
-};
-
-function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecordRow[] } = {}) {
-  const getLogsByTraceId = vi.fn().mockResolvedValue(legacyRows);
+function makeService({ storedRows = [row] } = {}) {
+  const getLogsByTraceId = vi.fn().mockResolvedValue(storedRows);
   const repository: LogRecordStorageRepository = {
     findLogsByTraceId: getLogsByTraceId,
+    insertLogRecords: vi.fn(),
   };
-  const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
-  const canonical = createApiFixture<LogApi>({ getLogsByTraceId: canonicalGetLogsByTraceId });
   return {
-    service: LogRecordStorageService.create({ repository, canonical }),
+    service: LogRecordStorageService.create({ repository }),
     getLogsByTraceId,
-    canonicalGetLogsByTraceId,
   };
+}
+
+function storedRowOf(overrides: Parameters<typeof canonicalLogRecordFixture>[0]) {
+  return storedLogRecordOf(canonicalLogRecordFixture(overrides));
 }
 
 describe("LogRecordStorageService.getLogsByTraceId", () => {
@@ -76,43 +76,23 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
       });
     });
 
-    it("queries the canonical store with the same read and returns rows only it holds", async () => {
-      // The prod regression this pins: post-cutover traces exist ONLY in
-      // canonical `log_records`, so a read that skips canonical returns []
-      // and the drawer/transcript render contentless.
-      const { service, canonicalGetLogsByTraceId } = makeService({
-        legacyRows: [],
-        canonicalRows: [canonicalRow],
+    /** @scenario "Trace reads a trace's logs from its own stored log records" */
+    it("answers each record once, oldest first, from trace's own store", async () => {
+      const repository = MemoryLogRecordStorageRepository.create();
+      await repository.insertLogRecords({
+        records: [
+          storedRowOf({ recordId: "b".repeat(64), timeUnixMs: 2_000, bodyText: "later" }),
+          storedRowOf({ recordId: "a".repeat(64), timeUnixMs: 1_000, bodyText: "earlier" }),
+          // The pre-cutover writer's copy of the earlier record, under another id.
+          storedRowOf({ recordId: "c".repeat(64), timeUnixMs: 1_000, bodyText: "earlier" }),
+        ],
+        retentionDays: 30,
       });
+      const service = LogRecordStorageService.create({ repository });
 
-      const result = await service.getLogsByTraceId({
-        tenantId: "project_test",
-        traceId: "trace-1",
-        occurredAtMs: 1_700_000_000_000,
-        limit: 250,
-      });
+      const rows = await service.getLogsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
 
-      expect(canonicalGetLogsByTraceId).toHaveBeenCalledWith({
-        tenantId: "project_test",
-        traceId: "trace-1",
-        occurredAtMs: 1_700_000_000_000,
-        limit: 250,
-      });
-      expect(result).toEqual([canonicalRow]);
-    });
-
-    it("merges legacy and canonical rows in time order", async () => {
-      const { service } = makeService({
-        legacyRows: [row],
-        canonicalRows: [canonicalRow],
-      });
-
-      const result = await service.getLogsByTraceId({
-        tenantId: "project_test",
-        traceId: "trace-1",
-      });
-
-      expect(result).toEqual([row, canonicalRow]);
+      expect(rows.map((stored) => stored.body)).toEqual(["earlier", "later"]);
     });
   });
 });

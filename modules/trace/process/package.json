@@ -76,6 +76,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",

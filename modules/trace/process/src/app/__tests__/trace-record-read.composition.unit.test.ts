@@ -13,7 +13,6 @@ import {
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { CLOUD_FREE_LICENSING_PLAN } from "@langwatch/plans";
 import { LocalFeatureApis } from "@langwatch/process";
@@ -95,7 +94,6 @@ function compose({
     AuthzApi,
     DataRetentionApi,
     EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ShareApi,
     TopicApi,
@@ -146,7 +144,6 @@ function compose({
     annotations: apis.reference(AnnotationApi),
     dataRetention: apis.reference(DataRetentionApi),
     evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects,
     share: apis.reference(ShareApi),

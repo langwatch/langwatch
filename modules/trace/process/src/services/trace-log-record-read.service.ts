@@ -1,40 +1,21 @@
-import type { LogApi } from "@langwatch/log-contract";
-
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "../repositories/log-record-storage.repository.ts";
 
 /**
- * The trace-correlated log read, across the canonical cutover. Canonical `log_records` is
- * authoritative; `stored_log_records` still takes writes during a rolling deploy and holds every
- * pre-cutover record. Both are read, deduped on record identity, and merged in time order.
+ * The trace-correlated log read over trace's own `stored_log_records`: pre-cutover rows, and
+ * every record since, mapped there from log's record fact by trace_log_records (D-LOG).
  */
 export class LogRecordStorageService {
-  static create(options: {
-    repository: LogRecordStorageRepository;
-    canonical: LogApi;
-  }): LogRecordStorageService {
+  static create(options: { repository: LogRecordStorageRepository }): LogRecordStorageService {
     return new LogRecordStorageService(options);
   }
 
   readonly repository: LogRecordStorageRepository;
-  private readonly canonical: LogApi;
 
-  /**
-   * `canonical` is required: canonical `log_records` is the only table still receiving writes, so
-   * a service built without it reads legacy-only and silently returns nothing for every trace
-   * ingested after the cutover. Deployments without ClickHouse get the unavailable Log adapter.
-   */
-  private constructor({
-    repository,
-    canonical,
-  }: {
-    repository: LogRecordStorageRepository;
-    canonical: LogApi;
-  }) {
+  private constructor({ repository }: { repository: LogRecordStorageRepository }) {
     this.repository = repository;
-    this.canonical = canonical;
   }
 
   /**
@@ -53,18 +34,13 @@ export class LogRecordStorageService {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
-    const [legacy, canonical] = await Promise.all([
-      this.repository.findLogsByTraceId({ tenantId, traceId, occurredAtMs, limit }),
-      this.canonical.getLogsByTraceId({
-        tenantId,
-        traceId,
-        occurredAtMs,
-        limit,
-      }),
-    ]);
-
-    // Keep-last dedup: canonical goes LAST so it wins a divergent duplicate,
-    // matching "canonical is the authoritative store".
-    return LogRecordStorageRepository.mergeStoredLogRows([...legacy, ...canonical], limit);
+    const rows = await this.repository.findLogsByTraceId({
+      tenantId,
+      traceId,
+      occurredAtMs,
+      limit,
+    });
+    // A record written by the pre-cutover writer and mapped again carries two ProjectionIds.
+    return LogRecordStorageRepository.mergeStoredLogRows(rows, limit);
   }
 }

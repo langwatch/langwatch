@@ -11,7 +11,6 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as Observability from "@langwatch/observability";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
@@ -79,7 +78,6 @@ function unreachablePeers() {
     DataRetentionApi,
     EntitlementApi,
     EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
@@ -95,7 +93,6 @@ function unreachablePeers() {
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
     evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
@@ -198,7 +195,6 @@ function deployment(access: OtlpAccess = {}) {
       projects: peers.projects,
       topics: peers.topics,
       modelProviders: peers.modelProviders,
-      logs: peers.logs,
       annotations: peers.annotations,
       dataRetention: peers.dataRetention,
       evaluations: peers.evaluations,

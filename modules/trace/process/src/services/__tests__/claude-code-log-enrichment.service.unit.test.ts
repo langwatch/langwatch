@@ -1,5 +1,3 @@
-import type { LogApi } from "@langwatch/log-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -83,7 +81,6 @@ function logStore(
 ): LogRecordStorageService {
   const store = LogRecordStorageService.create({
     repository: new NullLogRecordStorageRepository(),
-    canonical: createApiFixture<LogApi>(),
   });
   vi.spyOn(store, "getLogsByTraceId").mockImplementation(getLogsByTraceId);
   return store;

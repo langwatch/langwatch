@@ -1,14 +1,16 @@
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
+  type StoredLogRecordWrite,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
+import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 
 const logRecordRowSchema = z.looseObject({
@@ -33,12 +35,67 @@ const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 
 const logger = createLogger("langwatch:app-layer:traces:log-record-storage-repository");
 
+const LOG_INSERT_SETTINGS = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  input_format_json_throw_on_bad_escape_sequence: 0,
+} as const;
+
+function clickHouseTimestamp(epochMs: number): Date {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
+}
+
 export class LogRecordStorageClickHouseRepository implements LogRecordStorageRepository {
   static create(resolveClient: ClickHouseClientResolver): LogRecordStorageClickHouseRepository {
     return new LogRecordStorageClickHouseRepository(resolveClient);
   }
 
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  /**
+   * ProjectionId is log's record id and the version is its accepted instant, so a redelivered
+   * or replayed record lands as the same ReplacingMergeTree row.
+   */
+  async insertLogRecords({
+    records,
+    retentionDays,
+  }: {
+    records: readonly StoredLogRecordWrite[];
+    retentionDays: number;
+  }): Promise<void> {
+    const first = records[0];
+    if (!first) return;
+    EventUtils.validateTenantId(
+      { tenantId: first.tenantId },
+      "LogRecordStorageClickHouseRepository.insertLogRecords",
+    );
+    if (records.some((record) => record.tenantId !== first.tenantId)) {
+      throw new Error("insertLogRecords: every record in one insert must share a tenant");
+    }
+    const client = await this.resolveClient(first.tenantId);
+    await client.insert({
+      table: TABLE_NAME,
+      values: records.map((record) => ({
+        ProjectionId: record.recordId,
+        TenantId: record.tenantId,
+        TraceId: record.traceId,
+        SpanId: record.spanId,
+        TimeUnixMs: clickHouseTimestamp(record.timeUnixMs),
+        SeverityNumber: record.severityNumber,
+        SeverityText: record.severityText,
+        Body: record.body,
+        Attributes: record.attributes,
+        ResourceAttributes: record.resourceAttributes,
+        ScopeName: record.scopeName,
+        ScopeVersion: record.scopeVersion,
+        CreatedAt: clickHouseTimestamp(record.acceptedAtMs),
+        UpdatedAt: clickHouseTimestamp(record.acceptedAtMs),
+        _retention_days: retentionDays,
+      })),
+      format: "JSONEachRow",
+      clickhouse_settings: LOG_INSERT_SETTINGS,
+    });
+  }
 
   async findLogsByTraceId({
     tenantId,

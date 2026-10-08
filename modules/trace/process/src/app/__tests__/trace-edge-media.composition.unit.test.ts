@@ -10,7 +10,6 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -79,7 +78,6 @@ function compose({
     annotations: createApiFixture<AnnotationApi>(),
     dataRetention: createApiFixture<DataRetentionApi>(),
     evaluations: createApiFixture<EvaluationApi>(),
-    logs: createApiFixture<LogApi>(),
     modelProviders: createApiFixture<ModelProviderApi>(),
     projects: createApiFixture<ProjectApi>(),
     share: createApiFixture<ShareApi>(),

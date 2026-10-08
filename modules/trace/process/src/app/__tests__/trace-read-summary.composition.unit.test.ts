@@ -5,7 +5,6 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FoldProjectionStore, FoldStateRead } from "@langwatch/eventing";
-import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -78,7 +77,6 @@ function unreachablePeers() {
     DataRetentionApi,
     EntitlementApi,
     EvaluationApi,
-    LogApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
@@ -94,7 +92,6 @@ function unreachablePeers() {
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
     evaluations: apis.reference(EvaluationApi),
-    logs: apis.reference(LogApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),

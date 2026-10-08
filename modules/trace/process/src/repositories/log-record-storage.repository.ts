@@ -3,6 +3,15 @@ import type { CanonicalTraceLogRecord } from "@langwatch/log-contract";
 /** Stored log record read by trace: log's trace-correlated read shape. */
 export type StoredLogRecordRow = CanonicalTraceLogRecord;
 
+/** One `stored_log_records` row trace writes from log's record fact, keyed by its record id. */
+export type StoredLogRecordWrite = StoredLogRecordRow & {
+  tenantId: string;
+  recordId: string;
+  severityNumber: number;
+  severityText: string;
+  acceptedAtMs: number;
+};
+
 // Ceiling on log rows one trace read materialises to avoid OOM in marathon sessions.
 export const TRACE_LOG_READ_CAP = 2000;
 
@@ -23,6 +32,16 @@ export abstract class LogRecordStorageRepository {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]>;
+
+  /** Writes rows; idempotent per record, so a redelivered or replayed fact changes nothing. */
+  abstract insertLogRecords({
+    records,
+    retentionDays,
+  }: {
+    records: readonly StoredLogRecordWrite[];
+    retentionDays: number;
+  }): Promise<void>;
+
   /**
    * Dedup and time-order rows read from both log stores during canonical cutover.
    * Attribute keys are sorted before serializing to ensure consistent identity.
@@ -59,4 +78,9 @@ export class NullLogRecordStorageRepository implements LogRecordStorageRepositor
   }): Promise<StoredLogRecordRow[]> {
     return [];
   }
+
+  async insertLogRecords(_params: {
+    records: readonly StoredLogRecordWrite[];
+    retentionDays: number;
+  }): Promise<void> {}
 }
