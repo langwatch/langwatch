@@ -538,3 +538,10 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
 ## Round 54 candidates (2026-10-08)
 - PO-1. analytics lwql-provision reads every project's `lwqlKey` directly; no ProjectApi read returns it. Rec: a new ProjectApi.listLwqlKeys paged read (analytics -> project already exists?) vs a Project share to analytics.
 - PO-2. authz-migration scans project ids per organisation and projects with an apiKey plus createdAt. authz -> project is likely a peer cycle (project -> authz). Rec: project publishes the facts authz needs (project created, with apiKey presence) and authz folds them; vs a Project share for the migration only.
+- From dev/docs/plans/peer-cycles-remaining-2026-10-08.md §5 (the last 72 findings ride on licensing -> gateway):
+  - Q1 (R-C1f, round 44 q9) seat counts below organization. Rec (a): organization-contract exports the pure seat rule; entitlement and licensing read the seat tables through declared shares.
+  - Q2 (C3a) hosted Connect routes. Rec (a): all three to instant-eval, paths unchanged under an R10 shared path behind gateway's secret.
+  - Q3 (C3b) Connect managed key provisioning. Rec (a): facts both ways; issuing a credential becomes eventual by seconds.
+  - Q4 (C3c) createSelfHostedCustomer. Rec (a): licensing mints the organisation id and records a fact; organization creates the row (R42 shape).
+  - Q5 (U1) avatar after R50. Rec (a): read the personal-workspace project through Team and Project shares.
+- Proposed rounds: 54 = Q1, Q2, Q3, Q4 (unlocks C1 and C3a-c, 0 cycles); 55 = Q5, PO-1, PO-2.
