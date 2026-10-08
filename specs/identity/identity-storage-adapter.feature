@@ -677,3 +677,59 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     # will eventually read "native transaction support" as a promise it
     # cannot keep. The branches are in different databases. What keeps this
     # sound is that the append is atomic and idempotent on its own.
+
+  # Parity with main's storage adapter: the transaction, the connection issuer
+  # translation both ways, the passkey guard's storage and the logged refusal.
+  @unit
+  Scenario: The identity adapter runs a transaction over the rebound legacy engine
+    Given better-auth composed with the identity storage adapter
+    When better-auth runs work inside the adapter's transaction
+    Then one Postgres transaction is opened
+    And the work runs against the legacy engine bound to it
+
+  @unit
+  Scenario: A connection account is found by its real issuer beside its connection id
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" holds an account on a single sign-on connection
+    When better-auth looks the account up by the connection id, the real issuer and the subject
+    Then the account row is returned
+
+  @unit
+  Scenario: A built-in provider beside a foreign issuer stays unanswered
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" holds a GitHub account
+    When better-auth looks it up by "github" beside an issuer no provider id encodes
+    Then no row is returned
+
+  @unit
+  Scenario: A backfilled connection account is found by the issuer its connection registered
+    Given a single sign-on connection that registered its identity provider's issuer
+    And an account on it whose stored issuer is the synthetic one the backfill wrote
+    When better-auth looks the account up by the real issuer and the subject alone
+    Then the lookup asks for the connection's id and the subject, and the row is returned
+
+  @unit
+  Scenario: A connection account without an issuer is served the issuer its connection registered
+    Given a single sign-on connection that registered its identity provider's issuer
+    And an account on it with no stored issuer
+    When better-auth reads the account through the legacy branch
+    Then the row carries the registered issuer, not a synthetic one
+
+  @integration @unimplemented
+  Scenario: An issuer more than one connection registers resolves to no connection
+    Given two connections that register the same issuer
+    When the legacy branch translates that issuer alone
+    Then it answers no connection and logs a warning
+
+  @integration @unimplemented
+  Scenario: Removing a user's last way in is refused inside one serializable transaction
+    Given a user whose only way in is one passkey
+    When two removals of their passkeys race
+    Then at most one is deleted and the other answers that it would strand the user
+
+  @unit
+  Scenario: A sorted account read on the identity branch is refused and logged
+    Given a finalized user "sam" on the identity branch
+    When better-auth lists the user's accounts with a sort
+    Then the read is refused
+    And the refusal is logged at error

@@ -338,6 +338,7 @@ repository, never ambient (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data
 objectStorage or rateLimiter in any `*Module` class or service. A store client crosses into a module
 in exactly one place: the `create(stores)` of one of its repository or channel registries, which the
 container calls. The module class receives built repositories and channels.
+Exception, better-auth storage (Alex, 2026-10-08): auth builds better-auth's engine over its own store and hands it, built, to one `IdentityApi` operation that returns identity's routed adapter.
 
 ### 3.3 What a module may demand — the four-way rule
 
