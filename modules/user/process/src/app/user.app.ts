@@ -23,7 +23,6 @@ import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
-  ChangeOwnPasswordInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
@@ -36,7 +35,6 @@ import type {
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
   SetOwnAvatarInput,
-  SetOwnFirstPasswordInput,
   SetUserAvatarInput,
   SetUserHomePathInput,
   UnlinkUserAccountInput,
@@ -44,8 +42,6 @@ import type {
   UserAccountInfo,
   UserApiRequestBudgetIncreaseInput,
   UserAvatarResult,
-  UserBrowserSession,
-  UserBrowserSessionEnded,
   UserBudgetIncreaseRequested,
   UserCaller,
   UserFullProfile,
@@ -73,20 +69,12 @@ import type {
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
-  ImpersonationCannotChangeCredentialsError,
   UserAccountAccessDeniedError,
   UserAvatarNotFoundError,
   UserAvatarRateLimitedError,
   UserBudgetRequestNotDeliveredError,
-  UserFederatedPasswordAccountMissingError,
-  UserFederatedPasswordChangeUnavailableError,
   UserLastAuthenticationMethodError,
   UserLinkedAccountNotFoundError,
-  UserPasswordAlreadySetError,
-  UserPasswordAttemptsThrottledError,
-  UserPasswordAuthUnavailableError,
-  UserPasswordIncorrectError,
-  UserPasswordNotSetError,
   UserRegistrationNotAvailableError,
   UserSignupThrottledError,
   UserApi,
@@ -98,7 +86,6 @@ import type { UserBudgetRequestMailChannel } from "../channels/user-budget-reque
 import type { UserChannels } from "../channels/user.channels.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
-import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
 import type { UserFactIntent } from "../rules/user-lifecycle-outbox.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
@@ -130,7 +117,6 @@ const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
 const SIGNUP_BUDGET = { windowSeconds: 60 * 60, max: 20 } as const;
 
 /** A credential outlives the session that set it, so every attempt is metered. */
-const PASSWORD_BUDGET = { windowSeconds: 60 * 15, max: 5 } as const;
 
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
@@ -522,104 +508,6 @@ export class UserModule implements UserApi {
   }
 
   /**
-   * Fills an EMPTY credential slot and never replaces a full one. A stolen session can
-   * already read everything; what's worth denying it is a credential that outlives the
-   * session being revoked — the refusal below is the whole endpoint's safety argument.
-   */
-  async setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void> {
-    // Refused before anything else: while impersonating, the account written is the
-    // subject's with no proof of the current password, so without this an operator
-    // could mint a durable credential on exactly the SSO-only/passkey-only accounts
-    // this method exists for. `keepSessionId` being null is the defensive half of
-    // the same rule.
-    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
-
-    const problem = describePasswordProblem(input.password);
-
-    if (problem) {
-      throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
-    }
-
-    // Under a broker the password lives in the broker's tenant - unless the
-    // deployment issues its own (D09). Either way an address an organization
-    // routes through its own provider may not take a local password.
-    const emailMode = (await this.#authReads.resolveAuthProvider()) === "email";
-
-    if (!emailMode && !this.#facts.localPasswords) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-    const address = (await this.#users.findById({ id: input.userId }))?.email;
-    if (address && (await this.#addressRoutesToConnection(address))) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-
-    await this.#meter({
-      key: `user.setPassword:${input.userId}`,
-      budget: PASSWORD_BUDGET,
-      refuse: () => new UserPasswordAttemptsThrottledError(),
-    });
-
-    const result = await this.#users.setFirstPassword({
-      id: input.userId,
-      passwordHash: await this.#passwords.hash({ password: input.password }),
-    });
-
-    if (result === "already_set") throw new UserPasswordAlreadySetError();
-
-    await this.#endOtherSessions(input);
-  }
-
-  /**
-   * Verifies the current password and replaces it. Throttled for both modes: this path
-   * has no recent-reauthentication gate like the hosted change-password endpoint, so
-   * without a budget a stolen session could brute-force `currentPassword`.
-   */
-  async changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    // Same rule as `setOwnFirstPassword`: how an account signs in belongs to
-    // its owner. Knowing the current password does not make it the operator's
-    // to replace, and a replacement outlives the impersonation session.
-    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
-
-    const provider = await this.#authReads.resolveAuthProvider();
-
-    // A denied SSO deployment is coerced to email mode (ADR-027), and a person
-    // who recovered through the password-reset path owns a credential account
-    // they must be able to change. `changeOwnPassword` demands the current
-    // password, so this is no takeover vector.
-    if (provider !== "email" && provider !== "auth0" && !this.#facts.localPasswords) {
-      throw new UserPasswordAuthUnavailableError();
-    }
-
-    await this.#meter({
-      key: `user.changePassword:${input.userId}`,
-      budget: PASSWORD_BUDGET,
-      refuse: () => new UserPasswordAttemptsThrottledError(),
-    });
-
-    const holdsOwnPassword = await this.#users.hasPassword({ id: input.userId });
-
-    if (changeTargetsBrokeredPassword({ provider, holdsOwnPassword })) {
-      await this.#changeFederatedPassword(input);
-      await this.#endOtherSessions(input);
-
-      return;
-    }
-
-    // Verify-and-replace as ONE call: split into a read of the stored hash and
-    // a write of its replacement, this method would be holding the hash.
-    const rotation = await this.#credentials.rotatePassword({
-      userId: input.userId,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-    });
-
-    if (rotation === "no_password") throw new UserPasswordNotSetError();
-    if (rotation === "wrong_password") throw new UserPasswordIncorrectError();
-
-    await this.#endOtherSessions(input);
-  }
-
-  /**
    * Whether an organization's own connection governs this address (D04). Left
    * to throw: for an address a company signs in, "could not tell" must not
    * become "here is a password".
@@ -669,26 +557,6 @@ export class UserModule implements UserApi {
 
   dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
     return this.#users.dismissJoinOffer(input);
-  }
-
-  /**
-   * What this person is signed in on. The reading half of ending a session:
-   * a person who lost a laptop needs the list before the action.
-   */
-  listBrowserSessions(input: {
-    userId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSession[]> {
-    return this.#account.listBrowserSessions(input);
-  }
-
-  /** Ends ONE of this person's own browser sessions, never the current one. */
-  endBrowserSession(input: {
-    userId: string;
-    sessionId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSessionEnded> {
-    return this.#account.endBrowserSession(input);
   }
 
   /**
@@ -974,42 +842,6 @@ export class UserModule implements UserApi {
     const allowance = await this.#rateLimits.check({ key, ...budget });
 
     if (!allowance.allowed) throw refuse();
-  }
-
-  /** A credential write ends every session but the one that made it. */
-  async #endOtherSessions(input: { userId: string; keepSessionId: string | null }): Promise<void> {
-    if (!input.keepSessionId) return;
-
-    await this.#account.revokeOtherBrowserSessions({
-      userId: input.userId,
-      keepSessionId: input.keepSessionId,
-    });
-  }
-
-  async #changeFederatedPassword(input: ChangeOwnPasswordInput): Promise<void> {
-    const profile = await this.#users.findById({ id: input.userId });
-    const result = await this.#peers.auth.changeFederatedPassword({
-      userId: input.userId,
-      email: profile?.email ?? null,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-    });
-
-    if (result.outcome === "changed") return;
-    if (result.outcome === "no_federated_account") {
-      throw new UserFederatedPasswordAccountMissingError(input.userId);
-    }
-    // Nothing the caller sent causes an account with no address, and nothing
-    // they can send avoids it, so it degrades to the generic failure.
-    if (result.outcome === "no_address_on_record") {
-      throw new Error("the authenticated account carries no email address");
-    }
-    if (result.outcome === "wrong_password") throw new UserPasswordIncorrectError();
-    // The provider's policy rejected the NEW password, and its wording is the
-    // only thing that says what to fix.
-    if (result.outcome === "weak_password") throw new ValidationError(result.message);
-
-    throw new UserFederatedPasswordChangeUnavailableError(result.outcome);
   }
 
   async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {

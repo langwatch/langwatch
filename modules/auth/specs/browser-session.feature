@@ -51,3 +51,9 @@ Feature: Browser session lifecycle
     When the run calls a project route with it
     Then the handler's actor is the system acting for an unattended run
     And never the creator of the monitor, nor nobody
+
+  @unit
+  Scenario: The browser session procedures answer on auth's namespace
+    Given a signed-in person reading from one of their browsers
+    When they list their browsers or end one over auth's procedures
+    Then auth answers for the caller's own account, with the reading browser named as current

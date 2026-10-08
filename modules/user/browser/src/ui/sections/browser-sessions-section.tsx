@@ -22,14 +22,14 @@ import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts
 
 export function BrowserSessionsSection() {
   const host = usePersonalWorkspaceHost();
-  const sessions = api.user.browserSessions.useQuery({});
-  const endSession = api.user.endBrowserSession.useMutation();
+  const sessions = api.auth.browserSessions.useQuery({});
+  const endSession = api.auth.endBrowserSession.useMutation();
   const utils = api.useUtils();
 
   const end = async (sessionId: string) => {
     try {
       await endSession.mutateAsync({ sessionId });
-      await utils.user.browserSessions.invalidate();
+      await utils.auth.browserSessions.invalidate();
       host.succeeded({ title: "Signed that browser out" });
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't sign that browser out" });

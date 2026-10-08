@@ -39,6 +39,8 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       completeVerification: mutation(),
     },
     auth: {
+      changePassword: mutation(),
+      setPassword: mutation(),
       myAddressConfirmation: {
         useQuery: () => ({
           data: { email: "sam@acme.test", confirmed: true, canSendConfirmation: true },
@@ -62,8 +64,6 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },
-      changePassword: mutation(),
-      setPassword: mutation(),
       unlinkAccount: mutation(),
     },
   };

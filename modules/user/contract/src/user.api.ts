@@ -7,19 +7,13 @@ import type {
 } from "@langwatch/organization-contract";
 
 import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
-import type {
-  UserBrowserSession,
-  UserBrowserSessionEnded,
-  UserBudgetIncreaseRequested,
-  UserHomePagePickerState,
-} from "./user.responses.ts";
+import type { UserBudgetIncreaseRequested, UserHomePagePickerState } from "./user.responses.ts";
 import type {
   UserCodeAccessPreference,
   UserApiRequestBudgetIncreaseInput,
 } from "./user.schemas.ts";
 import type {
   AdoptUnconfirmedAccountOutcome,
-  ChangeOwnPasswordInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
@@ -28,7 +22,6 @@ import type {
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetOwnAvatarInput,
-  SetOwnFirstPasswordInput,
   UnlinkUserAccountInput,
   UnlinkUserAccountOutcome,
   UserCaller,
@@ -111,10 +104,6 @@ export interface UserApi {
   registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
-  /** Fills an empty credential slot, then ends every other session. */
-  setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
-  /** Verifies the current password, replaces it, then ends every other session. */
-  changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
   /** Whether to offer this person a passkey or two-step verification now, on this session. */
   getPasskeyOffer(
@@ -135,17 +124,6 @@ export interface UserApi {
   unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome>;
   /** Removes one of the caller's own sign-in methods, refusing the last one. */
   unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
-  /** What this person is signed in on, and how each session signed in. */
-  listBrowserSessions(input: {
-    userId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSession[]>;
-  /** Ends ONE of this person's own sessions; the current one is refused. */
-  endBrowserSession(input: {
-    userId: string;
-    sessionId: string;
-    currentSessionId?: string | undefined;
-  }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   /** Retires an account, never the last active operator, in one write; records no fact. */

@@ -5,6 +5,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
+  browserSessionFact,
   callerAddressFact,
   defineTrpcFact,
   defineTrpcRouter,
@@ -79,6 +80,8 @@ const OWN_ADDRESS_STATE =
 
 const SELF_OR_OPERATOR =
   "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
+
+const OWN_ACCOUNT = "operates on the session user's own account, so no tenant scope applies";
 
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
@@ -222,6 +225,59 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
 
     return { success: true as const };
   })
+
+  /** The session row travels as a fact, so the reading browser is marked and refused by name. */
+  .procedure("browserSessions")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor }, browserSession) => [
+    ...(await app.listBrowserSessions({
+      userId: actor.id,
+      currentSessionId: browserSession ?? undefined,
+    })),
+  ])
+
+  .procedure("endBrowserSession")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }, browserSession) =>
+    app.endBrowserSession({
+      userId: actor.id,
+      sessionId: input.sessionId,
+      currentSessionId: browserSession ?? undefined,
+    }),
+  )
+
+  // The session row travels as a fact: one person on two tabs is one actor and two sessions,
+  // so "end every session but this one" asks about the request (D-A1U-4, wire from `user.*`).
+  .procedure("setPassword")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }, browserSession) => {
+    await app.setOwnFirstPassword({
+      userId: actor.id,
+      password: input.password,
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
+      caller: callerOf(actor),
+    });
+
+    return { success: true as const };
+  })
+
+  .procedure("changePassword")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }, browserSession) => {
+    await app.changeOwnPassword({
+      userId: actor.id,
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+      keepSessionId: deriveKeptSession({ actor, browserSession }),
+      caller: callerOf(actor),
+    });
+
+    return { success: true as const };
+  })
   .build();
 
 /**
@@ -232,6 +288,21 @@ function callerOf(actor: TrpcHandlerActor): UserCaller {
   const operatorId = (actor.type === "user" ? actor.impersonatorId : undefined) ?? actor.id;
 
   return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
+}
+
+/**
+ * The session a credential write keeps. Null while an operator is impersonating: the row is
+ * the OPERATOR's, so keeping it would neither keep the subject's tab nor mean anything about
+ * the subject's devices.
+ */
+function deriveKeptSession({
+  actor,
+  browserSession,
+}: {
+  actor: TrpcHandlerActor;
+  browserSession: string | null;
+}): string | null {
+  return callerOf(actor).impersonated ? null : browserSession;
 }
 
 /**

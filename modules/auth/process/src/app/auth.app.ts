@@ -73,6 +73,8 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   UserApi,
+  type ChangeOwnPasswordInput,
+  type SetOwnFirstPasswordInput,
   type UpdateUserEmailInput,
   type UserCaller,
   type UserLifecycleChangeInput,
@@ -126,6 +128,7 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
+import { OwnPasswordService } from "../services/own-password.service.ts";
 import { PriorSessionService } from "../services/prior-session.service.ts";
 import { ProjectAuthTokenService } from "../services/project-auth-token.service.ts";
 import {
@@ -170,7 +173,14 @@ type AuthAppPeers = Readonly<{
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
-    "findById" | "updateEmail" | "deactivate" | "recordDeactivated" | "isOperator"
+    | "findById"
+    | "updateEmail"
+    | "deactivate"
+    | "recordDeactivated"
+    | "isOperator"
+    | "hasPassword"
+    | "setFirstPassword"
+    | "rotatePassword"
   >;
 }>;
 
@@ -255,6 +265,7 @@ export class AuthModule implements AuthApiContract {
   readonly #lifecycle: AuthLifecycleNoticeService;
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
+  readonly #ownPasswords: OwnPasswordService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
   /** The Auth0 tenant's password change; set once the provider secrets resolve. */
@@ -387,6 +398,11 @@ export class AuthModule implements AuthApiContract {
         revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input),
         revokeCliTokens: (input) => this.revokeCliTokens(input),
       },
+    });
+    this.#ownPasswords = OwnPasswordService.create({
+      users: dependencies.users,
+      auth: this,
+      issuesOwnPasswords: () => this.#issuesOwnPasswords,
     });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
@@ -962,6 +978,14 @@ export class AuthModule implements AuthApiContract {
 
   changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
     return this.#accounts.changeEmail(input);
+  }
+
+  setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void> {
+    return this.#ownPasswords.setFirst(input);
+  }
+
+  changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
+    return this.#ownPasswords.change(input);
   }
 
   /** Meters through the counter every process supplies, the same one the token

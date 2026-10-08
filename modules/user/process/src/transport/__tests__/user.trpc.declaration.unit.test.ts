@@ -18,11 +18,8 @@ describe("the user tRPC surface", () => {
 
     it("declares every procedure the account and /me screens call", () => {
       expect(Object.keys(userTrpc.members).toSorted()).toEqual([
-        "browserSessions",
-        "changePassword",
         "dismissSecureAccountNudge",
         "dismissTraceExplorerTour",
-        "endBrowserSession",
         "getAccountInfo",
         "getAvatarUrl",
         "getLinkedAccounts",
@@ -40,7 +37,6 @@ describe("the user tRPC surface", () => {
         "setAvatar",
         "setLastHomePath",
         "setNotificationPreference",
-        "setPassword",
         "unlinkAccount",
         "updateLastLogin",
         "updateName",
@@ -53,8 +49,6 @@ describe("the user tRPC surface", () => {
       );
 
       expect(kinds).toMatchObject({
-        browserSessions: "query",
-        endBrowserSession: "mutation",
         getAccountInfo: "query",
         getAvatarUrl: "query",
         getLinkedAccounts: "query",
@@ -68,10 +62,8 @@ describe("the user tRPC surface", () => {
         secureAccountNudge: "query",
         dismissSecureAccountNudge: "mutation",
         updateName: "mutation",
-        changePassword: "mutation",
         register: "mutation",
         setAvatar: "mutation",
-        setPassword: "mutation",
         unlinkAccount: "mutation",
       });
     });

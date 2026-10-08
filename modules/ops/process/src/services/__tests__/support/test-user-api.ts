@@ -90,23 +90,12 @@ export class TestUserApi implements UserApi {
     this.overrides.registerCredentialAccount?.(input) ??
     this.unimplemented("registerCredentialAccount");
 
-  listBrowserSessions: UserApi["listBrowserSessions"] = (input) =>
-    this.overrides.listBrowserSessions?.(input) ?? this.unimplemented("listBrowserSessions");
-
-  endBrowserSession: UserApi["endBrowserSession"] = (input) =>
-    this.overrides.endBrowserSession?.(input) ?? this.unimplemented("endBrowserSession");
-
   hasPassword: UserApi["hasPassword"] = (input) =>
     this.overrides.hasPassword?.(input) ?? this.unimplemented("hasPassword");
 
   setFirstPassword: UserApi["setFirstPassword"] = (input) =>
     this.overrides.setFirstPassword?.(input) ?? this.unimplemented("setFirstPassword");
 
-  setOwnFirstPassword: UserApi["setOwnFirstPassword"] = (input) =>
-    this.overrides.setOwnFirstPassword?.(input) ?? this.unimplemented("setOwnFirstPassword");
-
-  changeOwnPassword: UserApi["changeOwnPassword"] = (input) =>
-    this.overrides.changeOwnPassword?.(input) ?? this.unimplemented("changeOwnPassword");
 
   getPasskeyNudgeStatus: UserApi["getPasskeyNudgeStatus"] = (input) =>
     this.overrides.getPasskeyNudgeStatus?.(input) ?? this.unimplemented("getPasskeyNudgeStatus");

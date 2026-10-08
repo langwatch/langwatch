@@ -154,64 +154,9 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     return { name: input.name };
   })
 
-  // The session row travels as a fact so the list can say which entry is the
-  // browser doing the reading, and so ending that one is refused by name.
-  .procedure("browserSessions")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(({ app, actor }, browserSession) =>
-    app.listBrowserSessions({
-      userId: actor.id,
-      currentSessionId: browserSession ?? undefined,
-    }),
-  )
-
-  .procedure("endBrowserSession")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(({ app, actor, input }, browserSession) =>
-    app.endBrowserSession({
-      userId: actor.id,
-      sessionId: input.sessionId,
-      currentSessionId: browserSession ?? undefined,
-    }),
-  )
-
   .procedure("hasPassword")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }) => ({ hasPassword: await app.hasPassword({ id: actor.id }) }))
-
-  // The session row travels as a fact: one person on two tabs is one actor and
-  // two sessions, so "end every session but this one" is a question about the
-  // request rather than about who asked.
-  .procedure("setPassword")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(async ({ app, actor, input }, browserSession) => {
-    await app.setOwnFirstPassword({
-      userId: actor.id,
-      password: input.password,
-      keepSessionId: deriveKeptSession({ actor, browserSession }),
-      caller: callerOf(actor),
-    });
-
-    return { success: true as const };
-  })
-
-  .procedure("changePassword")
-  .withFacts(browserSessionFact)
-  .noPermission({ reason: OWN_ACCOUNT })
-  .handle(async ({ app, actor, input }, browserSession) => {
-    await app.changeOwnPassword({
-      userId: actor.id,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-      keepSessionId: deriveKeptSession({ actor, browserSession }),
-      caller: callerOf(actor),
-    });
-
-    return { success: true as const };
-  })
 
   .procedure("reactivate")
   .noPermission({ reason: SELF_OR_OPERATOR })
@@ -259,18 +204,3 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
     app.getHomePagePickerState({ userId: actor.id, organizationId: input.organizationId }),
   )
   .build();
-
-/**
- * The session a credential write keeps. Null while an operator is
- * impersonating: the row is the OPERATOR's, so keeping it would neither keep
- * the subject's tab nor mean anything about the subject's devices.
- */
-function deriveKeptSession({
-  actor,
-  browserSession,
-}: {
-  actor: TrpcHandlerActor;
-  browserSession: string | null;
-}): string | null {
-  return callerOf(actor).impersonated ? null : browserSession;
-}

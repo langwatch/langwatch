@@ -50,6 +50,12 @@ Feature: Account changes that end credentials
       Then the account is deactivated as themselves
       And the answer is success, as user.deactivate answered before
 
+    @unit
+    Scenario: The password procedures answer on auth's namespace
+      When a signed-in person calls auth.setPassword or auth.changePassword for their own account
+      Then auth writes the password through user as themselves
+      And the answer is success, as user.setPassword and user.changePassword answered before
+
   Rule: An address change writes through user, then ends the sessions that cached the old one
 
     @unit

@@ -35,8 +35,8 @@ const calls = vi.hoisted(() => ({
 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => {
   const api = {
-    useUtils: () => ({ user: { browserSessions: { invalidate: calls.invalidate } } }),
-    user: {
+    useUtils: () => ({ auth: { browserSessions: { invalidate: calls.invalidate } } }),
+    auth: {
       browserSessions: {
         useQuery: () => ({ data: state.sessions, isLoading: state.loading }),
       },

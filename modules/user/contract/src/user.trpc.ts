@@ -13,14 +13,10 @@ import {
   userApiLinkedAccountsSchema,
   userApiOkSchema,
   userApiUpdatedNameSchema,
-  userApiBrowserSessionEndedSchema,
-  userApiBrowserSessionSchema,
   userApiSuccessSchema,
 } from "./user.responses.ts";
 import {
-  userApiChangePasswordInputSchema,
   userApiEmptyInputSchema,
-  userApiEndBrowserSessionInputSchema,
   userApiNotificationTopicInputSchema,
   userApiOrganizationInputSchema,
   userApiRegisterInputSchema,
@@ -28,7 +24,6 @@ import {
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
   userApiSetNotificationPreferenceInputSchema,
-  userApiSetPasswordInputSchema,
   userApiUnlinkAccountInputSchema,
   userApiUpdateNameInputSchema,
   userApiUserInputSchema,
@@ -112,28 +107,9 @@ export const userTrpc = defineTrpcContract("user")
   .withInput(userApiUpdateNameInputSchema)
   .withOutput(userApiUpdatedNameSchema)
 
-  // Reading the browsers somebody is signed in on, and ending one of them.
-  // Both answer about the CALLER's own account: the session id never names
-  // whose it is, so nothing here can reach somebody else's list.
-  .query("browserSessions")
-  .withInput(userApiEmptyInputSchema)
-  .withOutput(userApiBrowserSessionSchema.array())
-
-  .mutation("endBrowserSession")
-  .withInput(userApiEndBrowserSessionInputSchema)
-  .withOutput(userApiBrowserSessionEndedSchema)
-
   .query("hasPassword")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiHasPasswordSchema)
-
-  .mutation("setPassword")
-  .withInput(userApiSetPasswordInputSchema)
-  .withOutput(userApiSuccessSchema)
-
-  .mutation("changePassword")
-  .withInput(userApiChangePasswordInputSchema)
-  .withOutput(userApiSuccessSchema)
 
   .mutation("reactivate")
   .withInput(userApiUserInputSchema)

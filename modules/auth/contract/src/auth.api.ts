@@ -9,6 +9,8 @@ import type {
   UserCaller,
   UserLifecycleChangeInput,
   UserProfile,
+  ChangeOwnPasswordInput,
+  SetOwnFirstPasswordInput,
 } from "@langwatch/user-contract";
 import { z } from "zod";
 
@@ -215,6 +217,10 @@ export interface AuthApi {
   deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   /** Writes the address through user, then ends every session that cached the old one. */
   changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
+  /** Fills an empty credential slot through user, then ends every other session (D-A1U-4). */
+  setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
+  /** Verifies the current password and replaces it, then ends every other session. */
+  changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
 
   /** Whether this attempt is inside the budget the door asked for, and how
    *  long to wait when it is not — the refusal's words name the seconds. */

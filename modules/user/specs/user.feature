@@ -199,7 +199,7 @@ Feature: Canonical user lifecycle
   Scenario: The account surface serves the browsers somebody is signed in on
     Given a signed-in person holding several browser sessions
     When they open their account's devices list
-    Then the browsers are served under the user namespace with their sign-in method and last activity
+    Then the browsers are served under auth's namespace with their sign-in method and last activity
     And the browser making the request is marked as the current one
 
   @unit
