@@ -52,7 +52,7 @@ export interface IdentitySecretCarryRepository {
   deleteCredentials(args: { userId: string; accountIds: readonly string[] }): Promise<number>;
 }
 
-export interface IdentitySecretCarryOutcome {
+interface IdentitySecretCarryOutcome {
   /** Credential rows created — a user's secrets carried across at latch. */
   carried: number;
   /** Credential rows overwritten — the reverse mirror's heal leg. */

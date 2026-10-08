@@ -27,10 +27,10 @@ import type { JoinRequestEvent, JoinRequestFoldState } from "./join-request-stat
 const logger = createLogger("langwatch:identity:join-request-ledger");
 
 /** The read-your-writes window, the identity ledger's convergence shape. */
-export const JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const JOIN_REQUEST_CONVERGENCE_POLL_MS = 25;
+const JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS = 2_000;
+const JOIN_REQUEST_CONVERGENCE_POLL_MS = 25;
 
-export type JoinRequestStagedSender = {
+type JoinRequestStagedSender = {
   send(data: unknown): Promise<unknown>;
 };
 
@@ -42,7 +42,7 @@ const SENDER_NAME_BY_COMMAND: Record<JoinRequestCommandType, string> = {
   [EXPIRE_JOIN_COMMAND_TYPE]: "expireJoin",
 };
 
-export interface JoinRequestLedgerWriterDeps {
+interface JoinRequestLedgerWriterDeps {
   projectionStore: StateProjectionStore<JoinRequestFoldState>;
   /**
    * The event stack this ledger stages through. Required, and asked per command rather than held:

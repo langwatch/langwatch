@@ -18,7 +18,7 @@ import { PerSubjectCachedGateService } from "./per-subject-cached-gate.service.t
  * state repository itself: the gate asks two questions of one row family, the runtime composes
  * whichever store answers them, and nothing here needs the runner's writes.
  */
-export interface IdentityWriteGateState {
+interface IdentityWriteGateState {
   /** One tenant's record for a migration; throws `SystemMigrationRecordNotFoundError` if none. */
   getRecord(input: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 

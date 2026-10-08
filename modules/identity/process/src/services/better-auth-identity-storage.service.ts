@@ -12,7 +12,7 @@ import { APIError } from "better-auth/api";
 
 import { type AdapterNaming, httpStatusFor } from "../rules/better-auth-storage-rows.rules.ts";
 
-export interface IdentityStorageAdapterDeps {
+interface IdentityStorageAdapterDeps {
   /**
    * better-auth's own published storage engine, built (`prismaAdapter(...)`,
    * `memoryAdapter(...)`) but not yet bound to options. The legacy branch delegates to it

@@ -25,7 +25,7 @@ import type { BetterAuthUserBranchService } from "./better-auth-user-branch.serv
 
 /** One instance per better-auth options: `legacy` and `naming` are bound at adapter-factory
  *  time, so app/ composes this and both branches inside the factory it hands the storage. */
-export interface IdentityStorageRoutingDeps {
+interface IdentityStorageRoutingDeps {
   legacy: DBAdapter;
   naming: AdapterNaming;
   accounts: IdentityAccounts;

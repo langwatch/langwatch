@@ -200,7 +200,7 @@ export function defineIdentityPipeline(deps: IdentityPipelineDeps): IdentityPipe
 }
 
 /** The two guard instances, and the ONE address lock they claim through (ADR-116 §6). */
-export type IdentityGuardsComposition = {
+type IdentityGuardsComposition = {
   identityGuards: IdentityGuardsService;
   mfaGuards: MfaGuardsService;
   reservations: IdentityReservationRepository;

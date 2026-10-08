@@ -60,10 +60,10 @@ const identityCommitDurationSeconds = new Histogram({
 });
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
-export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const IDENTITY_CONVERGENCE_POLL_MS = 25;
+const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
+const IDENTITY_CONVERGENCE_POLL_MS = 25;
 
-export type IdentityStagedSender = {
+type IdentityStagedSender = {
   send(data: unknown): Promise<unknown>;
 };
 
@@ -86,7 +86,7 @@ export interface ProvisionalHeadsWriter {
   writeProvisionalHeads(args: { facts: IdentifierFact[] }): Promise<void>;
 }
 
-export interface IdentityLedgerWriterDeps {
+interface IdentityLedgerWriterDeps {
   projectionStore: StateProjectionStore<IdentityFoldState> & ProvisionalHeadsWriter;
   /** Whether the user has folded, and what their heads hold: the provisional write's two reads. */
   heads: Pick<IdentityHeadsRepository, "hasFolded" | "findHeads">;

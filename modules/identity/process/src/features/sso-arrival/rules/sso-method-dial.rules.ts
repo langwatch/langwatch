@@ -4,7 +4,7 @@ import { legacySsoDialOf } from "./legacy-sso-dial.rules.ts";
 
 /** Where each half of the answer comes from, supplied rather than read here
  *  so the decision below needs neither a deployment nor an engine. */
-export interface SsoMethodConfiguration {
+interface SsoMethodConfiguration {
   /** The providers this deployment mounts from its own configuration. Empty
    *  in plain email mode; one of them otherwise. */
   mountedMethods(): Promise<readonly string[]>;

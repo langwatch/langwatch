@@ -25,7 +25,7 @@ type OrganizationCall = Readonly<{ organizationId: string }>;
 type Decision = Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>;
 
 /** What each `identity.joinRequests.*` handler asks of identity's own join door. */
-export interface JoinRequestDoor {
+interface JoinRequestDoor {
   lookup(input: OwnCall): Promise<JoinLookupDecision>;
   offer(input: OwnCall): Promise<JoinLookupDecision>;
   dismissOffer(input: OwnCall): Promise<void>;

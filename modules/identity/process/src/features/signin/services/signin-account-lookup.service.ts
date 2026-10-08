@@ -6,7 +6,7 @@ import type { IdentitySignInAccountsRepository } from "../../../repositories/ide
 import type { IdentityUserGate } from "../../../rules/identity-user-gate.rules.ts";
 import type { SignInAccountLookup } from "./signin-router.service.ts";
 
-export interface SignInAccountLookupServiceDeps {
+interface SignInAccountLookupServiceDeps {
   heads: IdentityHeadsRepository;
   legacy: IdentitySignInAccountsRepository;
   isLatched: IdentityUserGate;

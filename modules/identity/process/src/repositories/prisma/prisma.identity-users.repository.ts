@@ -4,7 +4,7 @@ import { UserNotFoundError } from "@langwatch/user-contract";
 import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 
 /** The one model the identity guards touch on the legacy side of the fork. */
-export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user" | "$executeRaw" | "$queryRaw">;
+type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user" | "$executeRaw" | "$queryRaw">;
 
 /**
  * The two `User` columns identity touches. `userHashKey` is written only

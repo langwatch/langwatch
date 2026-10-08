@@ -8,7 +8,7 @@ import type {
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The two models the operator back office reads, and no others. */
-export type PrismaSsoConnectionAdminDatabase = Pick<PrismaClient, "ssoConnection" | "organization">;
+type PrismaSsoConnectionAdminDatabase = Pick<PrismaClient, "ssoConnection" | "organization">;
 
 /**
  * Search over the identifiers and domains an operator would have to hand: a

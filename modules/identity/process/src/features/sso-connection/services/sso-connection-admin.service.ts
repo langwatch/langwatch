@@ -21,7 +21,7 @@ import type { SsoConnectionService } from "./sso-connection.service.ts";
  */
 
 /** One row of the back office's connection list. */
-export interface AdminSsoConnection {
+interface AdminSsoConnection {
   connectionId: string;
   organizationId: string;
   /** Resolved server-side. Null when the organization no longer exists — the
@@ -57,13 +57,13 @@ export interface AdminSsoConnection {
   updatedAtMs: number;
 }
 
-export interface AdminSsoConnectionList {
+interface AdminSsoConnectionList {
   connections: AdminSsoConnection[];
   total: number;
 }
 
 /** The operator issuing a command, as the surface knows them. */
-export interface OperatorActor {
+interface OperatorActor {
   userId: string;
 }
 

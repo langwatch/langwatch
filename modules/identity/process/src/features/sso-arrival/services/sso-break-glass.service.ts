@@ -35,7 +35,7 @@ export interface SsoBreakGlassDirectory {
   findAdministrators(args: { organizationId: string }): Promise<SsoBreakGlassPerson[]>;
 }
 
-export interface SsoBreakGlassServiceDeps {
+interface SsoBreakGlassServiceDeps {
   bindings: SsoBreakGlassRepository;
   /** Where an expiry warning goes. Unanswered where the process composed no
    *  gateway for it, which the sweep refuses by name on. */

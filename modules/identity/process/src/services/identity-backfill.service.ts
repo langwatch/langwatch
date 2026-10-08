@@ -39,7 +39,7 @@ export type IdentityBackfillOutcome =
   | { status: "migrated"; report: { kind: "parity"; diffs: BackfillDiff[] } }
   | { status: "migrated"; report: { kind: "unproven_account" } };
 
-export interface IdentityBackfillServiceDeps {
+interface IdentityBackfillServiceDeps {
   now?: () => number;
 }
 

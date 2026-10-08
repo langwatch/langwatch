@@ -52,7 +52,7 @@ export interface CallbackUserMatch {
 /**
  * The user-level reads and writes a callback needs BEFORE the ADR-116 storage
  */
-export interface SignInCallbackDirectory {
+interface SignInCallbackDirectory {
   findUserByProviderSubject(input: {
     connectionId: string | null;
     provider: IdentifierProvider;
@@ -89,12 +89,12 @@ export interface SignInCallbackDirectory {
 /**
  * The before/after audit pair around a link (ADR-117 §3). Two records rather
  */
-export interface SignInCallbackAudit {
+interface SignInCallbackAudit {
   linkAttempted(record: CallbackAuditRecord): void;
   linkRecorded(record: CallbackAuditRecord): void;
 }
 
-export interface CallbackAuditRecord {
+interface CallbackAuditRecord {
   userId: string;
   connectionId: string | null;
   provider: IdentifierProvider;
@@ -102,13 +102,13 @@ export interface CallbackAuditRecord {
   domain: string | null;
 }
 
-export type CallbackLinkOutcome =
+type CallbackLinkOutcome =
   | { kind: "signed_in"; userId: string; linked: false }
   | { kind: "linked"; userId: string; linked: true }
   | { kind: "provisioned"; userId: string; linked: true }
   | { kind: "awaiting_approval"; userId: string; linked: true };
 
-export interface SignInCallbackLinkingDeps {
+interface SignInCallbackLinkingDeps {
   directory: SignInCallbackDirectory;
   proposals: IdentityLinkProposalWrites;
   audit: SignInCallbackAudit;

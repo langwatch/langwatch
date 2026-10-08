@@ -44,7 +44,7 @@ const ALLOWED_FROM: Record<JoinRequestCommandType, readonly JoinRequestState[]> 
   [EXPIRE_JOIN_COMMAND_TYPE]: ["PENDING"],
 };
 
-export interface JoinRequestGuardsDeps {
+interface JoinRequestGuardsDeps {
   requests: JoinRequestReadRepository;
 }
 

@@ -60,7 +60,7 @@ export interface SignInBreakGlassLimiter {
  * bake dashboards and the D05 ops surface can take the same feed later
  * without this service learning about either.
  */
-export interface SignInRoutingRecorder {
+interface SignInRoutingRecorder {
   decided(record: SignInRoutingRecord): void;
 }
 
@@ -89,7 +89,7 @@ const defaultRecorder: SignInRoutingRecorder = {
   },
 };
 
-export interface SignInRouterDeps {
+interface SignInRouterDeps {
   domains: SignInDomainRouting;
   /** Absent where the deployment composed no legacy columns: the projection
    *  is then the only answer, which is where every instance ends up. */
@@ -100,7 +100,7 @@ export interface SignInRouterDeps {
   recorder?: SignInRoutingRecorder;
 }
 
-export interface SignInRouteRequest {
+interface SignInRouteRequest {
   /** The raw value as it was typed; null when the surface was requested
    *  before any address was asked for. */
   identifier: string | null;

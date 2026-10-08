@@ -23,8 +23,6 @@ import type { IdentityRepositories } from "../../../repositories/identity.reposi
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestLifecycleDispatcherService } from "../services/join-request-lifecycle-dispatcher.service.ts";
-import type { JoinRequestMail } from "../services/join-request-notification.service.ts";
-import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import {
   AppendingJoinRequestLedgerStore,
@@ -193,17 +191,6 @@ export function composeJoinRequestPipeline(options: {
     joinRequestProjectionStore: head,
     joinRequestGuards: guards,
     lifecycle: JoinRequestLifecycleDispatcherService.create(reads, notifier, () => requests),
-  });
-}
-
-/** The wake notifications: the audience is the module's rows, the mail the process's port. */
-export function composeJoinRequestNotifications(options: {
-  repositories: Pick<IdentityRepositories, "joinRequestAudience">;
-  mail: JoinRequestMail;
-}): JoinRequestNotificationService {
-  return JoinRequestNotificationService.create({
-    audience: options.repositories.joinRequestAudience,
-    mail: options.mail,
   });
 }
 

@@ -14,7 +14,7 @@ type CacheEntry = { isOn: boolean; expiresAt: number };
  */
 type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
-export type PerSubjectCachedFlag = {
+type PerSubjectCachedFlag = {
   /**
    * The cached answer for one subject, reading through `read` on a
    * cache miss. Concurrent calls for the same subject while that read

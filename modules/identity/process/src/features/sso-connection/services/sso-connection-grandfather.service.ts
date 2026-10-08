@@ -19,7 +19,7 @@ import type { SsoConnectionService } from "./sso-connection.service.ts";
  * Grandfathering (ADR-117 §5, D04): the organizations that already have
  */
 
-export type SsoConnectionGrandfatherOutcome =
+type SsoConnectionGrandfatherOutcome =
   | { status: "finalized"; report: { kind: "no_legacy_sso" } }
   | {
       status: "finalized";
@@ -43,7 +43,7 @@ export type SsoConnectionGrandfatherOutcome =
       };
     };
 
-export interface SsoConnectionGrandfatherDeps {
+interface SsoConnectionGrandfatherDeps {
   connections: SsoConnectionService;
   /** Where the legacy strings are read from. */
   legacy: Pick<LegacySsoOrganizationRepository, "getLegacySso">;
