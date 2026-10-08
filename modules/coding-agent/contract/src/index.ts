@@ -32,11 +32,8 @@ export {
   codingAgentTranscriptSchema,
   transcriptEntrySchema,
 } from "./coding-agent-transcript.ts";
-export type {
-  CodingAgentTranscript,
-  TranscriptEntry,
-  TranscriptLogRecord,
-} from "./coding-agent-transcript.ts";
+export type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-transcript.ts";
+export type { TranscriptLogRecord } from "./coding-agent-transcript-state.ts";
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
 export * from "./coding-agent-span-admission.ts";

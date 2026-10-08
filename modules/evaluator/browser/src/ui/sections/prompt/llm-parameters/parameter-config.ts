@@ -54,19 +54,6 @@ export function toInternalKey(camelCaseKey: string): string {
 }
 
 // ============================================================================
-// Types (re-exported from parameterRegistry for backward compatibility)
-// ============================================================================
-
-/**
- * @deprecated Use SliderParameterDefinition from parameterRegistry.ts
- */
-export type {
-  ParameterDefinition as ParameterConfig,
-  SelectParameterDefinition as SelectParameterConfig,
-  SliderParameterDefinition as SliderParameterConfig,
-} from "./parameter-registry.ts";
-
-// ============================================================================
 // Parameter Definitions (derived from registry)
 // ============================================================================
 
@@ -152,7 +139,7 @@ const REASONING_PARAMETER_LABELS: Record<string, string> = {
  *
  * @param paramName - The parameter name (e.g., "reasoning", "temperature")
  * @param reasoningConfig - Model's reasoning configuration (optional)
- * @returns ParameterConfig with resolved options and label, or undefined if not configured
+ * @returns ParameterDefinition with resolved options and label, or undefined if not configured
  */
 export function getParameterConfigWithModelOverrides(
   paramName: string,
