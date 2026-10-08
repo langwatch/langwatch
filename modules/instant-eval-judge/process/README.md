@@ -6,7 +6,7 @@ The server half of [instant-eval-judge](../README.md). It keeps the judge's own 
 
 ## Installation
 
-`defineProcessModule("instant-eval-judge").withRepositories(instantEvalJudgeRepositories).withApi(InstantEvalJudgeModule).withEventing(instantEvalJudgeFactsEventing).withEventing(instantEvalJudgeSpendEventing)`, `src/instant-eval-judge.module.ts:8`.
+`defineProcessModule("instant-eval-judge").withRepositories(instantEvalJudgeRepositories).withApi(InstantEvalJudgeModule).withEventing(instantEvalJudgeFactsEventing).withEventing(instantEvalJudgeSpendEventing)`, `src/instant-eval-judge.module.ts:16`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -72,12 +72,11 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `instant_eval_judge_facts` (aggregate `global`)
 
-Declared at `src/eventing/instant-eval-judge-facts.pipeline.ts:35`.
+Declared at `src/eventing/instant-eval-judge-facts.pipeline.ts:32`.
 
 | Kind            | Name                                  | Handles                                                                                          | Declared at                                            |
 | --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| peer subscriber | `instantEvalJudgeProjectCreated`      | `lw.project.created` from [project](../../project/README.md)                                     | `src/eventing/instant-eval-judge-facts.pipeline.ts:42` |
-| peer subscriber | `instantEvalJudgeUsageBillingChanged` | `lw.billing.usage_billing_changed` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/instant-eval-judge-facts.pipeline.ts:48` |
+| peer subscriber | `instantEvalJudgeUsageBillingChanged` | `lw.billing.usage_billing_changed` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/instant-eval-judge-facts.pipeline.ts:39` |
 
 ### Pipeline `instant_eval_judge_spend` (aggregate `instant_eval_judge_spend`)
 
@@ -92,7 +91,7 @@ Declared at `src/eventing/instant-eval-judge-spend.pipeline.ts:41`. Events: `ins
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                       |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:60`            |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval-judge.app.ts:59`            |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval-judge.config.ts:10` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval-judge.config.ts:18` |
 | config | `globalTokensPerSecond` | `INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND` | `../contract/src/instant-eval-judge.config.ts:20` |

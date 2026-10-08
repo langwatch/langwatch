@@ -1,18 +1,26 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type {
-  InstantEvalJudgeProjectPlacement,
+import {
+  type InstantEvalJudgeProjectPlacement,
   InstantEvalJudgeProjectRepository,
 } from "../instant-eval-judge-placement.repository.ts";
 
+/** Only the shared delegates this reader touches; it claims no table (R40). */
+type PrismaInstantEvalJudgeProjectDatabase = Pick<PrismaClient, "project" | "team">;
+
 /** Project's `Project` and organization's `Team` rows, read through their shares (R40). */
-export class PrismaInstantEvalJudgeProjectRepository
-  extends PrismaRepository.for("Project", "Team")
-  implements InstantEvalJudgeProjectRepository
-{
-  static readonly create = this.factory(
-    (prisma) => new PrismaInstantEvalJudgeProjectRepository(prisma),
-  );
+export class PrismaInstantEvalJudgeProjectRepository extends InstantEvalJudgeProjectRepository {
+  private constructor(private readonly prisma: PrismaInstantEvalJudgeProjectDatabase) {
+    super();
+  }
+
+  static create({
+    prisma,
+  }: Readonly<{
+    prisma: PrismaInstantEvalJudgeProjectDatabase;
+  }>): PrismaInstantEvalJudgeProjectRepository {
+    return new PrismaInstantEvalJudgeProjectRepository(prisma);
+  }
 
   async getPlacement({
     projectId,
