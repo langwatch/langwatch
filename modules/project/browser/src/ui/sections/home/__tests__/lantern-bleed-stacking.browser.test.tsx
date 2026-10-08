@@ -71,6 +71,9 @@ class StubProjectHomeHost extends ProjectHomeHost {
   hasPermission(): boolean {
     return false;
   }
+  featureFlag() {
+    return { enabled: false, isLoading: false };
+  }
   langyVisibility(): ProjectHomeLangyVisibility {
     return { show: true, isResolving: false };
   }
