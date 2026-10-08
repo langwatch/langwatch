@@ -15,30 +15,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type MutationName = "create" | "rename" | "delete" | "reorder";
 
-const { mutationFor, invalidate, setData, toast, refusal } =
-  vi.hoisted(() => {
-    const refusal = new Error("aggregate_project_is_read_only");
-    const options: Partial<
-      Record<string, { onError?: (error: unknown) => void }>
-    > = {};
-    const mutationFor = (name: string) => ({
-      useMutation: (hookOptions: { onError?: (error: unknown) => void }) => {
-        options[name] = hookOptions;
-        return {
-          mutate: () => {
-            options[name]?.onError?.(refusal);
-          },
-        };
-      },
-    });
-    return {
-      mutationFor,
-      invalidate: vi.fn(),
-      setData: vi.fn(),
-      toast: vi.fn<(args: { title?: string; type?: string }) => void>(),
-      refusal,
-    };
+const { mutationFor, invalidate, setData, toast } = vi.hoisted(() => {
+  const refusal = new Error("aggregate_project_is_read_only");
+  const options: Partial<
+    Record<string, { onError?: (error: unknown) => void }>
+  > = {};
+  const mutationFor = (name: string) => ({
+    useMutation: (hookOptions: { onError?: (error: unknown) => void }) => {
+      options[name] = hookOptions;
+      return {
+        mutate: () => {
+          options[name]?.onError?.(refusal);
+        },
+      };
+    },
   });
+  return {
+    mutationFor,
+    invalidate: vi.fn(),
+    setData: vi.fn(),
+    toast: vi.fn<(args: { title?: string; type?: string }) => void>(),
+  };
+});
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({

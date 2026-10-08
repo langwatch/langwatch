@@ -294,7 +294,10 @@ describe("reloadingWriteOptions", () => {
     it("reloads and shows no toast", () => {
       const reload = vi.fn();
 
-      reloadingWriteOptions({ fallbackTitle: "Couldn't save", reload }).onSuccess();
+      reloadingWriteOptions({
+        fallbackTitle: "Couldn't save",
+        reload,
+      }).onSuccess();
 
       expect(reload).toHaveBeenCalledTimes(1);
       expect(create).not.toHaveBeenCalled();
