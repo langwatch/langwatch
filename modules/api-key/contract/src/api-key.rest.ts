@@ -57,7 +57,6 @@ export const apiKeyRestMintedSchema = z.object({
     createdAt: z.date(),
   }),
 });
-export type ApiKeyRestMinted = z.infer<typeof apiKeyRestMintedSchema>;
 
 /** What a revoke answers. */
 export const apiKeyRestRevokedSchema = z.object({ success: z.boolean() });
@@ -86,7 +85,6 @@ export const projectRestPageSchema = z
       .meta({ id: "Pagination" }),
   })
   .strict();
-export type ProjectRestPage = z.infer<typeof projectRestPageSchema>;
 
 /**
  * A freshly created project, with the service key minted alongside it. The
@@ -96,4 +94,3 @@ export const projectRestCreatedSchema = projectRestSchema.safeExtend({
   serviceApiKey: z.string().min(1),
   serviceApiKeyId: z.string().min(1),
 });
-export type ProjectRestCreated = z.infer<typeof projectRestCreatedSchema>;

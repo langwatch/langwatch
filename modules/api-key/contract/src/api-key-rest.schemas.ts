@@ -112,7 +112,6 @@ export const apiKeyRestUpdateSchema = z
       ),
   })
   .superRefine(refineRestrictedPermissions);
-export type ApiKeyRestUpdate = z.infer<typeof apiKeyRestUpdateSchema>;
 
 /** `GET /api/projects`, served here at project's path: the page asked for. */
 export const projectRestPaginationQuerySchema = z.object({

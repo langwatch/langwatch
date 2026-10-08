@@ -20,33 +20,30 @@ const OWN_KEYS_REASON =
   "personal API keys are the caller's own; the application proves organization membership and ownership itself";
 const KEY_ASSIGNMENT_REASON =
   "any member assigning a key needs the organization's projects, teams and members; the application refuses a non-member before reading";
+const MEMBER_ONLY = {
+  organizationId: "the application refuses a caller who is not a member of this organization",
+};
 
 export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKeyTrpc> =
   defineTrpcRouter(ApiKeyApi, apiKeyTrpc)
     .procedure("myBindings")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listCallerBindings(input, { id: actor.id }))
 
     .procedure("nameById")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.findKeyName(input, { id: actor.id }))
 
     .procedure("list")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listKeys(input, { id: actor.id }))
 
@@ -54,9 +51,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .mintsCredential("organization:view")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     // Mints a key and hands back its plaintext token — once, here, and nowhere
     // else. Only the key's identity rides beside it, which is also all the
@@ -73,9 +68,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("update")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(async ({ app, input, actor }) => {
       const updated = await app.updateKey(input, { id: actor.id });
@@ -86,9 +79,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("revoke")
     .noPermission({
       reason: OWN_KEYS_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(async ({ app, input, actor }) => {
       await app.revokeKey(input, { id: actor.id });
@@ -99,27 +90,21 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("orgProjects")
     .noPermission({
       reason: KEY_ASSIGNMENT_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listOrganizationProjects(input, { id: actor.id }))
 
     .procedure("orgTeams")
     .noPermission({
       reason: KEY_ASSIGNMENT_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listOrganizationTeams(input, { id: actor.id }))
 
     .procedure("orgMembers")
     .noPermission({
       reason: KEY_ASSIGNMENT_REASON,
-      allow: {
-        organizationId: "the application refuses a caller who is not a member of this organization",
-      },
+      allow: MEMBER_ONLY,
     })
     .handle(({ app, input, actor }) => app.listOrganizationMembers(input, { id: actor.id }))
 
