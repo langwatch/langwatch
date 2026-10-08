@@ -496,13 +496,15 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
 - S1 R2 oversight organisation names: no rename fact and pre-eventing organisations have no signed_up fact, so a fold is incomplete; no operator-facing names-by-ids procedure exists. Options: a fact fold plus an organization `renamed` fact and a seed step; a new organization names-by-ids read for operators; show ids.
 
 ## Round 43 (prepared 2026-10-08, A1: identity and user off auth; handoff a1-identity-user-off-auth §11)
+
 1. A1-a Capability switches (passkeys, two-step, own passwords, trusted IdP origins): (a, rec) shared deployment facts in packages/config beside signInProviders/signUpMode, no lockfile; (b) identity-contract owns them; (c) cut auth-contract -> identity-contract first.
 2. A1-b Provider resolution needs client secrets plus the platform SSO licence: (a) identity and user also hold the secrets and ask licensing; (b, rec) user's three password doors move to auth, auth -> user kept, with new UserApi writes for the user-owned rows; (c) an Api-bound channel to auth.
 3. A1-c Stored reads (R40): (a, rec) declare Session shared auth -> identity and Account shared user -> identity, each module reads through its own repository; user's SSO status reads its own Account table.
 4. A1-d Commands that are synchronous today (link provider account, operator two-step reset, deactivate revoking sessions first): (a, rec) stay synchronous by moving those doors to auth, which sits above identity and user (R36) and calls them downward; (b) become facts auth subscribes to, plus read-time refusal of a deactivated user's session and CLI token.
-Coordinator default if unanswered: split A1 into A1-identity and A1-user lanes; A1-user sequenced with U1.
+   Coordinator default if unanswered: split A1 into A1-identity and A1-user lanes; A1-user sequenced with U1.
 
 ## Round 44 candidates (prepared 2026-10-08)
+
 1. DS-3 upgrade modal (policies-DS-3a §11): the upgrade-modal slice (uses licensing's LimitType) lives in browser-host, a framework package. (a, rec) licensing lends an operations token from licensing-client, browser-host keeps only the mount point; (b) licensing-client exports the slice (new pattern); (c) restate LimitType in browser-host (edge goes, feature stays in the framework).
 2. FS-3 webhook memory tier: there is no memory twin of the HTTP destination; memory-tier processes still deliver through the real HTTP channel behind the egress fence. (a, rec) keep as is and record it as the named exception (the memory-tier worker test relies on the fence refusing private addresses); (b) add a memory twin, so memory-tier processes stop delivering webhooks.
 3. R41 memory outbox (eventing-memory-outbox handoff): user's memory twin keeps facts in a private outbox no drain sees. How does a memory repository reach the shared process store? (a, rec) `memoryStores()` owns one InMemoryProcessStore that the memory registries and memory eventing share (adds a member to the closed ProcessMembers set; live has one store too); (b) memory registries require `eventing` (extends ops' Q212 exception); (c) a new memory outbox source primitive. Coordinator default (follows §9): only the worker role drains on memory; an installation test boots a worker over the same memoryStores() to see the fact.
