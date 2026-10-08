@@ -1,5 +1,6 @@
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import type {
+  InstantEvalClassifierLimits,
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
@@ -207,6 +208,12 @@ export interface InstantEvalApi {
    * the hold. Refuses an exhausted budget or an oversized query before anything is judged.
    */
   judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
+
+  /**
+   * The limits of the judge `judgeQuery` sends to, so a caller trims a conversation to them
+   * before asking (Alex, 2026-10-08, round 26 CD-4). Published by the judge, never assumed.
+   */
+  getJudgeLimits(): InstantEvalClassifierLimits;
 
   /** What judging these input tokens cost LangWatch and what the customer is charged, in USD. */
   priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };

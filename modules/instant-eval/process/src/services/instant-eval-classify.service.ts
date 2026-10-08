@@ -6,6 +6,7 @@
  */
 
 import type {
+  InstantEvalClassifierLimits,
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
@@ -43,5 +44,10 @@ export class InstantEvalClassifyService {
     const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.judge.pricing });
 
     return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }) };
+  }
+
+  /** The limits this judge publishes, which a query judged through it is trimmed to. */
+  getJudgeLimits(): InstantEvalClassifierLimits {
+    return this.judge.limits;
   }
 }

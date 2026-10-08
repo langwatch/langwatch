@@ -27,6 +27,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import {
   InstantEvalJudgeApi,
+  type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
@@ -650,6 +651,10 @@ export class InstantEvalModule implements InstantEvalApiContract {
 
   judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging> {
     return this.queries.judgeQuery(input);
+  }
+
+  getJudgeLimits(): InstantEvalClassifierLimits {
+    return this.classifications.getJudgeLimits();
   }
 
   priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number } {

@@ -9,6 +9,7 @@ import {
   LangWatchQLAppFunctionHydrationFailedError,
   type LangWatchQLAppFunctionOption,
 } from "@langwatch/analytics-contract";
+import type { InstantEvalTranscriptFit } from "@langwatch/instant-eval-contract";
 import type { Trace } from "@langwatch/trace-contract";
 
 import type { LangWatchQLAppFunctionDefinition } from "../rules/langwatch-ql-app-function-shapes.rules.ts";
@@ -132,10 +133,13 @@ export class LangWatchQLHydrationComputeService {
     resolved,
     traces,
     maxHydratedValueBytes,
+    judgeFits,
   }: {
     resolved: readonly LangWatchQLResolvedCall[];
     traces: LangWatchQLFetchedTraces;
     maxHydratedValueBytes: number;
+    /** By output column: the judge's budget a judged conversation is re-rendered under. */
+    judgeFits?: ReadonlyMap<string, InstantEvalTranscriptFit>;
   }): Promise<LangWatchQLComputedValues> {
     const computed = new Map<string, ReadonlyMap<string, LangWatchQLComputedValue>>();
     try {
@@ -151,6 +155,7 @@ export class LangWatchQLHydrationComputeService {
                 options: entry.call.options,
                 parts,
                 traces,
+                judgeFit: judgeFits?.get(entry.call.column),
               }),
               maxBytes: maxHydratedValueBytes,
             }),
@@ -173,11 +178,13 @@ export class LangWatchQLHydrationComputeService {
     options,
     parts,
     traces,
+    judgeFit,
   }: {
     definition: LangWatchQLAppFunctionDefinition;
     options: readonly LangWatchQLAppFunctionOption[];
     parts: readonly string[];
     traces: LangWatchQLFetchedTraces;
+    judgeFit?: InstantEvalTranscriptFit;
   }): Promise<LangWatchQLComputedValue> {
     const [first, second] = parts;
     if (first === undefined) return LWQL_NOT_RESOLVED;
@@ -188,6 +195,7 @@ export class LangWatchQLHydrationComputeService {
         options,
         threadKey: first,
         threadTraces: traces.byThread.get(first) ?? [],
+        judgeFit,
       });
     }
 
@@ -202,11 +210,13 @@ export class LangWatchQLHydrationComputeService {
     options,
     threadKey,
     threadTraces,
+    judgeFit,
   }: {
     definition: LangWatchQLAppFunctionDefinition;
     options: readonly LangWatchQLAppFunctionOption[];
     threadKey: string;
     threadTraces: readonly Trace[];
+    judgeFit?: InstantEvalTranscriptFit;
   }): Promise<LangWatchQLComputedValue> {
     if (threadTraces.length === 0) return LWQL_NOT_RESOLVED;
     const { name } = definition;
@@ -233,7 +243,40 @@ export class LangWatchQLHydrationComputeService {
       ...(isBounded ? { maxTokens: pickNumberOption({ definition, options, at: 0 }) } : {}),
     });
 
+    if (name === "conversation" && judgeFit) {
+      return this.#withinJudgeFit({ transcript, threadKey, traces: ordered, judgeFit });
+    }
+
     return { value: transcript, isTruncated: false, isResolved: true };
+  }
+
+  /**
+   * A judged conversation past the judge's budget, re-rendered through the bounded renderer
+   * so both ends and a marker of the dropped turns survive instead of the judge's blind cut.
+   * Measured at the judge's own ratio, the check it is about to make (main's withinJudgeBudget).
+   */
+  async #withinJudgeFit({
+    transcript,
+    threadKey,
+    traces,
+    judgeFit,
+  }: {
+    transcript: string;
+    threadKey: string;
+    traces: readonly Trace[];
+    judgeFit: InstantEvalTranscriptFit;
+  }): Promise<LangWatchQLComputedValue> {
+    if (new TextEncoder().encode(transcript).length <= judgeFit.maxBytes) {
+      return { value: transcript, isTruncated: false, isResolved: true };
+    }
+    const bounded = await this.renderer.renderThreadTranscript({
+      threadKey,
+      traces,
+      view: "conversation",
+      maxTokens: judgeFit.renderTokens,
+    });
+
+    return { value: bounded, isTruncated: true, isResolved: true };
   }
 
   async #computeTraceValue({

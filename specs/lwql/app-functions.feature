@@ -277,8 +277,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When the statement is hydrated
     Then it fails with instant_eval_questions_too_long and nothing is sent to the judge
 
-  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
-  @unit @unimplemented
+  @unit
   Scenario: A conversation over the judge's budget is measured with the judge's own ratio
     Given a conversation that fits four bytes a token but not the judge's denser ratio
     When the statement is hydrated

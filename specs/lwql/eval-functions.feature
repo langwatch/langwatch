@@ -336,8 +336,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
-  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
-  @unit @unimplemented
+  @unit
   Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends
     Given an eval over a conversation far longer than the judge's budget
     When the statement is hydrated
@@ -346,8 +345,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And it names how many turns were dropped from the middle
     And the cell reports itself truncated
 
-  # Needs the judge's limits in hydration; held, lwql-sync-eval handoff.
-  @unit @unimplemented
+  @unit
   Scenario: A conversation inside the judge's budget is sent whole and not marked truncated
     Given an eval over a conversation smaller than the judge's budget
     When the statement is hydrated

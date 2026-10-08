@@ -6,7 +6,11 @@
  * @see specs/lwql/app-functions.feature
  */
 import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
-import type { InstantEvalApi, InstantEvalQueryJudging } from "@langwatch/instant-eval-contract";
+import {
+  computeInstantEvalTranscriptFit,
+  type InstantEvalApi,
+  type InstantEvalQueryJudging,
+} from "@langwatch/instant-eval-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
@@ -42,6 +46,49 @@ const ANNOYED_QUERY =
   "FROM analytics.trace_metrics";
 
 type JudgeQuery = InstantEvalApi["judgeQuery"];
+
+/** A judge with a small state, so a conversation past it stays a few kilobytes. */
+const JUDGE_LIMITS: ReturnType<InstantEvalApi["getJudgeLimits"]> = {
+  stateTokens: 1_000,
+  totalTokens: 2_000,
+  maxCategoryOptions: 255,
+  maxScoreLevels: 10,
+  reserveTokens: 100,
+  bytesPerInputToken: 2.7,
+  fitBytesPerInputToken: 2,
+  transcriptFitBytesPerInputToken: 2.4,
+  retryBytesPerInputToken: 1.5,
+};
+
+/** The fit the annoyed question leaves under {@link JUDGE_LIMITS}. */
+const ANNOYED_FIT = computeInstantEvalTranscriptFit({
+  judgements: [
+    {
+      column: "annoyed",
+      function: "eval",
+      reads: "probability",
+      kind: "boolean",
+      instructions: "The customer sounds annoyed",
+    },
+  ],
+  limits: JUDGE_LIMITS,
+});
+
+/** Renders the whole thread as `transcript`, and a bounded one keeping both ends. */
+function threadRenderer(transcript: string) {
+  const budgets: number[] = [];
+  const rendering: LangWatchQLTraceRenderer = {
+    ...renderer,
+    renderThreadTranscript: async ({ maxTokens }) => {
+      if (maxTokens === undefined) return transcript;
+      budgets.push(maxTokens);
+
+      return "## opening\n\n[... 40 turns omitted ...]\n\n## close";
+    },
+  };
+
+  return { rendering, budgets };
+}
 
 function trace({ id, threadId }: { id: string; threadId: string }): Trace {
   return {
@@ -114,11 +161,13 @@ function serviceOver({
   values = ["thread-a"],
   judgeQuery,
   stopwatch,
+  rendering = renderer,
 }: {
   column?: string;
   values?: readonly string[];
   judgeQuery?: JudgeQuery;
   stopwatch?: () => number;
+  rendering?: LangWatchQLTraceRenderer;
 }) {
   const traces = new CountingTraceSource();
   const asked: Parameters<JudgeQuery>[0][] = [];
@@ -130,12 +179,13 @@ function serviceOver({
 
             return judgeQuery(input);
           },
+          getJudgeLimits: () => JUDGE_LIMITS,
         }
       : {},
   );
   const hydration = LangWatchQLHydrationService.create({
     reads: LangWatchQLHydrationReadService.create({ traces }),
-    compute: LangWatchQLHydrationComputeService.create({ renderer }),
+    compute: LangWatchQLHydrationComputeService.create({ renderer: rendering }),
     runner: {
       executeLangWatchQLPass: () => Promise.reject(new Error("the sync path reads no pass")),
     },
@@ -193,6 +243,61 @@ describe("LangWatchQLService with an eval function", () => {
       expect(result.rows).toEqual([{ TraceId: "trace-of-thread-a", annoyed: 0.9 }]);
       expect(result.columns.find((column) => column.name === "annoyed")?.type).toBe(
         "Nullable(Float64)",
+      );
+    });
+  });
+
+  describe("when the conversation is past the judge's budget", () => {
+    /** @scenario "A conversation past the judge's budget is cut through the bounded renderer, keeping both ends" */
+    it("sends the bounded rendering under the judge's budget and reports the cell truncated", async () => {
+      const { rendering, budgets } = threadRenderer("## opening\n\n" + "turn ".repeat(4_000));
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.7), rendering });
+
+      const result = await query({ service, sql: ANNOYED_QUERY });
+
+      expect(budgets).toEqual([ANNOYED_FIT?.renderTokens]);
+      const sent = String(asked[0]?.rows[0]?.annoyed);
+      expect(sent).toContain("## opening");
+      expect(sent).toContain("## close");
+      expect(sent).toContain("40 turns omitted");
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: "APP_FUNCTION_VALUE_TRUNCATED",
+          meta: { columns: [{ column: "annoyed", function: "conversation", values: 1 }] },
+        }),
+      );
+    });
+  });
+
+  describe("when the conversation fits four bytes a token but not the judge's ratio", () => {
+    /** @scenario "A conversation over the judge's budget is measured with the judge's own ratio" */
+    it("re-renders it under the judge's budget and reports the row truncated", async () => {
+      const bytes = (ANNOYED_FIT?.maxBytes ?? 0) + 100;
+      expect(bytes).toBeLessThan(((ANNOYED_FIT?.maxBytes ?? 0) / 2.4) * 4);
+      const { rendering, budgets } = threadRenderer("x".repeat(bytes));
+      const { service } = serviceOver({ judgeQuery: answering(0.2), rendering });
+
+      const result = await query({ service, sql: ANNOYED_QUERY });
+
+      expect(budgets).toHaveLength(1);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+        "APP_FUNCTION_VALUE_TRUNCATED",
+      );
+    });
+  });
+
+  describe("when the conversation is inside the judge's budget", () => {
+    /** @scenario "A conversation inside the judge's budget is sent whole and not marked truncated" */
+    it("sends the whole conversation and reports nothing truncated", async () => {
+      const { rendering, budgets } = threadRenderer(TRANSCRIPT);
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.1), rendering });
+
+      const result = await query({ service, sql: ANNOYED_QUERY });
+
+      expect(budgets).toEqual([]);
+      expect(asked[0]?.rows[0]?.annoyed).toBe(TRANSCRIPT);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+        "APP_FUNCTION_VALUE_TRUNCATED",
       );
     });
   });

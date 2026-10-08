@@ -35,8 +35,10 @@ import {
   langWatchQLExtractionPlan,
 } from "../rules/langwatch-ql-hydration-plan.rules.ts";
 import {
+  computeLangWatchQLConversationFits,
   langWatchQLJudgedColumns,
   langWatchQLJudgementCalls,
+  pickLangWatchQLConversationJudgements,
 } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
@@ -109,7 +111,7 @@ export interface LangWatchQLServiceDependencies {
    * Judges the eval columns once hydration left their text in place (Alex, 2026-10-06, "Judge
    * cycle"). Absent only in a suite that judges nothing; an eval column then keeps its text.
    */
-  readonly judging?: Pick<InstantEvalApi, "judgeQuery">;
+  readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
 }
@@ -451,6 +453,10 @@ export class LangWatchQLService {
         ? langWatchQLExtractionPlan(validation.appFunctions)
         : langWatchQLExtractionCalls(validation.appFunctions);
     if (!hydration || (calls.length === 0 && judgements.length === 0)) return execution;
+    // Trimmed here, before judgeQuery, to the judge's own limits (Alex, 2026-10-08, CD-4).
+    const isConversationJudged =
+      judging !== undefined &&
+      pickLangWatchQLConversationJudgements(validation.appFunctions).length > 0;
     const hydrated = await hydration.hydrate({
       projectIds: projects.map((project) => project.id),
       protections,
@@ -458,6 +464,14 @@ export class LangWatchQLService {
       columns: execution.columns,
       rows: execution.rows,
       ...(signal ? { signal } : {}),
+      ...(isConversationJudged
+        ? {
+            judgeFits: computeLangWatchQLConversationFits({
+              calls: validation.appFunctions,
+              limits: judging.getJudgeLimits(),
+            }),
+          }
+        : {}),
     });
     const judged = await this.judge({ projects, judgements, rows: hydrated.rows, signal });
 

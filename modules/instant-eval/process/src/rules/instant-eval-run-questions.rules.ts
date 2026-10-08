@@ -8,6 +8,7 @@ import type {
   LangWatchQLJudgementCall,
   LangWatchQLJudgementReading,
 } from "@langwatch/analytics-contract";
+import { toInstantEvalQuestion } from "@langwatch/instant-eval-contract";
 import type {
   InstantEvalQuestion,
   InstantEvalQuestionKind,
@@ -111,24 +112,8 @@ function runQuestionOf(call: LangWatchQLJudgementCall): InstantEvalRunQuestion {
     function: call.function,
     kind: call.kind,
     reads: call.reads,
-    question: askedQuestionOf(call),
+    question: toInstantEvalQuestion(call),
     ...(call.threshold === undefined ? {} : { threshold: call.threshold }),
-  };
-}
-
-/** The same question, addressed to the judge by the column it comes back in. */
-function askedQuestionOf(call: LangWatchQLJudgementCall): InstantEvalQuestion {
-  const { column: id, instructions } = call;
-  if (call.kind === "score") return { id, kind: "score", instructions, range: call.range };
-  if (call.kind === "category") {
-    return { id, kind: "category", instructions, options: call.options };
-  }
-
-  return {
-    id,
-    kind: "boolean",
-    instructions,
-    ...(call.criteria ? { criteria: call.criteria } : {}),
   };
 }
 

@@ -111,4 +111,13 @@ describe("given a peer with text of its own to classify", () => {
       expect(judgement.verdicts).toEqual([]);
     });
   });
+
+  describe("when a peer asks the judge's limits to trim a query to", () => {
+    it("answers the limits the judge itself publishes", () => {
+      const judge = new RecordingJudge();
+      const classifications = InstantEvalClassifyService.create({ judge });
+
+      expect(classifications.getJudgeLimits()).toBe(judge.limits);
+    });
+  });
 });

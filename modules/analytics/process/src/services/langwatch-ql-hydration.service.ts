@@ -13,6 +13,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { InstantEvalTranscriptFit } from "@langwatch/instant-eval-contract";
 
 import {
   assembleLangWatchQLHydration,
@@ -80,6 +81,7 @@ export class LangWatchQLHydrationService {
     columns,
     rows,
     signal,
+    judgeFits,
   }: {
     projectIds: readonly string[];
     protections: LangWatchQLProtections;
@@ -87,6 +89,8 @@ export class LangWatchQLHydrationService {
     columns: readonly LangWatchQLColumn[];
     rows: readonly Record<string, unknown>[];
     signal?: AbortSignal;
+    /** By output column: the judge's budget a judged conversation is re-rendered under. */
+    judgeFits?: ReadonlyMap<string, InstantEvalTranscriptFit>;
   }): Promise<LangWatchQLHydrationResult> {
     if (calls.length === 0) {
       return { columns, rows, isTruncatedByBytes: false, valueTruncations: [], unresolvedKeys: [] };
@@ -109,6 +113,7 @@ export class LangWatchQLHydrationService {
       resolved,
       traces,
       maxHydratedValueBytes: this.limits.maxHydratedValueBytes,
+      ...(judgeFits ? { judgeFits } : {}),
     });
 
     return assembleLangWatchQLHydration({
