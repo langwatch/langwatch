@@ -57,7 +57,12 @@ export function redactOutput({ run, secrets }: { run: ToolRun; secrets: readonly
   return secrets.reduce((text, secret) => text.split(secret).join("<redacted>"), run.output.trim());
 }
 
-function defaultPrisma(): { command: string; args: readonly string[] } {
+let resolvedPrisma: { command: string; args: readonly string[] } | undefined;
+
+/** Resolved once: a later node_modules relink by a concurrent install cannot fail a run. */
+export function defaultPrisma(): { command: string; args: readonly string[] } {
+  if (resolvedPrisma) return resolvedPrisma;
   const manifest = createRequire(import.meta.url).resolve("prisma/package.json");
-  return { command: process.execPath, args: [join(dirname(manifest), "build/index.js")] };
+  resolvedPrisma = { command: process.execPath, args: [join(dirname(manifest), "build/index.js")] };
+  return resolvedPrisma;
 }

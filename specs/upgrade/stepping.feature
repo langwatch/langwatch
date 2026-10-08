@@ -185,3 +185,9 @@ Feature: Stepping the schema one release at a time
     When the goose passes are worked out
     Then the compatibility replay stops at the lower of 86 and that version
     And the final pass runs up to that version
+
+  @unit
+  Scenario: The Prisma CLI is resolved once per process
+    Given the upgrade has resolved the package's Prisma CLI once
+    When a later release step runs Prisma again
+    Then it reuses the first resolution instead of looking up prisma/package.json again
