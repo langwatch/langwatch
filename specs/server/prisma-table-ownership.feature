@@ -75,3 +75,41 @@ Feature: Private Prisma table ownership
     And the foreign table retains its single original owner
 
   # Audit writes ride the producer's outbox after commit (Alex, Q72): modules/audit-log/specs/audit-log.feature.
+
+  # Shared reads over copies (R40): an owner shares a model for reading; writes stay its own.
+  @unit @architecture
+  Scenario: A module reading a Prisma table its owner shares with it passes
+    Given project claims Project and shares it for reading with entitlement
+    When entitlement claims Project and reads it through a delegate and raw SQL
+    Then no finding names entitlement or a second owner of Project
+
+  @unit @architecture
+  Scenario: A module the owner did not name still may not claim a shared Prisma table
+    Given project shares Project for reading with entitlement only
+    When experiment claims Project
+    Then the policy reports Project as claimed by experiment and project
+
+  @unit @architecture
+  Scenario: A named reader writing a shared Prisma table is reported
+    Given project shares Project for reading with entitlement
+    When entitlement updates Project through a delegate or raw SQL
+    Then the policy reports each write as reading-only access misused
+
+  @unit @architecture
+  Scenario: A shared Prisma table declared by a module that does not own it is reported
+    Given the policy declares Project shared by organization
+    And project is the module that claims Project
+    When the policy runs
+    Then the policy reports the declaration as naming the wrong owner
+
+  @unit @architecture
+  Scenario: A shared Prisma reader that no longer reads the table is reported
+    Given project shares Project for reading with entitlement
+    And entitlement no longer reads Project
+    When the policy runs
+    Then the policy asks for entitlement to be deleted from the declaration
+
+  @unit @architecture
+  Scenario: Every shared Prisma table carries a reason
+    When the declared Prisma shares are read
+    Then each one has a non-empty reason

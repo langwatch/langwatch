@@ -10,6 +10,25 @@ import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
+/** A Prisma model its claiming module shares for reading with named modules (R40). */
+export type SharedPrismaTable = {
+  table: string;
+  owner: string;
+  readers: readonly string[];
+  reason: string;
+};
+
+/** The Postgres twin of clickhouse-table-ownership's `shared`; `table` is the model name. */
+export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
+  {
+    table: "Project",
+    owner: "project",
+    readers: ["entitlement"],
+    reason:
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40)",
+  },
+];
+
 const PRISMA_REPOSITORY_FILE = new RegExp(
   `/process/src/${FEATURE_PREFIX}repositories/prisma/prisma\\.[^/]+\\.repository\\.ts$`,
 );
@@ -380,10 +399,20 @@ export function featureClaims(
   });
 }
 
-function checkOwners(
-  claims: readonly Claim[],
-  models: ReadonlyMap<string, string>,
-): ArchitectureViolation[] {
+/** A claim by a module the model's owner named as a reader: a read seat, not a second owner. */
+function isReaderClaim(claim: Claim, shared: readonly SharedPrismaTable[]): boolean {
+  return shared.some((item) => item.table === claim.model && item.readers.includes(claim.feature));
+}
+
+function checkOwners({
+  claims,
+  models,
+  shared,
+}: {
+  claims: readonly Claim[];
+  models: ReadonlyMap<string, string>;
+  shared: readonly SharedPrismaTable[];
+}): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const owners = new Map<string, Claim>();
 
@@ -394,6 +423,8 @@ function checkOwners(
       violations.push(issue(claim.file, `Unknown Prisma model ${claim.model}.`, claim.line));
       continue;
     }
+
+    if (isReaderClaim(claim, shared)) continue;
 
     const previous = owners.get(table);
 
@@ -414,15 +445,174 @@ function checkOwners(
 }
 
 /**
- * Checks explicit adoption across the catalogue, including features never
- * installed together. Migration access (who may reach a table) is its own
- * registered policy now, not nested here — see policies/index.ts.
+ * Checks adoption across the catalogue, features never installed together included. Declared
+ * shares apply where their owner is catalogued; migration access is its own policy (index.ts).
  */
-export function lintPrismaTableOwnership(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+export function lintPrismaTableOwnership(
+  snapshot: WorkspaceSnapshot,
+  declared?: readonly SharedPrismaTable[],
+): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
+  const shared =
+    declared ??
+    SHARED_PRISMA_TABLES.filter((item) => catalogue.some((entry) => entry.id === item.owner));
   const models = prismaModelNames({ root, policy: "prisma-table-ownership" });
   const violations: ArchitectureViolation[] = [];
   const claims = catalogue.flatMap((feature) => featureClaims(root, feature, violations));
 
-  return [...violations, ...checkOwners(claims, models)];
+  return [
+    ...violations,
+    ...checkOwners({ claims, models, shared }),
+    ...sharedFindings({ root, catalogue, claims, models, shared }),
+  ];
+}
+
+const READ_METHODS = new Set([
+  "aggregate",
+  "count",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "findUnique",
+  "findUniqueOrThrow",
+  "groupBy",
+]);
+const WRITE_METHODS = new Set([
+  "create",
+  "createMany",
+  "createManyAndReturn",
+  "delete",
+  "deleteMany",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+]);
+const SQL_VERB = "(FROM|JOIN|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM|TRUNCATE(?:\\s+TABLE)?)";
+const READING_VERBS = new Set(["from", "join"]);
+
+/** One read or write of a shared model by a named reader: a delegate call or quoted raw SQL. */
+type ShareAccess = { file: string; line: number; write: boolean };
+
+/** A delegate method call on the model, as eventing-table-access.ts reads delegates. */
+function delegateAccess(node: ts.Node, delegate: string): boolean | undefined {
+  if (!ts.isPropertyAccessExpression(node) || node.name.text !== delegate) return void 0;
+
+  const method = node.parent;
+  if (!ts.isPropertyAccessExpression(method) || method.expression !== node) return void 0;
+
+  if (!ts.isCallExpression(method.parent) || method.parent.expression !== method) return void 0;
+
+  if (WRITE_METHODS.has(method.name.text)) return true;
+
+  return READ_METHODS.has(method.name.text) ? false : void 0;
+}
+
+function fileAccess({
+  file,
+  table,
+  delegate,
+}: {
+  file: string;
+  table: string;
+  delegate: string;
+}): ShareAccess[] {
+  const text = sourceText({ file });
+  if (!text.includes(delegate) && !text.includes(`"${table}"`)) return [];
+
+  const source = parsedSourceFile({ file });
+  const sql = new RegExp(`\\b${SQL_VERB}\\s+"${table}"`, "gi");
+  const found: ShareAccess[] = [];
+  const add = (node: ts.Node, write: boolean): void => {
+    const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+    found.push({ file, line, write });
+  };
+  const visit = (node: ts.Node): void => {
+    const write = delegateAccess(node, delegate);
+    if (write !== void 0) add(node, write);
+
+    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) {
+      for (const match of node.getText(source).matchAll(sql))
+        add(node, !READING_VERBS.has((match[1] ?? "").toLowerCase()));
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  return found;
+}
+
+function readerAccess({
+  root,
+  feature,
+  table,
+}: {
+  root: string;
+  feature: FeatureCatalogueEntry;
+  table: string;
+}): ShareAccess[] {
+  const delegate = `${table.charAt(0).toLowerCase()}${table.slice(1)}`;
+  const files = listFiles({
+    directory: join(root, feature.root),
+    accept: (file) => /\.[cm]?tsx?$/.test(file) && !TEST_FILE.test(file),
+  });
+
+  return [...files].toSorted().flatMap((file) => fileAccess({ file, table, delegate }));
+}
+
+/** A share naming the wrong owner, a write by a named reader, or a reader that no longer reads. */
+function sharedFindings({
+  root,
+  catalogue,
+  claims,
+  models,
+  shared,
+}: {
+  root: string;
+  catalogue: readonly FeatureCatalogueEntry[];
+  claims: readonly Claim[];
+  models: ReadonlyMap<string, string>;
+  shared: readonly SharedPrismaTable[];
+}): ArchitectureViolation[] {
+  return shared.flatMap((item): ArchitectureViolation[] => {
+    const physical = models.get(item.table);
+    const owner = claims.find(
+      (claim) => models.get(claim.model) === physical && !isReaderClaim(claim, shared),
+    );
+
+    if (!physical || owner?.feature !== item.owner) {
+      return [
+        issue(
+          join(root, SCHEMA_PATH),
+          `Table ${item.table} is declared shared by ${item.owner}, which does not own it. Fix or delete the declaration.`,
+        ),
+      ];
+    }
+
+    return item.readers.flatMap((reader) => {
+      const feature = catalogue.find((entry) => entry.id === reader);
+      const access = feature ? readerAccess({ root, feature, table: item.table }) : [];
+      const writes = access
+        .filter((entry) => entry.write)
+        .map((entry) =>
+          issue(
+            entry.file,
+            `${reader} writes ${item.table}, which ${item.owner} shares with it for reading only.`,
+            entry.line,
+          ),
+        );
+
+      if (access.some((entry) => !entry.write)) return writes;
+
+      return [
+        ...writes,
+        issue(
+          owner.file,
+          `Table ${item.table} is shared with ${reader}, which no longer reads it. Delete the reader.`,
+          owner.line,
+        ),
+      ];
+    });
+  });
 }
