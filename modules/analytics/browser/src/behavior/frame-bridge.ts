@@ -31,7 +31,10 @@ import {
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { nowInstant } from "@langwatch/time";
 
-import { pageWidgetQueryLane, type WidgetQueryLane } from "./widget-query-lane.ts";
+import {
+  pageWidgetQueryLane,
+  type WidgetQueryLane,
+} from "../features/dashboard-widget/behavior/widget-query-lane.ts";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;

@@ -14,9 +14,9 @@ import {
   FirstSuiteEmptyState,
   NoCasesHereEmptyState,
 } from "../../../elements/agent-testing/cases/cases-empty-states.tsx";
+import { MoveToSuiteSelectionBar } from "../suite-rail/move-to-suite-selection-bar.tsx";
 import type { CasesPanelProps } from "./cases-panel.tsx";
 import { CasesTable, CasesTableSkeleton, ExternalCasesTable } from "./cases-table.tsx";
-import { MoveToSuiteSelectionBar } from "./move-to-suite-selection-bar.tsx";
 
 export type CasesPanelBodyProps = CasesPanelProps & {
   /** True for a set that runs from code, which the platform cannot write. */

@@ -1,4 +1,4 @@
-import type { AppFunctionStoreProbe } from "../../rules/langwatch-ql-app-function-store.rules.ts";
+import type { AppFunctionStoreProbe } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import type { AnalyticsRepositories } from "../analytics.repositories.ts";
 import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-function-store.repository.ts";
 import {

@@ -6,6 +6,13 @@
  * @see specs/lwql/api.feature
  */
 
+import { CLICKHOUSE_OVERRIDES } from "../features/lwql-catalogue/rules/lwql-clickhouse-overrides.rules.ts";
+import { CODING_TOOL_RESULTS } from "../features/lwql-catalogue/rules/lwql-coding-overrides.rules.ts";
+import { defineCatalogTable } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
+import {
+  LWQL_POSTGRES_CATALOG,
+  LWQL_POSTGRES_CATALOGUE,
+} from "../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import {
   defineLwqlCatalog,
@@ -16,19 +23,12 @@ import {
   LWQL_CLICKHOUSE_EVENT_TABLES,
   LWQL_TRACES_CATALOGUE,
 } from "./lwql-catalogue.rules.ts";
-import { CLICKHOUSE_OVERRIDES } from "./lwql-clickhouse-overrides.rules.ts";
-import { CODING_TOOL_RESULTS } from "./lwql-coding-overrides.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
-import { defineCatalogTable } from "./lwql-dataset-derivation.rules.ts";
 import {
   catalogueColumnGates,
   type UngatedViewDefinition,
   withCatalogueGates,
 } from "./lwql-gate.rules.ts";
-import {
-  LWQL_POSTGRES_CATALOG,
-  LWQL_POSTGRES_CATALOGUE,
-} from "./lwql-postgres-view-catalog.rules.ts";
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by

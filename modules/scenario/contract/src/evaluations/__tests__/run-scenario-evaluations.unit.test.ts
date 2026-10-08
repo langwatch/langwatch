@@ -3,7 +3,7 @@ import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
-import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators.ts";
+import { runEvaluatorDefinitionOf } from "../../features/run/scenario-run-evaluators.ts";
 import { ScenarioNotFoundError, SimulationRunNotFoundError } from "../../scenario.errors.ts";
 import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {

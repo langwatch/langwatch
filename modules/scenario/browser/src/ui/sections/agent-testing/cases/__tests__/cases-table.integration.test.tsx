@@ -18,9 +18,9 @@ import type {
   TestCase,
   TestSuiteEntry,
 } from "../../../../../model/agent-testing/cases/test-cases.ts";
+import { useSuiteRecentRuns } from "../../suite-rail/use-suite-recent-runs.ts";
 import { CasesPanel } from "../cases-panel.tsx";
 import type { CaseLastResult } from "../cases-table.tsx";
-import { useSuiteRecentRuns } from "../use-suite-recent-runs.ts";
 import { useTestCasesView } from "../use-test-cases-view.ts";
 
 const suiteRunDataQuery = vi.hoisted(() => vi.fn());

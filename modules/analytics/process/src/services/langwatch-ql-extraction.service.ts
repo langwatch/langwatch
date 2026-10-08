@@ -11,12 +11,13 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 
-import type { LangWatchQLAppFunctionDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
-import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../rules/langwatch-ql-hydration-assembly.rules.ts";
+import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 import {
   langWatchQLExtractionCalls,
   langWatchQLExtractionPlan,
-} from "../rules/langwatch-ql-hydration-plan.rules.ts";
+} from "../features/hydration/rules/langwatch-ql-hydration-plan.rules.ts";
+import type { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
+import type { LangWatchQLAppFunctionDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 import {
   computeLangWatchQLConversationFits,
   langWatchQLJudgedColumns,
@@ -24,7 +25,6 @@ import {
   pickLangWatchQLConversationJudgements,
 } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
-import type { LangWatchQLHydrationService } from "./langwatch-ql-hydration.service.ts";
 
 type LangWatchQLExtractionDependencies = {
   readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate"> | undefined;

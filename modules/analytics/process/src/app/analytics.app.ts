@@ -59,6 +59,18 @@ import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
+import { lwqlHydrationKeyCap } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { statementMightCallEvalFunction } from "../features/app-functions/rules/langwatch-ql-eval-function-catalog.rules.ts";
+import { LangWatchQLHydrationComputeService } from "../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
+import {
+  LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceReadInput,
+  type LangWatchQLTraceReadInput,
+  type LangWatchQLTraceSource,
+} from "../features/hydration/services/langwatch-ql-hydration-read.service.ts";
+import { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
+import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -77,10 +89,7 @@ import {
 } from "../rules/analytics-filter-catalogue.rules.ts";
 import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
-import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
-import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
-import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -94,16 +103,7 @@ import {
   LangWatchQLConnectionService,
   LWQL_CONNECTION_DEFAULTS,
 } from "../services/langwatch-ql-connection.service.ts";
-import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
-import {
-  LangWatchQLHydrationReadService,
-  type LangWatchQLThreadTraceReadInput,
-  type LangWatchQLTraceReadInput,
-  type LangWatchQLTraceSource,
-} from "../services/langwatch-ql-hydration-read.service.ts";
-import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
 import { LwqlKeyMapService } from "../services/langwatch-ql-key-map.service.ts";
-import { LangWatchQLProductionProvisioningService } from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,

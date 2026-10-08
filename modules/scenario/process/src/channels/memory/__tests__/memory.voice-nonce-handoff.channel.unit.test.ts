@@ -2,8 +2,8 @@ import { ChildProcess } from "node:child_process";
 
 import { describe, expect, it } from "vitest";
 
+import { VoiceNonceRegistryService } from "../../../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceRepository } from "../../../repositories/memory/memory.voice-nonce.repository.ts";
-import { VoiceNonceRegistryService } from "../../../services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceHandoffChannel } from "../memory.voice-nonce-handoff.channel.ts";
 
 describe("MemoryVoiceNonceHandoffChannel", () => {

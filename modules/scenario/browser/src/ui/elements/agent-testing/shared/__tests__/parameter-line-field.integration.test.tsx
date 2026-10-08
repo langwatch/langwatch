@@ -10,8 +10,8 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DeclaredParameter } from "../../../../../behavior/suites/use-run-suite.ts";
-import { ParameterLineField } from "../../../../sections/agent-testing/run/parameter-line-field.tsx";
-import { parameterPlaceholder } from "../../../../sections/agent-testing/run/parameter-suggestions.ts";
+import { ParameterLineField } from "../../../../sections/agent-testing/run-parameters/parameter-line-field.tsx";
+import { parameterPlaceholder } from "../../../../sections/agent-testing/run-parameters/parameter-suggestions.ts";
 
 const MODEL: DeclaredParameter = {
   name: "model",

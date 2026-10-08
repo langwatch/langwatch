@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { resolveRunParameters } from "../run-parameters.ts";
+import { resolveRunParameters } from "../features/run/run-parameters.ts";
 
 const SECRET_VALUE = "tok-live-abc123";
 

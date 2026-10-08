@@ -1,4 +1,4 @@
-import type { LwqlKeyMapRow } from "../../services/langwatch-ql-production-provisioning.service.ts";
+import type { LwqlKeyMapRow } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import { LwqlKeyMapRepository } from "../langwatch-ql-key-map.repository.ts";
 import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository.ts";
 

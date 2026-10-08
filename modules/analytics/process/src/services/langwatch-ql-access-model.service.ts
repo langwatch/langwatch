@@ -9,8 +9,8 @@ import {
   type LangWatchQLResourceLimits,
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
+import { LangWatchQLAppFunctionStatementsService } from "../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
-import { LangWatchQLAppFunctionStatementsService } from "../services/langwatch-ql-app-function-statements.service.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 
 const sqlText = LangWatchQLSqlTextService.create();

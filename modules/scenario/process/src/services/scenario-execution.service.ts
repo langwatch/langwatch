@@ -11,7 +11,7 @@ import type {
 import { nowInstant } from "@langwatch/time";
 
 import type { CancellationPublisher, ScenarioExecutionPool } from "../app/scenario.app.ts";
-import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
+import type { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 
 export class ScenarioExecutionService extends ScenarioExecutionServiceContract {

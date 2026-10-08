@@ -16,19 +16,19 @@ import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
+  LangWatchQLHydrationComputeService,
+  type LangWatchQLTraceRenderer,
+} from "../../features/hydration/services/langwatch-ql-hydration-compute.service.ts";
+import {
+  LangWatchQLHydrationReadService,
+  type LangWatchQLTraceSource,
+} from "../../features/hydration/services/langwatch-ql-hydration-read.service.ts";
+import { LangWatchQLHydrationService } from "../../features/hydration/services/langwatch-ql-hydration.service.ts";
+import {
   LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
-import {
-  LangWatchQLHydrationComputeService,
-  type LangWatchQLTraceRenderer,
-} from "../langwatch-ql-hydration-compute.service.ts";
-import {
-  LangWatchQLHydrationReadService,
-  type LangWatchQLTraceSource,
-} from "../langwatch-ql-hydration-read.service.ts";
-import { LangWatchQLHydrationService } from "../langwatch-ql-hydration.service.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
 

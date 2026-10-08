@@ -16,10 +16,10 @@ import {
   type RunEvaluatorDefinition,
   type RunEvaluators,
   runEvaluatorDefinitionOf,
-} from "../scenario-run-evaluators.ts";
+} from "../features/run/scenario-run-evaluators.ts";
+import type { RecordEvaluationsCommandData } from "../features/simulation/simulation.commands.ts";
 import type { Scenario } from "../scenario.ts";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
-import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
 import { parseScenarioFieldValues, type ScenarioFieldValues } from "../suite-fields.ts";
 import {
   attachmentsReadTrace,

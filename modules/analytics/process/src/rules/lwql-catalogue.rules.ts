@@ -12,12 +12,12 @@ import {
   type EventTableOmittedColumn,
 } from "@langwatch/eventing/tables";
 
+import type { DatasetOverride } from "../features/lwql-catalogue/rules/lwql-dataset-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
+import type { PrismaManifest } from "../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 import type { LwqlClickHouseRows } from "./lwql-columns-manifest.generated.ts";
 import type { ColumnsManifest } from "./lwql-columns-manifest.rules.ts";
-import type { DatasetOverride } from "./lwql-dataset-derivation.rules.ts";
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 import type { LwqlPrismaRows } from "./lwql-prisma-manifest.generated.ts";
-import type { PrismaManifest } from "./lwql-prisma-schema.rules.ts";
 
 type Permissions = readonly [AuthzPermission, ...AuthzPermission[]];
 

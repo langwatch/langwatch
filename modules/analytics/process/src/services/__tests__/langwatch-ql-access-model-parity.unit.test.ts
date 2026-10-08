@@ -2,12 +2,12 @@
 import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
+import type { PostgresNamedCollection } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
 import {
   LangWatchQLAccessModelDefinitionService,
   type LwqlAccessModelDefinition,
 } from "../langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
-import type { PostgresNamedCollection } from "../langwatch-ql-postgres-mapping.service.ts";
 
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 

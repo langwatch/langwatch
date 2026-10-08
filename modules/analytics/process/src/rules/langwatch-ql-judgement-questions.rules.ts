@@ -18,8 +18,8 @@ import {
   type InstantEvalTranscriptFit,
 } from "@langwatch/instant-eval-contract";
 
-import { findLangWatchQLAppFunctions } from "./langwatch-ql-app-function-catalog.rules.ts";
-import type { LangWatchQLAppFunctionDefinition } from "./langwatch-ql-app-function-shapes.rules.ts";
+import { findLangWatchQLAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "../features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts";
 
 /** Where a boolean call with no threshold of its own draws the line. */
 const LWQL_DEFAULT_JUDGEMENT_THRESHOLD = 0.5;

@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { LentTalkToItPanel } from "../features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx";
 import { scenarioWeb } from "../scenario.web.ts";
-import { LentParameterLineField } from "../ui/sections/agent-testing/run/lent-parameter-line-field.tsx";
+import { LentParameterLineField } from "../ui/sections/agent-testing/run-parameters/lent-parameter-line-field.tsx";
 
 async function loadLent({ key }: { key: string }) {
   const lend = scenarioWeb.installation.lends.find(({ token }) => token.key === key);

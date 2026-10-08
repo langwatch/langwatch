@@ -14,11 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
 import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
-import { COMPARE_HINT } from "../compare-agents-section.tsx";
-import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows.ts";
+import { COMPARE_HINT } from "../../run-compare/compare-agents-section.tsx";
+import { DUPLICATE_TARGETS_MESSAGE } from "../../run-compare/compare-rows.ts";
+import { LOCKED_IN_ROWS_MESSAGE } from "../../run-parameters/run-parameters-section.tsx";
 import { configurationKeyOf } from "../run-configuration.ts";
 import { RunDialog, type RunDialogSubject } from "../run-dialog.tsx";
-import { LOCKED_IN_ROWS_MESSAGE } from "../run-parameters-section.tsx";
 
 const mockSuitesRunPlan = vi.hoisted(() => vi.fn());
 const mockSuitesUpdate = vi.hoisted(() => vi.fn());

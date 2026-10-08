@@ -23,6 +23,7 @@ import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import type { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
 import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
@@ -44,7 +45,6 @@ import {
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
-import type { LangWatchQLHydrationService } from "./langwatch-ql-hydration.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import {
   type LangWatchQLGranularityResolution,

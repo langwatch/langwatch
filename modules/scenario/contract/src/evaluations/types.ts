@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema } from "../evaluator-attachments.ts";
-import { runEvaluatorDefinitionSchema } from "../scenario-run-evaluators.ts";
+import { runEvaluatorDefinitionSchema } from "../features/run/scenario-run-evaluators.ts";
 import { scenarioFieldValuesSchema } from "../suite-fields.ts";
 
 /** What one evaluation job carries: enough to load everything else. */

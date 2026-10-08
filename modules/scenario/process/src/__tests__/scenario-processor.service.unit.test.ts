@@ -18,7 +18,7 @@ import {
   type NodeScenarioChildService,
   buildOtelResourceAttributes,
   parseChildProcessResult,
-} from "../services/node-scenario-child.service.ts";
+} from "../features/child/services/node-scenario-child.service.ts";
 import {
   ScenarioExecutionPoolService,
   type ExecutionJobData,

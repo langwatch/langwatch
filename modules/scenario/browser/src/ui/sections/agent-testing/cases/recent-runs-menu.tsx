@@ -19,9 +19,9 @@ import {
   passRateColor,
 } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import { type RecentRun, useSuiteRecentRuns } from "../suite-rail/use-suite-recent-runs.ts";
 import { MENU_ACTION_ICONS, MenuActionLabel } from "./menu-action-label.tsx";
 import { useOpenPlanRun } from "./use-open-plan-run.ts";
-import { type RecentRun, useSuiteRecentRuns } from "./use-suite-recent-runs.ts";
 
 /** What the button reads. */
 export const OPEN_RECENT_RUN_LABEL = "Open recent run";

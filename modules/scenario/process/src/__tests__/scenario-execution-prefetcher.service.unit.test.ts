@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { VoiceTargetReader } from "../services/scenario-target-prefetch.service.ts";
+import type { VoiceTargetReader } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
 import {
   type AgentFetcher,
   createTestScenarioExecutionPrefetcherService,

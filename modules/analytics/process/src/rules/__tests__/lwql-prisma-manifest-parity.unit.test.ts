@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { parsePrismaSchema } from "../../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../lwql-prisma-manifest.rules.ts";
-import { parsePrismaSchema } from "../lwql-prisma-schema.rules.ts";
 
 const SCHEMA_PATH = fileURLToPath(
   new URL("../../../../../../packages/prisma-client/prisma/schema.prisma", import.meta.url),

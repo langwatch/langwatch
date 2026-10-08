@@ -17,18 +17,18 @@ import { LWQL_MAX_RESULT_ROWS } from "@langwatch/analytics-contract/langwatch-ql
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  * @see ../services/langwatch-ql-access-model.service.ts — the database isolation this backs up
  */
-import { readAppFunctionArguments } from "./langwatch-ql-app-function-arguments.rules.ts";
+import { readAppFunctionArguments } from "../features/app-functions/rules/langwatch-ql-app-function-arguments.rules.ts";
 import {
   findLangWatchQLAppFunctions,
   lwqlAppFunctionSignature,
-} from "./langwatch-ql-app-function-catalog.rules.ts";
-import type { LangWatchQLAppFunctionDefinition } from "./langwatch-ql-app-function-shapes.rules.ts";
-import { isEvalFunctionName } from "./langwatch-ql-eval-function-catalog.rules.ts";
+} from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "../features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts";
+import { isEvalFunctionName } from "../features/app-functions/rules/langwatch-ql-eval-function-catalog.rules.ts";
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
   LWQL_ALLOWED_FUNCTION_NAMES,
-} from "./langwatch-ql-functions.rules.ts";
+} from "../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
 import {

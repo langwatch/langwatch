@@ -5,7 +5,7 @@
 import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildChildEnvironment } from "../services/node-scenario-child.service.ts";
+import { buildChildEnvironment } from "../features/child/services/node-scenario-child.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 function jobData(target: ExecutionJobData["target"]["type"]): ExecutionJobData {

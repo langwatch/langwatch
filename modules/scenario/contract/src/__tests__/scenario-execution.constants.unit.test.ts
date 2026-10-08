@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { SCENARIO_QUEUE } from "../scenario-execution.constants.ts";
+import { SCENARIO_QUEUE } from "../features/execution/scenario-execution.constants.ts";
 
 /**
  * A queue name is Redis Cluster compatible when it contains a hash tag:

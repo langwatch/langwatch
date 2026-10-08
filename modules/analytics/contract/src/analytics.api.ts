@@ -10,17 +10,6 @@ import type {
   AnalyticsEvaluationUpsertInput,
 } from "./analytics.evaluation.ts";
 import type {
-  LangWatchQLCaller,
-  LangWatchQLExecuteInput,
-  LangWatchQLPassInput,
-  LangWatchQLProtections,
-  LangWatchQLQueryResult,
-  LangWatchQLRunCaller,
-  LangWatchQLSchema,
-  LangWatchQLTextHydrationInput,
-  LangWatchQLValidationInput,
-} from "./analytics.lwql.ts";
-import type {
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,
   AnalyticsMetricSource,
@@ -34,6 +23,17 @@ import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
 } from "./dashboard-widget-definition.ts";
+import type {
+  LangWatchQLCaller,
+  LangWatchQLExecuteInput,
+  LangWatchQLPassInput,
+  LangWatchQLProtections,
+  LangWatchQLQueryResult,
+  LangWatchQLRunCaller,
+  LangWatchQLSchema,
+  LangWatchQLTextHydrationInput,
+  LangWatchQLValidationInput,
+} from "./analytics.lwql.ts";
 import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,

@@ -8,7 +8,7 @@ import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LentParameterLineField } from "../lent-parameter-line-field.tsx";
+import { LentParameterLineField } from "../../run-parameters/lent-parameter-line-field.tsx";
 
 const MODEL: ScenarioParameterDefinition = {
   name: "model",

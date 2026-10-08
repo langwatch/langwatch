@@ -17,12 +17,12 @@ import { useWidenWindowForPlan } from "../../../../behavior/agent-testing/result
 import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { AgentTestingTabLayout } from "../../../elements/agent-testing/shared/tab-layout.tsx";
+import { RunPlanDetail } from "../run-plan-results/run-plan-detail.tsx";
+import { RunPlanDetailSkeleton } from "../run-plan-results/run-plan-results-states.tsx";
 import { useOpenRunPlan } from "../run/run-plan-dialog-host.tsx";
 import { useNewRunPlanFlow } from "../use-agent-testing-page-flows.ts";
 import { useScenarioPeriod } from "../use-scenario-period.ts";
 import { ResultsList } from "./results-list.tsx";
-import { RunPlanDetail } from "./run-plan-detail.tsx";
-import { RunPlanDetailSkeleton } from "./run-plan-results-states.tsx";
 
 export type ResultsTabProps = {
   /** While the live stream is up the fallback polling stands down. */

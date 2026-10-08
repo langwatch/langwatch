@@ -1,4 +1,4 @@
-import { ScenarioRunStatus } from "./scenario-run.ts";
+import { ScenarioRunStatus } from "./features/run/scenario-run.ts";
 import type { ScenarioEvaluationResult } from "./schemas/event-schemas.ts";
 
 /** The verdict values a run holds, as ClickHouse stores them. */

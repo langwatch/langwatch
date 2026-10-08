@@ -78,4 +78,4 @@ export {
 export type {
   ResolvedVoicePublicUrl,
   VoicePublicUrl,
-} from "./services/voice-public-url.service.ts";
+} from "./features/voice/services/voice-public-url.service.ts";

@@ -9,7 +9,7 @@ import { ScenarioTargetNotFoundError, type VoiceAgentConfig } from "@langwatch/s
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { ScenarioVoiceTargetService } from "../services/scenario-voice-target.service.ts";
+import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 
 const agentRecord = {
   id: "agent_voice",

@@ -1,11 +1,11 @@
 /** Rendered by default, SQL on request; each mode provisions only what it owns (ADR-159). */
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAccessModelMode,
-} from "../langwatch-ql-self-provisioning.service.ts";
+} from "../../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import type { LangWatchQLNames } from "../langwatch-ql-access-model.service.ts";
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 

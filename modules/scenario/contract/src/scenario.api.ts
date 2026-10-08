@@ -9,6 +9,53 @@ import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contrac
 import type { z } from "zod";
 
 import type {
+  ScenarioExecutionPrefetchInput,
+  ScenarioExecutionPrefetchResult,
+} from "./features/execution/scenario-execution.service.ts";
+import type { RunActor } from "./features/run/run-actor.ts";
+import type { ResolvedRunModels } from "./features/run/run-models.ts";
+import type { RunSecretCiphertext } from "./features/run/run-parameters.ts";
+import type { ScenarioEvent } from "./features/run/scenario-run-data.ts";
+import type { RunEvaluators } from "./features/run/scenario-run-evaluators.ts";
+import type {
+  ScenarioRunExportDownload,
+  ScenarioRunExportDownloadInput,
+} from "./features/run/scenario-run-export.ts";
+import type {
+  SimulationBatchSummaryRest,
+  SimulationRunListInput,
+  SimulationRunListResponse,
+  SimulationRunLookupInput,
+  SimulationRunRestResponse,
+} from "./features/simulation/simulation-run.schemas.ts";
+import type {
+  ComputeRunMetricsCommandData,
+  SimulationQueueRun,
+} from "./features/simulation/simulation.commands.ts";
+import type {
+  SimulationAllSuitesInput,
+  SimulationBatchHistoryInput,
+  SimulationBatchRunInput,
+  SimulationExternalSetCountInput,
+  SimulationLastResultSummariesInput,
+  SimulationLastUpdatedInput,
+  SimulationProjectDateRangeInput,
+  SimulationScenarioRunInput,
+  SimulationUpdateWatchInput,
+  SimulationScenarioSetRunsInput,
+} from "./features/simulation/simulation.service.ts";
+import type {
+  SimulationAllSuitesRunData,
+  SimulationBatchHistory,
+  SimulationBatchRunData,
+  SimulationBatchSummary,
+  SimulationExternalSetSummary,
+  SimulationLastResultSummary,
+  SimulationRunData,
+  SimulationStreamFrame,
+  SimulationSetData,
+} from "./features/simulation/simulation.ts";
+import type {
   CodeScenario,
   ResultAtom,
   ResultsFilter,
@@ -16,23 +63,10 @@ import type {
   ResultsOverview,
   RunTarget,
 } from "./result-atoms.ts";
-import type { RunActor } from "./run-actor.ts";
-import type { ResolvedRunModels } from "./run-models.ts";
-import type { RunSecretCiphertext } from "./run-parameters.ts";
-import type {
-  ScenarioExecutionPrefetchInput,
-  ScenarioExecutionPrefetchResult,
-} from "./scenario-execution.service.ts";
 import type {
   ScenarioGenerateRequest,
   ScenarioGenerateResponse,
 } from "./scenario-generate.schemas.ts";
-import type { ScenarioEvent } from "./scenario-run-data.ts";
-import type { RunEvaluators } from "./scenario-run-evaluators.ts";
-import type {
-  ScenarioRunExportDownload,
-  ScenarioRunExportDownloadInput,
-} from "./scenario-run-export.ts";
 import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { RunConfigurationEntryResponse, ScenarioRunScheduled } from "./scenario.responses.ts";
@@ -62,37 +96,6 @@ import type {
   ScenarioVersionRestoreInput,
   ScenarioVersionSummary,
 } from "./scenario.version.ts";
-import type {
-  SimulationBatchSummaryRest,
-  SimulationRunListInput,
-  SimulationRunListResponse,
-  SimulationRunLookupInput,
-  SimulationRunRestResponse,
-} from "./simulation-run.schemas.ts";
-import type { ComputeRunMetricsCommandData, SimulationQueueRun } from "./simulation.commands.ts";
-import type {
-  SimulationAllSuitesInput,
-  SimulationBatchHistoryInput,
-  SimulationBatchRunInput,
-  SimulationExternalSetCountInput,
-  SimulationLastResultSummariesInput,
-  SimulationLastUpdatedInput,
-  SimulationProjectDateRangeInput,
-  SimulationScenarioRunInput,
-  SimulationUpdateWatchInput,
-  SimulationScenarioSetRunsInput,
-} from "./simulation.service.ts";
-import type {
-  SimulationAllSuitesRunData,
-  SimulationBatchHistory,
-  SimulationBatchRunData,
-  SimulationBatchSummary,
-  SimulationExternalSetSummary,
-  SimulationLastResultSummary,
-  SimulationRunData,
-  SimulationStreamFrame,
-  SimulationSetData,
-} from "./simulation.ts";
 import type { VoiceMediaUpgrade } from "./voice/voice-media-upgrade.ts";
 import type {
   VoiceRecordingStream,

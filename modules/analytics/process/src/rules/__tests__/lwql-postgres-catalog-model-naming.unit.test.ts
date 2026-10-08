@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { toClickHouseType } from "../lwql-postgres-catalog-model.rules.ts";
-import type { PrismaField } from "../lwql-prisma-schema.rules.ts";
+import { toClickHouseType } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
+import type { PrismaField } from "../../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
 
 const scalarField = (over: Partial<PrismaField>): PrismaField => ({
   name: "f",

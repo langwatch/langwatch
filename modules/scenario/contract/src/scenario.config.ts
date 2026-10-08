@@ -15,12 +15,12 @@ import {
 import { nlpFetchMaxTimeoutMs } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
-import { SCENARIO_WORKER } from "./scenario-execution.constants.ts";
+import { SCENARIO_WORKER } from "./features/execution/scenario-execution.constants.ts";
 import {
   isScenarioResourceClass,
   SCENARIO_RESOURCE_CLASSES,
   type ScenarioResourceClass,
-} from "./scenario-resource-class.ts";
+} from "./features/execution/scenario-resource-class.ts";
 
 const trimmedOptional = z
   .string()

@@ -8,6 +8,11 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import {
+  SHIPPED_LWQL_DEDUP,
+  LangWatchQLViewStatementsService,
+} from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
@@ -16,11 +21,6 @@ import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import {
-  SHIPPED_LWQL_DEDUP,
-  LangWatchQLViewStatementsService,
-} from "../../services/langwatch-ql-view-statements.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,

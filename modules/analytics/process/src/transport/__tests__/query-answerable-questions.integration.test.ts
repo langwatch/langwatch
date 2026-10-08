@@ -10,6 +10,8 @@ import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
@@ -23,8 +25,6 @@ import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import { mountQueryDoor, type QueryTenant } from "./query-door.harness.ts";
 

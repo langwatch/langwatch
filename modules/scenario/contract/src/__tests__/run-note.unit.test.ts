@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MAX_RUN_NOTE_LENGTH, runNoteSchema, withNote } from "../run-note.ts";
-import { ScenarioRunStatus } from "../scenario-run.ts";
+import { MAX_RUN_NOTE_LENGTH, runNoteSchema, withNote } from "../features/run/run-note.ts";
+import { ScenarioRunStatus } from "../features/run/scenario-run.ts";
 import { runDataSchema } from "../schemas/response-schemas.ts";
 
 describe("withNote()", () => {

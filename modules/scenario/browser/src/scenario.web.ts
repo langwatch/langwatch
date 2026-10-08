@@ -77,8 +77,9 @@ export const scenarioWeb = defineBrowserModule("scenario")
   /** The call panel and parameter line lent to agent by token (§10.1). */
   .lends(ParameterLineFieldToken, {
     load: async () => ({
-      default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))
-        .LentParameterLineField,
+      default: (
+        await import("./ui/sections/agent-testing/run-parameters/lent-parameter-line-field.tsx")
+      ).LentParameterLineField,
     }),
   })
   .lends(TalkToItPanelToken, {

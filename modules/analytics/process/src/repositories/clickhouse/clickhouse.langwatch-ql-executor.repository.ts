@@ -16,7 +16,7 @@ import {
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { nowInstant } from "@langwatch/time";
 
-import { lwqlAppFunctionNames } from "../../rules/langwatch-ql-app-function-catalog.rules.ts";
+import { lwqlAppFunctionNames } from "../../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,

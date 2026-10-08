@@ -18,9 +18,14 @@ import { ClickHouseContainer, type StartedClickHouseContainer } from "@testconta
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { expect } from "vitest";
 
+import type { DerivedPostgresView } from "../../features/lwql-catalogue/rules/lwql-postgres-catalog-model.rules.ts";
+import { LWQL_POSTGRES_CATALOG } from "../../features/lwql-catalogue/rules/lwql-postgres-view-catalog.rules.ts";
+import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  LangWatchQLPostgresMappingService,
+} from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
 import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../../rules/langwatch-ql-config-store.rules.ts";
-import type { DerivedPostgresView } from "../../rules/lwql-postgres-catalog-model.rules.ts";
-import { LWQL_POSTGRES_CATALOG } from "../../rules/lwql-postgres-view-catalog.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../../rules/lwql-prisma-manifest.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
@@ -35,11 +40,6 @@ import {
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import {
-  DEFAULT_POSTGRES_READER_LIMITS,
-  LangWatchQLPostgresMappingService,
-} from "../../services/langwatch-ql-postgres-mapping.service.ts";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,

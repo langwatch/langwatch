@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { deriveRunActor, withActor } from "../run-actor.ts";
+import { deriveRunActor, withActor } from "../features/run/run-actor.ts";
 
 describe("the actor of a REST run", () => {
   describe("when the key belongs to a person", () => {

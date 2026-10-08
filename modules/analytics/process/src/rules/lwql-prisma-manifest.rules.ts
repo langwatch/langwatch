@@ -1,12 +1,12 @@
 /** The committed Prisma model manifest the Postgres catalog derivation reads. */
 
-import manifestJson from "./lwql-prisma-manifest.generated.json" with { type: "json" };
 import type {
   PrismaEnum,
   PrismaFieldKind,
   PrismaManifest,
   PrismaModel,
-} from "./lwql-prisma-schema.rules.ts";
+} from "../features/lwql-catalogue/rules/lwql-prisma-schema.rules.ts";
+import manifestJson from "./lwql-prisma-manifest.generated.json" with { type: "json" };
 
 const FIELD_KINDS: readonly PrismaFieldKind[] = ["scalar", "enum", "relation", "unsupported"];
 

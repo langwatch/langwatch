@@ -50,12 +50,12 @@ import {
   AgentTestPrefetchService,
   type AdapterRead,
   type ProjectRead,
-} from "./agent-test-prefetch.service.ts";
+} from "../features/prefetch/services/agent-test-prefetch.service.ts";
+import type { ScenarioExecutionPrefetchConfig } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import { ScenarioTargetPrefetchService } from "../features/prefetch/services/scenario-target-prefetch.service.ts";
 import { ConnectedTargetService } from "./connected-target.service.ts";
-import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefetcher.service.ts";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service.ts";
 import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
-import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
 export type AgentTestServiceOptions = {

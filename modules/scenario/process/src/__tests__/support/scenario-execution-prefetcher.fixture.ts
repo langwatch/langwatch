@@ -29,8 +29,8 @@ import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
-} from "../../services/scenario-execution-prefetcher.service.ts";
-import type { VoiceTargetReader } from "../../services/scenario-target-prefetch.service.ts";
+} from "../../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import type { VoiceTargetReader } from "../../features/prefetch/services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
 
 export interface ScenarioFetcher {

@@ -10,9 +10,9 @@ import type {
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
+import { SimulationService as SimulationServiceClass } from "../features/simulation/services/simulation.service.ts";
 import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
-import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { QueueRunCommand } from "./queue-run.commands.ts";

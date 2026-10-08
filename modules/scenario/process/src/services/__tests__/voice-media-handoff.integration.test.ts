@@ -7,9 +7,9 @@ import { createServer, connect, type Server, type Socket } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { VoiceMediaDoorService } from "../../features/voice/services/voice-media-door.service.ts";
+import { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
-import { VoiceMediaDoorService } from "../voice-media-door.service.ts";
-import { VoiceNonceRegistryService } from "../voice-nonce-registry.service.ts";
 
 /** The child answers its parent with what arrived and speaks on the handed-off socket. */
 const CHILD_SCRIPT = `

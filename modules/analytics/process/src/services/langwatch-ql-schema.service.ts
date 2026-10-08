@@ -14,9 +14,9 @@ import {
   LWQL_APP_FUNCTION_CATALOG,
   lwqlAppFunctionCap,
   lwqlAppFunctionSignature,
-} from "../rules/langwatch-ql-app-function-catalog.rules.ts";
-import type { LangWatchQLAppFunctionDefinition } from "../rules/langwatch-ql-app-function-shapes.rules.ts";
-import { LWQL_ALLOWED_FUNCTION_NAMES } from "../rules/langwatch-ql-functions.rules.ts";
+} from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "../features/app-functions/rules/langwatch-ql-app-function-shapes.rules.ts";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 import type { LwqlCatalogue } from "../rules/lwql-catalogue.rules.ts";
 import { publishedLwqlGates } from "../rules/lwql-gate.rules.ts";
 import { LWQL_CATALOG, LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";

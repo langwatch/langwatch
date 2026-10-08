@@ -7,11 +7,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo, type MouseEvent } from "react";
 
+import { EditableWidgetName } from "../../features/dashboard-widget/ui/sections/editable-widget-name.tsx";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "./chart-grid.tsx";
-import { EditableWidgetName } from "./editable-widget-name.tsx";
 import { GraphCardMenu } from "./graph-card-menu.tsx";
 
 type GraphCardTrigger = { id: string; active: boolean; alertType: string | null };

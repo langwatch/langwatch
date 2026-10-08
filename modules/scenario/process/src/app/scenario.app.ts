@@ -153,8 +153,20 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
+import { AgentTestTurnChildService } from "../features/child/services/agent-test-turn-child.service.ts";
+import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
+import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
+import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
+import { SimulationCommandDispatcherService } from "../features/simulation/services/simulation-command-dispatcher.service.ts";
+import { SimulationRunViewService } from "../features/simulation/services/simulation-run-view.service.ts";
+import { SimulationUpdateStreamService } from "../features/simulation/services/simulation-update-stream.service.ts";
+import { SimulationService } from "../features/simulation/services/simulation.service.ts";
+import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
+import { VoiceMediaDoorService } from "../features/voice/services/voice-media-door.service.ts";
+import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
+import { VoicePublicUrlService } from "../features/voice/services/voice-public-url.service.ts";
+import { VoiceSessionService } from "../features/voice/services/voice-session.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
-import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
@@ -163,27 +175,15 @@ import { RunConfigurationsService } from "../services/run-configurations.service
 import { ScenarioCreationCapService } from "../services/scenario-creation-cap.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
-import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
 import { ScenarioRunAttachmentsService } from "../services/scenario-run-attachments.service.ts";
-import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
-import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
 import { ScenarioTabRegistryService } from "../services/scenario-tab-registry.service.ts";
-import { ScenarioVoiceTargetService } from "../services/scenario-voice-target.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
-import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
-import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
-import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
-import { SimulationService } from "../services/simulation.service.ts";
-import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
-import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
-import { VoicePublicUrlService } from "../services/voice-public-url.service.ts";
-import { VoiceSessionService } from "../services/voice-session.service.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
 
