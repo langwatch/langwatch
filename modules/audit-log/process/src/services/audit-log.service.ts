@@ -1,6 +1,9 @@
 import {
+  findAuditLogByTargetKindInputSchema,
   recordAuditLogCommandSchema,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
@@ -124,6 +127,10 @@ export class AuditLogService {
 
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
     return this.repository.hasRecordedSince(input);
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    return this.repository.findByTargetKind(findAuditLogByTargetKindInputSchema.parse(input));
   }
 
   private static truncateString(value: string, maxLength: number): string {

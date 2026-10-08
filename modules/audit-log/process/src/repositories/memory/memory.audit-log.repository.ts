@@ -1,7 +1,10 @@
 import {
   auditLogHistoryEntrySchema,
+  auditLogTargetEntrySchema,
   type AuditLogEntry,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
@@ -75,6 +78,26 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
         args: row.args ?? null,
       }),
     );
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    // Reversed first, so entries written in one millisecond read last-written first.
+    return this.store.rows
+      .filter((row) => row.targetKind === input.targetKind)
+      .toReversed()
+      .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt))
+      .slice(0, input.limit)
+      .map((row) =>
+        auditLogTargetEntrySchema.parse({
+          id: row.id,
+          createdAt: toDate(row.createdAt),
+          action: row.action,
+          targetId: row.targetId ?? null,
+          projectId: row.projectId ?? null,
+          userId: row.userId ?? null,
+          metadata: row.metadata ?? null,
+        }),
+      );
   }
 }
 

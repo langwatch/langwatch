@@ -183,6 +183,7 @@ export function createCanonicalAutomationApp(): {
     record: vi.fn(async () => ({ id: "audit", occurredAt: 0 })),
     listEntityHistory: vi.fn(async () => []),
     hasRecordedSince: vi.fn(async () => false),
+    findByTargetKind: vi.fn(async () => []),
   };
   return {
     app: AutomationModule.fromInfrastructure({

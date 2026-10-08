@@ -1,23 +1,24 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
-import type { SchedulerAuditRepository } from "../repositories/ops-audit.repository.ts";
+const TARGET_KIND = "scheduled_job";
 
-/** Scheduler operator acts: written through the audit log, listed from ops' trail. */
+/** Scheduler operator acts: written to and listed from the audit log, each named by its actor. */
 export class SchedulerAuditService {
   static create({
     auditLog,
-    history,
+    users,
   }: {
-    auditLog: Pick<AuditLogApi, "record">;
-    history: SchedulerAuditRepository;
+    auditLog: Pick<AuditLogApi, "record" | "findByTargetKind">;
+    users: Pick<UserApi, "getProfiles">;
   }): SchedulerAuditService {
-    return new SchedulerAuditService(auditLog, history);
+    return new SchedulerAuditService(auditLog, users);
   }
 
   private constructor(
-    private readonly auditLog: Pick<AuditLogApi, "record">,
-    private readonly history: SchedulerAuditRepository,
+    private readonly auditLog: Pick<AuditLogApi, "record" | "findByTargetKind">,
+    private readonly users: Pick<UserApi, "getProfiles">,
   ) {}
 
   async append(entry: {
@@ -31,13 +32,38 @@ export class SchedulerAuditService {
       userId: entry.actorUserId,
       projectId: entry.projectId,
       action: entry.action,
-      targetKind: "scheduled_job",
+      targetKind: TARGET_KIND,
       targetId: entry.scheduleId,
       metadata: { slot: entry.slot },
     });
   }
 
-  findRecent(params: { limit: number }): Promise<SchedulerAuditEntryView[]> {
-    return this.history.findRecent(params);
+  async findRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
+    const entries = await this.auditLog.findByTargetKind({ targetKind: TARGET_KIND, limit });
+    const actors = await this.actorLabels({
+      userIds: [...new Set(entries.flatMap((entry) => (entry.userId ? [entry.userId] : [])))],
+    });
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      at: entry.createdAt.toISOString(),
+      action: entry.action,
+      scheduleId: entry.targetId ?? "",
+      projectId: entry.projectId,
+      actor: entry.userId ? (actors.get(entry.userId) ?? null) : null,
+    }));
+  }
+
+  /** Name, else address; an account that is gone, or has neither, names no one. */
+  private async actorLabels({ userIds }: { userIds: string[] }): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const profiles = await this.users.getProfiles({ userIds });
+
+    return new Map(
+      profiles.flatMap(({ id, name, email }) => {
+        const label = name ?? email;
+        return label ? [[id, label] as const] : [];
+      }),
+    );
   }
 }

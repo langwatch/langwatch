@@ -10,10 +10,24 @@ Feature: Ops repositories hold only ops' own stores
     And a fleet-scoped act names the fleet rather than a made-up instance
 
   @unit
-  Scenario: The operator trails list what ops' store holds, newest first
-    Given process and scheduler acts held in ops' store
+  Scenario: The operator trails list what the audit log holds, newest first
+    Given process acts recorded through the audit log beside acts of another target kind
     When the trails are listed with a limit
-    Then at most that many acts come back, newest first, and an empty trail answers empty
+    Then at most that many acts of the trail's own kind come back, newest first
+    And an empty trail answers empty without asking user for any names
+
+  @unit
+  Scenario: A scheduler act names its actor by name, else by address
+    Given scheduler acts by an account with a name and by one with only an address
+    When the scheduler trail is listed
+    Then user is asked once for the profiles of the distinct actors
+    And each act names its actor by name, or by address when the account has no name
+
+  @unit
+  Scenario: A scheduler act by an account that is gone names no one
+    Given a scheduler act whose actor's account no longer exists
+    When the scheduler trail is listed
+    Then the act is still listed and names no actor
 
   @unit
   Scenario: A killed tenant's backlog is not counted by the rate tracker

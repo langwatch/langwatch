@@ -60,10 +60,29 @@ export type ListAuditLogEntityHistoryInput = {
   limit: number;
 };
 
+/** One trail's read: the newest entries recorded under a target kind (Alex, 2026-10-07, CD-3). */
+export const findAuditLogByTargetKindInputSchema = z
+  .object({ targetKind: z.string().min(1), limit: z.number().int().positive() })
+  .strict();
+export type FindAuditLogByTargetKindInput = z.infer<typeof findAuditLogByTargetKindInputSchema>;
+
+export const auditLogTargetEntrySchema = z.object({
+  id: z.string(),
+  createdAt: z.date(),
+  action: z.string(),
+  targetId: z.string().nullable(),
+  projectId: z.string().nullable(),
+  userId: z.string().nullable(),
+  metadata: auditLogJsonValueSchema,
+});
+export type AuditLogTargetEntry = z.infer<typeof auditLogTargetEntrySchema>;
+
 /** Portable audit write capability. */
 export interface AuditLogApi {
   record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry>;
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
+  /** Newest first, at most `limit`; a kind nothing was recorded under lists nothing. */
+  findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
   /** Whether this actor already recorded this action on this target since `sinceMs`. */
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
 }

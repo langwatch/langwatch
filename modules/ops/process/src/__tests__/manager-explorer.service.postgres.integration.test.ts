@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AuditLogApi,
   AuditLogHistoryEntry,
+  AuditLogTargetEntry,
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
@@ -24,7 +25,6 @@ import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
-import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import type {
   DeadMessageDiscard,
@@ -63,6 +63,10 @@ class PrismaAuditLogTestSink implements AuditLogApi {
   }
 
   async listEntityHistory(): Promise<AuditLogHistoryEntry[]> {
+    return [];
+  }
+
+  async findByTargetKind(): Promise<AuditLogTargetEntry[]> {
     return [];
   }
 }
@@ -109,7 +113,6 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       fleet,
       audit: ProcessAuditService.create({
         auditLog: PrismaAuditLogTestSink.create(prisma),
-        history: PrismaProcessAuditRepository.create({ prisma }),
       }),
       introspection: new NoopIntrospection(),
     });

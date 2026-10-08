@@ -3,6 +3,8 @@ import { AnnotationApi } from "@langwatch/annotation-contract";
 import {
   AuditLogApi,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type ListAuditLogEntityHistoryInput,
   type RecentItem,
   type RecordAuditLogCommand,
@@ -90,6 +92,10 @@ export class AuditLogModule implements AuditLogApi, AuditLogHomeApi {
 
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
     return this.#entries.listEntityHistory(input);
+  }
+
+  findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    return this.#entries.findByTargetKind(input);
   }
 
   getRecentItems(input: {

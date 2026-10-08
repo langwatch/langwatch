@@ -131,4 +131,52 @@ describe("given the memory-backed audit log repositories", () => {
       expect(touches.map((touch) => touch.action)).toEqual(["dataset.update", "workflow.create"]);
     });
   });
+
+  describe("when reading a trail by target kind", () => {
+    /** @scenario "A trail lists the entries recorded under its target kind, newest first" */
+    it("answers only that kind, newest first, up to the limit, with absent fields as null", async () => {
+      const { entries } = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      const write = (targetId: string, targetKind: string, occurredAt: number) =>
+        entries.createOnce({
+          entry: { action: "ops.scheduler.run_now", targetKind, targetId },
+          idempotencyKey: `key-${targetId}`,
+          occurredAt,
+        });
+      await write("schedule-1", "scheduled_job", 1_000);
+      await write("schedule-3", "scheduled_job", 3_000);
+      await write("queue-1", "queue", 4_000);
+      await write("schedule-2", "scheduled_job", 2_000);
+
+      const trail = await entries.findByTargetKind({ targetKind: "scheduled_job", limit: 2 });
+
+      expect(trail).toEqual([
+        {
+          id: expect.any(String),
+          createdAt: new Date(3_000),
+          action: "ops.scheduler.run_now",
+          targetId: "schedule-3",
+          projectId: null,
+          userId: null,
+          metadata: null,
+        },
+        expect.objectContaining({ targetId: "schedule-2" }),
+      ]);
+    });
+
+    /** @scenario "A target kind nothing was recorded under lists nothing" */
+    it("answers an empty list for a kind nothing was recorded under", async () => {
+      const { entries } = instantiateRepositories(auditLogRepositories, {
+        tier: "memory",
+        members: {},
+      });
+      await entries.create({ action: "queue_drain_group", targetKind: "queue", targetId: "q" });
+
+      await expect(
+        entries.findByTargetKind({ targetKind: "no_such_kind", limit: 10 }),
+      ).resolves.toEqual([]);
+    });
+  });
 });

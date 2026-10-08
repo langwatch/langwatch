@@ -26,7 +26,6 @@ import type {
 } from "../app/ops.app.ts";
 import { PrismaImpersonationRepository } from "../repositories/prisma/prisma.admin.repository.ts";
 import { PrismaAdminBackofficeRepository } from "../repositories/prisma/prisma.instance-admin.repository.ts";
-import { PrismaSchedulerAuditRepository } from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
@@ -86,7 +85,6 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         queues: QueueRedisRepository.create({ redis, payloads: new NoopQueuePayloadDecoder() }),
         blobStore: BlobStoreRedisRepository.create(redis),
         anomalyState: RedisAnomalyStateRepository.create(redis),
-        schedulerAudit: PrismaSchedulerAuditRepository.create({ database }),
       },
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },

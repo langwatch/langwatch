@@ -1,6 +1,8 @@
 import type {
   AuditLogEntry,
   AuditLogHistoryEntry,
+  AuditLogTargetEntry,
+  FindAuditLogByTargetKindInput,
   ListAuditLogEntityHistoryInput,
   RecordedAuditLogEntry,
   RecordedSinceInput,
@@ -16,4 +18,6 @@ export interface AuditLogRepository {
   }): Promise<RecordedAuditLogEntry>;
   findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
+  /** Newest first, at most `limit`. */
+  findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
 }

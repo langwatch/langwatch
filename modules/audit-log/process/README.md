@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable audit write capability.
 
-Peers call these through the token, declared at `../contract/src/audit-log.ts:64`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/audit-log.ts:81`; nothing else in this package is public.
 
 #### `record`
 
@@ -26,6 +26,14 @@ record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry>;
 
 ```typescript
 listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
+```
+
+#### `findByTargetKind`
+
+Newest first, at most `limit`; a kind nothing was recorded under lists nothing.
+
+```typescript
+findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
 ```
 
 #### `hasRecordedSince`

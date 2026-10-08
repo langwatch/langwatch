@@ -2,10 +2,17 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
 import { z } from "zod";
 
-import type {
-  ProcessAuditRepository,
-  ProcessControlAction,
-} from "../repositories/ops-audit.repository.ts";
+export type ProcessControlAction =
+  | "process_wake_now"
+  | "process_redrive_dead_instance"
+  | "process_redrive_dead_message"
+  | "process_discard_dead_message"
+  /** Fleet-scoped acts record a pseudo-ref (`__fleet__`/`__all__`), the same
+   *  shape scheduled singletons use for their `__global__` pseudo-project;
+   *  the count moved lives in metadata. */
+  | "process_redrive_dead_letters"
+  | "process_discard_dead_letters"
+  | "process_release_lapsed_lease";
 
 const TARGET_KIND = "process_instance";
 
@@ -14,21 +21,18 @@ const auditMetadataSchema = z.record(z.string(), z.json());
 /** Target of an act that names no single instance; the scope is in metadata. */
 const FLEET_TARGET_ID = "fleet";
 
-/** Process-manager operator acts: written through the audit log, listed from ops' trail. */
+/** Process-manager operator acts: written to and listed from the audit log. */
 export class ProcessAuditService {
   static create({
     auditLog,
-    history,
   }: {
-    auditLog: Pick<AuditLogApi, "record">;
-    history: ProcessAuditRepository;
+    auditLog: Pick<AuditLogApi, "record" | "findByTargetKind">;
   }): ProcessAuditService {
-    return new ProcessAuditService(auditLog, history);
+    return new ProcessAuditService(auditLog);
   }
 
   private constructor(
-    private readonly auditLog: Pick<AuditLogApi, "record">,
-    private readonly history: ProcessAuditRepository,
+    private readonly auditLog: Pick<AuditLogApi, "record" | "findByTargetKind">,
   ) {}
 
   async append(entry: {
@@ -56,7 +60,16 @@ export class ProcessAuditService {
     });
   }
 
-  findRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
-    return this.history.findRecent(params);
+  async findRecent({ limit }: { limit: number }): Promise<ProcessAuditEntryView[]> {
+    const entries = await this.auditLog.findByTargetKind({ targetKind: TARGET_KIND, limit });
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt.getTime(),
+      action: entry.action,
+      targetId: entry.targetId ?? "",
+      actorUserId: entry.userId,
+      metadata: entry.metadata,
+    }));
   }
 }

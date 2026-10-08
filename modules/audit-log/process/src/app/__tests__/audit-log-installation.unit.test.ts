@@ -116,4 +116,44 @@ describe("given a process that installed the audit log", () => {
       }
     });
   });
+
+  describe("when operator acts are recorded in a memory process", () => {
+    /** @scenario "A memory process's trail lists what its own audit log recorded" */
+    it.each(["api", "worker"] as const)(
+      "lists them by target kind in the %s role",
+      async (role) => {
+        const runtime = await process(role).boot();
+
+        try {
+          const app = runtime.service(AuditLogApi);
+          for (const targetId of ["gateway_debits/project-1/a", "fleet"]) {
+            await app.record({
+              userId: "user-ops",
+              action: "process_wake_now",
+              targetKind: "process_instance",
+              targetId,
+              metadata: { moved: 1 },
+            });
+          }
+          await app.record({
+            userId: "user-ops",
+            action: "queue_drain_group",
+            targetKind: "queue",
+          });
+
+          await expect(
+            app.findByTargetKind({ targetKind: "process_instance", limit: 10 }),
+          ).resolves.toMatchObject([
+            { targetId: "fleet", userId: "user-ops", metadata: { moved: 1 } },
+            { targetId: "gateway_debits/project-1/a" },
+          ]);
+          await expect(
+            app.findByTargetKind({ targetKind: "scheduled_job", limit: 10 }),
+          ).resolves.toEqual([]);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
+  });
 });

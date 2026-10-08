@@ -18,6 +18,7 @@ const command = (args?: unknown) => ({
 
 function serviceWith(maxArgsBytes?: number) {
   const create = vi.fn<AuditLogRepository["create"]>(async () => ({ id: "audit", occurredAt: 0 }));
+  const findByTargetKind = vi.fn<AuditLogRepository["findByTargetKind"]>(async () => []);
   const repository: AuditLogRepository = {
     create,
     createOnce: async ({ idempotencyKey, occurredAt }) => ({ id: idempotencyKey, occurredAt }),
@@ -25,13 +26,14 @@ function serviceWith(maxArgsBytes?: number) {
     findEntityHistory: async () => {
       throw new Error("this suite reads no history back");
     },
+    findByTargetKind,
   };
   const service = AuditLogService.create({
     repository,
     maxArgsBytes: maxArgsBytes ?? 4 * 1024,
   });
 
-  return { create, service };
+  return { create, findByTargetKind, service };
 }
 
 /** The `args` the repository was actually asked to store. */
@@ -101,6 +103,22 @@ describe("AuditLogService.record", () => {
       const stored = await storedArgs({ note: "z".repeat(50_000) });
 
       expect(JSON.stringify(stored).length).toBeLessThanOrEqual(4 * 1024);
+    });
+  });
+});
+
+describe("given a trail read by target kind", () => {
+  describe("when the target kind is empty or the limit is not a positive whole number", () => {
+    /** @scenario "A trail read with an empty target kind or a non-positive limit is refused" */
+    it.each([
+      { targetKind: "", limit: 10 },
+      { targetKind: "scheduled_job", limit: 0 },
+      { targetKind: "scheduled_job", limit: 2.5 },
+    ])("refuses $targetKind/$limit before the repository is asked", async (input) => {
+      const { findByTargetKind, service } = serviceWith();
+
+      await expect(service.findByTargetKind(input)).rejects.toMatchObject({ name: "ZodError" });
+      expect(findByTargetKind).not.toHaveBeenCalled();
     });
   });
 });

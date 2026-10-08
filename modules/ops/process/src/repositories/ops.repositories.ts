@@ -15,7 +15,6 @@ import type { EventExplorerRepository } from "./event-explorer.repository.ts";
 import type { ImpersonationRepository } from "./impersonation.repository.ts";
 import type { AdminBackofficeRepository } from "./instance-admin.repository.ts";
 import type { MigrationMembershipRepository } from "./migration-membership.repository.ts";
-import type { ProcessAuditRepository, SchedulerAuditRepository } from "./ops-audit.repository.ts";
 import type { OpsMetricsRepository } from "./ops-metrics.repository.ts";
 import type { OpsSnapshotRepository } from "./ops-snapshot.repository.ts";
 import type { OrganizationTenantSourceRepository } from "./organization-tenant-source.repository.ts";
@@ -59,9 +58,6 @@ export interface OpsRepositories {
   readonly instanceAdmin: AdminBackofficeRepository;
   readonly impersonation: ImpersonationRepository;
   readonly processFleet: ProcessOpsRepository;
-  /** The operator trails as recorded; the acts are written through the audit log. */
-  readonly processAudit: ProcessAuditRepository;
-  readonly schedulerAudit: SchedulerAuditRepository;
   readonly postgresHealth: PostgresHealthRepository;
   /** The dashboard's published snapshots and the queue counters its writer reads. */
   readonly snapshots: OpsSnapshotRepository;

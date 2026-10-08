@@ -16,7 +16,7 @@ export type {
 } from "./app/ops.app.ts";
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
 export type { OpsOperationsOptions } from "./app/ops.app.ts";
-export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
+export type { ProcessControlAction } from "./services/process-audit.service.ts";
 export type { AdminAccess, AdminAccessServiceOptions } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
 export type { AnomalyHardTierAlert } from "./app/ops.app.ts";

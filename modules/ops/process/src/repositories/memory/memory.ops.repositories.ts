@@ -23,13 +23,11 @@ import { MemoryOpsMetricsRepository } from "./memory.ops-metrics.repository.ts";
 import { MemoryOpsSnapshotRepository } from "./memory.ops-snapshot.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
 import { MemoryOrganizationTenantSourceRepository } from "./memory.organization-tenant-source.repository.ts";
-import { MemoryProcessAuditRepository } from "./memory.process-audit.repository.ts";
 import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
 import { MemoryProcessOpsRepository } from "./memory.process-ops.repository.ts";
 import { MemoryProjectTenantSourceRepository } from "./memory.project-tenant-source.repository.ts";
 import { MemoryReplayRuntimeRepository } from "./memory.replay-runtime.repository.ts";
 import { MemoryReplayRepository } from "./memory.replay.repository.ts";
-import { MemorySchedulerAuditRepository } from "./memory.scheduler-audit.repository.ts";
 import { MemoryStorageFootprintRepository } from "./memory.storage-footprint.repository.ts";
 import { MemoryStorageStatsReadingsRepository } from "./memory.storage-stats-readings.repository.ts";
 import { MemorySystemMigrationEnrollmentRepository } from "./memory.system-migration-enrollment.repository.ts";
@@ -70,8 +68,6 @@ export class MemoryOpsRepositories {
       instanceAdmin: MemoryInstanceAdminRepository.create({ store }),
       impersonation: MemoryImpersonationRepository.create({ store }),
       processFleet: MemoryProcessOpsRepository.create({ store }),
-      processAudit: MemoryProcessAuditRepository.create({ store }),
-      schedulerAudit: MemorySchedulerAuditRepository.create({ store }),
       postgresHealth: MemoryPostgresHealthRepository.create(),
       snapshots: MemoryOpsSnapshotRepository.create({ store }),
       metrics: MemoryOpsMetricsRepository.create({ store }),

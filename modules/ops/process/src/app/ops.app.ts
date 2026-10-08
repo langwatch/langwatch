@@ -2320,10 +2320,7 @@ function buildOpsInfrastructure(input: {
           managerExplorer: ManagerExplorerService.create({
             store: repositories.processStore,
             fleet: repositories.processFleet,
-            audit: ProcessAuditService.create({
-              auditLog: dependencies.auditLog,
-              history: repositories.processAudit,
-            }),
+            audit: ProcessAuditService.create({ auditLog: dependencies.auditLog }),
             introspection,
           }) satisfies OpsProcessExplorer,
           // Every role reads, cancels and starts; only the worker hosting
@@ -2392,7 +2389,7 @@ export interface OpsOperationsOptions {
   /** The stores the operations read and edit, as the registry built them. */
   repositories: Pick<
     OpsRepositories,
-    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState" | "schedulerAudit"
+    "instanceAdmin" | "impersonation" | "queues" | "blobStore" | "anomalyState"
   >;
   audit: AdminAuditSink;
   /** Auth's session claims, which an impersonation starts, reads and stops. */
@@ -2454,7 +2451,7 @@ export class OpsOperations {
         ...this.options.scheduler,
         audit: SchedulerAuditService.create({
           auditLog: this.options.auditLog,
-          history: repositories.schedulerAudit,
+          users: this.options.users,
         }),
       }),
       anomalyState: repositories.anomalyState,

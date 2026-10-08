@@ -1,7 +1,10 @@
 import {
   auditLogHistoryEntrySchema,
+  auditLogTargetEntrySchema,
   type AuditLogEntry,
   type AuditLogHistoryEntry,
+  type AuditLogTargetEntry,
+  type FindAuditLogByTargetKindInput,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
@@ -20,6 +23,18 @@ const historySelect = {
 } as const;
 
 const auditLogHistoryEntriesSchema = auditLogHistoryEntrySchema.array();
+
+const targetSelect = {
+  id: true,
+  createdAt: true,
+  action: true,
+  targetId: true,
+  projectId: true,
+  userId: true,
+  metadata: true,
+} as const;
+
+const auditLogTargetEntriesSchema = auditLogTargetEntrySchema.array();
 
 /** The entry as a row; a JSON `null` is stored as JSON, not as an absent column. */
 function rowData(entry: AuditLogEntry) {
@@ -101,5 +116,16 @@ export class PrismaAuditLogRepository
     });
 
     return auditLogHistoryEntriesSchema.parse(entries);
+  }
+
+  async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
+    const entries = await this.prisma.auditLog.findMany({
+      where: { targetKind: input.targetKind },
+      orderBy: { createdAt: "desc" },
+      take: input.limit,
+      select: targetSelect,
+    });
+
+    return auditLogTargetEntriesSchema.parse(entries);
   }
 }

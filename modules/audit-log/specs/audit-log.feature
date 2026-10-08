@@ -37,6 +37,31 @@ Feature: Audit logging
     And stored author identifiers remain available for caller-owned enrichment
 
   @unit
+  Scenario: A trail lists the entries recorded under its target kind, newest first
+    Given audit entries recorded under one target kind and under another
+    When the caller reads that target kind's trail with a limit
+    Then only entries of that kind come back, newest first, at most the limit
+    And a project, target or actor the entry did not record reads as null
+
+  @unit
+  Scenario: A target kind nothing was recorded under lists nothing
+    Given audit entries recorded under other target kinds
+    When the caller reads the trail of a kind nothing was recorded under
+    Then the trail is empty, not refused
+
+  @unit
+  Scenario: A trail read with an empty target kind or a non-positive limit is refused
+    Given an audit service
+    When the caller reads a trail with an empty target kind, a zero limit or a fractional limit
+    Then the read is refused as invalid input before the repository is asked
+
+  @unit
+  Scenario: A memory process's trail lists what its own audit log recorded
+    Given a process that installed the audit log over memory stores
+    When operator acts are recorded through the audit log
+    Then reading their target kind's trail lists them, newest first
+
+  @unit
   Scenario: A valid audit command is persisted
     Given an audit service with a repository
     When a caller records an action with JSON arguments and request metadata

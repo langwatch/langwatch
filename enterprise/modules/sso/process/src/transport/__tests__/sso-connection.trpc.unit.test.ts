@@ -90,7 +90,12 @@ async function harness() {
         commands,
       }),
       authorization: createSsoTestAuthorization([STAFF_ID]),
-      auditLog: { record, listEntityHistory: async () => [], hasRecordedSince: async () => false },
+      auditLog: {
+        record,
+        listEntityHistory: async () => [],
+        hasRecordedSince: async () => false,
+        findByTargetKind: async () => [],
+      },
     },
   });
 

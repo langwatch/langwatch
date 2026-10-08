@@ -11,6 +11,7 @@ function serviceWithRecordingRepository() {
       createOnce: async ({ idempotencyKey, occurredAt }) => ({ id: idempotencyKey, occurredAt }),
       hasRecordedSince: async () => false,
       findEntityHistory: async () => [],
+      findByTargetKind: async () => [],
     },
     maxArgsBytes: 64 * 1024,
   });
