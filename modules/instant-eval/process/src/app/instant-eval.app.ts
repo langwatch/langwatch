@@ -1,6 +1,5 @@
 import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -26,18 +25,18 @@ import {
   isInstantEvalBounded,
 } from "@langwatch/instant-eval-contract";
 import {
-  InstantEvalJudgeApi,
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalChannels } from "../channels/instant-eval.channels.ts";
 import {
   DeterministicInstantEvalJudgeChannel,
   MemoryInstantEvalJudgeChannel,
@@ -116,7 +115,6 @@ function spendAttributionOf(
 
 type InstantEvalDependencies = Readonly<{
   featureFlags: typeof FeatureFlagApi;
-  projects: typeof ProjectApi;
   /** The query door: every statement is validated, run and extracted by it. */
   analytics: typeof AnalyticsApi;
   /** The plan that decides a run's row cap and whether the budget binds it. */
@@ -125,36 +123,29 @@ type InstantEvalDependencies = Readonly<{
   gateway: typeof GatewayApi;
   /** The query door: a filtered shorthand target resolves its trace ids here. */
   traces: typeof TraceApi;
-  /** Judges a connected install's texts on LangWatch, against its licence. */
-  licensing: typeof LicensingApi;
   /** Owns the organization's own Instant Evals consent (main #8348). */
   organizations: typeof OrganizationApi;
   /** Asks whether a member may throw the organization's switch, as `enable` declares. */
   authz: typeof AuthzApi;
-  /** LangWatch's classifier and its key, and where a run's or query's spend is recorded. */
-  judges: typeof InstantEvalJudgeApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
   InstantEvalDependencies,
-  never,
   InstantEvalServerConfig,
-  InstantEvalRepositories
+  InstantEvalRepositories,
+  InstantEvalChannels
 >;
 
 export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBrowserApi {
   static readonly contract = InstantEvalApi;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
-    projects: ProjectApi,
     analytics: AnalyticsApi,
     plans: EntitlementApi,
     gateway: GatewayApi,
     traces: TraceApi,
-    licensing: LicensingApi,
     organizations: OrganizationApi,
     authz: AuthzApi,
-    judges: InstantEvalJudgeApi,
   };
   static readonly config = instantEvalConfig;
 
@@ -198,7 +189,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const judge = InstantEvalModule.judgeOf(setup);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
-    const { analytics, projects, plans, gateway, traces } = setup.dependencies;
+    const { analytics, plans, gateway, traces } = setup.dependencies;
+    const { projects } = setup.channels;
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
@@ -277,7 +269,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const judgedSpend = InstantEvalJudgedSpendService.create({
       peers: {
         findOrganizationId: ({ projectId }) => projects.findOrganizationId(projectId),
-        judges: setup.dependencies.judges,
+        judges: setup.channels.judges,
       },
     });
     const queries = InstantEvalQueryJudgingService.create({
@@ -296,7 +288,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
           listProjectIds: ({ organizationId }) =>
             projects.listIdsByOrganization({ organizationId }),
           ledger: gateway,
-          judges: setup.dependencies.judges,
+          judges: setup.channels.judges,
         },
       }),
       access,
@@ -371,7 +363,8 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
   }): InstantEvalOptInService {
-    const { projects, plans, organizations, authz, licensing } = setup.dependencies;
+    const { plans, organizations, authz } = setup.dependencies;
+    const { projects, licensing } = setup.channels;
 
     return InstantEvalOptInService.create({
       peers: {
@@ -508,11 +501,11 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const isProduction = setup.config.nodeEnvironment === "production";
     const connect = () =>
       InstantEvalConnectJudgeService.create({
-        licensing: setup.dependencies.licensing,
-        projects: setup.dependencies.projects,
+        licensing: setup.channels.licensing,
+        projects: setup.channels.projects,
       });
     if (isInstantEvalJudgeChosenOnFirstCall({ classifier })) {
-      const { judges } = setup.dependencies;
+      const { judges } = setup.channels;
       return InstantEvalJudgeChoiceService.create({
         choose: async () => {
           const kind = await InstantEvalModule.kindOf(setup);
@@ -531,7 +524,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const { classifier } = setup.config;
     const hasCloudKey =
       isInstantEvalJudgeChosenOnFirstCall({ classifier }) &&
-      (await setup.dependencies.judges.isClassifierConfigured());
+      (await setup.channels.judges.isClassifierConfigured());
     return instantEvalJudgeKind({
       classifier,
       hasCloudKey,
