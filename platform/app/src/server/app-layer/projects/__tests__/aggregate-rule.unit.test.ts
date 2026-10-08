@@ -105,6 +105,10 @@ describe("given the aggregate rule shapes", () => {
         .success,
     ).toBe(false);
     expect(
+      aggregateRuleSchema.safeParse({ kind: "all-personal", projectIds: [] })
+        .success,
+    ).toBe(false);
+    expect(
       aggregateRuleSchema.safeParse({ kind: "all-personal", where: "x" })
         .success,
     ).toBe(false);
@@ -122,6 +126,22 @@ describe("given a rule that names a project in another organisation", () => {
     it("is refused with a named error", async () => {
       await expect(
         service.assertValid({ rule: foreignRule, organizationId: "org_a" }),
+      ).rejects.toBeInstanceOf(AggregateRuleOutsideOrganizationError);
+    });
+
+    /** @scenario "A rule that names a project in another organisation is refused" */
+    it("is refused the same way for a project named on top of every personal workspace", async () => {
+      await expect(
+        service.assertValid({
+          rule: { kind: "all-personal", projectIds: ["p_team", "p_foreign"] },
+          organizationId: "org_a",
+        }),
+      ).rejects.toBeInstanceOf(AggregateRuleOutsideOrganizationError);
+      await expect(
+        service.assertValid({
+          rule: { kind: "all-personal", projectIds: ["p_gov"] },
+          organizationId: "org_a",
+        }),
       ).rejects.toBeInstanceOf(AggregateRuleOutsideOrganizationError);
     });
 
@@ -178,6 +198,37 @@ describe("given a valid rule", () => {
           organizationId: "org_a",
         }),
       ).toEqual(["p_eng", "p_sales"]);
+    });
+
+    it("accepts every personal workspace plus named projects of the organisation", async () => {
+      await expect(
+        service.assertValid({
+          rule: { kind: "all-personal", projectIds: ["p_team"] },
+          organizationId: "org_a",
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("reads every personal project plus the named ones for all-personal with projects", async () => {
+      expect(
+        await service.membersOf({
+          rule: { kind: "all-personal", projectIds: ["p_team", "p_eng"] },
+          organizationId: "org_a",
+        }),
+      ).toEqual(["p_eng", "p_sales", "p_team"]);
+    });
+
+    it("reads the department's personal projects plus the named ones", async () => {
+      expect(
+        await service.membersOf({
+          rule: {
+            kind: "personal-by-department",
+            departmentId: "dep_eng",
+            projectIds: ["p_team"],
+          },
+          organizationId: "org_a",
+        }),
+      ).toEqual(["p_eng", "p_team"]);
     });
 
     it("reads only the department's personal projects for a department rule", async () => {

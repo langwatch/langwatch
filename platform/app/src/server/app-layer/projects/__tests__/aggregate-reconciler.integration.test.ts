@@ -273,6 +273,78 @@ describe("Feature: the reconciler keeps members current", () => {
     });
   });
 
+  describe("when ana creates an aggregate project with the rule all personal projects plus one LLMOps project", () => {
+    /** @scenario "The rule may read every personal workspace plus named projects" */
+    it("attaches every personal project and the named LLMOps project", async () => {
+      const aggregate = await createAggregate({
+        kind: "all-personal",
+        projectIds: [fixture.shared.id],
+      });
+
+      // Earlier scenarios add personal workspaces of their own, so this
+      // names the ones the fixture seeds rather than the whole list.
+      const members = await liveMembersOf(aggregate.id);
+      expect(members).toEqual(
+        expect.arrayContaining([
+          fixture.personal.engineer.id,
+          fixture.personal.seller.id,
+          fixture.shared.id,
+        ]),
+      );
+      expect(members).not.toContain(fixture.governance.id);
+      expect(
+        (
+          await prisma.project.findUniqueOrThrow({
+            where: { id: aggregate.id },
+          })
+        ).aggregateRule,
+      ).toEqual({ kind: "all-personal", projectIds: [fixture.shared.id] });
+    });
+  });
+
+  describe("given an aggregate project with the rule all personal projects plus one LLMOps project", () => {
+    describe("when a new member accepts an invite and their personal project is created", () => {
+      /** @scenario "A new member joins an aggregate that reads every personal workspace plus named projects" */
+      it("adds the new personal project and keeps the named LLMOps project", async () => {
+        const aggregate = await createAggregate({
+          kind: "all-personal",
+          projectIds: [fixture.shared.id],
+        });
+        const email = `combined-newcomer-${fixture.ns}@example.com`;
+        const newcomer = await prisma.user.create({
+          data: { email, name: "Combined newcomer" },
+        });
+        const invite = await prisma.organizationInvite.create({
+          data: {
+            email,
+            inviteCode: nanoid(),
+            expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            organizationId: fixture.organizationId,
+            teamIds: fixture.team.id,
+            role: OrganizationUserRole.MEMBER,
+            status: "PENDING",
+          },
+        });
+
+        await callerFor(newcomer.id, {
+          email,
+          name: "Combined newcomer",
+        }).invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const personal = await prisma.project.findFirstOrThrow({
+          where: {
+            isPersonal: true,
+            ownerUserId: newcomer.id,
+            team: { organizationId: fixture.organizationId },
+          },
+        });
+        const members = await liveMembersOf(aggregate.id);
+        expect(members).toContain(personal.id);
+        expect(members).toContain(fixture.shared.id);
+      });
+    });
+  });
+
   describe("given an aggregate project with the rule personal projects in department Engineering", () => {
     describe("when a member in Engineering is moved to department Sales", () => {
       /** @scenario "A department move updates a by-department aggregate" */

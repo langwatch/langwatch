@@ -17,11 +17,12 @@ export class AggregateRuleService {
 
   /**
    * Refuses a rule that names anything outside the organisation, before any
-   * write. An explicit rule may name any live project of the organisation,
-   * personal or not (ADR-144 decision 2); one id that is foreign, archived,
-   * missing, the governance project or another aggregate refuses the whole
-   * rule rather than being dropped, so the admin sees what they asked for or
-   * an error, never a quietly shorter list.
+   * write. A rule may name any live project of the organisation, personal or
+   * not (ADR-144 decision 2), whether as an explicit list or on top of the
+   * personal workspaces; one id that is foreign, archived, missing, the
+   * governance project or another aggregate refuses the whole rule rather
+   * than being dropped, so the admin sees what they asked for or an error,
+   * never a quietly shorter list.
    */
   async assertValid({
     rule,
@@ -30,33 +31,26 @@ export class AggregateRuleService {
     rule: AggregateRule;
     organizationId: string;
   }): Promise<void> {
-    switch (rule.kind) {
-      case "all-personal":
-        return;
-      case "personal-by-department": {
-        const belongs = await this.repository.departmentBelongsTo({
-          organizationId,
-          departmentId: rule.departmentId,
-        });
-        if (!belongs) throw new AggregateRuleOutsideOrganizationError();
-        return;
-      }
-      case "explicit": {
-        const named = new Set(rule.projectIds);
-        const readable = await this.repository.findReadableProjectIds({
-          organizationId,
-          projectIds: [...named],
-        });
-        if (readable.length !== named.size) {
-          throw new AggregateRuleOutsideOrganizationError();
-        }
-        return;
-      }
+    if (rule.kind === "personal-by-department") {
+      const belongs = await this.repository.departmentBelongsTo({
+        organizationId,
+        departmentId: rule.departmentId,
+      });
+      if (!belongs) throw new AggregateRuleOutsideOrganizationError();
+    }
+    if (!rule.projectIds) return;
+    const named = new Set(rule.projectIds);
+    const readable = await this.repository.findReadableProjectIds({
+      organizationId,
+      projectIds: [...named],
+    });
+    if (readable.length !== named.size) {
+      throw new AggregateRuleOutsideOrganizationError();
     }
   }
 
   /**
-   * The projects an explicit rule of this organisation may name, which is
+   * The projects a rule of this organisation may name, which is
    * exactly what {@link assertValid} accepts: every live project of any
    * ordinary kind, personal workspaces of every member included. The
    * new-project form offers these and nothing else, so a pick it offers is
@@ -72,8 +66,9 @@ export class AggregateRuleService {
 
   /**
    * The member project ids the rule resolves to today, sorted. Department
-   * membership is the owner's current one. The aggregate itself is never its
-   * own member, and an explicit id that has since been archived or moved out
+   * membership is the owner's current one. A personal rule's named projects
+   * are read on top of its personal workspaces. The aggregate itself is never
+   * its own member, and a named id that has since been archived or moved out
    * simply stops being a member.
    */
   async membersOf({
@@ -96,6 +91,26 @@ export class AggregateRuleService {
     rule: AggregateRule;
     organizationId: string;
   }): Promise<string[]> {
+    const [personal, named] = await Promise.all([
+      this.resolvePersonal({ rule, organizationId }),
+      rule.projectIds
+        ? this.repository.findReadableProjectIds({
+            organizationId,
+            projectIds: [...new Set(rule.projectIds)],
+          })
+        : [],
+    ]);
+    return [...new Set([...personal, ...named])];
+  }
+
+  /** The personal workspaces the rule covers by kind, before any named ones. */
+  private resolvePersonal({
+    rule,
+    organizationId,
+  }: {
+    rule: AggregateRule;
+    organizationId: string;
+  }): Promise<string[]> {
     switch (rule.kind) {
       case "all-personal":
         return this.repository.findPersonalProjectIds({ organizationId });
@@ -105,10 +120,7 @@ export class AggregateRuleService {
           departmentId: rule.departmentId,
         });
       case "explicit":
-        return this.repository.findReadableProjectIds({
-          organizationId,
-          projectIds: [...new Set(rule.projectIds)],
-        });
+        return Promise.resolve([]);
     }
   }
 }

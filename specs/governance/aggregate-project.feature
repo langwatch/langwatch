@@ -165,11 +165,39 @@ Feature: An aggregate project reads its member projects
     And the list may include projects that are not personal
 
   @integration
-  Scenario: An admin creates an aggregate from the new project drawer by picking projects
+  Scenario: The rule may read every personal workspace plus named projects
+    When ana creates an aggregate project with the rule "all personal projects" plus one LLMOps project
+    Then every personal project of the organisation is a member
+    And the named LLMOps project is a member too
+
+  @unit
+  Scenario: A rule stored before it could name projects still reads
+    Given an aggregate whose stored rule is "all personal projects" with no named projects
+    When the rule is read back
+    Then it means every personal project of the organisation, as before
+
+  @integration
+  Scenario: Governance covers every personal workspace by default
     When ana opens "Create New Project" and checks "Governance"
-    Then she sees the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
-    When she picks two projects and creates the project
-    Then the new project is an aggregate whose explicit rule names exactly those two projects
+    Then "All personal workspaces" is checked
+    And the projects dropdown offers only LLMOps projects
+    When she creates the project without picking any
+    Then the new project is an aggregate that reads every personal workspace, including people who join later
+
+  @integration
+  Scenario: An admin adds LLMOps projects on top of every personal workspace
+    When ana checks "Governance", leaves "All personal workspaces" checked and picks one LLMOps project
+    Then the dropdown shows the project's name
+    When she creates the project
+    Then the new project reads every personal workspace and that LLMOps project
+
+  @integration
+  Scenario: An admin picks projects one by one when All personal workspaces is off
+    When ana checks "Governance" and unchecks "All personal workspaces"
+    Then the projects dropdown offers two groups, "Personal workspaces" and "LLMOps projects"
+    And each personal workspace shows its owner's email
+    When she picks one personal workspace and one LLMOps project and creates the project
+    Then the new project is an aggregate that reads exactly those two projects
 
   @integration
   Scenario: The admin sees every member's personal workspace under Personal projects
@@ -187,8 +215,9 @@ Feature: An aggregate project reads its member projects
 
   @integration
   Scenario: Create stays disabled until a project is picked
-    When ana checks "Governance" and has picked no project
+    When ana checks "Governance", unchecks "All personal workspaces" and has picked no project
     Then the "Create" button is disabled
+    And she reads that she should pick at least one project
     When she picks one project
     Then the "Create" button is enabled
 
@@ -221,6 +250,7 @@ Feature: An aggregate project reads its member projects
     When a rule names a project that belongs to a different organisation
     Then the rule is refused
     And no grant is written
+    And the same holds for a project named on top of every personal workspace
 
   @integration
   Scenario: A non-admin on the aggregate's team is refused
@@ -277,6 +307,13 @@ Feature: An aggregate project reads its member projects
     Given an aggregate project with the rule "all personal projects"
     When a new member accepts an invite and their personal project is created
     Then the new personal project is a member of the aggregate
+
+  @integration
+  Scenario: A new member joins an aggregate that reads every personal workspace plus named projects
+    Given an aggregate project with the rule "all personal projects" plus one LLMOps project
+    When a new member accepts an invite and their personal project is created
+    Then the new personal project is a member of the aggregate
+    And the named LLMOps project is still a member
 
   @integration
   Scenario: A department move updates a by-department aggregate
