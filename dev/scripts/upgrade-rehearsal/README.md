@@ -70,6 +70,7 @@ second-run check only. Every run routes the second organisation to `clickhouse-p
   killed mid-step (`SIGKILL`; SIGTERM is phase 1's F-2); ClickHouse pauses for 20 s; a second
   upgrade run must change no step (`NO-OP`).
 - **Phase 6, scale.** `seed/scale.sql` writes the tenant set; memory is sampled throughout (`SCALE`).
+- **Product seeds.** Phase 0 seeds through the old tRPC; phase 2 reads back through head (`SEED-*`).
 - **Phase 7.** Phase 0 exports `event_log` to `event-log.jsonl` (`EVENTS`).
 - **Private target.** Goose versions of both ClickHouse targets and their ledger rows (`TARGETS`).
 
@@ -77,9 +78,13 @@ second-run check only. Every run routes the second organisation to `clickhouse-p
 
 Each gap reads `inconclusive`, never passed:
 
-- **Phase 0 product seeds**: privacy and retention policies, annotations, workflows, Slack,
-  reports, licences, SSO, suites and the coding assistant need the old image's own surfaces (a
-  scripted session through its tRPC), not SQL at the old schema.
+- **Phase 0 product seeds, partly**: `seed/product.mjs` signs in to the old image as an account
+  seeded by `migration-compat-smoke/seed-account.sh` and writes a privacy and a retention
+  policy, an annotation, a workflow, a Slack connection, a report and a suite through its tRPC;
+  phase 2 reads each back through head's api (`SEED-<kind>`). A licence is seeded only with
+  `REHEARSAL_LICENSE_KEY`; SSO and the coding assistant have no headless seed. A kind that was
+  not seeded or not read back is `inconclusive`. The workflow DSL and the privacy config are
+  unproven against a real image.
 - **Phase 2's per-row checks** beyond R01, R02, F-1, Q09 (R03 to R10, P01, S06, S08, S09, O01,
   C02) wait for those seeds.
 - **Phase 4**: duplicate detection and ops' redrive of blocked groups have no headless surface.

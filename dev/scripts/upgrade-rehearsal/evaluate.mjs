@@ -7,6 +7,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { PRODUCT_KINDS } from "./seed/product.mjs";
+
 /** The background steps that wait for old writers to be gone (plan B.3, S02 to S06). */
 export const NOWG_STEP_IDS = [
   "user:record-created-facts",
@@ -435,6 +437,31 @@ function events({ eventParse }) {
   };
 }
 
+/** One finding per product kind: seeded on the old image, then read back through head. */
+function products({ productSeeds, productReadback }) {
+  return PRODUCT_KINDS.map(({ kind }) => {
+    const id = `SEED-${kind}`;
+    const title = `A ${kind} seeded through the old image reads back through head`;
+    const seed = productSeeds?.kinds?.find((each) => each.kind === kind);
+    if (!seed) return missing(id, title, ["product-seeds.json"]);
+    if (!seed.seeded) {
+      return {
+        ...missing(id, title, ["product-seeds.json"]),
+        detail: `not seeded: ${seed.reason}`,
+      };
+    }
+    const read = productReadback?.kinds?.find((each) => each.kind === kind);
+    if (!read) return missing(id, title, ["product-readback.json"]);
+    return {
+      id,
+      title,
+      verdict: read.found ? VERDICT.notReproduced : VERDICT.reproduced,
+      detail: read.found ? "read back" : `missing on head${read.error ? `: ${read.error}` : ""}`,
+      evidence: ["product-seeds.json", "product-readback.json"],
+    };
+  });
+}
+
 /** Every finding the rehearsal reports, in plan order. */
 export function evaluate(evidence) {
   return [
@@ -451,6 +478,7 @@ export function evaluate(evidence) {
     noop(evidence),
     scale(evidence),
     events(evidence),
+    ...products(evidence),
   ];
 }
 
@@ -513,6 +541,8 @@ function readEvidence({ dir }) {
     bounds: json("bounds.json"),
     stepsSettled: json("ledger-steps.json"),
     eventParse: json("event-parse.json"),
+    productSeeds: json("product-seeds.json"),
+    productReadback: json("product-readback.json"),
   };
 }
 

@@ -124,6 +124,20 @@ Feature: The upgrade is rehearsed from real images before it ships
     When bounds are given and a step or the worker exceeds them
     Then SCALE is "reproduced"
 
+  @unit
+  Scenario: Product kinds seeded through the old image are read back through head
+    Given phase 0 signed in to the old image and seeded privacy and retention policies, an annotation, a workflow, a Slack connection, a report and a suite
+    When head's answer for a seeded kind holds its marker
+    Then that kind's SEED finding is "not-reproduced"
+    When head's answer lacks the marker or the read fails
+    Then that kind's SEED finding is "reproduced" and names the error
+
+  @unit
+  Scenario: A product kind with no seed or no read-back is inconclusive
+    Given a kind the old image could not seed, such as a licence with no signed key, SSO or the coding assistant
+    Then its SEED finding is "inconclusive" and names why it was not seeded
+    And every SEED finding is "inconclusive" when the seed or the read-back was not collected
+
   @e2e @unimplemented
   Scenario: Rollback, re-upgrade and failure drills from 3.20.1 and from origin/main
     Given phases 0 to 2 have run

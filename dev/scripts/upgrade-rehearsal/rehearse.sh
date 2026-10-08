@@ -199,6 +199,32 @@ build_images() {
   fi
 }
 
+# Phase 0 product seeds through the old image's tRPC as a seeded account (seed/product.mjs).
+# A failure is evidence: each kind it left unseeded reads inconclusive.
+phase0_products() {
+  SEED_EMAIL="seed+${RUN_ID}@rehearsal.test"
+  SEED_PASSWORD="Seed-$(node -e 'process.stdout.write(require("node:crypto").randomBytes(16).toString("hex"))')"
+  mkdir -p "$RUN_DIR/evidence/logs"
+  write_psql_shim
+  log "phase 0: product seeds through the old image's tRPC"
+  PATH="$RUN_DIR/bin:$PATH" DATABASE_URL="postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb" \
+    bash "$REPO_ROOT/dev/scripts/migration-compat-smoke/seed-account.sh" "$SEED_EMAIL" "$SEED_PASSWORD" \
+    >"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 &&
+    APP_BASE="http://localhost:${OLD_APP_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
+      SEED_LABEL="$RUN_ID" OUT="$RUN_DIR/evidence/product-seeds.json" node "$HERE/seed/product.mjs" seed \
+      >>"$RUN_DIR/evidence/logs/product-seed.log" 2>&1 ||
+    log "phase 0: product seeds failed (logs/product-seed.log); their findings read inconclusive"
+}
+
+# Phase 2 reads every seeded kind back through head's api with the same account.
+collect_products() {
+  [[ -s "$RUN_DIR/evidence/product-seeds.json" ]] || return 0
+  APP_BASE="http://localhost:${HEAD_API_PORT}" SEED_EMAIL="$SEED_EMAIL" SEED_PASSWORD="$SEED_PASSWORD" \
+    SEEDS="$RUN_DIR/evidence/product-seeds.json" OUT="$RUN_DIR/evidence/product-readback.json" \
+    node "$HERE/seed/product.mjs" readback >"$RUN_DIR/evidence/logs/product-readback.log" 2>&1 ||
+    log "phase 2: product read-back failed (logs/product-readback.log)"
+}
+
 phase0_seed() {
   log "phase 0: stores up"
   compose up -d --wait postgres redis clickhouse clickhouse-private
@@ -207,6 +233,7 @@ phase0_seed() {
   compose up -d old-app old-worker
   wait_http "http://localhost:${OLD_APP_PORT}/api/health" 600 || { log "old app never became healthy"; return 1; }
   compose exec -T postgres psql -U prisma -d mydb -v run="$RUN_ID" -f - <"$HERE/seed/tenancy.sql" >>"$RUN_DIR/rehearse.log"
+  phase0_products
   local key
   for key in team personal orgb; do post_traces "sk-lw-rh${RUN_ID}${key}" "$SEED_TRACES"; done
   log "phase 0: letting the old worker process the seed"
@@ -346,6 +373,7 @@ phase2_collect() {
   psql_json "SELECT step_id, target, status, version, last_error FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_target\" ORDER BY step_id, target" >"$RUN_DIR/evidence/ledger-targets.json"
   psql_json "SELECT process_id, role, image, release, steps, heartbeat_at FROM \"mydb_upgrade_ledger\".\"_langwatch_serving_roster\"" >"$RUN_DIR/evidence/ledger-roster.json"
   collect_resolution
+  collect_products
   snapshot_queues queues-settled.json
   curl -s "http://localhost:${HEAD_WORKER_METRICS_PORT}/metrics" >"$RUN_DIR/evidence/head-worker.metrics" || rm -f "$RUN_DIR/evidence/head-worker.metrics"
   local svc
