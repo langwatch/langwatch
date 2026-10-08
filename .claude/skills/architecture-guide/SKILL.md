@@ -84,7 +84,7 @@ For `Secret.load`, capabilities and entitlements, the `module-dependencies` skil
 1. Subject: `invite`. The catalogue gives it to `organization`
    (`modules/catalogue.json`), so §2/§3: it is in `modules/organization`.
 2. It is behaviour over owned state: §3.2, a service. See
-   `modules/organization/process/src/services/invite-creation-throttle.service.ts`.
+   `modules/organization/process/src/features/invite/services/invite-creation-throttle.service.ts`.
 3. If another module needs the answer: §3.1, an op on `OrganizationApi` in
    `modules/organization/contract/src/organization.api.ts`. Never import the
    service. Adding that op is a design choice: propose it, do not write it.
