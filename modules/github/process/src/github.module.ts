@@ -8,6 +8,7 @@ import {
   type GithubBranchDemandComposition,
   type GithubBranchDemand,
 } from "./app/github.app.ts";
+import { githubChannels } from "./channels/github-channels.registry.ts";
 import { githubLifecycleEventing } from "./eventing/github-lifecycle.pipeline.ts";
 import {
   buildGithubMaintenancePipeline,
@@ -33,6 +34,7 @@ import { githubTrpcTransport } from "./transport/github.trpc.ts";
 
 export const githubProcessModule = defineProcessModule("github")
   .withRepositories(githubRepositories)
+  .withChannels(githubChannels)
   .withApi(GithubModule)
   .withTransports(githubInstallRest, githubTrpcTransport)
   .withEventing(githubMaintenanceEventing)

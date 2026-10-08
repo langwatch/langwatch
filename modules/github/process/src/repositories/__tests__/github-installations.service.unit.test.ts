@@ -19,6 +19,7 @@ import {
   GithubInstallationNotFoundError,
   GithubRateLimitedError,
 } from "../../channels/github-api.channel.ts";
+import { MemoryGithubApiAdapter } from "../../channels/memory/memory.github-api.channel.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
@@ -93,8 +94,7 @@ function makeAppTokens(
   }> = {},
 ): GithubAppTokenService {
   const tokens = GithubAppTokenService.create({
-    appId: "app-1",
-    privateKey: "test-private-key",
+    api: MemoryGithubApiAdapter.create(),
     tokenCache: unansweredRedisRepositories().tokenCache,
   });
 

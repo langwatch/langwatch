@@ -7,6 +7,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { GithubModule } from "../../app/github.app.ts";
+import { MemoryGithubApiAdapter } from "../../channels/memory/memory.github-api.channel.ts";
 import { MemoryGithubRepositories } from "../../repositories/memory/memory.github.repositories.ts";
 import { TestOrganizationService, createTestProjects } from "./fixtures/github-services.fixture.ts";
 
@@ -15,9 +16,8 @@ const rawBody = JSON.stringify({ zen: "Keep it logically awesome." });
 function harness({ webhookSecret }: { webhookSecret: string }) {
   const github = GithubModule.composeApi({
     repositories: MemoryGithubRepositories.create(),
+    api: MemoryGithubApiAdapter.create(),
     config: {
-      appId: "test-app",
-      privateKey: "unused-private-key",
       appSlug: "test-app",
       webhookSecret,
       signingKey: "test-signing-key",

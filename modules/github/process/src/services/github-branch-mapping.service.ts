@@ -12,7 +12,7 @@ import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
 } from "../repositories/github-pull-requests.repository.ts";
-import type { GithubHost } from "./github-host.service.ts";
+import type { GithubHost } from "../rules/github-host.rules.ts";
 import type { GithubInstallationLookup } from "./github-installation-access.service.ts";
 
 const logger = createLogger("langwatch:github:branch-mapping");

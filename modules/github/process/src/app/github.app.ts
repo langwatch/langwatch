@@ -30,7 +30,9 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 
+import type { GithubChannels } from "../channels/github.channels.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
+import { githubHostOf, type GithubHost } from "../rules/github-host.rules.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
 import type { GithubWebhookDelivery, GithubWebhookReceipt } from "../rules/github-webhook.rules.ts";
@@ -42,7 +44,6 @@ import {
   type GithubBranchMaintenance,
 } from "../services/github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
-import { GithubHostService, type GithubHost } from "../services/github-host.service.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
 import {
@@ -140,7 +141,8 @@ type GithubSetup = FeatureSetup<
   typeof GithubModule.dependencies,
   never,
   GithubServerConfig,
-  GithubRepositories
+  GithubRepositories,
+  GithubChannels
 >;
 
 /** What a graph needs beside its rows to answer for a GitHub App. */
@@ -148,9 +150,8 @@ type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   organization: OrganizationApiContract;
   project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
+  api: GithubAppClient;
   config: {
-    appId: string;
-    privateKey: string;
     appSlug: string;
     webhookSecret: string;
     signingKey: string;
@@ -161,14 +162,14 @@ type GithubComposition = Readonly<{
 /** What the fleet-wide branch sweep needs beside its rows. */
 export type GithubBranchMaintenanceComposition = Readonly<{
   repositories: GithubRepositories;
-  config: { appId: string; privateKey: string };
+  api: GithubAppClient;
   hostConfig?: { host?: string };
 }>;
 
 /** What branch demand needs beside its rows: the project fact the demand call reads. */
 export type GithubBranchDemandComposition = Readonly<{
   repositories: GithubRepositories;
-  config: { appId: string; privateKey: string };
+  api: GithubAppClient;
   hostConfig?: { host?: string };
   project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
 }>;
@@ -250,10 +251,9 @@ export class GithubModule implements GithubApiContract {
    * and the installation flow's own signing and rendering.
    */
   static composeApi(parts: GithubComposition): GithubFeatureService {
-    const host = GithubHostService.create(parts.hostConfig);
+    const host = githubHostOf(parts.hostConfig);
     const appTokens = GithubAppTokenService.create({
-      appId: parts.config.appId,
-      privateKey: parts.config.privateKey,
+      api: parts.api,
       tokenCache: parts.repositories.tokenCache,
       host,
     });
@@ -323,10 +323,9 @@ export class GithubModule implements GithubApiContract {
   static composeBranchMaintenance(
     parts: GithubBranchMaintenanceComposition,
   ): GithubBranchMaintenance {
-    const host = GithubHostService.create(parts.hostConfig);
+    const host = githubHostOf(parts.hostConfig);
     const appTokens = GithubAppTokenService.create({
-      appId: parts.config.appId,
-      privateKey: parts.config.privateKey,
+      api: parts.api,
       tokenCache: parts.repositories.tokenCache,
       host,
     });
@@ -348,10 +347,9 @@ export class GithubModule implements GithubApiContract {
    * sweep must be composable without one, and either may be mounted alone.
    */
   static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
-    const host = GithubHostService.create(parts.hostConfig);
+    const host = githubHostOf(parts.hostConfig);
     const appTokens = GithubAppTokenService.create({
-      appId: parts.config.appId,
-      privateKey: parts.config.privateKey,
+      api: parts.api,
       tokenCache: parts.repositories.tokenCache,
       host,
     });
@@ -370,14 +368,11 @@ export class GithubModule implements GithubApiContract {
 
   static async create({
     repositories,
+    channels,
     secrets,
     config,
     dependencies,
   }: GithubSetup): Promise<GithubModule> {
-    const branchConfig = {
-      appId: config.appId ?? "",
-      privateKey: await secrets.into(GithubModule.secrets.privateKey, (value) => value ?? ""),
-    };
     const signingKey = await secrets.into(GithubModule.secrets.signingKey, (credentials) =>
       secrets.into(
         GithubModule.secrets.signingKeyFallback,
@@ -391,8 +386,8 @@ export class GithubModule implements GithubApiContract {
         repositories,
         organization: dependencies.organizations,
         project: dependencies.projects,
+        api: channels.api,
         config: {
-          ...branchConfig,
           appSlug: config.appSlug ?? "",
           webhookSecret: await secrets.into(
             GithubModule.secrets.webhookSecret,
@@ -407,7 +402,7 @@ export class GithubModule implements GithubApiContract {
       // sweep runs over this same graph's rows.
       branchMaintenance: GithubModule.composeBranchMaintenance({
         repositories,
-        config: branchConfig,
+        api: channels.api,
         ...hostConfig,
       }),
       projects: dependencies.projects,

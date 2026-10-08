@@ -19,7 +19,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GithubModule } from "../app/github.app.ts";
+import { HttpGithubApiAdapter } from "../channels/http/http.github-api.channel.ts";
 import { PostgresGithubRepositories } from "../repositories/prisma/prisma.github.repositories.ts";
+import { githubHostOf } from "../rules/github-host.rules.ts";
 import {
   TestOrganizationService,
   createTestProjects,
@@ -180,12 +182,15 @@ function harness(input: { host?: string } = {}) {
         ...PostgresGithubRepositories.create({ prisma: database() }),
       },
       config: {
-        appId: "test-app",
-        privateKey: testGithubPrivateKey,
         appSlug: "test-app",
         webhookSecret: "test-webhook-secret",
         signingKey: "test-signing-key",
       },
+      api: HttpGithubApiAdapter.create(
+        "test-app",
+        testGithubPrivateKey,
+        githubHostOf({ host: input.host }),
+      ),
       organization: new TestOrganizationService().api,
       project: projects,
       ...(input.host ? { hostConfig: { host: input.host } } : {}),

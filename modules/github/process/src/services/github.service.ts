@@ -17,6 +17,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
+import type { GithubHost } from "../rules/github-host.rules.ts";
 import type {
   installErrorHtml,
   installSuccessHtml,
@@ -28,7 +29,6 @@ import {
   type GithubWebhookReceipt,
 } from "../rules/github-webhook.rules.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
-import type { GithubHost } from "./github-host.service.ts";
 import type { GithubInstallState } from "./github-install-state.service.ts";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
 import {

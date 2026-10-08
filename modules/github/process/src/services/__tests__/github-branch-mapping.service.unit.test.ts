@@ -14,11 +14,11 @@ import type {
   GithubBranchCheckRow,
   UpsertGithubBranchCheckInput,
 } from "../../repositories/github-pull-requests.repository.ts";
+import type { GithubHost } from "../../rules/github-host.rules.ts";
 import {
   GithubBranchMappingService,
   type BranchMappingTarget,
 } from "../github-branch-mapping.service.ts";
-import type { GithubHost } from "../github-host.service.ts";
 import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();
