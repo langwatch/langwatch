@@ -10,6 +10,7 @@ export * from "./evaluator.schemas.ts";
 export * from "./evaluator.trpc.ts";
 export * from "./evaluators.native.ts";
 export * from "./evaluators.ts";
+export * from "./instant-eval-outside-judge.ts";
 export {
   batchEvaluationResultSchema,
   evaluationResultErrorSchema,

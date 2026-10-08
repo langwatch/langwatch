@@ -771,6 +771,47 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When it is saved and copied
       Then both are stored
 
+    @unit
+    Scenario Outline: An evaluator that is not an LLM judge is refused Instant Evals by name
+      When <save> names Instant Evals as the model of an evaluator that is not an LLM judge
+      Then it is refused as a client error that names the evaluator
+      And nothing is stored
+
+      Examples:
+        | save                                     |
+        | a new evaluator                          |
+        | an evaluator created through the API     |
+        | an evaluator update                      |
+        | an evaluator copy to another project     |
+        | a push of an evaluator to its copies     |
+        | an evaluator copy synced from its source |
+
+    @unit
+    Scenario: An LLM judge evaluator on Instant Evals still saves, copies, pushes and syncs
+      Given an LLM judge evaluator on Instant Evals
+      When it is created, updated, copied, pushed to its copies and a copy synced from it
+      Then each is stored
+
+    @unit
+    Scenario: An evaluator stored on Instant Evals outside a judge still renames
+      Given an evaluator that is not an LLM judge stored with Instant Evals before this rule
+      When it is renamed without changing its settings
+      Then the new name is stored
+      And its stored model is left as it was
+
+    @unit
+    Scenario Outline: A workflow or a workbench naming Instant Evals on an evaluator that is not a judge is refused where it sits
+      When <save> holds Instant Evals as the model of <place> whose evaluator is not an LLM judge
+      Then it is refused as a client error that names it
+      And nothing is stored
+
+      Examples:
+        | save             | place                                  |
+        | a workflow save  | an evaluator node's model setting      |
+        | a workflow save  | an evaluator node's unsaved settings   |
+        | a workbench save | an evaluator column's settings         |
+        | a workbench save | an evaluator column's unsaved settings |
+
     @integration
     Scenario Outline: An autosave refused for Instant Evals outside a judge names where it sits
       When <surface> autosave is refused because Instant Evals sits outside a judge

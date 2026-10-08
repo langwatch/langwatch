@@ -1,17 +1,17 @@
 /**
- * Instant Evals answers evaluator judges only (ADR-174 decision 11). A graph node that calls a
- * model runs on the gateway, never the judge, so a graph naming Instant Evals on one is refused.
- * Evaluator nodes keep it: the judge answers them.
+ * Instant Evals answers LLM judges only (ADR-174 decision 11). A graph node that calls a model,
+ * or an evaluator node that is not a judge, runs on the gateway, so a graph naming Instant Evals
+ * on one is refused. A node naming a saved evaluator is left to that evaluator's own save.
  */
 
+import { isInstantEvalOutsideJudge } from "@langwatch/evaluator-contract";
 import {
   InstantEvalJudgeOnlyModelError,
+  instantEvalJudgeOnlyPlace,
   isInstantEvalJudgeModel,
 } from "@langwatch/instant-eval-judge-contract";
 
 type Loose = Record<string, unknown>;
-
-const MAX_NAME_LENGTH = 48;
 
 const isLoose = (value: unknown): value is Loose =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -27,22 +27,43 @@ const modelsOf = (data: Loose): unknown[] => [
   isLoose(data.localPromptConfig) ? modelOf(data.localPromptConfig.llm) : undefined,
 ];
 
-const placeOf = (node: Loose, data: Loose): string => {
-  const name = typeof data.name === "string" && data.name ? data.name : String(node.id);
-  const shown = name.length > MAX_NAME_LENGTH ? `${name.slice(0, MAX_NAME_LENGTH - 1)}…` : name;
-  return `node "${shown}"`;
+/** The model slots of an evaluator node: its model setting, as saved or still unsaved. */
+const evaluatorModelsOf = (data: Loose): unknown[] => [
+  ...(Array.isArray(data.parameters) ? data.parameters : [])
+    .filter((parameter) => isLoose(parameter) && parameter.identifier === "model")
+    .map((parameter) => (parameter as Loose).value),
+  isLoose(data.localConfig) && isLoose(data.localConfig.settings)
+    ? data.localConfig.settings.model
+    : undefined,
+];
+
+/** Whether an evaluator node with an inline type that is not a judge names Instant Evals. */
+const isEvaluatorOutsideJudge = (data: Loose): boolean => {
+  const evaluatorType = data.evaluator;
+  if (typeof evaluatorType !== "string" || evaluatorType.startsWith("evaluators/")) return false;
+  return evaluatorModelsOf(data).some((model) =>
+    isInstantEvalOutsideJudge({ evaluatorType, model }),
+  );
 };
 
-/** The nodes of a graph, of any shape, that call a model on Instant Evals, named for the reader. */
+const placeOf = (node: Loose, data: Loose): string => {
+  const name = typeof data.name === "string" && data.name ? data.name : String(node.id);
+  return instantEvalJudgeOnlyPlace({ kind: "node", name });
+};
+
+/** The nodes of a graph, of any shape, on Instant Evals outside a judge, named for the reader. */
 export function instantEvalJudgeModelNodesOf({ dsl }: { dsl: unknown }): string[] {
   const nodes = isLoose(dsl) && Array.isArray(dsl.nodes) ? dsl.nodes : [];
   return nodes.flatMap((node) => {
-    if (!isLoose(node) || node.type === "evaluator" || !isLoose(node.data)) return [];
+    if (!isLoose(node) || !isLoose(node.data)) return [];
     const data = node.data;
-    const onJudge = modelsOf(data).some(
-      (model) => typeof model === "string" && isInstantEvalJudgeModel(model),
-    );
-    return onJudge ? [placeOf(node, data)] : [];
+    const outsideJudge =
+      node.type === "evaluator"
+        ? isEvaluatorOutsideJudge(data)
+        : modelsOf(data).some(
+            (model) => typeof model === "string" && isInstantEvalJudgeModel(model),
+          );
+    return outsideJudge ? [placeOf(node, data)] : [];
   });
 }
 

@@ -33,6 +33,15 @@ export function assertNotInstantEvalJudgeModel({
   }
 }
 
+const MAX_PLACE_NAME_LENGTH = 48;
+
+/** A place the refusal names, as `<kind> "<name>"`, shortened so the list stays readable. */
+export function instantEvalJudgeOnlyPlace({ kind, name }: { kind: string; name: string }): string {
+  const shown =
+    name.length > MAX_PLACE_NAME_LENGTH ? `${name.slice(0, MAX_PLACE_NAME_LENGTH - 1)}…` : name;
+  return `${kind} "${shown}"`;
+}
+
 /** Whether a failed save was this refusal, so a screen can let its copy name the place. */
 export function isInstantEvalJudgeOnlyRefusal(error: unknown): boolean {
   return readHandledError(error)?.code === "instant_eval_judge_only_model";

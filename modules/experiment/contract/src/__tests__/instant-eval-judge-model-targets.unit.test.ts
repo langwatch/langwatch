@@ -1,6 +1,6 @@
 /**
- * Instant Evals answers evaluator judges only, so a workbench naming it on a target that calls a
- * model is refused, naming the target. Evaluator columns and evaluator targets keep it.
+ * Instant Evals answers LLM judges only, so a workbench naming it on a target that calls a model,
+ * or on an evaluator column that is not a judge, is refused, naming it. Judge columns keep it.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -47,6 +47,23 @@ const state = (targets: unknown[]) => ({
   targets,
 });
 
+const ragasColumn = ({
+  id,
+  localEvaluatorConfig,
+  settings,
+}: {
+  id: string;
+  localEvaluatorConfig?: { name: string; settings?: Record<string, unknown> };
+  settings?: Record<string, unknown>;
+}) => ({
+  id,
+  evaluatorType: "ragas/faithfulness",
+  dbEvaluatorId: "evaluator_3",
+  ...(localEvaluatorConfig ? { localEvaluatorConfig } : {}),
+  ...(settings ? { settings } : {}),
+  mappings: {},
+});
+
 describe("instantEvalJudgeModelTargetsOf()", () => {
   describe("when a prompt target's unsaved prompt draft names Instant Evals", () => {
     /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
@@ -59,6 +76,31 @@ describe("instantEvalJudgeModelTargetsOf()", () => {
       });
 
       expect(named).toEqual(["target 2"]);
+    });
+  });
+
+  describe("when an evaluator column that is not an LLM judge names Instant Evals", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals on an evaluator that is not a judge is refused where it sits" */
+    it("names the column by its unsaved name, or else its position, before any target", () => {
+      const named = instantEvalJudgeModelTargetsOf({
+        state: {
+          ...state([promptTarget({ id: "broken", model: INSTANT_EVAL_JUDGE_MODEL_ID })]),
+          evaluators: [
+            judgeColumn,
+            ragasColumn({
+              id: "unsaved",
+              localEvaluatorConfig: {
+                name: "Grounded",
+                settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
+              },
+            }),
+            ragasColumn({ id: "legacy", settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID } }),
+            ragasColumn({ id: "fine", settings: { model: "openai/gpt-5-mini" } }),
+          ],
+        },
+      });
+
+      expect(named).toEqual(['evaluator "Grounded"', "evaluator 3", "target 1"]);
     });
   });
 
