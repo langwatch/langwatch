@@ -60,7 +60,6 @@
     "mustache": "^4.2.0",
     "numeral": "catalog:",
     "papaparse": "catalog:",
-    "posthog-js": "catalog:",
     "react": "catalog:",
     "react-feather": "catalog:",
     "react-hook-form": "catalog:",
