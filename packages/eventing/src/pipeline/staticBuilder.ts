@@ -65,6 +65,7 @@ import {
   EventUpcaster,
   type UpcastDeclaration,
 } from "../upcast/eventUpcast.ts";
+import { assertLaneAliasesDeclarable, type LaneAlias } from "../upcast/laneAlias.ts";
 import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
   ProcessManagerDefinition,
@@ -126,6 +127,7 @@ export class PipelineBuilder<
   private prepareEventForProjection?: (event: EventType) => EventType;
   private retentionPolicyResolver?: RetentionPolicyResolver;
   private upcastDeclaration?: UpcastDeclaration;
+  private laneAliases: readonly LaneAlias[] = [];
   private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
@@ -168,6 +170,16 @@ export class PipelineBuilder<
       events: declaration.events,
     });
     this.upcastDeclaration = declaration;
+    return this;
+  }
+
+  /**
+   * Former lane keys the previous release queued jobs under, each consumed by one of this
+   * pipeline's lanes for one release (round 49 E4). Spec: specs/lane-alias.feature.
+   */
+  withLaneAliases(aliases: readonly LaneAlias[]): this {
+    assertLaneAliasesDeclarable({ pipeline: this.name, aliases });
+    this.laneAliases = aliases;
     return this;
   }
 
@@ -688,6 +700,7 @@ export class PipelineBuilder<
         ? (value: unknown) => parseEvent(upcaster.applyToPayload(value))
         : parseEvent,
       ...(upcasts === undefined ? {} : { upcasts }),
+      ...(this.laneAliases.length === 0 ? {} : { laneAliases: this.laneAliases }),
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       ...(this.retentionPolicyResolver === undefined

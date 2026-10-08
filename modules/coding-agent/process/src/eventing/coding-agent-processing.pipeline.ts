@@ -6,6 +6,8 @@ import {
   spanFactsContributedEventSchema,
   logFactsContributedEventSchema,
   metricFactsContributedEventSchema,
+  parseSpanFactsLiftedPayload,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
 } from "@langwatch/coding-agent-contract";
 import {
   defineAggregate,
@@ -16,6 +18,7 @@ import {
   type RegisteredCommand,
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
+  type LaneAlias,
 } from "@langwatch/eventing";
 import {
   GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
@@ -230,6 +233,7 @@ export class EventingCodingAgentProcessingAdapter {
         },
         handle: (point) => deps.receivedFacts.contributeReceivedMetricPoint(point),
       })
+      .withLaneAliases(MAIN_FACTS_DISPATCH_ALIASES)
       // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
       // order-dependent model-call derivations. The log lane fills the session-context
       // memo from a declaration; the span lane only reads it.
@@ -296,3 +300,36 @@ export const codingAgentEventing = defineEventingModule({
     app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });
+
+/**
+ * Main's dispatch lanes on trace, log and metric, consumed here until 3.21.0 is cut (round 49 E4).
+ * Main staged a coding-agent span as its lifted facts, which are this command's data, or whole.
+ */
+const MAIN_FACTS_DISPATCH_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:subscriber:codingAgentSpanFactsDispatch",
+    to: { jobType: "command", lane: "contributeSpanFacts" },
+    eventTypes: [SPAN_FACTS_LIFTED_PAYLOAD_TYPE],
+    data: (stored) => {
+      const lifted = parseSpanFactsLiftedPayload(stored);
+      return lifted ? { ...lifted.data, tenantId: lifted.tenantId } : stored;
+    },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "trace_processing:subscriber:codingAgentSpanFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentSpanFactsDispatch" },
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "log_processing:subscriber:codingAgentLogFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentLogFactsDispatch" },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "metric_processing:subscriber:codingAgentMetricFactsDispatch",
+    to: { jobType: "subscriber", lane: "codingAgentMetricFactsDispatch" },
+    removeAfter: "3.21.0",
+  },
+];
