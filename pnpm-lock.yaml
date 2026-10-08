@@ -16555,15 +16555,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../modules/annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
-      '@langwatch/automation-contract':
-        specifier: workspace:*
-        version: link:../../modules/automation/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
@@ -16576,9 +16570,6 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluator/contract
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../modules/experiment/contract
@@ -16594,9 +16585,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../modules/prompt/contract
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../react-rum
