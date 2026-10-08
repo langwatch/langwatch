@@ -42,6 +42,22 @@ const RAG_DOCUMENT_COUNT = 2_000;
 /** The scaled-down `max_bytes_in_join` for a query that spills its join. */
 const SCALED_JOIN_BYTES = "30000000";
 
+/**
+ * Cap and spill threshold for the model-grouped chart. Its span-model join
+ * stacks three aggregations over the span scan (per span, per trace and model,
+ * per trace), and merging a spilled aggregation costs memory per spilled
+ * part, a cost that does not shrink with the data. At the 30 MB threshold the
+ * other panels use, this seed spills about 500 parts and on ClickHouse 25.10
+ * (the version CI and the self-hosted image run) the merge peaks near 320 MiB.
+ * At 100 MB (production spills at 500 MB) it spills about 120 and peaks near
+ * 145 MiB, against about 520 MiB with no spilling at all, so the cap below
+ * still fails a query that stops spilling.
+ */
+const MODEL_GROUPED_SETTINGS = {
+  max_memory_usage: "200000000",
+  max_bytes_before_external_group_by: "100000000",
+} as const;
+
 const CAPPED_SETTINGS = {
   max_threads: 2,
   max_memory_usage: "150000000",
@@ -112,6 +128,7 @@ async function runCapped<T>(
     params: Record<string, unknown>;
     settings?: Record<string, string | number>;
   },
+  overrides: Record<string, string> = {},
 ): Promise<T[]> {
   const result = await ch.query({
     query: query.sql,
@@ -126,6 +143,7 @@ async function runCapped<T>(
       ...(query.settings?.max_bytes_in_join
         ? { max_bytes_in_join: SCALED_JOIN_BYTES }
         : {}),
+      ...overrides,
     },
   });
   return result.json<T>();
@@ -402,7 +420,11 @@ describe("dashboard panels under a memory cap", () => {
       );
       expect(query.table).toBe("trace_summaries");
 
-      const rows = await runCapped<Record<string, unknown>>(ch, query);
+      const rows = await runCapped<Record<string, unknown>>(
+        ch,
+        query,
+        MODEL_GROUPED_SETTINGS,
+      );
       const perModel = new Map<string, number>();
       for (const row of rows.filter((r) => r.period === "current")) {
         const model = String(row.group_key);
