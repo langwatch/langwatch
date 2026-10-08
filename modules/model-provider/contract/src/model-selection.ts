@@ -1,9 +1,10 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
 import { allLitellmModels } from "./catalog/model-catalog.ts";
-import type { ModelOption } from "./model-options.ts";
+import { allModelOptions, type ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
+import type { ModelProviderSummary } from "./model-provider.ts";
 
 export type ModelOptionGroup = {
   provider: string;
@@ -266,4 +267,29 @@ function mergeGroups(groups: GroupedModelOptions): GroupedModelOptions {
     else byProvider.set(group.provider, { ...group, models: [...group.models] });
   }
   return [...byProvider.values()];
+}
+
+/**
+ * Whether the providers offer any chat model a picker with no feature restriction would
+ * list, read off server summaries the way the browser reads its provider rows.
+ */
+export function hasPickableChatModel(
+  providers: readonly Pick<ModelProviderSummary, "provider" | "enabled" | "customModels">[],
+): boolean {
+  const rows = providers.map((provider) => ({
+    provider: provider.provider,
+    enabled: provider.enabled,
+    customModels: provider.customModels.map((model) => ({
+      modelId: model.id,
+      displayName: model.label,
+      mode: "chat" as const,
+    })),
+  }));
+  const { selectOptions } = modelSelectionFrom({
+    providers: rows,
+    options: allModelOptions,
+    mode: "chat",
+    featureKey: undefined,
+  });
+  return selectOptions.length > 0;
 }

@@ -5,7 +5,12 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type {
+  ModelProviderApi,
+  ModelProviderResolution,
+  ModelProviderSummary,
+} from "@langwatch/model-provider-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -43,6 +48,34 @@ export function testModelResolution(featureKey: string, model: string): ModelPro
   };
 }
 
+/** Saved project providers, complete, that differ only in key and switch. */
+export function testProviderSummaries(
+  providers: readonly Pick<ModelProviderSummary, "provider" | "enabled">[],
+): ModelProviderSummary[] {
+  return providers.map(({ provider, enabled }, index) => ({
+    id: `provider-${index}`,
+    organizationId: "organization-1",
+    provider,
+    name: provider,
+    enabled,
+    routingHandle: null,
+    scopes: [],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    isSystem: false,
+    embeddingsUnsupported: false,
+  }));
+}
+
 /** Permits every project unless the case says which ones it permits. */
 export function testEvaluatorPermissions(permits: (projectId: string) => boolean): AuthzApi {
   return createApiFixture<AuthzApi>({
@@ -70,6 +103,7 @@ export function createEvaluatorTestApp(
   input: Readonly<{
     repository?: MemoryEvaluatorRepository;
     modelProviders?: Partial<ModelProviderApi>;
+    instantEvals?: Partial<InstantEvalApi>;
     permissions?: AuthzApi;
     graph?: EvaluatorGraph;
     /** The organization's plan; uncapped unless the case says otherwise. */
@@ -80,6 +114,7 @@ export function createEvaluatorTestApp(
   app: EvaluatorModule;
   repository: MemoryEvaluatorRepository;
   modelProviders: ModelProviderApi;
+  instantEvals: InstantEvalApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
 }> {
@@ -95,7 +130,12 @@ export function createEvaluatorTestApp(
           : "openai/text-embedding-3-large",
       ),
     ),
+    listForProject: vi.fn(async () => []),
     ...input.modelProviders,
+  });
+  const instantEvals = createApiFixture<InstantEvalApi>({
+    isReleased: vi.fn(async () => false),
+    ...input.instantEvals,
   });
 
   const app = EvaluatorModule.createWithGraph(
@@ -117,6 +157,7 @@ export function createEvaluatorTestApp(
         plans: createApiFixture<EntitlementApi>({
           getActivePlan: async () => testPlan(input.plan),
         }),
+        instantEvals,
       },
       config: { publicBaseUrl: "https://langwatch.test" },
       resources: new ResourceScope(),
@@ -125,5 +166,5 @@ export function createEvaluatorTestApp(
     graph,
   );
 
-  return { app, repository, modelProviders, permissions, graph };
+  return { app, repository, modelProviders, instantEvals, permissions, graph };
 }

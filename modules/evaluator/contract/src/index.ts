@@ -1,5 +1,6 @@
 export * from "./code-evaluator.ts";
 export * from "./evaluator.ts";
+export * from "./evaluator-fallback-model.ts";
 export * from "./evaluator-execution.ts";
 export * from "./evaluator.api.ts";
 export * from "./evaluator.errors.ts";

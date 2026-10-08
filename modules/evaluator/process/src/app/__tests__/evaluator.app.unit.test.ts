@@ -2,10 +2,15 @@
  * @vitest-environment node
  */
 import { newEvaluatorId } from "@langwatch/evaluator-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createEvaluatorTestApp, testModelResolution } from "./evaluator.fixture.ts";
+import {
+  createEvaluatorTestApp,
+  testModelResolution,
+  testProviderSummaries,
+} from "./evaluator.fixture.ts";
 
 /** A program a code evaluator can actually run. */
 const runnableCode = {
@@ -21,10 +26,12 @@ const runnableCode = {
  */
 function harness({
   modelProviders = {},
+  instantEvals = {},
 }: {
   modelProviders?: Partial<ModelProviderApi>;
+  instantEvals?: Partial<InstantEvalApi>;
 } = {}) {
-  return createEvaluatorTestApp({ modelProviders });
+  return createEvaluatorTestApp({ modelProviders, instantEvals });
 }
 
 /** The single argument a spied method was called with. */
@@ -335,6 +342,156 @@ describe("EvaluatorModule", () => {
           config: { evaluatorType: "ragas/faithfulness" },
         }),
       ).rejects.toThrow("the model provider registry is unreachable");
+    });
+  });
+
+  describe("when the project resolves no default model", () => {
+    /** The resolver's refusal for a project with no default model, for every feature. */
+    const noDefaultModel = vi.fn(async ({ featureKey }: { featureKey: string }) => {
+      throw new ModelNotConfiguredError({
+        featureKey,
+        role: featureKey === "evaluator.create_default" ? "DEFAULT" : "EMBEDDINGS",
+        featureDisplayName: "Evaluator default",
+        projectId: "project-1",
+      });
+    });
+
+    /** @scenario "A judge created through the API with no model provider starts on Instant Evals when released" */
+    it("creates an LLM judge on Instant Evals when released and no provider is enabled", async () => {
+      const { app, repository } = harness({
+        modelProviders: {
+          resolveModelForFeature: noDefaultModel,
+          listForProject: vi.fn(async () =>
+            testProviderSummaries([{ provider: "openai", enabled: false }]),
+          ),
+        },
+        instantEvals: { isReleased: vi.fn(async () => true) },
+      });
+      const create = vi.spyOn(repository, "create");
+
+      const evaluator = await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Is it polite?",
+        config: { evaluatorType: "langevals/llm_boolean" },
+      });
+
+      expect(evaluator.config).toMatchObject({ settings: { model: "langwatch/instant-evals" } });
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "An evaluator created through the API with no default model is refused otherwise" */
+    it.each([
+      {
+        case: "Instant Evals is not released",
+        released: false,
+        providers: [{ provider: "openai", enabled: false }],
+        config: { evaluatorType: "langevals/llm_boolean" },
+      },
+      {
+        case: "a provider offers a model",
+        released: true,
+        providers: [{ provider: "openai", enabled: true }],
+        config: { evaluatorType: "langevals/llm_score" },
+      },
+      {
+        case: "the type is not a judge",
+        released: true,
+        providers: [],
+        config: { evaluatorType: "ragas/faithfulness" },
+      },
+      {
+        case: "the create names its own model",
+        released: true,
+        providers: [],
+        config: { evaluatorType: "langevals/llm_boolean", settings: { model: "openai/gpt-5" } },
+      },
+    ])("refuses as today when $case", async ({ released, providers, config }) => {
+      const { app, repository } = harness({
+        modelProviders: {
+          resolveModelForFeature: noDefaultModel,
+          listForProject: vi.fn(async () => testProviderSummaries(providers)),
+        },
+        instantEvals: { isReleased: vi.fn(async () => released) },
+      });
+      const create = vi.spyOn(repository, "create");
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Faithfulness",
+          config,
+        }),
+      ).rejects.toMatchObject({ code: "model_not_configured", meta: { role: "DEFAULT" } });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A judge created through the API with no model provider starts on Instant Evals when released" */
+    it("treats a provider that serves only restricted features as no provider", async () => {
+      const { app } = harness({
+        modelProviders: {
+          resolveModelForFeature: noDefaultModel,
+          listForProject: vi.fn(async () =>
+            testProviderSummaries([{ provider: "openai_codex", enabled: true }]),
+          ),
+        },
+        instantEvals: { isReleased: vi.fn(async () => true) },
+      });
+
+      const evaluator = await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Is it polite?",
+        config: { evaluatorType: "langevals/llm_category" },
+      });
+
+      expect(evaluator.config).toMatchObject({ settings: { model: "langwatch/instant-evals" } });
+    });
+
+    it.each([
+      { read: "the release", failing: "isReleased" as const },
+      { read: "the providers", failing: "listForProject" as const },
+    ])("keeps today's refusal when $read cannot be read", async ({ failing }) => {
+      const unreachable = vi.fn(async () => {
+        throw new Error("unreachable");
+      });
+      const { app } = harness({
+        modelProviders: {
+          resolveModelForFeature: noDefaultModel,
+          ...(failing === "listForProject" ? { listForProject: unreachable } : {}),
+        },
+        instantEvals: {
+          isReleased: failing === "isReleased" ? unreachable : vi.fn(async () => true),
+        },
+      });
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Is it polite?",
+          config: { evaluatorType: "langevals/llm_boolean" },
+        }),
+      ).rejects.toMatchObject({ code: "model_not_configured", meta: { role: "DEFAULT" } });
+    });
+
+    it("keeps a refusal that is not a missing default model", async () => {
+      const failure = new Error("the model provider registry is unreachable");
+      const isReleased = vi.fn(async () => true);
+      const { app } = harness({
+        modelProviders: {
+          resolveModelForFeature: vi.fn(async () => {
+            throw failure;
+          }),
+        },
+        instantEvals: { isReleased },
+      });
+
+      await expect(
+        app.createWithResolvedDefaults({
+          projectId: "project-1",
+          name: "Is it polite?",
+          config: { evaluatorType: "langevals/llm_boolean" },
+        }),
+      ).rejects.toBe(failure);
+      expect(isReleased).not.toHaveBeenCalled();
     });
   });
 
