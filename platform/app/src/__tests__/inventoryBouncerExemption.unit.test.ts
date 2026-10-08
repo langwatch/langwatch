@@ -35,6 +35,7 @@ describe("the no-organization bouncer exemption list", () => {
       expect(noOrgBouncerRoutes).toContain("/governance/inventory/[id]");
       expect(noOrgBouncerRoutes).toContain("/governance/people");
       expect(noOrgBouncerRoutes).toContain("/governance/costs");
+      expect(noOrgBouncerRoutes).toContain("/governance/dashboards");
       expect(noOrgBouncerRoutes).toContain("/governance/billed");
       expect(noOrgBouncerRoutes).toContain("/governance/insights");
       expect(noOrgBouncerRoutes).toContain("/governance/analytics");
@@ -50,6 +51,9 @@ describe("the no-organization bouncer exemption list", () => {
         "/governance/inventory",
       );
       expect(resolvePathname("/governance/people")).toBe("/governance/people");
+      expect(resolvePathname("/governance/dashboards")).toBe(
+        "/governance/dashboards",
+      );
       expect(resolvePathname("/governance/insights")).toBe(
         "/governance/insights",
       );
