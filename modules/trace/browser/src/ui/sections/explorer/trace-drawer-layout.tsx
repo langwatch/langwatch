@@ -1,9 +1,10 @@
+import { lazyChunk } from "@langwatch/browser-host/navigation";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
-import { lazy, type ReactNode, Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 
 const ROUTED_PAGE = <UiRouteOutlet />;
 
-const TraceDrawerMount = lazy(() =>
+const TraceDrawerMount = lazyChunk(() =>
   import("./global-trace-v2-drawer-mount.tsx").then((module) => ({
     default: module.GlobalTraceV2DrawerMount,
   })),

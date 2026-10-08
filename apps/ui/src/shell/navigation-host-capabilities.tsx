@@ -4,18 +4,25 @@
  * there is no join offer, and user's second-factor enrolment gate.
  */
 
+import { lazyChunk, loadChunk } from "@langwatch/browser-host/navigation";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { userWeb } from "@langwatch/user-browser/declaration";
 import { lazy, Suspense, type ReactNode } from "react";
 
 // Fetched with the shell, not on first render: main drew the offer statically, and a
 // chunk requested only after the join queries resolve arrives seconds after sign-in.
-const joinOfferChunk = organizationWeb.installation.capabilities.joinOffer.load();
-const secureAccountNudgeChunk = userWeb.installation.capabilities.secureAccountNudge.load();
+const joinOfferChunk = loadChunk(organizationWeb.installation.capabilities.joinOffer.load);
+const secureAccountNudgeChunk = loadChunk(
+  userWeb.installation.capabilities.secureAccountNudge.load,
+);
 const JoinYourTeamTakeover = lazy(() => joinOfferChunk);
 const SecureAccountNudge = lazy(() => secureAccountNudgeChunk);
-const TeamAccessWaiting = lazy(organizationWeb.installation.capabilities.teamAccessWaiting.load);
-const organizationMfaGateChunk = userWeb.installation.capabilities.organizationMfaGate.load();
+const TeamAccessWaiting = lazyChunk(
+  organizationWeb.installation.capabilities.teamAccessWaiting.load,
+);
+const organizationMfaGateChunk = loadChunk(
+  userWeb.installation.capabilities.organizationMfaGate.load,
+);
 const OrganizationMfaGate = lazy(() => organizationMfaGateChunk);
 
 export function joinOffer({

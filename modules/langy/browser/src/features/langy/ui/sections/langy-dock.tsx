@@ -1,6 +1,7 @@
+import { lazyChunk } from "@langwatch/browser-host/navigation";
 import { LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
@@ -11,7 +12,7 @@ import type { LangySidecarProps } from "./langy-panel.tsx";
 
 // The panel (chat engine, cards, markdown, charts) is most of Langy's weight, so a page
 // loads it when Langy opens, not on every visit.
-const LangySidecar = lazy(() =>
+const LangySidecar = lazyChunk(() =>
   import("./langy-panel.tsx").then((module) => ({ default: module.LangySidecar })),
 );
 

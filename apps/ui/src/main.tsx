@@ -10,7 +10,10 @@ import type {
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/feature-flag-overrides";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
-import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
+import {
+  isChunkLoadFailure,
+  registerChunkReloadListener,
+} from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
   createUiApplication,
@@ -25,7 +28,11 @@ import { installedModuleApis } from "@langwatch/browser/module-apis";
 import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
 import { installedModuleHostMounts, type UiModuleHostMount } from "@langwatch/browser/module-hosts";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/browser/module-screens";
-import { UiPageFailure } from "@langwatch/browser/page-fallbacks";
+import {
+  UI_CHUNK_LOAD_FAILURE_COPY,
+  UiChunkLoadFailure,
+  UiPageFailure,
+} from "@langwatch/browser/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/browser/public-config";
 import { UiRuntime } from "@langwatch/browser/runtime";
 import { UiShell } from "@langwatch/browser/shell";
@@ -38,7 +45,7 @@ import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
-import { useLocation } from "react-router";
+import { useLocation, useRouteError } from "react-router";
 
 import { browserModules } from "./browser-modules.generated.ts";
 import { composeUiDesignSystem } from "./design-system";
@@ -88,6 +95,7 @@ function UiNoFooter() {
  * words come from the code-keyed registry rather than `error.message`.
  */
 function UiPageError({ error }: FallbackProps) {
+  if (isChunkLoadFailure(error)) return <UiChunkLoadFailure />;
   return (
     <UiPageFailure
       copy={resolveUiFailureCopy({ error, fallbackTitle: "This page did not load" })}
@@ -97,6 +105,25 @@ function UiPageError({ error }: FallbackProps) {
 
 /** The last resort: plain, because it must render when nothing else loaded. */
 function UiBootPageError() {
+  if (isChunkLoadFailure(useRouteError())) {
+    return (
+      <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
+        <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
+          {UI_CHUNK_LOAD_FAILURE_COPY.title}
+        </h1>
+        <p style={{ opacity: 0.7, marginBottom: "1rem" }}>
+          {UI_CHUNK_LOAD_FAILURE_COPY.description}
+        </p>
+        <button
+          type="button"
+          data-testid="chunk-load-retry"
+          onClick={() => window.location.reload()}
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
       <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>This page did not load</h1>

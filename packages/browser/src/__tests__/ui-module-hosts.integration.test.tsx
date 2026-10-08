@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
 /**
- * Spec: specs/ui/module-host-mounting.feature
+ * Spec: specs/ui/module-host-mounting.feature, specs/navigation/chunk-load-retry.feature
  */
-import { render, screen } from "@testing-library/react";
+import { isChunkLoadFailure } from "@langwatch/browser-host/navigation";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { act, render, screen } from "@testing-library/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// A retry asks for the chunk by address; here every address stays dropped.
+vi.mock("../../../browser-host/src/chunk-refetch.ts", () => ({
+  importChunkAgain: async () => {
+    throw new TypeError("Failed to fetch dynamically imported module: http://localhost/x.js");
+  },
+}));
 
 import { createUiModuleHostStack } from "../ui-module-hosts.tsx";
+import { UiChunkLoadFailure } from "../ui-page-fallbacks.tsx";
 
 const ProbeHost = createContext<string | null>(null);
 
@@ -122,6 +132,24 @@ describe("given a mount that resolves to no component", () => {
 });
 
 describe("given a mount whose module will not load", () => {
+  // The chunk is retried with backoff before the stack gives up; run those waits now.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  const giveUpRetrying = () => act(() => vi.advanceTimersByTimeAsync(5_000));
+
   /** @scenario "A mount with nothing to render is refused by name" */
   it("names the module and host rather than only the chunk url", async () => {
     const Hosts = createUiModuleHostStack([
@@ -148,9 +176,42 @@ describe("given a mount whose module will not load", () => {
       </ErrorBoundary>,
     );
 
+    await giveUpRetrying();
     expect(await screen.findByText("refused")).toBeTruthy();
     expect(String(thrown[0])).toContain("licensing");
     expect(String(thrown[0])).toContain("LicensingHostApi");
     expect((thrown[0] as Error).cause).toBeInstanceOf(TypeError);
+  });
+
+  /** @scenario "A failure that outlives its retries offers a retry" */
+  it("shows the root's check-your-connection screen, not a blank page", async () => {
+    const Hosts = createUiModuleHostStack([
+      {
+        module: "authz",
+        host: "AuthzHostApi",
+        load: async () => {
+          throw new TypeError("Failed to fetch dynamically imported module: http://localhost/x.js");
+        },
+      },
+    ]);
+
+    render(
+      <DesignSystemProvider forcedTheme="light">
+        <ErrorBoundary
+          FallbackComponent={({ error }) =>
+            isChunkLoadFailure(error) ? <UiChunkLoadFailure /> : <span>other failure</span>
+          }
+        >
+          <Hosts>
+            <ProbeScreen />
+          </Hosts>
+        </ErrorBoundary>
+      </DesignSystemProvider>,
+    );
+
+    await giveUpRetrying();
+    expect(await screen.findByText("Could not load")).toBeTruthy();
+    expect(screen.getByText("Check your connection, then try again.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
   });
 });

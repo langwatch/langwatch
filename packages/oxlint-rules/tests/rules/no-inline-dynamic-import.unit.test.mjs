@@ -62,6 +62,17 @@ describe("given a governed file", () => {
     });
   });
 
+  describe("when the file is the browser host's chunk refetch", () => {
+    /** @scenario "The browser host's chunk refetch is exempt" */
+    it("reports nothing there and still reports its siblings", () => {
+      const code = "const chunk = await import(fresh.href);";
+      const source = "packages/browser-host/src";
+
+      expect(report(code, `${source}/chunk-refetch.ts`)).toEqual([]);
+      expect(report(code, `${source}/navigation.ts`)).toHaveLength(1);
+    });
+  });
+
   describe("when the file is a dev runtime entry", () => {
     /** @scenario "The dev runtime's entries are exempt" */
     it("reports nothing there and still reports its siblings", () => {
@@ -121,9 +132,10 @@ describe("given a governed file", () => {
 
   describe("when a component is code-split through lazy", () => {
     /** @scenario "A lazy-loaded component is allowed" */
-    it("reports nothing for lazy or React.lazy, with or without a .then", () => {
+    it("reports nothing for lazy, React.lazy or lazyChunk, with or without a .then", () => {
       const code = [
         'const Chart = lazy(() => import("./chart"));',
+        'const Panel = lazyChunk(() => import("./panel").then((m) => ({ default: m.Panel })));',
         'const Editor = React.lazy(() => import("./editor").then((m) => ({ default: m.Editor })));',
       ].join("\n");
 

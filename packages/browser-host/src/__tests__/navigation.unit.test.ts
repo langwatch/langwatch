@@ -7,13 +7,9 @@ import {
   isServerUnreachable,
   isUiApiUnreachable,
   isUiNavigatingAway,
-  lazyRoute,
   nextUiApiPollDelay,
-  registerChunkReloadListener,
-  reloadOnChunkError,
   uiLeaveTo,
   uiOpenExternal,
-  warmChunk,
 } from "../navigation.ts";
 
 // jsdom locks down window.location (non-configurable, can't be deleted, redefined
@@ -22,20 +18,6 @@ import {
 // writes to sessionStorage — which is where the branching logic actually lives.
 const RELOAD_AT = "chunk-reload-at";
 const reloaded = () => sessionStorage.getItem(RELOAD_AT) !== null;
-
-/**
- * The event Vite dispatches from its preload helper. `payload` is the error it
- * is about to throw, and it is the only field that says which import failed.
- */
-const preloadErrorEvent = (payload: Error) =>
-  Object.assign(new Event("vite:preloadError", { cancelable: true }), {
-    payload,
-  });
-
-const staleChunkError = () => new Error("Failed to fetch dynamically imported module");
-
-/** Let the listener's deferred reload decision run. */
-const settleDeferredReload = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("isChunkLoadError", () => {
   describe("when the message is a Vite dynamic-import failure", () => {
@@ -105,164 +87,6 @@ describe("forceReloadOnce", () => {
       vi.advanceTimersByTime(11_000); // past the 10s cooldown
 
       expect(forceReloadOnce()).toBe(true);
-    });
-  });
-});
-
-describe("reloadOnChunkError", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  describe("when the error is a chunk error", () => {
-    it("reloads and reports it handled the error", () => {
-      expect(reloadOnChunkError(new Error("Failed to fetch dynamically imported module"))).toBe(
-        true,
-      );
-      expect(reloaded()).toBe(true);
-    });
-  });
-
-  describe("when the error is not a chunk error", () => {
-    it("does not reload and reports it did not handle the error", () => {
-      expect(reloadOnChunkError(new Error("boom"))).toBe(false);
-      expect(reloaded()).toBe(false);
-    });
-  });
-});
-
-describe("registerChunkReloadListener", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  describe("when Vite dispatches vite:preloadError for a stale chunk", () => {
-    /** @scenario "A stale file outside a warm-up still reloads the page" */
-    it("reloads the page once to fetch the new chunk hashes", () => {
-      registerChunkReloadListener();
-
-      const event = preloadErrorEvent(staleChunkError());
-      window.dispatchEvent(event);
-
-      expect(event.defaultPrevented).toBe(true);
-      expect(reloaded()).toBe(true);
-    });
-  });
-
-  describe("when a second vite:preloadError fires within the cooldown", () => {
-    it("does not suppress the error so it can reach the error boundary", () => {
-      // Simulate a reload already having happened in this session.
-      sessionStorage.setItem(RELOAD_AT, "9999999999999");
-      registerChunkReloadListener();
-
-      const event = preloadErrorEvent(staleChunkError());
-      window.dispatchEvent(event);
-
-      // No reload scheduled → Vite's error must NOT be preventDefault()'d.
-      expect(event.defaultPrevented).toBe(false);
-    });
-  });
-});
-
-describe("warmChunk", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  describe("when a warm-up asks for a file that is gone", () => {
-    /** @scenario "A stale file during a warm-up does not reload the page" */
-    it("does not reload the page", async () => {
-      registerChunkReloadListener();
-
-      const loaded = await warmChunk(() => {
-        // Vite fires the event from its preload helper, then rejects the
-        // import with the same error, so the warm-up is still in flight when
-        // the listener runs.
-        const failure = staleChunkError();
-        window.dispatchEvent(preloadErrorEvent(failure));
-        return Promise.reject(failure);
-      });
-      await settleDeferredReload();
-
-      expect(loaded).toBe(false);
-      expect(reloaded()).toBe(false);
-    });
-  });
-
-  describe("given a warm-up is in flight", () => {
-    describe("when another import fails because the file is gone", () => {
-      /** @scenario "A stale file for a waiting screen reloads during a warm-up" */
-      it("reloads the page for the import somebody is waiting for", async () => {
-        registerChunkReloadListener();
-
-        let finishWarmup = () => {};
-        const warmup = warmChunk(
-          () =>
-            new Promise<void>((resolve) => {
-              finishWarmup = resolve;
-            }),
-        );
-
-        // A drawer the person just opened asks for a stale file. This error is
-        // not the warm-up's, so recovery must still run.
-        window.dispatchEvent(preloadErrorEvent(staleChunkError()));
-
-        finishWarmup();
-        await warmup;
-        await settleDeferredReload();
-
-        expect(reloaded()).toBe(true);
-      });
-    });
-  });
-
-  describe("when the warm-up has finished", () => {
-    it("leaves a later stale chunk to reload the page", async () => {
-      registerChunkReloadListener();
-      await warmChunk(() => Promise.resolve());
-
-      window.dispatchEvent(preloadErrorEvent(staleChunkError()));
-
-      expect(reloaded()).toBe(true);
-    });
-  });
-});
-
-function Page() {
-  return null;
-}
-
-describe("lazyRoute", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  describe("given a route module that loads", () => {
-    it("hands React Router the module's default export as Component", async () => {
-      const route = lazyRoute(() => Promise.resolve({ default: Page }));
-
-      await expect(route.lazy()).resolves.toEqual({ Component: Page });
-      expect(reloaded()).toBe(false);
-    });
-  });
-
-  describe("given a route chunk that 404s after a deploy", () => {
-    it("attempts recovery once and still rejects so the error boundary sees it", async () => {
-      const staleChunk = new Error("Failed to fetch dynamically imported module: /assets/a-BJk.js");
-      const route = lazyRoute(() => Promise.reject(staleChunk));
-
-      await expect(route.lazy()).rejects.toBe(staleChunk);
-      expect(reloaded()).toBe(true);
-    });
-  });
-
-  describe("given a route module that throws for an unrelated reason", () => {
-    it("rejects without attempting a reload", async () => {
-      const failure = new Error("the page threw while evaluating");
-      const route = lazyRoute(() => Promise.reject(failure));
-
-      await expect(route.lazy()).rejects.toBe(failure);
-      expect(reloaded()).toBe(false);
     });
   });
 });

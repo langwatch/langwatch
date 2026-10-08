@@ -4,7 +4,15 @@
  */
 
 import { nowInstant } from "@langwatch/time";
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import {
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 import {
   createBrowserRouter,
   useLocation,
@@ -16,6 +24,7 @@ import {
 } from "react-router";
 
 import { UiNavigation, UiRoute, type UiRouteReadingValues } from "./capabilities.ts";
+import { importChunkAgain } from "./chunk-refetch.ts";
 
 /**
  * A failure that never reached the server — not a refusal, not a bug. A
@@ -140,13 +149,19 @@ export function uiOpenExternal(url: string): void {
 }
 
 /**
- * Recovery from stale content-hashed chunks after a deploy — the next
- * lazy `import()` of a removed chunk 404s with "Failed to fetch
- * dynamically imported module". Route chunks: `lazyRoute`; everything else: `vite:preloadError`.
+ * Loading code-split chunks on a link that drops requests and across deploys that remove
+ * them: every route, screen, host, drawer and lent loader goes through `loadChunk`.
+ * Spec: specs/navigation/chunk-load-retry.feature
  */
 
 const RELOAD_COOLDOWN_MS = 10_000;
 export const RELOAD_AT_KEY = "chunk-reload-at";
+
+/** The waits before each retry of a chunk that did not load. */
+export const CHUNK_RETRY_DELAYS_MS: readonly number[] = [500, 1_000, 2_000];
+
+/** How long the "is this chunk gone?" probe may take before it counts as no answer. */
+const DEPLOY_PROBE_TIMEOUT_MS = 5_000;
 
 function chunkErrorMessageOf(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -159,8 +174,29 @@ export function isChunkLoadError(err: unknown): boolean {
   return (
     msg.includes("loading chunk") ||
     msg.includes("dynamically imported module") ||
-    msg.includes("importing a module script failed")
+    msg.includes("importing a module script failed") ||
+    msg.includes("unable to preload css")
   );
+}
+
+/** Whether a failure, or any failure it wraps as its `cause`, is a chunk that did not load. */
+export function isChunkLoadFailure(err: unknown): boolean {
+  for (let at = err, depth = 0; at !== undefined && depth < 5; depth++) {
+    if (isChunkLoadError(at)) return true;
+    at = at instanceof Error ? at.cause : void 0;
+  }
+  return false;
+}
+
+/** The script a chunk failure names, when the engine names one (Chrome and Firefox do). */
+export function chunkUrlOf(err: unknown): string | undefined {
+  const named = /(\S+\.m?js)(?:\?\S*)?$/.exec(chunkErrorMessageOf(err).trim())?.[1];
+  if (named === undefined) return void 0;
+  try {
+    return new URL(named, window.location.href).href;
+  } catch {
+    return void 0;
+  }
 }
 
 export function forceReloadOnce(): boolean {
@@ -174,51 +210,100 @@ export function forceReloadOnce(): boolean {
   return true;
 }
 
-export function reloadOnChunkError(err: unknown): boolean {
-  if (!isChunkLoadError(err)) return false;
-  forceReloadOnce();
-  return true;
+/**
+ * Reloads once when the server answers that the failed chunk is gone (a deploy replaced it).
+ * A reload on a dropped connection lands on the browser's own error page, so no answer from
+ * the server means no reload.
+ */
+async function reloadIfDeployRemoved(err: unknown): Promise<boolean> {
+  const url = chunkUrlOf(err);
+  if (url === undefined) return false;
+  try {
+    const probe = await fetch(url, {
+      method: "HEAD",
+      cache: "no-store",
+      signal: AbortSignal.timeout(DEPLOY_PROBE_TIMEOUT_MS),
+    });
+    return probe.status === 404 && forceReloadOnce();
+  } catch {
+    return false;
+  }
 }
 
-let warmupsInFlight = 0;
-const warmupFailures = new WeakSet<object>();
+/** Failures a caller already owns, so the `vite:preloadError` listener leaves them alone. */
+const ownedFailures = new WeakSet<object>();
+
+function ownFailure(error: unknown): void {
+  if (typeof error === "object" && error !== null) ownedFailures.add(error);
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Loads a chunk, retrying after each wait in `delaysMs` while the failure is a chunk that
+ * did not load. A browser may remember a failed `import()` and reject the same address at
+ * once, so a retry asks for the address the failure named under a fresh query.
+ */
+export async function loadChunk<T>(
+  load: () => Promise<T>,
+  { delaysMs = CHUNK_RETRY_DELAYS_MS, wait = waitMs } = {},
+): Promise<T> {
+  let failure: unknown;
+  for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+    if (attempt > 0) await wait(delaysMs[attempt - 1] ?? 0);
+    const url = attempt === 0 ? void 0 : chunkUrlOf(failure);
+    try {
+      return await (url === void 0 ? load() : importChunkAgain<T>({ url, attempt }));
+    } catch (error) {
+      ownFailure(error);
+      if (!isChunkLoadError(error)) throw error;
+      failure = error;
+    }
+  }
+  await reloadIfDeployRemoved(failure);
+  throw failure;
+}
+
+/** `React.lazy` over `loadChunk`: a code-split component that survives a dropped request. */
+export function lazyChunk<Component extends ComponentType<never>>(
+  load: () => Promise<{ default: Component }>,
+): LazyExoticComponent<Component> {
+  return lazy(() => loadChunk(load));
+}
 
 export async function warmChunk(load: () => Promise<unknown>): Promise<boolean> {
-  warmupsInFlight += 1;
   try {
     await load();
     return true;
   } catch (error) {
-    if (typeof error === "object" && error !== null) {
-      warmupFailures.add(error);
-    }
+    ownFailure(error);
     return false;
-  } finally {
-    warmupsInFlight -= 1;
   }
 }
 
+/**
+ * Vite reports a failed chunk here before it rejects. Never `preventDefault`: Vite then
+ * RESOLVES the import with `undefined`, and the loader reads `.default` of nothing. A failure
+ * no loader owns (a bare `import()`) reloads only when the chunk is confirmed gone.
+ */
 export function registerChunkReloadListener(): void {
   if (typeof window === "undefined") return;
   window.addEventListener("vite:preloadError", (event) => {
-    if (warmupsInFlight === 0) {
-      if (forceReloadOnce()) event.preventDefault();
-      return;
-    }
-
     const payload = "payload" in event ? event.payload : void 0;
+    // The loader's own catch runs in a microtask after this event, so look after it.
     setTimeout(() => {
-      const claimed =
-        typeof payload === "object" && payload !== null && warmupFailures.has(payload);
-      if (!claimed) forceReloadOnce();
+      const owned = typeof payload === "object" && payload !== null && ownedFailures.has(payload);
+      if (!owned) void reloadIfDeployRemoved(payload);
     }, 0);
   });
 }
 
 /**
  * Wraps a dynamic `import()` for React Router's `lazy`, which keeps the OLD
- * route visible while the new module loads (no gray flash). A stale chunk
- * after a deploy reloads once; every other error falls to the boundary.
+ * route visible while the new module loads (no gray flash). A chunk that will
+ * not load is retried; what still fails falls to the boundary.
  */
 export type LazyRouteModule = { default: ComponentType };
 
@@ -226,13 +311,7 @@ export function lazyRoute(load: () => Promise<LazyRouteModule>): {
   lazy: () => Promise<{ Component: ComponentType }>;
 } {
   return {
-    lazy: () =>
-      load()
-        .then((module) => ({ Component: module.default }))
-        .catch((error: unknown) => {
-          reloadOnChunkError(error);
-          throw error;
-        }),
+    lazy: () => loadChunk(load).then((module) => ({ Component: module.default })),
   };
 }
 

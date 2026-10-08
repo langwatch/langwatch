@@ -17,6 +17,26 @@ import { Lock } from "lucide-react";
 
 import { UiErrorActions } from "./ui-error-actions.tsx";
 
+/** The words for code that did not arrive, so both boundaries say the same thing. */
+export const UI_CHUNK_LOAD_FAILURE_COPY = {
+  title: "Could not load",
+  description: "Check your connection, then try again.",
+} as const;
+
+/**
+ * When part of the application's code did not arrive, after its retries. Only a reload
+ * clears it: a browser may remember the failed fetch for the life of the page.
+ * Spec: specs/navigation/chunk-load-retry.feature
+ */
+export function UiChunkLoadFailure() {
+  return (
+    <UiPageFailure
+      copy={{ ...UI_CHUNK_LOAD_FAILURE_COPY, docsUrl: void 0, traceId: void 0 }}
+      retry={{ onRetry: () => window.location.reload(), testId: "chunk-load-retry" }}
+    />
+  );
+}
+
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {
   return (

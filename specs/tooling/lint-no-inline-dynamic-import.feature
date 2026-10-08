@@ -39,6 +39,12 @@ Feature: The no-inline-dynamic-import lint rule
     Then it reports nothing, while a sibling design-system file is still reported
 
   @unit
+  Scenario: The browser host's chunk refetch is exempt
+    Given packages/browser-host/src/chunk-refetch.ts with an inline import()
+    When the no-inline-dynamic-import rule runs over it
+    Then it reports nothing, while a sibling browser-host file is still reported
+
+  @unit
   Scenario: The dev runtime's entries are exempt
     Given tools/dev-runtime/src/backend.entrypoint.ts or app.entrypoint.ts with an inline import()
     When the no-inline-dynamic-import rule runs over it
@@ -70,7 +76,7 @@ Feature: The no-inline-dynamic-import lint rule
 
   @unit
   Scenario: A lazy-loaded component is allowed
-    Given a nested browser file loading components through lazy and React.lazy, one through a .then
+    Given a nested browser file loading components through lazy, React.lazy and lazyChunk, one through a .then
     When the no-inline-dynamic-import rule runs over it
     Then it reports nothing
 

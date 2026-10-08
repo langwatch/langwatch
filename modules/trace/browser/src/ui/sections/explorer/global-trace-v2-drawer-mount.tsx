@@ -1,6 +1,7 @@
+import { lazyChunk } from "@langwatch/browser-host/navigation";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type React from "react";
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 
 import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { isTraceExplorerPath } from "../../../model/trace-explorer-path.ts";
@@ -8,7 +9,7 @@ import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator
 
 // The drawer and everything it renders (transcripts, code, markdown) load when a trace opens,
 // not with every page this mount sits above.
-const TraceV2DrawerShell = lazy(() =>
+const TraceV2DrawerShell = lazyChunk(() =>
   import("./trace-drawer/index.ts").then((module) => ({ default: module.TraceV2DrawerShell })),
 );
 
