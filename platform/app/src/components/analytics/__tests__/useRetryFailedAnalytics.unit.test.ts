@@ -19,7 +19,9 @@ describe("FAILED_ACTIVE_QUERIES", () => {
     const observer = new QueryObserver(client, { queryKey: [key], queryFn });
     const unsubscribe = observer.subscribe(() => undefined);
     await vi.waitFor(() => {
-      expect(observer.getCurrentResult().isFetching).toBe(false);
+      if (observer.getCurrentResult().isFetching) {
+        throw new Error("still fetching");
+      }
     });
     return unsubscribe;
   }
