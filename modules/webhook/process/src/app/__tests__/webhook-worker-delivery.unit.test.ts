@@ -97,7 +97,7 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
         await webhooks.requestGatewayEventDelivery(admitted);
         await webhooks.requestGatewayEventDelivery(confirmed);
 
-        // The egress fence refuses the private address: the attempt still reached the last hop.
+        // The URL policy refuses the private address before any channel; one attempt is logged.
         await vi.waitFor(
           async () => {
             const log = await webhooks.getDeliveries({

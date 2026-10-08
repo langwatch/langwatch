@@ -133,7 +133,7 @@ describe("webhook app installation", () => {
           endpointId: endpoint.id,
         });
 
-        // The egress fence refused the private address: the fire reached the real last hop.
+        // The egress service's URL policy refuses the private address before any channel.
         expect(result).toMatchObject({ delivered: false, responseStatus: null });
         expect(log.deliveries).toHaveLength(1);
         expect(log.deliveries[0]?.error).toContain(`Webhook endpoint ${endpoint.id} (test)`);
