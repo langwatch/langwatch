@@ -197,7 +197,6 @@ async function installGateway({
     const state = await gatewayProcessModule.install({
       resources,
       config: { spendSettlementGraceMs: undefined },
-      members: {},
       repositorySelection: {
         tier: "live",
         members: { prisma, clickhouse, encryption: createApiFixture<Encryption>(), redis },

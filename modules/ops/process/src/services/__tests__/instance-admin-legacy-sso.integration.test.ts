@@ -44,6 +44,10 @@ function buildInstanceAdmin(connectionDecides = true) {
       ...MemoryOpsRepositories.create({ eventing: { definitions: [] } }),
       instanceAdmin: PrismaInstanceAdminRepository.create(refuseEveryQuery as never),
     },
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail: () => Promise.reject(new Error("unreached")),
+    },
     audit: new AuditStub(),
     sessions: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
