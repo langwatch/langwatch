@@ -105,3 +105,10 @@ Feature: A module declares its migration steps beside its tasks
     Given a process whose eventing member opens no replay engine, or that composed no replayer
     When a migration step replays a projection lane
     Then the replay is refused with the code "projection_replay_unavailable", naming the lane
+
+  @unit
+  Scenario: An installed list's migration steps are listed over memory stores without serving
+    Given two modules that each declare migration steps, one of them over its memory repositories
+    When the list's migration steps are listed over memory stores
+    Then every step is answered once, in installation order
+    And the module with repositories built its steps over its memory repositories

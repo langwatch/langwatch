@@ -181,3 +181,16 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given a roster whose prune is refused
     When a process records its roster entry
     Then its entry is written and the failure is reported
+
+  @unit
+  Scenario: The gate reads the image's generated code step list
+    Given the image's generated code step list holds a blocking step and a background step
+    When an api or worker builds its gate from the image tree
+    Then the blocking step is required before the process serves
+    And the background step is declared on its roster entry
+
+  @integration
+  Scenario: The api and worker declare the code steps the tasks process collects
+    Given the tasks process's installed modules booted over memory stores
+    When `pnpm task upgrade steps --json` lists their migration steps
+    Then the image's generated code step list, as the api and worker read it, names the same ids, kinds and modes in the same order

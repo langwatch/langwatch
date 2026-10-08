@@ -131,6 +131,7 @@ export {
   collectMigrationSteps,
   migrationStepsOf,
 } from "./migration-steps.ts";
+export { migrationStepsOverMemory } from "./memory-migration-steps.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,

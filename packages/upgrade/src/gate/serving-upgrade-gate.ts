@@ -16,6 +16,7 @@ import {
 } from "../serving-roster/serving-roster.service.ts";
 import { isMigrationStep } from "../step/migration-step.ts";
 import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
+import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, readImageTree } from "./image-tree.ts";
 import { type ServingRole, type ServingVerdict, UPGRADE_COMMAND } from "./serving-gate.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
@@ -23,10 +24,10 @@ import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 /** Roster refresh and stale bound (held question "cloud presence timings", default taken). */
 export const SERVING_ROSTER_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_000 } as const;
 
-/** A process with no database (the memory tier) has no installation to be behind. */
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
 
+/** A process with no database (the memory tier) has no installation to be behind. */
 const NO_LEDGER_GATE: UpgradeGate = {
   admit: async () => ({ admitted: true, outcome: "current" }),
   release: async () => undefined,
@@ -93,11 +94,11 @@ export function upgradeGateOver({
       pruneRoster: (input) => runner.pruneServingRoster(input),
     },
     ...SERVING_ROSTER_TIMING,
-    onRefreshError: (error) =>
     pruneDeadAfterMs: SERVING_ROSTER_PRUNE_AFTER_MS,
+    onRefreshError: (error) =>
       warn("roster refresh failed", { processId, error: messageOf(error) }),
-    onLapseChange: (lapsed) =>
     onPruneError: (error) => warn("roster prune failed", { processId, error: messageOf(error) }),
+    onLapseChange: (lapsed) =>
       warn(
         lapsed
           ? `roster entry lapsed past ${SERVING_ROSTER_TIMING.staleAfterMs} ms: ${processId} stops serving; ` +
@@ -239,6 +240,13 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
   };
 }
 
+/** The tree both serving roles gate on: the schema it ships and the tasks process's code steps. */
+export function servingImageTree({
+  codeStepsFile = IMAGE_CODE_STEPS_FILE,
+}: { codeStepsFile?: string } = {}): ReleaseTreeSteps {
+  return readImageTree({ codeSteps: readImageCodeSteps({ file: codeStepsFile }) });
+}
+
 /**
  * `withUpgradeGate`'s factory for the api and worker (held question "mig-serving-gate data
  * source", default (a)): one connection of its own from the stores' `DATABASE_URL`, opened only
@@ -253,7 +261,7 @@ export async function servingUpgradeGate({
   role: ServingRole;
   warn?: ServingGateWarn;
 }): Promise<UpgradeGate> {
-  const tree = readImageTree();
+  const tree = servingImageTree();
   const release = loadReleases().manifests.at(-1)?.release ?? null;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>

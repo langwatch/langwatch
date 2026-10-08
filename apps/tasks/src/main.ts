@@ -105,6 +105,12 @@ async function main(): Promise<void> {
   configureLogger({ redactPaths: secretLogRedactPaths(Object.values(tasksSecrets)) });
   const argv = process.argv.slice(2);
   const [first, ...rest] = argv;
+  if (first === "upgrade" && rest[0] === "steps") {
+    // The image's code step list, over memory stores: no connection, no secret, no lock.
+    const { upgradeSteps } = await import("./upgrade-steps.ts");
+    await upgradeSteps({ args: rest.slice(1) });
+    return;
+  }
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once("SIGINT", abort);
