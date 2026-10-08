@@ -26,6 +26,7 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"

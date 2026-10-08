@@ -11964,6 +11964,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../packages/system-migrations
