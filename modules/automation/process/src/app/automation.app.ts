@@ -80,6 +80,7 @@ import type { AutomationNotificationDelivery } from "../channels/automation-noti
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import type { AutomationChannels } from "../channels/automation.channels.ts";
+import { SlackWebApiDeliveryChannel } from "../channels/slack/slack.web-api-delivery.channel.ts";
 import { OutboxAutomationAuditSink } from "../eventing/automation-audit.intent.ts";
 import {
   createAutomationsPipeline,
@@ -529,7 +530,10 @@ export class AutomationModule implements AutomationApi {
       }),
       persistCaps: input.repositories.persistCaps,
       providers,
-      slackChannels: AutomationSlackDirectoryUnavailableService.create(),
+      // Main listed channels over conversations.list; only a process with no transport cannot.
+      slackChannels: input.channels
+        ? SlackWebApiDeliveryChannel.create(input.channels.slackApiTransport)
+        : AutomationSlackDirectoryUnavailableService.create(),
       traceFilters: AutomationTraceFilterCompilerService.create({ traces: input.traces, logger }),
       limits: input.repositories.callCounter,
       audit: AutomationAuditSinkService.create(input.auditLog),

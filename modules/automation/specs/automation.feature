@@ -335,3 +335,16 @@ Feature: Automation ownership
     Given the step stopped after finishing some pages of claims
     When it runs again from its checkpoint
     Then it starts after the last claim it finished and pages the rest by cursor
+
+  @unit
+  Scenario: The Slack channel picker lists a bot connection's channels
+    Given a process composed with a Slack transport
+    And a Slack automation form on a bot connection
+    When the form asks for the connection's channels
+    Then the channels Slack's conversations.list returns are offered, sorted by name
+
+  @unit
+  Scenario: The Slack channel picker names the error when Slack refuses the token
+    Given a Slack automation form on a bot connection whose token Slack refuses
+    When the form asks for the connection's channels
+    Then no channels are offered and the listing carries Slack's error code
