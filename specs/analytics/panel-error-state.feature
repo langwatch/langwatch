@@ -48,7 +48,7 @@ Feature: Analytics panel error state
     Then the total documents tab header shows the compact indicator
     And the documents table shows the compact panel message with a Retry
 
-  @integration
+  @integration @regression
   Scenario: A failed documents section stays visible and does not refetch on its own
     Given the top used documents query always fails with "This search was too large"
     When the documents section renders and a few seconds pass

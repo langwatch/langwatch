@@ -43,6 +43,9 @@ let documentRequests = 0;
 /** When set, `analytics.topUsedDocuments` answers with it instead of failing. */
 let documentsAnswer: unknown;
 
+/** When set, the next answer waits until the test resolves it. */
+let holdNextAnswer: Promise<void> | undefined;
+
 /** The handled error the server returns when the search ran out of memory. */
 function searchTooLarge() {
   return TRPCClientError.from<AppRouter>({
@@ -73,16 +76,24 @@ const failingLink: TRPCLink<AppRouter> =
     observable((observer) => {
       if (op.path === "analytics.topUsedDocuments") documentRequests++;
       const answer = documentsAnswer;
+      const held = holdNextAnswer;
+      holdNextAnswer = undefined;
+      let open = true;
       // Settle on a later tick, like a real round trip.
-      const timer = setTimeout(() => {
-        if (answer === undefined) {
-          observer.error(searchTooLarge());
-          return;
-        }
-        observer.next({ result: { type: "data", data: answer } });
-        observer.complete();
-      }, 5);
-      return () => clearTimeout(timer);
+      void (held ?? new Promise((resolve) => setTimeout(resolve, 5))).then(
+        () => {
+          if (!open) return;
+          if (answer === undefined) {
+            observer.error(searchTooLarge());
+            return;
+          }
+          observer.next({ result: { type: "data", data: answer } });
+          observer.complete();
+        },
+      );
+      return () => {
+        open = false;
+      };
     });
 
 function renderSection(ui: React.ReactElement) {
@@ -113,6 +124,7 @@ afterEach(cleanup);
 beforeEach(() => {
   documentRequests = 0;
   documentsAnswer = undefined;
+  holdNextAnswer = undefined;
 });
 
 describe("<DocumentsMetrics />", () => {
@@ -120,10 +132,12 @@ describe("<DocumentsMetrics />", () => {
     /** @scenario "A failed documents section stays visible and does not refetch on its own" */
     it("keeps the error and its Retry on screen without refetching, and Retry sends one request", async () => {
       renderSection(<DocumentsMetrics />);
+      await screen.findByRole("alert");
+      expect(documentRequests).toBe(1);
 
       await wait(1_500);
 
-      expect(documentRequests).toBeLessThanOrEqual(2);
+      expect(documentRequests).toBe(1);
       expect(screen.getByText("Documents")).toBeInTheDocument();
       expect(
         within(screen.getByRole("alert")).getByText(
@@ -135,13 +149,21 @@ describe("<DocumentsMetrics />", () => {
       });
 
       const before = documentRequests;
+      let release = () => {};
+      holdNextAnswer = new Promise((resolve) => {
+        release = resolve;
+      });
       await userEvent.click(retry);
 
-      // The section and its Retry stay up while the retry is in flight.
-      expect(screen.getByText("Documents")).toBeInTheDocument();
-      expect(screen.getByRole("alert")).toBeInTheDocument();
-
+      // The section and its Retry stay up, loading, while the retry is in flight.
       await waitFor(() => expect(documentRequests).toBe(before + 1));
+      expect(screen.getByText("Documents")).toBeInTheDocument();
+      // A loading button hides its label, so it is found by its loading state.
+      expect(
+        screen.getByRole("alert").querySelector("button[data-loading]"),
+      ).not.toBeNull();
+      await act(async () => release());
+
       await wait(1_000);
 
       expect(documentRequests).toBe(before + 1);
