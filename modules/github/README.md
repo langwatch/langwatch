@@ -24,7 +24,7 @@ The GitHub integration: app installations, their webhooks, and the pull requests
 | Stores required                |                                                                                              | `process/src/channels/http/http.github.channels.ts:11`                         |
 | Stores required                | prisma, redis                                                                                | `process/src/repositories/live/live.github.repositories.ts:11`                 |
 | Stores required                | prisma                                                                                       | `process/src/repositories/prisma/prisma.github.repositories.ts:13`             |
-| Secrets                        | GITHUB_LANGY_PRIVATE_KEY                                                                     | `process/src/app/github.app.ts:219`                                            |
+| Secrets                        | GITHUB_LANGY_PRIVATE_KEY                                                                     | `process/src/app/github.app.ts:220`                                            |
 | Config                         | `appId` (GITHUB_LANGY_APP_ID), `host` (GITHUB_LANGY_HOST), `appSlug` (GITHUB_LANGY_APP_SLUG) | `contract/src/github.config.ts:11`                                             |
 
 Anything else github needs belongs to another module and is reached through its `*Api`.
