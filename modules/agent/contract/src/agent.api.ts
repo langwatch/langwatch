@@ -3,14 +3,12 @@ import type { Instant } from "@langwatch/time";
 
 import type {
   RegisterConnectedAgentInput,
-  HttpAgentTestInput,
   ArchiveAgentCommand,
   CopyAgentCommand,
   CreateAgentCommand,
   UpdateAgentCommand,
 } from "./agent.commands.ts";
 import type {
-  HttpProxyResult,
   AgentReferenceState,
   AgentCopy,
   AgentHistoryEntry,
@@ -91,7 +89,6 @@ export interface AgentApi {
    * candidate query for the agent audit-log id backfill (scripts/backfill-agent-audit-log-ids.ts).
    */
   findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
-  executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
   listWithPresence(input: {
     projectId: string;
     page: number;

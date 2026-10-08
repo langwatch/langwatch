@@ -2,7 +2,6 @@ import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-con
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentAppFixture } from "./agent.fixture.ts";
@@ -41,9 +40,7 @@ describe("AgentModule workflow and audit ownership", () => {
   });
 
   it("reads no fields from Workflow and leaves a graph with no recorded fields unresolved", async () => {
-    const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({}),
-    });
+    const { app, repositories } = createAgentAppFixture();
     await repositories.agents.create(workflowAgent);
 
     expect(await app.getById(reference)).toMatchObject({
@@ -55,10 +52,7 @@ describe("AgentModule workflow and audit ownership", () => {
 
   /** @scenario "Cascade archive uses the workflow owner" */
   it("archives the Agent and records the archive naming the linked graph for Workflow", async () => {
-    const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));
-    const { app, repositories, archivedFacts } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ archiveLinked }),
-    });
+    const { app, repositories, archivedFacts } = createAgentAppFixture();
     await repositories.agents.create(workflowAgent);
 
     const result = await app.cascadeArchive(reference);
@@ -68,7 +62,6 @@ describe("AgentModule workflow and audit ownership", () => {
     expect((await repositories.agents.getByIdIncludingArchived(reference)).archivedAt).toEqual(
       result.agent.archivedAt,
     );
-    expect(archiveLinked).not.toHaveBeenCalled();
     expect(archivedFacts).toMatchObject([
       { agentId: reference.id, projectId: reference.projectId, cascadedWorkflowId: "workflow_1" },
     ]);

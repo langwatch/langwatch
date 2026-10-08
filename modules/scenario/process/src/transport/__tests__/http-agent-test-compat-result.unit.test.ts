@@ -12,11 +12,11 @@ import type {
  */
 import { describe, expect, it } from "vitest";
 
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
+import { createHttpAgentTestCaller } from "./http-agent-test.fixture.ts";
 
 function harness(state: ExecutionState) {
   let dispatched: ExecuteWorkflowComponentInput | undefined;
-  const caller = createHttpProxyCaller({
+  const caller = createHttpAgentTestCaller({
     workflows: createApiFixture<WorkflowApi>({
       executeComponent: async (input) => {
         dispatched = input;

@@ -52,7 +52,6 @@ const agentApi = createApiFixture<AgentApi>({
   cascadeArchive: mockMethod(),
   getCopies: mockMethod(),
   getSourceOfCopy: mockMethod(),
-  copy: mockMethod(),
   pushToCopies: mockMethod(),
   syncFromSource: mockMethod(),
   getHistory: mockMethod(),

@@ -1,6 +1,9 @@
 import {
+  type AgentApi,
   AgentStoredCredentialsDestinationError,
   buildHttpNodeParameters,
+  fillsStoredSecrets,
+  httpSecretsKeepingStored,
   type HttpAgentTestInput,
   type HttpAuth,
   type HttpHeader,
@@ -20,7 +23,6 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
-import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
 import { referencedSecretValues, withSecretValues } from "../rules/agent-test-destination.rules.ts";
 import {
   buildAgentTestTrace,
@@ -28,7 +30,6 @@ import {
   buildTraceTestContext,
   generateTraceIds,
 } from "../rules/agent-test-tracing.rules.ts";
-import type { AgentService } from "./agent.service.ts";
 
 const logger = createLogger("langwatch:httpProxy");
 type ExecutionState = NonNullable<BaseComponent["execution_state"]>;
@@ -43,14 +44,14 @@ const AGENT_TEST_WORKFLOW_KSUID_RESOURCE = "agenttestworkflow";
 type HttpAgentTestPeers = {
   workflows: WorkflowApi;
   traces: TraceApi;
-  agents: Pick<AgentService, "getById">;
+  agents: Pick<AgentApi, "getById">;
   secrets: Pick<SecretApi, "getValuesByName">;
 };
 
 export class HttpAgentTestService {
   readonly #workflows: WorkflowApi;
   readonly #traces: TraceApi;
-  readonly #agents: Pick<AgentService, "getById">;
+  readonly #agents: Pick<AgentApi, "getById">;
   readonly #secrets: Pick<SecretApi, "getValuesByName">;
 
   static create(peers: HttpAgentTestPeers): HttpAgentTestService {
@@ -155,10 +156,12 @@ export class HttpAgentTestService {
 
     const saved = { ...stored.config, url: withSecretValues({ text: stored.config.url, values }) };
     const requested = { ...input, url: withSecretValues({ text: input.url, values }) };
-    if (movesStoredSecrets({ stored: saved, incoming: requested })) {
-      throw new AgentStoredCredentialsDestinationError();
+    if (!isSameOrigin({ requested: requested.url, saved: saved.url })) {
+      if (fillsStoredSecrets({ stored: saved, incoming: requested })) {
+        throw new AgentStoredCredentialsDestinationError();
+      }
+      return unfilled;
     }
-    if (!isSameOrigin({ requested: requested.url, saved: saved.url })) return unfilled;
 
     return {
       call: httpSecretsKeepingStored({ stored: stored.config, incoming: input }),

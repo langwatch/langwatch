@@ -1,4 +1,9 @@
-import type { AgentTestRunResult, AgentTestTurnResult } from "@langwatch/agent-contract";
+import type {
+  AgentTestRunResult,
+  AgentTestTurnResult,
+  HttpAgentTestInput,
+  HttpProxyResult,
+} from "@langwatch/agent-contract";
 import { moduleApi } from "@langwatch/module";
 import type { UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
 import type { z } from "zod";
@@ -254,6 +259,7 @@ export interface ScenarioApi {
   streamVoiceRunAudio(input: VoiceRunAudioRequest): Promise<VoiceRunRecordingStream>;
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
+  testHttpAgent(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
   list(input: { projectId: string }): Promise<Scenario[]>;
   listTestSuites(input: {
     projectId: string;

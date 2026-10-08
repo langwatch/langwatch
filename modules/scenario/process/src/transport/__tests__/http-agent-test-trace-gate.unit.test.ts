@@ -7,7 +7,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
+import { createHttpAgentTestCaller } from "./http-agent-test.fixture.ts";
 
 type Recorded = RecordCapturedSpanInput;
 
@@ -15,7 +15,7 @@ function harness() {
   const dispatched: { projectId: string; headers: Record<string, string> }[] = [];
   const recorded: Recorded[] = [];
 
-  const caller = createHttpProxyCaller({
+  const caller = createHttpAgentTestCaller({
     workflows: createApiFixture<WorkflowApi>({
       executeComponent: async ({ projectId, workflow }) => {
         const node = workflow.nodes[0];
@@ -53,7 +53,7 @@ const REQUEST = {
   bodyTemplate: '{"question":"hi"}',
 };
 
-describe("httpProxy.execute", () => {
+describe("scenarios.testHttpAgent", () => {
   describe("given an agent that has been saved and carries an agentId", () => {
     describe("when the user executes a test request", () => {
       /** @scenario "Successful request creates a trace" */

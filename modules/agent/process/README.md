@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:23`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Agent application.
 
-Peers call these through the token, declared at `../contract/src/agent.api.ts:42`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/agent.api.ts:40`; nothing else in this package is public.
 
 #### `listWorkflowConfigs`
 
@@ -114,12 +114,6 @@ The ids of the agents created in a window, oldest first, archived ones included:
 
 ```typescript
 findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
-```
-
-#### `executeHttpTest`
-
-```typescript
-executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
 ```
 
 #### `listWithPresence`
@@ -520,7 +514,7 @@ type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/conn
 
 ### `agents`
 
-Contract `../contract/src/agent.trpc.ts:25`, router `src/transport/agent.trpc.ts:16`.
+Contract `../contract/src/agent.trpc.ts:20`, router `src/transport/agent.trpc.ts:16`.
 
 | Procedure               | Kind     | Gate                            | Input                               | Output                           |
 | ----------------------- | -------- | ------------------------------- | ----------------------------------- | -------------------------------- |
@@ -534,14 +528,6 @@ Contract `../contract/src/agent.trpc.ts:25`, router `src/transport/agent.trpc.ts
 | `agents.pushToCopies`   | mutation | Permission `evaluations:manage` | `agentApiPushToCopiesInputSchema`   | `agentPushToCopiesSchema`        |
 | `agents.syncFromSource` | mutation | Permission `evaluations:manage` | `agentApiAgentReferenceInputSchema` | `agentSyncFromSourceSchema`      |
 | `agents.getHistory`     | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
-
-### `httpProxy`
-
-Contract `../contract/src/agent.trpc.ts:68`, router `src/transport/http-proxy.trpc.ts:5`.
-
-| Procedure           | Kind     | Gate                            | Input                      | Output                  |
-| ------------------- | -------- | ------------------------------- | -------------------------- | ----------------------- |
-| `httpProxy.execute` | mutation | Permission `evaluations:manage` | `httpAgentTestInputSchema` | `httpProxyResultSchema` |
 
 ## Sockets
 

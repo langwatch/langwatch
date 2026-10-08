@@ -197,7 +197,7 @@ const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "suites.run": ["parameters"],
   "scenarios.run": ["parameters"],
-  "httpProxy.execute": ["templateVariables"],
+  "scenarios.testHttpAgent": ["templateVariables"],
 };
 
 /**

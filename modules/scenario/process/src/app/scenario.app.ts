@@ -3,6 +3,8 @@ import {
   MAX_CALL_TIMEOUT_MS,
   type AgentTestRunResult,
   type AgentTestTurnResult,
+  type HttpAgentTestInput,
+  type HttpProxyResult,
 } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -155,6 +157,7 @@ import type { ScenarioRepositories } from "../repositories/scenario.repositories
 import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 import { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { RunConfigurationsService } from "../services/run-configurations.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
@@ -191,6 +194,8 @@ const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
   agentTesting: AgentTestService;
+  /** One HTTP agent call from its editor, run by the workflow engine and traced. */
+  httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
@@ -367,6 +372,12 @@ export class ScenarioModule implements ScenarioApi {
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
+      httpAgentTesting: HttpAgentTestService.create({
+        workflows: peers.workflows,
+        traces: peers.traces,
+        agents: peers.agents,
+        secrets: peers.secrets,
+      }),
       projects: peers.projects,
       scenarios,
       simulations,
@@ -560,6 +571,10 @@ export class ScenarioModule implements ScenarioApi {
 
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
     return this.#dependencies.agentTesting.testRun(input);
+  }
+
+  testHttpAgent(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
+    return this.#dependencies.httpAgentTesting.execute(input);
   }
 
   /**

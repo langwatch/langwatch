@@ -11,7 +11,7 @@ Agents a project builds and runs: their workflow configurations, the connected a
 | Classification | core (`modules/catalogue.json`)                                                                |
 | Subjects       | agent                                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)    |
-| Api token      | `AgentApi` = `moduleApi<AgentApi>()("agent")`, `contract/src/agent.api.ts:161` (41 operations) |
+| Api token      | `AgentApi` = `moduleApi<AgentApi>()("agent")`, `contract/src/agent.api.ts:158` (40 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                     |
 
 ## What agent owns
@@ -33,9 +33,7 @@ Anything else agent needs belongs to another module and is reached through its `
 | `permissions`  | `AuthzApi`       | [authz](../authz/README.md)               |
 | `projects`     | `ProjectApi`     | [project](../project/README.md)           |
 | `secrets`      | `SecretApi`      | [secret](../secret/README.md)             |
-| `traces`       | `TraceApi`       | [trace](../trace/README.md)               |
 | `users`        | `UserApi`        | [user](../user/README.md)                 |
-| `workflows`    | `WorkflowApi`    | [workflow](../workflow/README.md)         |
 
 ## Who depends on agent
 

@@ -45,6 +45,14 @@ vi.mock("@langwatch/scenario-client", () => ({
   scenarioClient: {
     scenarios: {
       testAgentTurn: { useMutation: () => ({ mutate: vi.fn(), isPending: false, error: null }) },
+      testHttpAgent: {
+        useMutation: () => ({
+          mutateAsync: () => Promise.resolve({ success: true }),
+          mutate: vi.fn(),
+          isPending: false,
+          error: null,
+        }),
+      },
     },
   },
 }));
@@ -74,7 +82,6 @@ vi.mock("../../../behavior/agent-api.ts", () => {
         }),
         update: mutation(() => Promise.resolve({})),
       },
-      httpProxy: { execute: mutation(() => Promise.resolve({ success: true })) },
       workflow: {
         getById: {
           useQuery: () => ({ data: fetched.workflow, isLoading: false, isError: false }),

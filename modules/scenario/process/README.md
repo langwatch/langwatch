@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The scenario application: what every scenario door calls, and what peer features such as Suite reach it by.
 
-Peers call these through the token, declared at `../contract/src/scenario.api.ts:241`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scenario.api.ts:246`; nothing else in this package is public.
 
 #### `generateScenario`
 
@@ -80,6 +80,12 @@ testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
 
 ```typescript
 testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
+```
+
+#### `testHttpAgent`
+
+```typescript
+testHttpAgent(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
 ```
 
 #### `list`
@@ -846,7 +852,7 @@ type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract
 
 ### `scenarios`
 
-Contract `../contract/src/scenario.trpc.ts:167`, router `src/transport/scenario.trpc.ts:40`.
+Contract `../contract/src/scenario.trpc.ts:169`, router `src/transport/scenario.trpc.ts:40`.
 
 | Procedure                               | Kind         | Gate                                                                                                                                                                                                                                | Input                               | Output                               |
 | --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------ |
@@ -887,6 +893,7 @@ Contract `../contract/src/scenario.trpc.ts:167`, router `src/transport/scenario.
 | `scenarios.finishVoiceSession`          | mutation     | Service-authorized: scenarios:create, evaluations:manage; The voice flag and scenarios:create are checked in the app; evaluations:manage only when the call creates an agent, which a finish learns from its verified session token | `voiceSessionFinishInputSchema`     | `voiceSessionFinishResultSchema`     |
 | `scenarios.testAgentTurn`               | mutation     | Permission `evaluations:manage`                                                                                                                                                                                                     | `agentApiTestTurnInputSchema`       | `agentTestTurnResultSchema`          |
 | `scenarios.testAgentRun`                | mutation     | Permission `scenarios:create`                                                                                                                                                                                                       | `agentApiAgentReferenceInputSchema` | `agentTestRunResultSchema`           |
+| `scenarios.testHttpAgent`               | mutation     | Permission `evaluations:manage`                                                                                                                                                                                                     | `httpAgentTestInputSchema`          | `httpProxyResultSchema`              |
 
 ## Sockets
 
@@ -941,9 +948,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:264`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:265`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:267`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:269`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:270`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:272`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:85`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:87`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:89`  |

@@ -8,13 +8,7 @@ import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import {
-  workflowSchema,
-  workflowVersionSchema,
-  type WorkflowApi,
-} from "@langwatch/workflow-contract";
 
 import type { RecordAgentArchivedCommandData } from "../../eventing/agent-lifecycle.commands.ts";
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
@@ -70,9 +64,7 @@ export function createAgentAppFixture(
     permissions?: AuthzApi;
     projects?: ProjectApi;
     secrets?: SecretApi;
-    traces?: TraceApi;
     users?: UserApi;
-    workflows?: WorkflowApi;
     repositories?: AgentRepositories;
     config?: AgentServerConfig;
   } = {},
@@ -86,9 +78,7 @@ export function createAgentAppFixture(
       permissions: options.permissions ?? createApiFixture<AuthzApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>(),
       secrets: options.secrets ?? secretStoreFixture().secrets,
-      traces: options.traces ?? createApiFixture<TraceApi>(),
       users: options.users ?? createApiFixture<UserApi>(),
-      workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
     config: options.config ?? {
       replicaCount: 1,
@@ -112,40 +102,4 @@ export function createAgentAppFixture(
   });
 
   return { app, repositories, resources, archivedFacts };
-}
-
-export function agentWorkflowCopyFixture(workflowId = "workflow_copy", projectId = "project_2") {
-  const timestamp = toDate(Temporal.Instant.fromEpochMilliseconds(0));
-  const version = workflowVersionSchema.parse({
-    id: "version_copy",
-    workflowId,
-    projectId,
-    version: "1",
-    autoSaved: false,
-    commitMessage: "Copied",
-    authorId: "user_1",
-    parentId: null,
-    dsl: { name: "Copied workflow", version: "1", nodes: [], edges: [] },
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-  const workflow = workflowSchema.parse({
-    id: workflowId,
-    projectId,
-    name: "Copied workflow",
-    icon: null,
-    description: null,
-    latestVersionId: version.id,
-    currentVersionId: version.id,
-    publishedId: null,
-    publishedById: null,
-    copiedFromWorkflowId: "workflow_1",
-    isEvaluator: false,
-    isComponent: false,
-    archivedAt: null,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
-
-  return { workflow, version };
 }

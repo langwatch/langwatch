@@ -3,7 +3,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
+import { createHttpAgentTestCaller } from "./http-agent-test.fixture.ts";
 
 const request = {
   projectId: "project_1",
@@ -31,7 +31,7 @@ describe("HTTP agent test boundary", () => {
   it("redacts credentials from whitespace-padded header names before recording history", async () => {
     const dispatch = execution();
 
-    await createHttpProxyCaller(dispatch).execute({
+    await createHttpAgentTestCaller(dispatch).execute({
       ...request,
       headers: [{ key: " Authorization ", value: "Bearer secret-token" }],
     });
@@ -44,7 +44,7 @@ describe("HTTP agent test boundary", () => {
   });
   it("rejects invalid input before reaching the engine", async () => {
     const dispatch = execution();
-    const caller = createHttpProxyCaller(dispatch);
+    const caller = createHttpAgentTestCaller(dispatch);
 
     await expect(caller.execute({ ...request, url: "not a URL" })).rejects.toMatchObject({
       code: "BAD_REQUEST",
@@ -56,7 +56,7 @@ describe("HTTP agent test boundary", () => {
 
   it("requires an authenticated actor before any outbound work", async () => {
     const dispatch = execution();
-    const caller = createHttpProxyCaller(dispatch, null);
+    const caller = createHttpAgentTestCaller(dispatch, null);
 
     await expect(caller.execute(request)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
 
@@ -70,7 +70,7 @@ describe("HTTP agent test boundary", () => {
       new Error("https://secret-token@internal.service:8000"),
     );
 
-    const result = await createHttpProxyCaller(dispatch).execute(request);
+    const result = await createHttpAgentTestCaller(dispatch).execute(request);
 
     expect(result).toEqual({ success: false });
     expect(JSON.stringify(dispatch.recordCapturedSpan.mock.calls)).not.toContain("secret-token");
@@ -81,7 +81,7 @@ describe("HTTP agent test boundary", () => {
     const dispatch = execution();
     dispatch.recordCapturedSpan.mockRejectedValue(new Error("trace storage unavailable"));
 
-    const result = await createHttpProxyCaller(dispatch).execute(request);
+    const result = await createHttpAgentTestCaller(dispatch).execute(request);
 
     expect(result).toMatchObject({ success: true, extractedOutput: "answer" });
     expect(dispatch.executeComponent).toHaveBeenCalledOnce();
@@ -94,7 +94,7 @@ describe("HTTP agent test boundary", () => {
       new Error("The engine reported no result for this request"),
     );
 
-    const result = await createHttpProxyCaller(dispatch).execute(request);
+    const result = await createHttpAgentTestCaller(dispatch).execute(request);
 
     expect(result).toEqual({ success: false });
     expect(dispatch.recordCapturedSpan).toHaveBeenCalledOnce();

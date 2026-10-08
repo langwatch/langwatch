@@ -39,6 +39,6 @@ Anything else workflow needs belongs to another module and is reached through it
 
 ## Who depends on workflow
 
-[agent](../agent/README.md), [audit-log](../audit-log/README.md), [evaluation](../evaluation/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md) (as a peer).
+[audit-log](../audit-log/README.md), [evaluation](../evaluation/README.md), [evaluator](../evaluator/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [platform-health](../platform-health/README.md), [prompt](../prompt/README.md), [scenario](../scenario/README.md) (as a peer).
 
 <!-- readme:generated:end -->

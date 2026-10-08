@@ -1,6 +1,6 @@
-import { isDeepStrictEqual } from "node:util";
-
 import {
+  fillsStoredSecrets,
+  httpSecretsKeepingStored,
   isCredentialHeader,
   withoutLiteralCredential,
   type Agent,
@@ -69,42 +69,6 @@ export function agentConfigWithoutSecrets(agent: Agent): Agent["config"] {
   return agent.type === "http" ? httpConfigWithoutSecrets(agent.config) : agent.config;
 }
 
-function authKeepingStored(input: { stored: HttpAuth | undefined; incoming: HttpAuth }): HttpAuth {
-  const { stored, incoming } = input;
-  if (!stored) return incoming;
-  if (incoming.type === "bearer" && stored.type === "bearer" && incoming.token === "") {
-    return { ...incoming, token: stored.token };
-  }
-  if (incoming.type === "api_key" && stored.type === "api_key" && incoming.value === "") {
-    return { ...incoming, value: stored.value };
-  }
-  if (incoming.type === "basic" && stored.type === "basic" && incoming.password === "") {
-    return { ...incoming, password: stored.password };
-  }
-
-  return incoming;
-}
-
-/** A blank credential on a write means "unchanged": the stored value takes its place. */
-export function httpSecretsKeepingStored<T extends HttpSecrets>(input: {
-  stored: HttpSecrets;
-  incoming: T;
-}): T {
-  const { stored, incoming } = input;
-  const headers = incoming.headers?.map((header) =>
-    header.value === "" && isCredentialHeader(header.key)
-      ? { ...header, value: stored.headers?.find(({ key }) => key === header.key)?.value ?? "" }
-      : header,
-  );
-  const auth = incoming.auth && authKeepingStored({ stored: stored.auth, incoming: incoming.auth });
-
-  return {
-    ...incoming,
-    ...(headers ? { headers } : {}),
-    ...(auth ? { auth } : {}),
-  };
-}
-
 type HttpDestination = HttpSecrets & { url: string };
 
 /**
@@ -116,12 +80,8 @@ export function movesStoredSecrets(input: {
   incoming: HttpDestination;
 }): boolean {
   if (isSameOrigin({ requested: input.incoming.url, saved: input.stored.url })) return false;
-  const filled = httpSecretsKeepingStored(input);
 
-  return !isDeepStrictEqual(
-    { headers: filled.headers, auth: filled.auth },
-    { headers: input.incoming.headers, auth: input.incoming.auth },
-  );
+  return fillsStoredSecrets(input);
 }
 
 /**

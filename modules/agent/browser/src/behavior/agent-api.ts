@@ -1,4 +1,4 @@
-import type { agentTrpc, httpProxyTrpc } from "@langwatch/agent-contract";
+import type { agentTrpc } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
 import type { workflowTrpc } from "@langwatch/workflow-contract";
 
@@ -13,7 +13,6 @@ type BorrowedProcedures = {
 };
 
 export type AgentApiMap = ContractApiMap<typeof agentTrpc> &
-  ContractApiMap<typeof httpProxyTrpc> &
   ContractApiMap<typeof workflowTrpc> &
   BorrowedProcedures;
 

@@ -1,7 +1,6 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApp, MissingProviderError } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { agentProcessModule } from "../../agent.module.ts";
@@ -23,9 +22,10 @@ function bootWithoutPeers() {
 describe("agent installation", () => {
   describe("when a process boots without the peers Agent declares", () => {
     /** @scenario "Missing peer implementations fail boot" */
-    it("declares Workflow and Audit Log among its peers", () => {
-      expect(AgentModule.dependencies.workflows).toBe(WorkflowApi);
+    it("declares Audit Log among its peers, and neither Workflow nor Trace", () => {
       expect(AgentModule.dependencies.auditLog).toBe(AuditLogApi);
+      expect(Object.keys(AgentModule.dependencies)).not.toContain("workflows");
+      expect(Object.keys(AgentModule.dependencies)).not.toContain("traces");
     });
 
     /** @scenario "Missing peer implementations fail boot" */

@@ -18,7 +18,6 @@ import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
 import { agentTraceparent, createAgentRest } from "#transport/agent.rest";
 import { agentTrpcTransport } from "#transport/agent.trpc";
-import { httpProxyTrpcTransport } from "#transport/http-proxy.trpc";
 
 export const agentProcessModule = defineProcessModule("agent")
   .withRepositories(agentRepositories)
@@ -29,7 +28,6 @@ export const agentProcessModule = defineProcessModule("agent")
     createAgentWebSocketProtocol(),
     agentLegacyRest,
     agentTrpcTransport,
-    httpProxyTrpcTransport,
   )
   .withEventing(agentLifecycleEventing)
   .withEventing(agentWorkflowFieldsEventing)

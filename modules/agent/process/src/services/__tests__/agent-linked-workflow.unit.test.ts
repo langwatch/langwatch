@@ -1,22 +1,9 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  agentWorkflowCopyFixture,
-  createAgentAppFixture,
-} from "../../app/__tests__/agent.fixture.ts";
+import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 async function setup() {
-  const copy = vi.fn(async () => agentWorkflowCopyFixture());
-  const archiveLinked = vi.fn(async () => ({ id: "workflow_1" }));
-  const deleteUncommitted = vi.fn(async () => {});
-  const workflows = createApiFixture<WorkflowApi>({
-    copy,
-    archiveLinked,
-    deleteUncommitted,
-  });
-  const fixture = createAgentAppFixture({ workflows });
+  const fixture = createAgentAppFixture();
   await fixture.repositories.agents.create({
     id: "agent_workflow",
     projectId: "project_1",
@@ -26,7 +13,7 @@ async function setup() {
     workflowId: "workflow_1",
   });
 
-  return { ...fixture, copy, archiveLinked, deleteUncommitted };
+  return fixture;
 }
 
 describe("AgentModule linked workflow operations", () => {
@@ -41,13 +28,11 @@ describe("AgentModule linked workflow operations", () => {
       targetProjectId: "project_2",
       workflowId: "workflow_copy",
     });
-    expect(fixture.copy).not.toHaveBeenCalled();
     expect(
       await fixture.repositories.agents.getById({ id: copied.id, projectId: "project_2" }),
     ).toMatchObject({ workflowId: "workflow_copy", copiedFromAgentId: "agent_workflow" });
 
     const archived = await app.cascadeArchive({ id: "agent_workflow", projectId: "project_1" });
-    expect(fixture.archiveLinked).not.toHaveBeenCalled();
     expect(fixture.archivedFacts).toMatchObject([
       { agentId: "agent_workflow", projectId: "project_1", cascadedWorkflowId: "workflow_1" },
     ]);

@@ -23,7 +23,6 @@ import {
   type ConnectedAgentsInput,
   type ConnectedAgentsEnvironmentInput,
   type RegisterConnectedAgentInput,
-  type HttpAgentTestInput,
   type AgentConnection,
   type AgentConnectAdmission,
   type AgentConnectCredentials,
@@ -43,7 +42,6 @@ import {
   type DispatchAgent,
   type DispatchCall,
   type AgentWorkflowConfig,
-  type HttpProxyResult,
   type AgentConnectRegisterAnswer,
   type AgentConnectPollAnswer,
   type CallOutcome,
@@ -68,9 +66,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
   type AgentLifecyclePipeline,
@@ -93,7 +89,6 @@ import {
   type AgentPresence,
 } from "../services/connected-agent-presence.service.ts";
 import { ConnectedAgentService } from "../services/connected-agent.service.ts";
-import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 
 /**
  * The app's KSUID resource for a call's thread id (`KSUID_RESOURCES.THREAD`).
@@ -125,9 +120,7 @@ export class AgentModule implements AgentApi {
     projects: ProjectApi,
     /** Where the token typed into an HTTP agent is stored, as a project secret. */
     secrets: SecretApi,
-    traces: TraceApi,
     users: UserApi,
-    workflows: WorkflowApi,
   };
 
   readonly #agents: AgentService;
@@ -135,7 +128,6 @@ export class AgentModule implements AgentApi {
   readonly #copies: AgentCopyService;
   readonly #voiceRelease: AgentVoiceReleaseService;
   readonly #connected: ConnectedAgentService | undefined;
-  readonly #httpTesting: HttpAgentTestService;
   readonly #httpSecrets: AgentHttpSecretsService;
   readonly #auditLog: AuditLogApi;
   readonly #permissions: AuthzApi;
@@ -164,12 +156,6 @@ export class AgentModule implements AgentApi {
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
     this.#users = dependencies.users;
-    this.#httpTesting = HttpAgentTestService.create({
-      workflows: dependencies.workflows,
-      traces: dependencies.traces,
-      agents: this.#agents,
-      secrets: dependencies.secrets,
-    });
 
     const connected = ConnectedAgentService.create({
       agents: this.#agents,
@@ -446,10 +432,6 @@ export class AgentModule implements AgentApi {
     const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
     const names = new Map(users.map((user) => [user.id, user.name]));
     return new Map(userIds.map((userId) => [userId, { userId, name: names.get(userId) ?? null }]));
-  }
-
-  executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
-    return this.#httpTesting.execute(input);
   }
 
   acceptConnection(connection: AgentConnection, admission: AgentConnectAdmission): Promise<void> {

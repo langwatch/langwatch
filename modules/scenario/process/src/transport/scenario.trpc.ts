@@ -359,4 +359,9 @@ export const scenarioTrpcTransport: TrpcRouterDeclaration<ScenarioApi, typeof sc
     .handle(({ app, input, actor }) =>
       app.testAgentRun({ ...input, actor: { id: actor.id, label: "user" } }),
     )
+
+    // -- main's httpProxy.execute: the HTTP agent editor's and studio node's test call --
+    .procedure("testHttpAgent")
+    .withPermission("evaluations:manage")
+    .handle(({ input, app, actor }) => app.testHttpAgent({ ...input, actorId: actor.id }))
     .build();

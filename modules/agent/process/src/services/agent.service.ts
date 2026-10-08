@@ -27,11 +27,12 @@ import {
   type AgentName,
   type AgentPage,
   type WorkflowAgentConfig,
+  httpSecretsKeepingStored,
 } from "@langwatch/agent-contract";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
-import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
 import { workflowFieldsKeepingStored } from "../rules/agent-view.rules.ts";
 
 export class AgentService {

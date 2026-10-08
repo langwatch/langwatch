@@ -11,12 +11,12 @@ import type {
  */
 import { describe, expect, it } from "vitest";
 
-import { createHttpProxyCaller } from "./http-proxy.fixture.ts";
+import { createHttpAgentTestCaller } from "./http-agent-test.fixture.ts";
 
 function harness(state: ExecutionState) {
   let dispatchedEvent: ExecuteWorkflowComponentInput | undefined;
 
-  const caller = createHttpProxyCaller({
+  const caller = createHttpAgentTestCaller({
     workflows: createApiFixture<WorkflowApi>({
       executeComponent: async (input) => {
         dispatchedEvent = input;
@@ -50,7 +50,7 @@ const REQUEST = {
   templateVariables: { input: "hello" },
 };
 
-describe("httpProxy.execute", () => {
+describe("scenarios.testHttpAgent", () => {
   describe("when the engine reports a successful call", () => {
     /** @scenario "an agent on an internal address that tests green also runs green" */
     it("dispatches the request to the engine instead of calling out itself", async () => {

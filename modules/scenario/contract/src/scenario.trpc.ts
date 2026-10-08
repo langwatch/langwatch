@@ -9,6 +9,8 @@ import {
   agentApiTestTurnInputSchema,
   agentTestRunResultSchema,
   agentTestTurnResultSchema,
+  httpAgentTestInputSchema,
+  httpProxyResultSchema,
 } from "@langwatch/agent-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
@@ -487,4 +489,9 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .mutation("testAgentRun")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentTestRunResultSchema)
+
+  /** Main's `httpProxy.execute`: one HTTP agent call from its editor or a studio node. */
+  .mutation("testHttpAgent")
+  .withInput(httpAgentTestInputSchema)
+  .withOutput(httpProxyResultSchema)
   .build();

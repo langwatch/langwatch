@@ -1,10 +1,6 @@
 import { defineTrpcContract } from "@langwatch/module";
 
-import {
-  createAgentCommandSchema,
-  updateAgentCommandSchema,
-  httpAgentTestInputSchema,
-} from "./agent.commands.ts";
+import { createAgentCommandSchema, updateAgentCommandSchema } from "./agent.commands.ts";
 import {
   agentCascadeArchiveSchema,
   agentCopySchema,
@@ -12,7 +8,6 @@ import {
   agentPushToCopiesSchema,
   agentSyncFromSourceSchema,
   agentWithLegacyCopyCountSchema,
-  httpProxyResultSchema,
 } from "./agent.queries.ts";
 import {
   agentApiAgentInputSchema,
@@ -63,10 +58,4 @@ export const agentTrpc = defineTrpcContract("agents")
   .withInput(agentApiAgentReferenceInputSchema)
   .withOutput(agentHistoryEntrySchema.array())
 
-  .build();
-
-export const httpProxyTrpc = defineTrpcContract("httpProxy")
-  .mutation("execute")
-  .withInput(httpAgentTestInputSchema)
-  .withOutput(httpProxyResultSchema)
   .build();
