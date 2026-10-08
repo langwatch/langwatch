@@ -1,6 +1,5 @@
 /**
- * The page the user is on is offered as context, read off the route. Unbound: the spec says the
- * composer shows the chip, but a route chip is only offered until chosen (see the lane handoff).
+ * The page the user is on is offered as context, read off the route.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-context-system.feature
  */
@@ -23,6 +22,7 @@ function offeredAt(path: string) {
 }
 
 describe("given the user is viewing one resource", () => {
+  /** @scenario "Viewing an experiment surfaces it as context" */
   it("offers a chip for the experiment, workbench route included", () => {
     for (const path of [
       "/demo/experiments/checkout-eval",
@@ -34,12 +34,14 @@ describe("given the user is viewing one resource", () => {
     }
   });
 
+  /** @scenario "Viewing a trace surfaces it as context" */
   it("offers a chip for the trace", () => {
     const chips = offeredAt("/demo/traces/trace_abc123");
     expect(chips).toContainEqual(expect.objectContaining({ kind: "trace" }));
     expect(chips.map((chip) => chip.id).join(" ")).toContain("trace_abc123");
   });
 
+  /** @scenario "Viewing a prompt, dataset, or dashboard surfaces it as context" */
   it("offers a chip for the dataset", () => {
     const chips = offeredAt("/demo/datasets/ds_42");
     expect(chips).toContainEqual(expect.objectContaining({ kind: "dataset" }));

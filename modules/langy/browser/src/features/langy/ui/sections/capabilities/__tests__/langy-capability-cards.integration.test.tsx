@@ -6,7 +6,7 @@
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { toCliToolResult } from "@langwatch/langy-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
@@ -103,6 +103,7 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
+import { useLangyStore } from "../../../../../../behavior/langy.store.ts";
 import type { CapabilityData } from "../../../../behavior/use-capability-data.ts";
 import { LangyToolActivity } from "../../langy-tool-activity.tsx";
 import { LangyCapabilityRenderer } from "../langy-capability-renderer.tsx";
@@ -110,6 +111,7 @@ import { LangyCapabilityRenderer } from "../langy-capability-renderer.tsx";
 afterEach(() => {
   cleanup();
   hydration.current = null;
+  useLangyStore.setState({ devMode: false });
   window.matchMedia = originalMatchMedia;
 });
 
@@ -414,6 +416,94 @@ describe("given Langy has started a trace search that has not returned", () => {
 
       expect(screen.getByText("2 traces")).toBeTruthy();
       expect(screen.queryByText(/Searching traces…/)).toBeNull();
+    });
+  });
+});
+
+describe("given Langy searched traces and the search returned matches", () => {
+  describe("when the panel renders the call", () => {
+    /** @scenario "A trace search renders results inline with no Apply" */
+    it("lists the traces inline, each linking to its trace, with one link to the Trace Explorer", () => {
+      hydration.current = {
+        status: "hydrated",
+        rows: [{ id: "trace_visible", primary: "fresh question" }],
+        loadedCount: 1,
+        totalCount: 1,
+        isHydrating: false,
+      };
+      renderCall(traceSearchCall());
+
+      const row = screen.getByText("fresh question").closest("a");
+      expect(row?.getAttribute("href")).toContain("trace_visible");
+      expect(screen.getByText("View in Trace Explorer").closest("a")).toBeTruthy();
+      expect(screen.queryByText(/Open in Traces/i)).toBeNull();
+      expect(screen.queryByText(/Apply|Discard/)).toBeNull();
+    });
+  });
+});
+
+describe("given Langy ran an analytics query that returned numbers", () => {
+  const analytics = () =>
+    settledCall({
+      name: "langwatch.analytics.query",
+      resource: "analytics",
+      verb: "query",
+      payload: {
+        currentPeriod: [
+          {
+            date: "full",
+            "metadata.model": { "gpt-5-mini": { "0/metadata.trace_id/cardinality": 7 } },
+          },
+        ],
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      },
+    });
+
+  describe("when the panel renders the call", () => {
+    /** @scenario "An analytics query renders as a metrics card" */
+    it("shows the figures, rolling up from zero, and offers no deep link", () => {
+      mockReducedMotion(false);
+      renderCall(analytics());
+      expect(screen.getByText("Traces")).toBeTruthy();
+      expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+      expect(screen.queryByText(/Open in Analytics/i)).toBeNull();
+      cleanup();
+
+      mockReducedMotion(true);
+      renderCall(analytics());
+      expect(screen.getAllByText("7").length).toBeGreaterThan(0);
+      expect(screen.queryByText("0")).toBeNull();
+    });
+  });
+});
+
+describe("given developer mode is on and Langy ran a tool with no capability card", () => {
+  describe("when the panel renders the turn", () => {
+    /** @scenario "An unmapped tool falls through to the raw view" */
+    it("lets me show the tool's raw name, state, input and output", () => {
+      useLangyStore.setState({ devMode: true });
+      const parts: UIMessage["parts"] = [];
+      Object.assign(parts, [
+        {
+          type: "tool-mystery_probe",
+          toolCallId: "call-9",
+          state: "output-available",
+          input: { depth: 3 },
+          output: "probe-finished",
+        },
+      ]);
+      render(
+        inHost(<LangyToolActivity message={{ id: "assistant-2", role: "assistant", parts }} />),
+      );
+
+      fireEvent.click(screen.getByLabelText("Show raw data"));
+
+      const raw = screen.getByText(/"tool": "mystery_probe"/).textContent ?? "";
+      expect(raw).toContain('"state": "output-available"');
+      expect(raw).toContain('"depth": 3');
+      expect(raw).toContain("probe-finished");
     });
   });
 });
