@@ -33,7 +33,6 @@ const isNamedTask = (contribution: unknown): contribution is NamedTask =>
 class AnnotationModule implements AnnotationApi {
   static readonly contract = AnnotationApi;
   static readonly dependencies = {};
-  static readonly reads = [] as const;
   static create(): AnnotationModule {
     return new AnnotationModule();
   }
@@ -45,7 +44,6 @@ class AnnotationModule implements AnnotationApi {
 class DatasetModule implements DatasetApi {
   static readonly contract = DatasetApi;
   static readonly dependencies = {};
-  static readonly reads = [] as const;
   static create(): DatasetModule {
     return new DatasetModule();
   }

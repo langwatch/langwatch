@@ -19,7 +19,7 @@ async function bootRuntime({
   drainFails?: boolean;
   onDrain?: () => Promise<void> | void;
 }) {
-  const feature = serverFeature<object>("jobs")
+  const feature = serverFeature("jobs")
     .withSetup(({ resources }) => {
       resources.ownService({
         name: "feature consumers",

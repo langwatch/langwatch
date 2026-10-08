@@ -21,7 +21,6 @@ type Equal<Left, Right> =
 type Expect<T extends true> = T;
 
 type Config = Readonly<{ suffix: string }>;
-type Members = Readonly<{ prefix: string }>;
 
 abstract class CatalogueApi {
   abstract read(): string;
@@ -30,7 +29,6 @@ abstract class CatalogueApi {
 class CatalogueApp extends CatalogueApi {
   static readonly contract = CatalogueApi;
   static readonly dependencies = {};
-  static readonly reads = ["prefix"] as const;
   static readonly config = Config.define((c) => ({
     suffix: c.env("CATALOGUE_SUFFIX", z.string()),
   }));
@@ -39,10 +37,8 @@ class CatalogueApp extends CatalogueApi {
     super();
   }
 
-  static create(
-    setup: FeatureSetup<typeof CatalogueApp.dependencies, Config> & Readonly<{ members: Members }>,
-  ) {
-    return new CatalogueApp(`${setup.members.prefix}${setup.config.suffix}`);
+  static create(setup: FeatureSetup<typeof CatalogueApp.dependencies, Config>) {
+    return new CatalogueApp(setup.config.suffix);
   }
 
   read(): string {
@@ -63,7 +59,7 @@ const withoutBuild = defineProcessModule("annotation")
 describe("given a module that states its doors", () => {
   describe("when it is spelled without a terminator", () => {
     it("is installable as it stands", () => {
-      const installable: InstallableServerFeature<Members, "annotation", Config> = withoutBuild;
+      const installable: InstallableServerFeature<"annotation", Config> = withoutBuild;
 
       expect(installable.name).toBe("annotation");
     });
@@ -97,10 +93,8 @@ describe("given a module that states its doors", () => {
       const contributed = withoutBuild
         .withWorkers("consumer")
         .withTasks("backfill")
-        .withTransportFacts(({ app, members }) => [
-          { fact: "catalogueSize", read: () => `${members.prefix}${app.read()}` },
-        ]);
-      const installable: InstallableServerFeature<Members, "annotation", Config> = contributed;
+        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
+      const installable: InstallableServerFeature<"annotation", Config> = contributed;
 
       expect(installable.name).toBe("annotation");
       expect(contributed.workers).toEqual(["consumer"]);
@@ -119,7 +113,6 @@ describe("given a module that owns repositories", () => {
   class StoredApp extends CatalogueApi {
     static readonly contract = CatalogueApi;
     static readonly dependencies = {};
-    static readonly reads = ["prefix"] as const;
     static readonly config = CatalogueApp.config;
 
     private constructor(private readonly rows: number) {
@@ -127,8 +120,7 @@ describe("given a module that owns repositories", () => {
     }
 
     static create(
-      setup: FeatureSetup<typeof StoredApp.dependencies, Config, Readonly<{ rows: () => number }>> &
-        Readonly<{ members: Members }>,
+      setup: FeatureSetup<typeof StoredApp.dependencies, Config, Readonly<{ rows: () => number }>>,
     ) {
       return new StoredApp(setup.repositories.rows());
     }
@@ -145,7 +137,7 @@ describe("given a module that owns repositories", () => {
 
   it("terminates the same way on the repository path", () => {
     type _config = Expect<Equal<ModuleConfigFor<[typeof stored]>, { readonly annotation: Config }>>;
-    const installable: InstallableServerFeature<Members, "annotation", Config> = stored;
+    const installable: InstallableServerFeature<"annotation", Config> = stored;
 
     expect(installable.name).toBe("annotation");
     expect("build" in stored).toBe(false);

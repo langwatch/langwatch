@@ -73,7 +73,6 @@ describe("hosted MCP app installation", () => {
       hostedMcpProcessModule.install({
         resources,
         config: { publicBaseUrl: "https://app.langwatch.ai" },
-        members: {},
         repositorySelection: {
           tier: "live",
           members: {

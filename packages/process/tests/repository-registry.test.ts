@@ -7,7 +7,6 @@ import { ApplicationBuilder } from "../src/application.ts";
 import {
   defineProcessModule,
   defineRepositories,
-  withMemoryRepositories,
   type FeatureSetup,
   type Tier,
 } from "../src/index.ts";
@@ -59,15 +58,12 @@ class App {
 class ConfiguredApp {
   static readonly contract = ConfiguredApp;
   static readonly dependencies = {};
-  static readonly reads = ["suffix"] as const;
   static readonly config = Config.define((c) => ({ prefix: c.env("AGENT_PREFIX", z.string()) }));
   static create({
     repositories,
-    members,
     config,
-  }: FeatureSetup<Record<never, never>, { prefix: string }, Repositories> &
-    Readonly<{ members: { suffix: string } }>): ConfiguredApp {
-    return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}:${members.suffix}`);
+  }: FeatureSetup<Record<never, never>, { prefix: string }, Repositories>): ConfiguredApp {
+    return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}`);
   }
   constructor(readonly value: string) {}
 }
@@ -180,16 +176,16 @@ describe("given a module that declares both repository tiers", () => {
       await runtime.stop();
     });
 
-    it("hands the app its config, the members it reads and the live repositories", async () => {
+    it("hands the app its config and the live repositories", async () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
         config: { agent: { prefix: "config" } },
-        stores: liveMemberSourceOf({ suffix: "infra", prisma: { prefix: "database" } }),
+        stores: liveMemberSourceOf({ prisma: { prefix: "database" } }),
       })
         .withModules([configuredFeature])
         .boot();
 
-      expect(runtime.module(configuredFeature).provided.value).toBe("config:database:infra");
+      expect(runtime.module(configuredFeature).provided.value).toBe("config:database");
       await runtime.stop();
     });
   });
@@ -211,19 +207,6 @@ describe("given a module that declares both repository tiers", () => {
       expect(liveCreates).toBe(0);
       expect(memoryCreates).toBe(1);
       await runtime.stop();
-    });
-
-    it("refuses on a module that declares no repositories at all", () => {
-      class StorelessApp {
-        static readonly contract = StorelessApp;
-        static readonly dependencies = {};
-        static create(): StorelessApp {
-          return new StorelessApp();
-        }
-      }
-      const plain = defineProcessModule("share").withApi(StorelessApp).build();
-
-      expect(() => withMemoryRepositories(plain)).toThrow("has no memory tier");
     });
   });
 

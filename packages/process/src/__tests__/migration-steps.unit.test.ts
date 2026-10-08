@@ -65,7 +65,6 @@ async function installIn(role: ServerRole): Promise<{
   const state = await declaration.install({
     resources: new ResourceScope(),
     config: undefined,
-    members: {} as never,
     role,
     resolve: () => undefined,
   });

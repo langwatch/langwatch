@@ -44,7 +44,6 @@ async function replayerHandedTo({
   await declaration.install({
     resources: new ResourceScope(),
     config: undefined,
-    members: {} as never,
     role: "worker",
     ...(composed === undefined ? {} : { replayer: composed }),
     resolve: () => undefined,

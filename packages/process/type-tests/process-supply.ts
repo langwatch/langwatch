@@ -9,15 +9,16 @@ import type { SupplyModule } from "../src/process-supply.types.ts";
 import {
   clock,
   clockModule,
+  clockRepositories,
   ClockApp,
   connections,
   connectionsModule,
   configModule,
   facilities,
+  memoryRepositoryModule,
   facilityModule,
   licenseConsumerModule,
   licenseSource,
-  memoryRepositoryModule,
   peerModule,
   project,
   projectModule,
@@ -89,8 +90,7 @@ void all.boot();
 const ready = all
   .withConfig({ "api-key": { pepper: "test" } })
   .provide({ project })
-  .withRelational(facilities.relational)
-  .withKeyvalue(facilities.keyvalue)
+  .withMembers({ relational: facilities.relational, keyvalue: facilities.keyvalue })
   .withClock(clock)
   .withSecrets(facilities.secrets)
   .withEncryption(facilities.encryption)
@@ -110,7 +110,9 @@ void wrongFacility.boot();
 
 const repositoryOnly = createApp({ role: "api" }).withModules([repositoryModule]);
 expectTypeOf<MissingNames<typeof repositoryOnly>>().toEqualTypeOf<"relational" | "clock">();
-const repositorySupplied = repositoryOnly.withRelational(facilities.relational).withClock(clock);
+const repositorySupplied = repositoryOnly
+  .withMembers({ relational: facilities.relational })
+  .withClock(clock);
 expectTypeOf<MissingNames<typeof repositorySupplied>>().toEqualTypeOf<never>();
 void (() => repositorySupplied.boot());
 const memoryRepositoryOnly = createApp({ role: "api" }).withModules([memoryRepositoryModule]);
@@ -162,6 +164,7 @@ const overwritten = createApp({ role: "api" })
 expectTypeOf<MissingNames<typeof overwritten>>().toEqualTypeOf<"clock">();
 
 const withTransport = defineProcessModule("annotation")
+  .withRepositories(clockRepositories)
   .withApi(ClockApp)
   .withTransports({ protocol: "rest", router: () => ({}) });
 const transportClock = createApp({ role: "api" }).withModules([withTransport]);
@@ -320,13 +323,6 @@ function installDependenciesErased(module: DependenciesErasedModule) {
   return createApp({ role: "api" }).withModules([module]);
 }
 void installDependenciesErased;
-
-type MembersEvidenceErasedModule = Omit<typeof clockModule, "members">;
-function installMembersEvidenceErased(module: MembersEvidenceErasedModule) {
-  // @ts-expect-error member evidence must survive until the module tuple is accepted
-  return createApp({ role: "api" }).withModules([module]);
-}
-void installMembersEvidenceErased;
 
 const indexedPeers: Record<string, ProjectApi> = {};
 // @ts-expect-error an index signature does not prove the project key exists

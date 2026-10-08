@@ -20,12 +20,7 @@ export {
   RoleContributionError,
   StoreTierUnstatedError,
 } from "./boot-errors.ts";
-export {
-  buildClaimedMembers,
-  membersFor,
-  MissingMemberError,
-  type MemberClaim,
-} from "./module-members.ts";
+export { buildClaimedMembers, MissingMemberError, type MemberClaim } from "./module-members.ts";
 export type { Tier } from "./tiers.ts";
 export {
   commandsOf,
@@ -69,7 +64,6 @@ export {
   type ModuleOperatorReadsScope,
   type ModuleSecretsScope,
   type ServerRole,
-  withMemoryRepositories,
 } from "./feature-installer.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";

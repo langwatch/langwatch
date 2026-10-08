@@ -3,11 +3,7 @@ import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { type BoundApis, defineChannels } from "../src/channel-registry.ts";
-import {
-  defineProcessModule,
-  type FeatureSetup,
-  withMemoryRepositories,
-} from "../src/feature-installer.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
 
 export interface ProjectApi {
@@ -31,25 +27,38 @@ interface ClockApi {
   now(): string;
 }
 const ClockApi = moduleApi<ClockApi>()("annotation");
+type ClockClients = { clock: () => string };
+/** Store clients reach a module only through its registry; this one hands over the clock. */
+class ClockRepositories {
+  static readonly requires = ["clock"] as const;
+  static create(clients: ClockClients): ClockClients {
+    return clients;
+  }
+}
 export class ClockApp implements ClockApi {
   static readonly contract = ClockApi;
   static readonly dependencies = {};
-  static readonly reads = ["clock"] as const;
   readonly #clock: () => string;
   private constructor(clock: () => string) {
     this.#clock = clock;
   }
   static create({
-    members,
-  }: FeatureSetup<Record<never, never>, undefined> &
-    Readonly<{ members: { clock: () => string; unused?: number } }>): ClockApp {
-    return new ClockApp(members.clock);
+    repositories,
+  }: FeatureSetup<Record<never, never>, undefined, ClockClients>): ClockApp {
+    return new ClockApp(repositories.clock);
   }
   now(): string {
     return this.#clock();
   }
 }
-export const clockModule = defineProcessModule("annotation").withApi(ClockApp).build();
+export const clockRepositories = defineRepositories({
+  live: ClockRepositories,
+  memory: ClockRepositories,
+});
+export const clockModule = defineProcessModule("annotation")
+  .withRepositories(clockRepositories)
+  .withApi(ClockApp)
+  .build();
 export const clock = () => "frozen";
 
 interface ConfigApi {
@@ -107,10 +116,8 @@ interface FacilityApi {
   read(): string;
 }
 const FacilityApi = moduleApi<FacilityApi>()("user");
-class FacilityApp implements FacilityApi {
-  static readonly contract = FacilityApi;
-  static readonly dependencies = {};
-  static readonly reads = [
+class FacilityRepositories {
+  static readonly requires = [
     "relational",
     "keyvalue",
     "clock",
@@ -120,21 +127,41 @@ class FacilityApp implements FacilityApi {
     "secrets",
     "encryption",
   ] as const;
-  readonly #members: Facilities;
-  private constructor(members: Facilities) {
-    this.#members = members;
-  }
-  static create({
-    members,
-  }: FeatureSetup<Record<never, never>, undefined> &
-    Readonly<{ members: Facilities }>): FacilityApp {
-    return new FacilityApp(members);
-  }
-  read(): string {
-    return this.#members.relational.query();
+  static create(clients: {
+    relational: Facilities["relational"];
+    keyvalue: Facilities["keyvalue"];
+    clock: Facilities["clock"];
+    logging: Facilities["logging"];
+    metrics: Facilities["metrics"];
+    tracing: Facilities["tracing"];
+    secrets: Facilities["secrets"];
+    encryption: Facilities["encryption"];
+  }): Facilities {
+    return clients;
   }
 }
-export const facilityModule = defineProcessModule("user").withApi(FacilityApp).build();
+class FacilityApp implements FacilityApi {
+  static readonly contract = FacilityApi;
+  static readonly dependencies = {};
+  readonly #clients: Facilities;
+  private constructor(clients: Facilities) {
+    this.#clients = clients;
+  }
+  static create({
+    repositories,
+  }: FeatureSetup<Record<never, never>, undefined, Facilities>): FacilityApp {
+    return new FacilityApp(repositories);
+  }
+  read(): string {
+    return this.#clients.relational.query();
+  }
+}
+export const facilityModule = defineProcessModule("user")
+  .withRepositories(
+    defineRepositories({ live: FacilityRepositories, memory: FacilityRepositories }),
+  )
+  .withApi(FacilityApp)
+  .build();
 export const facilities: Facilities = {
   relational: { query: () => "rows" },
   keyvalue: { get: (key) => key },
@@ -160,15 +187,21 @@ export const facilities: Facilities = {
 const messages: string[] = [];
 
 export class RelationalRepositories {
-  static readonly requires = ["relational"] as const;
-  static create({ relational }: { relational: Facilities["relational"] }) {
-    return { row: () => relational.query() };
+  static readonly requires = ["relational", "clock"] as const;
+  static create({
+    relational,
+    clock,
+  }: {
+    relational: Facilities["relational"];
+    clock: () => string;
+  }) {
+    return { row: () => relational.query(), clock };
   }
 }
 export class MemoryRepositories {
-  static readonly requires = [] as const;
-  static create() {
-    return { row: () => "memory" };
+  static readonly requires = ["clock"] as const;
+  static create({ clock }: { clock: () => string }) {
+    return { row: () => "memory", clock };
   }
 }
 
@@ -183,17 +216,18 @@ const RepositoryApi = moduleApi<RepositoryApi>()("dataset");
 class RepositoryApp implements RepositoryApi {
   static readonly contract = RepositoryApi;
   static readonly dependencies = {};
-  static readonly reads = ["clock"] as const;
   readonly #row: () => string;
   private constructor(row: () => string) {
     this.#row = row;
   }
   static create({
     repositories,
-    members,
-  }: FeatureSetup<Record<never, never>, undefined, { row(): string }> &
-    Readonly<{ members: { clock: () => string; unused?: string } }>): RepositoryApp {
-    return new RepositoryApp(() => `${repositories.row()}@${members.clock()}`);
+  }: FeatureSetup<
+    Record<never, never>,
+    undefined,
+    { row(): string; clock: () => string }
+  >): RepositoryApp {
+    return new RepositoryApp(() => `${repositories.row()}@${repositories.clock()}`);
   }
   row(): string {
     return this.#row();
@@ -203,7 +237,11 @@ export const repositoryModule = defineProcessModule("dataset")
   .withRepositories(repositories)
   .withApi(RepositoryApp)
   .build();
-export const memoryRepositoryModule = withMemoryRepositories(repositoryModule);
+/** The same module asking for its own memory registry, as a dev harness may (record §4). */
+export const memoryRepositoryModule = Object.freeze({
+  ...repositoryModule,
+  tier: "memory" as const,
+});
 
 export interface Connections {
   primary(): string;
@@ -212,22 +250,30 @@ interface ConnectionsApi {
   primary(): string;
 }
 const ConnectionsApi = moduleApi<ConnectionsApi>()("sso");
+class ConnectionsRepositories {
+  static readonly requires = ["connections"] as const;
+  static create(clients: { connections: Connections }) {
+    return clients;
+  }
+}
 class ConnectionsApp implements ConnectionsApi {
   static readonly contract = ConnectionsApi;
   static readonly dependencies = {};
-  static readonly reads = ["connections"] as const;
   private constructor(private readonly connections: Connections) {}
-  static create({
-    members,
-  }: FeatureSetup<{}, undefined> & Readonly<{ members: { connections: Connections } }>) {
-    return new ConnectionsApp(members.connections);
+  static create({ repositories }: FeatureSetup<{}, undefined, { connections: Connections }>) {
+    return new ConnectionsApp(repositories.connections);
   }
   primary(): string {
     return this.connections.primary();
   }
 }
 export const connections = { primary: () => "primary" } satisfies Connections;
-export const connectionsModule = defineProcessModule("sso").withApi(ConnectionsApp).build();
+export const connectionsModule = defineProcessModule("sso")
+  .withRepositories(
+    defineRepositories({ live: ConnectionsRepositories, memory: ConnectionsRepositories }),
+  )
+  .withApi(ConnectionsApp)
+  .build();
 
 interface LicenseSource {
   resolve(): string;

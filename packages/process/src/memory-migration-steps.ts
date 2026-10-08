@@ -48,7 +48,7 @@ export async function migrationStepsOverMemory<Step extends { readonly id: strin
   isMigrationStep,
 }: {
   name: string;
-  modules: readonly (InstallableServerFeature<never> & PreambleOwner)[];
+  modules: readonly (InstallableServerFeature & PreambleOwner)[];
   /** The only environment read; a build hands a fixed one so the list never varies by host. */
   environment: PreambleEnvironment;
   isMigrationStep: (contribution: unknown) => contribution is Step;
@@ -65,8 +65,8 @@ export async function migrationStepsOverMemory<Step extends { readonly id: strin
     participation: "produce",
     processStore: InMemoryProcessStore.createForTesting(),
   });
-  // The installed modules still read these members until the no-members migration (§16), as the
-  // tasks installation test supplies them (apps/tasks/src/__tests__/tasks-installation...).
+  // The installed registries' store clients, as the tasks installation test supplies them
+  // (apps/tasks/src/__tests__/tasks-installation...).
   const supply: WholeListSupply = createApp({
     role: ROLE,
     secrets: (owner, handles) => resolver.scopeTo(owner, handles),

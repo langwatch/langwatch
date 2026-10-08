@@ -10,14 +10,11 @@ abstract class DirectoryApp {
   abstract readonly name: string;
 }
 
-type DeclaredMembers = Readonly<{ prefix: string }>;
 type Config = Readonly<{ suffix: string }>;
 
 class ComposedDirectoryApp extends DirectoryApp {
   static readonly contract = DirectoryApp;
   static readonly dependencies = {};
-  /** The one member this app reads, and therefore the only one boot builds. */
-  static readonly reads = ["prefix"] as const;
   /** Declared once; the process parse (§6) produces it, this app just reads it. */
   static readonly config = Config.define((c) => ({
     suffix: c.env("ANNOTATION_SUFFIX", z.string()),
@@ -28,10 +25,9 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 
   static create(
-    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, Config> &
-      Readonly<{ members: DeclaredMembers }>,
+    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, Config>,
   ): ComposedDirectoryApp {
-    return new ComposedDirectoryApp(`${setup.members.prefix}${setup.config.suffix}`);
+    return new ComposedDirectoryApp(`tenant-${setup.config.suffix}`);
   }
 }
 
@@ -70,10 +66,7 @@ describe("defineProcessModule", () => {
         super();
       }
 
-      static create(
-        setup: FeatureSetup<typeof ResourceApp.dependencies, undefined> &
-          Readonly<{ members: DeclaredMembers }>,
-      ): ResourceApp {
+      static create(setup: FeatureSetup<typeof ResourceApp.dependencies, undefined>): ResourceApp {
         setup.resources.own("resource", own);
         return new ResourceApp();
       }
