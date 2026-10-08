@@ -9,7 +9,9 @@ import { gatewayProcessModule } from "../../gateway.module.ts";
 describe("the core gateway module", () => {
   /** @scenario "Core gateway serves neither routing policies nor personal virtual keys" */
   it("serves neither routingPolicy nor personalVirtualKeys", () => {
-    const namespaces = gatewayProcessModule.transports.map((transport) => transport.namespace);
+    const namespaces = (gatewayProcessModule.transports ?? []).map(
+      (transport) => transport.namespace,
+    );
 
     expect(namespaces).not.toContain("routingPolicy");
     expect(namespaces).not.toContain("personalVirtualKeys");
