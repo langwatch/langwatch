@@ -71,7 +71,9 @@ function projectNotice() {
   });
   const taskLogger = { info: vi.fn() };
   const task = ProjectCreatedBackfillTask.create({
-    organizations: { findAllIds: async () => [ORGANIZATION, OTHER_ORGANIZATION] },
+    organizations: {
+      listAllIds: async () => ({ ids: [ORGANIZATION, OTHER_ORGANIZATION], next: null }),
+    },
     projects: { recordExistingProjectsCreated: (input) => notice.recordExisting(input) },
     logger: taskLogger,
   });

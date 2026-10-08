@@ -192,6 +192,19 @@ export interface OrganizationWithAdministrators {
   administrators: OrganizationAdministrator[];
 }
 
+export interface OrganizationIdPageInput {
+  after?: string | undefined;
+  limit?: number | undefined;
+}
+
+export interface OrganizationIdPage {
+  ids: string[];
+  next: string | null;
+}
+
+/** The page size fleet scans pass to `listAllIds`. */
+export const ORGANIZATION_ID_PAGE_LIMIT = 500;
+
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): the
  * members, the single sign-on providers named (by name only), and when the
@@ -850,8 +863,11 @@ export interface OrganizationApi {
   ): Promise<PersonalFeatures>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount>;
-  /** Every organization on this install, for the install-wide usage report. */
-  findAllIds(): Promise<string[]>;
+  /**
+   * Organization ids on this install ordered by id, a page at a time for
+   * fleet-wide scans. No limit reads them all; `next` is null on the last page.
+   */
+  listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

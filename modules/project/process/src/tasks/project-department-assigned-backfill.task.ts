@@ -1,10 +1,10 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
 import type { ProjectModule } from "../app/project.app.ts";
 
 type BackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
   projects: Pick<ProjectModule, "recordExistingDepartmentAssignments">;
 }>;
 
@@ -27,9 +27,17 @@ export class ProjectDepartmentAssignedBackfillTask extends Task {
   }
 
   async run({ signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      signal.throwIfAborted();
-      await this.peers.projects.recordExistingDepartmentAssignments({ organizationId });
-    }
+    let after: string | undefined;
+    do {
+      const page = await this.peers.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
+      });
+      for (const organizationId of page.ids) {
+        signal.throwIfAborted();
+        await this.peers.projects.recordExistingDepartmentAssignments({ organizationId });
+      }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
   }
 }

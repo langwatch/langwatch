@@ -36,7 +36,7 @@ const CANARY_TIMEOUT_MS = 150_000;
 /** Every peer the checkup and the report ask, by the one operation each needs. */
 export type OpsCheckupPeers = UsageReportPeers &
   Readonly<{
-    organizationDirectory: Pick<OrganizationApi, "findAllIds">;
+    organizationDirectory: Pick<OrganizationApi, "listAllIds">;
     licensing: UsageReportInstall & Pick<LicensingApi, "getLicenseStatus" | "getConnectStatus">;
     providerTests: Pick<ModelProviderApi, "listForOrganization" | "testConnection">;
     projectDirectory: Pick<ProjectApi, "listByOrganization">;

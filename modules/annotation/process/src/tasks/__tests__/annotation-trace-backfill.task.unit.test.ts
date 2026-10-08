@@ -18,7 +18,9 @@ const annotationsByProject: Readonly<Record<string, { id: string; traceId: strin
 
 function backfill(recorded: TraceAnnotationMarker[], failingTrace?: string) {
   return AnnotationTraceBackfillTask.create({
-    organizations: createApiFixture<OrganizationApi>({ findAllIds: async () => ["org-1"] }),
+    organizations: createApiFixture<OrganizationApi>({
+      listAllIds: async () => ({ ids: ["org-1"], next: null }),
+    }),
     projects: createApiFixture<ProjectApi>({
       listIdsByOrganization: async () => ["project-a", "project-b"],
     }),
@@ -35,6 +37,19 @@ function backfill(recorded: TraceAnnotationMarker[], failingTrace?: string) {
       },
     }),
   });
+}
+
+function pagedOver(ids: readonly string[]) {
+  const limits: (number | undefined)[] = [];
+  const organizations = createApiFixture<OrganizationApi>({
+    listAllIds: async ({ after, limit } = {}) => {
+      limits.push(limit);
+      const rest = ids.filter((id) => after === undefined || id > after);
+      const page = rest.slice(0, 2);
+      return { ids: page, next: rest.length > 2 ? (page[page.length - 1] ?? null) : null };
+    },
+  });
+  return { organizations, limits };
 }
 
 const run = (task: AnnotationTraceBackfillTask) =>
@@ -63,6 +78,32 @@ describe("given annotations across two projects", () => {
       await run(backfill(recorded, "trace-1"));
 
       expect(recorded.map(({ annotationId }) => annotationId)).toEqual(["a2", "b1"]);
+    });
+  });
+});
+
+describe("given an install whose organizations arrive in pages", () => {
+  describe("when the backfill runs", () => {
+    /** @scenario "A fleet scan visits every organization across pages" */
+    it("lists the projects of every organization on every page, once each", async () => {
+      const { organizations, limits } = pagedOver(["o1", "o2", "o3", "o4", "o5"]);
+      const listed: string[] = [];
+      const task = AnnotationTraceBackfillTask.create({
+        organizations,
+        projects: createApiFixture<ProjectApi>({
+          listIdsByOrganization: async ({ organizationId }) => {
+            listed.push(organizationId);
+            return [];
+          },
+        }),
+        annotations: createApiFixture<AnnotationApi>({}),
+        traces: createApiFixture<TraceApi>({}),
+      });
+
+      await run(task);
+
+      expect(listed).toEqual(["o1", "o2", "o3", "o4", "o5"]);
+      expect(limits).toEqual([500, 500, 500]);
     });
   });
 });

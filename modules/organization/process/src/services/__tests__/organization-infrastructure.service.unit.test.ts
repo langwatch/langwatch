@@ -17,6 +17,7 @@ import {
   TeamNotFoundError,
   UserNotInOrganizationError,
   type OrganizationBillingProfile,
+  type OrganizationIdPage,
   type OrganizationTeam,
   type OrganizationTeamPage,
   type PersonalFeatures,
@@ -44,8 +45,8 @@ class StubRepository extends OrganizationRepository {
     return null;
   }
 
-  async findAllIds(): Promise<string[]> {
-    return [];
+  async listAllIds(): Promise<OrganizationIdPage> {
+    return { ids: [], next: null };
   }
 
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {

@@ -6,7 +6,7 @@ import type { LicenseService } from "./license.service.ts";
 interface DomainClaimAuthorityDeps {
   isSaas: boolean;
   licenses: Pick<LicenseService, "isPlatformSsoLicensed" | "findPlatformLicenseDigests">;
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
 }
 
 /**
@@ -26,10 +26,10 @@ export class DomainClaimAuthorityService {
     if (this.deps.isSaas) {
       return { authorizesDomainClaims: false, hostsSingleOrganization: false, licenseDigests: [] };
     }
-    const [authorizesDomainClaims, organizationIds, licenseDigests] = await Promise.all([
+    const [authorizesDomainClaims, { ids: organizationIds }, licenseDigests] = await Promise.all([
       this.deps.licenses.isPlatformSsoLicensed({ isSaas: false }),
-      // ponytail: an id scan; a count read on OrganizationApi if installations grow large.
-      this.deps.organizations.findAllIds(),
+      // Two ids settle whether the installation hosts more than one organization.
+      this.deps.organizations.listAllIds({ limit: 2 }),
       this.deps.licenses.findPlatformLicenseDigests(),
     ]);
 

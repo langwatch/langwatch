@@ -66,7 +66,7 @@ function billingAnnouncer({ billed }: { billed: Set<string> }) {
   });
   const logger = { info: vi.fn() };
   const task = UsageBillingCatchUpTask.create({
-    organizations: { findAllIds: async () => [BILLED, NOT_BILLED] },
+    organizations: { listAllIds: async () => ({ ids: [BILLED, NOT_BILLED], next: null }) },
     billing: { catchUpUsageBilling: (input) => announcer.usageBillingCaughtUp(input) },
     logger,
   });

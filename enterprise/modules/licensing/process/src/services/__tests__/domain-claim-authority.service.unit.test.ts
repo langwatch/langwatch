@@ -5,17 +5,20 @@ import { describe, expect, it, vi } from "vitest";
 import { DomainClaimAuthorityService } from "../domain-claim-authority.service.ts";
 
 function authorityOver({ isSaas, organizations }: { isSaas: boolean; organizations: number }) {
-  const findAllIds = vi.fn(async () => Array.from({ length: organizations }, (_, i) => `org_${i}`));
+  const listAllIds = vi.fn(async () => ({
+    ids: Array.from({ length: organizations }, (_, i) => `org_${i}`),
+    next: null,
+  }));
   const service = DomainClaimAuthorityService.create({
     isSaas,
     licenses: {
       isPlatformSsoLicensed: async () => true,
       findPlatformLicenseDigests: async () => ["sha256:licence"],
     },
-    organizations: createApiFixture<OrganizationApi>({ findAllIds }),
+    organizations: createApiFixture<OrganizationApi>({ listAllIds }),
   });
 
-  return { service, findAllIds };
+  return { service, listAllIds };
 }
 
 describe("who the installation's licence speaks for when a domain is claimed", () => {
@@ -41,14 +44,14 @@ describe("who the installation's licence speaks for when a domain is claimed", (
 
   describe("when the deployment is the hosted service", () => {
     it("authorizes nothing and never counts organizations", async () => {
-      const { service, findAllIds } = authorityOver({ isSaas: true, organizations: 1 });
+      const { service, listAllIds } = authorityOver({ isSaas: true, organizations: 1 });
 
       await expect(service.getDomainClaimAuthority()).resolves.toEqual({
         authorizesDomainClaims: false,
         hostsSingleOrganization: false,
         licenseDigests: [],
       });
-      expect(findAllIds).not.toHaveBeenCalled();
+      expect(listAllIds).not.toHaveBeenCalled();
     });
   });
 });

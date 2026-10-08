@@ -8,6 +8,8 @@ import type {
   PersonalFeatures,
   PersonalWorkspace,
   PersonalWorkspaceInput,
+  OrganizationIdPage,
+  OrganizationIdPageInput,
   OrganizationUsageCount,
   PricingModel,
   SignInSecurityPolicy,
@@ -62,8 +64,8 @@ export abstract class OrganizationSettingsCipher {
  * row and the personal workspace it hosts. It never crosses into a caller.
  */
 export abstract class OrganizationRepository {
-  /** Every organization on the install; the usage report describes the install, not a tenant. */
-  abstract findAllIds(): Promise<string[]>;
+  /** Organization ids ordered by id, after the cursor; no limit reads them all. */
+  abstract listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
   /** The usage report's counts; the caller never passes an empty organization list. */
   abstract countUsage(input: {
     organizationIds: readonly string[];

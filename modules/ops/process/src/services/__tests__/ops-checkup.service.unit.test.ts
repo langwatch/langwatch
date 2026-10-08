@@ -101,7 +101,7 @@ function service() {
     peers: {
       ...world.peers(),
       organizationDirectory: createApiFixture<OrganizationApi>({
-        findAllIds: async () => ["org-1"],
+        listAllIds: async () => ({ ids: ["org-1"], next: null }),
       }),
       licensing: createApiFixture<LicensingApi>({
         findInstanceIdentity: async () => [],

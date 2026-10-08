@@ -1,6 +1,6 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 import { nowInstant } from "@langwatch/time";
@@ -12,7 +12,7 @@ type BackfillPeers = Readonly<{
   annotations: Pick<AnnotationApi, "list">;
   traces: Pick<TraceApi, "recordAnnotation">;
   projects: Pick<ProjectApi, "listIdsByOrganization">;
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
 }>;
 
 type BackfillTotals = { projects: number; traces: number; annotations: number };
@@ -35,14 +35,22 @@ export class AnnotationTraceBackfillTask extends Task {
 
   async run({ signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const totals: BackfillTotals = { projects: 0, traces: 0, annotations: 0 };
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      const projectIds = await this.peers.projects.listIdsByOrganization({ organizationId });
-      for (const projectId of projectIds) {
-        signal.throwIfAborted();
-        await this.backfillProject({ projectId, totals, signal });
-        totals.projects += 1;
+    let after: string | undefined;
+    do {
+      const page = await this.peers.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
+      });
+      for (const organizationId of page.ids) {
+        const projectIds = await this.peers.projects.listIdsByOrganization({ organizationId });
+        for (const projectId of projectIds) {
+          signal.throwIfAborted();
+          await this.backfillProject({ projectId, totals, signal });
+          totals.projects += 1;
+        }
       }
-    }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
     logger.info(
       {
         totalTraces: totals.traces,

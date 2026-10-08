@@ -13,6 +13,8 @@ import {
   type OrganizationWithAdministrators,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type OrganizationIdPage,
+  type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
@@ -51,8 +53,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return new MemoryOrganizationRepository(options.memory);
   }
 
-  async findAllIds(): Promise<string[]> {
-    return [...this.memory.organizations.keys()];
+  async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
+    const ids = [...this.memory.organizations.keys()]
+      .filter((id) => after === undefined || id > after)
+      .toSorted();
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */

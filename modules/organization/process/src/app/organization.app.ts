@@ -27,6 +27,8 @@ import {
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
   OrganizationApi,
+  type OrganizationIdPage,
+  type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -942,8 +944,8 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
    * The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
    * asks a flag per listed organization, and this avoids a membership query per row.
    */
-  findAllIds(): Promise<string[]> {
-    return this.#dependencies.organizations.findAllIds();
+  listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage> {
+    return this.#dependencies.organizations.listAllIds(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

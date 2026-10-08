@@ -1,5 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
 import type { ProjectModule } from "../app/project.app.ts";
@@ -7,7 +7,7 @@ import type { ProjectModule } from "../app/project.app.ts";
 const defaultLogger: Logger = createLogger("langwatch:task:backfill-project-created");
 
 type BackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
   projects: Pick<ProjectModule, "recordExistingProjectsCreated">;
   logger?: Pick<Logger, "info">;
 }>;
@@ -33,14 +33,22 @@ export class ProjectCreatedBackfillTask extends Task {
     const isDryRun = args.includes("--dry-run");
     let organizations = 0;
     let projects = 0;
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      signal.throwIfAborted();
-      projects += await this.peers.projects.recordExistingProjectsCreated({
-        organizationId,
-        isDryRun,
+    let after: string | undefined;
+    do {
+      const page = await this.peers.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
       });
-      organizations += 1;
-    }
+      for (const organizationId of page.ids) {
+        signal.throwIfAborted();
+        projects += await this.peers.projects.recordExistingProjectsCreated({
+          organizationId,
+          isDryRun,
+        });
+        organizations += 1;
+      }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
     (this.peers.logger ?? defaultLogger).info(
       { isDryRun, organizations, projects },
       isDryRun

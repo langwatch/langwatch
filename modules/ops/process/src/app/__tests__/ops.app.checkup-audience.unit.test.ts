@@ -78,7 +78,7 @@ function checkupService(): OpsCheckupService {
     peers: {
       ...world.peers(),
       organizationDirectory: createApiFixture<OrganizationApi>({
-        findAllIds: async () => ["org-1", "org-2"],
+        listAllIds: async () => ({ ids: ["org-1", "org-2"], next: null }),
       }),
       licensing: createApiFixture<LicensingApi>({
         findInstanceIdentity: async () => [],

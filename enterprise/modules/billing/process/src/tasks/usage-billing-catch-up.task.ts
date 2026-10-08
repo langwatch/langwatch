@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
 import type { BillingModule } from "../app/billing.app.ts";
@@ -8,7 +8,7 @@ import type { BillingModule } from "../app/billing.app.ts";
 const defaultLogger: Logger = createLogger("langwatch:task:usage-billing-catch-up");
 
 type UsageBillingCatchUpPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "findAllIds">;
+  organizations: Pick<OrganizationApi, "listAllIds">;
   billing: Pick<BillingModule, "catchUpUsageBilling">;
   logger?: Pick<Logger, "info">;
 }>;
@@ -36,12 +36,20 @@ export class UsageBillingCatchUpTask extends Task {
     const isDryRun = args.includes("--dry-run");
     let organizations = 0;
     let usageBilled = 0;
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      signal.throwIfAborted();
-      const answer = await this.peers.billing.catchUpUsageBilling({ organizationId, isDryRun });
-      organizations += 1;
-      if (answer.usageBilled) usageBilled += 1;
-    }
+    let after: string | undefined;
+    do {
+      const page = await this.peers.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
+      });
+      for (const organizationId of page.ids) {
+        signal.throwIfAborted();
+        const answer = await this.peers.billing.catchUpUsageBilling({ organizationId, isDryRun });
+        organizations += 1;
+        if (answer.usageBilled) usageBilled += 1;
+      }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
     (this.peers.logger ?? defaultLogger).info(
       { isDryRun, organizations, usageBilled, notUsageBilled: organizations - usageBilled },
       isDryRun

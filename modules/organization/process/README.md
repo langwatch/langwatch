@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:219`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:232`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1036,12 +1036,12 @@ The usage report's figures (ADR-156, section 10).
 countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount>;
 ```
 
-#### `findAllIds`
+#### `listAllIds`
 
-Every organization on this install, for the install-wide usage report.
+Organization ids on this install ordered by id, a page at a time for fleet-wide scans. No limit reads them all; `next` is null on the last page.
 
 ```typescript
-findAllIds(): Promise<string[]>;
+listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
 ```
 
 ## REST transport
@@ -1652,13 +1652,13 @@ Run by the tasks process, before serve.
 
 | Task                                     | Class                                     | Declared at                                                   |
 | ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| `backfill-organization-presence-setting` | `OrganizationPresenceSettingBackfillTask` | `src/tasks/organization-presence-setting-backfill.task.ts:14` |
+| `backfill-organization-presence-setting` | `OrganizationPresenceSettingBackfillTask` | `src/tasks/organization-presence-setting-backfill.task.ts:15` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:336`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:338`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |
