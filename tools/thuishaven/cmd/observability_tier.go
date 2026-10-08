@@ -16,8 +16,7 @@ import (
 // macOS, the LGTM container elsewhere or when LANGWATCH_HAVEN_OBS_TIER pins it.
 // The native tier drops Pyroscope, so its endpoints publish no profiler port.
 func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observability {
-	pinned := devEnv(domain.ObservabilityTierEnvVar)
-	tier, ok := domain.ObservabilityTierFor(runtime.GOOS, pinned)
+	tier, pinned, ok := selectedObservabilityTier()
 	if !ok {
 		fmt.Fprintf(os.Stderr, "haven: %s=%q names no tier (native, container) — using %s\n",
 			domain.ObservabilityTierEnvVar, pinned, tier)
@@ -33,4 +32,12 @@ func observabilityStack(rt *colima.Runtime, ram uint64, cpus int) app.Observabil
 		Home: havenHome(), Endpoints: endpoints, Limits: observabilityLimits(ram, cpus),
 		TempoBin: devEnv("HAVEN_OBS_TEMPO_BIN"), TempoArtifact: tempo,
 	})
+}
+
+// selectedObservabilityTier is the one tier selection, shared by the stack and
+// the viewer; ok is false when the pin names no tier.
+func selectedObservabilityTier() (tier domain.ObservabilityTier, pinned string, ok bool) {
+	pinned = devEnv(domain.ObservabilityTierEnvVar)
+	tier, ok = domain.ObservabilityTierFor(runtime.GOOS, pinned)
+	return tier, pinned, ok
 }

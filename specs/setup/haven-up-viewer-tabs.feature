@@ -183,6 +183,13 @@ Feature: haven up viewer tabs
       And o opens the flame graph for the selected service in Grafana
 
     @unit
+    Scenario: Profiles on the native tier says a profiler needs the container tier
+      Given the observability stack runs on the native tier
+      When the profiles tab opens
+      Then it says "Profiles need the container tier (LANGWATCH_HAVEN_OBS_TIER=container)"
+      And it does not say the stack is down
+
+    @unit
     Scenario: Square brackets move between services
       When the developer presses "]" or "["
       Then the selected service moves on, wrapping at either end
