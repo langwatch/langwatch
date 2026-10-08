@@ -167,15 +167,6 @@ export class GithubFeatureService implements GithubApi {
     return this.installations.recordInstallation(input);
   }
 
-  handleWebhookEvent(input: {
-    action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
-    installationId: string;
-    repositorySelection?: string;
-    repositories?: GithubRepositoryRef[] | null;
-  }): Promise<void> {
-    return this.installations.handleWebhookEvent(input);
-  }
-
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
@@ -244,10 +235,6 @@ export class GithubFeatureService implements GithubApi {
 
   popupErrorHtml(message: string): string {
     return this.installResponse.errorHtml(message);
-  }
-
-  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return this.pullRequestEvents.parse(payload);
   }
 
   /** The webhook door: verified against the shared secret before anything is applied. */

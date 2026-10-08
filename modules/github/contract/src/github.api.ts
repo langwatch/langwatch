@@ -6,12 +6,8 @@ import type {
   GithubInstallation,
   GithubInstallStatePayload,
   GithubPullRequest,
-  GithubPullRequestEvent,
-  GithubPullRequestLiveStatus,
-  GithubPullRequestRef,
   GithubRepositoryRef,
   GithubTurnToken,
-  GithubWebhookEnvelope,
 } from "./github.ts";
 
 /**
@@ -37,12 +33,6 @@ export interface GithubApi {
   parseInstallState(token: string | null | undefined): GithubInstallStatePayload | null;
   popupResponseHtml(login: string): string;
   popupErrorHtml(message: string): string;
-  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
-  applyWebhookPayload(input: {
-    payload: GithubWebhookEnvelope;
-    eventType: string | undefined;
-    deliveryId: string | undefined;
-  }): Promise<void>;
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
   findByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean>;
@@ -58,12 +48,6 @@ export interface GithubApi {
     expectedAccountLogin?: string | undefined;
     expectedInstallationId?: string | undefined;
   }): Promise<{ accountLogin: string }>;
-  handleWebhookEvent(input: {
-    action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
-    installationId: string;
-    repositorySelection?: string;
-    repositories?: GithubRepositoryRef[] | null;
-  }): Promise<void>;
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]>;
   /**
    * A token for one turn, scoped to the repository when named: empty when the App is not
@@ -81,11 +65,6 @@ export interface GithubApi {
     repositoryName: string;
     headBranch: string;
   }): Promise<void>;
-  getLivePullRequestStatuses(input: {
-    organizationId: string;
-    refs: readonly GithubPullRequestRef[];
-  }): Promise<readonly GithubPullRequestLiveStatus[]>;
-  applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean>;
   findForBranches(input: {
     organizationId: string;
     keys: readonly { repositoryHost: string; repositoryFullName: string; headBranch: string }[];

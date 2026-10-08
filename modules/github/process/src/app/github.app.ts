@@ -11,7 +11,6 @@ import {
   type GithubInstallation,
   type GithubInstallStatePayload,
   type GithubPullRequest,
-  type GithubPullRequestEvent,
   type GithubPullRequestLiveStatus,
   type GithubPullRequestRef,
   type GithubRepositoryRef,
@@ -21,7 +20,6 @@ import {
   type GithubRepository,
   githubSecrets,
   type GithubUsageCount,
-  type GithubWebhookEnvelope,
 } from "@langwatch/github-contract";
 import {
   OrganizationApi,
@@ -32,13 +30,12 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 
 import type { GithubChannels } from "../channels/github.channels.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import { githubHostOf, type GithubHost } from "../rules/github-host.rules.ts";
+import { githubHostOf } from "../rules/github-host.rules.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
 import type { GithubWebhookDelivery, GithubWebhookReceipt } from "../rules/github-webhook.rules.ts";
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
-import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import {
   GithubBranchMaintenanceService,
   type GithubBranchMaintenance,
@@ -164,46 +161,6 @@ type GithubBranchMaintenanceComposition = Readonly<{
   api: GithubAppClient;
   hostConfig?: { host?: string };
 }>;
-
-/** What branch demand needs beside its rows: the project fact the demand call reads. */
-type GithubBranchDemandComposition = Readonly<{
-  repositories: GithubRepositories;
-  api: GithubAppClient;
-  hostConfig?: { host?: string };
-  project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
-}>;
-
-/**
- * The demand service under the two names its cross-feature consumers know.
- * It answers the host question from the same `GithubHost` this composition
- * resolved and routes into the same demand service.
- */
-class ComposedGithubBranchDemand {
-  static create(parts: {
-    demand: GithubBranchDemandService;
-    host: GithubHost;
-  }): ComposedGithubBranchDemand {
-    return new ComposedGithubBranchDemand(parts.demand, parts.host);
-  }
-
-  private constructor(
-    private readonly demand: GithubBranchDemandService,
-    private readonly host: GithubHost,
-  ) {}
-
-  canMapRepositoryHost(repositoryHost: string): boolean {
-    return this.host.isMappable(repositoryHost);
-  }
-
-  requestBranchMapping(input: BranchMappingRequest): Promise<void> {
-    return this.demand.request(input);
-  }
-}
-
-type GithubBranchDemand = Pick<
-  ComposedGithubBranchDemand,
-  "canMapRepositoryHost" | "requestBranchMapping"
->;
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubModule implements GithubApiContract {
@@ -340,31 +297,6 @@ export class GithubModule implements GithubApiContract {
     return GithubBranchMaintenanceService.create({ repository: pullRequests, mapping });
   }
 
-  /**
-   * The demand half of pull-request linkage alone. Composes the same four
-   * objects as the sweep, deliberately — demand needs a project seam, the
-   * sweep must be composable without one, and either may be mounted alone.
-   */
-  static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
-    const host = githubHostOf(parts.hostConfig);
-    const appTokens = GithubAppTokenService.create({
-      api: parts.api,
-      tokenCache: parts.repositories.tokenCache,
-      host,
-    });
-    const { installations, pullRequests } = parts.repositories;
-    const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
-    const mapping = GithubBranchMappingService.create({
-      repository: pullRequests,
-      installations: installationAccess,
-      appTokens,
-      host,
-    });
-    const demand = GithubBranchDemandService.create({ mapping, project: parts.project, host });
-
-    return ComposedGithubBranchDemand.create({ demand, host });
-  }
-
   static async create({
     repositories,
     channels,
@@ -428,7 +360,10 @@ export class GithubModule implements GithubApiContract {
     const organizationId = await this.#projects.findOrganizationId(input.projectId);
     if (!organizationId) return { statuses: [] };
 
-    const statuses = await this.getLivePullRequestStatuses({ organizationId, refs: input.refs });
+    const statuses = await this.#service.getLivePullRequestStatuses({
+      organizationId,
+      refs: input.refs,
+    });
     return { statuses: [...statuses] };
   }
   /** Whether the person who started the install flow is the one signed in on this request. */
@@ -499,18 +434,8 @@ export class GithubModule implements GithubApiContract {
   popupErrorHtml(message: string): string {
     return this.#service.popupErrorHtml(message);
   }
-  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return this.#service.parsePullRequestEvent(payload);
-  }
   receiveWebhook(delivery: GithubWebhookDelivery): Promise<GithubWebhookReceipt> {
     return this.#service.receiveWebhook(delivery);
-  }
-  applyWebhookPayload(input: {
-    payload: GithubWebhookEnvelope;
-    eventType: string | undefined;
-    deliveryId: string | undefined;
-  }): Promise<void> {
-    return this.#service.applyWebhookPayload(input);
   }
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
     return this.#service.getAllForOrganization(organizationId);
@@ -539,14 +464,6 @@ export class GithubModule implements GithubApiContract {
   }): Promise<{ accountLogin: string }> {
     return this.#service.recordInstallation(input);
   }
-  handleWebhookEvent(input: {
-    action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
-    installationId: string;
-    repositorySelection?: string;
-    repositories?: GithubRepositoryRef[] | null;
-  }): Promise<void> {
-    return this.#service.handleWebhookEvent(input);
-  }
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.#service.listRepositoriesForOrganization(organizationId);
   }
@@ -570,15 +487,6 @@ export class GithubModule implements GithubApiContract {
     headBranch: string;
   }): Promise<void> {
     return this.#service.requestBranchMapping(input);
-  }
-  getLivePullRequestStatuses(input: {
-    organizationId: string;
-    refs: readonly GithubPullRequestRef[];
-  }): Promise<readonly GithubPullRequestLiveStatus[]> {
-    return this.#service.getLivePullRequestStatuses(input);
-  }
-  applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean> {
-    return this.#service.applyPullRequestEvent(event);
   }
   findForBranches(input: {
     organizationId: string;

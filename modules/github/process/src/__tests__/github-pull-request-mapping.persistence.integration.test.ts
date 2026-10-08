@@ -3,7 +3,7 @@
  */
 import { generateKeyPairSync } from "crypto";
 
-import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
+import { type GithubPullRequestEvent } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -27,6 +27,7 @@ import {
   createTestProjects,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
+import type { GithubFeatureService } from "../services/github.service.ts";
 import { unansweredRedisRepositories } from "./support/github-unanswered-redis.support.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -208,7 +209,11 @@ function branchRequest(headBranch: string, repositoryHost = "github.com") {
   };
 }
 
-async function storedFor(github: GithubApi, headBranch: string, repositoryHost = "github.com") {
+async function storedFor(
+  github: GithubFeatureService,
+  headBranch: string,
+  repositoryHost = "github.com",
+) {
   return github.findAllByBranches({
     organizationId,
     repositoryHost,
