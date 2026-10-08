@@ -22,7 +22,11 @@ import { type Encryption, MEMBER_NAMES, type MemberName, type ProcessMembers } f
 import { buildObjectStorage } from "./object-storage-member.ts";
 import { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 import { buildClickHouseAdmin, buildDatabaseTarget } from "./store-targets.ts";
-import { cachedTenantDirectory, prismaTenantDirectory } from "./tenant-directory.ts";
+import {
+  cachedTenantDirectory,
+  prismaTenantDirectory,
+  privateTenantListing,
+} from "./tenant-directory.ts";
 
 /**
  * A member this process was not configured to build. Thrown where the member is
@@ -206,10 +210,16 @@ function eventingMember({
   }
   // Read BEFORE the runtime is built, so the reverse close drains the
   // queue before the clients it dispatches and appends through go away.
+  const prisma = read("prisma");
+  const privateTenants = privateTenantListing({
+    prisma,
+    organizationIds: (config.clickhouse?.privateRoutes ?? []).map((r) => r.organizationId),
+  });
   return buildEventing({
     config: eventing,
     processName: config.processName,
-    prisma: read("prisma"),
+    prisma,
+    ...(privateTenants === undefined ? {} : { privateTenants }),
     ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
     ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)

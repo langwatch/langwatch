@@ -17,6 +17,7 @@ import {
   type ProcessStore,
   replayLeanOf,
   ReplayService,
+  unionReplayTenants,
   upcastReplayEventSource,
 } from "@langwatch/eventing";
 import {
@@ -73,6 +74,8 @@ export function buildEventing(options: {
   readonly eventLog?: EventingEventLogMembers;
   /** Overrides the half this process's role would otherwise install. */
   readonly participation?: EventingParticipation;
+  /** The tenant directory's privately routed tenants, which a replay lists beside the log's. */
+  readonly privateTenants?: () => AsyncIterable<string>;
 }): BuiltMember<EventSourcing> {
   const { config } = options;
   const processStore = PrismaProcessStore.create({ database: options.prisma });
@@ -115,6 +118,9 @@ export function buildEventing(options: {
           replayEngine: replayEngineOver({
             redis: options.redis,
             clickhouse: options.eventLog.clickhouse,
+            ...(options.privateTenants === undefined
+              ? {}
+              : { privateTenants: options.privateTenants }),
           }),
         }),
   });
@@ -170,9 +176,11 @@ function readHintsOver(redis: RedisConnection): NonNullable<EventSourcingOptions
 function replayEngineOver({
   redis,
   clickhouse,
+  privateTenants,
 }: {
   readonly redis: RedisConnection;
   readonly clickhouse: ClickHouseQueryClient;
+  readonly privateTenants?: () => AsyncIterable<string>;
 }): NonNullable<EventSourcingOptions["replayEngine"]> {
   return ({ definitions, retentionPolicyResolver }) => {
     if (redis.isCluster) {
@@ -181,14 +189,18 @@ function replayEngineOver({
       );
     }
     const connection = redis.duplicate();
-    const service = new ReplayService({
-      eventSource: upcastReplayEventSource({
-        source: new EventingClickHouseReplayEventSource({
-          clickhouse,
-          lean: replayLeanOf(definitions),
-        }),
-        upcasts: pipelineUpcastsOf(definitions),
+    const logSource = upcastReplayEventSource({
+      source: new EventingClickHouseReplayEventSource({
+        clickhouse,
+        lean: replayLeanOf(definitions),
       }),
+      upcasts: pipelineUpcastsOf(definitions),
+    });
+    const service = new ReplayService({
+      eventSource:
+        privateTenants === undefined
+          ? logSource
+          : unionReplayTenants({ source: logSource, listTenants: privateTenants }),
       redis: connection,
       ...(retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver }),
     });

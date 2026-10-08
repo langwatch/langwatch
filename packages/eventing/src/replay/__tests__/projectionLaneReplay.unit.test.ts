@@ -6,7 +6,11 @@ import type { Event } from "../../domain/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
 import { sealFoldProjection } from "../../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../../runtime.types.ts";
-import { ProjectionLaneNotFoundError, projectionLaneReplayer } from "../projectionLaneReplay.ts";
+import {
+  ProjectionLaneNotFoundError,
+  projectionLaneReplayer,
+  unionReplayTenants,
+} from "../projectionLaneReplay.ts";
 import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "../replayConstants.ts";
 import type {
   CutoffInfo,
@@ -133,9 +137,19 @@ class SeededLog implements ReplayEventSource {
 
 /** The same log, able to list the tenants holding a lane's events. */
 class TenantListingLog extends SeededLog {
+  /** The tenants the shared server holds; absent, every tenant in the log. */
+  sharedTenants: readonly string[] | undefined;
+
   async discoverTenants(input: Matching): Promise<string[]> {
-    return [...new Set(this.matching(input).map((event) => event.tenantId))].toSorted();
+    const listed = this.matching(input).map((event) => event.tenantId);
+    const shared = this.sharedTenants;
+    return [...new Set(listed)].filter((t) => !shared || shared.includes(t)).toSorted();
   }
+}
+
+/** The tenant directory's privately routed tenants, one page at a time. */
+async function* directoryListing(pages: readonly (readonly string[])[]): AsyncIterable<string> {
+  for (const page of pages) yield* page;
 }
 
 function seededEvent({
@@ -209,7 +223,13 @@ function foldLane({
 }
 
 /** Two tenants' events, a log that lists them, and a lane whose pipeline declares retention. */
-function setUpTwoTenants() {
+function setUpTwoTenants({
+  sharedTenants,
+  directoryPages,
+}: {
+  sharedTenants?: readonly string[];
+  directoryPages?: readonly (readonly string[])[];
+} = {}) {
   const redis = memoryRedisDouble({
     script: { hdel: async () => 0, hlen: async () => 0, lpush: async () => 0 },
   });
@@ -226,6 +246,7 @@ function setUpTwoTenants() {
     ],
     async () => (await redis.smembers(PAUSED_SET_KEY)).includes(PAUSE_KEY),
   );
+  log.sharedTenants = sharedTenants;
   const lane = foldLane({
     name: LANE,
     pauseKey: PAUSE_KEY,
@@ -235,7 +256,16 @@ function setUpTwoTenants() {
     stamped,
   });
   const replayer = projectionLaneReplayer({
-    service: new ReplayService({ eventSource: log, redis }),
+    service: new ReplayService({
+      eventSource:
+        directoryPages === undefined
+          ? log
+          : unionReplayTenants({
+              source: log,
+              listTenants: () => directoryListing(directoryPages),
+            }),
+      redis,
+    }),
     projections: { projections: [lane], mapProjections: [], stateProjections: [] },
   });
   const tenantsDone: { tenantId: string; replayedThrough: string }[] = [];
@@ -423,6 +453,36 @@ describe("projectionLaneReplayer", () => {
         "directory-a": { days: 30 },
         "directory-b": { days: 90 },
       });
+    });
+  });
+
+  describe("given a tenant the shared log does not list but the tenant directory does", () => {
+    /** @scenario "A tenant held only on a private dataplane is replayed" */
+    it("discovers and replays it beside the shared log's tenants", async () => {
+      const { log, readModel, replayer } = setUpTwoTenants({
+        sharedTenants: ["tenant-1"],
+        directoryPages: [["tenant-2"]],
+      });
+
+      const result = await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(log.discoveredFor).toEqual(["tenant-1", "tenant-2"]);
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 1, "directory-b": 2 });
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+    });
+  });
+
+  describe("given a tenant both the shared log and the tenant directory list", () => {
+    /** @scenario "A tenant listed by both the shared log and the tenant directory is replayed once" */
+    it("discovers and replays it once", async () => {
+      const { log, readModel, replayer } = setUpTwoTenants({
+        directoryPages: [["tenant-2"], ["tenant-2"]],
+      });
+
+      await replayer.replayLane({ lane: LANE, since: FROM_START, dryRun: false });
+
+      expect(log.discoveredFor).toEqual(["tenant-1", "tenant-2"]);
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 1, "directory-b": 2 });
     });
   });
 

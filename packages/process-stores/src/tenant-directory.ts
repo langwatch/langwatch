@@ -62,6 +62,56 @@ export function prismaTenantDirectory(prisma: TenantDirectoryRows): TenantDirect
   };
 }
 
+/** The one read the private tenant listing makes, which a `PrismaClient` answers as it is. */
+export type PrivateTenantRows = {
+  project: {
+    findMany(args: {
+      where: { team: { organizationId: { in: string[] } }; id?: { gt: string } };
+      select: { id: true };
+      orderBy: { id: "asc" };
+      take: number;
+    }): PromiseLike<{ id: string }[]>;
+  };
+};
+
+const DEFAULT_TENANT_PAGE_SIZE = 500;
+
+/**
+ * The tenants of privately routed organisations, each organisation then its projects a page at
+ * a time after the last id (Round 49 paging rule), so a replay lists tenants the shared server
+ * does not hold (Round 51). No private route: undefined, and Postgres is never asked.
+ */
+export function privateTenantListing({
+  prisma,
+  organizationIds,
+  pageSize = DEFAULT_TENANT_PAGE_SIZE,
+}: {
+  prisma: PrivateTenantRows;
+  organizationIds: readonly string[];
+  pageSize?: number;
+}): (() => AsyncIterable<string>) | undefined {
+  if (organizationIds.length === 0) return undefined;
+  const organizations = [...organizationIds];
+  return async function* listPrivateTenants() {
+    yield* organizations;
+    let after: string | undefined;
+    for (;;) {
+      const page = await prisma.project.findMany({
+        where: {
+          team: { organizationId: { in: organizations } },
+          ...(after === undefined ? {} : { id: { gt: after } }),
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: pageSize,
+      });
+      for (const project of page) yield project.id;
+      if (page.length < pageSize) return;
+      after = page.at(-1)?.id;
+    }
+  };
+}
+
 const DEFAULT_MAX_CACHE_ENTRIES = 10_000;
 
 /**

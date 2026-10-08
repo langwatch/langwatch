@@ -6,6 +6,9 @@ import type { ReplayProjections } from "./replayProjections.ts";
 import type { ReplayService } from "./replayService.ts";
 import type { BatchCompleteInfo, ProjectionKind, ReplayConfig } from "./types.ts";
 
+/** Reached through this file's place in the package index, beside the lane replay it widens. */
+export { unionReplayTenants } from "./replayTenantUnion.ts";
+
 /** One lane's replay, as a deploy step reports it; `replayedThrough` is the next run's `since`. */
 export interface ProjectionLaneReplayResult {
   lane: string;
