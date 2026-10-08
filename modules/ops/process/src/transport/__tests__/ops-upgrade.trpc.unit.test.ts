@@ -5,6 +5,7 @@
  * Spec: modules/ops/specs/upgrades.feature
  */
 import {
+  bindTrpcFact,
   createTrpcRuntime,
   TrpcRootDefinition,
   type TrpcProcedureFactory,
@@ -18,6 +19,7 @@ import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fix
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { statusOf, stepOf } from "../../services/__tests__/support/upgrade-ledger.ts";
+import { opsOperatorFact } from "../ops-operator.trpc.ts";
 import { opsUpgradeTrpcTransport } from "../ops-upgrade.trpc.ts";
 import { opsTrpcMembers, type OpsTrpcTestContext } from "./ops.trpc.harness.ts";
 
@@ -73,6 +75,19 @@ function readerOfOneRelease(): UpgradeReader {
   };
 }
 
+const MIGRATION_PROCEDURE_NAMES = [
+  "listSystemMigrations",
+  "listMigrationEnrollments",
+  "searchMigrationOrganizations",
+  "enrollMigrationTenant",
+  "enrollMigrationCohort",
+  "withdrawMigrationTenant",
+  "runSystemMigrationForOrganization",
+  "runSystemMigrationPass",
+  "assertSystemMigrationLegacyWritersDrained",
+  "rollBackSystemMigrationTenant",
+].map((name) => `ops.upgrade.${name}`);
+
 function mount({ reader }: { reader?: UpgradeReader } = {}) {
   const holders = { [OPERATOR.id]: ["ops:view"] } as const;
   const repositories = {
@@ -85,7 +100,9 @@ function mount({ reader }: { reader?: UpgradeReader } = {}) {
     root,
     procedure: root.procedure,
     members: opsTrpcMembers({ holders }),
-  }).mount(opsUpgradeTrpcTransport, () => app);
+  }).mount(opsUpgradeTrpcTransport, () => app, {
+    facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsTrpcTestContext) => ctx.operator)],
+  });
 
   return {
     operator: router.createCaller({ actor: { id: OPERATOR.id }, operator: OPERATOR }),
@@ -113,7 +130,11 @@ function boundAccess(): Record<string, string> {
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
   it("declares each of the six reads behind ops:view at the platform scope", () => {
-    expect(boundAccess()).toEqual({
+    const reads = Object.fromEntries(
+      Object.entries(boundAccess()).filter(([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name)),
+    );
+
+    expect(reads).toEqual({
       "ops.upgrade.status": "permission-platform:ops:view",
       "ops.upgrade.listReleases": "permission-platform:ops:view",
       "ops.upgrade.listSteps": "permission-platform:ops:view",
