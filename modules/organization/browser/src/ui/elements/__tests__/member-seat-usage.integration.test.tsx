@@ -9,7 +9,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   ResourceLimitRowToken,
   type ResourceLimitRowProps,
-} from "@langwatch/enterprise-licensing-contract";
+} from "@langwatch/enterprise-licensing-client";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

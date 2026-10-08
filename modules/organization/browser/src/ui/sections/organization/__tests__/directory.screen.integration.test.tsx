@@ -4,7 +4,7 @@
  * @see specs/identity/directory-administration.feature
  */
 import "@testing-library/jest-dom/vitest";
-import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-contract";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

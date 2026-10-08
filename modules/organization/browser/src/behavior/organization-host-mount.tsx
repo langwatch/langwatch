@@ -12,7 +12,7 @@ import {
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useLent, useLentAll } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { DirectorySummaryToken } from "@langwatch/enterprise-scim-contract";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
 import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";

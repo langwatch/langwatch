@@ -22,7 +22,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 

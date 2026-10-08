@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { describeError } from "@langwatch/browser-host/errors";
 import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
-import type {
-  ConnectedBillingOverview,
-  LicenseBillingSectionProps,
-} from "@langwatch/enterprise-billing-contract";
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-client";
+import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
 import { useState } from "react";
 
 import { connectedBillingApi } from "../../behavior/connected-billing-api.ts";

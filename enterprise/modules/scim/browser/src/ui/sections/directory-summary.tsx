@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
-import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-contract";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";
 import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";

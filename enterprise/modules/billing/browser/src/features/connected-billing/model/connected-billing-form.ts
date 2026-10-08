@@ -1,3 +1,4 @@
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-client";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The contract an operator onboards or renews a connected customer on
@@ -8,7 +9,6 @@ import type {
   ConnectedBillingAccountView,
   ConnectedOnboardRequest,
   ConnectedRenewRequest,
-  LicenseBillingSectionProps,
 } from "@langwatch/enterprise-billing-contract";
 
 const CENTS = 100;

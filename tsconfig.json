@@ -217,6 +217,9 @@
       "path": "enterprise/modules/billing/browser/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/billing/client/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/billing/contract/tsconfig.json"
     },
     {
@@ -254,6 +257,9 @@
     },
     {
       "path": "enterprise/modules/licensing/browser/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/licensing/client/tsconfig.json"
     },
     {
       "path": "enterprise/modules/licensing/contract/tsconfig.json"
@@ -296,6 +302,9 @@
     },
     {
       "path": "enterprise/modules/scim/browser/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/scim/client/tsconfig.json"
     },
     {
       "path": "enterprise/modules/scim/contract/tsconfig.json"

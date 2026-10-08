@@ -4,7 +4,7 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   ResourceLimitRowToken,
   type ResourceLimitRowProps,
-} from "@langwatch/enterprise-licensing-contract";
+} from "@langwatch/enterprise-licensing-client";
 
 /** Licensing's usage-against-limit row, rendered as licensing lends it. */
 export function ResourceLimitRow(props: ResourceLimitRowProps) {
