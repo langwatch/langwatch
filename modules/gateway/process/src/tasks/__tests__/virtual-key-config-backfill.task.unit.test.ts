@@ -16,6 +16,9 @@ function fakeRepository(virtualKeys: VirtualKeyRow[]) {
     routingPolicyId: string | null;
   }[] = [];
   let guardrailCount = 0;
+  const findVirtualKeys = vi.fn(
+    async (_input: { organizationId: string }): Promise<VirtualKeyRow[]> => virtualKeys,
+  );
   const mintRoutingPolicy = vi.fn(async (input: MintRoutingPolicyInput) => input.id);
   const mintGuardrail = vi.fn(async (_input: MintGuardrailInput) => {
     guardrailCount += 1;
@@ -23,13 +26,7 @@ function fakeRepository(virtualKeys: VirtualKeyRow[]) {
   });
 
   class FakeRepository extends GatewayVirtualKeyConfigBackfillRepository {
-    async findOrganizationIds(): Promise<string[]> {
-      return ["org-1"];
-    }
-
-    async findVirtualKeys(): Promise<VirtualKeyRow[]> {
-      return virtualKeys;
-    }
+    findVirtualKeys = findVirtualKeys;
 
     mintRoutingPolicy = mintRoutingPolicy;
     mintGuardrail = mintGuardrail;
@@ -43,8 +40,24 @@ function fakeRepository(virtualKeys: VirtualKeyRow[]) {
     }
   }
 
-  return { repository: new FakeRepository(), updates, mintRoutingPolicy, mintGuardrail };
+  return {
+    repository: new FakeRepository(),
+    updates,
+    findVirtualKeys,
+    mintRoutingPolicy,
+    mintGuardrail,
+  };
 }
+
+function organizationPages(pages: readonly string[][]) {
+  const listAllIds = vi.fn(async ({ after }: { after?: string | undefined; limit?: number }) => {
+    const index = after === undefined ? 0 : Number(after);
+    return { ids: pages[index] ?? [], next: index + 1 < pages.length ? String(index + 1) : null };
+  });
+  return { organizations: { listAllIds }, listAllIds };
+}
+
+const ONE_ORGANIZATION = organizationPages([["org-1"]]).organizations;
 
 function virtualKey(overrides: Partial<VirtualKeyRow>): VirtualKeyRow {
   return {
@@ -76,7 +89,11 @@ describe("backfillVirtualKeyConfig", () => {
         }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
+      const outcome = await backfillVirtualKeyConfig({
+        repository,
+        organizations: ONE_ORGANIZATION,
+        execute: true,
+      });
 
       expect(outcome.routingPoliciesMinted).toBe(1);
       expect(outcome.guardrailsMinted).toBe(1);
@@ -102,7 +119,11 @@ describe("backfillVirtualKeyConfig", () => {
         }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
+      const outcome = await backfillVirtualKeyConfig({
+        repository,
+        organizations: ONE_ORGANIZATION,
+        execute: true,
+      });
 
       expect(outcome.skippedWithoutProjectScope).toBe(1);
       expect(outcome.guardrailsMinted).toBe(0);
@@ -118,11 +139,47 @@ describe("backfillVirtualKeyConfig", () => {
         virtualKey({ config: { guardrailAttachments: [] }, routingPolicyId: "rp-1" }),
       ]);
 
-      const outcome = await backfillVirtualKeyConfig({ repository, execute: true });
+      const outcome = await backfillVirtualKeyConfig({
+        repository,
+        organizations: ONE_ORGANIZATION,
+        execute: true,
+      });
 
       expect(outcome.touched).toBe(0);
       expect(updates).toEqual([]);
       expect(mintRoutingPolicy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organizations arrive in pages", () => {
+    /** @scenario "The virtual-key config backfill walks every page of organizations" */
+    it("reads the keys of each organization on each page, following the cursor", async () => {
+      const { repository, findVirtualKeys } = fakeRepository([]);
+      const { organizations, listAllIds } = organizationPages([["org-1", "org-2"], ["org-3"]]);
+
+      await backfillVirtualKeyConfig({ repository, organizations, execute: false });
+
+      expect(findVirtualKeys.mock.calls.map(([input]) => input.organizationId)).toEqual([
+        "org-1",
+        "org-2",
+        "org-3",
+      ]);
+      expect(listAllIds).toHaveBeenCalledTimes(2);
+      expect(listAllIds.mock.calls[1]?.[0].after).toBe("1");
+    });
+  });
+
+  describe("when the first page of organizations is empty", () => {
+    /** @scenario "The virtual-key config backfill ends on an empty page of organizations" */
+    it("ends the scan having read no keys", async () => {
+      const { repository, findVirtualKeys } = fakeRepository([]);
+      const { organizations, listAllIds } = organizationPages([[]]);
+
+      const outcome = await backfillVirtualKeyConfig({ repository, organizations, execute: true });
+
+      expect(listAllIds).toHaveBeenCalledTimes(1);
+      expect(findVirtualKeys).not.toHaveBeenCalled();
+      expect(outcome.virtualKeys).toBe(0);
     });
   });
 });
