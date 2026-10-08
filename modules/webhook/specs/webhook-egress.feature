@@ -62,6 +62,20 @@ Feature: The fence a customer-supplied webhook leaves through
       Then the dispatch fails permanently
       And no request was made
 
+    @unit
+    Scenario: The live HTTP channel refuses a private address terminally
+      Given the live HTTP destination channel over the packaged fence
+      When it is asked to send to a private-range address
+      Then the send fails permanently
+      And the fence, not the memory tier, is what refused it
+
+    @unit
+    Scenario: The memory HTTP channel records a delivery and sends nothing
+      Given the memory tier's HTTP destination channel
+      When it is asked to send a request to any URL, including a private one
+      Then it answers 200 with an empty body
+      And the request it was asked to make is exposed to the test, with no connection opened
+
   Rule: The fence resolves the address it will actually connect to
 
     @unit

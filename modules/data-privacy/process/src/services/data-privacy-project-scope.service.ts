@@ -4,8 +4,8 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 import type { DataPrivacyProjectScopeRepository } from "../repositories/data-privacy-project-scope.repository.ts";
 
 /**
- * The chain facts a resolution is built from, read from project's and organization's rows
- * (round 46 E1, R40). A project with no row, or an archived one, is refused as not found.
+ * The chain facts a resolution is built from, read from project's and organization's rows (R40).
+ * No row is not found; an archived project resolves, as on main.
  * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature
  */
 export class DataPrivacyProjectScopeService {
@@ -21,7 +21,7 @@ export class DataPrivacyProjectScopeService {
 
   async getScopeFacts({ projectId }: { projectId: string }): Promise<DataPrivacyScopeFacts> {
     const scope = await this.repository.find({ projectId });
-    if (!scope || scope.archived) throw new ProjectNotFoundError();
+    if (!scope) throw new ProjectNotFoundError();
 
     return {
       organizationId: scope.organizationId,

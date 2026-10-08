@@ -1,16 +1,16 @@
 import type { WebhookServerConfig } from "@langwatch/webhook-contract";
 
-import { HttpDestinationChannel } from "../http/http.destination.channel.ts";
 import type { WebhookChannels } from "../webhook.channels.ts";
+import { MemoryHttpDestinationChannel } from "./memory.http-destination.channel.ts";
 import { MemorySqsWebhookDestinationChannel } from "./memory.sqs-webhook-destination.channel.ts";
 
-/** SQS sends are recorded in-process; HTTP keeps the live fence, as before the registry. */
+/** HTTP and SQS sends are recorded in-process; nothing leaves the process. */
 export class MemoryWebhookChannels {
   static readonly requires = [] as const;
 
-  static create({ config }: { config: WebhookServerConfig }): WebhookChannels {
+  static create(_input: { config: WebhookServerConfig }): WebhookChannels {
     return {
-      http: HttpDestinationChannel.create({ tls: { rejectUnauthorized: config.isSaas } }),
+      http: MemoryHttpDestinationChannel.create(),
       sqs: MemorySqsWebhookDestinationChannel.create(),
     };
   }

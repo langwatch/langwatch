@@ -47,7 +47,7 @@ export function dataPrivacyTestTeam(): Team {
   };
 }
 
-/** The test project as project's and organization's rows place it; overrides move or archive it. */
+/** The test project as project's and organization's rows place it; overrides move it. */
 export function dataPrivacyTestPlacement(
   overrides: Partial<DataPrivacyProjectScope> = {},
 ): DataPrivacyProjectScope {
@@ -57,7 +57,6 @@ export function dataPrivacyTestPlacement(
     teamId: dataPrivacyTestGraph.teamId,
     isPersonal: false,
     departmentId: null,
-    archived: false,
     ...overrides,
   };
 }

@@ -84,12 +84,13 @@ describe("DataPrivacyProjectScopeService", () => {
     });
   });
 
-  /** @scenario "An archived project no longer resolves" */
-  it("refuses a project whose row is archived", async () => {
-    const { scopes } = setup([dataPrivacyTestPlacement({ archived: true })]);
+  /** @scenario "An archived project resolves its privacy policy as on main" */
+  it("resolves a project whose row is archived", async () => {
+    const { scopes } = setup([dataPrivacyTestPlacement({ departmentId: "risk" })]);
 
-    await expect(scopes.getScopeFacts(project)).rejects.toMatchObject({
-      code: "project_not_found",
+    await expect(scopes.getScopeFacts(project)).resolves.toMatchObject({
+      teamId: "team-1",
+      departmentId: "risk",
     });
   });
 });

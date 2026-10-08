@@ -1,18 +1,17 @@
-/** Where one project sits, as project's row and its team's row place it. */
+/** Where one project sits; a personal project's department is its owner's membership's. */
 export type DataPrivacyProjectScope = Readonly<{
   projectId: string;
   organizationId: string;
   teamId: string;
   isPersonal: boolean;
   departmentId: string | null;
-  archived: boolean;
 }>;
 
 /**
- * Project placement read through project's `Project` and organization's `Team` shares (round 46
+ * Project placement read through the `Project`, `Team` and `OrganizationUser` shares (round 46
  * E1, R40): no copy, so an existing project resolves on the first request after a deploy.
  */
 export abstract class DataPrivacyProjectScopeRepository {
-  /** Null when project's table holds no row for the id; an archived row is answered as archived. */
+  /** Null when project's table holds no row for the id or its team; archived rows are answered. */
   abstract find(input: { projectId: string }): Promise<DataPrivacyProjectScope | null>;
 }

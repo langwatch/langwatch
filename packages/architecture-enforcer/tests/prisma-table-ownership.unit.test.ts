@@ -393,7 +393,7 @@ describe("Prisma table ownership lint", () => {
         "organization",
         ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
       ],
-      ["OrganizationUser", "organization", ["authz"]],
+      ["OrganizationUser", "organization", ["authz", "data-privacy"]],
       ["Organization", "organization", ["scim", "entitlement"]],
       ["Topic", "topic", ["trace"]],
       ["Annotation", "annotation", ["trace"]],
