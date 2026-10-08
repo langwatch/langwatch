@@ -15,24 +15,24 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryElevenLabsConversationChannel } from "../../channels/memory/memory.elevenlabs-conversation.channel.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
-import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
-import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
-import { GatewayElevenLabsCredentialService } from "../gateway-elevenlabs-credential.service.ts";
-import { GatewayRealtimeSessionMeteringService } from "../gateway-realtime-session-metering.service.ts";
+import { GatewayRealtimeSessionMeteringService } from "../../features/realtime-session/services/gateway-realtime-session-metering.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
-} from "../gateway-realtime-session-reconciliation.service.ts";
-import { GatewayRealtimeSessionSweepService } from "../gateway-realtime-session-sweep.service.ts";
+} from "../../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../../features/realtime-session/services/gateway-realtime-session-sweep.service.ts";
 import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
   type GatewaySpendConfirmation,
   type ReserveInput,
-} from "../gateway-realtime-session.service.ts";
-import type { GatewaySpanIngestion } from "../gateway-realtime-settlement-span.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../model-catalog-gateway-spend-rating.service.ts";
+} from "../../features/realtime-session/services/gateway-realtime-session.service.ts";
+import type { GatewaySpanIngestion } from "../../features/realtime-session/services/gateway-realtime-settlement-span.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
+import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
+import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
+import { GatewayElevenLabsCredentialService } from "../gateway-elevenlabs-credential.service.ts";
 
 const PROJECT_ID = "project-1";
 const ORG_ID = "organization-1";

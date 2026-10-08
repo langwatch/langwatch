@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import type { GatewaySpendState } from "../../../eventing/gateway-spend.projection.ts";
 import { EMPTY_SPEND_USAGE } from "../../../rules/gateway-spend-projection.rules.ts";
 import { gatewayRepositories } from "../../gateway-repositories.registry.ts";
-import { MemoryGatewayAuditRepository } from "../memory.gateway-audit.repository.ts";
 import { MemoryGatewayBudgetSpendRepository } from "../memory.gateway-budget-spend.repository.ts";
 import { MemoryGatewayCacheRuleRepository } from "../memory.gateway-cache-rule.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../memory.gateway-change-event.repository.ts";
@@ -14,7 +13,10 @@ import { MemoryGatewayOpenAdmissionsRepository } from "../memory.gateway-open-ad
 import { MemoryGatewayScopeResolutionRepository } from "../memory.gateway-scope-resolution.repository.ts";
 import { MemoryGatewaySpendEventsRepository } from "../memory.gateway-spend-events.repository.ts";
 import { MemoryGatewayVirtualKeyRepository } from "../memory.gateway-virtual-key.repository.ts";
-import { MemoryGatewayRepositories } from "../memory.gateway.repositories.ts";
+import {
+  MemoryGatewayAuditRepository,
+  MemoryGatewayRepositories,
+} from "../memory.gateway.repositories.ts";
 import { MemoryGatewayStore, memoryGatewayModelProvider } from "../memory.gateway.store.ts";
 import { MemoryVirtualKeyAuthorizationRepository } from "../memory.virtual-key-authorization.repository.ts";
 

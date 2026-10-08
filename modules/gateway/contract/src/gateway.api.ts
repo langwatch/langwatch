@@ -9,6 +9,41 @@ import type { Instant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type {
+  ArchiveGatewayBudgetInput,
+  CreateGatewayBudgetInput,
+  GatewayBudgetChangeInput,
+  GatewayBudgetCheckInput,
+  GatewayBudgetCheckResult,
+  GatewayBudgetDebitRow,
+  GatewayBudgetDetail,
+  GatewayBudgetListWithHealth,
+  GatewayBudgetPageWithHealth,
+  GatewayBudgetResolutionTarget,
+  GatewayBudgetResource,
+  GatewayBudgetScopeTarget,
+  GatewayResolvedBudget,
+  ResetGatewayBudgetInput,
+  UpdateGatewayBudgetInput,
+  GatewayApplicableBudget,
+  GatewayVirtualKeyDirectBudget,
+  GatewayBudgetHealth,
+  GatewayBudgetScopeReachResult,
+} from "./features/budget/gateway.budget.ts";
+import type {
+  GatewayPrincipalDailySpend,
+  GatewayPrincipalModelSpend,
+  GatewayPrincipalSpendSummary,
+  GatewayPrincipalSpendWindow,
+} from "./features/spend/gateway-principal-spend.ts";
+import type {
+  GatewayPricedSpend,
+  GatewayPricedSpendResult,
+  SpendEventRow,
+  SpendEventStatus,
+  SpendFilters,
+  SpendUsage,
+} from "./features/spend/gateway-spend.schemas.ts";
+import type {
   ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
   GatewayCacheRuleResource,
@@ -29,41 +64,6 @@ import type {
   GatewayVirtualKeyCaller,
   gatewayRequestCredentialSchema,
 } from "./gateway-platform.schemas.ts";
-import type {
-  GatewayPrincipalDailySpend,
-  GatewayPrincipalModelSpend,
-  GatewayPrincipalSpendSummary,
-  GatewayPrincipalSpendWindow,
-} from "./gateway-principal-spend.ts";
-import type {
-  GatewayPricedSpend,
-  GatewayPricedSpendResult,
-  SpendEventRow,
-  SpendEventStatus,
-  SpendFilters,
-  SpendUsage,
-} from "./gateway-spend.schemas.ts";
-import type {
-  ArchiveGatewayBudgetInput,
-  CreateGatewayBudgetInput,
-  GatewayBudgetChangeInput,
-  GatewayBudgetCheckInput,
-  GatewayBudgetCheckResult,
-  GatewayBudgetDebitRow,
-  GatewayBudgetDetail,
-  GatewayBudgetListWithHealth,
-  GatewayBudgetPageWithHealth,
-  GatewayBudgetResolutionTarget,
-  GatewayBudgetResource,
-  GatewayBudgetScopeTarget,
-  GatewayResolvedBudget,
-  ResetGatewayBudgetInput,
-  UpdateGatewayBudgetInput,
-  GatewayApplicableBudget,
-  GatewayVirtualKeyDirectBudget,
-  GatewayBudgetHealth,
-  GatewayBudgetScopeReachResult,
-} from "./gateway.budget.ts";
 import type { GatewayDeploymentAddresses } from "./gateway.config.ts";
 import type {
   GatewayPersonalBudget,

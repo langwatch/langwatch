@@ -13,9 +13,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { memoryVirtualKeySeed } from "../../__tests__/support/gateway-memory-seeds.fixture.ts";
+import { GatewayPersonalBudgetService } from "../../features/budget/services/gateway-personal-budget.service.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import { MemoryGatewayStore } from "../../repositories/memory/memory.gateway.store.ts";
-import { GatewayPersonalBudgetService } from "../gateway-personal-budget.service.ts";
 
 const workspace: PersonalWorkspace = {
   team: { id: "team-1", name: "Ada's workspace", slug: "ada", createdAtMs: 0 },

@@ -12,9 +12,9 @@ import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { writeGatewayDebitsSchema } from "../../../eventing/gateway-debit.intent.ts";
-import { GatewayBudgetChangeDedupeService } from "../../../services/gateway-budget-change-dedupe.service.ts";
-import { GatewayBudgetCrossingService } from "../../../services/gateway-budget-crossing.service.ts";
-import { GatewaySpendDebitService } from "../../../services/gateway-spend-debit.service.ts";
+import { GatewayBudgetChangeDedupeService } from "../../../features/budget/services/gateway-budget-change-dedupe.service.ts";
+import { GatewayBudgetCrossingService } from "../../../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewaySpendDebitService } from "../../../features/spend/services/gateway-spend-debit.service.ts";
 import type { BucketBoundaryRow } from "../../gateway-budget.repository.ts";
 import type { AppendGatewayChangeEventInput } from "../../gateway-change-event.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";

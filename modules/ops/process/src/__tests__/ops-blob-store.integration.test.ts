@@ -89,6 +89,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       sessions: createApiFixture<AuthApi>(),
+      accounts: createApiFixture<AuthApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,
       scheduler: {

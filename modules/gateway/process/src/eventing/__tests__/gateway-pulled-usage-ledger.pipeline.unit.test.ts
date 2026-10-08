@@ -23,8 +23,8 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { GatewayBudgetLedgerService } from "../../features/budget/services/gateway-budget-ledger.service.ts";
 import { MemoryGatewayBudgetSpendRepository } from "../../repositories/memory/memory.gateway-budget-spend.repository.ts";
-import { GatewayBudgetLedgerService } from "../../services/gateway-budget-ledger.service.ts";
 import { buildGatewayPulledUsageLedgerPipeline } from "../gateway-pulled-usage-ledger.pipeline.ts";
 
 const GOVERNANCE_TENANT = "project-governance-1";

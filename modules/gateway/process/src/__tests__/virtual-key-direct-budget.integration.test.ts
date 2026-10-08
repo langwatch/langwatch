@@ -10,13 +10,13 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { VirtualKeyDirectBudgetService } from "../features/virtual-key/services/virtual-key-direct-budget.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
-import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
 import {
   ALL_KEY_IDS,
   BUDGET_BOTH_MANAGED_ID,

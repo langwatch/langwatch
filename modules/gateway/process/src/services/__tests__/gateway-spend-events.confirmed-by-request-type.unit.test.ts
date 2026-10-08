@@ -7,9 +7,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
+import { GatewaySpendEventsService } from "../../features/spend/services/gateway-spend-events.service.ts";
 import { MemoryGatewaySpendEventsRepository } from "../../repositories/memory/memory.gateway-spend-events.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
-import { GatewaySpendEventsService } from "../gateway-spend-events.service.ts";
 
 const OCCURRED_AT = Temporal.Instant.from("2026-10-01T10:00:00Z").epochMilliseconds;
 

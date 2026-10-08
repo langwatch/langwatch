@@ -16,8 +16,8 @@ import {
 } from "@langwatch/eventing";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
+import type { GatewayBudgetLedgerService } from "../features/budget/services/gateway-budget-ledger.service.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
-import type { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 
 const GATEWAY_PULLED_USAGE_LEDGER_PIPELINE_NAME = "gateway_pulled_usage_ledger" as const;
 

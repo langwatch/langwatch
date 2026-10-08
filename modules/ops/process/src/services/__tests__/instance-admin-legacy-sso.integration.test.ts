@@ -46,6 +46,7 @@ function buildInstanceAdmin(connectionDecides = true) {
     },
     audit: new AuditStub(),
     sessions: createApiFixture<AuthApi>(),
+    accounts: createApiFixture<AuthApi>(),
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),

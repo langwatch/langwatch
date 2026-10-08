@@ -50,12 +50,12 @@ export const gatewaySpendEventing = defineEventingModule({
  * A process manager mounted under the name its durable rows are already keyed
  * by: renaming loses inbox/state/outbox rows.
  */
-export interface GatewaySpendProcessManagerMount {
+interface GatewaySpendProcessManagerMount {
   name: string;
   applier: ProcessManagerApplier<GatewaySpendProcessingEvent>;
 }
 
-export interface EventingGatewaySpendAdapterOptions {
+interface EventingGatewaySpendAdapterOptions {
   /** The spend ledger the fold reads and writes. The `FoldProjectionStore`
    *  built over it stays private to this feature, which is what
    *  `private-runtime-export` requires of a feature server root. */

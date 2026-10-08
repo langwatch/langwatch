@@ -18,6 +18,23 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { MemoryElevenLabsConversationChannel } from "../channels/memory/memory.elevenlabs-conversation.channel.ts";
 import { writeGatewayDebitsSchema } from "../eventing/gateway-debit.intent.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
+import { GatewayBudgetChangeDedupeService } from "../features/budget/services/gateway-budget-change-dedupe.service.ts";
+import type { GatewayBudgetCrossingService } from "../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewayRealtimeSessionMeteringService } from "../features/realtime-session/services/gateway-realtime-session-metering.service.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+} from "../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../features/realtime-session/services/gateway-realtime-session-sweep.service.ts";
+import {
+  type GatewaySpendConfirmation,
+  GatewayRealtimeSessionService,
+  REALTIME_OPEN_SESSION_WINDOW_MS,
+  type GatewayRealtimeSessionCollaborators,
+} from "../features/realtime-session/services/gateway-realtime-session.service.ts";
+import type { GatewaySpanIngestion } from "../features/realtime-session/services/gateway-realtime-settlement-span.service.ts";
+import { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -27,25 +44,8 @@ import { GatewayBudgetChangeDedupeRepository } from "../repositories/gateway-bud
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
-import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
-import type { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
 import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
-import { GatewayRealtimeSessionMeteringService } from "../services/gateway-realtime-session-metering.service.ts";
-import {
-  GatewayRealtimeSessionReconciliationService,
-  realtimeSessionReconciliationConfig,
-} from "../services/gateway-realtime-session-reconciliation.service.ts";
-import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
-import {
-  type GatewaySpendConfirmation,
-  GatewayRealtimeSessionService,
-  REALTIME_OPEN_SESSION_WINDOW_MS,
-  type GatewayRealtimeSessionCollaborators,
-} from "../services/gateway-realtime-session.service.ts";
-import type { GatewaySpanIngestion } from "../services/gateway-realtime-settlement-span.service.ts";
-import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 import { organizationApiOver } from "./support/prisma-organization-api.ts";
 

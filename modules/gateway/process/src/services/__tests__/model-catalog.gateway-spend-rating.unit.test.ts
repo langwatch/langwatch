@@ -5,8 +5,8 @@ import {
 } from "@langwatch/gateway-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 
 const spendRating = ModelCatalogGatewaySpendRatingService.create();
 // The rating service is the only place that can see a request burn something

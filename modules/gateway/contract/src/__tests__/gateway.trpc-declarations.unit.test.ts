@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { gatewayBudgetTrpc } from "../gateway-budget.trpc.ts";
+import { gatewayBudgetTrpc } from "../features/budget/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpc } from "../gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpc } from "../gateway-guardrail.trpc.ts";
 import { gatewayUsageTrpc } from "../gateway-usage.trpc.ts";

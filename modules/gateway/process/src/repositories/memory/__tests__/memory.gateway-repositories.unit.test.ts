@@ -2,15 +2,17 @@ import type { GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryGatewayAuditRepository } from "../memory.gateway-audit.repository.ts";
-import { MemoryGatewayBudgetChangeDedupeRepository } from "../memory.gateway-budget-change-dedupe.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../memory.gateway-change-event.repository.ts";
 import { MemoryGatewayKeyBudgetRepository } from "../memory.gateway-key-budget.repository.ts";
 import { MemoryGatewayOrganizationDirectoryRepository } from "../memory.gateway-organization-directory.repository.ts";
 import { MemoryGatewayProviderLabelRepository } from "../memory.gateway-provider-label.repository.ts";
 import { MemoryGatewaySpendScopeRepository } from "../memory.gateway-spend-scope.repository.ts";
-import { MemoryGatewayTransactionRepository } from "../memory.gateway-transaction.repository.ts";
 import { MemoryVirtualKeyDirectBudgetRepository } from "../memory.gateway-virtual-key-direct-budget.repository.ts";
+import {
+  MemoryGatewayAuditRepository,
+  MemoryGatewayBudgetChangeDedupeRepository,
+  MemoryGatewayTransactionRepository,
+} from "../memory.gateway.repositories.ts";
 import {
   MemoryGatewayStore,
   memoryGatewayDecimal,

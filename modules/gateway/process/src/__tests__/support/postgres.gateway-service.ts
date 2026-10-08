@@ -2,6 +2,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import { GatewayEndUserCapsService } from "../../features/budget/services/gateway-end-user-caps.service.ts";
 import type { GatewayAuditRepository } from "../../repositories/gateway-audit.repository.ts";
 import type { GatewayBudgetSpendRepository } from "../../repositories/gateway-budget-spend.repository.ts";
 import type { GatewayChangeEventsRepository } from "../../repositories/gateway-change-event.repository.ts";
@@ -18,7 +19,6 @@ import {
   type GatewayGuardrailDatabase,
 } from "../../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { GatewayCacheRuleService } from "../../services/gateway-cache-rule.service.ts";
-import { GatewayEndUserCapsService } from "../../services/gateway-end-user-caps.service.ts";
 import { GatewayGuardrailService } from "../../services/gateway-guardrail.service.ts";
 import { GatewayService, type GatewayBudgetOrganizations } from "../../services/gateway.service.ts";
 

@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- * Gateway writes the ledger row the meter reads from the Instant Evals judge's priced fact,
- * through its own peer subscriber (ADR-174 decision 13). A repeat under the same request id is
- * the same confirm, which the spend spine keeps once.
+ * Gateway writes the meter's ledger row from the Instant Evals judge's priced fact through its own
+ * peer subscriber (ADR-174 decision 13); a repeat request id is one confirm, kept once.
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
@@ -29,8 +28,8 @@ import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { GatewayInstantEvalJudgeSpendService } from "../../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
 import { pricedSpendCommandData } from "../../rules/gateway-spend-command.rules.ts";
-import { GatewayInstantEvalJudgeSpendService } from "../../services/gateway-instant-eval-judge-spend.service.ts";
 import { buildGatewayInstantEvalJudgeSpendPipeline } from "../gateway-instant-eval-judge-spend.pipeline.ts";
 import { ConfirmSpendCommand } from "../gateway-spend.intent.ts";
 

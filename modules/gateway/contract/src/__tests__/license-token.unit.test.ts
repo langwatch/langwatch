@@ -6,7 +6,7 @@ import {
   isLicenseTokenShape,
   LICENSE_TOKEN_PREFIX,
   registryHashForToken,
-} from "../license-token.ts";
+} from "../gateway-internal.schemas.ts";
 
 const token = `${LICENSE_TOKEN_PREFIX}${"a1".repeat(32)}`;
 

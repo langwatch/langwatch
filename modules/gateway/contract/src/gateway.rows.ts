@@ -4,9 +4,13 @@
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
 
-import type { SpendUsage } from "./gateway-spend.schemas.ts";
-import type { GatewayBudgetScopeType, GatewayBudgetWindow } from "./gateway.budget.ts";
+import type {
+  GatewayBudgetScopeType,
+  GatewayBudgetWindow,
+} from "./features/budget/gateway.budget.ts";
+import type { SpendUsage } from "./features/spend/gateway-spend.schemas.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
 export type GatewayJsonObject = { [Key in string]?: GatewayJsonValue };
@@ -228,3 +232,16 @@ export type GatewayVirtualKeyRecord = {
 
 /** The same record, named for the join a caller cares about. */
 export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
+
+/* BigInt-safe audit serialiser: plain `JSON.stringify(row)` throws on a BigInt column
+ * (VK.revision, GatewayChangeEvent.revision) and silently lost every VK-mutation audit write. */
+const gatewayAuditJsonSchema = z.json();
+
+export type GatewayAuditJson = z.infer<typeof gatewayAuditJsonSchema>;
+
+export function serializeRowForAudit(row: object): GatewayAuditJson {
+  const serialised = JSON.stringify(row, (_key, value) =>
+    typeof value === "bigint" ? value.toString() : value,
+  );
+  return gatewayAuditJsonSchema.parse(JSON.parse(serialised));
+}

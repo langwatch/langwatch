@@ -1411,8 +1411,8 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/spend-summaries`.
 
 ```typescript
-type Query = z.infer<typeof gatewaySpendSummariesQuerySchema>; // ../contract/src/gateway-spend-rest.schemas.ts:319
-type Response = z.infer<typeof gatewaySpendSummariesPageSchema>; // ../contract/src/gateway-spend-rest.schemas.ts:360
+type Query = z.infer<typeof gatewaySpendSummariesQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:319
+type Response = z.infer<typeof gatewaySpendSummariesPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:360
 ```
 
 #### `GET /api/gateway/v1/spend-events` · `listGatewaySpendEvents`
@@ -1424,8 +1424,8 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/spend-events`.
 
 ```typescript
-type Query = z.infer<typeof gatewaySpendEventsQuerySchema>; // ../contract/src/gateway-spend-rest.schemas.ts:135
-type Response = z.infer<typeof gatewaySpendEventsPageSchema>; // ../contract/src/gateway-spend-rest.schemas.ts:367
+type Query = z.infer<typeof gatewaySpendEventsQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:135
+type Response = z.infer<typeof gatewaySpendEventsPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:367
 ```
 
 #### `GET /api/gateway/v1/end-users/:id/spend` · `getGatewayEndUserSpend`
@@ -1437,25 +1437,25 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/end-users/:id/spend`.
 
 ```typescript
-// Params: gatewayEndUserSpendParamsSchema, ../contract/src/gateway-spend-rest.schemas.ts:162
+// Params: gatewayEndUserSpendParamsSchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:162
 interface Params {
   id: string;
 }
-// Query: gatewayEndUserSpendQuerySchema, ../contract/src/gateway-spend-rest.schemas.ts:155
+// Query: gatewayEndUserSpendQuerySchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:155
 interface Query {
   window?: "day" | "week" | "month";
   from?: number;
   to?: number;
   virtual_key_id?: string;
 }
-type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contract/src/gateway-spend-rest.schemas.ts:373
+type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:373
 ```
 
 ## tRPC transport
 
 ### `gatewayBudgets`
 
-Contract `../contract/src/gateway-budget.trpc.ts:25`, router `src/transport/gateway-budget.trpc.ts:78`.
+Contract `../contract/src/features/budget/gateway-budget.trpc.ts:25`, router `src/transport/gateway-budget.trpc.ts:78`.
 
 | Procedure                       | Kind     | Gate                               | Input                                     | Output                            |
 | ------------------------------- | -------- | ---------------------------------- | ----------------------------------------- | --------------------------------- |
@@ -1471,21 +1471,21 @@ Contract `../contract/src/gateway-budget.trpc.ts:25`, router `src/transport/gate
 
 ```typescript
 // gatewayBudgets.list
-// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/gateway.budget.ts:452
+// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/features/budget/gateway.budget.ts:452
 interface Input {
   organizationId: string;
 }
 type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:173
 
 // gatewayBudgets.listForProject
-// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/gateway.budget.ts:455
+// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/features/budget/gateway.budget.ts:455
 interface Input {
   projectId: string;
 }
 type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:173
 
 // gatewayBudgets.get
-// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/gateway.budget.ts:458
+// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/features/budget/gateway.budget.ts:458
 interface Input {
   organizationId: string;
   id: string;
@@ -1493,7 +1493,7 @@ interface Input {
 type Output = z.infer<typeof gatewayBudgetDetailSchema>; // ../contract/src/gateway.responses.ts:182
 
 // gatewayBudgets.groupTargets
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/gateway.budget.ts:452
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:452
 // Output: gatewayBudgetGroupTargetsSchema, ../contract/src/gateway.responses.ts:203
 type Output = {
   id: string;
@@ -1502,15 +1502,15 @@ type Output = {
 }[];
 
 // gatewayBudgets.personalBudget
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/gateway.budget.ts:452
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:452
 type Output = z.infer<typeof gatewayPersonalBudgetSchema>; // ../contract/src/gateway.responses.ts:326
 
 // gatewayBudgets.create
-type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/gateway.budget.ts:463
+type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:463
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
 
 // gatewayBudgets.update
-// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/gateway.budget.ts:494
+// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/features/budget/gateway.budget.ts:494
 interface Input {
   organizationId: string;
   id: string;
@@ -1523,11 +1523,11 @@ interface Input {
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
 
 // gatewayBudgets.archive
-type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/gateway.budget.ts:458
+type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:458
 type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
 
 // gatewayBudgets.reset
-// Input: gatewayBudgetApiResetInputSchema, ../contract/src/gateway.budget.ts:504
+// Input: gatewayBudgetApiResetInputSchema, ../contract/src/features/budget/gateway.budget.ts:504
 interface Input {
   organizationId: string;
   id: string;
@@ -1641,7 +1641,7 @@ interface Output {
 
 ### `gatewaySpendEvents`
 
-Contract `../contract/src/gateway-spend-event.trpc.ts:30`, router `src/transport/gateway-spend-event.trpc.ts:12`.
+Contract `../contract/src/features/spend/gateway-spend-event.trpc.ts:30`, router `src/transport/gateway-spend-event.trpc.ts:12`.
 
 | Procedure                 | Kind  | Gate                           | Input             | Output                        |
 | ------------------------- | ----- | ------------------------------ | ----------------- | ----------------------------- |
@@ -1649,7 +1649,7 @@ Contract `../contract/src/gateway-spend-event.trpc.ts:30`, router `src/transport
 
 ```typescript
 // gatewaySpendEvents.list
-type Input = z.infer<typeof listInputSchema>; // ../contract/src/gateway-spend-event.trpc.ts:12
+type Input = z.infer<typeof listInputSchema>; // ../contract/src/features/spend/gateway-spend-event.trpc.ts:12
 type Output = z.infer<typeof gatewaySpendEventPageSchema>; // ../contract/src/gateway.responses.ts:249
 ```
 

@@ -2,6 +2,7 @@ import type { GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { GatewayBudgetLedgerService } from "../../features/budget/services/gateway-budget-ledger.service.ts";
 import type {
   BudgetDebitRow,
   GatewayBudgetSpendRepository,
@@ -10,7 +11,6 @@ import type {
   AppendGatewayChangeEventInput,
   GatewayChangeEventsRepository,
 } from "../../repositories/gateway-change-event.repository.ts";
-import { GatewayBudgetLedgerService } from "../gateway-budget-ledger.service.ts";
 
 class RecordingLedger implements Pick<
   GatewayBudgetSpendRepository,

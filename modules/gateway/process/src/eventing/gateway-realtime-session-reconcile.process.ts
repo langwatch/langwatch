@@ -1,7 +1,7 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
-import { realtimeSessionReconciliationConfig } from "../services/gateway-realtime-session-reconciliation.service.ts";
+import { realtimeSessionReconciliationConfig } from "../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
 
 export const GATEWAY_REALTIME_SESSION_RECONCILE_PROCESS_NAME = "gatewayRealtimeSessionReconcile";
 

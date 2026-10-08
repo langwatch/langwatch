@@ -24,7 +24,7 @@ import { confirmSpendCommandDataSchema } from "../../../eventing/gateway-spend-c
 import { ConfirmSpendCommand } from "../../../eventing/gateway-spend.intent.ts";
 import { GatewaySpendStore } from "../../../eventing/gateway-spend.pipeline.ts";
 import { GatewaySpendFoldProjection } from "../../../eventing/gateway-spend.projection.ts";
-import { GatewayInstantEvalJudgeSpendService } from "../../../services/gateway-instant-eval-judge-spend.service.ts";
+import { GatewayInstantEvalJudgeSpendService } from "../../../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
 import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,

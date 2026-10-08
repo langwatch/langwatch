@@ -10,7 +10,7 @@ import { EMPTY_SPEND_USAGE } from "./gateway-spend-projection.rules.ts";
 /** The request type a usage report's spend record carries. */
 export const REALTIME_REPORT_REQUEST_TYPE = "realtime_response";
 /** The longest a sanitised report key may be. */
-export const REALTIME_REPORT_KEY_MAX_LENGTH = 128;
+const REALTIME_REPORT_KEY_MAX_LENGTH = 128;
 /** The report key of a closing report that named none. */
 export const REALTIME_FINAL_REPORT_KEY = "final";
 /** The report key of the estimate recorded for a session that never reported. */
@@ -25,19 +25,19 @@ export const REALTIME_LEDGER_LAG_MS = 60_000;
  */
 export const REALTIME_BUDGET_READ_TIMEOUT_MS = 1_000;
 /** The shortest call an estimate assumes. */
-export const REALTIME_ESTIMATE_MIN_DURATION_MS = 60_000;
+const REALTIME_ESTIMATE_MIN_DURATION_MS = 60_000;
 /** The longest call an estimate assumes. */
-export const REALTIME_ESTIMATE_MAX_DURATION_MS = 60 * 60_000;
+const REALTIME_ESTIMATE_MAX_DURATION_MS = 60 * 60_000;
 /** Input audio tokens an unreported `realtime` session is assumed to take each second. */
-export const REALTIME_ESTIMATE_INPUT_AUDIO_TOKENS_PER_SECOND = 10;
+const REALTIME_ESTIMATE_INPUT_AUDIO_TOKENS_PER_SECOND = 10;
 /** Output audio tokens an unreported `realtime` session is assumed to produce per spoken second. */
-export const REALTIME_ESTIMATE_OUTPUT_AUDIO_TOKENS_PER_SECOND = 20;
+const REALTIME_ESTIMATE_OUTPUT_AUDIO_TOKENS_PER_SECOND = 20;
 /** The share of an unreported `realtime` call the model is assumed to be speaking. */
-export const REALTIME_ESTIMATE_OUTPUT_SHARE = 0.5;
+const REALTIME_ESTIMATE_OUTPUT_SHARE = 0.5;
 /** Characters an unreported `tts_socket` session is assumed to synthesise each second. */
-export const REALTIME_ESTIMATE_TTS_CHARS_PER_SECOND = 15;
+const REALTIME_ESTIMATE_TTS_CHARS_PER_SECOND = 15;
 /** The duration assumed for each kind when the credential's lifetime is unknown. */
-export const REALTIME_ESTIMATE_DEFAULT_DURATION_MS: Readonly<Record<string, number>> = {
+const REALTIME_ESTIMATE_DEFAULT_DURATION_MS: Readonly<Record<string, number>> = {
   realtime: 600_000,
   live: 600_000,
   tts_socket: 300_000,

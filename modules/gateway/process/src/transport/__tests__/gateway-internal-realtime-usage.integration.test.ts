@@ -7,10 +7,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
+import type { GatewaySpendConfirmation } from "../../features/realtime-session/services/gateway-realtime-session.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import { MemoryGatewayRealtimeSessionRepository } from "../../repositories/memory/memory.gateway-realtime-session.repository.ts";
 import { EMPTY_SPEND_USAGE } from "../../rules/gateway-spend-projection.rules.ts";
-import type { GatewaySpendConfirmation } from "../../services/gateway-realtime-session.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,

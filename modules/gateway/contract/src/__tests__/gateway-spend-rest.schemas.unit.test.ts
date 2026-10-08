@@ -8,7 +8,7 @@ import {
   gatewaySpendEventsQuerySchema,
   gatewaySpendSummariesQuerySchema,
   spendFilterQueryShape,
-} from "../gateway-spend-rest.schemas.ts";
+} from "../features/spend/gateway-spend-rest.schemas.ts";
 
 const WINDOW = { from: "1000", to: "2000" };
 const INVERTED = { from: "2000", to: "1000" };

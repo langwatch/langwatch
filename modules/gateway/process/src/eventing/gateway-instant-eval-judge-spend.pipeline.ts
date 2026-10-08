@@ -1,7 +1,6 @@
 /**
- * Gateway writes the ledger row for each Instant Evals judge call from the judge's own priced
- * fact (ADR-174 decision 13), as it debits governance's priced pulled usage: the leaf calls no
- * gateway Api, so wave 1 adds no peer cycle. The request id keeps a repeat to one row.
+ * Gateway writes the ledger row for each Instant Evals judge call from the judge's priced fact
+ * (ADR-174 decision 13); the leaf calls no gateway Api; the request id keeps a repeat to one row.
  * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import {
@@ -17,8 +16,8 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 
 import type { GatewayModule } from "../app/gateway.app.ts";
+import type { GatewayInstantEvalJudgeSpendService } from "../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
-import type { GatewayInstantEvalJudgeSpendService } from "../services/gateway-instant-eval-judge-spend.service.ts";
 
 const GATEWAY_INSTANT_EVAL_JUDGE_SPEND_PIPELINE_NAME = "gateway_instant_eval_judge_spend" as const;
 

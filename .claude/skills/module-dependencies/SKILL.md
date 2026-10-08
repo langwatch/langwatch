@@ -127,7 +127,7 @@ itself close a cycle, a scheduled process manager pulls instead.
    the policy re-run showed the edges gone.
 
 The reversed shape is `gateway -> webhook`: gateway's spend event types and schemas live in
-`modules/gateway/contract/src/gateway.spend-events.ts`, and webhook declares six peer subscribers
+`modules/gateway/contract/src/features/spend/gateway.spend-events.ts`, and webhook declares six peer subscribers
 in `modules/webhook/process/src/eventing/webhook-delivery.pipeline.ts:68`. Gateway holds no
 `WebhookApi`.
 

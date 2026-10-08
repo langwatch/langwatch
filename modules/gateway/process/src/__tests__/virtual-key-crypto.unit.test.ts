@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   VirtualKeyCryptoService,
   VirtualKeyCryptoError,
-} from "../services/virtual-key-crypto.service.ts";
+} from "../features/virtual-key/services/virtual-key-crypto.service.ts";
 
 const crypto = VirtualKeyCryptoService.create({
   pepper: "unit-test-pepper-32-bytes-exactly!",

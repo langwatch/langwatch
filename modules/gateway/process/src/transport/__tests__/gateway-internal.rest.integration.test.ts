@@ -14,6 +14,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
+import { ModelCatalogGatewaySpendRatingService } from "../../features/spend/services/model-catalog-gateway-spend-rating.service.ts";
 import { gatewayProcessModule } from "../../gateway.module.ts";
 import type { GatewayChangeEventsRepository } from "../../repositories/gateway-change-event.repository.ts";
 import {
@@ -27,7 +28,6 @@ import {
 } from "../../rules/gateway-internal-identity.rules.ts";
 import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
 import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import { gatewayInternalRest } from "../gateway-internal.rest.ts";
 import {
   mountGatewayInternalRest,

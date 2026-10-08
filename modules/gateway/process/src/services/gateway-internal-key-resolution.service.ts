@@ -11,6 +11,10 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
+  VirtualKeyCryptoError,
+  VirtualKeyCryptoService,
+} from "../features/virtual-key/services/virtual-key-crypto.service.ts";
+import {
   answer,
   detectVirtualKeyStatusRejection,
   readJson,
@@ -18,7 +22,6 @@ import {
   type KeyAuthRejection,
 } from "../rules/gateway-internal-door.rules.ts";
 import type { GatewayAuthDecisionService } from "./gateway-auth-decision.service.ts";
-import { VirtualKeyCryptoError, VirtualKeyCryptoService } from "./virtual-key-crypto.service.ts";
 
 /** How each license-token refusal reads on the wire, exactly as main answered it. */
 const LICENSE_TOKEN_REFUSALS: Record<

@@ -11,6 +11,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { BudgetOverviewService } from "../features/budget/services/gateway-budget-overview.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -18,7 +19,6 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/prisma.gateway-budget-overview.repository.ts";
 import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
-import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import {
   BUDGET_ARCHIVED_ID,

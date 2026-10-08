@@ -6,13 +6,13 @@ import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
+  GatewayRealtimeSessionService,
+  type GatewayRealtimeSessionCollaborators,
+} from "../features/realtime-session/services/gateway-realtime-session.service.ts";
+import {
   GatewayElevenLabsCredentialService,
   type ElevenLabsCredentialCollaborators,
 } from "./gateway-elevenlabs-credential.service.ts";
-import {
-  GatewayRealtimeSessionService,
-  type GatewayRealtimeSessionCollaborators,
-} from "./gateway-realtime-session.service.ts";
 
 const logger = createLogger("langwatch:api:elevenlabs");
 const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;

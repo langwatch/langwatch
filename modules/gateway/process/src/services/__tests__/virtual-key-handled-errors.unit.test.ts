@@ -21,9 +21,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { VirtualKeyValidationService } from "../../features/virtual-key/services/virtual-key-validation.service.ts";
 import type { GatewayVirtualKeyRepository } from "../../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayScopeResolutionService } from "../gateway-scope-resolution.service.ts";
-import { VirtualKeyValidationService } from "../virtual-key-validation.service.ts";
 
 function validationOver(repository: Partial<GatewayVirtualKeyRepository>) {
   return VirtualKeyValidationService.create({

@@ -12,6 +12,9 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { writeGatewayDebitsSchema } from "../../eventing/gateway-debit.intent.ts";
+import { GatewayBudgetChangeDedupeService } from "../../features/budget/services/gateway-budget-change-dedupe.service.ts";
+import type { GatewayBudgetCrossingService } from "../../features/budget/services/gateway-budget-crossing.service.ts";
+import { GatewaySpendDebitService } from "../../features/spend/services/gateway-spend-debit.service.ts";
 import { GatewayBudgetChangeDedupeRepository } from "../../repositories/gateway-budget-change-dedupe.repository.ts";
 import type {
   BudgetDebitRow,
@@ -21,9 +24,6 @@ import type {
   AppendGatewayChangeEventInput,
   GatewayChangeEventsRepository,
 } from "../../repositories/gateway-change-event.repository.ts";
-import { GatewayBudgetChangeDedupeService } from "../gateway-budget-change-dedupe.service.ts";
-import type { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
-import { GatewaySpendDebitService } from "../gateway-spend-debit.service.ts";
 import type { GatewayService } from "../gateway.service.ts";
 
 const epoch = Temporal.Instant.fromEpochMilliseconds(0);

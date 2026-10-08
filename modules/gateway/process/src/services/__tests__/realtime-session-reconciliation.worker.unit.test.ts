@@ -8,7 +8,7 @@ import {
   realtimeSessionReconciliationConfig,
   type ElevenLabsCredentialReader,
   type RealtimeSessionReconciliationRepository,
-} from "../../services/gateway-realtime-session-reconciliation.service.ts";
+} from "../../features/realtime-session/services/gateway-realtime-session-reconciliation.service.ts";
 
 const session = {
   id: "session-1",

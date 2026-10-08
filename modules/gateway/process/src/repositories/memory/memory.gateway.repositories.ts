@@ -1,7 +1,18 @@
+import type { FoldProjectionStore } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
+
+import type {
+  AppendGatewayAuditInput,
+  GatewayAuditRepository,
+} from "../gateway-audit.repository.ts";
+import { GatewayBudgetChangeDedupeRepository } from "../gateway-budget-change-dedupe.repository.ts";
+import type { GatewaySpendFoldCacheRepository } from "../gateway-spend-fold-cache.repository.ts";
+import type {
+  GatewayPersistenceTransaction,
+  GatewayTransactionRepository,
+} from "../gateway-transaction.repository.ts";
 import type { GatewayRepositories } from "../gateway.repositories.ts";
 import { MemoryGatewayAgentCacheEntryRepository } from "./memory.gateway-agent-cache.repository.ts";
-import { MemoryGatewayAuditRepository } from "./memory.gateway-audit.repository.ts";
-import { MemoryGatewayBudgetChangeDedupeRepository } from "./memory.gateway-budget-change-dedupe.repository.ts";
 import { MemoryGatewayBudgetSpendRepository } from "./memory.gateway-budget-spend.repository.ts";
 import { MemoryGatewayBudgetRepository } from "./memory.gateway-budget.repository.ts";
 import { MemoryGatewayCacheRuleRepository } from "./memory.gateway-cache-rule.repository.ts";
@@ -17,11 +28,9 @@ import { MemoryGatewayProviderLabelRepository } from "./memory.gateway-provider-
 import { MemoryGatewayRealtimeSessionRepository } from "./memory.gateway-realtime-session.repository.ts";
 import { MemoryGatewayScopeResolutionRepository } from "./memory.gateway-scope-resolution.repository.ts";
 import { MemoryGatewaySpendEventsRepository } from "./memory.gateway-spend-events.repository.ts";
-import { MemoryGatewaySpendFoldCacheRepository } from "./memory.gateway-spend-fold-cache.repository.ts";
 import { MemoryGatewaySpendScopeRepository } from "./memory.gateway-spend-scope.repository.ts";
 import { MemoryGatewayTraceDestinationReportRepository } from "./memory.gateway-trace-destination-report.repository.ts";
 import { MemoryGatewayTraceExportKeyRepository } from "./memory.gateway-trace-export-key.repository.ts";
-import { MemoryGatewayTransactionRepository } from "./memory.gateway-transaction.repository.ts";
 import { MemoryGatewayVirtualKeyConfigBackfillRepository } from "./memory.gateway-virtual-key-config-backfill.repository.ts";
 import { MemoryVirtualKeyDirectBudgetRepository } from "./memory.gateway-virtual-key-direct-budget.repository.ts";
 import { MemoryGatewayVirtualKeyRepository } from "./memory.gateway-virtual-key.repository.ts";
@@ -83,5 +92,66 @@ export class MemoryGatewayRepositories {
       spendFoldCache: MemoryGatewaySpendFoldCacheRepository.create(),
       budgetChangeDedupe: MemoryGatewayBudgetChangeDedupeRepository.create(),
     };
+  }
+}
+
+/** The gateway's audit trail in memory: appended to the store's `auditEntries`. */
+export class MemoryGatewayAuditRepository implements GatewayAuditRepository {
+  static create(store: MemoryGatewayStore): MemoryGatewayAuditRepository {
+    return new MemoryGatewayAuditRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryGatewayStore) {}
+
+  async append(input: AppendGatewayAuditInput): Promise<void> {
+    this.store.auditEntries.push({ ...input, projectId: input.projectId ?? null });
+  }
+}
+
+/** One claim per project per window, lapsing when the window does, as the Redis key expires. */
+export class MemoryGatewayBudgetChangeDedupeRepository extends GatewayBudgetChangeDedupeRepository {
+  static create(): MemoryGatewayBudgetChangeDedupeRepository {
+    return new MemoryGatewayBudgetChangeDedupeRepository();
+  }
+
+  readonly #claimedUntil = new Map<string, number>();
+
+  private constructor() {
+    super();
+  }
+
+  async claimWindow(input: { projectId: string; windowSeconds: number }): Promise<boolean> {
+    const now = nowInstant().epochMilliseconds;
+    const until = this.#claimedUntil.get(input.projectId);
+    if (until !== undefined && until > now) return false;
+    this.#claimedUntil.set(input.projectId, now + input.windowSeconds * 1000);
+
+    return true;
+  }
+}
+
+/** No cache tier in memory: the durable store is already as fast as a cache. */
+export class MemoryGatewaySpendFoldCacheRepository implements GatewaySpendFoldCacheRepository {
+  static create(): MemoryGatewaySpendFoldCacheRepository {
+    return new MemoryGatewaySpendFoldCacheRepository();
+  }
+
+  private constructor() {}
+
+  cached<State>(store: FoldProjectionStore<State>): FoldProjectionStore<State> {
+    return store;
+  }
+}
+
+/** One unit of work over the shared memory rows: a throw leaves them as they were. */
+export class MemoryGatewayTransactionRepository implements GatewayTransactionRepository {
+  static create(store: MemoryGatewayStore): MemoryGatewayTransactionRepository {
+    return new MemoryGatewayTransactionRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryGatewayStore) {}
+
+  run<T>(work: (transaction: GatewayPersistenceTransaction) => Promise<T>): Promise<T> {
+    return this.store.atomically(() => work({}));
   }
 }

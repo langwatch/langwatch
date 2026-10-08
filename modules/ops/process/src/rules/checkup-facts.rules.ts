@@ -14,7 +14,7 @@ export type ProviderTestOutcome =
   | { readonly outcome: "unchecked"; readonly reason: string };
 
 /** What a canary route answered. */
-export interface CanaryAnswer {
+interface CanaryAnswer {
   readonly status: number;
   readonly body: unknown;
 }
@@ -43,7 +43,7 @@ export interface CheckupLicenseView {
   readonly maxMembers?: number;
 }
 
-export interface CheckupGatewayFacts {
+interface CheckupGatewayFacts {
   readonly baseUrl: string | undefined;
   /**
    * Every address this app is reached at, its public address first. The
@@ -55,7 +55,7 @@ export interface CheckupGatewayFacts {
   readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
 }
 
-export interface CheckupEmailFacts {
+interface CheckupEmailFacts {
   readonly provider: string | undefined;
   readonly smtpConfigured: boolean;
   /** The transport logs in to the relay; an internal relay often takes none. */

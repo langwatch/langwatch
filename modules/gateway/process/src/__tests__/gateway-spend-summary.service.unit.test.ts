@@ -12,7 +12,7 @@ import {
   GatewayUsageService,
   type GatewayUsageProjects,
   type GatewayUsageVirtualKeys,
-} from "../services/gateway-spend-summary.service.ts";
+} from "../features/spend/services/gateway-spend-summary.service.ts";
 
 type TraceStub = {
   virtualKeyId: string;
