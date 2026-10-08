@@ -3,6 +3,7 @@ import { trpcQueryKey } from "@langwatch/api/web";
 import { useReadFreshness } from "@langwatch/browser-host/read-freshness";
 import {
   resolveGraphTimeScale,
+  shouldSkipPreviousPeriod,
   withGroupedPipeline,
   type CustomGraphInput,
 } from "@langwatch/dashboard-contract";
@@ -52,6 +53,7 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useRetryFailedAnalytics } from "../../behavior/analytics-feedback.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useDashboardRefetchInterval } from "../../behavior/use-dashboard-auto-refresh.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
@@ -73,7 +75,7 @@ import { describeError } from "../../model/describe-error.ts";
 import { monitorPeriodLabel, summarizeMonitor } from "../../model/monitor-summary.ts";
 import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 import { resolveSeriesValueFormat } from "../../model/series-value-format.ts";
-import { ChartErrorState } from "../elements/chart-error-state.tsx";
+import { ChartErrorIndicator, ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
 import { SummaryMetric } from "../elements/summary-metric.tsx";
 
@@ -274,7 +276,11 @@ function useGraphTimeseries({
     ...queryInput,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
-  const timeseriesInput = { ...query, timeScale };
+  const timeseriesInput = {
+    ...query,
+    timeScale,
+    shouldSkipPreviousPeriod: shouldSkipPreviousPeriod(input),
+  };
   const timeseries = analyticsApi.analytics.getTimeseries.useQuery(timeseriesInput, {
     ...queryOpts,
     enabled: queryOpts.enabled && load,
@@ -284,9 +290,15 @@ function useGraphTimeseries({
     queryKey: trpcQueryKey("analytics.getTimeseries", { input: timeseriesInput, type: "query" }),
   });
   // A monitor card headlines the whole period as one "full" bucket, which run-weights it;
-  // averaging daily buckets would weigh a 1-run day like a 100-run day.
+  // averaging daily buckets would weigh a 1-run day like a 100-run day. It reads only the
+  // current period.
+  const monitorSummaryInput = {
+    ...query,
+    timeScale: "full" as const,
+    shouldSkipPreviousPeriod: true,
+  };
   const monitorSummaryTimeseries = analyticsApi.analytics.getTimeseries.useQuery(
-    { ...query, timeScale: "full" },
+    monitorSummaryInput,
     {
       ...queryOpts,
       enabled: queryOpts.enabled && load && input.graphType === "monitor_graph",
@@ -550,6 +562,7 @@ function EmptyChart() {
 
 /** Stale data stays up with a retry badge; its one-line `title` is what `describeError` is for. */
 function StaleDataRetry({ timeseries }: { timeseries: ChartTimeseries }) {
+  const retryFailedAnalytics = useRetryFailedAnalytics();
   return (
     <button
       type="button"
@@ -564,7 +577,7 @@ function StaleDataRetry({ timeseries }: { timeseries: ChartTimeseries }) {
         padding: 0,
       }}
       aria-label="Retry loading chart data"
-      onClick={() => void timeseries.refetch()}
+      onClick={retryFailedAnalytics}
       title={describeError({
         error: timeseries.error,
         fallbackTitle: "Couldn't refresh this chart",
@@ -578,8 +591,20 @@ function StaleDataRetry({ timeseries }: { timeseries: ChartTimeseries }) {
 }
 
 /**
+ * The panel error state, with a Retry that refetches every failed analytics panel on
+ * screen. Its own component so the retry hook only mounts on a failed panel.
+ */
+function PanelErrorState({ error, height_ }: { error: unknown; height_: number }) {
+  const retryFailedAnalytics = useRetryFailedAnalytics();
+  return (
+    <ChartErrorState error={error} onRetry={retryFailedAnalytics} minHeight={`${height_}px`} />
+  );
+}
+
+/**
  * Loading, refetching, failure and empty states around a chart. A summary draws its own
- * per-figure placeholders, so it gets no bar-chart skeleton behind them.
+ * per-figure placeholders and its own compact error state per figure (it often sits inside a
+ * tab header or a small card), so it gets neither the bar-chart skeleton nor the panel error.
  */
 function GraphContainer({
   graphType,
@@ -597,6 +622,7 @@ function GraphContainer({
   children: React.ReactNode;
 }) {
   const failedOutright = Boolean(timeseries.error) && !timeseries.data;
+  const isSummaryFigures = graphType === "summary";
   const showEmpty = isEmpty && graphType !== "monitor_graph";
   return (
     <Box width="full" height="full" position="relative">
@@ -608,11 +634,13 @@ function GraphContainer({
           <Spinner position="absolute" right={4} top={4} />
         </Delayed>
       )}
-      {failedOutright ? (
-        <ChartErrorState error={timeseries.error} onRetry={() => void timeseries.refetch()} />
+      {failedOutright && !isSummaryFigures ? (
+        <PanelErrorState error={timeseries.error} height_={height_} />
       ) : (
         <>
-          {Boolean(timeseries.error) && <StaleDataRetry timeseries={timeseries} />}
+          {Boolean(timeseries.error) && !failedOutright && (
+            <StaleDataRetry timeseries={timeseries} />
+          )}
           {showEmpty ? (emptyState ?? <EmptyChart />) : children}
         </>
       )}
@@ -649,6 +677,13 @@ function SummaryGraph({
   return (
     <HStack gap={0} align="start" minHeight={SUMMARY_ROW_MIN_HEIGHT} overflowX="auto" width="full">
       <Flex paddingBottom={3} width="full" gap={0}>
+        {Boolean(timeseries.error) && !timeseries.data && (
+          <SummaryErrorFigures
+            error={timeseries.error}
+            labels={Object.values(seriesSet).map((series) => series.name)}
+            titleProps={titleProps}
+          />
+        )}
         {timeseries.isLoading &&
           Object.entries(seriesSet).map(([key, series]) => (
             <SummaryMetric key={key} label={series.name} titleProps={titleProps} />
@@ -1643,4 +1678,26 @@ function SummaryBarGraph({
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+/**
+ * A failed row of figures. One figure keeps its label, so a tab header still says which tab
+ * it is; a row of several collapses to one indicator, since repeating it per figure widens
+ * the card past its column on narrow screens and says the same thing several times.
+ */
+function SummaryErrorFigures({
+  error,
+  labels,
+  titleProps,
+}: {
+  error: unknown;
+  labels: string[];
+  titleProps: GraphTitleProps | undefined;
+}) {
+  const indicator = <ChartErrorIndicator error={error} />;
+  const [onlyLabel] = labels;
+  if (labels.length === 1 && onlyLabel !== undefined) {
+    return <SummaryMetric label={onlyLabel} titleProps={titleProps} valueSlot={indicator} />;
+  }
+  return indicator;
 }
