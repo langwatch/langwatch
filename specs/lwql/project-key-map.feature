@@ -52,12 +52,11 @@ Feature: A new project can query LangWatchQL as soon as it exists
     When an organization API key creates a project through the REST API
     Then project records a created event for it
 
-  # Organization writes the personal project row itself: it records the new workspace on its own
-  # pipeline, and project records the project as created from its own side.
+  # Organization records the new personal team; project creates the project and mints its key.
   @unit
   Scenario: A personal workspace records its new project
     When a user's personal workspace is created
-    Then organization records the new workspace with its project
+    Then organization records the new workspace with its project id and slug, and no project key
     And an existing workspace records nothing
 
   @unit
