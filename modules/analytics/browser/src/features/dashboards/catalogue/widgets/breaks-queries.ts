@@ -1,6 +1,7 @@
 /**
  * LangWatchQL for "Where my agent breaks": failed steps and tools, errors by type,
- * repeated calls and the tool-choice judge. A step is any span below the trace's root.
+ * repeated calls and the tool-choice judge. A step is any span below the trace's root, or a
+ * top-level span with nothing below it.
  */
 
 import { bucketOf, END, inPeriod, MIDPOINT, START } from "../../templates/model/lwql-period.ts";
@@ -11,29 +12,47 @@ const SPAN_TYPE = "SpanAttributes['langwatch.span.type']";
 export const WRONG_TOOL_JUDGE = "Tool choice";
 
 /**
- * Calls, failures and recovered failures per step. A failure is recovered when the
- * span above it still ended without an error, so the user never saw it.
+ * Calls, failures and recovered failures per step. A failure is recovered when the span above
+ * it still ended without an error. A top-level span with nothing below it (a trace of one span,
+ * or of flat spans) is a step too, and its failure always reached the user.
  */
 function stepFailuresSql({ toolsOnly, limit }: { toolsOnly: boolean; limit: number }): string {
-  const tools = toolsOnly ? `\n  AND c.${SPAN_TYPE} = 'tool'` : "";
-  return `SELECT c.SpanName AS step,
+  const tools = (column: string) => (toolsOnly ? `\n    AND ${column} = 'tool'` : "");
+  return `SELECT step,
   count() AS calls,
-  countIf(c.StatusCode = 2) AS failures,
-  countIf(c.StatusCode = 2 AND p.StatusCode != 2) AS recovered
-FROM spans AS c
-INNER JOIN (
-  SELECT TraceId, SpanId, StatusCode
-  FROM spans
-  WHERE StartTime >= subtractDays(${START}, 1) AND StartTime < ${END}
-) AS p ON p.TraceId = c.TraceId AND p.SpanId = c.ParentSpanId
-WHERE ${inPeriod("c.StartTime")}
-  AND c.ParentSpanId IS NOT NULL${tools}
+  countIf(failed) AS failures,
+  countIf(recovered) AS recovered
+FROM (
+  SELECT c.SpanName AS step,
+    c.StatusCode = 2 AS failed,
+    c.StatusCode = 2 AND p.StatusCode != 2 AS recovered
+  FROM spans AS c
+  INNER JOIN (
+    SELECT TraceId, SpanId, StatusCode
+    FROM spans
+    WHERE StartTime >= subtractDays(${START}, 1) AND StartTime < ${END}
+  ) AS p ON p.TraceId = c.TraceId AND p.SpanId = c.ParentSpanId
+  WHERE ${inPeriod("c.StartTime")}
+    AND c.ParentSpanId IS NOT NULL${tools(`c.${SPAN_TYPE}`)}
+  UNION ALL
+  SELECT r.SpanName AS step, r.StatusCode = 2 AS failed, false AS recovered
+  FROM spans AS r
+  LEFT ANTI JOIN (
+    SELECT DISTINCT TraceId, ParentSpanId
+    FROM spans
+    WHERE ${inPeriod("StartTime")}
+      AND ParentSpanId IS NOT NULL
+  ) AS k ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId
+  WHERE ${inPeriod("r.StartTime")}
+    AND r.ParentSpanId IS NULL${tools(`r.${SPAN_TYPE}`)}
+)
 GROUP BY step
 ORDER BY failures - recovered DESC, failures DESC, calls DESC
 LIMIT ${limit}`;
 }
 
-export const FAILING_STEPS_SQL = stepFailuresSql({ toolsOnly: false, limit: 6 });
+// Three steps fill the card beside the slowest steps without leaving it half empty.
+export const FAILING_STEPS_SQL = stepFailuresSql({ toolsOnly: false, limit: 3 });
 
 /** Every tool, so the widget's totals cover all of them. */
 export const TOOL_FAILURES_SQL = stepFailuresSql({ toolsOnly: true, limit: 50 });
@@ -57,9 +76,11 @@ ORDER BY bucket`;
 
 // A loop: one tool called 3 or more times in a trace with the same input. A retry:
 // a failed call followed by another under the same parent, of the same step, or of
-// any model call. A trace that does both counts once for each.
+// any model call. A trace that does both counts once for each. `uncosted` counts the spans
+// with no cost, which make the summed cost a lower bound.
 const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS looped,
-    sum(ifNull(Cost, 0)) - argMin(ifNull(Cost, 0), StartTime) AS cost
+    sum(ifNull(Cost, 0)) - argMin(ifNull(Cost, 0), StartTime) AS cost,
+    countIf(Cost IS NULL) AS uncosted
   FROM spans
   WHERE ${inPeriod("StartTime")}
     AND ${SPAN_TYPE} = 'tool'
@@ -69,7 +90,8 @@ const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS lo
   UNION ALL
   SELECT TraceId, minIf(StartTime, StatusCode = 2) AS at,
     anyIf(SpanName, StatusCode = 2) AS step, 0 AS looped,
-    sumIf(ifNull(Cost, 0), StatusCode = 2) AS cost
+    sumIf(ifNull(Cost, 0), StatusCode = 2) AS cost,
+    countIf(Cost IS NULL AND StatusCode = 2) AS uncosted
   FROM spans
   WHERE ${inPeriod("StartTime")}
     AND ParentSpanId IS NOT NULL
@@ -81,7 +103,8 @@ const REPEATS = `SELECT TraceId, min(StartTime) AS at, SpanName AS step, 1 AS lo
 export const REPEATS_BY_BUCKET_SQL = `SELECT ${bucketOf("at")} AS bucket,
   uniqExactIf(TraceId, looped = 1) AS looped_traces,
   uniqExactIf(TraceId, looped = 0) AS retried_traces,
-  sum(cost) AS cost
+  sum(cost) AS cost,
+  sum(uncosted) AS uncosted_spans
 FROM (${REPEATS})
 GROUP BY bucket
 ORDER BY bucket`;

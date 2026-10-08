@@ -1,12 +1,17 @@
 /**
- * The ask bar on a board. Where the board takes widgets, typing opens "Add a widget" with the
- * text, with or without Langy; "Ask" and the empty board's chips go to Langy, when the member
- * has it. A read-only board without Langy shows no bar.
+ * The ask bar on a board. Where the board takes widgets, a click opens "Add a widget", with
+ * or without Langy; on a read-only board it opens Langy about the board. The empty board's
+ * chips ask Langy, when the member has it. A read-only board without Langy shows no bar.
  */
 
 import type { BoardPeriod } from "../../../model/board-period.ts";
 import { useLangyAsk } from "../../behavior/use-board-langy.ts";
-import { type BoardSubject, boardQuestion, SUGGESTED_QUESTIONS } from "../../model/board-langy.ts";
+import {
+  type BoardSubject,
+  boardOpen,
+  boardQuestion,
+  SUGGESTED_QUESTIONS,
+} from "../../model/board-langy.ts";
 import { BoardAskBar } from "../blocks/board-ask-bar.tsx";
 
 export function BoardLangy({
@@ -20,24 +25,21 @@ export function BoardLangy({
   /** On an empty board: the suggested questions under the bar. */
   withSuggestions?: boolean;
   /** Absent on a read-only board, which takes no widgets. */
-  onOpenPicker?: (search: string) => void;
+  onOpenPicker?: () => void;
 }) {
   const langy = useLangyAsk();
-  if (!langy.enabled && !onOpenPicker) return null;
   const onAsk = langy.enabled
-    ? (question: string) =>
-        langy.ask(
-          boardQuestion({
-            question: question || "What should I look at on this dashboard?",
-            board,
-            period,
-          }),
-        )
+    ? (question: string) => langy.ask(boardQuestion({ question, board, period }))
     : void 0;
+  const chips = withSuggestions ? SUGGESTED_QUESTIONS : [];
+  if (onOpenPicker) {
+    return <BoardAskBar onOpen={onOpenPicker} chips={chips} onAsk={onAsk} />;
+  }
+  if (!langy.enabled) return null;
   return (
     <BoardAskBar
-      chips={withSuggestions ? SUGGESTED_QUESTIONS : []}
-      onType={onOpenPicker}
+      onOpen={() => langy.ask(boardOpen({ board, period }))}
+      chips={chips}
       onAsk={onAsk}
     />
   );

@@ -12,7 +12,7 @@ import {
 import type { WidgetQuestion, WidgetQuestionIcon } from "../../model/widget-questions.ts";
 import type { BoardTemplateWidget } from "../../templates/model/board-template.ts";
 import type { AgentKind, QuestionType, Trunk } from "./catalogue-labels.ts";
-import { CATALOGUE_WIDGETS, type CatalogueWidget } from "./catalogue-widgets.ts";
+import { CATALOGUE_WIDGETS, type CatalogueWidget, isCodingWidget } from "./catalogue-widgets.ts";
 import { QUESTION_BRANCHES, QUESTION_TREE } from "./question-tree.ts";
 import { implementedWidget, IMPLEMENTED_WIDGET_IDS, promptFor } from "./widget-implementations.ts";
 
@@ -61,11 +61,6 @@ const branchByTitle = new Map(PICKER_BRANCHES.map((branch) => [branch.title, bra
 const branchOf = new Map(
   QUESTION_TREE.map(({ id, branch }) => [id, branchByTitle.get(branch)] as const),
 );
-
-/** Made for coding agents, or reads their traces: those widgets live with coding agents. */
-const isCodingWidget = (widget: CatalogueWidget): boolean =>
-  widget.agentKinds.includes("coding") ||
-  widget.requirements.some((keys) => keys.includes("coding"));
 
 function pickerQuestion({
   widget,

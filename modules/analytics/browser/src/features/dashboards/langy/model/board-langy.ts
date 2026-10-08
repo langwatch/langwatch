@@ -122,6 +122,17 @@ export function boardQuestion({
   return { question: question.trim(), context: [boardAskContext({ board, period })] };
 }
 
+/** Opens Langy with the board attached and nothing asked, for the reader to write in. */
+export function boardOpen({
+  board,
+  period,
+}: {
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  return { context: [boardAskContext({ board, period })] };
+}
+
 /** A prompt with the board's concrete window and grain appended. */
 function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPeriod }): string {
   const window =

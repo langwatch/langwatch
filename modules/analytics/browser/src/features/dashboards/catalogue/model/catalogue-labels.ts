@@ -98,7 +98,7 @@ export const QUESTION_TYPE_LABELS: Readonly<Record<QuestionType, string>> = {
 };
 
 /** The question tree's trunks: each a verb for what the member wants from their agent. */
-export const TRUNKS = ["Profit", "Grow", "Protect", "Trust"] as const;
+export const TRUNKS = ["Grow", "Protect", "Profit", "Trust"] as const;
 export type Trunk = (typeof TRUNKS)[number];
 
 /** The question each trunk answers. */

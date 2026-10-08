@@ -135,9 +135,8 @@ Feature: Dashboards v1
   @integration
   Scenario: AC16 Ask Langy from the board
     Given Langy is enabled for the project
-    When the member presses "Ask" in the "What do you want to know?" bar on any board
-    Then Langy opens about that board, with the board passed as context
-    When they type in the bar instead, the picker opens with their text in its search
+    When the member clicks the "What do you want to know?" bar on a stored board
+    Then the picker opens with the cursor in its search
     And a pinned "Ask Langy" footer is always visible below the list
     When they press "Ask Langy" on the footer
     Then Langy opens with that question and the current board as context

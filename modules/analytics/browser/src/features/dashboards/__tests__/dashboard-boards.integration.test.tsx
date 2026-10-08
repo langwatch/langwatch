@@ -303,9 +303,7 @@ describe("a member's board", () => {
       });
 
       expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
-      expect(
-        screen.getByRole("textbox", { name: "What do you want to know?" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What do you want to know?" })).toBeInTheDocument();
       for (const question of ["Where does my money go?", "Is quality holding?"]) {
         expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
       }
@@ -334,28 +332,24 @@ describe("a member's board", () => {
 
     describe("when Langy is not available to the member", () => {
       /** @scenario "Boards: every board has the ask bar" */
-      it("keeps the ask bar for finding a widget, with no Ask and no suggested questions", async () => {
+      it("keeps the ask bar for finding a widget, with no suggested questions", async () => {
         openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
         expect(
-          await screen.findByRole("textbox", { name: "What do you want to know?" }),
+          await screen.findByRole("button", { name: "What do you want to know?" }),
         ).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
         expect(screen.queryByRole("button", { name: "Where does my money go?" })).toBeNull();
       });
     });
 
-    describe("when the member types in the ask bar", () => {
-      /** @scenario "Boards: typing in the ask bar opens Add a widget with the text in its search" */
-      it("opens Add a widget with what was typed as its search", async () => {
+    describe("when the member clicks the ask bar", () => {
+      /** @scenario "Boards: the ask bar opens its modal on a click, with the cursor in the modal" */
+      it("opens Add a widget with the cursor in its search", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer({ boards: OWN_BOARDS });
         const { host } = openBoard({ server });
 
-        await user.type(
-          await screen.findByRole("textbox", { name: "What do you want to know?" }),
-          "c",
-        );
+        await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
         expect(host.lastQuery).toEqual({ addBlock: "open" });
       });

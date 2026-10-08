@@ -145,7 +145,7 @@ function Chip({
   );
 }
 
-/** "All" and one chip per trunk, each in its own colour. */
+/** "All" and one chip per trunk with something in it, each in its own colour. */
 export function TrunkChips({
   picked,
   counts,
@@ -163,17 +163,22 @@ export function TrunkChips({
         isPicked={picked === void 0}
         onClick={() => onPick(void 0)}
       />
-      {TRUNKS.map((trunk) => (
-        <Chip
-          key={trunk}
-          label={trunk}
-          count={counts.byTrunk[trunk]}
-          isPicked={picked === trunk}
-          palette={TRUNK_PALETTES[trunk]}
-          icon={TRUNK_ICONS[trunk]}
-          onClick={() => onPick(picked === trunk ? void 0 : trunk)}
-        />
-      ))}
+      {TRUNKS.flatMap((trunk) => {
+        const isPicked = picked === trunk;
+        // A chip offering nothing is noise; a picked one stays so it can be cleared.
+        if (counts.byTrunk[trunk] === 0 && !isPicked) return [];
+        return [
+          <Chip
+            key={trunk}
+            label={trunk}
+            count={counts.byTrunk[trunk]}
+            isPicked={isPicked}
+            palette={TRUNK_PALETTES[trunk]}
+            icon={TRUNK_ICONS[trunk]}
+            onClick={() => onPick(isPicked ? void 0 : trunk)}
+          />,
+        ];
+      })}
     </ChipRow>
   );
 }

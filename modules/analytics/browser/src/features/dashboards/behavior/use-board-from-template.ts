@@ -15,7 +15,7 @@ import {
   dashboardsPath,
   templateBoardName,
 } from "../model/boards.ts";
-import { type CuratedBoard, curatedCopyWidgets } from "../model/curated-boards.ts";
+import type { CuratedBoard } from "../model/curated-boards.ts";
 import { catalogueSource } from "../model/widget-source.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
@@ -182,7 +182,7 @@ export function useBoardFromTemplate() {
         id: board.templateId,
         name: curatedCopyName(board.name),
         description: board.job,
-        widgets: () => Promise.resolve(curatedCopyWidgets(board)),
+        widgets: () => Promise.resolve([...board.widgets]),
         widgetSource: fromCatalogue,
       },
       existingNames,

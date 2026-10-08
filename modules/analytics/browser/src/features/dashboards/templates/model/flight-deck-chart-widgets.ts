@@ -40,9 +40,13 @@ function Change({ current, previous, rising }) {
   let arrow = "→";
   if (up) arrow = "↗";
   if (down) arrow = "↘";
+  // Past tenfold the exact rise says nothing more, as on the legacy summary tiles.
+  const shown = Math.abs(delta) > 9.99
+    ? "999%+"
+    : (delta > 0 ? "+" : "") + (delta * 100).toFixed(0) + "%";
   return (
     <div style={{ ...line, color }}>
-      {arrow} {(delta > 0 ? "+" : "") + (delta * 100).toFixed(0) + "%"}
+      {arrow} {shown}
       <span style={{ color: C.faint }}> vs prev</span>
     </div>
   );

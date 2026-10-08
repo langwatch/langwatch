@@ -109,6 +109,9 @@ const TONE = { Worse: "bad", Unclear: "warn", Better: "good" };`,
   );`,
 });
 
+/** The flakiest scenarios listed: as many as a list card holds. */
+const FLAKY_SHOWN = 5;
+
 export const FLAKY_TESTS_CODE = widgetCode({
   summary: "The last ten runs of each scenario as a strip of passes and fails, flaky ones first.",
   subtitle: "Fix or set aside the scenarios that flip",
@@ -155,7 +158,7 @@ function Strip({ strip }) {
   return (
     <Panel>
       <div style={{ fontSize: 11.5, color: C.subtle, marginBottom: 6 }}>{line}</div>
-      {rows.slice(0, 6).map((row) => (
+      {rows.slice(0, ${FLAKY_SHOWN}).map((row) => (
         <div key={row.scenario} style={{ display: "flex", alignItems: "center", gap: 8,
           padding: "4px 0", borderTop: "1px solid " + C.border, fontSize: 11.5 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",

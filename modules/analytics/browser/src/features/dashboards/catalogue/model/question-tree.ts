@@ -5,10 +5,8 @@
 
 import type { CatalogueScope, Trunk } from "./catalogue-labels.ts";
 
-/** The tree's branches, in tree order: the picker's sections, each with what it covers. */
+/** The tree's branches, trunk by trunk in `TRUNKS` order: the picker's sections. */
 export const QUESTION_BRANCHES = [
-  { title: "Spend less", trunk: "Profit", why: "What am I spending, and where does it go?" },
-  { title: "Spend better", trunk: "Profit", why: "What do I get for each unit of spend?" },
   { title: "More usage and users", trunk: "Grow", why: "Is my AI used, by whom, and for what?" },
   { title: "Productive agents", trunk: "Grow", why: "How much work does my agent get done?" },
   { title: "Keep users", trunk: "Grow", why: "Are users happy enough to stay?" },
@@ -22,6 +20,8 @@ export const QUESTION_BRANCHES = [
     trunk: "Protect",
     why: "Inventory, usage, access and standards",
   },
+  { title: "Spend less", trunk: "Profit", why: "What am I spending, and where does it go?" },
+  { title: "Spend better", trunk: "Profit", why: "What do I get for each unit of spend?" },
   { title: "Can I trust my data?", trunk: "Trust", why: "Completeness and correctness" },
 ] as const satisfies readonly { title: string; trunk: Trunk; why: string }[];
 

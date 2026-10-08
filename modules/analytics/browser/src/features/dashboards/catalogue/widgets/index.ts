@@ -15,6 +15,7 @@ import { AGENT_KIND_WIDGET_BUILDS } from "./agent-kind-widgets.ts";
 import { ANSWERS_ASKS_WIDGET_BUILDS } from "./answers-asks-widgets.ts";
 import { BREAKS_RELEASE_WIDGET_BUILDS } from "./breaks-release-widgets.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "./flight-deck-costs-widgets.ts";
+import { trustWidgetBuilds } from "./trust-widgets.ts";
 
 /** One built widget: its code, its named queries and its place on a board. */
 export interface CatalogueWidgetBuild {
@@ -27,7 +28,7 @@ export interface CatalogueWidgetBuild {
 
 const CHART = 6;
 
-export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
+const BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
   "ck-status": {
     code: deckChart.STATUS_CODE,
     queries: { main: deck.PERIOD_COMPARISON_SQL },
@@ -214,4 +215,9 @@ export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBui
   ...BREAKS_RELEASE_WIDGET_BUILDS,
   ...FLIGHT_DECK_COSTS_BUILDS,
   ...AGENT_KIND_WIDGET_BUILDS,
+};
+
+export const CATALOGUE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
+  ...BUILDS,
+  ...trustWidgetBuilds({ builds: BUILDS }),
 };

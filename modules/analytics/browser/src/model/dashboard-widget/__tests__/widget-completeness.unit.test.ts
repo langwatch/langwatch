@@ -12,6 +12,7 @@ import {
   completenessNotes,
   hasUnpricedCost,
   recordQueryFailure,
+  sampleNote,
   recordQueryResult,
   widgetFace,
   type WidgetQueryRecords,
@@ -138,5 +139,17 @@ describe("widgetFace", () => {
     });
 
     expect(widgetFace(records).kind).toBe("chart");
+  });
+});
+
+describe("sampleNote", () => {
+  /** @scenario "The info tip says how much a widget with whole data checked" */
+  it("names the rows a complete widget checked, and nothing for partial or empty data", () => {
+    expect(sampleNote(combineCompleteness([report({ total: 1234 })]))).toBe(
+      "Checked 1,234 traces in this period.",
+    );
+    expect(sampleNote(combineCompleteness([PARTIAL]))).toBeUndefined();
+    expect(sampleNote(combineCompleteness([NO_TRAFFIC]))).toBeUndefined();
+    expect(sampleNote(null)).toBeUndefined();
   });
 });

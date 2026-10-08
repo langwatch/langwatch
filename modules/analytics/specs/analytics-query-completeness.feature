@@ -100,11 +100,19 @@ Feature: Query completeness report
       And the completeness state is "partial"
 
     @unit
-    Scenario: A trace with no model call has a known cost
+    Scenario: A trace that called a model and carries no cost reads as missing cost, not as $0
       Given a windowed statement over analytics.traces reading TotalCost
-      And no trace in the period carries an unpriced span, though some made no model call
+      And every trace in the period called a model and none carries a cost
       When the statement runs for a project
-      Then the report counts a cost as present on every trace without an unpriced span
+      Then the report counts a cost as present only on traces with no unpriced span that carry a cost or called no model
+      And the completeness state is "missing"
+
+    @unit
+    Scenario: A trace that called no model owes no cost
+      Given a windowed statement over analytics.traces reading TotalCost
+      And the traces in the period made only tool, retrieval or evaluator calls and carry no cost
+      When the statement runs for a project
+      Then those traces count as having their cost
       And the completeness state is "complete"
 
     @unit

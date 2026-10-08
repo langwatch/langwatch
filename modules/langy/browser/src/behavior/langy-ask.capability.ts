@@ -40,6 +40,8 @@ export function createLangyAsk(): LangyAsk {
         langy.askLangy(prompt);
       } else {
         langy.openPanel();
+        // Opened from another page to be written in: the cursor waits in the composer.
+        langy.requestComposerFocus();
         seeded = seedDraft({ request, seeded, screen });
       }
 

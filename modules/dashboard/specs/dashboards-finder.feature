@@ -10,11 +10,17 @@ Feature: Dashboards finder: templates and widgets filed by what the member wants
   # parts both had before; these scenarios cover what is new.
 
   @unit
-  Scenario: Finder: categories are the verbs Profit, Grow, Protect and Trust
+  Scenario: Finder: categories are the verbs Grow, Protect, Profit and Trust
     Given the dashboards catalogue
-    Then its categories are Profit, Grow, Protect and Trust, in that order
+    Then its categories are Grow, Protect, Profit and Trust, in that order
     And every question of the question tree sits on one branch, and every branch on one category
     And every template and every widget is filed by the question tree
+
+  @integration
+  Scenario: Finder: a category chip with nothing in it is not shown
+    Given the finder or "Add a widget" narrowed so that a category holds nothing
+    Then that category has no chip, unless it is the one picked
+    And no chip reads 0
 
   @unit
   Scenario: Finder: a per-kind widget list is its own focus template

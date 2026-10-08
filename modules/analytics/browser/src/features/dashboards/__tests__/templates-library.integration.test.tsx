@@ -118,7 +118,7 @@ describe("the templates finder", () => {
       openLibrary();
 
       expect(chip({ row: "Categories", name: "All" })).toHaveAttribute("aria-pressed", "true");
-      for (const trunk of ["Profit", "Grow", "Protect", "Trust"]) {
+      for (const trunk of ["Grow", "Protect", "Profit", "Trust"]) {
         expect(chip({ row: "Categories", name: trunk })).toHaveAttribute("aria-pressed", "false");
       }
       const types = within(screen.getByRole("group", { name: "Agent types" }));
@@ -183,6 +183,19 @@ describe("the templates finder", () => {
       );
       for (const card of cards) {
         expect(within(card).getByText(AGENT_KIND_CHIP_LABELS.voice)).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("given an agent type with nothing in a category", () => {
+    /** @scenario "Finder: a category chip with nothing in it is not shown" */
+    it("shows no chip for that category, and no chip anywhere reads 0", () => {
+      openLibrary({ query: { agent: "voice" } });
+
+      const categories = within(screen.getByRole("group", { name: "Categories" }));
+      expect(categories.queryByRole("button", { name: /^Trust/ })).toBeNull();
+      for (const button of screen.getAllByRole("button", { pressed: false })) {
+        expect(button.textContent ?? "").not.toMatch(/\D0$/);
       }
     });
   });
@@ -286,7 +299,7 @@ describe("the templates finder", () => {
      * @scenario "AC107c Templates library: each card reads like the prototype's"
      * @scenario "AC144 Template card: the primary button reads Add to this project"
      */
-    it("shows the name, the job, the preview, the footer and Add to this project, in order", () => {
+    it("shows the name, the job, the widget count, Add to this project and the category, in order", () => {
       openLibrary();
 
       const card = screen.getByRole("article", { name: READY.name });
@@ -297,7 +310,9 @@ describe("the templates finder", () => {
         name: `Add ${READY.name} to this project`,
       });
       expect(create).toHaveTextContent("Add to this project");
-      const order = [name, job, count, create];
+      const category = within(card).getByTitle(POOL[0]!.trunk);
+      expect(category).toHaveTextContent(POOL[0]!.trunk);
+      const order = [name, job, count, create, category];
       for (const [index, element] of order.slice(1).entries()) {
         expect(
           order[index]!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING,

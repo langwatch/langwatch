@@ -1,10 +1,17 @@
 /**
- * One template, top to bottom: its name, its job and a preview of the top of its board, then
- * a one-row footer (a focus template's agent type, the widget count), then whatever actions
- * the surface gives it. Cards carry no data status: missing data shows inside the widgets.
+ * One template: its name, its job, a preview of its board with its widget count on it, then a
+ * footer of the surface's actions, a focus template's agent type and its category badge. With
+ * no actions the badges sit over the preview. Cards carry no data status.
  */
 
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  HStack,
+  Text,
+  VisuallyHidden,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Bot, Check, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -12,6 +19,7 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-menu-link.tsx";
 import { AGENT_KIND_CHIP_LABELS } from "../../catalogue/index.ts";
 import type { LibraryTemplate } from "../../model/template-library.ts";
+import { TRUNK_ICONS, TRUNK_PALETTES } from "./catalogue-filters.tsx";
 import { TemplatePreview } from "./template-preview.tsx";
 
 export function TemplateCard({
@@ -22,7 +30,7 @@ export function TemplateCard({
   /** What this surface lets the member do with the template, such as add it. */
   actions?: ReactNode;
 }) {
-  const { board, focusKind, widgetCount, preview } = template;
+  const { board, focusKind, widgetCount, preview, trunk } = template;
   return (
     <VStack
       as="article"
@@ -48,26 +56,92 @@ export function TemplateCard({
           {board.summary ?? board.description}
         </Text>
       </VStack>
-      <TemplatePreview preview={preview} />
-      {/* One fixed-height row on every card, the agent type slot kept even when empty, so the
-          actions below sit level across a row. */}
-      <HStack height="20px" minWidth={0} justify="space-between" gap={3} fontSize="12px">
-        <HStack gap={1} minWidth={0} color="fg.muted">
-          {focusKind && (
-            <>
-              <Bot size={12} aria-hidden />
-              <Text as="span" truncate>
-                {AGENT_KIND_CHIP_LABELS[focusKind]}
-              </Text>
-            </>
-          )}
+      {/* With no actions the card is itself the link, so a footer would be an empty row: its
+          badges then sit over the preview beside the widget count. */}
+      <Box position="relative" marginTop="auto">
+        <TemplatePreview preview={preview} />
+        <HStack position="absolute" right={2} bottom={2} gap={1.5}>
+          {!actions && <TemplateBadges trunk={trunk} focusKind={focusKind} onImage />}
+          <Text {...PILL} fontWeight="medium">
+            {widgetCount} widgets
+          </Text>
         </HStack>
-        <Text flexShrink={0} color="fg.muted">
-          {widgetCount} widgets
-        </Text>
-      </HStack>
-      {actions && <HStack gap={2}>{actions}</HStack>}
+      </Box>
+      {actions && (
+        // One row on every card, so the actions sit level across a row.
+        <HStack minHeight="32px" minWidth={0} justify="space-between" gap={3}>
+          <HStack gap={2} flexShrink={0}>
+            {actions}
+          </HStack>
+          <TemplateBadges trunk={trunk} focusKind={focusKind} />
+        </HStack>
+      )}
     </VStack>
+  );
+}
+
+/** A small label over the preview image, so it reads on any capture. */
+const PILL = {
+  borderRadius: "full",
+  borderWidth: "1px",
+  borderColor: "border",
+  background: "bg.panel",
+  paddingX: 2,
+  paddingY: 0.5,
+  fontSize: "11px",
+  lineHeight: "16px",
+  color: "fg.muted",
+  boxShadow: "xs",
+} as const;
+
+/** A focus template's agent type, then its category in the far right corner. */
+function TemplateBadges({
+  trunk,
+  focusKind,
+  onImage = false,
+}: {
+  trunk: LibraryTemplate["trunk"];
+  focusKind?: LibraryTemplate["focusKind"];
+  /** Over the preview, the agent type wears a pill so it reads on the image. */
+  onImage?: boolean;
+}) {
+  return (
+    <HStack gap={2} minWidth={0} fontSize="12px" lineHeight="20px">
+      {focusKind && (
+        <HStack gap={1} minWidth={0} color="fg.muted" {...(onImage ? PILL : {})}>
+          <Box as="span" flexShrink={0} color="fg.subtle" display="flex">
+            <Bot size={12} aria-hidden />
+          </Box>
+          <Text as="span" truncate>
+            {AGENT_KIND_CHIP_LABELS[focusKind]}
+          </Text>
+        </HStack>
+      )}
+      <TrunkBadge trunk={trunk} />
+    </HStack>
+  );
+}
+
+/** The template's category as its coloured icon; its name is the hover and the spoken label. */
+function TrunkBadge({ trunk }: { trunk: LibraryTemplate["trunk"] }) {
+  const Icon = TRUNK_ICONS[trunk];
+  return (
+    <Box
+      title={trunk}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      flexShrink={0}
+      width="24px"
+      height="24px"
+      borderRadius="md"
+      colorPalette={TRUNK_PALETTES[trunk]}
+      background="colorPalette.subtle"
+      color="colorPalette.fg"
+    >
+      <Icon size={13} aria-hidden />
+      <VisuallyHidden>{trunk}</VisuallyHidden>
+    </Box>
   );
 }
 

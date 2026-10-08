@@ -251,6 +251,8 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   }));
   const repeated = points.reduce((sum, point) => sum + point.looped + point.retried, 0);
   const repeatCost = daily.data.reduce((sum, row) => sum + num(row.cost), 0);
+  // A repeat with no cost on its spans leaves the sum short of the real cost.
+  const lowerBound = daily.data.some((row) => num(row.uncosted_spans) > 0);
   const spend = num(totals.data[0]?.cost);
   const series = [
     { key: "looped", label: "looped: same tool, same input, 3+ times", colour: C.teal,
@@ -264,7 +266,7 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
         <Stat label={"Looped or retried, " + pct(repeated / traffic) + " of traces"}
           value={count(repeated)} />
         <Stat label={"Cost of the repeats, " + pct(ratio(repeatCost, spend)) +
-          " of spend"} value={usd(repeatCost)} />
+          " of spend"} value={usd(repeatCost) + (lowerBound ? "+" : "")} />
         <div style={{ minWidth: 0, fontSize: 11 }}>
           <div style={{ fontSize: 10, color: C.faint }}>Most repeated steps</div>
           {steps.data.map((row) => (

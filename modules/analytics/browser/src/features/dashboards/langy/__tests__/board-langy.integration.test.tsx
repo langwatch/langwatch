@@ -78,33 +78,18 @@ afterEach(cleanup);
 
 describe("Langy on a board", () => {
   describe("given Langy is enabled for the project", () => {
-    describe("when the member types in the bar on their own board", () => {
-      /** @scenario "Boards: typing in the ask bar opens Add a widget with the text in its search" */
-      it("opens the picker and asks Langy nothing", async () => {
+    describe("when the member clicks the bar on their own board", () => {
+      /** @scenario "Boards: the ask bar opens its modal on a click, with the cursor in the modal" */
+      it("opens Add a widget, asks Langy nothing and holds no text itself", async () => {
         const user = userEvent.setup();
         const server = inMemoryServer();
         const host = openBoard({ server });
 
-        await user.type(await screen.findByRole("textbox", { name: ASK_BAR }), "c");
+        await user.click(await screen.findByRole("button", { name: ASK_BAR }));
 
         expect(host.lastQuery).toEqual({ addBlock: "open" });
         expect(host.langyAsks).toEqual([]);
-        expect(writesTo(server)).toEqual([]);
-      });
-    });
-
-    describe("when the member presses Ask with nothing typed", () => {
-      /** @scenario "AC16 Ask Langy from the board" */
-      it("asks Langy about the board and changes nothing on it", async () => {
-        const user = userEvent.setup();
-        const server = inMemoryServer();
-        const host = openBoard({ server });
-
-        await user.click(await screen.findByRole("button", { name: "Ask" }));
-
-        expect(host.langyAsks).toHaveLength(1);
-        expect(host.langyAsks[0]?.question).toBe("What should I look at on this dashboard?");
-        expect(host.langyAsks[0]?.context[0]).toMatchObject({ kind: "dashboard" });
+        expect(screen.queryByRole("textbox", { name: ASK_BAR })).toBeNull();
         expect(writesTo(server)).toEqual([]);
       });
     });
@@ -199,13 +184,12 @@ describe("Langy on a board", () => {
         MEMBER.filter((permission) => permission !== "langy:create"),
       ],
     ])(
-      "keeps the bar for finding a widget, with no Ask, when %s",
+      "keeps the bar for finding a widget, with no suggested questions, when %s",
       async (_case, flags, permissions) => {
         openBoard({ server: inMemoryServer(), flags, permissions });
 
         expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
-        expect(screen.getByRole("textbox", { name: ASK_BAR })).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: "Ask" })).toBeNull();
+        expect(screen.getByRole("button", { name: ASK_BAR })).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "What needs attention?" })).toBeNull();
       },
     );

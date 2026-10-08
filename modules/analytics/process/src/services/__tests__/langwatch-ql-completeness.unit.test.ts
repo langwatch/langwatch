@@ -33,6 +33,9 @@ const FILTERED_SQL =
 const ROOT_SPANS_SQL =
   "SELECT countIf(ParentSpanId IS NULL) AS roots FROM analytics.spans " +
   `${SPAN_PERIOD} GROUP BY ParentSpanId`;
+// Present: priced, and either a cost carried or no model called (a tool-only trace).
+const PRESENT_COST =
+  "countIf(`UnpricedSpanCount` = 0 AND (`TotalCost` IS NOT NULL OR empty(`Models`))) AS f0";
 const SPAN_COST_SQL = `SELECT sum(Cost) AS cost FROM analytics.spans ${SPAN_PERIOD}`;
 const ROLLUP_SQL =
   "SELECT sum(TraceCount) AS n FROM analytics.trace_metrics_by_minute " +
@@ -127,18 +130,34 @@ describe("LangWatchQLService completeness", () => {
       expect(completeness).not.toHaveProperty("buckets");
     });
 
-    /** @scenario "A trace with no model call has a known cost" */
-    it("counts a cost as known on every trace without an unpriced span", async () => {
+    /** @scenario "A trace that called a model and carries no cost reads as missing cost, not as $0" */
+    it("counts a model call with no cost as a gap", async () => {
       const { executor, result } = run({
         sql: COST_SQL,
-        answers: [[{ cost: null }], [{ n: 10, f0: 10, unpriced_count: 0, unpriced_models: [] }]],
+        answers: [[{ cost: null }], [{ n: 10, f0: 0, unpriced_count: 0, unpriced_models: [] }]],
       });
 
       const { completeness } = await result;
 
-      expect(executor.requests[1]?.sql).toContain("countIf(`UnpricedSpanCount` = 0) AS f0");
-      expect(executor.requests[1]?.sql).not.toContain("`TotalCost` IS NOT NULL");
-      expect(completeness).toMatchObject({ state: "complete", unpriced: { count: 0 } });
+      expect(executor.requests[1]?.sql).toContain(PRESENT_COST);
+      expect(completeness).toMatchObject({
+        state: "missing",
+        fields: [{ field: "TotalCost", present: 0 }],
+        unpriced: { count: 0 },
+      });
+    });
+
+    /** @scenario "A trace that called no model owes no cost" */
+    it("counts a trace that called no model as having its cost", async () => {
+      const { executor, result } = run({
+        sql: COST_SQL,
+        answers: [[{ cost: null }], [{ n: 4, f0: 4, unpriced_count: 0, unpriced_models: [] }]],
+      });
+
+      const { completeness } = await result;
+
+      expect(executor.requests[1]?.sql).toContain(PRESENT_COST);
+      expect(completeness?.state).toBe("complete");
     });
 
     /** @scenario "Every field present on every row is complete" */

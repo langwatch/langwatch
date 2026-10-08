@@ -79,3 +79,8 @@ The chart kit is `@langwatch/charts` in widget code (`model/dashboard-widget/cha
 - **Formatting.** Nothing turns null, NaN or undefined into 0 on the way to the screen.
   `toNumber` keeps null, and the kit prints "–" for a value it does not have.
 - **Nothing to show.** A source that sent nothing says so ("No runs"), not "$0.00".
+- **Cost coverage.** A row's cost counts as present only when the row carries a cost and no
+  unpriced span. A project that sends no cost reads `missing` ("Needs total cost"), never $0.
+- **Nothing to flag.** A widget whose job is to flag problems says so plainly when it finds
+  none ("All costs priced", with a check), filling the card so it never reads as broken. The
+  (i) says how much any whole-data widget checked: "Checked 1,880 traces in this period."

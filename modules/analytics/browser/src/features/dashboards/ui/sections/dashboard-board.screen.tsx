@@ -9,7 +9,6 @@ import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks
 import { Button, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
-import { useState } from "react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -58,20 +57,14 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const { range, grain, period, setRange, setGrain } = useBoardPeriod();
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
-  const [pickerSearch, setPickerSearch] = useState("");
   const { widgets } = boardWidgets;
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
   const editor = useBoardEditor({ board: subject, period, widgets });
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
 
-  const openPicker = (search = "") => {
-    setPickerSearch(search);
+  const openPicker = () => {
     if (!picker.isOpen) picker.open();
-  };
-  const closePicker = () => {
-    setPickerSearch("");
-    picker.close();
   };
   /** Saves the editor's widget, a new one or an edit, and closes it once that landed. */
   const saveEdited = async (edited: DashboardWidgetDraft) => {
@@ -181,13 +174,11 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         <BlockPickerDialog
           board={subject}
           period={period}
-          initialSearch={pickerSearch}
           onAddWidgets={boardWidgets.addQuestionWidgets}
           onSkip={() => {
-            setPickerSearch("");
             editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
           }}
-          onClose={closePicker}
+          onClose={picker.close}
         />
       )}
       {editor.editing && (

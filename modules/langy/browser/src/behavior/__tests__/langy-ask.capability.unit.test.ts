@@ -14,7 +14,12 @@ const view = {
 };
 
 beforeEach(() => {
-  useLangyStore.setState({ isOpen: false, draft: "", attachedContext: [] });
+  useLangyStore.setState({
+    isOpen: false,
+    draft: "",
+    attachedContext: [],
+    composerFocusRequested: false,
+  });
 });
 
 describe("given another module asking Langy a question", () => {
@@ -35,6 +40,14 @@ describe("given another module asking Langy a question", () => {
 
       expect(useLangyStore.getState().isOpen).toBe(true);
       expect(useLangyStore.getState().draft).toBe("Find traces where ");
+    });
+
+    it("opens the panel with the cursor in the composer when nothing is asked", () => {
+      langyAsk.ask({ context: [view] });
+
+      expect(useLangyStore.getState().isOpen).toBe(true);
+      expect(useLangyStore.getState().composerFocusRequested).toBe(true);
+      expect(useLangyStore.getState().pendingPrompt).toBeFalsy();
     });
 
     it("never plants the seed over a half-written question", () => {

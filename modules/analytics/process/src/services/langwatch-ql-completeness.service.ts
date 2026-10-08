@@ -26,6 +26,7 @@ const logger = createLogger("langwatch:analytics:lwql:completeness");
 /** Written at ingestion: spans whose model had no price, and those models. */
 const UNPRICED_COUNT_COLUMN = "UnpricedSpanCount";
 const UNPRICED_MODELS_COLUMN = "UnpricedModels";
+const MODELS_COLUMN = "Models";
 /** Enough names for a hover; the count of unpriced rows stays exact. */
 const MAX_UNPRICED_MODELS = 20;
 const COST_UNIT = "USD";
@@ -46,6 +47,8 @@ interface CompletenessPlan {
   readonly fields: readonly LangWatchQLViewColumn[];
   /** The view records unpriced spans and the query reads a cost from it. */
   readonly readsCost: boolean;
+  /** The view names the models a row called, so a row that called none owes no cost. */
+  readonly recordsModels: boolean;
 }
 
 /** Why a result carries no report. Each is expected, so none is an error. */
@@ -142,7 +145,8 @@ function planCompleteness({
   const reads = (column: LangWatchQLViewColumn) => read.has(column.name.toLowerCase());
   const hasColumn = (name: string) => view.columns.some((column) => column.name === name);
   const recordsUnpriced = hasColumn(UNPRICED_COUNT_COLUMN) && hasColumn(UNPRICED_MODELS_COLUMN);
-  // A null cost is also a row with no model call, so only the unpriced record tells a gap.
+  // Only a view that records unpriced spans can tell a price gap; a span cost is null on
+  // every span that made no model call, so it is not counted.
   const canLack = (column: LangWatchQLViewColumn) =>
     isCost(column)
       ? recordsUnpriced
@@ -158,6 +162,7 @@ function planCompleteness({
     timeColumn: timeColumn.name,
     fields,
     readsCost: fields.some(isCost),
+    recordsModels: hasColumn(MODELS_COLUMN),
   };
 }
 
@@ -165,11 +170,24 @@ function isCost(column: LangWatchQLViewColumn): boolean {
   return column.unit === COST_UNIT;
 }
 
-/** A cost is present on a row with no unpriced span: a row with no model call has none to miss. */
-function presentSql({ field }: { field: LangWatchQLViewColumn }): string {
-  return isCost(field)
-    ? `countIf(${quoted(UNPRICED_COUNT_COLUMN)} = 0)`
-    : `countIf(${quoted(field.name)} IS NOT NULL)`;
+/**
+ * A cost is present on a row with no unpriced span that either carries a cost or called no
+ * model: a model call with no cost is a gap, never a known $0, while a tool-only or $0 trace
+ * stores no cost and owes none. A view that names no models keeps the unpriced rule alone.
+ */
+function presentSql({
+  field,
+  recordsModels,
+}: {
+  field: LangWatchQLViewColumn;
+  recordsModels: boolean;
+}): string {
+  const carried = `${quoted(field.name)} IS NOT NULL`;
+  if (!isCost(field)) return `countIf(${carried})`;
+  const priced = `${quoted(UNPRICED_COUNT_COLUMN)} = 0`;
+  return recordsModels
+    ? `countIf(${priced} AND (${carried} OR empty(${quoted(MODELS_COLUMN)})))`
+    : `countIf(${priced})`;
 }
 
 /** Catalogue identifiers only, never caller text; bucketed exactly as dashboard templates do. */
@@ -190,7 +208,9 @@ function completenessSql({
         ]
       : []),
     "count() AS n",
-    ...plan.fields.map((field, index) => `${presentSql({ field })} AS f${index}`),
+    ...plan.fields.map(
+      (field, index) => `${presentSql({ field, recordsModels: plan.recordsModels })} AS f${index}`,
+    ),
     ...(plan.readsCost
       ? [
           `countIf(${quoted(UNPRICED_COUNT_COLUMN)} > 0) AS unpriced_count`,

@@ -54,7 +54,11 @@ HAVING new_runs > 0 AND current_runs > 0
 ORDER BY new_passed / new_runs - current_passed / current_runs ASC
 LIMIT 100`;
 
-/** What each scenario run cost: the newest figure per trace it recorded, summed. */
+/**
+ * What each scenario run cost: the newest figure per trace it recorded, summed. A run with
+ * no recorded trace has no cost, never $0, so an average skips it; an unmatched join row
+ * carries an empty id, not null.
+ */
 const RUN_COSTS = `SELECT ScenarioRunId, sum(cost) AS cost
   FROM (
     SELECT ScenarioRunId, TraceId, argMax(TotalCost, OccurredAt) AS cost
@@ -68,7 +72,7 @@ const RUNS_WITH_COST = `SELECT s.ScenarioRunId AS run_id, s.ScenarioId AS scenar
     s.BatchRunId AS batch, s.ScenarioSetId AS suite, s.StartedAt AS started_at,
     s.Verdict = 'success' AS passed, s.DurationMs AS duration_ms,
     length(s.MetCriteria) AS met, length(s.MetCriteria) + length(s.UnmetCriteria) AS criteria,
-    ifNull(c.cost, 0) AS cost
+    if(c.ScenarioRunId = '', NULL, c.cost) AS cost
   FROM simulations AS s
   LEFT JOIN (${RUN_COSTS}) AS c ON c.ScenarioRunId = s.ScenarioRunId
   WHERE ${inPeriod("s.StartedAt")}

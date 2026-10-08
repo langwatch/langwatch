@@ -66,6 +66,13 @@ Feature: A dashboard widget frame shows what its queries report
       When the info tip's notes are written
       Then they read "Total cost on 400 of 1,000 traces." and "No price for my-finetune-v2 (600 traces)."
 
+    @unit
+    Scenario: The info tip says how much a widget with whole data checked
+      Given a complete report over 1,234 traces
+      When the info tip is written
+      Then it says "Checked 1,234 traces in this period."
+      And partial data, no traffic or no report add no such line
+
   Rule: A widget with several queries shows one state
 
     @unit

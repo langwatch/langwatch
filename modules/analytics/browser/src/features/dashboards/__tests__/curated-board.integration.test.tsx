@@ -57,27 +57,30 @@ describe("given a member opens a From LangWatch board", () => {
     expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
   });
 
-  describe("when the board has widgets with no query yet", () => {
-    /** @scenario "From LangWatch: a widget with no query yet shows as not built, with no numbers" */
-    it("shows each as not built yet", async () => {
+  describe("when the board is Can I trust my numbers?", () => {
+    /** @scenario "From LangWatch: every widget on a template board has code" */
+    it("shows its four widgets and no placeholder", async () => {
       openCurated("data");
 
       expect(
         await screen.findByRole("heading", { name: "Can I trust my numbers?" }),
       ).toBeInTheDocument();
-      expect(screen.getAllByText("Not built yet")).toHaveLength(3);
+      expect(screen.getByText("Is my data complete?")).toBeInTheDocument();
+      expect(screen.getByText("Which of my traces are noise?")).toBeInTheDocument();
+      expect(screen.queryByText("Not built yet")).toBeNull();
     });
   });
 
-  describe("when the member asks Langy from its bar", () => {
+  describe("when the member clicks its ask bar", () => {
     /** @scenario "From LangWatch: a template board asks Langy with the board as context" */
-    it("asks about the template board", async () => {
+    it("opens Langy about the template board with nothing asked yet", async () => {
       const user = userEvent.setup();
       const { host } = openCurated("breaks");
 
-      await user.click(await screen.findByRole("button", { name: "Ask" }));
+      await user.click(await screen.findByRole("button", { name: "What do you want to know?" }));
 
       expect(host.langyAsks).toHaveLength(1);
+      expect(host.langyAsks[0]?.question).toBeUndefined();
       expect(host.langyAsks[0]?.context[0]?.ref).toContain("From LangWatch dashboard");
     });
   });

@@ -33,6 +33,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each tile shows "No earlier data" as its change label instead of "New"
     # Evidence: screenshot of the Status widget
 
+  @unit
+  Scenario: AC3c A status tile caps a change past tenfold
+    Given the current period has more than eleven times the figure of the period before
+    When the Status widget renders
+    Then the tile's change reads "999%+", as the legacy summary tiles do
+
   @unit @unimplemented
   Scenario: AC4 Money has cents
     Then a cost of 0 dollars shows as "$0.00"
@@ -415,11 +421,53 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the steps are ordered by the failures that reached the user
 
   @unit
+  Scenario: AC61b Where my agent breaks: a top-level span with nothing below it is a step
+    Given the "up-where-fails" and "tools-error-rate" widgets
+    And a trace whose spans are not nested, such as a trace of one span
+    Then each top-level span with no span below it counts as a step
+    And its failure counts as reaching the user
+    # Fix 2026-10-08: traces with no child spans made the widget say "No spans in this period"
+
+  @unit
+  Scenario: AC166 Can I trust my numbers?: data health names each missing field and what it unlocks
+    Given the "data-health" widget
+    Then it shows the share of traces in the period that carry a model, cost, user, conversation, labels and an outcome
+    And each field it reads is a filter, so a missing field shows as a gap on the card, never as a setup view
+    And each field missing on some traces says what to send and how many built widgets read it
+    And its hover lists those widgets by their question
+    And when every field is on every trace it says "Every field arrives" with a check, filling the card
+
+  @unit
+  Scenario: AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price
+    Given the "cost-accuracy" widget
+    Then it shows the share of traces with a model that have a span with no price, per bucket
+    And it lists the models with no price by the traces that used them
+    And its info tip says traces stored before 7 October 2026 have no unpriced record
+    And when nothing is unpriced it says "All costs priced" with a check, filling the card
+
+  @unit
+  Scenario: AC168 Can I trust my numbers?: noise is traffic that clearly comes from tests, staging and the like
+    Given the "noise" widget
+    Then a trace is noise when its origin is evaluation, simulation or playground
+    Or when its span resource attribute deployment.environment, its metadata environment or a label names a test, staging or dev environment
+    And it shows each source's traces, its share of traffic and its share of cost
+    And it counts no health checks or duplicates
+    And when nothing is noise it says "No test traffic" with a check, filling the card
+    # Owner, 2026-10-08: noise is traffic that clearly comes from tests, staging and the like
+
+  @unit
+  Scenario: AC61c Board cards: a list card is as tall as its longest list
+    Given the failing steps, the release verdict and the flaky tests widgets
+    Then each is a list card the height of a table, beside the table it pairs with
+    And it lists no more rows than that card holds: 3 failing steps, 4 changed scenarios, 5 flaky scenarios
+
+  @unit
   Scenario: AC62 Where my agent breaks: loops and retries are read from repeated spans
     Given the "up-loops" widget
     Then a trace has looped when it calls one tool 3 or more times with the same input
     And a trace has retried when a failed span is followed under the same parent by the same step, or by another model call
     And it shows those traces per bucket, their share of all traces, and the cost of the repeated calls
+    And that cost reads as a lower bound, marked "+", when a repeated span carries no cost
 
   @unit
   Scenario: AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered
@@ -599,7 +647,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC101 Templates library: every ready template is listed by trunk
     Given the member opens the templates finder with no search and no filters
     Then they see "Dashboard templates" and a one-line introduction
-    And every template that can be made today is listed once, in sections Profit, Grow, Protect and Trust
+    And every template that can be made today is listed once, in sections Grow, Protect, Profit and Trust
     And inside each section each template comes before its focus templates
     And each section header carries its trunk's colour
 
@@ -611,7 +659,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder
-    Given one plain search, the category chips "All", Profit, Grow, Protect and Trust,
+    Given one plain search, the category chips "All", Grow, Protect, Profit and Trust,
       and a chip for each agent type with something made for it
     When the member picks a category
     Then only that category's templates are listed, with the search applied
@@ -640,11 +688,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC107c Templates library: each card reads like the prototype's
     Given the templates finder
-    Then each card shows, in order: the name, what the board is for, a short preview,
-      a footer with the agent type a focus template is made for and the number of widgets,
-      then "Add to this project"
-    And a card shows no status and no category pill
-    And the footer has one fixed height on every card, so the buttons line up across a row
+    Then each card shows, in order: the name, what the board is for, a short preview with
+      the number of widgets in a pill over its bottom-right corner, then one footer row
+    And the footer row holds "Add to this project" on the left, and on the right the agent type
+      a focus template is made for, then the category as a coloured icon badge named by its hover
+    And a card shows no status
+    And the footer has one height on every card, so the buttons line up across a row
+    # Owner, 2026-10-08: no empty space above the button
     And the cards fill the page's width: one to a row on a phone, up to three on a wide screen
     # Evidence: screenshot of the finder beside the prototype's gallery
 
@@ -768,7 +818,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: Boards: every board has the ask bar
     Given any stored or From LangWatch board
     Then "What do you want to know?" sits under the header
-    And with Langy it has an "Ask" button; without Langy a stored board keeps it to find a widget
+    And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none
 
   @integration
   Scenario: Boards: every empty board shows one view
@@ -778,10 +828,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And each card opens its live board
 
   @integration
-  Scenario: Boards: typing in the ask bar opens Add a widget with the text in its search
-    When the member types in the ask bar on a stored board
-    Then "Add a widget" opens with what they typed in its search
+  Scenario: Boards: the ask bar opens its modal on a click, with the cursor in the modal
+    Given the ask bar is a button that looks like a search field and never holds text
+    When the member clicks it, or presses Enter or Space on it, on a stored board
+    Then "Add a widget" opens at once with the cursor in its search
     And Langy is asked nothing
+    # Owner, 2026-10-08: the bar opens the modal; it is not a search of its own
 
   @integration
   Scenario: Boards: no star or pencil by the board title
@@ -801,11 +853,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And an unknown template id shows the not-found page
 
   @unit @integration
-  Scenario: From LangWatch: a widget with no query yet shows as not built, with no numbers
-    Given a From LangWatch board with a widget that has no query yet
-    Then that widget says "Not built yet" and shows no numbers
+  Scenario: From LangWatch: every widget on a template board has code
+    Given the From LangWatch boards
+    Then every widget on them runs its own query, and none is a placeholder
+    And "Can I trust my numbers?" shows data health, cost accuracy, noise and evaluation coverage
 
-  @unit @integration
+  @integration
   Scenario: From LangWatch: Duplicate to edit makes an own board named after the template
     When the member presses "Duplicate to edit"
     Then a board named "<name> (copy)" is made for the project with the template's built widgets
@@ -813,8 +866,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: From LangWatch: a template board asks Langy with the board as context
-    When the member asks Langy on a From LangWatch board
-    Then the board is attached as context, named as read-only and not stored
+    When the member clicks the ask bar on a From LangWatch board
+    Then Langy opens with the cursor in its composer and nothing asked yet
+    And the board is attached as context, named as read-only and not stored
 
   @unit
   Scenario: Langy drafts: a draft records the board it is about
@@ -956,7 +1010,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit @integration
   Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk
     Given the picker
-    Then each branch of the question tree is a section, in tree order, so the trunks run Profit, Grow, Protect, Trust
+    Then each branch of the question tree is a section, in tree order, so the trunks run Grow, Protect, Profit, Trust
     And each section heading's icon and each row's icon take the trunk's colour, as in the templates finder
 
   @integration

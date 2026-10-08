@@ -101,6 +101,30 @@ describe("given the Langy composer after an askLangy handoff", () => {
     });
   });
 
+  describe("when the panel is still opening and its field refuses focus", () => {
+    /** @scenario The composer is ready to keep typing after a handoff */
+    it("takes focus once the panel has finished opening", async () => {
+      renderComposer();
+      // A disabled field refuses focus as a hidden one does in the browser.
+      composerField().setAttribute("disabled", "");
+
+      act(() => {
+        useLangyStore.getState().askLangy("which step fails most?");
+      });
+      await act(nextFrame);
+      await act(nextFrame);
+      expect(composerField()).not.toHaveFocus();
+      expect(useLangyStore.getState().composerFocusRequested).toBe(true);
+      composerField().removeAttribute("disabled");
+      act(() => {
+        useLangyStore.getState().markPanelShown();
+      });
+
+      await waitFor(() => expect(composerField()).toHaveFocus());
+      expect(useLangyStore.getState().composerFocusRequested).toBe(false);
+    });
+  });
+
   describe("when only the home hero composer is mounted", () => {
     it("leaves the request for the panel's composer", async () => {
       renderComposer({ variant: "hero" });

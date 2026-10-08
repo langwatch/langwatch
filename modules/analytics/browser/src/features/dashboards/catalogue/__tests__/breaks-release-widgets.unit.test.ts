@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
 import { CATALOGUE_WIDGET_BUILDS } from "../index.ts";
 
 function buildOf(id: string) {
@@ -31,10 +32,33 @@ describe("given the Where my agent breaks widgets", () => {
   it("counts a failure as recovered when the span above it did not fail", () => {
     const { code, sql } = buildOf("up-where-fails");
     expect(sql.main).toContain("p.SpanId = c.ParentSpanId");
-    expect(sql.main).toContain("countIf(c.StatusCode = 2 AND p.StatusCode != 2) AS recovered");
+    expect(sql.main).toContain("c.StatusCode = 2 AND p.StatusCode != 2 AS recovered");
     expect(sql.main).toContain("ORDER BY failures - recovered DESC");
     expect(sql.main).not.toContain("'tool'");
     expect(code).toContain("reached the user");
+  });
+
+  /** @scenario "AC61b Where my agent breaks: a top-level span with nothing below it is a step" */
+  it("counts a top-level span with no children as a step whose failure reached the user", () => {
+    const { sql } = buildOf("up-where-fails");
+    expect(sql.main).toContain("UNION ALL");
+    expect(sql.main).toContain("LEFT ANTI JOIN (");
+    expect(sql.main).toContain("ON k.TraceId = r.TraceId AND k.ParentSpanId = r.SpanId");
+    expect(sql.main).not.toContain("NOT IN");
+    expect(sql.main).toContain("StatusCode = 2 AS failed, false AS recovered");
+    expect(buildOf("tools-error-rate").sql.main).toContain(
+      "AND r.ParentSpanId IS NULL\n    AND r.SpanAttributes['langwatch.span.type'] = 'tool'",
+    );
+  });
+
+  /** @scenario "AC61c Board cards: a list card is as tall as its longest list" */
+  it("sizes the list cards as tables and caps their lists to fit", () => {
+    for (const id of ["up-where-fails", "ship-verdict", "ship-flaky"]) {
+      expect(CATALOGUE_WIDGET_BUILDS[id]?.rows, id).toBe(TABLE_ROWS);
+    }
+    expect(buildOf("up-where-fails").sql.main).toMatch(/LIMIT 3$/);
+    expect(buildOf("ship-verdict").code).toContain(".slice(0, 4)");
+    expect(buildOf("ship-flaky").code).toContain("rows.slice(0, 5)");
   });
 
   /** @scenario "AC62 Where my agent breaks: loops and retries are read from repeated spans" */
@@ -46,6 +70,9 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.daily).toContain("GROUP BY TraceId, ParentSpanId");
     expect(sql.totals).toContain("sum(CostSum)");
     expect(code).toContain("Cost of the repeats");
+    expect(sql.daily).toContain("countIf(Cost IS NULL) AS uncosted");
+    expect(sql.daily).toContain("sum(uncosted) AS uncosted_spans");
+    expect(code).toContain('usd(repeatCost) + (lowerBound ? "+" : "")');
   });
 
   /** @scenario "AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered" */
@@ -76,6 +103,9 @@ describe("given the Release check widgets", () => {
     expect(sql.scenarios).toContain("countIf(BatchRunId != newest) AS current_runs");
     expect(sql.costs).toContain("median(duration_ms) AS typical_ms");
     expect(sql.costs).toContain("FROM simulation_trace_metrics");
+    // A run with no recorded trace has no cost: missing is never $0.
+    expect(sql.costs).toContain("if(c.ScenarioRunId = '', NULL, c.cost) AS cost");
+    expect(sql.costs).not.toContain("ifNull(c.cost, 0)");
     expect(code).toContain("Math.min(current, 1 - current)");
     expect(code).toContain('"Scenarios worse"');
     expect(code).not.toContain("Hold the newest run");

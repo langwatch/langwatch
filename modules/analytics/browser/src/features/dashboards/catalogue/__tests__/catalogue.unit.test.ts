@@ -45,9 +45,9 @@ describe("given the dashboards catalogue", () => {
     }
   });
 
-  /** @scenario "Finder: categories are the verbs Profit, Grow, Protect and Trust" */
+  /** @scenario "Finder: categories are the verbs Grow, Protect, Profit and Trust" */
   it("files every question under a branch, and every branch under a trunk, in trunk order", () => {
-    expect(TRUNKS).toEqual(["Profit", "Grow", "Protect", "Trust"]);
+    expect(TRUNKS).toEqual(["Grow", "Protect", "Profit", "Trust"]);
     const branchTitles = new Set(QUESTION_BRANCHES.map(({ title }) => title));
     for (const { id, branch } of QUESTION_TREE) expect(branchTitles, id).toContain(branch);
     const trunkOrder = QUESTION_BRANCHES.map(({ trunk }) => TRUNKS.indexOf(trunk));

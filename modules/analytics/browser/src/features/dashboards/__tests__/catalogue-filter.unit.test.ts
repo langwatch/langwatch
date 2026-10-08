@@ -112,6 +112,9 @@ describe("the picker's catalogue filter", () => {
       expect(sections.flatMap(({ questions }) => questions)).toHaveLength(PICKER_QUESTIONS.length);
       const order = sections.map(({ title }) => treeOrder.indexOf(title));
       expect(order).toEqual(order.toSorted((a, b) => a - b));
+      const trunks = sections.map(({ trunk }) => TRUNKS.indexOf(trunk));
+      expect(trunks).toEqual(trunks.toSorted((a, b) => a - b));
+      expect(sections[0]?.trunk).toBe(TRUNKS[0]);
       for (const section of sections) {
         for (const question of section.questions) {
           expect(question.branch.title, question.id).toBe(section.title);

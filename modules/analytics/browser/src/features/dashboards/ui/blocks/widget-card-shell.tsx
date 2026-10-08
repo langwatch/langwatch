@@ -10,6 +10,7 @@ import { type ReactNode, useState } from "react";
 import { WidgetCompletenessSinkContext } from "../../../../behavior/widget-completeness-sink.ts";
 import {
   completenessNotes,
+  sampleNote,
   type WidgetCompleteness,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { boardCardHeightPx } from "../../model/board-grid.ts";
@@ -38,7 +39,8 @@ export function WidgetCardShell({
   children: ReactNode;
 }) {
   const [completeness, setCompleteness] = useState<WidgetCompleteness | null>(null);
-  const hasNotes = completenessNotes(completeness).length > 0;
+  const hasNotes =
+    completenessNotes(completeness).length > 0 || sampleNote(completeness) !== undefined;
   return (
     <VStack
       className="group"

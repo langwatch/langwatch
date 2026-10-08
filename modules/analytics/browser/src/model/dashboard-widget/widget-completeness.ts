@@ -162,6 +162,16 @@ export function completenessNotes(completeness: WidgetCompleteness | null): stri
   return [...new Set(lines)];
 }
 
+/**
+ * "Checked 1,000 traces in this period.": the sample under a widget whose data is whole, so the
+ * (i) carries it and the card face never does. Partial data says its own totals.
+ */
+export function sampleNote(completeness: WidgetCompleteness | null): string | undefined {
+  if (completeness?.state !== "complete") return undefined;
+  const report = completeness.reports.find((candidate) => candidate.total > 0);
+  return report ? `Checked ${count(report.total)} ${report.unit} in this period.` : undefined;
+}
+
 /** Whether any query found traces whose model has no price, so the (i) offers to add one. */
 export function hasUnpricedCost(completeness: WidgetCompleteness | null): boolean {
   return completeness?.reports.some((report) => (report.unpriced?.count ?? 0) > 0) ?? false;

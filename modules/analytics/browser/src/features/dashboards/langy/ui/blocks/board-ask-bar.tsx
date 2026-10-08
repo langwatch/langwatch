@@ -1,35 +1,27 @@
 /**
  * The "What do you want to know?" bar, with suggested questions on one line on an empty
- * board. Typing hands the text to "Add a widget"; "Ask" and the chips go to Langy.
+ * board. It looks like a search field but is a button: a click, or Enter or Space on focus,
+ * opens the board's modal at once with the cursor in its own input, so it never holds text.
  */
 
 import { Box, chakra, HStack, VStack } from "@langwatch/design-system/primitives";
 import { Sparkles } from "lucide-react";
-import { useState } from "react";
 
 /** The prototype's hover ring: purple at a tenth, outside the gradient edge. */
 const HALO = "0 0 0 4px color-mix(in srgb, var(--chakra-colors-purple-500) 10%, transparent)";
 
 export function BoardAskBar({
+  onOpen,
   chips = [],
-  onType,
   onAsk,
 }: {
+  /** Opens the board's modal: "Add a widget", or Langy on a read-only board. */
+  onOpen: () => void;
   /** The suggested questions, asked of Langy on a click. */
   chips?: readonly string[];
-  /** Where the board takes widgets: the text as it is typed, to open "Add a widget" with. */
-  onType?: (text: string) => void;
-  /** Puts a question to Langy; absent when Langy is not available. */
+  /** Puts a chip's question to Langy; absent when Langy is not available. */
   onAsk?: (question: string) => void;
 }) {
-  const [text, setText] = useState("");
-
-  const submit = () => {
-    if (onAsk) onAsk(text.trim());
-    else onType?.(text);
-    setText("");
-  };
-
   return (
     <VStack marginX="auto" marginBottom={5} maxWidth="640px" width="full" gap={2.5}>
       <Box
@@ -44,60 +36,48 @@ export function BoardAskBar({
         _hover={{ boxShadow: HALO }}
         _focusWithin={{ boxShadow: HALO }}
       >
-        <chakra.form
+        <chakra.button
+          type="button"
+          aria-label="What do you want to know?"
+          onClick={onOpen}
           display="flex"
           alignItems="center"
+          width="full"
           height="40px"
           gap={2.5}
           paddingX={4}
           borderRadius="full"
           background="bg.panel"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit();
-          }}
+          cursor="text"
+          outline="none"
+          textAlign="left"
         >
           <Box as="span" flexShrink={0} color="purple.600" display="flex">
             <Sparkles size={15} aria-hidden />
           </Box>
-          <chakra.input
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value);
-              onType?.(event.target.value);
-            }}
-            // Keys typed before "Add a widget" takes focus still land here; once it has
-            // the text, the bar empties.
-            onBlur={() => onType && setText("")}
-            placeholder="What do you want to know?"
-            aria-label="What do you want to know?"
+          <chakra.span
             flex={1}
             minWidth={0}
-            background="transparent"
-            outline="none"
+            truncate
             fontSize="sm"
             fontWeight="medium"
-            color="purple.700"
-            _placeholder={{ color: "purple.600/70" }}
-          />
-          {onAsk && (
-            <chakra.button
-              type="submit"
-              flexShrink={0}
-              borderRadius="full"
-              paddingX={2.5}
-              paddingY={0.5}
-              background="purple.50"
-              color="purple.600"
-              fontSize="11px"
-              fontWeight="medium"
-              cursor="pointer"
-              _hover={{ background: "purple.100" }}
-            >
-              Ask
-            </chakra.button>
-          )}
-        </chakra.form>
+            color="purple.600/70"
+          >
+            What do you want to know?
+          </chakra.span>
+          <chakra.span
+            flexShrink={0}
+            borderRadius="full"
+            paddingX={2.5}
+            paddingY={0.5}
+            background="purple.50"
+            color="purple.600"
+            fontSize="11px"
+            fontWeight="medium"
+          >
+            Ask
+          </chakra.span>
+        </chakra.button>
       </Box>
       {onAsk && chips.length > 0 && (
         // One line: a narrow screen scrolls it from the first chip rather than clipping both ends.

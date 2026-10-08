@@ -14,6 +14,7 @@ import * as release from "./release-queries.ts";
 import * as releaseCode from "./release-widgets-code.ts";
 
 const CHART = 6;
+// A list card is as tall as its longest list, so it never shows a block of empty card.
 
 export const BREAKS_RELEASE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
   "up-errors": {
@@ -26,7 +27,7 @@ export const BREAKS_RELEASE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidg
     code: breaksCode.FAILING_STEPS_CODE,
     queries: { main: breaks.FAILING_STEPS_SQL },
     width: "half",
-    rows: CHART,
+    rows: TABLE_ROWS,
   },
   "up-loops": {
     code: breaksCode.LOOPS_AND_RETRIES_CODE,
@@ -58,13 +59,13 @@ export const BREAKS_RELEASE_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidg
     code: releaseCode.NEW_VERSION_CODE,
     queries: { scenarios: release.NEW_VERSION_SCENARIOS_SQL, costs: release.NEW_VERSION_COST_SQL },
     width: "full",
-    rows: CHART,
+    rows: TABLE_ROWS,
   },
   "ship-flaky": {
     code: releaseCode.FLAKY_TESTS_CODE,
     queries: { main: release.FLAKY_SCENARIOS_SQL },
     width: "half",
-    rows: CHART,
+    rows: TABLE_ROWS,
   },
   "ship-compare": {
     code: releaseCode.RUNS_COMPARED_CODE,

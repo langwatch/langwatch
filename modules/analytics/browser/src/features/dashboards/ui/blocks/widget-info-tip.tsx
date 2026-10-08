@@ -1,7 +1,7 @@
 /**
  * A widget's (i) on a board card, faint beside the title: hover or focus shows what the widget
- * is for and why it matters, then what its data is missing, so the card itself carries only
- * the title and a clean face (features/dashboards/WIDGET_STANDARD.md).
+ * is for and why it matters, then how much it checked or what its data is missing, so the card
+ * carries only the title and a clean face (features/dashboards/WIDGET_STANDARD.md).
  */
 
 import { IconButton, Text, VStack } from "@langwatch/design-system/primitives";
@@ -11,6 +11,7 @@ import { Info } from "lucide-react";
 import {
   completenessNotes,
   hasUnpricedCost,
+  sampleNote,
   type WidgetCompleteness,
 } from "../../../../model/dashboard-widget/widget-completeness.ts";
 import { Link } from "../../../../ui/elements/analytics-link.tsx";
@@ -29,11 +30,13 @@ export function WidgetInfoTip({
   completeness?: WidgetCompleteness | null;
 }) {
   const notes = completenessNotes(completeness);
+  const sample = sampleNote(completeness);
   return (
     <Tooltip
       content={
         <VStack align="stretch" gap={2}>
           {description && <Text>{description}</Text>}
+          {sample && <Text color="fg.muted">{sample}</Text>}
           {notes.length > 0 && (
             <VStack
               align="stretch"

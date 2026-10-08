@@ -28,6 +28,11 @@ export interface CatalogueWidget {
   readonly prompt: string;
 }
 
+/** Made for coding agents, or reads their traces: those widgets live with coding agents. */
+export const isCodingWidget = (widget: CatalogueWidget): boolean =>
+  widget.agentKinds.includes("coding") ||
+  widget.requirements.some((keys) => keys.includes("coding"));
+
 export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
   {
     id: "traffic",
@@ -578,7 +583,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "prototype",
     question: "Does my agent go in circles?",
     title: "Loops and retries",
-    why: "Traces where my agent calls the same tool with the same input 3 or more times, or retries a step, and what the repeats cost.",
+    why: "Traces where my agent calls the same tool with the same input 3 or more times, or retries a step, and what the repeats cost. A repeat with no cost recorded on its spans makes that cost a lower bound, marked +.",
     questionId: "tools",
     alsoAnswers: ["spend"],
     questionType: "happened",
@@ -1562,7 +1567,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     personas: ["eng"],
     agentKinds: ["support-bot", "rag", "voice", "extraction", "tools-agent", "generative"],
     requirements: [["traces"]],
-    build: "logic",
+    build: "built",
     scope: "project",
     prompt:
       "Is my data complete? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of traces that carry model, cost, user, conversation, labels and outcome. Each gap names what to send and the widgets it unlocks. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
@@ -1572,34 +1577,34 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "proposed",
     question: "Which of my traces are noise?",
     title: "",
-    why: "Test, health-check and duplicate traces that inflate volume and the bill, by source.",
+    why: "Traffic that clearly comes from tests, staging and the like: playground, evaluation and simulation runs, and traces from a test, staging or dev environment. Each source's share of traces and of cost.",
     questionId: "arriving",
     alsoAnswers: [],
     questionType: "matters",
     personas: ["eng", "finance"],
     agentKinds: ["support-bot", "rag", "voice", "extraction", "tools-agent", "generative"],
     requirements: [["traces"]],
-    build: "logic",
+    build: "built",
     scope: "project",
     prompt:
-      "Which of my traces are noise? Answer it with LangWatchQL over the dashboard period. What the answer shows: Test, health-check and duplicate traces that inflate volume and the bill, by source. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which of my traces are noise? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traffic that clearly comes from tests, staging and the like: playground, evaluation and simulation runs, and traces from a test, staging or dev environment. Each source's share of traces and of cost. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-accuracy",
     origin: "proposed",
     question: "Are my cost figures complete?",
     title: "",
-    why: "Traces with a model but no price, and models with no known price. Missing cost understates spend.",
+    why: "Traces with a model but no price, and the models with no known price. Missing cost understates spend. Traces stored before 7 October 2026 have no unpriced record, so they count as priced.",
     questionId: "costok",
     alsoAnswers: [],
     questionType: "line",
     personas: ["finance", "eng"],
     agentKinds: ["support-bot", "rag", "voice", "extraction", "tools-agent", "generative"],
     requirements: [["model"]],
-    build: "logic",
+    build: "built",
     scope: "project",
     prompt:
-      "Are my cost figures complete? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces with a model but no price, and models with no known price. Missing cost understates spend. It needs: model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Are my cost figures complete? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces with a model but no price, and the models with no known price. Missing cost understates spend. Traces stored before 7 October 2026 have no unpriced record, so they count as priced. It needs: model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "inventory",

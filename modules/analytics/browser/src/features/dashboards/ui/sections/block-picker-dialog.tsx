@@ -18,7 +18,7 @@ import {
   Sparkles,
   TrendingDown,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   AGENT_KIND_CHIP_LABELS,
@@ -63,7 +63,6 @@ const QUESTION_ICONS: Readonly<Record<WidgetQuestionIcon, LucideIcon>> = {
 export function BlockPickerDialog({
   board,
   period,
-  initialSearch = "",
   onAddWidgets,
   onSkip,
   onClose,
@@ -71,8 +70,6 @@ export function BlockPickerDialog({
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
   period: BoardPeriod;
-  /** The search it opens with, such as what the ask bar had typed. */
-  initialSearch?: string;
   /** Adds the picked question's widget(s) to the board; false when the write failed. */
   onAddWidgets: (question: WidgetQuestion) => Promise<boolean>;
   /** Opens the widget editor on a new widget instead; the caller closes the picker with it. */
@@ -80,20 +77,8 @@ export function BlockPickerDialog({
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
-  const [filters, setFilters] = useState<CatalogueFilters>({
-    ...NO_CATALOGUE_FILTERS,
-    search: initialSearch,
-  });
+  const [filters, setFilters] = useState<CatalogueFilters>(NO_CATALOGUE_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
-  // The dialog's focus selects the search; the caret goes to the end instead, so typing
-  // carries on from the ask bar rather than replacing what was typed there.
-  useEffect(() => {
-    if (!initialSearch) return;
-    const frame = requestAnimationFrame(() => {
-      searchRef.current?.setSelectionRange(initialSearch.length, initialSearch.length);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [initialSearch]);
 
   // The agent type picks the pool; the search and the category narrow it.
   const pool = pickerPool({ agentKind: filters.agentKind });
