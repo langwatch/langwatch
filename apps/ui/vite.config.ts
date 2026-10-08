@@ -27,6 +27,17 @@ import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 const here = import.meta.dirname;
 const repoRoot = path.resolve(here, "../..");
 
+/** Names the chunk a module must land in, or undefined for Rolldown's default split. */
+function manualChunkFor(id: string): string | undefined {
+  // Every `import()` calls the preload helper. Left unassigned, Rolldown puts it in the
+  // first manual chunk that uses it (shiki), so the entry imported 600 kB of highlighter
+  // on every page just to lazy-load a screen.
+  if (id.includes("vite/preload-helper")) return "preload-helper";
+  // Shiki chunk-splitting lives in the Design System's `shiki-chunking` module
+  // (dependency-free) so its guard test can exercise the real logic.
+  return shikiManualChunk(id);
+}
+
 type PackageExportTarget = string | { default?: string };
 
 /** Every immediate directory of `base` (one level, e.g. `packages/*`). */
@@ -300,15 +311,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           defaultHandler(warning);
         },
         output: {
-          manualChunks(id: string) {
-            // Every `import()` calls the preload helper. Left unassigned, Rolldown
-            // puts it in the first manual chunk that uses it (shiki), so the entry
-            // imported 600 kB of highlighter on every page just to lazy-load a screen.
-            if (id.includes("vite/preload-helper")) return "preload-helper";
-            // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
-            // module (dependency-free) so its guard test can exercise the real logic.
-            return shikiManualChunk(id);
-          },
+          manualChunks: manualChunkFor,
         },
       },
     },
@@ -430,12 +433,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
         },
         // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
         "^/mcp(?:\\?.*)?$": {
-          target: API_TARGET,
-          changeOrigin: true,
-          secure: false,
-        },
-        // The widget chart frame is the API's framed document; unproxied it falls to the SPA shell.
-        "^/sandbox/chart-frame(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,
