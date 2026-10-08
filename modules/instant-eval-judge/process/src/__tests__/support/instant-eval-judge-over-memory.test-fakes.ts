@@ -31,14 +31,13 @@ import { InstantEvalJudgeService } from "../../services/instant-eval-judge.servi
 export type InstantEvalJudgeOverMemory = Readonly<{
   /** The judge call, the run and query record, and the spend catch-up's copy, all real. */
   judges: Pick<InstantEvalJudgeApi, "judge" | "recordSpend" | "copyLedgerSpend">;
-  /** The judge's folds of project's and billing's facts. */
+  /** The judge's fold of billing's usage-billed fact. */
   factsPipeline: () => InstantEvalJudgeFactsPipeline;
   /** The judge's own priced facts; connect its senders with `connectSpend`. */
   spendPipeline: () => InstantEvalJudgeSpendPipeline;
   connectSpend: (send: (fact: InstantEvalJudgeSpendPricedEventData) => Promise<void>) => void;
-  /** The tables, so a suite can count the rows the folds and copies left. */
+  /** The judge's tables, so a suite can count the rows the folds and copies left. */
   rows: Readonly<{
-    projects: ReadonlyMap<string, { organizationId: string; createdAtMs: number }>;
     usageBilling: ReadonlyMap<string, InstantEvalJudgeUsageBillingFact>;
     spend: ReadonlyMap<string, InstantEvalJudgeSpendRow>;
   }>;
@@ -48,8 +47,15 @@ export type InstantEvalJudgeOverMemory = Readonly<{
 
 const OCCURRED_AT = Date.UTC(2026, 9, 7);
 
-export function instantEvalJudgeOverMemory(): InstantEvalJudgeOverMemory {
-  const projectRows = new Map<string, { organizationId: string; createdAtMs: number }>();
+/** `placed` stands in for the projects project's and organization's tables hold (R40). */
+export function instantEvalJudgeOverMemory({
+  placed = [],
+}: {
+  placed?: readonly Readonly<{ projectId: string; organizationId: string }>[];
+} = {}): InstantEvalJudgeOverMemory {
+  const projectRows = new Map(
+    placed.map(({ projectId, organizationId }) => [projectId, { organizationId }]),
+  );
   const usageBillingRows = new Map<string, InstantEvalJudgeUsageBillingFact>();
   const spendRows = new Map<string, InstantEvalJudgeSpendRow>();
   const repositories = {
@@ -88,7 +94,7 @@ export function instantEvalJudgeOverMemory(): InstantEvalJudgeOverMemory {
     connectSpend: (send) => {
       sendPriced = send;
     },
-    rows: { projects: projectRows, usageBilling: usageBillingRows, spend: spendRows },
+    rows: { usageBilling: usageBillingRows, spend: spendRows },
     usageBilledOf: async ({ organizationId }) => {
       const held = await facts.getUsageBilling({ organizationId });
       return held.outcome === "folded" ? held.fact.usageBilled : "never_folded";

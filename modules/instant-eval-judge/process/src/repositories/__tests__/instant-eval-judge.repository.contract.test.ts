@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 
 /**
  * @vitest-environment node
- * The judge's folds, through its service, answer alike over memory and Postgres (ADR-174
- * decisions 13, 17). Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
+ * The judge's billing fold and spend rows, through its service, answer alike over memory and
+ * Postgres (ADR-174 decisions 13, 17).
+ * Spec: modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -22,8 +23,8 @@ import type { InstantEvalJudgeRepositories } from "../instant-eval-judge.reposit
 import { MemoryInstantEvalJudgeRepositories } from "../memory/memory.instant-eval-judge.repositories.ts";
 import { PostgresInstantEvalJudgeRepositories } from "../prisma/prisma.instant-eval-judge.repositories.ts";
 
-/** The three tables; the classifier's buckets have their own suite. */
-type FactRepositories = Pick<InstantEvalJudgeRepositories, "projects" | "usageBilling" | "spend">;
+/** The judge's two tables; placement and the classifier's buckets have their own suites. */
+type FactRepositories = Pick<InstantEvalJudgeRepositories, "usageBilling" | "spend">;
 
 type Backend = Readonly<{
   repositories: () => FactRepositories;
@@ -36,32 +37,10 @@ const CHANGE_STAMPED_AT = 100;
 function contractCases(backend: Backend): void {
   const facts = () => InstantEvalJudgeFactsService.create({ repositories: backend.repositories() });
   const organizationId = () => `org_${backend.namespace()}`;
-  const projectId = () => `project_${backend.namespace()}`;
   const billing = async (service: InstantEvalJudgeFactsService) => {
     const held = await service.getUsageBilling({ organizationId: organizationId() });
     return held.outcome === "folded" ? held.fact.usageBilled : "never folded";
   };
-
-  describe("the project fold", () => {
-    it("knows no project before its created fact folds", async () => {
-      await expect(facts().getProjectPlacement({ projectId: projectId() })).resolves.toEqual({
-        outcome: "unknown",
-      });
-    });
-
-    it("keeps the first organization when the same created fact folds again", async () => {
-      const service = facts();
-      const created = { projectId: projectId(), organizationId: organizationId(), occurredAt: 5 };
-      await service.projectCreated(created);
-      await service.projectCreated(created);
-      await service.projectCreated({ ...created, organizationId: "org_other", occurredAt: 9 });
-
-      await expect(service.getProjectPlacement({ projectId: projectId() })).resolves.toEqual({
-        outcome: "known",
-        organizationId: organizationId(),
-      });
-    });
-  });
 
   describe("the usage-billing fold", () => {
     it("reads an organization it never folded as never folded", async () => {
@@ -203,7 +182,6 @@ describe.skipIf(!databaseUrl)("given the judge's Postgres repositories", () => {
   const namespace = randomUUID();
   const clean = () =>
     cleanupTestRows(database(), [
-      ["instantEvalJudgeProject", { projectId: `project_${namespace}` }],
       ["instantEvalJudgeUsageBilling", { organizationId: `org_${namespace}` }],
       ["instantEvalJudgeSpend", { organizationId: `org_${namespace}` }],
     ]);

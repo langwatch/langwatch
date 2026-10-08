@@ -37,9 +37,6 @@
       "path": "../../../packages/process/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {

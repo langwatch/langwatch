@@ -46,16 +46,18 @@ slice and the priced event's schema. There is no transport.
 
 No peer `*Api`. The contract depends on `zod`, `@langwatch/config` and `@langwatch/handled-error`.
 It cannot import the trace contract, which depends on it through Instant Evals' contract, so the
-text cuts that need trace's helper live in the process half. The process half reads two peers' event
-contracts, never their Apis: project's `lw.project.created` and billing's
-`lw.billing.usage_billing_changed`. A peer subscriber is not a dependency edge.
+text cuts that need trace's helper live in the process half. The process half reads one peer's event
+contract, never its Api: billing's `lw.billing.usage_billing_changed`. A peer subscriber is not a
+dependency edge. It reads project's `Project` and organization's `Team` rows through their declared
+Postgres shares to place a project (round 46 E1, R40); a share is not an Api edge either.
 
 ## Persistence
 
 Three Postgres tables, created in migration `20261007140001_instant_eval_judge_tables` (ADR-174
 Schema). Each is the leaf's own copy of a fact; none has a relation or foreign key.
 
-- `InstantEvalJudgeProject`, keyed by `projectId`: the project's organization and creation time.
+- `InstantEvalJudgeProject`, keyed by `projectId`: retired by round 46 E1. Nothing writes or reads it;
+  a contract migration drops it later. The judge places a project through the shares instead.
 - `InstantEvalJudgeUsageBilling`, keyed by `organizationId`: whether the organization is usage-billed,
   when that was true, and whether a catch-up wrote it.
 - `InstantEvalJudgeSpend`, keyed by `organizationId` and `requestId`: one judge request's spend in
@@ -64,7 +66,6 @@ Schema). Each is the leaf's own copy of a fact; none has a relation or foreign k
 One Prisma repository claims each table, with an in-memory twin. Every query names the project or
 the organization. Each write is safe to repeat, since a peer event is delivered at least once:
 
-- The project row is written once and never changed, since a project never leaves its organization.
 - The billing row keeps the newest stamp, and a real fact wins a tie over a catch-up
   (`usageBillingFactWins`, ADR-174 decision 17). The Postgres update states the same rule in SQL, so
   two folds racing on one row cannot both land.

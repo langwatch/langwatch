@@ -425,7 +425,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
   Rule: Catch-up jobs fill the judge's copies right after the rollout
 
     @integration
-    Scenario: The project catch-up teaches the judge every existing project
+    Scenario: The project catch-up records every existing project's created fact
       Given projects created before the judge existed
       And a project whose created fact failed to write
       When the project catch-up runs twice
@@ -437,12 +437,6 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       Given recording a new project's created fact fails
       When the failure is logged
       Then the log names the backfill-project-created catch-up
-
-    @unit
-    Scenario: A repeated project created fact leaves one judge row
-      Given the judge already holds a project
-      When the same project created fact is folded again
-      Then the judge holds one row for that project
 
     @integration
     Scenario: The usage-billing catch-up gives every organization's answer
@@ -478,16 +472,6 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And billing stopped billing it while the judge's subscriber was not running
       When the usage-billing catch-up runs again
       Then the judge reads it as not usage billed
-
-    @integration
-    Scenario: The judge refuses calls until the project catch-up has run, then judges them
-      Given the judge was just deployed and holds no projects
-      And a project created before the deploy with Instant Evals released
-      When a judge call arrives for it
-      Then it is refused with the project unknown error
-      When the project catch-up runs
-      And the same judge call arrives again
-      Then it is classified
 
     @integration
     Scenario: The spend catch-up copies every ledger row once

@@ -5,7 +5,7 @@ import {
 import {
   type InstantEvalJudgeProjectPlacement,
   InstantEvalJudgeProjectRepository,
-} from "../instant-eval-judge-project.repository.ts";
+} from "../instant-eval-judge-placement.repository.ts";
 import {
   InstantEvalJudgeSpendRepository,
   type InstantEvalJudgeSpendRow,
@@ -18,15 +18,15 @@ import {
 import type { InstantEvalJudgeRepositories } from "../instant-eval-judge.repositories.ts";
 import { MemoryInstantEvalRateLimitRepository } from "./memory.instant-eval-rate-limit.repository.ts";
 
-type MemoryInstantEvalJudgeProjectRow = { organizationId: string; createdAtMs: number };
+type MemoryInstantEvalJudgeProjectRow = { organizationId: string };
 
-/** In-memory twin of the judge's project to organization map. */
+/** In-memory twin of the project placement project's and organization's tables hold. */
 export class MemoryInstantEvalJudgeProjectRepository extends InstantEvalJudgeProjectRepository {
   private constructor(private readonly rows: Map<string, MemoryInstantEvalJudgeProjectRow>) {
     super();
   }
 
-  /** A test may hand in the map, to see how many rows the folds left. */
+  /** A test hands in the map, standing in for the projects their owners hold. */
   static create({
     rows = new Map<string, MemoryInstantEvalJudgeProjectRow>(),
   }: {
@@ -42,18 +42,6 @@ export class MemoryInstantEvalJudgeProjectRepository extends InstantEvalJudgePro
   }): Promise<InstantEvalJudgeProjectPlacement> {
     const row = this.rows.get(projectId);
     return row ? { outcome: "known", organizationId: row.organizationId } : { outcome: "unknown" };
-  }
-
-  async upsert({
-    projectId,
-    organizationId,
-    createdAtMs,
-  }: {
-    projectId: string;
-    organizationId: string;
-    createdAtMs: number;
-  }): Promise<void> {
-    if (!this.rows.has(projectId)) this.rows.set(projectId, { organizationId, createdAtMs });
   }
 }
 

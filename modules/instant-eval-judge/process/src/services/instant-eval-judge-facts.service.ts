@@ -3,7 +3,6 @@ import type {
   InstantEvalJudgeLedgerSpendCopy,
 } from "@langwatch/instant-eval-judge-contract";
 
-import type { InstantEvalJudgeProjectPlacement } from "../repositories/instant-eval-judge-project.repository.ts";
 import type {
   InstantEvalJudgeSpendRow,
   InstantEvalJudgeSpendWrite,
@@ -13,13 +12,13 @@ import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-
 
 type InstantEvalJudgeFactRepositories = Pick<
   InstantEvalJudgeRepositories,
-  "projects" | "usageBilling" | "spend"
+  "usageBilling" | "spend"
 >;
 
 /**
- * Folds the facts the judge checks before each call into its own tables, and reads them back
- * (ADR-174 decisions 13, 17). Every fold is safe to repeat: a peer event is delivered at least
- * once and never deduplicated for a subscriber.
+ * Folds billing's usage-billed fact and the judge's spend into its own tables, and reads them back
+ * (ADR-174 decisions 13, 17); project placement is read through shares (R40). Every fold is safe
+ * to repeat: a peer event is delivered at least once and never deduplicated for a subscriber.
  */
 export class InstantEvalJudgeFactsService {
   private constructor(private readonly repositories: InstantEvalJudgeFactRepositories) {}
@@ -30,23 +29,6 @@ export class InstantEvalJudgeFactsService {
     repositories: InstantEvalJudgeFactRepositories;
   }): InstantEvalJudgeFactsService {
     return new InstantEvalJudgeFactsService(repositories);
-  }
-
-  /** Project's `lw.project.created`: the project's organization, kept as first written. */
-  projectCreated({
-    projectId,
-    organizationId,
-    occurredAt,
-  }: {
-    projectId: string;
-    organizationId: string;
-    occurredAt: number;
-  }): Promise<void> {
-    return this.repositories.projects.upsert({
-      projectId,
-      organizationId,
-      createdAtMs: occurredAt,
-    });
   }
 
   /** Billing's usage-billing fact, real or catch-up; the newest stamp wins. */
@@ -91,14 +73,6 @@ export class InstantEvalJudgeFactsService {
       occurredAtMs: occurredAt,
     });
     return { outcome: outcome === "recorded" ? "copied" : "already_held" };
-  }
-
-  getProjectPlacement({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<InstantEvalJudgeProjectPlacement> {
-    return this.repositories.projects.getPlacement({ projectId });
   }
 
   getUsageBilling({

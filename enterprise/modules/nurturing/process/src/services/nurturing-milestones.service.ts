@@ -32,8 +32,7 @@ export class NurturingMilestonesService {
 
   /** A backfilled project seeds its organization: its first_* milestones already happened. */
   projectCreated(data: ProjectCreatedEventData): Promise<void> {
-    return this.dependencies.milestones.recordProject({
-      projectId: data.projectId,
+    return this.dependencies.milestones.recordOrganization({
       organizationId: data.organizationId,
       adminUserId: data.adminUserId ?? null,
       seeded: data.backfilled === true,
