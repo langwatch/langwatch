@@ -1,4 +1,4 @@
-import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -72,6 +72,8 @@ import {
   extractRedactionsForObject,
 } from "../../rules/trace-read-redaction.rules.ts";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service.ts";
+import type { TraceAnnotationScoresReadRepository } from "../trace-annotation-scores.repository.ts";
+import type { TraceAnnotationsReadRepository } from "../trace-annotations.repository.ts";
 import {
   TraceLegacyReadRepository,
   type ResolveTraceSpansBatchFn,
@@ -356,7 +358,13 @@ export interface ClickHouseTraceLegacyReadOptions {
    * at the platform default, which still bounds every read.
    */
   retentionDays?: RetentionDaysProvider | undefined;
-  annotations?: AnnotationApi | undefined;
+  /** Trace's fold of annotation's rows and score names (EF-1), read by the projection join. */
+  annotations?:
+    | {
+        rows: Pick<TraceAnnotationsReadRepository, "findForTraces">;
+        scores: Pick<TraceAnnotationScoresReadRepository, "findScoreNames">;
+      }
+    | undefined;
 }
 
 function mergeFilterWhere({
@@ -797,7 +805,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly resolveClickHouseClient:
     | ((tenantId: string) => Promise<TraceClickHouseClient>)
     | undefined;
-  private readonly annotations: AnnotationApi | undefined;
+  private readonly annotations: ClickHouseTraceLegacyReadOptions["annotations"];
   private readonly traceCanonicalisation: TraceCanonicalisationService;
 
   private readonly retentionFloor: RetentionFloorService;
@@ -2592,11 +2600,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
     if (!this.annotations) {
-      throw new Error("AnnotationApi is required for trace annotation projection");
+      throw new Error("Trace's annotation fold is required for trace annotation projection");
     }
     const [rows, scoreDefs] = await Promise.all([
-      this.annotations.listForProjection({ projectId, traceIds, anchor: "all" }),
-      this.annotations.listScoreNames({ projectId }),
+      this.annotations.rows.findForTraces({ projectId, traceIds }),
+      this.annotations.scores.findScoreNames({ projectId }),
     ]);
     const scoreNameById = new Map(scoreDefs.map((s) => [s.id, s.name]));
 
@@ -2613,7 +2621,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           row.scoreOptions,
           scoreNameById,
         ),
-        created_at: row.createdAt.getTime(),
+        created_at: row.createdAt,
       });
       byTrace.set(row.traceId, list);
     }

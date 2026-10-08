@@ -216,7 +216,8 @@ Feature: Langy drives and reads the Trace Explorer
       Then "find traces" asks are routed to find-traces
       And the committed compiled skill matches a fresh render of its source
 
-    @e2e
+    # Gap: main's test drove a fake Explorer tab; this tree has no Explorer page helper yet (round 29).
+    @e2e @unimplemented
     Scenario: Asked for thumbs-down traces, Langy applies the event filter and answers the Explorer's count
       Given a project where thumbs down exists only as thumbs_up_down events with a vote of -1
       When the user asks for the traces with a thumbs down

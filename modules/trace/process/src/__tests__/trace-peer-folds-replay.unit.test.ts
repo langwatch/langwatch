@@ -1,7 +1,15 @@
 /**
  * @vitest-environment node
- * Spec: modules/trace/specs/trace-log-record-storage.feature
+ * Spec: modules/trace/specs/trace-topic-names.feature
+ * Spec: modules/trace/specs/trace-annotations.feature
  */
+import {
+  ANNOTATION_CREATED_EVENT_TYPE,
+  ANNOTATION_DELETED_EVENT_TYPE,
+  ANNOTATION_SCORE_DEFINED_EVENT_TYPE,
+  ANNOTATION_SCORE_RENAMED_EVENT_TYPE,
+  ANNOTATION_UPDATED_EVENT_TYPE,
+} from "@langwatch/annotation-contract";
 import {
   defineAggregate,
   definePipeline,
@@ -20,6 +28,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { TOPIC_CLUSTERING_EVENT_TYPES } from "@langwatch/topic-contract";
 import { isMigrationStep, PROJECTION_REPLAY_FROM_START } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
@@ -28,15 +37,17 @@ import {
   annotationStandIn,
   topicStandIn,
 } from "../eventing/__tests__/trace-peer-folds.fixtures.ts";
-import { TRACE_LOG_RECORD_STORAGE_LANE } from "../eventing/trace-log-records.pipeline.ts";
+import {
+  TRACE_ANNOTATION_SCORES_LANE,
+  TRACE_ANNOTATIONS_LANE,
+} from "../eventing/trace-annotations.pipeline.ts";
+import { TRACE_TOPIC_NAMES_LANE } from "../eventing/trace-topic-names.pipeline.ts";
 import { traceProcessModule } from "../trace.module.ts";
-
-const STEP_ID = "trace:map-log-records";
 
 type Discovery = { eventTypes: readonly string[]; sinceMs?: number };
 
-/** Log's record log, empty, recording what the replay engine asks it to discover. */
-class RecordingLogRecordLog implements ReplayEventSource {
+/** The owners' logs, empty, recording what the replay engine asks them to discover. */
+class RecordingOwnerLog implements ReplayEventSource {
   readonly discoveries: Discovery[] = [];
 
   async discoverAffectedAggregates(input: Discovery) {
@@ -57,7 +68,6 @@ class RecordingLogRecordLog implements ReplayEventSource {
   }
 }
 
-/** Log's record pipeline as a stand-in owner, as a worker installing both registers it. */
 function logStandIn() {
   return definePipeline({ name: "log_records", aggregate: defineAggregate({ type: "log_record" }) })
     .withEvents([
@@ -66,8 +76,8 @@ function logStandIn() {
     .build();
 }
 
-/** A worker installing trace whose eventing replays over the recording log. */
-async function bootWorker({ log }: { log: RecordingLogRecordLog }) {
+/** A worker installing trace beside its peer folds' owners, replaying over the recording log. */
+async function bootWorker({ log }: { log: RecordingOwnerLog }) {
   const eventing = new EventSourcing({
     enabled: false,
     processStore: InMemoryProcessStore.createForTesting(),
@@ -82,7 +92,6 @@ async function bootWorker({ log }: { log: RecordingLogRecordLog }) {
     }),
   });
   eventing.register(logStandIn());
-  // Trace's other peer folds refuse to route unless their owners are registered too.
   eventing.register(topicStandIn());
   eventing.register(annotationStandIn());
   const stores = memoryStores();
@@ -102,34 +111,59 @@ async function bootWorker({ log }: { log: RecordingLogRecordLog }) {
   });
 }
 
-describe("given a worker installing trace over log's record log", () => {
-  /** @scenario "Trace's log record lane is replayed over every log record at deploy" */
-  it("declares the map step, which replays the log record lane from the start once old writers are gone", async () => {
-    const log = new RecordingLogRecordLog();
-    const runtime = await bootWorker({ log });
+const STEPS = [
+  {
+    scenario: "Trace's topic name fold is replayed over every topic model at deploy",
+    id: "trace:fold-topic-names",
+    lane: TRACE_TOPIC_NAMES_LANE,
+    eventTypes: [TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED],
+  },
+  {
+    scenario: "Trace's annotation folds are replayed over every annotation fact at deploy",
+    id: "trace:fold-annotations",
+    lane: TRACE_ANNOTATIONS_LANE,
+    eventTypes: [
+      ANNOTATION_CREATED_EVENT_TYPE,
+      ANNOTATION_UPDATED_EVENT_TYPE,
+      ANNOTATION_DELETED_EVENT_TYPE,
+    ],
+  },
+  {
+    scenario: "Trace's annotation folds are replayed over every annotation fact at deploy",
+    id: "trace:fold-annotation-scores",
+    lane: TRACE_ANNOTATION_SCORES_LANE,
+    eventTypes: [ANNOTATION_SCORE_DEFINED_EVENT_TYPE, ANNOTATION_SCORE_RENAMED_EVENT_TYPE],
+  },
+] as const;
 
-    try {
-      const step = runtime.migrationSteps(isMigrationStep).find(({ id }) => id === STEP_ID);
-      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+describe("given a worker installing trace over its peer folds' owner logs", () => {
+  /**
+   * @scenario "Trace's topic name fold is replayed over every topic model at deploy"
+   * @scenario "Trace's annotation folds are replayed over every annotation fact at deploy"
+   */
+  it.each(STEPS)(
+    "declares $id, which replays $lane from the start once old writers are gone",
+    async ({ id, lane, eventTypes }) => {
+      const log = new RecordingOwnerLog();
+      const runtime = await bootWorker({ log });
 
-      const report = await step?.run({
-        checkpoint: { resumeFrom: null, save: async () => void 0 },
-        dryRun: false,
-        signal: new AbortController().signal,
-      });
+      try {
+        const step = runtime.migrationSteps(isMigrationStep).find((s) => s.id === id);
+        expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
 
-      expect(report).toMatchObject({
-        lane: TRACE_LOG_RECORD_STORAGE_LANE,
-        aggregatesReplayed: 0,
-      });
-      expect(log.discoveries).toEqual([
-        {
-          eventTypes: [CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE],
-          sinceMs: Date.parse(PROJECTION_REPLAY_FROM_START),
-        },
-      ]);
-    } finally {
-      await runtime.stop();
-    }
-  });
+        const report = await step?.run({
+          checkpoint: { resumeFrom: null, save: async () => void 0 },
+          dryRun: false,
+          signal: new AbortController().signal,
+        });
+
+        expect(report).toMatchObject({ lane, aggregatesReplayed: 0 });
+        expect(log.discoveries).toEqual([
+          { eventTypes, sinceMs: Date.parse(PROJECTION_REPLAY_FROM_START) },
+        ]);
+      } finally {
+        await runtime.stop();
+      }
+    },
+  );
 });

@@ -13,7 +13,7 @@ function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
     facets: CLICKHOUSE_FACET_CATALOG,
     repository: { listAll } as never,
     evaluations: { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
-    topicService: { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
+    topicNames: { findNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   });
 }
 

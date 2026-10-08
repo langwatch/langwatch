@@ -9,6 +9,7 @@ import {
   useOptionalUiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 
 import { UiNavigationHost } from "./navigation-host-provider";
 import type { UiRootCapabilities } from "./ui-root-capabilities";
@@ -16,9 +17,12 @@ import { useAnalyticsIdentity } from "./use-analytics-identity";
 
 export default function UiAppChrome({
   capabilities: root,
+  process,
   fullScreen = false,
 }: {
   capabilities: UiRootCapabilities;
+  /** The process owner's slice: the chrome's development badge reads it. */
+  process: ProcessWebConfig;
   /** Draws the page with no top bar or sidebar, behind the same gates. */
   fullScreen?: boolean;
 }) {
@@ -31,7 +35,7 @@ export default function UiAppChrome({
   if (!capabilities || capabilities.scope === UNAVAILABLE_UI_SCOPE) return <UiRouteOutlet />;
 
   return (
-    <UiNavigationHost commandBar capabilities={root}>
+    <UiNavigationHost commandBar capabilities={root} process={process}>
       <UiAppChromeFrame
         scope={root.scope}
         navigationChrome={root.navigationChrome}

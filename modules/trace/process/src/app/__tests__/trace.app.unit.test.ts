@@ -4,7 +4,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 /**
  * @vitest-environment node
  * Trace application rules: full resolution on content-consuming reads,
@@ -134,7 +133,6 @@ function harness(
       editOverlay: {} as TraceEditOverlayStore,
       changeTraceName: async () => undefined,
     },
-    topics: {} as TopicApi,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no read in this suite subscribes");

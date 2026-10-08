@@ -3,7 +3,6 @@
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Spec: modules/trace/specs/large-trace-blob-offload.feature
  */
-import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -15,7 +14,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -75,13 +73,11 @@ function compose({
       }),
       fallbackVisibilityDays: 14,
     },
-    annotations: createApiFixture<AnnotationApi>(),
     dataRetention: createApiFixture<DataRetentionApi>(),
     evaluations: createApiFixture<EvaluationApi>(),
     modelProviders: createApiFixture<ModelProviderApi>(),
     projects: createApiFixture<ProjectApi>(),
     share: createApiFixture<ShareApi>(),
-    topics: createApiFixture<TopicApi>(),
     requestBounds: plans,
     exportBounds: null,
     ...(featureFlags ? { featureFlags } : {}),

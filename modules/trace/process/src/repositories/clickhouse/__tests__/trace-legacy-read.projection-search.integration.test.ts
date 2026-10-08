@@ -1,10 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type {
-  AnnotationScoreName,
-  ProjectionAnnotation,
-  AnnotationApi,
-} from "@langwatch/annotation-contract";
-import type {
   Protections,
   ProjectionFrom,
   GetAllTracesForProjectInput,
@@ -19,6 +14,7 @@ import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enr
  * specs/traces/trace-search-projection.feature against real infra. */
 import { compileProjection } from "../../../rules/trace-projection-compile.rules.ts";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
+import type { TraceAnnotationRow } from "../../trace-annotations.repository.ts";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import { openProtections } from "./open-protections.ts";
 import {
@@ -175,146 +171,19 @@ function makeQueryInput(
 /** A fake AnnotationService — no Postgres testcontainer here, so the service's
  *  own mapping (id -> name remap, ProjectedAnnotation shape) is exercised
  *  against canned rows instead of a real join. */
-class FakeAnnotationService implements AnnotationApi {
-  countUsage(): Promise<{
-    annotations: number;
-    annotationQueues: number;
-    annotationQueueItems: number;
-    annotationScores: number;
-  }> {
-    return Promise.resolve({
-      annotations: 0,
-      annotationQueues: 0,
-      annotationQueueItems: 0,
-      annotationScores: 0,
-    });
-  }
-
-  createUnattributed(): never {
-    throw new Error("Not used by projection search tests: createUnattributed.");
-  }
-  getQueue(): never {
-    throw new Error("Not used by projection search tests: getQueue.");
-  }
-  getQueueWalkStep(): never {
-    throw new Error("Not used by projection search tests: getQueueWalkStep.");
-  }
-  createReview(): never {
-    throw new Error("Not used by projection search tests: createReview.");
-  }
-  updateReview(): never {
-    throw new Error("Not used by projection search tests: updateReview.");
-  }
-  deleteReview(): never {
-    throw new Error("Not used by projection search tests: deleteReview.");
-  }
-  listWithFullUsers(): never {
-    throw new Error("Not used by projection search tests: listWithFullUsers.");
-  }
-  listWithUserSummaries(): never {
-    throw new Error("Not used by projection search tests: listWithUserSummaries.");
-  }
-  listReviewQueueItems(): never {
-    throw new Error("Not used by projection search tests: listReviewQueueItems.");
-  }
-  listOptimizedQueues(): never {
-    throw new Error("Not used by projection search tests: listOptimizedQueues.");
-  }
-  configure(): never {
-    throw new Error("Not used by projection search tests: configure.");
-  }
-  listQueues(): never {
-    throw new Error("Not used by projection search tests: listQueues.");
-  }
-  tryGetQueue(): never {
-    throw new Error("Not used by projection search tests: tryGetQueue.");
-  }
-  listQueueItems(): never {
-    throw new Error("Not used by projection search tests: listQueueItems.");
-  }
-  countPendingItems(): never {
-    throw new Error("Not used by projection search tests: countPendingItems.");
-  }
-  countAssignedItems(): never {
-    throw new Error("Not used by projection search tests: countAssignedItems.");
-  }
-  listMemberQueuePendingCounts(): never {
-    throw new Error("Not used by projection search tests: listMemberQueuePendingCounts.");
-  }
-  deleteQueueItems(): never {
-    throw new Error("Not used by projection search tests: deleteQueueItems.");
-  }
-  markQueueItemDone(): never {
-    throw new Error("Not used by projection search tests: markQueueItemDone.");
-  }
-  listQueueItemsPage(): never {
-    throw new Error("Not used by projection search tests: listQueueItemsPage.");
-  }
-  listQueuesWithItems(): never {
-    throw new Error("Not used by projection search tests: listQueuesWithItems.");
-  }
-  queueTraces(): never {
-    throw new Error("Not used by projection search tests: queueTraces.");
-  }
-
-  rows: ProjectionAnnotation[] = [];
-  scores: AnnotationScoreName[] = [];
-
-  async listForProjection(): Promise<ProjectionAnnotation[]> {
-    return this.rows;
-  }
-
-  async listScoreNames(): Promise<AnnotationScoreName[]> {
-    return this.scores;
-  }
-
-  create(): never {
-    throw new Error("not implemented in this fake");
-  }
-  update(): never {
-    throw new Error("not implemented in this fake");
-  }
-  delete(): never {
-    throw new Error("not implemented in this fake");
-  }
-  getById(): never {
-    throw new Error("not implemented in this fake");
-  }
-  list(): never {
-    throw new Error("not implemented in this fake");
-  }
-  getProjectOrganizationId(): never {
-    throw new Error("not implemented in this fake");
-  }
-  assertQueueConfigurationReferences(): never {
-    throw new Error("not implemented in this fake");
-  }
-  assertAnnotatorReferences(): never {
-    throw new Error("not implemented in this fake");
-  }
-  upsertScore(): never {
-    throw new Error("not implemented in this fake");
-  }
-  listScores(): never {
-    throw new Error("not implemented in this fake");
-  }
-  getScore(): never {
-    throw new Error("not implemented in this fake");
-  }
-  toggleScore(): never {
-    throw new Error("not implemented in this fake");
-  }
-  deleteScore(): never {
-    throw new Error("not implemented in this fake");
-  }
-  createQueueItems(): never {
-    throw new Error("not implemented in this fake");
-  }
+/** Trace's annotation fold as the projection join reads it, seeded per test. */
+class FakeAnnotationFold {
+  rows: TraceAnnotationRow[] = [];
+  scores: { id: string; name: string }[] = [];
+  readonly reads = {
+    rows: { findForTraces: async (): Promise<TraceAnnotationRow[]> => this.rows },
+    scores: { findScoreNames: async () => this.scores },
+  };
 }
 
 let ch: ClickHouseClient;
 let service: TraceLegacyReadClickHouseRepository;
-const annotations = new FakeAnnotationService();
+const annotations = new FakeAnnotationFold();
 
 /**
  * Run the full surface pipeline against the real service: compile the
@@ -354,7 +223,7 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
     service = TraceLegacyReadClickHouseRepository.create({
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),
-      annotations,
+      annotations: annotations.reads,
     });
 
     await insert({
@@ -392,13 +261,14 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
         comment: "looks right",
         expectedOutput: null,
         scoreOptions: { [QUALITY_SCORE_ID]: { value: "5", reason: "accurate" } },
-        createdAt: new Date(now),
+        createdAt: now,
+        updatedAt: now,
         anchorKind: null,
         anchorId: null,
         anchorPath: null,
       },
     ];
-    annotations.scores = [{ id: QUALITY_SCORE_ID, name: "quality" } as AnnotationScoreName];
+    annotations.scores = [{ id: QUALITY_SCORE_ID, name: "quality" }];
   }, 60_000);
 
   afterAll(async () => {
@@ -454,6 +324,7 @@ describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", 
   describe("given a select over annotation fields", () => {
     describe("when the page is projected", () => {
       /** @scenario "Select annotation fields returned as nested array" */
+      /** @scenario "Trace's legacy read attaches annotations from its own fold" */
       it("returns annotations joined as a nested array", async () => {
         const rows = await projectedSearch({
           select: ["trace_id", "annotations.is_thumbs_up", "annotations.scores"],

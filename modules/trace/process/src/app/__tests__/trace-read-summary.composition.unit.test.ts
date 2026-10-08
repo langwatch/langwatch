@@ -1,4 +1,3 @@
-import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -11,7 +10,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { TopicApi } from "@langwatch/topic-contract";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -71,7 +69,6 @@ const FOLDED: TraceSummaryData = traceSummaryDataSchema.parse({
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   for (const token of [
-    AnnotationApi,
     AuthzApi,
     DataPrivacyApi,
     DataRetentionApi,
@@ -80,13 +77,11 @@ function unreachablePeers() {
     ModelProviderApi,
     ProjectApi,
     ShareApi,
-    TopicApi,
   ]) {
     apis.declare(token);
   }
 
   return {
-    annotations: apis.reference(AnnotationApi),
     authz: apis.reference(AuthzApi),
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
@@ -95,7 +90,6 @@ function unreachablePeers() {
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
-    topics: apis.reference(TopicApi),
   };
 }
 
