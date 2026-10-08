@@ -3,7 +3,7 @@ import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { useIsNewAccount } from "../../hooks/useIsNewAccount";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";
@@ -160,7 +160,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   // that silently fails to filter on load. The button comes back the
   // moment the error is resolved.
   const hasParseError = useExplorerStore((s) => Boolean(s.parseError));
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
 
   // Measure the toolbar's own width so controls can collapse when space runs
   // out (narrow window OR a wide filters sidebar — viewport breakpoints miss

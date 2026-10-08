@@ -3,13 +3,13 @@ import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import type { PromptConfigFormValues } from "~/prompts";
 import { DeployPromptDialog } from "~/prompts/components/DeployPromptDialog";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { SavePromptButton } from "~/prompts/components/SavePromptButton";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
-import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
 export type PromptEditorHeaderProps = {
@@ -61,7 +61,7 @@ export function PromptEditorHeader({
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");
   const deployDialog = useDisclosure();
-  const acceptsWrites = !isAggregateProjectKind(project?.kind);
+  const acceptsWrites = useProjectAcceptsWrites();
 
   return (
     <Box width="full" display="flex" gap={8} justifyContent="space-between">

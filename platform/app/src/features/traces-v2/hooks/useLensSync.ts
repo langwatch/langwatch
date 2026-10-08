@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { reloadingWriteOptions } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../stores/explorerStore";
 import { type LensConfig, setLensSyncBridge } from "../stores/viewSlice";
-import { useCanSaveLenses } from "./useCanSaveLenses";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -154,7 +154,7 @@ export function useLensSync(): void {
   // every render, which would otherwise force us to re-register.
   const projectIdRef = useRef(projectId);
   projectIdRef.current = projectId;
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
   const canSaveLensesRef = useRef(canSaveLenses);
   canSaveLensesRef.current = canSaveLenses;
   const createRef = useRef(createLens);

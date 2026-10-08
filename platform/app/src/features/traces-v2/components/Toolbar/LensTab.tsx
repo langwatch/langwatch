@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import {
   MenuContent,
   MenuContextTrigger,
@@ -30,7 +31,6 @@ import {
   MenuRoot,
   MenuSeparator,
 } from "../../../../components/ui/menu";
-import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { LensConfig } from "../../stores/viewSlice";
 import { LensNameDialog } from "./LensNameDialog";
@@ -223,7 +223,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
   const createLens = useExplorerStore((s) => s.createLens);
   // An aggregate project takes no lens writes (ADR-144): its dot still offers
   // to discard the changes, but not to save them as a new lens.
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -388,7 +388,7 @@ const BuiltInLensMenuItems: React.FC<{
   const revertLens = useExplorerStore((s) => s.revertLens);
   const createLens = useExplorerStore((s) => s.createLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // "All" is the table's home base — if a user could dismiss it
@@ -453,7 +453,7 @@ const UserLensMenuItems: React.FC<{
   const createLens = useExplorerStore((s) => s.createLens);
   const duplicateLens = useExplorerStore((s) => s.duplicateLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   if (!canSaveLenses) {

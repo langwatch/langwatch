@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
@@ -35,7 +35,7 @@ const TIPS_WITH_LENS_SAVE = [SAVE_AS_LENS_TIP, ...GENERAL_TIPS];
  * (ADR-144), so its tips leave out the one that points to it.
  */
 const useCyclingTip = (active: boolean): string => {
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
   const tips = canSaveLenses ? TIPS_WITH_LENS_SAVE : GENERAL_TIPS;
   const [index, setIndex] = useState(0);
   useEffect(() => {

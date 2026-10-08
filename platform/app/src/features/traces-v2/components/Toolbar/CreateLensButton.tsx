@@ -1,8 +1,8 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { Tooltip } from "../../../../components/ui/tooltip";
-import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { LensNamePopover } from "./LensNamePopover";
 
@@ -22,7 +22,7 @@ const BETA_TOOLTIP =
  */
 export const CreateLensButton: React.FC = () => {
   const createLens = useExplorerStore((s) => s.createLens);
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
 
   if (!canSaveLenses) return null;
 

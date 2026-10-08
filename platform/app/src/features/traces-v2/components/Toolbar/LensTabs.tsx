@@ -4,13 +4,13 @@ import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import {
   MenuContent,
   MenuItem,
   MenuRoot,
   MenuTrigger,
 } from "../../../../components/ui/menu";
-import { useCanSaveLenses } from "../../hooks/useCanSaveLenses";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useExplorerStore } from "../../stores/explorerStore";
@@ -50,7 +50,7 @@ export const LensTabs: React.FC = () => {
   const revertLens = useExplorerStore((s) => s.revertLens);
   const isDraft = useExplorerStore((s) => s.isDraft);
   const errorCount = useErrorCount();
-  const canSaveLenses = useCanSaveLenses();
+  const canSaveLenses = useProjectAcceptsWrites();
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
   // Save-as-new from the unsaved-changes prompt routes through the shared

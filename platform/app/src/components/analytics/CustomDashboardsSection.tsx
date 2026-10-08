@@ -14,7 +14,7 @@ import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -27,6 +27,7 @@ export function CustomDashboardsSection({
 }: CustomDashboardsSectionProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const acceptsWrites = useProjectAcceptsWrites();
   const projectId = project?.id ?? "";
   const currentDashboardId = router.query.dashboard as string | undefined;
   const { openDrawer } = useDrawer();
@@ -306,7 +307,7 @@ export function CustomDashboardsSection({
         );
       })}
       {/* An aggregate (ADR-144) keeps no dashboards of its own. */}
-      {!isAggregateProjectKind(project?.kind) && (
+      {acceptsWrites && (
         <Button
           size="sm"
           width="full"
