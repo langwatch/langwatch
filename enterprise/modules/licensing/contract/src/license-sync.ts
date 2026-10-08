@@ -6,8 +6,7 @@
 
 import { z } from "zod";
 
-import type { ConnectService } from "./connect-services.ts";
-import type { ConnectCredentialGrant } from "./issued-license.ts";
+import type { ConnectCredentialGrant, ConnectService } from "./issued-license.ts";
 
 /**
  * Exactly what a sync may carry: the version and the two seat counts. No

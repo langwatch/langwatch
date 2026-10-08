@@ -1,3 +1,4 @@
+import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/config";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The one callable thing every SCIM door reaches: the settings page over tRPC,
@@ -9,7 +10,8 @@
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { moduleApi } from "@langwatch/module";
+import { moduleApi, uiTokens } from "@langwatch/module";
+import { Secret } from "@langwatch/secrets/secret";
 
 import type {
   DirectoryIdentityRow,
@@ -285,3 +287,28 @@ export interface ScimApi {
 }
 
 export const ScimApi = moduleApi<ScimApi>()("scim");
+
+/** Scim's drawers, by token: the one way a caller opens them (ARCHITECTURE.md §10.1). */
+
+/** What a caller hands the provisioning-setup drawer. */
+export type UiProvisioningSetupDrawerProps = {
+  open?: boolean;
+};
+
+const drawers = uiTokens("scim");
+
+/** SCIM provisioning for the reader's organization: the address, the tokens, the sync. */
+export const ProvisioningSetupDrawerToken =
+  drawers.drawer<UiProvisioningSetupDrawerProps>("provisioningSetup");
+
+/** `provenOffboarding` selects one process-wide offboarding path at boot. */
+export const scimConfig = Config.define((c) => ({
+  provenOffboarding: c.env("SCIM_V2_GRANTS", environmentBooleanSchema.default(false)),
+}));
+
+export type ScimServerConfig = ConfigOf<typeof scimConfig>;
+
+/** A blank webhook secret answers 404 so an unconfigured install looks unrouted. */
+export const scimSecrets = {
+  auth0WebhookSecret: Secret.load("AUTH0_SCIM_WEBHOOK_SECRET", { optional: true }),
+} as const;

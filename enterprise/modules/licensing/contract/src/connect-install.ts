@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-import { CONNECT_SERVICES } from "./connect-services.ts";
+import { CONNECT_SERVICES } from "./issued-license.ts";
 import type { LicenseError } from "./license-constants.ts";
 
 /** What an install presents on every call to LangWatch. */

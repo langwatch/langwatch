@@ -1,7 +1,11 @@
 export * from "./scim.contract.ts";
-export * from "./scim-drawers.ts";
 export {
+  ProvisioningSetupDrawerToken,
   ScimApi,
+  scimConfig,
+  scimSecrets,
+  type ScimServerConfig,
+  type UiProvisioningSetupDrawerProps,
   type ScimDeliveryReceipt,
   type ScimDirectoryScope,
   type ScimTokenAuditEntry,
@@ -9,7 +13,6 @@ export {
 } from "./scim.api.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export * from "./scim-token.rest.ts";
-export * from "./scim-webhook.rest.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
 export { scimOversightTrpc } from "./scim-oversight.trpc.ts";
 export {
@@ -97,7 +100,6 @@ export {
   type ScimTokenSummary,
 } from "./scim-token.ts";
 export { SCIM_ROLES, resolveHighestRole, type ScimRole } from "./scim-role-resolver.ts";
-export * from "./scim.config.ts";
 export {
   emptyScimSync,
   pickRetiredLetter,
@@ -165,7 +167,7 @@ export {
   type ScimSyncCommand,
   type ScimSyncCommandType,
 } from "./scim-sync-commands.ts";
-export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events.ts";
+export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync.ts";
 export {
   SCIM_COST_CENTER_CHANGED_EVENT_TYPE,
   SCIM_COST_CENTER_CHANGED_EVENT_VERSION,
@@ -173,4 +175,4 @@ export {
   SCIM_MEMBER_AGGREGATE_TYPE,
   type ScimCostCenterChangedEventData,
   scimCostCenterChangedEventDataSchema,
-} from "./scim-cost-center.events.ts";
+} from "./scim-sync.ts";

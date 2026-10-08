@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { scimConfig } from "../scim.config.ts";
+import { scimConfig } from "../scim.api.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "scim", config: scimConfig }], environment }).scim;

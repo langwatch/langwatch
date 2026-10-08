@@ -25,8 +25,8 @@ import type {
   LicenseRefreshOutcome,
   LicenseSyncAnswer,
 } from "./connect-install.ts";
-import type { ConnectService } from "./connect-services.ts";
 import type {
+  ConnectService,
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
@@ -35,7 +35,7 @@ import type {
   SeatChangeResult,
   SignedIssuedLicense,
 } from "./issued-license.ts";
-import type { PlanInfo } from "./license-plan.ts";
+import type { PlanInfo } from "./license-constants.ts";
 import type { IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,

@@ -6,8 +6,7 @@ import {
 } from "@langwatch/plans";
 import { z } from "zod";
 
-import type { LicenseError } from "./license-constants.ts";
-import type { PlanInfo } from "./license-plan.ts";
+import type { LicenseError, PlanInfo } from "./license-constants.ts";
 
 /**
  * Plan limits embedded within a license (the signed payload).

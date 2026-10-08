@@ -1,7 +1,5 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { toEpochMs } from "@langwatch/time";
-
-import { readableDate } from "./display-formatters.ts";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
 export type LicenseStatusWithMetadata = Extract<LicenseStatus, { hasLicense: true; plan: string }>;
@@ -93,4 +91,9 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** The moment a screen prints, as the `Date` the Intl formatters take. */
+export function readableDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
 }

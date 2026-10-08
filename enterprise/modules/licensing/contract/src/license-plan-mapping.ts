@@ -1,7 +1,7 @@
 import { quotedPlanLimitsOf } from "@langwatch/plans";
 
+import type { PlanInfo } from "./license-constants.ts";
 import { resolvePlanDefaults } from "./license-plan-defaults.ts";
-import type { PlanInfo } from "./license-plan.ts";
 import type { LicenseData } from "./license.ts";
 
 export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {

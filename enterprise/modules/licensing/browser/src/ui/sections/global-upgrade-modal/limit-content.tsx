@@ -4,7 +4,6 @@ import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { LIMIT_TYPE_LABELS } from "@langwatch/enterprise-licensing-contract";
 
 import type { UpgradeModalVariant } from "../../../model/upgrade-modal-store.ts";
-import { planManagementUrl } from "./plan-management-url.ts";
 
 /**
  * Seat allowances are the limits an admin runs into while doing the opposite
@@ -76,4 +75,13 @@ export function LimitContent({
       </Dialog.Footer>
     </>
   );
+}
+
+/**
+ * Where "upgrade" goes. A family-local copy of billing-web's pure
+ * `planManagementUrl` — kept local since billing-web already depends on
+ * licensing-web and the reverse edge would cycle.
+ */
+export function planManagementUrl(isSaaS: boolean): string {
+  return isSaaS ? "/settings/subscription" : "/settings/license";
 }
