@@ -12,10 +12,6 @@ export class MemoryDatasetMigrationRepository implements DatasetMigrationReposit
     return new MemoryDatasetMigrationRepository();
   }
 
-  async findProjectIds(): Promise<string[]> {
-    return [];
-  }
-
   async findPostgresDatasetIds(): Promise<string[]> {
     return [];
   }

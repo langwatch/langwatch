@@ -36,7 +36,6 @@ type DatasetKey = { datasetId: string; projectId: string };
 
 /** The Postgres side of the one-off move of dataset content into object-storage chunks. */
 export interface DatasetMigrationRepository {
-  findProjectIds(): Promise<string[]>;
   /** One id-ordered page of a project's datasets still on the postgres layout. */
   findPostgresDatasetIds(input: {
     projectId: string;

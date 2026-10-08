@@ -19,6 +19,8 @@ import {
   type TraceSharingConfig,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -332,6 +334,17 @@ export class MemoryProjectRepository implements ProjectRepository {
       updatedProjects: projects.filter((project) => after(project.updatedAt.getTime())).length,
       ...(made.length === 0 ? {} : { firstProjectAt: Math.min(...made) }),
     };
+  }
+
+  async listAllIds({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectIdPage> {
+    const ids = this.#database
+      .projects()
+      .map((project) => project.id)
+      .filter((id) => after === undefined || id > after)
+      .toSorted();
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
   }
 
   async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {

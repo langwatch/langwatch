@@ -21,6 +21,8 @@ import {
   type TraceDestinationProject,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { fromDate, toDate } from "@langwatch/time";
@@ -105,6 +107,19 @@ export class PrismaProjectRepository
       updatedProjects,
       ...(first ? { firstProjectAt: first.createdAt.getTime() } : {}),
     };
+  }
+
+  async listAllIds({ after, limit }: ProjectIdPageInput = {}): Promise<ProjectIdPage> {
+    const rows = await this.prisma.project.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const ids = rows.map((row) => row.id);
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
   }
 
   async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {

@@ -19,12 +19,13 @@ export const datasetProcessModule: PublishedProcessModule<
   .withApi(DatasetModule)
   .withTransports(createDatasetRest(), datasetTrpcTransport, datasetRecordTrpcTransport)
   .withEventing(datasetNormalizationEventing)
-  .withTasks(({ repositories }) => [
+  .withTasks(({ repositories, dependencies }) => [
     DatasetContentBackfillTask.create({
       migration: () =>
         DatasetMigrationService.create({
           repository: repositories.migration,
           storage: repositories.migrationChunks,
+          projects: dependencies.projects,
         }),
     }),
   ]);

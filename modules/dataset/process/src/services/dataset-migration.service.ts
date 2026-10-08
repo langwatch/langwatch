@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type {
@@ -13,6 +14,8 @@ const logger = createLogger("langwatch:dataset:migration");
 const DATASET_PAGE_SIZE = 50;
 const RECORD_PAGE_SIZE = 1000;
 
+type MigrationProjects = Pick<ProjectApi, "listAllIds">;
+
 /**
  * The one-off move of postgres-layout dataset content into object-storage
  * chunks: walks every project's postgres datasets, streams each one's records
@@ -22,13 +25,16 @@ export class DatasetMigrationService {
   static create(options: {
     repository: DatasetMigrationRepository;
     storage: DatasetChunkRepository;
+    /** The owner of the project table, which names every project the scan walks. */
+    projects: MigrationProjects;
   }): DatasetMigrationService {
-    return new DatasetMigrationService(options.repository, options.storage);
+    return new DatasetMigrationService(options.repository, options.storage, options.projects);
   }
 
   private constructor(
     private readonly repository: DatasetMigrationRepository,
     private readonly storage: DatasetChunkRepository,
+    private readonly projects: MigrationProjects,
   ) {}
 
   async run(input: { dryRun?: boolean } = {}): Promise<DatasetMigrationRunResult> {
@@ -83,21 +89,38 @@ export class DatasetMigrationService {
       failed: 0,
     };
 
-    for (const projectId of await this.repository.findProjectIds()) {
-      let afterId: string | undefined;
-      let page: string[];
-      do {
-        page = await this.repository.findPostgresDatasetIds({
-          projectId,
-          afterId,
-          limit: DATASET_PAGE_SIZE,
-        });
-        await this.migratePage({ projectId, page, input, summary });
-        afterId = page.at(-1);
-      } while (page.length > 0);
-    }
+    let after: string | undefined;
+    do {
+      const projects = await this.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
+      for (const projectId of projects.ids) {
+        await this.migrateProject({ projectId, input, summary });
+      }
+      after = projects.next ?? undefined;
+    } while (after !== undefined);
 
     return summary;
+  }
+
+  private async migrateProject({
+    projectId,
+    input,
+    summary,
+  }: {
+    projectId: string;
+    input: { dryRun?: boolean };
+    summary: DatasetMigrationSummary;
+  }): Promise<void> {
+    let afterId: string | undefined;
+    let page: string[];
+    do {
+      page = await this.repository.findPostgresDatasetIds({
+        projectId,
+        afterId,
+        limit: DATASET_PAGE_SIZE,
+      });
+      await this.migratePage({ projectId, page, input, summary });
+      afterId = page.at(-1);
+    } while (page.length > 0);
   }
 
   /** Migrates one page of datasets, counting each outcome; a failed one waits for a later run. */

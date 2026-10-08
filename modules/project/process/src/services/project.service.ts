@@ -32,6 +32,8 @@ import {
   traceDestinationProjectIdsSchema,
   type UpdateProjectInput,
   ProjectNotFoundError,
+  type ProjectIdPage,
+  type ProjectIdPageInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
@@ -316,6 +318,10 @@ export class ProjectService {
 
   countWithTraces(input: { organizationId: string }): Promise<number> {
     return this.repository.countWithTraces(input);
+  }
+
+  listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage> {
+    return this.repository.listAllIds(input);
   }
 
   findSharedProjectSlugs(input: {
