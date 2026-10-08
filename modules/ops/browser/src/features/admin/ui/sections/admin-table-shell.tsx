@@ -5,10 +5,10 @@ import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import type { ComponentProps } from "react";
 
-import { BackofficeTable as OpsBackofficeTable } from "../blocks/backoffice-table.tsx";
+import { AdminTable as OpsAdminTable } from "../blocks/admin-table.tsx";
 
-type BackofficeTableProps = Omit<
-  ComponentProps<typeof OpsBackofficeTable>,
+type AdminTableProps = Omit<
+  ComponentProps<typeof OpsAdminTable>,
   "searchInput" | "errorContent" | "createAction"
 > & {
   onCreate?: () => void;
@@ -16,11 +16,11 @@ type BackofficeTableProps = Omit<
 };
 
 /**
- * App composition adapter for the reusable Ops backoffice list shell.
+ * App composition adapter for the reusable Ops admin list shell.
  * SearchInput, PageLayout and handled-error copy are app concerns; list
  * layout and pagination behaviour lives in @langwatch/ops-browser.
  */
-export function BackofficeTable({
+export function AdminTable({
   onCreate,
   createLabel = "Create",
   error,
@@ -29,9 +29,9 @@ export function BackofficeTable({
   onSearchChange,
   searchPlaceholder,
   ...props
-}: BackofficeTableProps) {
+}: AdminTableProps) {
   return (
-    <OpsBackofficeTable
+    <OpsAdminTable
       {...props}
       title={title}
       searchValue={searchValue}

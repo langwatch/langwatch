@@ -6,13 +6,13 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BackofficeTable } from "../ui/blocks/backoffice-table.tsx";
+import { AdminTable } from "../ui/blocks/admin-table.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
-describe("BackofficeTable", () => {
+describe("AdminTable", () => {
   afterEach(() => {
     cleanup();
   });
@@ -22,14 +22,14 @@ describe("BackofficeTable", () => {
     const onPageChange = vi.fn();
 
     render(
-      <BackofficeTable
+      <AdminTable
         title="Users"
         searchValue="alice"
         onSearchChange={onSearchChange}
         pagination={{ page: 2, perPage: 25, total: 60, onPageChange }}
       >
         <div>rows</div>
-      </BackofficeTable>,
+      </AdminTable>,
       { wrapper },
     );
 
@@ -45,7 +45,7 @@ describe("BackofficeTable", () => {
 
   it("renders the app-provided error slot without rendering table children", () => {
     render(
-      <BackofficeTable
+      <AdminTable
         title="Organizations"
         searchValue=""
         onSearchChange={() => void 0}
@@ -53,7 +53,7 @@ describe("BackofficeTable", () => {
         errorContent={<div>handled failure</div>}
       >
         <div>rows</div>
-      </BackofficeTable>,
+      </AdminTable>,
       { wrapper },
     );
 

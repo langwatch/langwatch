@@ -19,9 +19,9 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter } from "../../../../behavior/ops-router.ts";
 import { shortenIdentifier, waitedFor } from "../../model/identity-lookup-copy.ts";
-import { EmptyCell, formatDateTime } from "../elements/backoffice-cells.tsx";
+import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 import { IdentityLookupDrawer } from "./identity-lookup-drawer.tsx";
 
 const COLUMN_COUNT = 4;
@@ -54,7 +54,7 @@ export default function IdentityLookupView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Identity Lookup"
         searchValue={search}
         onSearchChange={setSearch}
@@ -84,7 +84,7 @@ export default function IdentityLookupView() {
           <ClaimQueuePanel />
           <OperatorActivityPanel />
         </VStack>
-      </BackofficeTable>
+      </AdminTable>
 
       <IdentityLookupDrawer
         userId={openUserId}

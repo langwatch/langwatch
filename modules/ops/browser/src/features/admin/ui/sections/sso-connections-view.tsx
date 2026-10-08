@@ -22,12 +22,12 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
-import { EmptyCell, formatDateTime } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
 
-/** SSO connections management (D05 tier 1). Uses BackofficeTable shell; every action
+/** SSO connections management (D05 tier 1). Uses the AdminTable shell; every action
  * is guarded command (offers verbs, not forms). Replaces org-record text inputs. */
 export default function SsoConnectionsView() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function SsoConnectionsView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Single Sign-On"
         searchValue={search}
         onSearchChange={setSearch}
@@ -75,7 +75,7 @@ export default function SsoConnectionsView() {
         }}
       >
         <ConnectionsTable connections={list.data?.connections} onOpen={setOpenConnection} />
-      </BackofficeTable>
+      </AdminTable>
 
       <ConnectionDrawer connectionId={openConnectionId} onClose={() => setOpenConnection(null)} />
     </>

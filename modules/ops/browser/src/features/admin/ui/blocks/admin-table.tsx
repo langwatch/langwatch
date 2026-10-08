@@ -13,9 +13,9 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { PaginationState } from "../elements/backoffice-cells.tsx";
+import type { PaginationState } from "../elements/admin-cells.tsx";
 
-export interface BackofficeTableProps {
+export interface AdminTableProps {
   title: string;
   searchValue: string;
   onSearchChange: (value: string) => void;
@@ -34,11 +34,11 @@ export interface BackofficeTableProps {
 }
 
 /**
- * Controlled list-view chrome shared by Ops backoffice resources. Resource
+ * Controlled list-view chrome shared by Ops admin resources. Resource
  * queries, routing and handled-error copy stay in the application; this
  * package owns heading, search, card, loading and paging presentation.
  */
-export function BackofficeTable({
+export function AdminTable({
   title,
   searchValue,
   onSearchChange,
@@ -51,7 +51,7 @@ export function BackofficeTable({
   searchInput,
   createAction,
   children,
-}: BackofficeTableProps) {
+}: AdminTableProps) {
   return (
     <>
       <PageLayout.Header>
@@ -72,7 +72,7 @@ export function BackofficeTable({
 
         <Card.Root width="full" overflow="hidden">
           <Card.Body paddingY={0} paddingX={0}>
-            <BackofficeTableContent
+            <AdminTableContent
               title={title}
               error={error}
               errorContent={errorContent}
@@ -80,7 +80,7 @@ export function BackofficeTable({
               isFetching={isFetching}
             >
               {children}
-            </BackofficeTableContent>
+            </AdminTableContent>
           </Card.Body>
         </Card.Root>
 
@@ -126,7 +126,7 @@ function PaginationBar({ page, perPage, total, onPageChange }: PaginationState) 
   );
 }
 
-interface BackofficeTableContentProps {
+interface AdminTableContentProps {
   title: string;
   error?: unknown;
   errorContent?: ReactNode;
@@ -135,14 +135,14 @@ interface BackofficeTableContentProps {
   children: ReactNode;
 }
 
-function BackofficeTableContent({
+function AdminTableContent({
   title,
   error,
   errorContent,
   isLoading,
   isFetching,
   children,
-}: BackofficeTableContentProps) {
+}: AdminTableContentProps) {
   if (error) {
     return (
       errorContent ?? (

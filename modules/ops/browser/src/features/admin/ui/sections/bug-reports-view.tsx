@@ -17,8 +17,8 @@ import { useDebounce } from "use-debounce";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { EmptyCell, formatDateTime } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 const PAGE_SIZE = 25;
 
 const kindLabel: Record<string, string> = {
@@ -60,7 +60,7 @@ export default function BugReportsView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Bug Reports"
         searchValue={search}
         onSearchChange={setSearch}
@@ -76,7 +76,7 @@ export default function BugReportsView() {
         }}
       >
         <BugReportsTable reports={list.data?.reports} onOpen={setOpenReport} />
-      </BackofficeTable>
+      </AdminTable>
 
       <BugReportDrawer reportId={openReportId} onClose={() => setOpenReport(null)} />
     </>

@@ -35,7 +35,7 @@ const user = {
   projects: [],
 };
 
-describe("Feature: Backoffice User Impersonation Reason", () => {
+describe("Feature: Admin User Impersonation Reason", () => {
   beforeEach(() => {
     vi.mocked(impersonateUser).mockClear();
     host = fakeOpsHost({ isOpsAdmin: true });

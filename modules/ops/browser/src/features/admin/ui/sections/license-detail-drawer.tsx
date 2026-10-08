@@ -22,12 +22,7 @@ import {
 } from "../../model/license-terms.ts";
 import { seatChangeSummary } from "../../model/seat-change-summary.ts";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
-import {
-  dateInputToISO,
-  EmptyCell,
-  formatDate,
-  formatDateTime,
-} from "../elements/backoffice-cells.tsx";
+import { dateInputToISO, EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
 import { Detail, Section } from "../elements/drawer-sections.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";

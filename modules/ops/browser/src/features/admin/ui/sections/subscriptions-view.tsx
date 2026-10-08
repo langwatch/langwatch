@@ -22,9 +22,9 @@ import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { PlanTypes, SubscriptionStatus } from "../../model/backoffice-enums.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/backoffice-cells.tsx";
-import { BackofficeTable } from "./backoffice-table-shell.tsx";
+import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
+import { dateInputToISO, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminTable } from "./admin-table-shell.tsx";
 interface AdminSubscription {
   id: string;
   organizationId: string;
@@ -122,7 +122,7 @@ export default function SubscriptionsView() {
 
   return (
     <>
-      <BackofficeTable
+      <AdminTable
         title="Subscriptions"
         searchValue={search}
         onSearchChange={(v) => {
@@ -205,7 +205,7 @@ export default function SubscriptionsView() {
             ))}
           </Table.Body>
         </Table.Root>
-      </BackofficeTable>
+      </AdminTable>
 
       <SubscriptionDrawer mode="edit" subscription={editing} onClose={() => setEditing(null)} />
       <SubscriptionDrawer

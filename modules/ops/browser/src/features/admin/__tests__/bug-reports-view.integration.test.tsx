@@ -105,7 +105,7 @@ describe("BugReportsView", () => {
   });
 
   describe("given stored reports", () => {
-    /** @scenario "Admins see reports in the backoffice" */
+    /** @scenario "Admins see reports in the admin console" */
     it("lists them with date, kind, agent, project, and contact", () => {
       renderView();
       expect(screen.getByText("agent stuck instrumenting python")).toBeInTheDocument();

@@ -26,7 +26,7 @@ export const SELF_HOSTED_SIGNALS = [
 
 export type SelfHostedSignal = (typeof SELF_HOSTED_SIGNALS)[number];
 
-/** One install as the backoffice reads it. */
+/** One install as the admin console reads it. */
 export const selfHostedInstanceViewSchema = z.object({
   id: z.string(),
   instanceId: z.string(),

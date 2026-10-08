@@ -6002,7 +6002,7 @@ const presentations = {
   connected_billing_unavailable: {
     title: "Connected billing is not available here",
     describe: () =>
-      "Invoicing a connected self-hosted customer runs on LangWatch Cloud only. Do this from the LangWatch Cloud backoffice.",
+      "Invoicing a connected self-hosted customer runs on LangWatch Cloud only. Do this from the LangWatch Cloud admin console.",
   },
   activation_code_already_redeemed: {
     title: "Activation code already used",

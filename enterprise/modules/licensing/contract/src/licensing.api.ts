@@ -259,7 +259,7 @@ export interface LicensingApi {
   /**
    * Activation codes (ADR-156, section 5): the short code a fresh install
    * pastes instead of a license blob. Minting and revoking are the
-   * backoffice's; redeeming is a public route an install calls once.
+   * the admin console's; redeeming is a public route an install calls once.
    */
   issueActivationCode(input: IssueActivationCodeInput): Promise<IssuedActivationCode>;
   listActivationCodes(input: {

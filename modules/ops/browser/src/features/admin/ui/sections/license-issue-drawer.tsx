@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { useLicenseCommands } from "../../behavior/use-license-commands.ts";
 import { termsFormFrom, termsPayload, type TermsForm } from "../../model/license-terms.ts";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
-import { dateInputToISO } from "../elements/backoffice-cells.tsx";
+import { dateInputToISO } from "../elements/admin-cells.tsx";
 import { SignedLicenseOnce } from "../elements/signed-license-once.tsx";
 
 type IssueMode = "issue" | "register";
