@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/test-harness",
+  "langwatch": { "group": "tooling" },
   "version": "0.1.0",
   "private": true,
   "description": "The test harness every LangWatch process shares: which lane a test file belongs in, how a shard is weighted, the one TypeScript compiler session a static scan runs through, and the datastores an integration suite is handed.",

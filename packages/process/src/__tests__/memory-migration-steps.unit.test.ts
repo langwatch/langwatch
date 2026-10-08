@@ -6,7 +6,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { defineProcessModule, type FeatureSetup } from "../feature-installer.ts";
-import { migrationStepsOverMemory } from "../memory-migration-steps.ts";
+import { migrationStepsOverMemory } from "../migration/memory-migration-steps.ts";
 import { defineRepositories } from "../repository-registry.ts";
 
 /** Stands in for `@langwatch/upgrade/step`'s step, which the kernel cannot name. */

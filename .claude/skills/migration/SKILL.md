@@ -117,7 +117,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
 | No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
 | Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
-| A lapsed roster entry: `/readyz` 503, background steps and consumers pause | landed (`packages/process/src/upgrade-gate.ts`, `pauseConsumers` in `packages/process/src/module-eventing.ts`)        |
+| A lapsed roster entry: `/readyz` 503, background steps and consumers pause | landed (`packages/process/src/migration/upgrade-gate.ts`, `pauseConsumers` in `packages/process/src/module-eventing.ts`)        |
 
 ## Wrong first moves
 

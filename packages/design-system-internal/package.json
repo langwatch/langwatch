@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/design-system-internal",
+  "langwatch": { "group": "browser" },
   "version": "0.0.1",
   "private": true,
   "description": "The paper look of every internal console (haven hub and stack home, IdP simulator, mail sink): tokens, one stylesheet and a small set of React components (ADR-160).",

@@ -6,7 +6,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Avatar, UserAvatar } from "../src/components/avatar.tsx";
+import { Avatar, UserAvatar } from "../src/components/display/avatar.tsx";
 
 afterEach(cleanup);
 

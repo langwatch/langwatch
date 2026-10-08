@@ -16,7 +16,7 @@ import {
   MigrationStepCollectionError,
   collectMigrationSteps,
   migrationStepsOf,
-} from "../migration-steps.ts";
+} from "../migration/migration-steps.ts";
 import { ResourceScope } from "../resource-scope.ts";
 
 interface DatasetApi {

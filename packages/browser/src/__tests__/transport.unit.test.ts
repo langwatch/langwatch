@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../transport.ts";
+import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../wire/transport.ts";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";

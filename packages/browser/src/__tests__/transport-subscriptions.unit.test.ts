@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link.ts";
+import type {
+  SseEventSourceConstructor,
+  SseEventSourceLike,
+} from "../wire/sse-subscription-link.ts";
 import {
   createUiFeatureApiClient,
   UI_SSE_ENDPOINT_PREFIX,
   UI_TRPC_ENDPOINT,
-} from "../transport.ts";
+} from "../wire/transport.ts";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";

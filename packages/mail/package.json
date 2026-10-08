@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/mail",
+  "langwatch": { "group": "libraries" },
   "version": "0.1.0",
   "private": true,
   "description": "The transactional messages LangWatch sends, rendered here and sent through notification.",

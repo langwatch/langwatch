@@ -4,9 +4,9 @@ import {
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
 
-import { checkHostMounts } from "./ui-host-mounts.ts";
-import { checkLends } from "./ui-module-lends.ts";
-import { checkScreenAddresses } from "./ui-screen-addresses.ts";
+import { checkHostMounts } from "./module/ui-host-mounts.ts";
+import { checkLends } from "./module/ui-module-lends.ts";
+import { checkScreenAddresses } from "./page/ui-screen-addresses.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 import type {
   CheckedUiModules,

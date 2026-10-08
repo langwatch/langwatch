@@ -10,7 +10,10 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { processShutdownDeadlineMs, SHUTDOWN_CLOSE_SLACK_MS } from "../shutdown-deadline.ts";
+import {
+  processShutdownDeadlineMs,
+  SHUTDOWN_CLOSE_SLACK_MS,
+} from "../lifecycle/shutdown-deadline.ts";
 
 const REPO_ROOT = (() => {
   let directory = path.dirname(fileURLToPath(import.meta.url));

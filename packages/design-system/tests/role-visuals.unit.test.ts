@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { getDisplayRoleVisuals } from "../src/components/role-visuals.tsx";
+import { getDisplayRoleVisuals } from "../src/components/scope/role-visuals.tsx";
 
 describe("getDisplayRoleVisuals", () => {
   describe("given a scenario run", () => {

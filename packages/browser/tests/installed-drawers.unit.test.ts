@@ -2,7 +2,7 @@ import { declareDrawers, navigateToDrawer } from "@langwatch/browser-host/drawer
 import { describe, expect, it } from "vitest";
 
 import { defineBrowserModule, installedDrawerLoaders } from "../src/index.ts";
-import { installedModuleDrawers } from "../src/ui-module-drawers.ts";
+import { installedModuleDrawers } from "../src/module/ui-module-drawers.ts";
 
 const traceDrawer = { default: () => null };
 const spanDrawer = { default: () => null };

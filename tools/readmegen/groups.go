@@ -6,13 +6,11 @@ import (
 	"strings"
 )
 
-// packageGroups is W-22's closed list of `"langwatch": { "group" }` values. It
-// stays empty until the list is ruled (rulings-2026-10-05.md, packages/README.md
-// grouping); while it is empty the index keeps its Kind column and --check
-// refuses only a package that declares a group no list names.
-var packageGroups = []string{}
+// packageGroups is W-22's closed list of `"langwatch": { "group" }` values, in
+// the order packages/README.md shows them; --check refuses a package without one.
+var packageGroups = []string{"framework", "browser", "data", "telemetry", "tooling", "libraries"}
 
-// groupedPrefix is where every package must declare a group once the list is ruled.
+// groupedPrefix is where every package must declare a group.
 const groupedPrefix = "packages/"
 
 // groupOrder is a group's position in the closed list; an unlisted group sorts last.

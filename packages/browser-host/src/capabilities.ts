@@ -7,11 +7,11 @@
 import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
 import { createContext, useContext } from "react";
 
-import type { UiAnalytics } from "./analytics.ts";
 import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy-targets.ts";
 import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
+import type { UiAnalytics } from "./telemetry/analytics.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };

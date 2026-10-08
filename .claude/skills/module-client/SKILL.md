@@ -24,7 +24,7 @@ contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQu
 
 - `@langwatch/api/web` derives the typed client from the contract's declarations.
 - `@langwatch/browser` owns the transport (one client per application,
-  `packages/browser/src/transport.ts`), the SSE subscription link and the
+  `packages/browser/src/wire/transport.ts`), the SSE subscription link and the
   query client. Only a client package and a screen's `behavior/` import it.
   A design-system component fetches nothing.
 - The browser calls no REST.

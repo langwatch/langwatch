@@ -18,7 +18,7 @@ import {
 import type { TrpcContract, TrpcContractMember } from "@langwatch/module";
 
 import type { ServerRole } from "./feature-installer.ts";
-import type { RuntimeService } from "./runtime-lifecycle.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
 import type { DeclaredTransports } from "./transport-mounting.ts";
 
 /**

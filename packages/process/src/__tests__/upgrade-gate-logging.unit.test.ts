@@ -5,7 +5,7 @@
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import { type UpgradeGate, upgradeGateComponent } from "../upgrade-gate.ts";
+import { type UpgradeGate, upgradeGateComponent } from "../migration/upgrade-gate.ts";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

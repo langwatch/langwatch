@@ -13,17 +13,17 @@ import type {
   CanonicalEvent,
   CanonicalSpanContext,
 } from "./canonicalTypes.ts";
-import { ClaudeCodeCanonicaliserService } from "./claudeCodeCanonicaliser.ts";
-import { CodexCanonicaliserService } from "./codexCanonicaliser.ts";
-import type { CodexScopes } from "./codexSpan.ts";
+import { ClaudeCodeCanonicaliserService } from "./claude-code/claudeCodeCanonicaliser.ts";
+import { CodexCanonicaliserService } from "./codex/codexCanonicaliser.ts";
+import type { CodexScopes } from "./codex/codexSpan.ts";
 import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 import { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 import { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
 import { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
-import { canonicaliseLangWatchIdentity } from "./langwatchIdentity.ts";
-import { canonicaliseLangWatchMetadata } from "./langwatchMetadata.ts";
-import { canonicaliseLangWatchMetrics } from "./langwatchMetrics.ts";
-import { canonicaliseLangWatchValues } from "./langwatchValue.ts";
+import { canonicaliseLangWatchIdentity } from "./langwatch/langwatchIdentity.ts";
+import { canonicaliseLangWatchMetadata } from "./langwatch/langwatchMetadata.ts";
+import { canonicaliseLangWatchMetrics } from "./langwatch/langwatchMetrics.ts";
+import { canonicaliseLangWatchValues } from "./langwatch/langwatchValue.ts";
 import { LegacyOtelCanonicaliserService } from "./legacyOtelCanonicaliser.ts";
 import { LogfireCanonicaliserService } from "./logfireCanonicaliser.ts";
 import { MastraCanonicaliserService } from "./mastraCanonicaliser.ts";
@@ -31,9 +31,9 @@ import { OpenInferenceCanonicaliserService } from "./openinferenceCanonicaliser.
 import { SpringAICanonicaliserService } from "./springAiCanonicaliser.ts";
 import { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 import { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
-import { canonicaliseVercelCore } from "./vercelCore.ts";
-import { canonicaliseVercelIO } from "./vercelIo.ts";
-import { VertexAdkCanonicaliserService } from "./vertexAdkCanonicaliser.ts";
+import { canonicaliseVercelCore } from "./vercel/vercelCore.ts";
+import { canonicaliseVercelIO } from "./vercel/vercelIo.ts";
+import { VertexAdkCanonicaliserService } from "./vertex-adk/vertexAdkCanonicaliser.ts";
 
 export class LangWatchCanonicaliserService implements AttributeCanonicaliser {
   static create(): LangWatchCanonicaliserService {

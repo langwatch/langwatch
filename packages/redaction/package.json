@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/redaction",
+  "langwatch": { "group": "telemetry" },
   "version": "0.0.1",
   "private": true,
   "description": "Canonical secret and PII redaction rules shared across LangWatch services: the ingestion-pipeline secret scrubbing plus the session-report scrubbing mirrored into the langwatch CLI",

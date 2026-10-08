@@ -45,17 +45,17 @@ import {
   type ReactNode,
 } from "react";
 
-import { BrowserUiRpc } from "./browser-rpc.ts";
-import { createUiQueryClient, resetUiQueries } from "./query-client.ts";
-import { readHintStreamOver, startUiQueryHints } from "./query-hints.ts";
+import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
+import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature.ts";
+import type { UiProviderShell } from "./ui-outer-providers.tsx";
+import { BrowserUiRpc } from "./wire/browser-rpc.ts";
+import { createUiQueryClient, resetUiQueries } from "./wire/query-client.ts";
+import { readHintStreamOver, startUiQueryHints } from "./wire/query-hints.ts";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
-} from "./transport.ts";
-import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
-import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature.ts";
-import type { UiProviderShell } from "./ui-outer-providers.tsx";
+} from "./wire/transport.ts";
 
 /** The device store the shell publishes to every feature. */
 const SHELL_UI_STORAGE = new BrowserUiStorage();

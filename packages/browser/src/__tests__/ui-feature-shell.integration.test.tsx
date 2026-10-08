@@ -21,13 +21,13 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { createUiFeatureShell } from "../ui-feature-shell.tsx";
+import type { UiProviderShell } from "../ui-outer-providers.tsx";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
-} from "../transport.ts";
-import { createUiFeatureShell } from "../ui-feature-shell.tsx";
-import type { UiProviderShell } from "../ui-outer-providers.tsx";
+} from "../wire/transport.ts";
 
 /** Namespaced as auth's own query key would be; nothing here reads a real one. */
 const TEST_SESSION_QUERY_KEY = ["test", "session"];

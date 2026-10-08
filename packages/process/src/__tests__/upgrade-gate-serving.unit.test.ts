@@ -4,9 +4,9 @@ import { createServer } from "node:net";
 import { describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
+import type { UpgradeGate } from "../migration/upgrade-gate.ts";
 import { eventingConsumers, type EventingHost } from "../module-eventing.ts";
 import { Server } from "../preamble.ts";
-import type { UpgradeGate } from "../upgrade-gate.ts";
 
 type Recorded = string[];
 

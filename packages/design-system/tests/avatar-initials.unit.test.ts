@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { initialsFromName } from "../src/components/avatar.tsx";
+import { initialsFromName } from "../src/components/display/avatar.tsx";
 
 /** What the component library did, kept here as the thing to agree with. */
 function chakraInitials(name: string): string {

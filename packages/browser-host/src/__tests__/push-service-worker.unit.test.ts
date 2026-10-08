@@ -11,7 +11,7 @@ import {
   PUSH_SHOWS_MESSAGE,
   type PushWindowClient,
   type PushWorkerScope,
-} from "../push-service-worker.ts";
+} from "../push/push-service-worker.ts";
 
 const ORIGIN = "https://app.acme.test";
 const PAYLOAD = {

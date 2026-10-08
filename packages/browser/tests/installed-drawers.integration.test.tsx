@@ -11,7 +11,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { defineBrowserModule } from "../src/index.ts";
-import { installedModuleDrawers } from "../src/ui-module-drawers.ts";
+import { installedModuleDrawers } from "../src/module/ui-module-drawers.ts";
 
 const drawerShowing = (text: string) => ({ default: () => <p>{text}</p> });
 

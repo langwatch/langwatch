@@ -3,8 +3,8 @@ import type { AddressInfo } from "node:net";
 import process from "node:process";
 import type { Duplex } from "node:stream";
 
-import { GracefulShutdown } from "./graceful-shutdown.ts";
-import { drainHttpServer } from "./http-drain.ts";
+import { GracefulShutdown } from "./lifecycle/graceful-shutdown.ts";
+import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
   LIVENESS_PATH,
@@ -13,9 +13,9 @@ import {
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
-} from "./liveness-thread.ts";
+} from "./lifecycle/liveness-thread.ts";
+import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
-import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./shutdown-deadline.ts";
 
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {

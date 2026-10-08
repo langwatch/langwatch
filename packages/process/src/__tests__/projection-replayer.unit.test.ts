@@ -7,7 +7,7 @@ import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { defineProcessModule } from "../feature-installer.ts";
-import { processProjectionReplayer } from "../projection-replayer.ts";
+import { processProjectionReplayer } from "../migration/projection-replayer.ts";
 import { ResourceScope } from "../resource-scope.ts";
 
 interface DatasetApi {

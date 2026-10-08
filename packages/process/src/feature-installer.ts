@@ -24,9 +24,9 @@ import {
   type ChannelsFor,
 } from "./channel-registry.ts";
 /** One feature installer. A feature declares its config, the contract services */
-import { buildsMigrationSteps } from "./migration-steps.ts";
+import { buildsMigrationSteps } from "./migration/migration-steps.ts";
+import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
-import { processProjectionReplayer } from "./projection-replayer.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 import {
   instantiateRepositories,

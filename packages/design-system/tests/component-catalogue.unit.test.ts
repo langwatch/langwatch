@@ -9,9 +9,9 @@ const isStory = (name: string) => name.endsWith(".stories.tsx");
 const isComponent = (name: string) => name.endsWith(".tsx") && !isStory(name);
 
 /**
- * A directory of components (icons, messages) is documented by one story for
- * the whole directory, named after it. Documenting thirteen vendor marks as
- * thirteen entries buries the rest of the catalogue.
+ * A family directory (icons, messages: it has an index.ts) is documented by one
+ * story named after it; thirteen vendor marks as thirteen entries bury the rest.
+ * A concern folder (forms, overlays) holds components each with its own story.
  */
 function directoriesIn(dir: string): string[] {
   return readdirSync(dir).filter((entry) => statSync(path.join(dir, entry)).isDirectory());
@@ -21,15 +21,29 @@ function filesIn(dir: string): string[] {
   return readdirSync(dir).filter((entry) => statSync(path.join(dir, entry)).isFile());
 }
 
+const isFamily = (dir: string) => filesIn(path.join(COMPONENTS, dir)).includes("index.ts");
+const concernFolders = [
+  COMPONENTS,
+  ...directoriesIn(COMPONENTS)
+    .filter((dir) => !isFamily(dir))
+    .map((dir) => path.join(COMPONENTS, dir)),
+];
+
 describe("the design system component catalogue", () => {
   describe("given the components the package publishes", () => {
     /** @scenario "Every exported component has a story" */
     it("finds a story file beside every component file", () => {
-      const entries = filesIn(COMPONENTS).filter(isComponent);
-      const stories = new Set(filesIn(COMPONENTS).filter(isStory));
+      const entries = concernFolders.flatMap((dir) =>
+        filesIn(dir)
+          .filter(isComponent)
+          .map((file) => path.join(dir, file)),
+      );
 
       const undocumented = entries.filter(
-        (file) => !stories.has(`${file.replace(/\.tsx$/, "")}.stories.tsx`),
+        (file) =>
+          !filesIn(path.dirname(file)).includes(
+            path.basename(file).replace(/\.tsx$/, ".stories.tsx"),
+          ),
       );
 
       expect(entries.length).toBeGreaterThan(0);
@@ -38,7 +52,7 @@ describe("the design system component catalogue", () => {
 
     /** @scenario "Every exported component has a story" */
     it("finds one story file for every directory of components", () => {
-      const directories = directoriesIn(COMPONENTS);
+      const directories = directoriesIn(COMPONENTS).filter(isFamily);
       const undocumented = directories.filter(
         (dir) => !filesIn(path.join(COMPONENTS, dir)).includes(`${dir}.stories.tsx`),
       );

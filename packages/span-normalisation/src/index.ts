@@ -16,15 +16,15 @@ export { extractLastUserMessageText, extractMessageContentText } from "./canonic
 export {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
-} from "./claudeCodeCanonicaliser.ts";
+} from "./claude-code/claudeCodeCanonicaliser.ts";
 export {
   CLAUDE_CODE_SCOPE_NAMES,
   ClaudeCodeCanonicaliserService,
-} from "./claudeCodeCanonicaliser.ts";
-export { ClaudeCodeRequestService } from "./claudeCodeRequest.ts";
-export { ClaudeCodeResponseService } from "./claudeCodeResponse.ts";
-export { CodexCanonicaliserService } from "./codexCanonicaliser.ts";
-export type { CodexScopes } from "./codexSpan.ts";
+} from "./claude-code/claudeCodeCanonicaliser.ts";
+export { ClaudeCodeRequestService } from "./claude-code/claudeCodeRequest.ts";
+export { ClaudeCodeResponseService } from "./claude-code/claudeCodeResponse.ts";
+export { CodexCanonicaliserService } from "./codex/codexCanonicaliser.ts";
+export type { CodexScopes } from "./codex/codexSpan.ts";
 export { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 export { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 export { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
@@ -39,7 +39,7 @@ export { StrandsCanonicaliserService } from "./strandsCanonicaliser.ts";
 export { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
 export { capPayloadString, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "./tracePayloadCap.ts";
 export { VercelCanonicaliserService } from "./spanCanonicalisation.ts";
-export { VertexAdkCanonicaliserService } from "./vertexAdkCanonicaliser.ts";
+export { VertexAdkCanonicaliserService } from "./vertex-adk/vertexAdkCanonicaliser.ts";
 export {
   type CanonicalisedLogRecord,
   type CanonicalisedSpanAttributes,

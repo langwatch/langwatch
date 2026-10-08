@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   ClaudeCodeCanonicaliserService,
   isConversationalQuerySource,
-} from "../claudeCodeCanonicaliser.ts";
-import { ClaudeCodeRequestService } from "../claudeCodeRequest.ts";
-import { ClaudeCodeResponseService } from "../claudeCodeResponse.ts";
+} from "../claude-code/claudeCodeCanonicaliser.ts";
+import { ClaudeCodeRequestService } from "../claude-code/claudeCodeRequest.ts";
+import { ClaudeCodeResponseService } from "../claude-code/claudeCodeResponse.ts";
 import { createExtractorContext, createLogExtractorContext } from "./testHelpers.ts";
 
 const claudeCodeResponseService = ClaudeCodeResponseService.create();

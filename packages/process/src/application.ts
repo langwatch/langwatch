@@ -35,8 +35,14 @@ import type {
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
+import {
+  RuntimeLifecycle,
+  cleanupAfterFailure,
+  type RuntimeService,
+} from "./lifecycle/runtime-lifecycle.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
-import { migrationStepsOf } from "./migration-steps.ts";
+import { migrationStepsOf } from "./migration/migration-steps.ts";
+import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import {
   commandsOf,
   buildModuleEventing,
@@ -48,7 +54,6 @@ import {
   type EventingHost,
 } from "./module-eventing.ts";
 import { buildClaimedMembers } from "./module-members.ts";
-import { processProjectionReplayer } from "./projection-replayer.ts";
 import {
   assertRepositoryOwnership,
   snapshotRepositories,
@@ -62,7 +67,6 @@ import {
   type RepositorySelection,
 } from "./repository-registry.ts";
 import { type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
-import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import type { TestPeer } from "./testing.ts";
 import type { Tier } from "./tiers.ts";
 import {

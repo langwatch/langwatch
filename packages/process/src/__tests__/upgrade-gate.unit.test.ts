@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
+import type { UpgradeGatedRole, UpgradeGate } from "../migration/upgrade-gate.ts";
 import { Server } from "../preamble.ts";
-import type { UpgradeGatedRole, UpgradeGate } from "../upgrade-gate.ts";
 
 type Recorded = string[];
 

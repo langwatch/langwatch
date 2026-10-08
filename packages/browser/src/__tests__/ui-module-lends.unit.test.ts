@@ -1,7 +1,7 @@
 import { uiTokens } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
-import { checkLends } from "../ui-module-lends.ts";
+import { checkLends } from "../module/ui-module-lends.ts";
 import { defineBrowserModule } from "../web-module.ts";
 
 const Peek = uiTokens("trace").component<{ traceId: string }>("traceIdPeek");

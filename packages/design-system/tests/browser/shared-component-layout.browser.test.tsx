@@ -7,9 +7,9 @@ import { VStack } from "@chakra-ui/react";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { NoDataInfoBlock } from "../../src/components/no-data-info-block.tsx";
-import { SegmentedControl } from "../../src/components/segmented-control.tsx";
-import { STACK_DEPTH, Toaster, toaster } from "../../src/components/toaster.tsx";
+import { SegmentedControl } from "../../src/components/forms/segmented-control.tsx";
+import { STACK_DEPTH, Toaster, toaster } from "../../src/components/overlays/toaster.tsx";
+import { NoDataInfoBlock } from "../../src/components/states/no-data-info-block.tsx";
 import { renderWithDesignSystem } from "../../src/testing/index.tsx";
 
 beforeAll(() => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { GracefulShutdown, type ShutdownPhase } from "../graceful-shutdown.ts";
+import { GracefulShutdown, type ShutdownPhase } from "../lifecycle/graceful-shutdown.ts";
 
 function silentLogger() {
   return { info: vi.fn(), error: vi.fn() };

@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/group-queue",
+  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "Typed Redis-backed queues with per-group FIFO ordering and independent producer and consumer capabilities.",

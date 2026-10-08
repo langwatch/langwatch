@@ -5,7 +5,7 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ScopeFilter } from "../src/components/scope-filter.tsx";
+import { ScopeFilter } from "../src/components/scope/scope-filter.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);

@@ -2,7 +2,7 @@ import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
 import { processConfig } from "../config.ts";
-import { processShutdownDeadlineMs } from "../shutdown-deadline.ts";
+import { processShutdownDeadlineMs } from "../lifecycle/shutdown-deadline.ts";
 
 /** Resolves the deadline the way ProcessServer.create does, from the parsed env. */
 const deadlineFor = (environment: Record<string, string | undefined>) => {

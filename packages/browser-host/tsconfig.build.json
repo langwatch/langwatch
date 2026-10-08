@@ -16,7 +16,7 @@
     "./src/toaster.ts",
     "./src/storage.ts",
     "./src/errors.ts",
-    "./src/query-retry.ts",
+    "./src/query/query-retry.ts",
     "./src/testing.ts",
     "./src/link.tsx",
     "./src/use-drawer.ts",

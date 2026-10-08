@@ -74,7 +74,7 @@ What each field must be (`packages/upgrade/src/step/migration-step.ts`; spec
 - **`id`**: `<module>:<kebab-name>`, the declaring module first. `defineMigrationStep` throws
   `migration_step_declaration_refused` (`malformed_id`, `missing_description`, `blocking_not_data`);
   collection throws `migration_step_collection_refused` (`foreign_prefix`, `duplicate_id`,
-  `not_a_step`; `packages/process/src/migration-steps.ts`). Never reuse an id.
+  `not_a_step`; `packages/process/src/migration/migration-steps.ts`). Never reuse an id.
 - **`description`**: one line, required, shown on the Upgrades page and in `upgrade status` before
   the step runs. Say what it does to the data in operator words, not how.
 - **`run({ checkpoint, dryRun, signal })`** returns a report (a JSON object) the ledger keeps.
@@ -193,7 +193,7 @@ never by asking an operator to run a replay. It is a `data` step in `background`
 ```
 
 - **`replayer` comes from the binder**, never built by the module: the process composes it
-  (`processProjectionReplayer`, `packages/process/src/projection-replayer.ts`); a process with none
+  (`processProjectionReplayer`, `packages/process/src/migration/projection-replayer.ts`); a process with none
   refuses the step.
 - **`since`** (optional, default the start of the log, `PROJECTION_REPLAY_FROM_START`) is the instant
   a first run replays from; a handed-over fold sets it to refold only the deploy overlap (record §9).

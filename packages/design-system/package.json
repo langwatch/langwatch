@@ -11,16 +11,16 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "./format-money-display": {
-      "types": "./dist/components/format-money-display.d.ts",
-      "default": "./src/components/format-money-display.tsx"
+      "types": "./dist/components/display/format-money-display.d.ts",
+      "default": "./src/components/display/format-money-display.tsx"
     },
     "./copy-button": {
-      "types": "./dist/components/copy-button.d.ts",
-      "default": "./src/components/copy-button.tsx"
+      "types": "./dist/components/display/copy-button.d.ts",
+      "default": "./src/components/display/copy-button.tsx"
     },
     "./form-error-display": {
-      "types": "./dist/components/form-error-display.d.ts",
-      "default": "./src/components/form-error-display.tsx"
+      "types": "./dist/components/forms/form-error-display.d.ts",
+      "default": "./src/components/forms/form-error-display.tsx"
     },
     "./use-reduced-motion": {
       "types": "./dist/use-reduced-motion.d.ts",
@@ -51,129 +51,129 @@
       "default": "./src/testing/index.tsx"
     },
     "./avatar": {
-      "types": "./dist/components/avatar.d.ts",
-      "default": "./src/components/avatar.tsx"
+      "types": "./dist/components/display/avatar.d.ts",
+      "default": "./src/components/display/avatar.tsx"
     },
     "./presence": {
-      "types": "./dist/components/presence.d.ts",
-      "default": "./src/components/presence.tsx"
+      "types": "./dist/components/display/presence.d.ts",
+      "default": "./src/components/display/presence.tsx"
     },
     "./cached-view": {
-      "types": "./dist/components/cached-view.d.ts",
-      "default": "./src/components/cached-view.tsx"
+      "types": "./dist/components/states/cached-view.d.ts",
+      "default": "./src/components/states/cached-view.tsx"
     },
     "./checkbox": {
-      "types": "./dist/components/checkbox.d.ts",
-      "default": "./src/components/checkbox.tsx"
+      "types": "./dist/components/forms/checkbox.d.ts",
+      "default": "./src/components/forms/checkbox.tsx"
     },
     "./close-button": {
-      "types": "./dist/components/close-button.d.ts",
-      "default": "./src/components/close-button.tsx"
+      "types": "./dist/components/overlays/close-button.d.ts",
+      "default": "./src/components/overlays/close-button.tsx"
     },
     "./column-type-icon": {
-      "types": "./dist/components/column-type-icon.d.ts",
-      "default": "./src/components/column-type-icon.tsx"
+      "types": "./dist/components/display/column-type-icon.d.ts",
+      "default": "./src/components/display/column-type-icon.tsx"
     },
     "./confirm-dialog": {
-      "types": "./dist/components/confirm-dialog.d.ts",
-      "default": "./src/components/confirm-dialog.tsx"
+      "types": "./dist/components/overlays/confirm-dialog.d.ts",
+      "default": "./src/components/overlays/confirm-dialog.tsx"
     },
     "./copy-icon": {
       "types": "./dist/components/icons/copy.d.ts",
       "default": "./src/components/icons/copy.tsx"
     },
     "./delayed": {
-      "types": "./dist/components/delayed.d.ts",
-      "default": "./src/components/delayed.tsx"
+      "types": "./dist/components/states/delayed.d.ts",
+      "default": "./src/components/states/delayed.tsx"
     },
     "./delete-confirmation-dialog": {
-      "types": "./dist/components/delete-confirmation-dialog.d.ts",
-      "default": "./src/components/delete-confirmation-dialog.tsx"
+      "types": "./dist/components/overlays/delete-confirmation-dialog.d.ts",
+      "default": "./src/components/overlays/delete-confirmation-dialog.tsx"
     },
     "./external-image": {
-      "types": "./dist/components/external-image.d.ts",
-      "default": "./src/components/external-image.tsx"
+      "types": "./dist/components/display/external-image.d.ts",
+      "default": "./src/components/display/external-image.tsx"
     },
     "./format-money": {
       "types": "./dist/format-money.d.ts",
       "default": "./src/format-money.ts"
     },
     "./back-link": {
-      "types": "./dist/components/back-link.d.ts",
-      "default": "./src/components/back-link.tsx"
+      "types": "./dist/components/layout/back-link.d.ts",
+      "default": "./src/components/layout/back-link.tsx"
     },
     "./branded-card": {
-      "types": "./dist/components/branded-card.d.ts",
-      "default": "./src/components/branded-card.tsx"
+      "types": "./dist/components/brand/branded-card.d.ts",
+      "default": "./src/components/brand/branded-card.tsx"
     },
     "./full-logo": {
-      "types": "./dist/components/full-logo.d.ts",
-      "default": "./src/components/full-logo.tsx"
+      "types": "./dist/components/brand/full-logo.d.ts",
+      "default": "./src/components/brand/full-logo.tsx"
     },
     "./logo-icon": {
-      "types": "./dist/components/logo-icon.d.ts",
-      "default": "./src/components/logo-icon.tsx"
+      "types": "./dist/components/brand/logo-icon.d.ts",
+      "default": "./src/components/brand/logo-icon.tsx"
     },
     "./langy-mark": {
-      "types": "./dist/components/langy-mark.d.ts",
-      "default": "./src/components/langy-mark.tsx"
+      "types": "./dist/components/brand/langy-mark.d.ts",
+      "default": "./src/components/brand/langy-mark.tsx"
     },
     "./personal-access-token-banner": {
-      "types": "./dist/components/personal-access-token-banner.d.ts",
-      "default": "./src/components/personal-access-token-banner.tsx"
+      "types": "./dist/components/states/personal-access-token-banner.d.ts",
+      "default": "./src/components/states/personal-access-token-banner.tsx"
     },
     "./generate-api-snippet-button": {
-      "types": "./dist/components/generate-api-snippet-button.d.ts",
-      "default": "./src/components/generate-api-snippet-button.tsx"
+      "types": "./dist/components/scope/generate-api-snippet-button.d.ts",
+      "default": "./src/components/scope/generate-api-snippet-button.tsx"
     },
     "./horizontal-form-control": {
-      "types": "./dist/components/horizontal-form-control.d.ts",
-      "default": "./src/components/horizontal-form-control.tsx"
+      "types": "./dist/components/forms/horizontal-form-control.d.ts",
+      "default": "./src/components/forms/horizontal-form-control.tsx"
     },
     "./langwatch-endpoint-env": {
       "types": "./dist/langwatch-endpoint-env.d.ts",
       "default": "./src/langwatch-endpoint-env.ts"
     },
     "./ambient-ground": {
-      "types": "./dist/components/ambient-ground.d.ts",
-      "default": "./src/components/ambient-ground.tsx"
+      "types": "./dist/components/brand/ambient-ground.d.ts",
+      "default": "./src/components/brand/ambient-ground.tsx"
     },
-    "./langy-theme.css": "./src/components/langy-theme.css",
+    "./langy-theme.css": "./src/components/brand/langy-theme.css",
     "./loading-screen": {
-      "types": "./dist/components/loading-screen.d.ts",
-      "default": "./src/components/loading-screen.tsx"
+      "types": "./dist/components/brand/loading-screen.d.ts",
+      "default": "./src/components/brand/loading-screen.tsx"
     },
     "./messages": {
       "types": "./dist/components/messages/index.d.ts",
       "default": "./src/components/messages/index.ts"
     },
     "./no-data-info-block": {
-      "types": "./dist/components/no-data-info-block.d.ts",
-      "default": "./src/components/no-data-info-block.tsx"
+      "types": "./dist/components/states/no-data-info-block.d.ts",
+      "default": "./src/components/states/no-data-info-block.tsx"
     },
     "./overflown-text": {
-      "types": "./dist/components/overflown-text.d.ts",
-      "default": "./src/components/overflown-text.tsx"
+      "types": "./dist/components/display/overflown-text.d.ts",
+      "default": "./src/components/display/overflown-text.tsx"
     },
     "./property-section-title": {
-      "types": "./dist/components/property-section-title.d.ts",
-      "default": "./src/components/property-section-title.tsx"
+      "types": "./dist/components/forms/property-section-title.d.ts",
+      "default": "./src/components/forms/property-section-title.tsx"
     },
     "./selection-action-bar": {
-      "types": "./dist/components/selection-action-bar.d.ts",
-      "default": "./src/components/selection-action-bar.tsx"
+      "types": "./dist/components/layout/selection-action-bar.d.ts",
+      "default": "./src/components/layout/selection-action-bar.tsx"
     },
     "./slugify": {
       "types": "./dist/slugify.d.ts",
       "default": "./src/slugify.ts"
     },
     "./studio-drawer": {
-      "types": "./dist/components/studio-drawer.d.ts",
-      "default": "./src/components/studio-drawer.tsx"
+      "types": "./dist/components/overlays/studio-drawer.d.ts",
+      "default": "./src/components/overlays/studio-drawer.tsx"
     },
     "./studio-dialog": {
-      "types": "./dist/components/studio-dialog.d.ts",
-      "default": "./src/components/studio-dialog.tsx"
+      "types": "./dist/components/overlays/studio-dialog.d.ts",
+      "default": "./src/components/overlays/studio-dialog.tsx"
     },
     "./string-casing": {
       "types": "./dist/string-casing.d.ts",
@@ -192,8 +192,8 @@
       "default": "./src/use-interactive-tooltip.ts"
     },
     "./vertical-form-control": {
-      "types": "./dist/components/vertical-form-control.d.ts",
-      "default": "./src/components/vertical-form-control.tsx"
+      "types": "./dist/components/forms/vertical-form-control.d.ts",
+      "default": "./src/components/forms/vertical-form-control.tsx"
     },
     "./zod-salvage": {
       "types": "./dist/zod-salvage.d.ts",
@@ -204,72 +204,72 @@
       "default": "./src/metric-value-formatters.ts"
     },
     "./pass-rate-indicator": {
-      "types": "./dist/components/pass-rate-indicator.d.ts",
-      "default": "./src/components/pass-rate-indicator.tsx"
+      "types": "./dist/components/display/pass-rate-indicator.d.ts",
+      "default": "./src/components/display/pass-rate-indicator.tsx"
     },
     "./dialog": {
-      "types": "./dist/components/dialog.d.ts",
-      "default": "./src/components/dialog.tsx"
+      "types": "./dist/components/overlays/dialog.d.ts",
+      "default": "./src/components/overlays/dialog.tsx"
     },
     "./display-formatters": {
       "types": "./dist/display-formatters.d.ts",
       "default": "./src/display-formatters.ts"
     },
     "./drawer": {
-      "types": "./dist/components/drawer.d.ts",
-      "default": "./src/components/drawer.tsx"
+      "types": "./dist/components/overlays/drawer.d.ts",
+      "default": "./src/components/overlays/drawer.tsx"
     },
     "./first-grapheme": {
       "types": "./dist/first-grapheme.d.ts",
       "default": "./src/first-grapheme.ts"
     },
     "./field-info-tooltip": {
-      "types": "./dist/components/field-info-tooltip.d.ts",
-      "default": "./src/components/field-info-tooltip.tsx"
+      "types": "./dist/components/forms/field-info-tooltip.d.ts",
+      "default": "./src/components/forms/field-info-tooltip.tsx"
     },
     "./icons": {
       "types": "./dist/components/icons/index.d.ts",
       "default": "./src/components/icons/index.ts"
     },
     "./info-without-selecting": {
-      "types": "./dist/components/info-without-selecting.d.ts",
-      "default": "./src/components/info-without-selecting.tsx"
+      "types": "./dist/components/states/info-without-selecting.d.ts",
+      "default": "./src/components/states/info-without-selecting.tsx"
     },
     "./input-group": {
-      "types": "./dist/components/input-group.d.ts",
-      "default": "./src/components/input-group.tsx"
+      "types": "./dist/components/forms/input-group.d.ts",
+      "default": "./src/components/forms/input-group.tsx"
     },
     "./json-value-text": {
       "types": "./dist/json-value-text.d.ts",
       "default": "./src/json-value-text.ts"
     },
     "./list-table": {
-      "types": "./dist/components/list-table.d.ts",
-      "default": "./src/components/list-table.tsx"
+      "types": "./dist/components/layout/list-table.d.ts",
+      "default": "./src/components/layout/list-table.tsx"
     },
     "./menu": {
-      "types": "./dist/components/menu.d.ts",
-      "default": "./src/components/menu.tsx"
+      "types": "./dist/components/overlays/menu.d.ts",
+      "default": "./src/components/overlays/menu.tsx"
     },
     "./meter-bar": {
-      "types": "./dist/components/meter-bar.d.ts",
-      "default": "./src/components/meter-bar.tsx"
+      "types": "./dist/components/display/meter-bar.d.ts",
+      "default": "./src/components/display/meter-bar.tsx"
     },
     "./page-layout": {
-      "types": "./dist/components/page-layout.d.ts",
-      "default": "./src/components/page-layout.tsx"
+      "types": "./dist/components/layout/page-layout.d.ts",
+      "default": "./src/components/layout/page-layout.tsx"
     },
     "./pagination": {
-      "types": "./dist/components/pagination.d.ts",
-      "default": "./src/components/pagination.tsx"
+      "types": "./dist/components/layout/pagination.d.ts",
+      "default": "./src/components/layout/pagination.tsx"
     },
     "./popover": {
-      "types": "./dist/components/popover.d.ts",
-      "default": "./src/components/popover.tsx"
+      "types": "./dist/components/overlays/popover.d.ts",
+      "default": "./src/components/overlays/popover.tsx"
     },
     "./radio": {
-      "types": "./dist/components/radio.d.ts",
-      "default": "./src/components/radio.tsx"
+      "types": "./dist/components/forms/radio.d.ts",
+      "default": "./src/components/forms/radio.tsx"
     },
     "./rotating-colors": {
       "types": "./dist/rotating-colors.d.ts",
@@ -284,132 +284,132 @@
       "default": "./src/shiki-chunking.ts"
     },
     "./search-input": {
-      "types": "./dist/components/search-input.d.ts",
-      "default": "./src/components/search-input.tsx"
+      "types": "./dist/components/forms/search-input.d.ts",
+      "default": "./src/components/forms/search-input.tsx"
     },
     "./segmented-control": {
-      "types": "./dist/components/segmented-control.d.ts",
-      "default": "./src/components/segmented-control.tsx"
+      "types": "./dist/components/forms/segmented-control.d.ts",
+      "default": "./src/components/forms/segmented-control.tsx"
     },
     "./provider-scope-chips": {
-      "types": "./dist/components/provider-scope-chips.d.ts",
-      "default": "./src/components/provider-scope-chips.tsx"
+      "types": "./dist/components/scope/provider-scope-chips.d.ts",
+      "default": "./src/components/scope/provider-scope-chips.tsx"
     },
     "./scope-chip-picker": {
-      "types": "./dist/components/scope-chip-picker.d.ts",
-      "default": "./src/components/scope-chip-picker.tsx"
+      "types": "./dist/components/scope/scope-chip-picker.d.ts",
+      "default": "./src/components/scope/scope-chip-picker.tsx"
     },
     "./scope-filter": {
-      "types": "./dist/components/scope-filter.d.ts",
-      "default": "./src/components/scope-filter.tsx"
+      "types": "./dist/components/scope/scope-filter.d.ts",
+      "default": "./src/components/scope/scope-filter.tsx"
     },
     "./select": {
-      "types": "./dist/components/select.d.ts",
-      "default": "./src/components/select.tsx"
+      "types": "./dist/components/forms/select.d.ts",
+      "default": "./src/components/forms/select.tsx"
     },
     "./slider": {
-      "types": "./dist/components/slider.d.ts",
-      "default": "./src/components/slider.tsx"
+      "types": "./dist/components/forms/slider.d.ts",
+      "default": "./src/components/forms/slider.tsx"
     },
     "./small-label": {
-      "types": "./dist/components/small-label.d.ts",
-      "default": "./src/components/small-label.tsx"
+      "types": "./dist/components/forms/small-label.d.ts",
+      "default": "./src/components/forms/small-label.tsx"
     },
     "./switch": {
-      "types": "./dist/components/switch.d.ts",
-      "default": "./src/components/switch.tsx"
+      "types": "./dist/components/forms/switch.d.ts",
+      "default": "./src/components/forms/switch.tsx"
     },
     "./tooltip": {
-      "types": "./dist/components/tooltip.d.ts",
-      "default": "./src/components/tooltip.tsx"
+      "types": "./dist/components/overlays/tooltip.d.ts",
+      "default": "./src/components/overlays/tooltip.tsx"
     },
     "./toaster": {
-      "types": "./dist/components/toaster.d.ts",
-      "default": "./src/components/toaster.tsx"
+      "types": "./dist/components/overlays/toaster.d.ts",
+      "default": "./src/components/overlays/toaster.tsx"
     },
     "./text-overflow": {
       "types": "./dist/text-overflow.d.ts",
       "default": "./src/text-overflow.ts"
     },
     "./trigger-anchor": {
-      "types": "./dist/components/trigger-anchor.d.ts",
-      "default": "./src/components/trigger-anchor.tsx"
+      "types": "./dist/components/overlays/trigger-anchor.d.ts",
+      "default": "./src/components/overlays/trigger-anchor.tsx"
     },
     "./use-copy-to-clipboard": {
       "types": "./dist/use-copy-to-clipboard.d.ts",
       "default": "./src/use-copy-to-clipboard.ts"
     },
     "./ask-chip": {
-      "types": "./dist/components/ask-chip.d.ts",
-      "default": "./src/components/ask-chip.tsx"
+      "types": "./dist/components/brand/ask-chip.d.ts",
+      "default": "./src/components/brand/ask-chip.tsx"
     },
     "./hero-lead-pill": {
-      "types": "./dist/components/hero-lead-pill.d.ts",
-      "default": "./src/components/hero-lead-pill.tsx"
+      "types": "./dist/components/brand/hero-lead-pill.d.ts",
+      "default": "./src/components/brand/hero-lead-pill.tsx"
     },
     "./kbd": {
-      "types": "./dist/components/kbd.d.ts",
-      "default": "./src/components/kbd.tsx"
+      "types": "./dist/components/display/kbd.d.ts",
+      "default": "./src/components/display/kbd.tsx"
     },
     "./format-milliseconds": {
       "types": "./dist/format-milliseconds.d.ts",
       "default": "./src/format-milliseconds.ts"
     },
     "./stat-tile": {
-      "types": "./dist/components/stat-tile.d.ts",
-      "default": "./src/components/stat-tile.tsx"
+      "types": "./dist/components/display/stat-tile.d.ts",
+      "default": "./src/components/display/stat-tile.tsx"
     },
     "./tab-count": {
-      "types": "./dist/components/tab-count.d.ts",
-      "default": "./src/components/tab-count.tsx"
+      "types": "./dist/components/display/tab-count.d.ts",
+      "default": "./src/components/display/tab-count.tsx"
     },
     "./settings-section": {
-      "types": "./dist/components/settings-section.d.ts",
-      "default": "./src/components/settings-section.tsx"
+      "types": "./dist/components/layout/settings-section.d.ts",
+      "default": "./src/components/layout/settings-section.tsx"
     },
     "./settings-card": {
-      "types": "./dist/components/settings-card.d.ts",
-      "default": "./src/components/settings-card.tsx"
+      "types": "./dist/components/layout/settings-card.d.ts",
+      "default": "./src/components/layout/settings-card.tsx"
     },
     "./section-navigation-frame": {
-      "types": "./dist/components/section-navigation-frame.d.ts",
-      "default": "./src/components/section-navigation-frame.tsx"
+      "types": "./dist/components/layout/section-navigation-frame.d.ts",
+      "default": "./src/components/layout/section-navigation-frame.tsx"
     },
     "./bubble-tones": {
       "types": "./dist/components/bubble-tones.d.ts",
       "default": "./src/components/bubble-tones.ts"
     },
     "./role-visuals": {
-      "types": "./dist/components/role-visuals.d.ts",
-      "default": "./src/components/role-visuals.tsx"
+      "types": "./dist/components/scope/role-visuals.d.ts",
+      "default": "./src/components/scope/role-visuals.tsx"
     },
     "./conversation-expand-context": {
       "types": "./dist/components/conversation-expand-context.d.ts",
       "default": "./src/components/conversation-expand-context.ts"
     },
     "./chip": {
-      "types": "./dist/components/chip.d.ts",
-      "default": "./src/components/chip.tsx"
+      "types": "./dist/components/display/chip.d.ts",
+      "default": "./src/components/display/chip.tsx"
     },
     "./filter-chips": {
-      "types": "./dist/components/filter-chips.d.ts",
-      "default": "./src/components/filter-chips.tsx"
+      "types": "./dist/components/layout/filter-chips.d.ts",
+      "default": "./src/components/layout/filter-chips.tsx"
     },
     "./suggestion-panel": {
-      "types": "./dist/components/suggestion-panel.d.ts",
-      "default": "./src/components/suggestion-panel.tsx"
+      "types": "./dist/components/states/suggestion-panel.d.ts",
+      "default": "./src/components/states/suggestion-panel.tsx"
     },
     "./provider-icons": {
-      "types": "./dist/components/provider-icons.d.ts",
-      "default": "./src/components/provider-icons.tsx"
+      "types": "./dist/components/scope/provider-icons.d.ts",
+      "default": "./src/components/scope/provider-icons.tsx"
     },
     "./no-models-configured-callout": {
-      "types": "./dist/components/no-models-configured-callout.d.ts",
-      "default": "./src/components/no-models-configured-callout.tsx"
+      "types": "./dist/components/states/no-models-configured-callout.d.ts",
+      "default": "./src/components/states/no-models-configured-callout.tsx"
     },
     "./provider-model-selector": {
-      "types": "./dist/components/provider-model-selector.d.ts",
-      "default": "./src/components/provider-model-selector.tsx"
+      "types": "./dist/components/scope/provider-model-selector.d.ts",
+      "default": "./src/components/scope/provider-model-selector.tsx"
     },
     "./history-icon": {
       "types": "./dist/components/icons/history-icon.d.ts",
@@ -424,8 +424,8 @@
       "default": "./src/components/variable-mapping/index.ts"
     },
     "./workflow-card": {
-      "types": "./dist/components/workflow-card.d.ts",
-      "default": "./src/components/workflow-card.tsx"
+      "types": "./dist/components/layout/workflow-card.d.ts",
+      "default": "./src/components/layout/workflow-card.tsx"
     }
   },
   "scripts": {
@@ -480,5 +480,8 @@
     "@emotion/react": "^11.14.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
+  },
+  "langwatch": {
+    "group": "browser"
   }
 }

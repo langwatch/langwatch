@@ -6,7 +6,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { PageLayout } from "../src/components/page-layout.tsx";
+import { PageLayout } from "../src/components/layout/page-layout.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => cleanup());

@@ -14,6 +14,11 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import {
+  assertGatedRole,
+  type UpgradeGatedRole,
+  type UpgradeGate,
+} from "./migration/upgrade-gate.ts";
 import { isProcessModule } from "./process-container.ts";
 import { ProcessServer } from "./process-server.ts";
 import {
@@ -23,7 +28,6 @@ import {
   type ServerLogger,
   type ServerOptions,
 } from "./server.ts";
-import { assertGatedRole, type UpgradeGatedRole, type UpgradeGate } from "./upgrade-gate.ts";
 
 /** An owner as the preamble reads one: a name, and what it declared (§6). */
 export type PreambleOwner = ConfigOwner &

@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/sim-console",
+  "langwatch": { "group": "browser" },
   "version": "0.0.1",
   "private": true,
   "description": "The one shell every haven simulator console is built on (mailsim, idpsim, storagesim, llmsim, voicesim, analyticssim): header, tabs kept in the hash, list and detail panes, polling and typed fetches, on the internal console kit (ADR-160).",

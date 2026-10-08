@@ -7,7 +7,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { describe, expect, it } from "vitest";
 
-import { createUiModuleHostStack } from "../ui-module-hosts.tsx";
+import { createUiModuleHostStack } from "../module/ui-module-hosts.tsx";
 
 const ProbeHost = createContext<string | null>(null);
 

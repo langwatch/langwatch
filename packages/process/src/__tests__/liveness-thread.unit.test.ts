@@ -10,7 +10,7 @@ import {
   startHeartbeat,
   startLivenessThread,
   type LivenessThread,
-} from "../liveness-thread.ts";
+} from "../lifecycle/liveness-thread.ts";
 import { Server, type HealthRoute } from "../server.ts";
 
 const logger = { info: vi.fn(), error: vi.fn() };

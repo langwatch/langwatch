@@ -9,6 +9,7 @@ import type {
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
+import type { RuntimeService } from "./lifecycle/runtime-lifecycle.ts";
 import { ObservabilitySupply } from "./process-supply.options.ts";
 import type {
   InstalledPeersInAnyBranch,
@@ -22,7 +23,6 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
-import type { RuntimeService } from "./runtime-lifecycle.ts";
 import { type TestPeer, testPeer } from "./testing.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 

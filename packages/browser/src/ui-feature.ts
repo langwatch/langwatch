@@ -15,14 +15,14 @@ import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
+import type { UiModuleHostMount } from "./module/ui-host-mounts.ts";
+import type { UiPageLoaderRegistry } from "./page/ui-page-loaders.ts";
+import type { UiWebRouteParent } from "./ui-web-installation.ts";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,
   UiFeatureApiTransport,
-} from "./transport.ts";
-import type { UiModuleHostMount } from "./ui-host-mounts.ts";
-import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
-import type { UiWebRouteParent } from "./ui-web-installation.ts";
+} from "./wire/transport.ts";
 
 /** What a failure interceptor may do about the failure it just read. */
 export type UiFailureHost = {

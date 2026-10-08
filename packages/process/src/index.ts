@@ -66,7 +66,7 @@ export {
   type ServerRole,
 } from "./feature-installer.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
-export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
+export { RuntimeLifecycle, cleanupAfterFailure } from "./lifecycle/runtime-lifecycle.ts";
 
 export {
   defineChannels,
@@ -109,19 +109,19 @@ export {
   type ShutdownPhase,
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
-} from "./graceful-shutdown.ts";
+} from "./lifecycle/graceful-shutdown.ts";
 export {
   processProjectionReplayer,
   ProjectionReplayUnavailableError,
-} from "./projection-replayer.ts";
+} from "./migration/projection-replayer.ts";
 export {
   MigrationStepCollectionError,
   type MigrationStepCollectionRefusal,
   buildsMigrationSteps,
   collectMigrationSteps,
   migrationStepsOf,
-} from "./migration-steps.ts";
-export { migrationStepsOverMemory } from "./memory-migration-steps.ts";
+} from "./migration/migration-steps.ts";
+export { migrationStepsOverMemory } from "./migration/memory-migration-steps.ts";
 export {
   loadTaskModules,
   parseTaskModuleSpecifiers,

@@ -30,7 +30,7 @@ var readmeFixture = map[string]string{
 	"modules/gamma/process/package.json":                      `{"name":"@lw/gamma-process","dependencies":{"@lw/core":"workspace:*"}}`,
 	"enterprise/modules/beta/process/package.json":            `{"name":"@lw/enterprise-beta-process"}`,
 	"enterprise/packages/signing/package.json":                `{"name":"@lw/signing","description":"Signs licenses | offline."}`,
-	"packages/core/package.json":                              `{"name":"@lw/core","description":"The core vocabulary."}`,
+	"packages/core/package.json":                              `{"name":"@lw/core","description":"The core vocabulary.","langwatch":{"group":"framework"}}`,
 	"packages/core/README.md":                                 "# @lw/core\n\nThe core vocabulary.\n",
 	"apps/api/package.json":                                   `{"name":"@lw/api","description":"The api process."}`,
 	"apps/ui/package.json":                                    `{"name":"@lw/ui","description":"The browser process."}`,

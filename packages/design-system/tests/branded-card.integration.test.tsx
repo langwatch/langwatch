@@ -4,7 +4,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BrandedCard, BrandedCardPage } from "../src/components/branded-card.tsx";
+import { BrandedCard, BrandedCardPage } from "../src/components/brand/branded-card.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(() => {

@@ -125,7 +125,7 @@ export const reads = {
   "@langwatch/group-queue": ["apps/*/package.json"],
   "@langwatch/process": ["charts/langwatch/**/*"],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
-  "@langwatch/config": ["packages/browser/src/public-config.ts"],
+  "@langwatch/config": ["packages/browser/src/wire/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
   "@langwatch/mcp-server": ["feature-map.json"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],

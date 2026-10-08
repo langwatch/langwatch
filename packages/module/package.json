@@ -1,5 +1,6 @@
 {
   "name": "@langwatch/module",
+  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "The light core every module contract imports: API tokens, module names, tRPC contract declarations and UI tokens.",

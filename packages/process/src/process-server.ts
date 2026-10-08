@@ -8,6 +8,12 @@ import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
+import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
+import {
+  type UpgradeGate,
+  upgradeGateComponent,
+  type UpgradeGatedRole,
+} from "./migration/upgrade-gate.ts";
 import {
   ApiProcessContainer,
   TasksProcessContainer,
@@ -24,12 +30,10 @@ import {
   type ServerContribution,
   type ServerLogger,
 } from "./server.ts";
-import { processShutdownDeadlineMs } from "./shutdown-deadline.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./transport/asset-base.ts";
 import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
 import { processSurface } from "./transport/process-surface.ts";
-import { type UpgradeGate, upgradeGateComponent, type UpgradeGatedRole } from "./upgrade-gate.ts";
 
 /** What `run` may be handed: a booted worker also pauses its work and lists its steps. */
 type RunnableApplication = ServedApplication &

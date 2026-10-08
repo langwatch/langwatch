@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "../attributeKeys.ts";
-import { VertexAdkCanonicaliserService } from "../vertexAdkCanonicaliser.ts";
+import { VertexAdkCanonicaliserService } from "../vertex-adk/vertexAdkCanonicaliser.ts";
 import { createExtractorContext } from "./testHelpers.ts";
 
 /**
