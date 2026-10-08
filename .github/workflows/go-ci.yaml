@@ -295,12 +295,13 @@ jobs:
       # Through the Makefile, so the check CI runs and the check a developer
       # runs cannot drift apart.
       - run: make herrgen-check
-      # The README generator's extractor runs inside the enforcer, so that
-      # closure is the whole install. The REST cross-check needs the app
-      # installed and runs in langwatch-app-ci's lint job instead.
+      # The README generator reads zod schemas from the app, so it needs the
+      # whole installed workspace plus the prepared generated files and a
+      # built SDK. The prepare action runs start:prepare:files and ensure:built.
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/architecture-enforcer..."
+          install: "all"
+      - uses: ./.github/actions/prepare-generated-files
       - name: Generated READMEs are current
         run: pnpm check:readmes
 
