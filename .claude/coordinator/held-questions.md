@@ -501,3 +501,7 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
 3. A1-c Stored reads (R40): (a, rec) declare Session shared auth -> identity and Account shared user -> identity, each module reads through its own repository; user's SSO status reads its own Account table.
 4. A1-d Commands that are synchronous today (link provider account, operator two-step reset, deactivate revoking sessions first): (a, rec) stay synchronous by moving those doors to auth, which sits above identity and user (R36) and calls them downward; (b) become facts auth subscribes to, plus read-time refusal of a deactivated user's session and CLI token.
 Coordinator default if unanswered: split A1 into A1-identity and A1-user lanes; A1-user sequenced with U1.
+
+## Round 44 candidates (prepared 2026-10-08)
+1. DS-3 upgrade modal (policies-DS-3a §11): the upgrade-modal slice (uses licensing's LimitType) lives in browser-host, a framework package. (a, rec) licensing lends an operations token from licensing-client, browser-host keeps only the mount point; (b) licensing-client exports the slice (new pattern); (c) restate LimitType in browser-host (edge goes, feature stays in the framework).
+2. FS-3 webhook memory tier: there is no memory twin of the HTTP destination; memory-tier processes still deliver through the real HTTP channel behind the egress fence. (a, rec) keep as is and record it as the named exception (the memory-tier worker test relies on the fence refusing private addresses); (b) add a memory twin, so memory-tier processes stop delivering webhooks.
