@@ -96,7 +96,7 @@ describe("Feature: an admin picks the projects a new aggregate reads", () => {
   });
 
   describe("when the admin creates an aggregate over two listed projects", () => {
-    /** @scenario "An admin creates an aggregate from the new project drawer by picking projects" */
+    /** @scenario "An admin picks projects one by one when All personal workspaces is off" */
     it("stores an explicit rule naming exactly those two", async () => {
       const picked = [fixture.personal.engineer.id, fixture.shared.id];
 

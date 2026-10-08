@@ -24,7 +24,12 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { Checkbox } from "../ui/checkbox";
 import { Select } from "../ui/select";
-import { AggregateMemberPicker } from "./AggregateMemberPicker";
+import {
+  AGGREGATE_DEFAULT_SELECTION,
+  AggregateMemberPicker,
+  type AggregateMemberSelection,
+  selectsAnyMember,
+} from "./AggregateMemberPicker";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
@@ -35,10 +40,10 @@ export interface ProjectFormData {
   name: string;
   teamId: string;
   newTeamName?: string;
-  /** ADR-144: create an aggregate that reads the picked projects. */
+  /** ADR-144: create an aggregate that reads the picked members. */
   isAggregate: boolean;
-  /** The projects the aggregate's explicit rule names. */
-  aggregateProjectIds: string[];
+  /** What the aggregate reads: every personal workspace, picked projects, or both. */
+  aggregateMembers: AggregateMemberSelection;
 }
 
 export interface ProjectFormProps {
@@ -85,7 +90,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
       // teams.useQuery-driven useEffect below never fired a reset).
       teamId: defaultTeamId ?? "",
       isAggregate: false,
-      aggregateProjectIds: [],
+      aggregateMembers: AGGREGATE_DEFAULT_SELECTION,
     },
   });
   const {
@@ -99,7 +104,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
 
   const teamId = watch("teamId");
   const isAggregate = watch("isAggregate");
-  const aggregateProjectIds = watch("aggregateProjectIds");
+  const aggregateMembers = watch("aggregateMembers");
 
   /**
    * The part of the submit failure the form itself could not put on a field.
@@ -249,7 +254,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             disabled={isSubmitDisabled({
               isLoading,
               isAggregate,
-              aggregateProjectIds,
+              aggregateMembers,
             })}
           >
             Create
@@ -262,24 +267,24 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
 
 /**
  * Create waits for an in-flight submit, and for an aggregate also for at least
- * one picked project: an explicit rule naming none is refused by the server.
+ * one member: a rule that reads nothing is refused by the server.
  */
 function isSubmitDisabled({
   isLoading,
   isAggregate,
-  aggregateProjectIds,
+  aggregateMembers,
 }: {
   isLoading: boolean;
   isAggregate: boolean;
-  aggregateProjectIds: string[];
+  aggregateMembers: AggregateMemberSelection;
 }): boolean {
   if (isLoading) return true;
-  return isAggregate && aggregateProjectIds.length === 0;
+  return isAggregate && !selectsAnyMember(aggregateMembers);
 }
 
 /**
- * ADR-144: the Governance checkbox and, once checked, the projects the new
- * aggregate reads. Shown to organisation admins only.
+ * ADR-144: the Governance checkbox and, once checked, what the new aggregate
+ * reads, nested under it. Shown to organisation admins only.
  */
 function GovernanceFields({
   control,
@@ -314,13 +319,15 @@ function GovernanceFields({
       {isAggregate && organizationId && (
         <Controller
           control={control}
-          name="aggregateProjectIds"
+          name="aggregateMembers"
           render={({ field }) => (
-            <AggregateMemberPicker
-              organizationId={organizationId}
-              value={field.value}
-              onChange={field.onChange}
-            />
+            <Box paddingStart={6}>
+              <AggregateMemberPicker
+                organizationId={organizationId}
+                value={field.value}
+                onChange={field.onChange}
+              />
+            </Box>
           )}
         />
       )}

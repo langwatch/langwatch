@@ -14,6 +14,7 @@ import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
+import { aggregateRuleOf } from "./AggregateMemberPicker";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
 import { NEW_TEAM_VALUE } from "./projectFormValidation";
 
@@ -64,7 +65,7 @@ function aggregateFieldsOf(data: ProjectFormData): {
   if (!data.isAggregate) return {};
   return {
     kind: AGGREGATE_PROJECT_KIND,
-    aggregateRule: { kind: "explicit", projectIds: data.aggregateProjectIds },
+    aggregateRule: aggregateRuleOf(data.aggregateMembers),
   };
 }
 
