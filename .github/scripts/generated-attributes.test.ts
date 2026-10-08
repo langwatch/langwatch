@@ -130,7 +130,15 @@ void describe("given the generators and the files they write", () => {
   void describe("when a README carries the readmegen block", () => {
     /** @scenario "A README carrying the readmegen block is marked generated" */
     void it("is marked linguist-generated", () => {
-      const out = git(["grep", "--cached", "-lz", "-e", "^<!-- readme:generated:start", "--", "*README.md"]);
+      const out = git([
+        "grep",
+        "--cached",
+        "-lz",
+        "-e",
+        "^<!-- readme:generated:start",
+        "--",
+        "*README.md",
+      ]);
       const readmes = out.split("\0").filter(Boolean);
       assert.notEqual(readmes.length, 0);
       assert.deepEqual(unmarked(readmes), [], "add a .gitattributes line for these");

@@ -1495,7 +1495,11 @@ jobs:
         run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
 
       - name: Test the change detector's pathspec parity with dorny's matcher
-        run: bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
+        run: |
+          picomatch_dir="$(mktemp -d)"
+          npm install --prefix "$picomatch_dir" --no-save --no-audit --no-fund picomatch@^2.3.1
+          export PICOMATCH="$picomatch_dir/node_modules/picomatch"
+          bash .github/scripts/__tests__/detect-changes-pathspec-parity.test.sh
 
       # Lives here rather than in deployment-impact-check.yml because that
       # workflow filters `on.paths` down to deployment surface, which

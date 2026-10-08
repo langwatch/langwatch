@@ -231,8 +231,8 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"the Go constant is the wire name the control plane reads")
 
 	accumulation := readControlPlaneSource(t,
-		"modules", "trace", "process", "src", "services",
-		"trace-attribute-extraction.service.ts")
+		"modules", "trace", "contract", "src",
+		"trace-attribute-extraction.ts")
 	if !strings.Contains(accumulation, `"`+customertracebridge.AttrModelProviderID+`"`) {
 		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}

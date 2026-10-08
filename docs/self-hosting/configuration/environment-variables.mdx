@@ -351,7 +351,7 @@ The app and the workers never migrate on startup: `pnpm task upgrade` does, befo
 | `CLICKHOUSE_COLD_STORAGE_ENABLED` | `true` makes the upgrade's reconcile phase write TTLs that move aged data to the cold volume | `false` |
 | `CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS` | Hot days for every table without its own `CLICKHOUSE_COLD_STORAGE_<TABLE>_TTL_DAYS` | each table's built-in default |
 | `BASE_HOST` | The upgrade's last log line reads it to say where the UI is | - |
-| `BUILD_TIME` | Set while building an image: the upgrade applies nothing to ClickHouse. Leave unset at runtime | unset |
+| `BUILD_TIME` | Set while building an image: the upgrade applies no ClickHouse migration. Leave unset at runtime | unset |
 
 Exit codes, outcome codes and the log lines are in [Upgrade Guide](/self-hosting/upgrade#exit-codes-and-what-to-do).
 

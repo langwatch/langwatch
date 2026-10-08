@@ -31,8 +31,6 @@ export type UiAuthenticationOverviewCardProps = {
 /** What organization's Directory hands the directory status band above its tabs. */
 export type UiDirectorySummaryProps = UiAuthenticationOverviewCardProps;
 
-;
-
 /** A dataset column as a dataset surface names it: its name and its type's name. */
 export type UiDatasetColumn = DatasetColumn;
 
