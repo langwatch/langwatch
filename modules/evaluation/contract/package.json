@@ -27,7 +27,6 @@
     "@langwatch/secrets": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

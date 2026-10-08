@@ -3,7 +3,11 @@
  */
 
 import type { Field, StudioEdge, StudioNode } from "@langwatch/workflow-contract";
-import { getInputsOutputs, getMappingSurfaceInputs } from "@langwatch/workflow-contract";
+import {
+  getInputsOutputs,
+  getMappingSurfaceInputs,
+  getWorkflowsRequiredFields,
+} from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +185,41 @@ describe("getInputsOutputs", () => {
       const { outputs } = getInputsOutputs(edges, nodes);
 
       expect(outputs).toEqual(endInputs);
+    });
+  });
+});
+
+describe("getWorkflowsRequiredFields", () => {
+  describe("when the latest version carries a DSL", () => {
+    it("names each wired entry field once, in edge order", () => {
+      const dsl = buildWorkflow({
+        entryOutputs: [
+          { identifier: "input", type: "str" },
+          { identifier: "expected", type: "str" },
+        ],
+        edges: [makeEdge("input", "llm1", 0), makeEdge("expected", "eval1", 1)],
+      });
+
+      const requirements = getWorkflowsRequiredFields({
+        workflows: [{ id: "wf_1", name: "Judge", versions: [{ dsl }, { dsl: undefined }] }],
+      });
+
+      expect(requirements).toEqual([
+        { id: "wf_1", name: "Judge", requiredFields: ["input", "expected"] },
+      ]);
+    });
+  });
+
+  describe("when the latest version has no DSL", () => {
+    it("leaves the workflow out", () => {
+      const requirements = getWorkflowsRequiredFields({
+        workflows: [
+          { id: "wf_1", name: "Empty", versions: [{}] },
+          { id: "wf_2", name: "Unpublished", versions: [] },
+        ],
+      });
+
+      expect(requirements).toEqual([]);
     });
   });
 });

@@ -23,6 +23,7 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { getWorkflowsRequiredFields } from "@langwatch/workflow-contract";
 import { fromZodError, isZodErrorLike } from "zod-validation-error";
 
 import type { ExperimentService } from "./experiment.service.ts";
@@ -150,7 +151,7 @@ export class ExperimentDatasetEvaluationService {
     try {
       return getEvaluatorIncludingCustom({
         checkType: checkType as EvaluatorTypes,
-        customEvaluators,
+        customEvaluators: getWorkflowsRequiredFields({ workflows: customEvaluators }),
       });
     } catch (error) {
       if (HandledError.isHandled(error) && error.code === "evaluator_not_found") return undefined;

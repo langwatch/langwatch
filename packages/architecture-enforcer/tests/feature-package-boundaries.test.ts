@@ -1156,7 +1156,33 @@ describe("Prisma client containment", () => {
 
     const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
     expect(messages).toContain(
-      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract",
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract; strongly connected with 2 packages: @langwatch/agent-contract, @langwatch/raw-client",
     );
+  });
+
+  /** @scenario A strongly connected component is one package cycle naming every member */
+  it("reports each strongly connected component once, with all its members", () => {
+    const contract = (feature: string, targets: string[]) =>
+      featurePackage({
+        feature,
+        role: "contract",
+        dependencies: Object.fromEntries(
+          targets.map((target) => [`@langwatch/${target}-contract`, "workspace:*"]),
+        ),
+      });
+    contract("agent", ["dataset"]);
+    contract("dataset", ["agent", "workflow"]);
+    contract("workflow", ["agent"]);
+    contract("trace", ["user"]);
+    contract("user", ["trace"]);
+
+    const cycles = lintWorkspace({ root, declarations: false })
+      .filter((violation) => violation.policy === "package-cycle")
+      .map((violation) => violation.message);
+
+    expect(cycles).toEqual([
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/dataset-contract -> @langwatch/agent-contract; strongly connected with 3 packages: @langwatch/agent-contract, @langwatch/dataset-contract, @langwatch/workflow-contract",
+      "Package dependency cycle: @langwatch/trace-contract -> @langwatch/user-contract -> @langwatch/trace-contract; strongly connected with 2 packages: @langwatch/trace-contract, @langwatch/user-contract",
+    ]);
   });
 });

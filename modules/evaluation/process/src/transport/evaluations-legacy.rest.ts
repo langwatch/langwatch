@@ -48,6 +48,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { getWorkflowsRequiredFields } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError as ZodErrorClass } from "zod";
@@ -793,7 +794,9 @@ async function resolveEvaluatorDefinition({
     return {
       evaluatorDefinition: getEvaluatorIncludingCustom({
         checkType: checkType as EvaluatorTypes,
-        customEvaluators: await app.listCustomEvaluators({ projectId }),
+        customEvaluators: getWorkflowsRequiredFields({
+          workflows: await app.listCustomEvaluators({ projectId }),
+        }),
       }),
     };
   } catch (error) {

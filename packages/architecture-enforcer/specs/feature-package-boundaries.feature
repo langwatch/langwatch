@@ -344,3 +344,10 @@ Feature: Feature package boundary lint
     And that package depends back on the contract
     When architecture lint checks the fixture workspace
     Then it reports the package cycle, although the framework package is no feature package
+
+  @unit @architecture
+  Scenario: A strongly connected component is one package cycle naming every member
+    Given three workspace packages that all reach each other through two overlapping cycles
+    And a separate pair of packages that depend on each other
+    When architecture lint checks the fixture workspace
+    Then it reports one package cycle per component, each naming every member and one concrete cycle

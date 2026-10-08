@@ -1,6 +1,7 @@
 /**
  * The evaluator a type names, built-in or one of the project's custom workflows,
- * as a pure rule both evaluation's evaluate doors and experiment's dataset door read.
+ * as a pure rule both evaluation's evaluate doors and experiment's dataset door read. Callers
+ * pass each custom workflow's required fields, from workflow-contract's getWorkflowsRequiredFields.
  */
 import {
   AVAILABLE_EVALUATORS,
@@ -9,9 +10,6 @@ import {
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
-
-import type { CustomEvaluator } from "./evaluation-trpc.schemas.ts";
 
 export type EvaluatorIncludingCustom =
   | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
@@ -26,25 +24,14 @@ export const getEvaluatorIncludingCustom = ({
   customEvaluators,
 }: {
   checkType: EvaluatorTypes;
-  customEvaluators: readonly CustomEvaluator[];
+  customEvaluators: readonly { id: string; name: string; requiredFields: string[] }[];
 }): EvaluatorIncludingCustom => {
-  const customEntries: [string, CustomEvaluatorDefinition][] = [];
-
-  for (const evaluator of customEvaluators) {
-    const dsl = evaluator.versions[0]?.dsl;
-
-    if (!dsl) continue;
-
-    const cloned = JSON.parse(JSON.stringify(dsl)) as
-      | { edges?: StudioEdge[]; nodes?: StudioNode[] }
-      | undefined;
-    const { inputs } = getInputsOutputs(cloned?.edges ?? [], cloned?.nodes ?? []);
-    const requiredFields = inputs
-      .map((input) => input.identifier)
-      .filter((id): id is string => typeof id === "string");
-
-    customEntries.push([`custom/${evaluator.id}`, { name: evaluator.name, requiredFields }]);
-  }
+  const customEntries = customEvaluators.map(
+    ({ id, name, requiredFields }): [string, CustomEvaluatorDefinition] => [
+      `custom/${id}`,
+      { name, requiredFields },
+    ],
+  );
 
   const availableEvaluators: Record<string, EvaluatorIncludingCustom | undefined> = {
     ...AVAILABLE_EVALUATORS,

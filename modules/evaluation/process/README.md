@@ -234,7 +234,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:169` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:170` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -243,54 +243,54 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:177`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:178`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:184)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:185)
 ```
 
 #### `POST /api/evaluations/:evaluator/evaluate` · `postApiEvaluationsByEvaluatorEvaluate`
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:205`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:206`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:208)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:211)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:209)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:212)
 ```
 
 #### `POST /api/evaluations/:evaluator/:subpath/evaluate` · `postApiEvaluationsByEvaluatorBySubpathEvaluate`
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:236`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:237`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof namespacedEvaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:16
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:242)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:245)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:243)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:246)
 ```
 
 #### `POST /api/guardrails/:evaluator/evaluate` · `postApiGuardrailsByEvaluatorEvaluate`
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:270`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:271`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:272)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:275)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:273)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:276)
 ```
 
 ## tRPC transport
