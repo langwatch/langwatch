@@ -545,3 +545,4 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
   - Q4 (C3c) createSelfHostedCustomer. Rec (a): licensing mints the organisation id and records a fact; organization creates the row (R42 shape).
   - Q5 (U1) avatar after R50. Rec (a): read the personal-workspace project through Team and Project shares.
 - Proposed rounds: 54 = Q1, Q2, Q3, Q4 (unlocks C1 and C3a-c, 0 cycles); 55 = Q5, PO-1, PO-2.
+- PR-SYNC (2026-10-08): #8524 and #8530 (a cloud session's branches) need a merge of the base (generated README conflicts only) plus their own fix (.gitattributes browser README lines; migration 20261008160000 -> 20261008180002). Pushing to those branches was refused by the auto-mode classifier. Rec: Alex approves pushing merge commits plus those fixes to the two branches (merge commits only, no rewrite), or asks the owning session to do it.
