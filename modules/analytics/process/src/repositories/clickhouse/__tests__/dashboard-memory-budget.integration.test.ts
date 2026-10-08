@@ -143,7 +143,7 @@ async function seedInChunks(
       query_params: { ...query_params, offset, chunk: Math.min(SEED_CHUNK, TRACE_COUNT - offset) },
       clickhouse_settings: {
         max_threads: 1,
-        max_insert_threads: 1,
+        max_insert_threads: "1",
         max_block_size: "2048",
         min_insert_block_size_rows: "4096",
         min_insert_block_size_bytes: "1000000",
