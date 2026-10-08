@@ -22,7 +22,7 @@ export const WORKFLOW_LIFECYCLE_PIPELINE_NAME = "workflow_lifecycle" as const;
 export const WORKFLOW_AGGREGATE_TYPE = "workflow" as const;
 
 export const WORKFLOW_CREATED_EVENT_VERSION = "2026-09-29" as const;
-export const RECORD_WORKFLOW_CREATED_COMMAND_TYPE = "lw.workflow.record_created" as const;
+const RECORD_WORKFLOW_CREATED_COMMAND_TYPE = "lw.workflow.record_created" as const;
 
 export const workflowCreatedEventSchema = z.object({
   ...EventSchema.shape,
@@ -33,8 +33,7 @@ export const workflowCreatedEventSchema = z.object({
 export type WorkflowCreatedEvent = z.infer<typeof workflowCreatedEventSchema>;
 
 export const WORKFLOW_VERSION_SAVED_EVENT_VERSION = "2026-10-07" as const;
-export const RECORD_WORKFLOW_VERSION_SAVED_COMMAND_TYPE =
-  "lw.workflow.record_version_saved" as const;
+const RECORD_WORKFLOW_VERSION_SAVED_COMMAND_TYPE = "lw.workflow.record_version_saved" as const;
 
 export const workflowVersionSavedEventSchema = z.object({
   ...EventSchema.shape,
@@ -42,10 +41,10 @@ export const workflowVersionSavedEventSchema = z.object({
   version: z.literal(WORKFLOW_VERSION_SAVED_EVENT_VERSION),
   data: workflowVersionSavedEventDataSchema,
 });
-export type WorkflowVersionSavedEvent = z.infer<typeof workflowVersionSavedEventSchema>;
+type WorkflowVersionSavedEvent = z.infer<typeof workflowVersionSavedEventSchema>;
 
 export const WORKFLOW_ARCHIVED_EVENT_VERSION = "2026-10-08" as const;
-export const RECORD_WORKFLOW_ARCHIVED_COMMAND_TYPE = "lw.workflow.record_archived" as const;
+const RECORD_WORKFLOW_ARCHIVED_COMMAND_TYPE = "lw.workflow.record_archived" as const;
 
 export const workflowArchivedEventSchema = z.object({
   ...EventSchema.shape,
@@ -53,7 +52,7 @@ export const workflowArchivedEventSchema = z.object({
   version: z.literal(WORKFLOW_ARCHIVED_EVENT_VERSION),
   data: workflowArchivedEventDataSchema,
 });
-export type WorkflowArchivedEvent = z.infer<typeof workflowArchivedEventSchema>;
+type WorkflowArchivedEvent = z.infer<typeof workflowArchivedEventSchema>;
 export type WorkflowLifecycleEvent =
   | WorkflowCreatedEvent
   | WorkflowVersionSavedEvent

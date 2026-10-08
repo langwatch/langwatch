@@ -21,7 +21,7 @@ import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-
 import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 
 /** Everything the hosted MCP endpoint needs from the process that mounts it. */
-export type HostedMcpDependencies = Readonly<{
+type HostedMcpDependencies = Readonly<{
   /** Session records, the replica relay, OAuth codes and clients, from one tier. */
   repositories: HostedMcpRepositories;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;

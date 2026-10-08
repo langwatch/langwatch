@@ -1,11 +1,11 @@
 import type { ModelProvider, ModelProviderWriteInput } from "@langwatch/model-provider-contract";
 
-export type ProviderModelsForWrite = {
+type ProviderModelsForWrite = {
   customModels: ModelProvider["customModels"];
   customEmbeddingsModels: ModelProvider["customEmbeddingsModels"];
 };
 
-export type ProviderRateLimitsForWrite = {
+type ProviderRateLimitsForWrite = {
   rateLimitRpm: number | null;
   rateLimitTpm: number | null;
   rateLimitRpd: number | null;

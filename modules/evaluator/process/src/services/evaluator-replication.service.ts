@@ -15,7 +15,7 @@ import {
  * workflow is copied with the studio DSL and version history the Workflow
  * feature keeps, none of which the Evaluator feature reaches into.
  */
-export type EvaluatorReplicationMembers = Readonly<{
+type EvaluatorReplicationMembers = Readonly<{
   /**
    * Clones the workflow into the target project and answers the new workflow
    * id. Refuses a workflow with no saved version — an evaluator created
@@ -31,7 +31,7 @@ export type EvaluatorReplicationMembers = Readonly<{
 }>;
 
 /** One replication, from the source project into the target. */
-export type EvaluatorCopyCommand = Readonly<{
+type EvaluatorCopyCommand = Readonly<{
   evaluators: {
     findById(input: { id: string; projectId: string }): Promise<Evaluator | undefined>;
     create(input: {

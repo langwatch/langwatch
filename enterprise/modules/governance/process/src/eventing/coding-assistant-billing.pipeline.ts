@@ -26,7 +26,7 @@ import {
 import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 
-export type CodingAssistantBillingDefinition = StaticPipelineDefinition<
+type CodingAssistantBillingDefinition = StaticPipelineDefinition<
   CodingAssistantBillingRecordedEvent & Event,
   Record<string, Projection>,
   RegisteredCommand
@@ -48,7 +48,7 @@ const RecordCodingAssistantBillingCommand = defineCommand({
 });
 
 /** A fact-only pipeline: governance records it, trace folds it; nothing here projects. */
-export function buildCodingAssistantBillingPipeline(): CodingAssistantBillingDefinition {
+function buildCodingAssistantBillingPipeline(): CodingAssistantBillingDefinition {
   return definePipeline({
     name: CODING_ASSISTANT_BILLING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: CODING_ASSISTANT_BILLING_AGGREGATE_TYPE }),

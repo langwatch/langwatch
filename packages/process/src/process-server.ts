@@ -2,7 +2,7 @@ import { RawHttpHost, RawSocketHost, type TransportPeers, WebSocketHost } from "
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import { ModuleApiToken } from "@langwatch/module";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
-import { hostedMembers, openStores, type ProcessMemberSource } from "@langwatch/process-stores";
+import { hostedStores, openStores, type ProcessMemberSource } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
@@ -204,7 +204,7 @@ export class ProcessServer implements ProcessBoot {
           }),
         );
       }
-      this.server.with(hostedMembers(members));
+      this.server.with(hostedStores(members));
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;
       if (hosted) this.server.with({ name: "raw http doors", stop: () => hosted.close() });

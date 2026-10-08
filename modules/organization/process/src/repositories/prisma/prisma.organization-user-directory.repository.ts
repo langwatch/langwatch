@@ -6,9 +6,9 @@ import { OrganizationUserDirectoryRepository } from "../organization-user-direct
 type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
 
 /**
- * The organization's own reads of the `User` table: an invited address, the
- * legacy verified-email column, and member display names — read narrowly
- * through this module's own repository, as every module does.
+ * The organization's own reads of the `User` table: an invited address and the
+ * legacy verified-email column, read narrowly through this module's own
+ * repository, as every module does.
  */
 export class PrismaOrganizationUserDirectoryRepository extends OrganizationUserDirectoryRepository {
   static create(
@@ -36,15 +36,5 @@ export class PrismaOrganizationUserDirectoryRepository extends OrganizationUserD
       select: { email: true, emailVerified: true },
     });
     return row?.emailVerified ? (row.email ?? null) : null;
-  }
-
-  /** Display names for a page of user ids the organization already vouches for. */
-  async findUserNames(
-    userIds: readonly string[],
-  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]> {
-    return this.database.user.findMany({
-      where: { id: { in: [...userIds] } },
-      select: { id: true, name: true },
-    });
   }
 }

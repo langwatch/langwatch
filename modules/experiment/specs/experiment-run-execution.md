@@ -181,7 +181,7 @@ domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), 
   evaluator reporting (`EvaluationApi.reportEvaluation`), sandbox key (`ExperimentRunSandboxCredentialService`,
   minted per cell and shared through ApiKey's Redis), connected dispatch (`AgentApi.callConnected`),
   attachments (`ExperimentAttachmentInputService`), and the abort flag.
-- **The api's start:** `SuiteApi.assertConnectedAgentsRunnable`, execution-data loading, and the plan:
+- **The api's start:** `AgentApi.assertConnectedAgentsRunnable`, execution-data loading, and the plan:
   phase-1 cells from `ExperimentCellPlanService`, phase-2 cells and setup skips from the comparison
   planner's configuration half.
 - **Deleted (round 5c):**

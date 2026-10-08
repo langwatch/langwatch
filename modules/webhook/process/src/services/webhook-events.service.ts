@@ -9,7 +9,7 @@ import {
 import { parseSpendEventId, spendStatusesForTypes } from "../rules/webhook-spend-event-id.rules.ts";
 import type { WebhookEnvelopeService } from "./webhook-envelope.service.ts";
 
-export type WebhookEventsServiceOptions = {
+type WebhookEventsServiceOptions = {
   projects: Pick<ProjectApi, "listIdsByOrganization">;
   /** Gateway owns gateway_spend; webhook reads its emitted events through gateway's Api. */
   spend: Pick<GatewayApi, "listSpendEventsAcrossTenants" | "findSpendEventAcrossTenants">;

@@ -12,6 +12,7 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 import type { OpsApi } from "./ops.api.ts";
@@ -56,6 +57,11 @@ export const opsConfig = Config.define((c) => ({
   serviceVersion,
   otelResourceAttributes,
 }));
+
+/** Posts the new-bug-report alert; absent, intake stays silent. */
+export const opsSecrets = {
+  slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
+} as const;
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;
 

@@ -15,7 +15,7 @@ import type {
 } from "../api-key.repository.ts";
 
 /** The key rows, plus the raw write the fenced revoke needs. */
-export type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey"> & Pick<PrismaClient, "$executeRaw">;
+type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey"> & Pick<PrismaClient, "$executeRaw">;
 
 /** Prisma persistence is private to the API-key server package. */
 export class PrismaApiKeyRepository implements ApiKeyRepository {

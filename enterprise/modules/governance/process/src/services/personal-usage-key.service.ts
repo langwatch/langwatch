@@ -23,7 +23,7 @@ type PersonalUsageKeyQuery = {
   window?: { startMs: number; endMs: number };
 };
 
-export type PersonalUsageKeyServiceOptions = {
+type PersonalUsageKeyServiceOptions = {
   projects: Pick<ProjectApi, "findIdentity" | "findInternal">;
   organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId">;
   /** Whether the asking member is the personal workspace's owner. */

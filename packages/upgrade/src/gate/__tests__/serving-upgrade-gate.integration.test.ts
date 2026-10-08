@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createLedgerTables } from "../../ledger-tables.ts";
 import type { ReleaseTreeSteps } from "../../manifest/stamp.ts";
+import { readImageCodeSteps } from "../image-code-steps.ts";
 import { UPGRADE_COMMAND } from "../serving-gate.ts";
 import { gatePoolConfig, upgradeGateOver } from "../serving-upgrade-gate.ts";
 
@@ -43,6 +44,12 @@ afterEach(async () => {
   await scratch.admin.end();
 });
 
+const KIND_BY_PREFIX: Record<string, string> = {
+  prisma: "postgres-schema",
+  clickhouse: "clickhouse-schema",
+};
+const kindOf = (id: string) => KIND_BY_PREFIX[id.slice(0, id.indexOf(":"))] ?? "data";
+
 async function recordSteps(steps: Record<string, "done" | "pending">): Promise<void> {
   const { postgres } = scratch;
   await postgres.query(`CREATE TABLE "_prisma_migrations" ("migration_name" TEXT NOT NULL)`);
@@ -51,7 +58,7 @@ async function recordSteps(steps: Record<string, "done" | "pending">): Promise<v
     await postgres.query(
       `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
        VALUES ($1, $2, 'blocking', $3, now())`,
-      [id, id.startsWith("prisma:") ? "postgres-schema" : "clickhouse-schema", status],
+      [id, kindOf(id), status],
     );
   }
 }
@@ -60,10 +67,12 @@ function gateFor({
   role,
   withClickHouse = true,
   firstInstall = async () => 0,
+  tree = TREE,
 }: {
   role: "api" | "worker";
   withClickHouse?: boolean;
   firstInstall?: () => Promise<number>;
+  tree?: ReleaseTreeSteps;
 }) {
   return upgradeGateOver({
     role,
@@ -72,7 +81,7 @@ function gateFor({
       scratch.closed = true;
       await scratch.postgres.end();
     },
-    tree: TREE,
+    tree,
     release: null,
     withClickHouse,
     processId: `test:${role}`,
@@ -176,6 +185,42 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
       expect(verdict).toMatchObject({ admitted: false, outcome: "behind" });
       expect(verdict.admitted ? "" : verdict.refusal).toContain(UPGRADE_COMMAND);
       expect(runs).toBe(0);
+    });
+  });
+
+  describe("given the image's committed code step list", () => {
+    const codeSteps = readImageCodeSteps();
+    const tree = { ...TREE, codeSteps };
+    const blocking = codeSteps.filter((step) => step.mode === "blocking").map(({ id }) => id);
+    const background = codeSteps.filter((step) => step.mode !== "blocking").map(({ id }) => id);
+    const schemaDone = { [PRISMA]: "done", [GOOSE]: "done" } as const;
+    const pendingOf = (ids: string[]) =>
+      Object.fromEntries(ids.map((id) => [id, "pending" as const]));
+    const doneOf = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, "done" as const]));
+
+    /** @scenario "A serving process over a real ledger gates on the generated code step list" */
+    it("refuses the worker naming the list's pending blocking step", async () => {
+      expect(blocking.length).toBeGreaterThan(0);
+      await recordSteps({ ...schemaDone, ...pendingOf(blocking) });
+
+      const verdict = await gateFor({ role: "worker", tree }).admit();
+
+      expect(verdict).toMatchObject({ admitted: false, outcome: "behind", outstanding: blocking });
+    });
+
+    /** @scenario "A serving process over a real ledger gates on the generated code step list" */
+    it("admits the api once they are done and declares the background steps", async () => {
+      await recordSteps({ ...schemaDone, ...doneOf(blocking) });
+      const gate = gateFor({ role: "api", tree });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      const { rows } = await scratch.postgres.query(
+        `SELECT "steps" FROM "_langwatch_serving_roster"`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].steps).toEqual(expect.arrayContaining(background));
+
+      await gate.release();
     });
   });
 });

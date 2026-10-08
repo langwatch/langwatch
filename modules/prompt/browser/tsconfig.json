@@ -24,9 +24,6 @@
       "path": "../../api-key/client/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
@@ -37,6 +34,9 @@
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
     },
     {
       "path": "../../experiment/contract/tsconfig.build.json"

@@ -254,7 +254,7 @@ export interface TopicClusteringOutcomeCommands {
  * clustering execution that OWNS the failure taxonomy (the app-layer
  * composition wires it in); the intent handler only consumes its verdict.
  */
-export type TopicClusteringErrorClassifier = (error: unknown) => ClassifiedClusteringError;
+type TopicClusteringErrorClassifier = (error: unknown) => ClassifiedClusteringError;
 
 /**
  * The page-execution metrics the executor reports (ADR-054). The concrete

@@ -34,7 +34,7 @@ const logger = createLogger("langwatch:experiment:run-results-writer");
 /**
  * Where a completed run writes its cells so an open page can show them.
  */
-export interface RunResultsPersistence {
+interface RunResultsPersistence {
   experiments: Pick<ExperimentService, "getWorkbenchState" | "recordWorkbenchRunResults">;
   /** Who the workbench write is attributed to in the version history. */
   actor: WorkbenchActor;
@@ -43,7 +43,7 @@ export interface RunResultsPersistence {
 /**
  * What a streaming run feeds its frames into so its cells reach the board.
  */
-export interface RunResultsWriter {
+interface RunResultsWriter {
   /**
    * Record one frame. The cells are written when the run reports it ended,
    * which is `done` or `stopped`.

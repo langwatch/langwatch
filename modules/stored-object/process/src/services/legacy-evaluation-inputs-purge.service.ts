@@ -10,7 +10,7 @@ import { LEGACY_EVALUATION_INPUTS_PURPOSE } from "../rules/legacy-evaluation-inp
 
 const logger = createLogger("langwatch:stored-object:legacy-evaluation-inputs-purge");
 
-export type LegacyEvaluationInputsPurgeReport = Readonly<{
+type LegacyEvaluationInputsPurgeReport = Readonly<{
   scanned: number;
   bytesDeleted: number;
   rowsDeleted: number;

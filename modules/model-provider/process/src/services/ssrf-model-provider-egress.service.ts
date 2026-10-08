@@ -13,7 +13,7 @@ export type ModelProviderEgressResponse = {
 };
 
 /** What one credential probe asks of the network. */
-export type ModelProviderEgressRequest = {
+type ModelProviderEgressRequest = {
   method: string;
   headers: Record<string, string>;
   body?: string;

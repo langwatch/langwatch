@@ -1,7 +1,7 @@
 import type { TraceApi } from "@langwatch/trace-contract";
 
 /** What one viewer may see of one project: the generated titles travel under content visibility. */
-export type CodingAgentViewerVisibility = Readonly<{
+type CodingAgentViewerVisibility = Readonly<{
   canReadCapturedContent: boolean;
   canSeeCosts: boolean;
 }>;

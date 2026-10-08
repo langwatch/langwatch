@@ -68,7 +68,7 @@ export const apiKeyEventing = defineEventingModule({
   },
 });
 
-export interface AgentSandboxMaintenancePipelineDeps {
+interface AgentSandboxMaintenancePipelineDeps {
   sandboxKeyReap: AgentSandboxKeyReapDeps;
   /** The hourly sweep over CLI login keys whose session ran out. */
   cliLoginKeyReap: CliLoginKeyReapDeps;
@@ -78,7 +78,7 @@ export interface AgentSandboxMaintenancePipelineDeps {
 // left behind, and the CLI login key a device session stopped refreshing. Neither is retired by
 // anything else, so both are scheduled sweeps rather than event-driven. No events; costs nothing
 // beyond scheduled wake.
-export function buildAgentSandboxMaintenancePipeline({
+function buildAgentSandboxMaintenancePipeline({
   sandboxKeyReap,
   cliLoginKeyReap,
 }: AgentSandboxMaintenancePipelineDeps): StaticPipelineDefinition<never> {

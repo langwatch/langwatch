@@ -36,7 +36,7 @@ type LoadedExecutionData = Extract<
  * `POST /api/experiments/:slug/run` and the UI-action backend executor, so a run started
  * with no browser attached goes through exactly the load path a CI run does.
  */
-export interface SavedStateExecution {
+interface SavedStateExecution {
   experiment: { id: string; slug: string };
   workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>;
   state: EvaluationsV3State;

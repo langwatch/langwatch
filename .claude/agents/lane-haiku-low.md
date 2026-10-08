@@ -1,17 +1,17 @@
 ---
-name: lane-sonnet
+name: lane-haiku-low
 description: |
-  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29): high effort: big scoped implementation lanes with a clear acceptance test. At high effort Sonnet costs about what Opus does, so judgement-heavy work goes to lane-opus instead.
+  The lane agent pinned to Haiku 5.5 (Alex, 2026-10-08): low effort: file inventories, narrow validation, formatting-only and repetitive checks.
   A bounded implementation lane in the LangWatch coordinator/lane workflow. Use
   when spawning work that has a manifest under .claude/manifests/ - the lane
   edits only its owned paths, runs only scoped checks, and stops with a handoff
   a fresh agent can continue from.
   <example>Spawn a lane for .claude/manifests/cv2-port-word.md</example>
-  <example>Start the module conversion task on Sonnet 5.5</example>
-  Spawn WITHOUT a model parameter: this agent pins Sonnet 5.5, and passing
-  `model: "sonnet"` overrides it to Sonnet 5 (Alex, 2026-09-29).
-model: claude-sonnet-5-5
-effort: high
+  <example>Inventory every caller of X on Haiku 5.5</example>
+  Spawn WITHOUT a model parameter: this agent pins Haiku 5.5, and passing
+  `model: "haiku"` may resolve to an older Haiku.
+model: claude-haiku-5-5
+effort: low
 tools:
   - Read
   - Write

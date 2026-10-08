@@ -13,7 +13,7 @@ import type {
 export const nlpLambdaFleetSecret = Secret.load("LANGWATCH_NLP_LAMBDA_CONFIG", { optional: true });
 
 /** An engine whose stream and runtime are already whole: one address, or none usable. */
-export type WorkflowSingleEngine = Readonly<{
+type WorkflowSingleEngine = Readonly<{
   kind: "single";
   stream: WorkflowStudioStream;
   runtime: WorkflowNlpRuntime;
@@ -22,7 +22,7 @@ export type WorkflowSingleEngine = Readonly<{
 }>;
 
 /** The AWS channels of a project-function engine; the app resolves ARNs over them. */
-export type WorkflowLambdaEngine = Readonly<{
+type WorkflowLambdaEngine = Readonly<{
   kind: "lambda";
   resolver: NlpLambdaArnResolver;
   streamInvoke: NlpLambdaStreamInvoke;

@@ -65,7 +65,7 @@ const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
  *  in `topicClusteringProcessManager`, ADR-052 "Approved builder API", like automations. */
-export interface TopicClusteringProcessingPipelineDeps {
+interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Postgres run-history read model (audit; bounded, newest first). */

@@ -10,7 +10,7 @@ import {
   workflowAgentFieldsSchema,
 } from "@langwatch/agent-contract";
 
-export type AgentWorkflowFieldsServiceOptions = {
+type AgentWorkflowFieldsServiceOptions = {
   agents: {
     listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]>;
     updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void>;

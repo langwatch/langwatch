@@ -87,7 +87,7 @@ export const experimentRunProcessingEventing = defineEventingModule({
   connect: ({ app, commands }) => app.connectCommands(commands),
 });
 
-export interface ClickhouseExperimentRunProcessingRepository {
+interface ClickhouseExperimentRunProcessingRepository {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** Runs a requested workflow evaluation; hosted only where the pipeline is drained. */

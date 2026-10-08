@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildProcessStores, hostedMembers } from "../src/create-members.ts";
+import { buildProcessStores, hostedStores } from "../src/create-members.ts";
 import type { ProcessConfig } from "../src/index.ts";
 
 /** Port 1 refuses every connection, so a query fails fast rather than waiting on a timeout. */
@@ -58,7 +58,7 @@ describe("given the stores hosted on a server", () => {
       try {
         members.read("prisma");
 
-        await expect(hostedMembers(members).ready?.()).rejects.toMatchObject({
+        await expect(hostedStores(members).ready?.()).rejects.toMatchObject({
           code: "store_not_answering",
         });
       } finally {

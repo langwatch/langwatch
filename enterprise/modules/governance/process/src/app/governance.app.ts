@@ -305,7 +305,7 @@ const logger = createLogger("langwatch:governance");
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
-export interface GovernanceAppDependencies {
+interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered webhook endpoints, from the delivery intent only. */
   webhooks: Pick<WebhookApi, "requestDelivery">;
   /**

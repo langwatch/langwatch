@@ -56,7 +56,7 @@ const DETAIL: Record<SubsystemProbeReason, string> = {
 };
 
 /** The credential and project the monitoring probes run as. */
-export interface SubsystemProbeCredential {
+interface SubsystemProbeCredential {
   readonly authToken: string;
   findProjectIds(): Promise<string[]>;
 }

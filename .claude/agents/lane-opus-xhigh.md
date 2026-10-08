@@ -1,17 +1,17 @@
 ---
-name: lane-sonnet
+name: lane-opus-xhigh
 description: |
-  The lane agent pinned to Sonnet 5.5 (Alex, 2026-09-29): high effort: big scoped implementation lanes with a clear acceptance test. At high effort Sonnet costs about what Opus does, so judgement-heavy work goes to lane-opus instead.
+  The lane agent pinned to Opus 5.5 (Alex, 2026-09-22): xhigh effort, for the hardest lanes: architecture cuts, security, cross-module integration.
   A bounded implementation lane in the LangWatch coordinator/lane workflow. Use
   when spawning work that has a manifest under .claude/manifests/ - the lane
   edits only its owned paths, runs only scoped checks, and stops with a handoff
   a fresh agent can continue from.
   <example>Spawn a lane for .claude/manifests/cv2-port-word.md</example>
-  <example>Start the module conversion task on Sonnet 5.5</example>
-  Spawn WITHOUT a model parameter: this agent pins Sonnet 5.5, and passing
-  `model: "sonnet"` overrides it to Sonnet 5 (Alex, 2026-09-29).
-model: claude-sonnet-5-5
-effort: high
+  <example>Start the module conversion task with model sonnet</example>
+  Always pass an explicit model: the manifest names one and the coordinator
+  enforces it at spawn.
+model: claude-opus-5-5
+effort: xhigh
 tools:
   - Read
   - Write

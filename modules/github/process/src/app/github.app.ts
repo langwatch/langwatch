@@ -159,14 +159,14 @@ type GithubComposition = Readonly<{
 }>;
 
 /** What the fleet-wide branch sweep needs beside its rows. */
-export type GithubBranchMaintenanceComposition = Readonly<{
+type GithubBranchMaintenanceComposition = Readonly<{
   repositories: GithubRepositories;
   api: GithubAppClient;
   hostConfig?: { host?: string };
 }>;
 
 /** What branch demand needs beside its rows: the project fact the demand call reads. */
-export type GithubBranchDemandComposition = Readonly<{
+type GithubBranchDemandComposition = Readonly<{
   repositories: GithubRepositories;
   api: GithubAppClient;
   hostConfig?: { host?: string };
@@ -200,7 +200,7 @@ class ComposedGithubBranchDemand {
   }
 }
 
-export type GithubBranchDemand = Pick<
+type GithubBranchDemand = Pick<
   ComposedGithubBranchDemand,
   "canMapRepositoryHost" | "requestBranchMapping"
 >;

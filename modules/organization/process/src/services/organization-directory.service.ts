@@ -2,20 +2,14 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 
 import type { OrganizationUserDirectoryRepository } from "../repositories/organization-user-directory.repository.ts";
 
-/**
- * One person's own verified address, and the display names a pending list
- * renders. Both are the identity directory's, read through this process.
- */
+/** One person's own verified address, the identity directory's, read through this process. */
 export interface OrganizationDirectory {
   findVerifiedEmail(input: Readonly<{ userId: string }>): Promise<string | null>;
   findProvenAddresses(input: Readonly<{ userId: string }>): Promise<string[]>;
-  listUserNames(
-    input: Readonly<{ userIds: readonly string[] }>,
-  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]>;
 }
 
 /**
- * One person's verified address, and the display names a pending list renders.
+ * One person's verified address.
  * The address comes from the SAME identity application `user.*` answers from;
  * the fallback is the legacy verified column.
  */
@@ -48,15 +42,5 @@ export class OrganizationDirectoryService implements OrganizationDirectory {
     if (verified.kind === "resolved") return verified.emails.map(({ value }) => value);
     const legacy = await this.options.userDirectory.findLegacyVerifiedEmail(userId);
     return legacy === null ? [] : [legacy];
-  }
-
-  // Names only: the local part of a requester's address is not the
-  // organization's business until they are a member of it.
-  listUserNames({
-    userIds,
-  }: Readonly<{ userIds: readonly string[] }>): Promise<
-    readonly Readonly<{ id: string; name: string | null }>[]
-  > {
-    return this.options.userDirectory.findUserNames(userIds);
   }
 }

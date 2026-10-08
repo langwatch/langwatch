@@ -17,7 +17,7 @@ export function readbackHeaders(
 }
 
 /** The OTLP body a canary is sent as, written out rather than borrowed. */
-export type CanaryOtelPayload = Readonly<{
+type CanaryOtelPayload = Readonly<{
   resourceSpans: readonly {
     resource: { attributes: readonly { key: string; value: { stringValue: string } }[] };
     scopeSpans: readonly {
@@ -36,7 +36,7 @@ export type CanaryOtelPayload = Readonly<{
   }[];
 }>;
 
-export type RestCanaryPayload = Readonly<{
+type RestCanaryPayload = Readonly<{
   spans: readonly Record<string, unknown>[];
   metadata: { canary: true };
 }>;

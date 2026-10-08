@@ -108,9 +108,7 @@ type WebhookTestDispatchInput = {
   isTestFire: boolean;
 };
 
-export type WebhookTestDispatch = (
-  input: WebhookTestDispatchInput,
-) => Promise<DeliveryDispatchResult>;
+type WebhookTestDispatch = (input: WebhookTestDispatchInput) => Promise<DeliveryDispatchResult>;
 
 /** What the process composes this feature's application from. */
 export interface WebhookAppDependencies {
@@ -491,7 +489,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
  * What one delivery attempt amounted to. - `success`: the receiver has it. Clears the
  * endpoint's failure streak. - `retryable`: try again along the ladder.
  */
-export type WebhookDispatchVerdict = "success" | "retryable" | "terminal";
+type WebhookDispatchVerdict = "success" | "retryable" | "terminal";
 
 export interface WebhookDispatchResult {
   verdict: WebhookDispatchVerdict;

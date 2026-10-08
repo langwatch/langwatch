@@ -9,7 +9,7 @@ import type {
   CodingAgentScopePermissions,
 } from "./coding-agent-scope-permissions.service.ts";
 
-export interface CallerProjectScope {
+interface CallerProjectScope {
   /** Projects the caller may read. Work outside it never appears. */
   permittedProjectIds: string[];
   /** The subset of those the caller may also price. */
@@ -18,7 +18,7 @@ export interface CallerProjectScope {
   projects: Record<string, CodingAgentContributorProject>;
 }
 
-export interface CodingAgentCallerScopeDependencies {
+interface CodingAgentCallerScopeDependencies {
   directory: CodingAgentCallerScopeDirectory;
   permissions: CodingAgentScopePermissions;
 }

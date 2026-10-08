@@ -54,4 +54,18 @@ export const identityProcessModule: PublishedProcessModule<
         return dryRun ? { wouldReopen: reopened } : { reopened };
       },
     }),
+    // An older pod's system-migrations pass re-finalizes reopened accounts:
+    // sweep again once none serves.
+    defineMigrationStep({
+      id: "identity:reopen-unproven-accounts-after-rollout",
+      kind: "data",
+      mode: "background",
+      description:
+        "Returns accounts an older image finalized during the rollout to the legacy sign-in path.",
+      needsOldWritersGone: true,
+      run: async ({ dryRun }) => {
+        const reopened = await repositories.migration.reopenUnprovenAccounts({ dryRun });
+        return dryRun ? { wouldReopen: reopened } : { reopened };
+      },
+    }),
   ]);

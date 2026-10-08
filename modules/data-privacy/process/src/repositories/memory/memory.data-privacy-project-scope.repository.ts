@@ -19,11 +19,6 @@ export class MemoryDataPrivacyProjectScopeRepository implements DataPrivacyProje
     this.#rows = new Map(projects.map((project) => [project.projectId, project]));
   }
 
-  /** Puts, moves or archives a project, as a row written by project. */
-  put(project: DataPrivacyProjectScope): void {
-    this.#rows.set(project.projectId, project);
-  }
-
   async find({ projectId }: { projectId: string }): Promise<DataPrivacyProjectScope | null> {
     return this.#rows.get(projectId) ?? null;
   }

@@ -62,6 +62,7 @@ import {
   type UsageReportAnswer,
   opsBrowserConfig,
   opsConfig,
+  opsSecrets,
   type AdminIdentity,
   type AggregateDiscovery,
   type AggregateEventView,
@@ -244,7 +245,6 @@ import {
 } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
-import { Secret } from "@langwatch/secrets/secret";
 import {
   credentialsSecret,
   credentialsSecretPrevious,
@@ -768,8 +768,7 @@ export class OpsModule implements OpsApi {
   static readonly config = opsConfig;
   static readonly secrets = {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
-    /** Posts the new-bug-report alert; absent, intake stays silent. */
-    slackBugReportsBotToken: Secret.load("SLACK_BUG_REPORTS_BOT_TOKEN", { optional: true }),
+    slackBugReportsBotToken: opsSecrets.slackBugReportsBotToken,
     /** The stores' own keys: credentials-reseal moves values from the previous to the current. */
     credentials: credentialsSecret,
     credentialsFallback: sessionSecret,
