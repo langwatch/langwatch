@@ -410,16 +410,6 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
   }
 
-  async claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    const organization = this.memory.organizations.get(input.organizationId);
-    if (!organization || organization.stripeCustomerId) return false;
-    organization.stripeCustomerId = input.billingCustomerId;
-    return true;
-  }
-
   async getPersonalWorkspace(input: {
     userId: string;
     organizationId: string;

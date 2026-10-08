@@ -56,6 +56,14 @@ function doorWith({
     return accounts[email] ?? null;
   });
   const service = OrganizationInvitationDoorService.create({
+    billing: {
+      createSeatCheckout: async () => {
+        throw new Error("this suite opens no seat checkout");
+      },
+    },
+    getOldestTeamId: async () => {
+      throw new Error("this suite opens no seat checkout");
+    },
     invitations: createApiFixture<OrganizationInvitations>({
       create: create as never,
       findUserIdByEmail,

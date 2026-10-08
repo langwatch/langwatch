@@ -33,6 +33,14 @@ function door(options: { beyondCaller?: string[] }) {
     createPaymentPending,
     assertWithinCaller,
     service: OrganizationInvitationDoorService.create({
+      billing: {
+        createSeatCheckout: async () => {
+          throw new Error("this suite opens no seat checkout");
+        },
+      },
+      getOldestTeamId: async () => {
+        throw new Error("this suite opens no seat checkout");
+      },
       invitations,
       directory: { findProvenAddresses: async () => [] },
       signals,

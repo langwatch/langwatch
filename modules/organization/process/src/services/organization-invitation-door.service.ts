@@ -1,5 +1,6 @@
 /** Invitation ceremony: non-fatal paths preserve membership as durable outcome. */
 
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import {
   SignedInAddressRequiredError,
   InviteAlreadyAcceptedError,
@@ -21,6 +22,8 @@ import {
   type OrganizationPendingInviteApplied,
   type OrganizationUserRole,
   type PendingInvitationsForCaller,
+  type OrganizationApiSeatCheckoutInput,
+  type OrganizationSeatCheckoutRedirect,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 
@@ -49,6 +52,10 @@ interface OrganizationInvitationDoorDependencies {
   readonly ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   /** The sender-scoped per-hour creation counter, spent before a batch is written. */
   readonly creationThrottle: Pick<InviteCreationThrottleService, "assertCreationAllowed">;
+  /** Billing's seat checkout, answering the pending subscription invitations are held on. */
+  readonly billing: Pick<BillingApi, "createSeatCheckout">;
+  /** The organisation's oldest team, where a checkout's invitations land, as billing's did. */
+  getOldestTeamId(input: Readonly<{ organizationId: string }>): Promise<string>;
   /** Provisions the accepting person's personal workspace for this tenant. */
   ensurePersonalWorkspace(
     input: Readonly<{
@@ -162,6 +169,34 @@ export class OrganizationInvitationDoorService {
       caller: grantCallerOf(by),
       grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
     });
+  }
+
+  /**
+   * Round 50 (C2 A): the ceiling first, so a refused invitation opens no checkout; then
+   * billing's checkout; then the invitations, held payment pending on the subscription it opened.
+   */
+  async checkoutSeats(
+    input: OrganizationApiSeatCheckoutInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationSeatCheckoutRedirect> {
+    const { organizationId } = input;
+    const teamIds =
+      input.invites.length > 0 ? await this.deps.getOldestTeamId({ organizationId }) : "";
+    const invites = input.invites.map(({ email, role }) => ({ email, role, teamIds }));
+    if (invites.length > 0) await this.checkInvitesWithinCaller({ organizationId, invites }, by);
+
+    const { url, subscriptionId } = await this.deps.billing.createSeatCheckout({
+      organizationId,
+      baseUrl: input.baseUrl,
+      membersToAdd: input.totalSeats,
+      ...(input.currency === undefined ? {} : { currency: input.currency }),
+      ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
+      customerEmail: by.email ?? null,
+    });
+    if (invites.length > 0) {
+      await this.deps.invitations.createPaymentPending({ organizationId, subscriptionId, invites });
+    }
+    return { url };
   }
 
   /** Payment is no barrier: the inviter's ceiling is asked here, as for any invitation. */

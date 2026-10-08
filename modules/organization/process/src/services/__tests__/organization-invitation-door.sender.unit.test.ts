@@ -20,6 +20,14 @@ describe("given an administrator creating a batch", () => {
         invites: [],
       }));
       const service = OrganizationInvitationDoorService.create({
+        billing: {
+          createSeatCheckout: async () => {
+            throw new Error("this suite opens no seat checkout");
+          },
+        },
+        getOldestTeamId: async () => {
+          throw new Error("this suite opens no seat checkout");
+        },
         invitations: createApiFixture<OrganizationInvitations>({ create }),
         directory: { findProvenAddresses: async () => [] },
         signals: createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() }),

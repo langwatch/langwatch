@@ -14,7 +14,9 @@ import { MemoryStripePricesChannel } from "../../channels/memory/memory.stripe-p
 import { MemoryStripeSubscriptionsChannel } from "../../channels/memory/memory.stripe-subscriptions.channel.ts";
 import { MemoryStripeWebhooksChannel } from "../../channels/memory/memory.stripe-webhooks.channel.ts";
 import type { RecordBillingAuditCommandData } from "../../eventing/billing-lifecycle.events.ts";
+import { MemoryBillingOrganizationRepository } from "../../repositories/memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import type { UsageReportingService } from "../../services/usage-reporting.service.ts";
@@ -68,9 +70,6 @@ function licensedAt(commitUsdCents: number) {
           (permission === "ops:manage" || permission === "ops:view")) ||
           (principal.id === VIEWER.id && permission === "ops:view")),
     },
-    organizations: createApiFixture<ConnectedBillingPeers["organizations"]>({
-      findSelfHostedCustomers: async () => [{ organizationId: ACME, organizationName: "Acme" }],
-    }),
   };
   return { asked, peers };
 }
@@ -90,7 +89,7 @@ function lifecycleRecording() {
   });
   const lifecycle = BillingLifecycleAnnouncerService.create({
     subscriptions: { findLastNonCancelled: async () => null },
-    organizations: { getAllMembers: async () => [] },
+    organizations: { findActiveMemberIds: async () => [] },
     resourceLimitAlerts: { notifyResourceLimitReached: async () => {} },
     planLimitAlerts: { notifyPlanLimitReached: async () => {} },
     billingOrganizations: { getOrganizationForBilling: async () => ({ outcome: "not_found" }) },
@@ -136,7 +135,23 @@ function billingApp({
   webhookSecret?: string;
 }) {
   const registry = licensedAt(commitUsdCents);
-  const repositories = MemoryBillingRepositories.create();
+  // Acme is a connected self-hosted customer on organization's shared table (C2 B).
+  const store = MemoryBillingStore.create();
+  store.organizations.set(ACME, {
+    id: ACME,
+    name: "Acme",
+    stripeCustomerId: null,
+    pricingModel: null,
+    currency: null,
+    license: null,
+    selfHostedCustomer: true,
+    teamIds: [],
+    signupData: {},
+  });
+  const repositories = {
+    ...MemoryBillingRepositories.create(),
+    organizations: MemoryBillingOrganizationRepository.create(store),
+  };
   const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
   const { lifecycle, audited } = lifecycleRecording();
   const app = BillingModule.assemble({

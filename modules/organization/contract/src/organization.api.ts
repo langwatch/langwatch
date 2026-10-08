@@ -55,7 +55,9 @@ import type {
 import type {
   OrganizationApiCreateInvitesInput,
   OrganizationApiInviteScope,
+  OrganizationApiSeatCheckoutInput,
   OrganizationApiUpdateTeamMemberRoleInput,
+  OrganizationSeatCheckoutRedirect,
 } from "./organization.trpc-schemas.ts";
 import type {
   EnrichedAuditLog,
@@ -570,10 +572,6 @@ export interface OrganizationApi {
   getWithAdministrators(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationWithAdministrators>;
-  /** Main's `updateSentPlanLimitAlert`. */
-  updateSentPlanLimitAlert(
-    input: Readonly<{ organizationId: string; sentAt: Instant }>,
-  ): Promise<void>;
   /** The licence and its expiry; the mint stamps `validatedAt` null, an activation now. */
   setLicense(
     input: Readonly<{
@@ -587,9 +585,6 @@ export interface OrganizationApi {
   clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
   /** The support contact set in settings, else the longest-seated enabled administrator's email. */
   findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
-  claimBillingCustomerId(
-    input: Readonly<{ organizationId: string; billingCustomerId: string }>,
-  ): Promise<boolean>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
   /** Main `personal-team-scope.ts:78-81`: the personal teams among the ids, archived too. */
   findPersonalTeamOwners(
@@ -745,6 +740,15 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<void>;
   /**
+   * Bounds the invitations by `by`, opens billing's seat checkout, then holds them payment
+   * pending against the subscription it opened (C2 A, Round 50). Refuses
+   * `grant_exceeds_caller_permissions` before any checkout opens.
+   */
+  createSeatCheckoutWithInvites(
+    input: OrganizationApiSeatCheckoutInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationSeatCheckoutRedirect>;
+  /**
    * Holds a seat checkout's invitations until it is paid, as main's billing did; an address
    * that already holds an open invitation here is skipped. `by` is who invited: nobody is
    * invited to more than they hold (checked before storing; acceptance after payment is `system`).
@@ -756,10 +760,6 @@ export interface OrganizationApi {
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
     by: OrganizationCaller,
-  ): Promise<void>;
-  /** Drops the held invitations of seat checkouts that were abandoned. */
-  cancelPaymentPendingInvites(
-    input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void>;
   /**
    * The seats an organization holds: full and lite members, live invitations
@@ -780,10 +780,6 @@ export interface OrganizationApi {
   reportLimitBlocked(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,
     by: OrganizationCaller,
-  ): Promise<void>;
-  /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
-  approvePaymentPendingInvites(
-    input: Readonly<{ subscriptionId: string; organizationId: string }>,
   ): Promise<void>;
 
   /** One team-role change, with the personal-team, plan and seat guards. */

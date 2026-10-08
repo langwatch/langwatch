@@ -4,7 +4,12 @@
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { subscriptionTrpc, currencyTrpc } from "@langwatch/enterprise-billing-contract";
+import type {
+  Currency,
+  currencyTrpc,
+  SubscriptionBillingInterval,
+  subscriptionTrpc,
+} from "@langwatch/enterprise-billing-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import type { Plan, SeatLimitInfo } from "@langwatch/entitlement-contract";
 
@@ -87,6 +92,19 @@ type BorrowedProcedures = {
   invite: {
     getOrganizationPendingInvites: {
       query: { input: OrganizationScope; output: PendingInviteRead[] };
+    };
+    /** A seat checkout and the invitations that motivated it: organization's door (C2 A). */
+    upgradeWithInvites: {
+      mutation: {
+        input: OrganizationScope & {
+          baseUrl: string;
+          currency?: Currency;
+          billingInterval?: SubscriptionBillingInterval;
+          totalSeats: number;
+          invites: { email: string; role: OrganizationUserRole }[];
+        };
+        output: { url: string | null };
+      };
     };
     createInvites: {
       mutation: {

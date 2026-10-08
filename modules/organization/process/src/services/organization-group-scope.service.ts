@@ -1,14 +1,18 @@
 import {
   OrganizationGroupService as OrganizationGroupServiceContract,
   type OrganizationGroupGrant,
-  type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+
+import type { OrganizationService } from "./organization.service.ts";
+
+/** The two organization reads a group scope's name needs, from the process service. */
+type GroupScopeOrganizations = Pick<OrganizationService, "listTeams" | "getBillingProfile">;
 
 /** Resolves the display names of group binding scopes for the group surfaces. */
 export class OrganizationGroupScopeService extends OrganizationGroupServiceContract {
   static create(dependencies: {
-    organizations: OrganizationService;
+    organizations: GroupScopeOrganizations;
     projects: ProjectApi;
   }): OrganizationGroupScopeService {
     return new OrganizationGroupScopeService(dependencies);
@@ -16,7 +20,7 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
 
   private constructor(
     private readonly dependencies: {
-      organizations: OrganizationService;
+      organizations: GroupScopeOrganizations;
       projects: ProjectApi;
     },
   ) {

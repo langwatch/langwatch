@@ -1,9 +1,9 @@
-import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { OrganizationGroupScopeService } from "../organization-group-scope.service.ts";
+import type { OrganizationService } from "../organization.service.ts";
 
 function teamGrant({ id, teamId }: { id: string; teamId: string }) {
   return {
@@ -25,7 +25,12 @@ describe("OrganizationGroupScopeService.resolveBindingScopeNames", () => {
         });
         const getTeam = vi.fn().mockRejectedValue(new Error("team not found"));
         const service = OrganizationGroupScopeService.create({
-          organizations: createApiFixture<OrganizationService>({ listTeams, getTeam }),
+          organizations: createApiFixture<
+            Pick<OrganizationService, "listTeams" | "getTeam" | "getBillingProfile">
+          >({
+            listTeams,
+            getTeam,
+          }),
           projects: createApiFixture<ProjectApi>(),
         });
 

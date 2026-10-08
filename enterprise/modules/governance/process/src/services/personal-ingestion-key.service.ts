@@ -27,7 +27,7 @@ import {
   type RotatedIngestionKey,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import { type OrganizationService, TeamNotFoundError } from "@langwatch/organization-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 
 import type { IngestionTemplateRepository } from "../repositories/ingestion-template.repository.ts";
 
@@ -40,14 +40,14 @@ type IngestionKeyStore = Pick<
 
 type PersonalIngestionKeyMembers = {
   apiKeys: IngestionKeyStore;
-  organizations: Pick<OrganizationService, "getPersonalWorkspace">;
+  organizations: Pick<OrganizationApi, "getPersonalWorkspace">;
   templates: IngestionTemplateRepository;
   auditLog: Pick<AuditLogApi, "record">;
 };
 
 export class PersonalIngestionKeyService {
   private readonly apiKeys: IngestionKeyStore;
-  private readonly organizations: Pick<OrganizationService, "getPersonalWorkspace">;
+  private readonly organizations: Pick<OrganizationApi, "getPersonalWorkspace">;
   private readonly templates: IngestionTemplateRepository;
   private readonly auditLog: Pick<AuditLogApi, "record">;
 

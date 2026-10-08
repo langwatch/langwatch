@@ -1,4 +1,10 @@
+import type {
+  OrganizationIdPage,
+  OrganizationIdPageInput,
+  OrganizationWithAdministrators,
+} from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
 import { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
 
@@ -7,7 +13,10 @@ import { BillingAccountFactsRepository } from "../billing-account-facts.reposito
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type BillingOrganizationDatabase = Pick<PrismaClient, "organization" | "team" | "$executeRaw">;
+type BillingOrganizationDatabase = Pick<
+  PrismaClient,
+  "organization" | "organizationUser" | "user" | "team" | "$executeRaw"
+>;
 
 export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepository {
   private constructor(private readonly prisma: BillingOrganizationDatabase) {
@@ -74,5 +83,64 @@ export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepo
          AND "stripeCustomerId" IS NULL
     `;
     return updated > 0;
+  }
+
+  async findWithAdministrators(
+    organizationId: string,
+  ): Promise<OrganizationWithAdministrators | null> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, sentPlanLimitAlert: true },
+    });
+    if (!organization) return null;
+    const admins = await this.prisma.organizationUser.findMany({
+      where: { organizationId, role: "ADMIN" },
+      select: { userId: true },
+    });
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: admins.map((admin) => admin.userId) } },
+      select: { id: true, name: true, email: true },
+    });
+    const byId = new Map(users.map((user) => [user.id, user]));
+    return {
+      id: organization.id,
+      name: organization.name,
+      sentPlanLimitAlert:
+        organization.sentPlanLimitAlert && fromDate(organization.sentPlanLimitAlert),
+      administrators: admins.flatMap(({ userId }) => {
+        const user = byId.get(userId);
+        return user ? [{ userId, name: user.name, email: user.email }] : [];
+      }),
+    };
+  }
+
+  async findActiveMemberIds(organizationId: string): Promise<string[]> {
+    const members = await this.prisma.organizationUser.findMany({
+      where: { organizationId, disabledAt: null, user: { deactivatedAt: null } },
+      select: { userId: true },
+    });
+    return members.map((member) => member.userId);
+  }
+
+  async findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
+    const rows = await this.prisma.organization.findMany({
+      where: { selfHostedCustomer: true },
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row) => ({ organizationId: row.id, organizationName: row.name }));
+  }
+
+  async listIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
+    const rows = await this.prisma.organization.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const ids = rows.map((row) => row.id);
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page.at(-1) ?? null };
   }
 }

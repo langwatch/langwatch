@@ -12,9 +12,9 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`BillingApi`)
 
-What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The backoffice operations trust the platform door (Q43): staff only, writes need ops:manage.
+What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
 
-Peers call these through the token, declared at `../contract/src/billing.api.ts:35`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/billing.api.ts:37`; nothing else in this package is public.
 
 #### `getConnectedBillingOverview`
 
@@ -108,6 +108,14 @@ The organization's pricing model column, which is empty for organizations never 
 getPricingModel(input: { organizationId: string; }): Promise<{ pricingModel: BillingPricingModel | null }>;
 ```
 
+#### `createSeatCheckout`
+
+Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEmail`. Answers the pending subscription organization holds the checkout's invitations against (C2 A).
+
+```typescript
+createSeatCheckout(input: { organizationId: string; baseUrl: string; membersToAdd: number; currency?: Currency; billingInterval?: SubscriptionBillingInterval; customerEmail: string | null; }): Promise<{ url: string | null; subscriptionId: string }>;
+```
+
 ## REST transport
 
 ### `billingStripeWebhookRest`
@@ -127,8 +135,8 @@ Answers at `/api/webhooks/stripe`, `/api/v1/webhooks/stripe`.
 
 ```typescript
 // Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:40)
-type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:226
-type Response = z.infer<typeof billingStripeWebhookReceiptSchema>; // ../contract/src/billing-types.ts:224
+type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:227
+type Response = z.infer<typeof billingStripeWebhookReceiptSchema>; // ../contract/src/billing-types.ts:225
 ```
 
 ## tRPC transport
@@ -156,7 +164,7 @@ Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.t
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:41`, router `src/transport/subscription.trpc.ts:94`.
+Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscription.trpc.ts:81`.
 
 | Procedure                            | Kind     | Gate                             | Input                     | Output                           |
 | ------------------------------------ | -------- | -------------------------------- | ------------------------- | -------------------------------- |
@@ -165,7 +173,6 @@ Contract `../contract/src/subscription.trpc.ts:41`, router `src/transport/subscr
 | `subscription.manage`                | mutation | Permission `organization:manage` | inline                    | `billingPortalSessionSchema`     |
 | `subscription.previewProration`      | query    | Permission `organization:manage` | inline                    | `providerOwnedSchema`            |
 | `subscription.getLastSubscription`   | query    | Permission `organization:view`   | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.upgradeWithInvites`    | mutation | Permission `organization:manage` | inline                    | `billingRedirectSchema`          |
 | `subscription.prospective`           | mutation | Permission `organization:manage` | inline                    | `providerOwnedSchema`            |
 | `subscription.listInvoices`          | query    | Permission `organization:view`   | `organizationScopeSchema` | inline                           |
 
@@ -177,17 +184,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `billing_lifecycle` (aggregate `billing_lifecycle`)
 
-Declared at `src/eventing/billing-lifecycle.pipeline.ts:65`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`, `billingAuditRecordedEventSchema`.
+Declared at `src/eventing/billing-lifecycle.pipeline.ts:85`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`, `billingAuditRecordedEventSchema`, `planLimitAlertSentEventSchema`, `checkoutCurrencySelectedEventSchema`, `pricingModelChangedEventSchema`, `seatCheckoutPaidEventSchema`, `seatCheckoutsAbandonedEventSchema`.
 
-| Kind            | Name                           | Handles               | Declared at                                     |
-| --------------- | ------------------------------ | --------------------- | ----------------------------------------------- |
-| command         | `recordSubscriptionChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:76` |
-| command         | `recordSubscriptionStarted`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:77` |
-| command         | `recordCheckoutCompleted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:78` |
-| command         | `recordUsageBillingChanged`    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:79` |
-| command         | `recordAudit`                  | –                     | `src/eventing/billing-lifecycle.pipeline.ts:80` |
-| peer subscriber | `organizationSeatLimitReached` | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:81` |
-| peer subscriber | `usageLimitReached`            | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:85` |
+| Kind            | Name                             | Handles               | Declared at                                      |
+| --------------- | -------------------------------- | --------------------- | ------------------------------------------------ |
+| command         | `recordSubscriptionChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:101` |
+| command         | `recordSubscriptionStarted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:102` |
+| command         | `recordCheckoutCompleted`        | –                     | `src/eventing/billing-lifecycle.pipeline.ts:103` |
+| command         | `recordUsageBillingChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:104` |
+| command         | `recordAudit`                    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:105` |
+| command         | `recordPlanLimitAlertSent`       | –                     | `src/eventing/billing-lifecycle.pipeline.ts:106` |
+| command         | `recordCheckoutCurrencySelected` | –                     | `src/eventing/billing-lifecycle.pipeline.ts:107` |
+| command         | `recordPricingModelChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:108` |
+| command         | `recordSeatCheckoutPaid`         | –                     | `src/eventing/billing-lifecycle.pipeline.ts:109` |
+| command         | `recordSeatCheckoutsAbandoned`   | –                     | `src/eventing/billing-lifecycle.pipeline.ts:110` |
+| peer subscriber | `organizationSeatLimitReached`   | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:111` |
+| peer subscriber | `usageLimitReached`              | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:115` |
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
@@ -213,19 +225,19 @@ Run by the tasks process, before serve.
 
 | Task                     | Class                     | Declared at                                   |
 | ------------------------ | ------------------------- | --------------------------------------------- |
-| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:22` |
+| `usage-billing-catch-up` | `UsageBillingCatchUpTask` | `src/tasks/usage-billing-catch-up.task.ts:24` |
 | `stripe-prices-sync`     | `StripePricesSyncTask`    | `src/tasks/stripe-prices-sync.task.ts:467`    |
 
 ## Configuration
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:205`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:206`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:207`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:208`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:209`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:210`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:186`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:187`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:188`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:189`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:190`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:191`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |

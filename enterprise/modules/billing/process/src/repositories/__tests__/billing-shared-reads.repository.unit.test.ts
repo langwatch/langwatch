@@ -3,11 +3,14 @@
  */
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryBillingOrganizationRepository } from "../memory/memory.billing-account-facts.repository.ts";
 import { MemoryBillingGatewaySpendRepository } from "../memory/memory.billing-gateway-spend.repository.ts";
 import { MemoryBillingProjectDirectoryRepository } from "../memory/memory.billing-project-directory.repository.ts";
 import { MemoryBillingStore } from "../memory/memory.billing.store.ts";
+import { PrismaBillingOrganizationRepository } from "../prisma/prisma.billing-account-facts.repository.ts";
 import { PrismaBillingProjectDirectoryRepository } from "../prisma/prisma.billing-project-directory.repository.ts";
 
 const spend = (row: {
@@ -102,6 +105,114 @@ describe("billing's shared reads", () => {
           select: { id: true, name: true },
           orderBy: { name: "asc" },
         },
+      ]);
+    });
+  });
+
+  describe("when billing reads organisations, memberships and people", () => {
+    const STAMP = Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000);
+
+    function storeWithPeople() {
+      const store = MemoryBillingStore.create();
+      for (const [id, selfHostedCustomer] of [
+        ["org-a", false],
+        ["org-b", true],
+        ["org-c", false],
+      ] as const) {
+        store.organizations.set(id, {
+          id,
+          name: id.toUpperCase(),
+          stripeCustomerId: null,
+          pricingModel: "SEAT_EVENT",
+          currency: null,
+          license: null,
+          selfHostedCustomer,
+          teamIds: [],
+          signupData: {},
+          sentPlanLimitAlert: id === "org-a" ? STAMP : null,
+        });
+      }
+      const person = (id: string, deactivated = false) =>
+        store.users.set(id, { id, name: id, email: `${id}@acme.test`, deactivated });
+      person("ann");
+      person("bob");
+      person("cat");
+      person("dan", true);
+      store.members.push(
+        { organizationId: "org-a", userId: "ann", role: "ADMIN", disabled: false },
+        { organizationId: "org-a", userId: "bob", role: "MEMBER", disabled: false },
+        { organizationId: "org-a", userId: "cat", role: "MEMBER", disabled: true },
+        { organizationId: "org-a", userId: "dan", role: "MEMBER", disabled: false },
+      );
+      return MemoryBillingOrganizationRepository.create(store);
+    }
+
+    /** @scenario "Billing names an organisation's administrators from the shared tables" */
+    it("answers the name, the stamp and only the administrators", async () => {
+      const organizations = storeWithPeople();
+
+      await expect(organizations.findWithAdministrators("org-a")).resolves.toEqual({
+        id: "org-a",
+        name: "ORG-A",
+        sentPlanLimitAlert: STAMP,
+        administrators: [{ userId: "ann", name: "ann", email: "ann@acme.test" }],
+      });
+      await expect(organizations.findWithAdministrators("org-gone")).resolves.toBeNull();
+    });
+
+    /** @scenario "Billing names an organisation's administrators from the shared tables" */
+    it("asks organization's and user's tables for the administrators", async () => {
+      const queries: unknown[] = [];
+      const prisma = prismaDouble({
+        organization: {
+          findUnique: async () => ({ id: "org-a", name: "ORG-A", sentPlanLimitAlert: null }),
+        },
+        organizationUser: {
+          findMany: async (args: unknown) => {
+            queries.push(args);
+            return [{ userId: "ann" }];
+          },
+        },
+        user: {
+          findMany: async (args: unknown) => {
+            queries.push(args);
+            return [{ id: "ann", name: "Ann", email: "ann@acme.test" }];
+          },
+        },
+      });
+
+      await expect(
+        PrismaBillingOrganizationRepository.create(prisma).findWithAdministrators("org-a"),
+      ).resolves.toEqual({
+        id: "org-a",
+        name: "ORG-A",
+        sentPlanLimitAlert: null,
+        administrators: [{ userId: "ann", name: "Ann", email: "ann@acme.test" }],
+      });
+      expect(queries).toEqual([
+        { where: { organizationId: "org-a", role: "ADMIN" }, select: { userId: true } },
+        { where: { id: { in: ["ann"] } }, select: { id: true, name: true, email: true } },
+      ]);
+    });
+
+    /** @scenario "Billing's lifecycle facts carry only the organisation's active members" */
+    it("carries only members neither disabled nor deactivated", async () => {
+      await expect(storeWithPeople().findActiveMemberIds("org-a")).resolves.toEqual(["ann", "bob"]);
+    });
+
+    /** @scenario "Billing pages organisation ids and lists connected customers from organization's shared table" */
+    it("pages every id once in order and names only the connected customer", async () => {
+      const organizations = storeWithPeople();
+
+      const first = await organizations.listIds({ limit: 2 });
+      const second = await organizations.listIds({ after: first.next ?? undefined, limit: 2 });
+
+      expect([first, second]).toEqual([
+        { ids: ["org-a", "org-b"], next: "org-b" },
+        { ids: ["org-c"], next: null },
+      ]);
+      await expect(organizations.findSelfHostedCustomers()).resolves.toEqual([
+        { organizationId: "org-b", organizationName: "ORG-B" },
       ]);
     });
   });

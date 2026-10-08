@@ -16,6 +16,8 @@ import {
   organizationApiCreateInvitesInputSchema,
   organizationApiInviteScopeSchema,
   organizationApiScopeSchema,
+  organizationApiSeatCheckoutInputSchema,
+  organizationSeatCheckoutRedirectSchema,
 } from "./organization.trpc-schemas.ts";
 
 export const inviteTrpc = defineTrpcContract("invite")
@@ -37,6 +39,10 @@ export const inviteTrpc = defineTrpcContract("invite")
   .mutation("acceptInvite")
   .withInput(organizationApiAcceptInviteInputSchema)
   .withOutput(organizationInviteAcceptedSchema)
+
+  .mutation("upgradeWithInvites")
+  .withInput(organizationApiSeatCheckoutInputSchema)
+  .withOutput(organizationSeatCheckoutRedirectSchema)
 
   .query("myPendingInvitation")
   .withInput(z.object({}))

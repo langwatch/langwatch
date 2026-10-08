@@ -1,3 +1,9 @@
+import type {
+  OrganizationIdPage,
+  OrganizationIdPageInput,
+  OrganizationWithAdministrators,
+} from "@langwatch/organization-contract";
+
 /** Narrow organization reads needed by the billing lifecycle services. */
 export abstract class BillingAccountFactsRepository {
   abstract findPricingModel(organizationId: string): Promise<string | null>;
@@ -16,4 +22,16 @@ export abstract class BillingAccountFactsRepository {
     organizationId: string;
     stripeCustomerId: string;
   }): Promise<boolean>;
+  /** The organization and every ADMIN membership's person, through the shares (C2 B). */
+  abstract findWithAdministrators(
+    organizationId: string,
+  ): Promise<OrganizationWithAdministrators | null>;
+  /** Members neither disabled nor deactivated, by user id (C2 B). */
+  abstract findActiveMemberIds(organizationId: string): Promise<string[]>;
+  /** Organizations an operator marked connected self-hosted customers, oldest first. */
+  abstract findSelfHostedCustomers(): Promise<
+    { organizationId: string; organizationName: string }[]
+  >;
+  /** Every organization id, a page at a time by id cursor (round 49). */
+  abstract listIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
 }

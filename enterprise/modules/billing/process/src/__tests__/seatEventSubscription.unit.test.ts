@@ -1,4 +1,3 @@
-import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
 import {
   Currency,
   SubscriptionStatus,
@@ -15,10 +14,7 @@ import type {
   BillingSubscription,
 } from "../rules/billing-stripe-shapes.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
-import {
-  type SeatCheckoutInvites,
-  SeatEventSubscriptionService,
-} from "../services/seat-event-subscription.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 
@@ -59,20 +55,12 @@ const createMockSubscriptions = (): {
   reactivateWithSeats: vi.fn(),
 });
 
-const createMockInvites = (): {
-  [K in keyof SeatCheckoutInvites]: Mock<SeatCheckoutInvites[K]>;
-} => ({
-  checkInvitesWithinCaller: vi.fn(),
-  createPaymentPendingInvites: vi.fn(),
-});
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe("seatEventSubscription", () => {
   let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
   let customers: MemoryStripeCustomersChannel;
   let subscriptions: ReturnType<typeof createMockSubscriptions>;
-  let invites: ReturnType<typeof createMockInvites>;
   /** Billing's fact that organization drops the held invitations from (R42). */
   let abandoned: {
     seatCheckoutsAbandoned: Mock<BillingLifecycleAnnouncerService["seatCheckoutsAbandoned"]>;
@@ -86,12 +74,10 @@ describe("seatEventSubscription", () => {
     // New customers have no fixed currency until their first subscription.
     customers.seed({ id: "cus_1", currency: null });
     subscriptions = createMockSubscriptions();
-    invites = createMockInvites();
     abandoned = { seatCheckoutsAbandoned: vi.fn() };
     service = SeatEventSubscriptionService.create({
       stripeSubscriptions,
       subscriptions,
-      invites,
       abandoned,
       prices,
       customerCurrency: StripeCustomerCurrencyService.create({
@@ -923,68 +909,20 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the checkout carries invitations", () => {
-      beforeEach(() => {});
-
-      /** @scenario Inviting through a seat checkout is bounded by the inviter */
-      it("holds them as the person who invited, so organization bounds them by that person", async () => {
-        await service.createSeatEventCheckout({
+    describe("when organization asks for the checkout", () => {
+      /** @scenario "Billing's seat checkout answers the pending subscription it opened" */
+      it("answers the checkout url and the pending subscription organization holds invites on", async () => {
+        const result = await service.createSeatEventCheckout({
           organizationId: "org_1",
           customerId: "cus_1",
           baseUrl: "https://app.test",
           currency: Currency.USD,
           billingInterval: "monthly",
           membersToAdd: 1,
-          invitations: {
-            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
-            by: { id: "user_1" },
-          },
         });
 
-        expect(invites.createPaymentPendingInvites).toHaveBeenCalledWith(
-          expect.objectContaining({
-            organizationId: "org_1",
-            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
-          }),
-          { id: "user_1" },
-        );
-      });
-
-      /** @scenario A seat checkout inviting past the inviter writes nothing */
-      it("refuses invitations past the inviter before any checkout row is written", async () => {
-        invites.checkInvitesWithinCaller.mockRejectedValue(
-          new GrantExceedsCallerPermissionsError(["organization:manage"]),
-        );
-
-        await expect(
-          service.createSeatEventCheckout({
-            organizationId: "org_1",
-            customerId: "cus_1",
-            baseUrl: "https://app.test",
-            currency: Currency.USD,
-            billingInterval: "monthly",
-            membersToAdd: 1,
-            invitations: {
-              invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
-              by: { id: "user_1" },
-            },
-          }),
-        ).rejects.toMatchObject({
-          code: "grant_exceeds_caller_permissions",
-          meta: { missingPermissions: ["organization:manage"] },
-        });
-
-        expect(invites.checkInvitesWithinCaller).toHaveBeenCalledWith(
-          {
-            organizationId: "org_1",
-            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
-          },
-          { id: "user_1" },
-        );
-        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
-        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
-        expect(invites.createPaymentPendingInvites).not.toHaveBeenCalled();
-        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
+        expect(result.subscriptionId).toBe("sub_new_1");
+        expect(result.url).toBe(stripeSubscriptions.checkoutSessions.at(-1)?.url ?? null);
       });
     });
 
@@ -1024,6 +962,7 @@ describe("seatEventSubscription", () => {
 
         expect(result).toEqual({
           url: "https://checkout.memory.test/cs_memory_1",
+          subscriptionId: "sub_new_1",
         });
       });
 

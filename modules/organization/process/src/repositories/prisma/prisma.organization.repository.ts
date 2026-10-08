@@ -251,7 +251,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     userId: string;
     at: Instant;
   }): Promise<void> {
-    // The condition sits on the table, as in `claimBillingCustomerId`: a second
+    // The condition sits on the table, as in billing's Stripe customer claim: a second
     // click parked on the row lock re-checks it and keeps the first record.
     await this.database.$executeRaw`
       -- @tenancy: an organization is addressed by its own primary key.
@@ -519,24 +519,6 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       name: organization.name,
       billingCustomerId: organization.stripeCustomerId,
     };
-  }
-
-  async claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean> {
-    // The condition sits on the table, not in `updateMany`'s subquery: a write
-    // parked on the row lock re-checks it against the committed row, so only
-    // one of two checkouts started together is told it won.
-    const updated = await this.database.$executeRaw`
-      -- @tenancy: an organization is addressed by its own primary key.
-      UPDATE "Organization"
-         SET "stripeCustomerId" = ${input.billingCustomerId},
-             "updatedAt" = now()
-       WHERE "id" = ${input.organizationId}
-         AND "stripeCustomerId" IS NULL
-    `;
-    return updated > 0;
   }
 
   async getPersonalWorkspace(input: {

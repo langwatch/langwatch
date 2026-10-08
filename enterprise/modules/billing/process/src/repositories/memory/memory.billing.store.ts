@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { Instant } from "@langwatch/time";
+
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 import type {
   ConnectedBillingAccountRecord,
@@ -21,6 +23,23 @@ export type MemoryBillingOrganization = {
   selfHostedCustomer: boolean;
   teamIds: string[];
   signupData: Record<string, unknown>;
+  sentPlanLimitAlert?: Instant | null;
+};
+
+/** A membership as organization's shared OrganizationUser table shows it to billing. */
+export type MemoryBillingMember = {
+  organizationId: string;
+  userId: string;
+  role: string;
+  disabled: boolean;
+};
+
+/** A person as user's shared User table shows them to billing. */
+export type MemoryBillingUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  deactivated: boolean;
 };
 
 /** A project as project's shared table shows it to billing. */
@@ -48,6 +67,9 @@ export type MemoryBillingSpendRow = {
  */
 export class MemoryBillingStore {
   readonly organizations = new Map<string, MemoryBillingOrganization>();
+  /** Organization's memberships and user's people, as their shares show them to billing. */
+  readonly members: MemoryBillingMember[] = [];
+  readonly users = new Map<string, MemoryBillingUser>();
   /** Connected self-hosted billing accounts, keyed by organization. */
   readonly connectedBillingAccounts = new Map<string, ConnectedBillingAccountRecord>();
   readonly connectedSeatChanges = new Map<string, ConnectedSeatChangeRecord>();

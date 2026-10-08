@@ -1,4 +1,4 @@
-import { QuoteExpiredError, type SubscriptionInvite } from "@langwatch/enterprise-billing-contract";
+import { QuoteExpiredError } from "@langwatch/enterprise-billing-contract";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -11,12 +11,6 @@ import type {
   BillingSubscription,
   BillingSubscriptionItem,
 } from "./billing-stripe-shapes.rules.ts";
-
-export type InviteInput = {
-  email: string;
-  role: SubscriptionInvite["role"];
-  teamIds: string;
-};
 
 /**
  * The two fields a seat quote is allowed to read, and the only invoice they mean anything

@@ -14,6 +14,14 @@ function door({ proven }: { proven: string[] }) {
   const findPendingForAddresses = vi.fn(async () => []);
   const findProvenAddresses = vi.fn(async () => proven);
   const service = OrganizationInvitationDoorService.create({
+    billing: {
+      createSeatCheckout: async () => {
+        throw new Error("this suite opens no seat checkout");
+      },
+    },
+    getOldestTeamId: async () => {
+      throw new Error("this suite opens no seat checkout");
+    },
     invitations: createApiFixture<OrganizationInvitations>({ findPendingForAddresses }),
     directory: { findProvenAddresses },
     signals: createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() }),

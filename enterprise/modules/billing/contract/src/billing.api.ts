@@ -19,6 +19,8 @@ import type {
   ConnectedRenewRequest,
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
+import type { Currency } from "./pricing.ts";
+import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
 /**
  * The staff member the platform door admitted for an admin console command: the
@@ -89,6 +91,18 @@ export interface BillingApi {
   getPricingModel(input: {
     organizationId: string;
   }): Promise<{ pricingModel: BillingPricingModel | null }>;
+  /**
+   * Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEmail`. Answers
+   * the pending subscription organization holds the checkout's invitations against (C2 A).
+   */
+  createSeatCheckout(input: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    currency?: Currency;
+    billingInterval?: SubscriptionBillingInterval;
+    customerEmail: string | null;
+  }): Promise<{ url: string | null; subscriptionId: string }>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

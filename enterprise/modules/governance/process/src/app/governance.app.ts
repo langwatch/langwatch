@@ -159,11 +159,7 @@ import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  OrganizationApi,
-  type OrganizationService,
-  TeamNotFoundError,
-} from "@langwatch/organization-contract";
+import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -399,7 +395,7 @@ export interface GovernanceAppDependencies {
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.
    */
-  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
+  organizations: Pick<OrganizationApi, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
     Pick<
       OrganizationApi,
       | "isMember"

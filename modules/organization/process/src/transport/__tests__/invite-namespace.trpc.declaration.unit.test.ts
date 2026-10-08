@@ -50,6 +50,11 @@ describe("given a client discovering the invitation procedures", () => {
       }
     });
 
+    /** @scenario "The invite checkout is organization's procedure" */
+    it("declares the seat checkout with invitations under invite, organization's door (C2 A)", () => {
+      expect(invite).toContain("invite.upgradeWithInvites");
+    });
+
     /** @scenario "Invitation RPCs have one dedicated namespace" */
     it("does not restore the retired approval-request procedures", () => {
       for (const name of [...invite, ...organization]) {

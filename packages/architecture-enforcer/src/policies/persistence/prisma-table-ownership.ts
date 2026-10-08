@@ -48,9 +48,9 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
   {
     table: "OrganizationUser",
     owner: "organization",
-    readers: ["authz", "data-privacy"],
+    readers: ["authz", "data-privacy", "billing"],
     reason:
-      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53)",
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42); data privacy reads a personal project owner's department from the membership, as main did (round 53); billing reads an organisation's administrators and active members for its alerts and lifecycle facts (C2 B, R40)",
     writes: [
       {
         reader: "authz",
@@ -80,6 +80,13 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
           "the Stripe customer-id claim stays a synchronous compare-and-set, so two checkouts never make two customers (round 46 D-b)",
       },
     ],
+  },
+  {
+    table: "User",
+    owner: "user",
+    readers: ["billing"],
+    reason:
+      "billing reads its organisations' administrators' names and addresses, and which members are deactivated, never a copy (C2 B, R40)",
   },
   {
     table: "Topic",

@@ -105,7 +105,7 @@ export function useSubscriptionActions({
   const upgradeModal = useLentHooks(UpgradeModalToken);
 
   const createSubscription = billingApi.subscription.create.useMutation();
-  const upgradeWithInvites = billingApi.subscription.upgradeWithInvites.useMutation();
+  const upgradeWithInvites = billingApi.invite.upgradeWithInvites.useMutation();
   const addTeamMemberOrEvents = billingApi.subscription.addTeamMemberOrEvents.useMutation();
   const manageSubscription = billingApi.subscription.manage.useMutation();
 

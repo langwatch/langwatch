@@ -10,9 +10,9 @@
 import type { ConnectedSpendView } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-judge-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingGatewaySpendRepository } from "../repositories/billing-gateway-spend.repository.ts";
 import type { BillingProjectDirectoryRepository } from "../repositories/billing-project-directory.repository.ts";
 import type {
@@ -41,7 +41,7 @@ export type ConnectedCustomerPeers = Readonly<{
     BillingGatewaySpendRepository,
     "isSpendSourceAvailable" | "sumSpendNanoUsdByRequestType"
   >;
-  organizations: Pick<OrganizationApi, "findSelfHostedCustomers">;
+  organizations: Pick<BillingAccountFactsRepository, "findSelfHostedCustomers">;
   projects: Pick<BillingProjectDirectoryRepository, "findProjectIds">;
 }>;
 

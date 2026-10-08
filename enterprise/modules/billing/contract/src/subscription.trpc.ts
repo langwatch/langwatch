@@ -25,13 +25,6 @@ export type SubscribablePlan = z.infer<typeof subscribablePlanSchema>;
 export const subscriptionBillingIntervalSchema = z.enum(["monthly", "annual"]);
 export type SubscriptionBillingInterval = z.infer<typeof subscriptionBillingIntervalSchema>;
 
-/** One invitation a checkout was started to pay a seat for. */
-export const subscriptionInviteSchema = z.object({
-  email: z.string().email(),
-  role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
-});
-export type SubscriptionInvite = z.infer<typeof subscriptionInviteSchema>;
-
 /**
  * Three of these answer the billing provider's own object, unchanged: naming
  * its shape here would drift the first time the provider adds a field.
@@ -81,19 +74,6 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
   .query("getLastSubscription")
   .withInput(organizationScopeSchema)
   .withOutput(providerOwnedSchema)
-
-  .mutation("upgradeWithInvites")
-  .withInput(
-    z.object({
-      ...organizationScopeSchema.shape,
-      baseUrl: z.string(),
-      currency: currencySchema.optional(),
-      billingInterval: subscriptionBillingIntervalSchema.optional(),
-      totalSeats: z.number().min(1),
-      invites: z.array(subscriptionInviteSchema),
-    }),
-  )
-  .withOutput(billingRedirectSchema)
 
   .mutation("prospective")
   .withInput(

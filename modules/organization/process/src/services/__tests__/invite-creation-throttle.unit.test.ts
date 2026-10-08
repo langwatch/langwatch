@@ -201,6 +201,14 @@ describe("OrganizationInvitationDoorService.create", () => {
       });
       const invitations = invitationStub(create);
       const door = OrganizationInvitationDoorService.create({
+        billing: {
+          createSeatCheckout: async () => {
+            throw new Error("this suite opens no seat checkout");
+          },
+        },
+        getOldestTeamId: async () => {
+          throw new Error("this suite opens no seat checkout");
+        },
         invitations,
         directory: { findProvenAddresses: async () => [] },
         signals: { trackServerEvent: () => {} } as never,

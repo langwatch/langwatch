@@ -178,10 +178,6 @@ export abstract class OrganizationRepository {
   abstract clearLicense(input: { organizationId: string }): Promise<void>;
   /** The longest-seated enabled administrator's email, or null when none is. */
   abstract findFirstAdministratorEmail(organizationId: string): Promise<string | null>;
-  abstract claimBillingCustomerId(input: {
-    organizationId: string;
-    billingCustomerId: string;
-  }): Promise<boolean>;
   /** The user's personal team in the organization; throws `TeamNotFoundError`. */
   abstract getPersonalWorkspace(input: {
     userId: string;
