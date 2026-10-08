@@ -1,4 +1,5 @@
 import { defineProcessModule } from "@langwatch/process";
+import { defineMigrationStep, type MigrationStepRun } from "@langwatch/upgrade/step";
 
 import { AutomationModule } from "./app/automation.app.ts";
 import { automationChannels } from "./channels/automation-channels.registry.ts";
@@ -45,6 +46,30 @@ export const automationProcessModule = defineProcessModule("automation")
     SlackAlertTask.create({ baseHost: config.publicBaseUrl ?? "" }),
     ReportScheduleBackfillTask.create(app),
   ])
+  .withMigrations(({ app }) => {
+    const run: MigrationStepRun = async ({ dryRun }) =>
+      dryRun ? { dryRun: true } : app.reconcileReportSchedules();
+    const description =
+      "Gives every active report automation its schedule; reports already scheduled or paused are left alone.";
+    return [
+      defineMigrationStep({
+        id: "automation:reconcile-report-schedules",
+        kind: "data",
+        mode: "background",
+        description,
+        run,
+      }),
+      defineMigrationStep({
+        id: "automation:reconcile-report-schedules-after-rollout",
+        kind: "data",
+        mode: "background",
+        description: `${description} Runs again once older images stop serving.`,
+        // An older image creates reports without a schedule process: run again once none serves.
+        needsOldWritersGone: true,
+        run,
+      }),
+    ];
+  })
   .withEventing(automationsEventing);
 
 /**

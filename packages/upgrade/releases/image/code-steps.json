@@ -1,5 +1,19 @@
 [
   {
+    "id": "automation:reconcile-report-schedules",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone."
+  },
+  {
+    "id": "automation:reconcile-report-schedules-after-rollout",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone. Runs again once older images stop serving."
+  },
+  {
     "id": "entitlement:seed-trace-meter",
     "kind": "data",
     "mode": "background",

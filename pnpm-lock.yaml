@@ -6885,6 +6885,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/webhook-contract':
         specifier: workspace:*
         version: link:../../webhook/contract
