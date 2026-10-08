@@ -36,7 +36,7 @@ const refusedForInstantEvals = {
     error: {
       code: "instant_eval_judge_only_model",
       httpStatus: 422,
-      message: "Instant Evals works only as an evaluator judge model.",
+      message: "Instant Evals runs only LLM judge evaluators.",
       meta: { places: ['node "Answer"'] },
     },
   },

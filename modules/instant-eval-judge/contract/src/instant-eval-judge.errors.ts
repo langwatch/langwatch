@@ -45,8 +45,7 @@ export class InstantEvalFreeBudgetExhaustedError extends HandledError {
   }
 }
 
-export const INSTANT_EVAL_JUDGE_ONLY_MESSAGE =
-  "Instant Evals works only as an evaluator judge model.";
+export const INSTANT_EVAL_JUDGE_ONLY_MESSAGE = "Instant Evals runs only LLM judge evaluators.";
 
 /**
  * A save named Instant Evals as the model of something that is not an evaluator judge.
