@@ -46,8 +46,9 @@ refuses until an upgrade runs without it) and, in the reconcile phase, the cold-
 lower number never runs there. The `migration-order` workflow (`cmd/migrationorder`,
 `specs/ci/migration-order.feature`) fails a number below main's newest, a number main took while
 your PR was open, two files sharing a number, and any change to a merged file, and prints the `git mv`
-to a free number. Once stepping is wired, a version in a later release that sorts below an earlier release's
-last version is refused outright.
+to a free number. Stepping (`goose up-to` each release's last version) does not yet refuse a later
+release's version that sorts below an earlier release's last one (`packages/upgrade/src/stepping/stepping.errors.ts`
+has no such code), so the main-relative number is your only protection.
 
 **One owner.** Every table the file touches belongs to one module;
 `pnpm lint:architecture --policies migration-owners` refuses two. Split the file.

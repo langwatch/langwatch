@@ -70,7 +70,7 @@ A table created in the same migration is empty, so the locking rules leave it al
 | `unique-or-validated-constraint-on-existing-table` | `ADD UNIQUE`/`PRIMARY KEY` built at once, `CHECK` validated at once                | pre-build the index and `ADD CONSTRAINT ... USING INDEX`, or `NOT VALID` + a later `VALIDATE`                   |
 | `plain-index-on-existing-table`                    | `CREATE INDEX` on an existing table with no pre-build note                         | the ops pre-build note (below)                                                                                  |
 | `rename-in-place`                                  | `RENAME COLUMN`, `ALTER TABLE ... RENAME TO`                                       | add, backfill, dual-write, switch, retire                                                                       |
-| `new-foreign-key`                                  | `FOREIGN KEY` or a `REFERENCES <table>(...)` clause, on a new or an existing table | a plain column with an index (below); new `@relation` lines are held by the enforcer's `prisma-relations` list  |
+| `new-foreign-key`                                  | `FOREIGN KEY` or a `REFERENCES <table>(...)` clause, on a new or an existing table | a plain column with an index (below); a new `@relation` fails the enforcer's relation ratchet                   |
 
 **The ops pre-build note.** `CONCURRENTLY` cannot run inside Prisma's transaction, so an index on an
 existing table carries a comment naming the statement an operator runs ahead; the migration's own
@@ -113,8 +113,11 @@ guard as the fix. Prisma's generated SQL has none of these guards: edit it after
 
 ## No foreign keys, no new `@relation`
 
-The W-01 guard (`new-foreign-key`, merged in 0dece53e) refuses a new `FOREIGN KEY` or `REFERENCES` clause in
-a migration and a new `@relation` in `schema.prisma`; existing ones stay. A reference is a plain scalar column with an index. Joins happen in the owning repository by a second
+The W-01 guard is two checks: the scanner's `new-foreign-key` rule refuses a new `FOREIGN KEY` or
+`REFERENCES` clause in a migration, and the relation ratchet
+(`packages/architecture-enforcer/tests/prisma-relations.unit.test.ts`, list in
+`packages/architecture-enforcer/tests/baselines/prisma-relations.json`, shrink-only) refuses a new `@relation` in `schema.prisma`;
+existing ones stay. A reference is a plain scalar column with an index. Joins happen in the owning repository by a second
 query; a table another module owns is never joined (ask its `*Api`). Deleting dependents is a
 service's behaviour; children in another module go by a fact and that module's purge subscriber (§9.1).
 
@@ -178,7 +181,7 @@ A folder at or below the marker, or one the image does not ship, keeps the conse
 `upgrade` exits 1 with code `failed_prisma_migration` and names the command to clear it. Check what it left, then
 `prisma migrate resolve --rolled-back <name>` if nothing remains, or `--applied <name>` if you
 completed it by hand, then run `upgrade` again. Nothing has rolled; the old image still serves.
-specs/upgrade/rerunnable-migrations.feature.
+Spec: `specs/upgrade/rerunnable-migrations.feature`.
 
 ## The scanner
 
@@ -188,6 +191,8 @@ VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/prisma-client test src/__tests__/m
 
 It reads every folder not in `src/__tests__/migration-safety.baseline.txt` (frozen; adding yours is
 refused) and fails by name with the fix. Folders merged from main are in
-`migration-safety.from-main.txt` by blob sha. The six floor and lock rules (`FLOOR_AND_LOCK_RULES`)
-hold only folders after the test's `NEW_RULES_FROM` marker. Spec: `specs/ops/migration-safety.feature`.
+`migration-safety.from-main.txt` by blob sha. The seven floor, lock and foreign-key rules
+(`FLOOR_AND_LOCK_RULES` in `migration-safety.rules.ts`) hold only folders after the test's
+`NEW_RULES_FROM` marker (`20261006170527_data_privacy_project_scope`); every new folder sorts above
+it, so all ten rules apply to yours. Spec: `specs/ops/migration-safety.feature`.
 ClickHouse: the `clickhouse-migration` skill.
