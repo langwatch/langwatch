@@ -29,13 +29,13 @@ describe.skipIf(!DB_URL)("upgrade old-writers-gone and pre-roster-rollback", () 
     const t = await createLedgerTables({ postgres });
     await postgres.query(
       `INSERT INTO ${t.run} ("id", "kind", "started_at", "finished_at", "outcome", "report") VALUES
-         ('seed-1', 'seed', now() - interval '2 minutes', now() - interval '2 minutes', 'succeeded',
+         ('seed-1', 'seed', (now() AT TIME ZONE 'UTC') - interval '2 minutes', (now() AT TIME ZONE 'UTC') - interval '2 minutes', 'succeeded',
           '{"seeded":{"prisma-migration":3}}'),
-         ('run-1', 'upgrade', now() - interval '1 minute', now() - interval '1 minute', 'succeeded', NULL)`,
+         ('run-1', 'upgrade', (now() AT TIME ZONE 'UTC') - interval '1 minute', (now() AT TIME ZONE 'UTC') - interval '1 minute', 'succeeded', NULL)`,
     );
     await postgres.query(
       `INSERT INTO ${t.step} ("id", "kind", "mode", "status", "updated_at")
-       VALUES ($1, 'data', 'background', 'done', now())`,
+       VALUES ($1, 'data', 'background', 'done', (now() AT TIME ZONE 'UTC'))`,
       [STEP],
     );
   });
