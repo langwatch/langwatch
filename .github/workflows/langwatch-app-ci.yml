@@ -275,6 +275,7 @@ jobs:
               - 'services/langevals/**'
               - 'dev/scripts/**'
               - '.github/scripts/**'
+              - '.gitattributes'
               - '.github/workflows/langwatch-app-ci.yml'
 
   # Which applications a change actually reaches, from the Nx project graph
@@ -1502,6 +1503,12 @@ jobs:
       # guard. This job's gate already lists `.github/scripts/**`.
       - name: Test guard-deployment-impact.ts
         run: node --test --experimental-strip-types .github/scripts/guard-deployment-impact.test.ts
+
+      - name: Test that every generated file is marked generated
+        run: node --test --experimental-strip-types .github/scripts/generated-attributes.test.ts
+
+      - name: Test the PR impact map categories
+        run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
 
   # The npm artifact's staging filters, run over the real tree.
   #

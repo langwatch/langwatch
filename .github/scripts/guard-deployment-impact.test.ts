@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -160,6 +163,37 @@ void describe("given the author of a pull request", () => {
     void it("withholds it, because the match is exact", () => {
       assert.equal(isDependencyBot("dependabot"), false);
       assert.equal(isDependencyBot("not-dependabot[bot]"), false);
+    });
+  });
+});
+
+const ROOT = resolve(import.meta.dirname, "../..");
+
+/** Layout-reserved trigger paths that may match nothing today. */
+const RESERVED = new Set(["enterprise/modules/*/process/src/migrations/**"]);
+
+/** The `paths:` list under `on.pull_request` in the workflow. */
+const triggerPaths = (): string[] => {
+  const yml = readFileSync(resolve(ROOT, ".github/workflows/deployment-impact-check.yml"), "utf8");
+  const block = /\n {4}paths:\n((?: {6}- .*\n)+)/.exec(yml)?.[1] ?? "";
+  return [...block.matchAll(/- "([^"]+)"/g)].map((m) => m[1]!);
+};
+
+void describe("given the deployment-impact workflow's trigger paths", () => {
+  void describe("when each is matched against the tracked files", () => {
+    /** @scenario "Every trigger path still names deployment surface in the tree" */
+    void it("matches at least one tracked file unless the layout reserves it", () => {
+      const paths = triggerPaths();
+      assert.ok(paths.length > 10, "the paths: list did not parse");
+      const stale = paths.filter((glob) => {
+        if (RESERVED.has(glob)) return false;
+        const out = execFileSync("git", ["ls-files", "--", `:(glob)${glob}`], {
+          cwd: ROOT,
+          encoding: "utf8",
+        });
+        return out.trim() === "";
+      });
+      assert.deepEqual(stale, []);
     });
   });
 });
