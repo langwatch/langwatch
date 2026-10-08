@@ -1,6 +1,6 @@
 Feature: Router models are never billed a negative cost
   As a LangWatch user sending traffic through a model router
-  I want a router span to show no cost rather than a negative one
+  I want a router call never to be costed below zero
   So that my cost totals are never reduced by a price the router does not have
 
   # Background
@@ -10,12 +10,13 @@ Feature: Router models are never billed a negative cost
   # OpenRouter's own routers carry it, and so do routers other vendors publish
   # under their own name (for example nvidia/switchyard). Read as a price, -1
   # bills every token at minus one dollar, so a single routed call would knock
-  # its cost off the trace, project and analytics totals.
+  # its cost off the spend, evaluation and analytics totals.
   #
   # A negative rate is treated as no rate when the catalog becomes the cost
-  # registry. A router whose rates are all negative then has no entry at all,
-  # so its span is left unpriced, the same as any model the catalog cannot
-  # price, instead of being billed below zero or shown as free.
+  # registry. A router whose rates are all negative then has no registry
+  # entry, so it is costed the way any model the catalog cannot price is: the
+  # gateway rates the request at zero, an evaluation cell gets no cost, and a
+  # trace span records a cost of zero. None of them goes below zero.
 
   @unit
   Scenario: A catalog rate below zero is not used as a price
@@ -25,7 +26,7 @@ Feature: Router models are never billed a negative cost
     And the router has no registry entry
 
   @unit
-  Scenario: A span naming a router is left unpriced
+  Scenario: A router name matches no registry price
     Given the model catalog prices "nvidia/switchyard" at -1 per token
     When the cost for model "nvidia/switchyard" is matched
     Then no registry entry is returned

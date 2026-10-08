@@ -6,6 +6,7 @@ import {
   resolveCacheWrite1hRate,
 } from "../llmModelCost";
 import { llmModels } from "../loadModelCatalog";
+import { VARIABLE_PRICE_ROUTERS } from "./variablePriceRouters.test-helpers";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -217,6 +218,23 @@ describe("hour-long cache write rate", () => {
           c.cacheCreation1hCostPerToken !== undefined,
       );
       expect(others).toEqual([]);
+    });
+  });
+
+  describe("given another provider's catalog entry states an hour-long price", () => {
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("carries exactly the price the catalog states", () => {
+      const stated = costs.filter(
+        (c) =>
+          !/^~?anthropic\//.test(c.model) &&
+          llmModels.models[c.model]?.pricing?.inputCacheWrite1hPerToken != null,
+      );
+      expect(stated.length).toBeGreaterThan(0);
+      for (const entry of stated) {
+        expect(entry.cacheCreation1hCostPerToken, entry.model).toBe(
+          llmModels.models[entry.model]?.pricing?.inputCacheWrite1hPerToken,
+        );
+      }
     });
   });
 });
@@ -483,6 +501,18 @@ describe("variable-price routers", () => {
 
   describe("when the catalog prices a router at -1 per token", () => {
     /** @scenario A catalog rate below zero is not used as a price */
+    it("still has routers in the catalog to guard against", () => {
+      // The precondition every router test rests on. If a sync stops
+      // publishing a negative price for routers, these guards (and the
+      // shared router list) can be retired rather than left passing on
+      // nothing.
+      expect(VARIABLE_PRICE_ROUTERS).toContain("nvidia/switchyard");
+      expect(
+        llmModels.models["nvidia/switchyard"]?.pricing?.inputCostPerToken,
+      ).toBeLessThan(0);
+    });
+
+    /** @scenario A catalog rate below zero is not used as a price */
     it("keeps every negative rate out of the cost registry", () => {
       const negative = costs.flatMap((entry) =>
         RATE_FIELDS.filter((field) => (entry[field] ?? 0) < 0).map(
@@ -495,13 +525,11 @@ describe("variable-price routers", () => {
     /** @scenario A catalog rate below zero is not used as a price */
     it("leaves the router out of the registry", () => {
       expect(
-        costs.filter((entry) =>
-          ["nvidia/switchyard", "typesafe/jev-router"].includes(entry.model),
-        ),
+        costs.filter((entry) => VARIABLE_PRICE_ROUTERS.includes(entry.model)),
       ).toEqual([]);
     });
 
-    /** @scenario A span naming a router is left unpriced */
+    /** @scenario A router name matches no registry price */
     it("matches no registry entry for a router span", () => {
       expect(
         matchModelCostWithFallbacks("nvidia/switchyard", costs),

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { VARIABLE_PRICE_ROUTERS } from "~/server/modelProviders/__tests__/variablePriceRouters.test-helpers";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../schemas/commands";
 import {
   NO_RATE_RULE_CODE,
@@ -284,24 +285,10 @@ describe("rateSpendNanoUsd", () => {
   });
 });
 
-/**
- * The upstream catalog prices a model router at -1 per token, since a router
- * has no rate of its own. Every router in the catalog is listed here by id.
- */
-const ROUTERS = [
-  "openrouter/auto",
-  "openrouter/auto-beta",
-  "openrouter/fusion",
-  "openrouter/pareto-code",
-  "openrouter/bodybuilder",
-  "nvidia/switchyard",
-  "typesafe/jev-router",
-];
-
 describe("rateSpendNanoUsd for a variable-price router", () => {
   describe("given a gateway request routed through a router", () => {
     /** @scenario A router call through the gateway never lowers spend */
-    it.each(ROUTERS)("never rates %s below zero", (model) => {
+    it.each(VARIABLE_PRICE_ROUTERS)("never rates %s below zero", (model) => {
       const { costNanoUsd } = rateSpendNanoUsd({
         model,
         usage: usage({ input_tokens: 1000, output_tokens: 500 }),

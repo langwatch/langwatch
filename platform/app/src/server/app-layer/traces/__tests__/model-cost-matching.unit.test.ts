@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { VARIABLE_PRICE_ROUTERS } from "~/server/modelProviders/__tests__/variablePriceRouters.test-helpers";
 import { computeSpanCost } from "../model-cost-matching";
 
 describe("computeSpanCost", () => {
@@ -387,24 +388,10 @@ describe("cache write TTL pricing through computeSpanCost", () => {
   });
 });
 
-/**
- * The upstream catalog prices a model router at -1 per token, since a router
- * has no rate of its own. Every router in the catalog is listed here by id.
- */
-const ROUTERS = [
-  "openrouter/auto",
-  "openrouter/auto-beta",
-  "openrouter/fusion",
-  "openrouter/pareto-code",
-  "openrouter/bodybuilder",
-  "nvidia/switchyard",
-  "typesafe/jev-router",
-];
-
 describe("computeSpanCost for a variable-price router", () => {
   describe("given a span naming a router and its token usage", () => {
     /** @scenario A router span on a trace is never costed below zero */
-    it.each(ROUTERS)("never costs %s below zero", (model) => {
+    it.each(VARIABLE_PRICE_ROUTERS)("never costs %s below zero", (model) => {
       const result = computeSpanCost({
         attrs: {},
         model,
