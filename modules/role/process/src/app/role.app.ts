@@ -11,6 +11,7 @@ import {
   builtInRoleIdSchema,
   builtinRolePermissions,
   newAuthzGrantId,
+  OrgExclusivePermissionScopeError,
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   type BuiltInRoleId,
@@ -20,7 +21,6 @@ import { generate } from "@langwatch/ksuid";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import {
-  OrgExclusivePermissionScopeError,
   RoleApi,
   RoleExceedsCallerPermissionsError,
   RoleInUseError,

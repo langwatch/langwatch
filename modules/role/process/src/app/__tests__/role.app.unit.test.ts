@@ -4,10 +4,10 @@ import {
   AuthzGrantNotConfirmedError,
   AuthzScopeNotFoundError,
   GrantExceedsCallerPermissionsError,
+  OrgExclusivePermissionScopeError,
 } from "@langwatch/authz-contract";
 import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import {
-  OrgExclusivePermissionScopeError,
   RoleInUseError,
   RoleNotFoundError,
   RoleTeamNotFoundError,
