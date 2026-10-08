@@ -83,6 +83,14 @@ Feature: Feature package boundary lint
     Then the declared dependency is reported
 
   @unit @architecture
+  Scenario: A contract may declare eventing when it imports only the tables subpath
+    Given a contract package.json declares eventing
+    And every eventing import in its source is "@langwatch/eventing/tables"
+    When architecture lint checks the package
+    Then the declared dependency is accepted
+    And any other eventing import, or none, still reports it
+
+  @unit @architecture
   Scenario: Feature contracts remain transport-neutral
     Given governed feature source imports a Hono-specific Zod adapter
     When architecture lint checks the package

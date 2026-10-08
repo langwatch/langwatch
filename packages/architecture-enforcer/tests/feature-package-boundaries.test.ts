@@ -359,6 +359,28 @@ describe("feature package boundary lint", () => {
     );
   });
 
+  /** @scenario A contract may declare eventing when it imports only the tables subpath */
+  it("accepts eventing in a contract that imports only its tables subpath", () => {
+    const declared = "A contract package cannot declare the server runtime @langwatch/eventing.";
+    const messages = (source: string): string[] => {
+      featurePackage({
+        feature: "agent",
+        role: "contract",
+        dependencies: { "@langwatch/eventing": "workspace:*" },
+        source,
+      });
+
+      return lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    };
+    const tables = 'import { EVENT_TABLES } from "@langwatch/eventing/tables";';
+
+    expect(messages(tables)).not.toContain(declared);
+    expect(messages(`${tables} import { x } from "@langwatch/eventing/server";`)).toContain(
+      declared,
+    );
+    expect(messages(`${tables} import { x } from "@langwatch/eventing";`)).toContain(declared);
+  });
+
   it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "process" });

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import { featurePackageName, type WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
@@ -297,12 +298,30 @@ function enterpriseRuntimeViolation(
 const SERVER_RUNTIME_PACKAGE =
   /^@langwatch\/(?:eventing|group-queue|prisma-client|clickhouse-client|redis-client|process(?:-server|-stores)?)$/;
 
+const EVENTING_TABLES_SPECIFIER = "@langwatch/eventing/tables";
+const IMPORT_SPECIFIER = /(?:\bfrom|\bimport)\s*["']([^"']+)["']/g;
+
+/** Eventing's plain-data table list is the one entry a contract may read (record ET-2). */
+function importsOnlyEventingTables(pkg: ClassifiedPackage): boolean {
+  const specifiers = listFiles({
+    directory: join(pkg.root, "src"),
+    accept: (file) => file.endsWith(".ts") || file.endsWith(".tsx"),
+    ignoredDirectories: new Set(["__tests__"]),
+  })
+    .flatMap((file) => [...readFileSync(file, "utf8").matchAll(IMPORT_SPECIFIER)])
+    .map((match) => match[1]!)
+    .filter((specifier) => /^@langwatch\/eventing(?:\/|$)/.test(specifier));
+
+  return specifiers.length > 0 && specifiers.every((item) => item === EVENTING_TABLES_SPECIFIER);
+}
+
 /** Contract-declares-a-server-runtime violation, read by name: raw clients are not snapshots. */
 function contractRuntimeViolation(
   pkg: ClassifiedPackage,
   dependency: string,
 ): ArchitectureViolation | undefined {
   if (pkg.kind !== "contract" || !SERVER_RUNTIME_PACKAGE.test(dependency)) return undefined;
+  if (dependency === "@langwatch/eventing" && importsOnlyEventingTables(pkg)) return undefined;
 
   return {
     policy: "package-role",
