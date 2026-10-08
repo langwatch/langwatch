@@ -296,6 +296,19 @@ Feature: An aggregate project reads its member projects
     Then each member's row of that trace appears on exactly one page
     And no row is skipped or repeated across the pages
 
+  @integration
+  Scenario: A member span opens in the playground under the aggregate
+    Given an aggregate project with a member holding a trace with an LLM span
+    When ana opens that span in the prompt playground from the aggregate's trace drawer
+    Then the playground loads the span's messages and model from the member
+    And a link naming a member the aggregate does not read is answered as not found
+
+  @integration
+  Scenario: A playground link on a plain project opens as before
+    Given a plain project holding a trace with an LLM span
+    When ana opens that span in the prompt playground, with or without the link naming its trace
+    Then the playground loads the span's messages and model either way
+
   # Unimplemented: analytics read through raw clients and the rollup windows
   # on BucketStart, a time column the fence does not admit yet; the fifth
   # time column awaits a decision (ADR-144 open questions).

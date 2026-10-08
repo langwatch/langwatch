@@ -155,6 +155,7 @@ const TRACE_ROUTERS = [
   "app/api/traces/[[...route]]/app.v1.ts",
   "server/api/routers/llmModelCosts.ts",
   "server/api/routers/sharedTrace.ts",
+  "server/api/routers/spans.ts",
   "server/api/routers/traceEditOverlay.ts",
   "server/api/routers/traces.ts",
   "server/api/routers/tracesV2.ts",
@@ -283,7 +284,7 @@ const HAND_TENANT_READS: Array<{
     service: "TraceService",
     references: 3,
     reason:
-      "the v1 span reads hand the URL project to TraceService; on an aggregate they read the aggregate's own tenant and find none. The drawer reads spans through tracesV2.",
+      "getAllForTrace, and a playground link that names only its span, hand the URL project to TraceService; on an aggregate they read the aggregate's own tenant and find none. The drawer reads spans through tracesV2, and its playground links name the trace, so getForPromptStudio reads those through the proof.",
     owner: "follow-up to block F (v1 trace router)",
   },
   {

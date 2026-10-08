@@ -1,8 +1,19 @@
+import type { Authorization } from "@langwatch/actor";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import {
+  promptStudioRowFromNormalizedSpan,
+  promptStudioSpanFromTrace,
+} from "~/server/traces/prompt-studio-span";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  occurredAtFromInput,
+  spanReadHintShape,
+  traceDetailAuthorization,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 
 export const spansRouter = createTRPCRouter({
@@ -59,22 +70,30 @@ export const spansRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         spanId: z.string(),
+        /**
+         * The trace the span belongs to, when the link names it. Named, the
+         * read goes through the route's proof, narrowed to the member that
+         * holds the trace on an aggregate (ADR-144 block F). A link that
+         * names only the span reads the URL project, as it always has.
+         */
+        traceId: z.string().min(1).optional(),
+        ...spanReadHintShape,
       }),
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const { projectId, spanId } = input;
-
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId,
-      });
-
-      const traceService = TraceService.create(ctx.prisma);
-      const result = await traceService.getSpanForPromptStudio(
-        projectId,
-        spanId,
-        protections,
-      );
+      const result =
+        input.traceId === undefined
+          ? await readProjectSpanForPromptStudio({ ctx, input })
+          : await readTraceSpanForPromptStudio({
+              authorization: await traceDetailAuthorization({
+                ctx,
+                input: { traceId: input.traceId, tenantId: input.tenantId },
+              }),
+              traceId: input.traceId,
+              spanId: input.spanId,
+              ...occurredAtFromInput(input),
+            });
 
       if (!result) {
         throw new TRPCError({
@@ -86,3 +105,56 @@ export const spansRouter = createTRPCRouter({
       return result;
     }),
 });
+
+/**
+ * The playground's read for a link that names only the span: the URL
+ * project's own spans, found by span id. An aggregate holds no spans of its
+ * own, so its links name the trace and take the read through the proof.
+ */
+async function readProjectSpanForPromptStudio({
+  ctx,
+  input,
+}: {
+  ctx: Parameters<typeof getUserProtectionsForProject>[0];
+  input: { projectId: string; spanId: string };
+}) {
+  const protections = await getUserProtectionsForProject(ctx, {
+    projectId: input.projectId,
+  });
+  const traceService = TraceService.create(ctx.prisma);
+  return traceService.getSpanForPromptStudio(
+    input.projectId,
+    input.spanId,
+    protections,
+  );
+}
+
+/**
+ * The playground's read through the proof: every span of the named trace,
+ * from the tenants the proof reads, resolved to the llm span to load.
+ */
+async function readTraceSpanForPromptStudio({
+  authorization,
+  traceId,
+  spanId,
+  occurredAtMs,
+}: {
+  authorization: Authorization;
+  traceId: string;
+  spanId: string;
+  occurredAtMs?: number;
+}) {
+  const spans = await getApp().traces.spans.getNormalizedSpansByTraceId({
+    authorization,
+    traceId,
+    limit: PROMPT_STUDIO_TRACE_SPAN_LIMIT,
+    ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+  });
+  return promptStudioSpanFromTrace({
+    rows: spans.map(promptStudioRowFromNormalizedSpan),
+    spanId,
+  });
+}
+
+/** The span ceiling the playground's trace read has always had. */
+const PROMPT_STUDIO_TRACE_SPAN_LIMIT = 1000;
