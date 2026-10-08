@@ -123,6 +123,35 @@ describe("JoinRequestNotifierService", () => {
       expect(keys[0]).not.toBe(keys[1]);
       expect(keys.slice(2)).toEqual(keys.slice(0, 2));
     });
+
+    /** @scenario "One bouncing admin address does not silence the rest" */
+    it("still mails the second administrator when the first address bounces", async () => {
+      const recording = recordingMail();
+      recording.sendRequestArrived.mockRejectedValueOnce(new Error("mailbox unavailable"));
+      const audience = fakeAudience();
+      audience.findAdmins = vi.fn(async () => [
+        { userId: "user_priya", email: "priya@acme.example" },
+        { userId: "user_sam", email: "sam@acme.example" },
+      ]);
+      const adapter = JoinRequestNotifierService.create({
+        audience,
+        context: fakeContext(),
+        mail: recording.mail,
+        baseHost: "https://app.langwatch.ai",
+      });
+
+      await expect(
+        adapter.requestArrived({
+          joinRequestId: "joinreq_1",
+          organizationId: "organization_acme",
+          requesterUserId: "user_morgan",
+          domain: "acme.example",
+        }),
+      ).resolves.toBeUndefined();
+
+      const recipients = recording.sendRequestArrived.mock.calls.map(([sent]) => sent.adminEmail);
+      expect(recipients).toEqual(["priya@acme.example", "sam@acme.example"]);
+    });
   });
 
   describe("when a lapsed requester already holds a personal project", () => {
