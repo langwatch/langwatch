@@ -1159,6 +1159,12 @@ const presentations = {
     title: "That handle is already in use",
     describe: () => "Pick a different handle, or open the prompt that already has it.",
   },
+  prompt_author_unknown: {
+    // Only a REST body names an author; a session-derived author is never refused.
+    title: "That author can't write prompts here",
+    describe: () =>
+      "Name a person who can create or edit prompts in this project, or leave the author out.",
+  },
   system_prompt_required: {
     title: "A system prompt is required",
     describe: () => "Add one before running this.",
