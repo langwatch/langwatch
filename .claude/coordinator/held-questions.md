@@ -459,3 +459,15 @@ recommendation, and "default taken" if a lane proceeded on it.
 ## Held (2026-10-08, port-8416 section 11)
 
 - LicensingApi.getConnectServiceState({ organizationId, service }) -> { isEntitled, isSwitchedOn } (new operation, one row read over findEntitledServices/findEnabledServices) so a self-hosted install is told not_in_license vs switched_off as on main (instant-eval-opt-in.feature:72). Until ruled, self-hosted refusals keep the "contact us" answer. Coordinator leans yes (a restore of main's behaviour).
+
+## Rounds 24-28 (planned 2026-10-08, from the open-decisions sweep)
+
+Thirty-seven unruled items, cut to five rounds of four. Item ids are the sweep's (EF eventing, CD contracts and doors, BC behaviour, SR storage, SB specs). Recommendation listed first.
+
+- Round 24, facts that cut peer cycles: EF-1 annotation records facts (a) / EF-2 invitee ids on members_invited (a) / EF-3 organization folds identity join facts (a) / EF-4 eventing retries an undeclared queued type during a drain (a).
+- Round 25, the meter and replay bounds (ships with the entitlement commit): SR-1 usage_trace_meter TTL 13 months via data-retention / EF-7 narrow metering schema in trace's contract / SR-2 delete TraceMeterSeedService in the same commit / EF-5 host declares the takeover, `since` resolved at the step's first run.
+- Round 26, doors and boundaries: CD-2 evaluator doors move to evaluator (transport-local token) / CD-3 ops reads audit trail through AuditLogApi and UserApi / CD-7 auth passes the provisioned membership into identity's resolveUser / CD-4 InstantEvalApi read of the judge's limits.
+- Round 27, behaviour users see: BC-1 reword instant-eval copy to "judging turned off", keep route value / BC-2 recent items ask each owner's permission / BC-3 every workflow archive takes its evaluators and monitors / CD-8 SsoHostApi.canView.
+- Round 28, wire tidy and bulk confirm: CD-1 delete listFields, getLogsByTraceId, backfillPullRequestMappings, WorkflowApi.copy (deleteUncommitted waits) / SR-5 experiment folds trace cost from the round 23 span subscription / CD-5 browser config reads move into web declarations / bulk confirm of the defaults below.
+
+Coordinator defaults carried into the round 28 bulk confirm: BC-4 all six as built; CD-10 all four as built; sweep section 7 lane defaults; EF-6 keep data/background kind; EF-8 accept after a delivery-order test; CD-6 withConfig(schema, project); CD-9 tRPC stays unmasked, asymmetry recorded in §12; CD-11 defaults stand, AD-1 accepted as internal rename; CD-12 a lane checks the trace routes before choosing; SR-3 eventing surfaces event_log TTL and size; SR-4 analytics owns lwql_api_key_tenant_map; SR-6 keep tolerating unknown ids, drop the e2e case; SR-7 current behaviour; SR-8 round 15 principle applies to licensing; SB-1 @unimplemented with gap note; SB-2 keep unbound; SB-3 merge into the module copy; SB-4 tag all 16; SB-5 memoised upgrade spawn; BC-2 skeleton loading and per-type archive proof.
