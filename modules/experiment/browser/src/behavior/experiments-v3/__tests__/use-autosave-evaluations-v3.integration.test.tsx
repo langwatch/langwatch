@@ -81,6 +81,7 @@ vi.mock("../../../model/posthog-error-capture.ts", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
+import { toaster } from "@langwatch/browser-host/toaster";
 import { extractPersistedState } from "@langwatch/experiment-contract";
 // Import hook after mocks
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -278,6 +279,60 @@ describe("Autosave evaluation state", () => {
       evaluatorCount: 0,
     });
     expect(captured?.extra?.stateByteSize).toBeGreaterThan(0);
+  });
+
+  describe("when the save fails", () => {
+    async function failSaveWith(error: unknown) {
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+      mockMutateAsync.mockRejectedValueOnce(error);
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({ datasetId: "test-data", row: 0, columnId: "input", value: "edit" });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+    }
+
+    /** @scenario "An autosave refused for Instant Evals outside a judge names where it sits" */
+    it("hands a refusal for Instant Evals outside a judge to the toast, so it names the target", async () => {
+      const refusal = {
+        data: {
+          error: {
+            code: "instant_eval_judge_only_model",
+            httpStatus: 422,
+            message: "Instant Evals works only as an evaluator judge model.",
+            meta: { places: ["target 1"] },
+          },
+        },
+      };
+
+      await failSaveWith(refusal);
+
+      expect(toaster.create).toHaveBeenCalledWith({
+        title: "Failed to autosave evaluation",
+        type: "error",
+        error: refusal,
+      });
+    });
+
+    /** @scenario "Any other autosave failure keeps its generic message" */
+    it("keeps the generic toast for any other failure", async () => {
+      await failSaveWith(new Error("Network error"));
+
+      expect(toaster.create).toHaveBeenCalledWith({
+        title: "Failed to autosave evaluation",
+        type: "error",
+      });
+    });
   });
 
   it("saves when a new dataset is added", async () => {

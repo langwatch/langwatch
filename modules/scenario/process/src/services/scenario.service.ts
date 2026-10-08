@@ -1,3 +1,4 @@
+import { assertNotInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 import {
   ScenarioNotFoundError,
   scenarioCreateInputSchema,
@@ -63,6 +64,18 @@ function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
     : { userId: null, label: "api" };
 }
 
+/**
+ * Every door's schema refines these too; the service checks again, so no write that skips a
+ * door, a duplicate or a restored version, stores Instant Evals. Only models the write sends.
+ */
+function assertScenarioModels(models: {
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+}): void {
+  assertNotInstantEvalJudgeModel({ model: models.simulatorModel });
+  assertNotInstantEvalJudgeModel({ model: models.judgeModel });
+}
+
 export type ScenarioServiceOptions = {
   repository: ScenarioRepository;
   simulations: SimulationService;
@@ -91,6 +104,7 @@ export class ScenarioService {
 
   async create(input: ScenarioCreateInput): Promise<Scenario> {
     const parsed = scenarioCreateInputSchema.parse(input);
+    assertScenarioModels(parsed);
     // No scenario is loose: a create that names no suite files into the
     // project's Default, which is created here on the first such write.
     const testSuiteId =
@@ -163,6 +177,7 @@ export class ScenarioService {
 
   async update(input: ScenarioUpdateInput): Promise<Scenario> {
     const parsed = await this.withResolvedTestSuite(scenarioUpdateInputSchema.parse(input));
+    assertScenarioModels(parsed);
     let fields = parsed.fields;
     if (fields !== undefined) {
       const scenario = await this.options.repository.findById({
@@ -282,8 +297,18 @@ export class ScenarioService {
     return this.options.repository.findVersion(parsed);
   }
 
-  restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario> {
-    return this.options.repository.restoreVersion(scenarioVersionRestoreInputSchema.parse(input));
+  async restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario> {
+    const parsed = scenarioVersionRestoreInputSchema.parse(input);
+    // A missing scenario still answers as one before its snapshot is read.
+    await this.options.repository.findById({ id: parsed.scenarioId, projectId: parsed.projectId });
+    const snapshot = await this.options.repository.findVersion({
+      projectId: parsed.projectId,
+      scenarioId: parsed.scenarioId,
+      version: parsed.version,
+    });
+    assertScenarioModels(snapshot.fields);
+
+    return this.options.repository.restoreVersion(parsed);
   }
 
   archive(input: ScenarioIdInput): Promise<Scenario> {

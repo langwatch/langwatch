@@ -669,11 +669,24 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | an agent update                        |
         | a scenario's judge or simulator model  |
         | a suite run's judge or simulator model |
+        | an agent copy                          |
+        | a push of an agent to its copies       |
+        | an agent copy synced from its source   |
+        | a restore of a prompt version          |
+        | a scenario duplicate                   |
+        | a restore of a scenario version        |
 
     @unit
     Scenario: A prompt or an agent with any other model still saves
       When a prompt and an agent are saved with a model from the project's providers
       Then both are saved
+
+    @unit
+    Scenario: Copying, restoring or duplicating on any other model still saves
+      Given an agent, a prompt version and a scenario on a model from the project's providers
+      When the agent is copied, pushed and synced, the prompt version restored
+      And the scenario duplicated and a version of it restored
+      Then each is stored
 
     @unit
     Scenario: A prompt or an agent stored with Instant Evals before this rule still reads
@@ -712,6 +725,21 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And a prompt target on another model
       When it is saved and copied
       Then both are stored
+
+    @integration
+    Scenario Outline: An autosave refused for Instant Evals outside a judge names where it sits
+      When <surface> autosave is refused because Instant Evals sits outside a judge
+      Then a toast names the <place> to move off Instant Evals
+
+      Examples:
+        | surface         | place  |
+        | a Studio        | node   |
+        | a workbench     | target |
+
+    @integration
+    Scenario: Any other autosave failure keeps its generic message
+      When a Studio or a workbench autosave fails for any other reason
+      Then it shows the same generic autosave failure as before
 
   Rule: An evaluator error shows its stored error text in the trace list
 

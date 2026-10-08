@@ -3,6 +3,8 @@
  * model outside a judge refuses it here: one predicate, as a schema refinement or a service check.
  */
 
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "./instant-eval-judge.api.ts";
 import {
   INSTANT_EVAL_JUDGE_ONLY_MESSAGE,
@@ -29,4 +31,9 @@ export function assertNotInstantEvalJudgeModel({
   if (model && isInstantEvalJudgeModel(model)) {
     throw new InstantEvalJudgeOnlyModelError();
   }
+}
+
+/** Whether a failed save was this refusal, so a screen can let its copy name the place. */
+export function isInstantEvalJudgeOnlyRefusal(error: unknown): boolean {
+  return readHandledError(error)?.code === "instant_eval_judge_only_model";
 }

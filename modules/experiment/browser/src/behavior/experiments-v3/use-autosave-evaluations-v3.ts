@@ -3,6 +3,7 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { isInstantEvalJudgeOnlyRefusal } from "@langwatch/instant-eval-judge-contract";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -152,7 +153,12 @@ const handleAutosaveFailure = ({
     return "refused";
   }
   reportUnexpectedSaveFailure(error);
-  toaster.create({ title: "Failed to autosave evaluation", type: "error" });
+  // Only this refusal's copy names the target to change; any other keeps the generic title.
+  toaster.create({
+    title: "Failed to autosave evaluation",
+    type: "error",
+    ...(isInstantEvalJudgeOnlyRefusal(error) ? { error } : {}),
+  });
   // Identifiers, sizes and counts only: the state carries customer content.
   captureException(toError(error), {
     extra: {

@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import {
   assertNotInstantEvalJudgeModel,
+  isInstantEvalJudgeOnlyRefusal,
   refuseInstantEvalJudgeModel,
 } from "../instant-eval-judge-only-model.ts";
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "../instant-eval-judge.api.ts";
@@ -71,5 +72,23 @@ describe("InstantEvalJudgeOnlyModelError", () => {
     it("keeps the plain message", () => {
       expect(new InstantEvalJudgeOnlyModelError().message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
     });
+  });
+});
+
+describe("isInstantEvalJudgeOnlyRefusal()", () => {
+  /** @scenario "An autosave refused for Instant Evals outside a judge names where it sits" */
+  it("answers true for the refusal, thrown or as the tRPC envelope carries it", () => {
+    const envelope = {
+      data: { error: { code: "instant_eval_judge_only_model", httpStatus: 422, message: "" } },
+    };
+
+    expect(isInstantEvalJudgeOnlyRefusal(new InstantEvalJudgeOnlyModelError())).toBe(true);
+    expect(isInstantEvalJudgeOnlyRefusal(envelope)).toBe(true);
+  });
+
+  /** @scenario "Any other autosave failure keeps its generic message" */
+  it("answers false for any other failure", () => {
+    expect(isInstantEvalJudgeOnlyRefusal(new Error("Network error"))).toBe(false);
+    expect(isInstantEvalJudgeOnlyRefusal(undefined)).toBe(false);
   });
 });

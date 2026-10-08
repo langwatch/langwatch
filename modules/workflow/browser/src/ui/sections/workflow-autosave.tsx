@@ -1,4 +1,6 @@
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { isInstantEvalJudgeOnlyRefusal } from "@langwatch/instant-eval-judge-contract";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "react-feather";
@@ -122,8 +124,17 @@ export function WorkflowAutosave({
         onRefreshVersions,
         moveBaseline: () => setAutosavedWorkflow(currentWorkflow),
       });
-    } catch {
+    } catch (error) {
       setHasSaveError(true);
+      // The status line has no room for which node to change, so this refusal gets a toast.
+      if (isInstantEvalJudgeOnlyRefusal(error)) {
+        toaster.create({
+          id: "workflow-autosave-instant-eval",
+          title: "Failed to autosave",
+          type: "error",
+          error,
+        });
+      }
     } finally {
       setIsSaving(false);
     }
