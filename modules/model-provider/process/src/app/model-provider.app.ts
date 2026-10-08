@@ -74,10 +74,12 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { nlpInternalSecret, openAiApiKey, Secret } from "@langwatch/secrets";
 
-import { modelProviderCodexGatewayPingChannels } from "../channels/model-provider-codex-gateway-ping-channels.registry.ts";
 import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
-import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
-import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
+import {
+  executionProxyBaseUrlOf,
+  type ModelProviderConnectionPing,
+} from "../channels/model-provider-connection-ping.channel.ts";
+import type { ModelProviderChannels } from "../channels/model-provider.channels.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
 import { CodexAccountService } from "../services/codex-account.service.ts";
@@ -186,17 +188,9 @@ type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderModule.dependencies,
   never,
   ModelProviderServerConfig,
-  ModelProviderRepositories
+  ModelProviderRepositories,
+  ModelProviderChannels
 >;
-
-/**
- * The address a resolved model executes against when no NLP engine is
- * configured. Matches the deleted composition's own sentinel.
- */
-const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
-
-/** Where nlpgo answers the execution proxy, once an engine address is named. */
-const EXECUTION_PROXY_PATH = "/go/proxy/v1";
 
 /**
  * What `create` composes the infrastructure over, derived from the contract's
@@ -206,10 +200,6 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
-  /** The engine hop's shared credential, as the process resolved it. */
-  nlpInternalSecret: string | undefined;
-  /** The AI gateway as the control plane reaches it; unset when unconfigured. */
-  gatewayBaseUrl: string | undefined;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -291,15 +281,13 @@ export class ModelProviderModule implements ModelProviderApi {
   }
 
   private static withPlatformChain(
-    { repositories, dependencies, config }: ModelProviderSetup,
+    { repositories, channels, dependencies, config }: ModelProviderSetup,
     {
       platformChain,
       nlpInternalSecret,
     }: { platformChain: PlatformProviderChainService; nlpInternalSecret: string | undefined },
   ): ModelProviderModule {
-    const executionProxyBaseUrl = config.nlpServiceUrl
-      ? `${config.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
-      : UNCONFIGURED_EXECUTION_PROXY;
+    const executionProxyBaseUrl = executionProxyBaseUrlOf(config);
     const buildConfig: ModelProviderBuildConfig = {
       egress: {
         blockLocal: config.blockLocalHttpCalls,
@@ -307,16 +295,13 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
-      nlpInternalSecret,
-      // The control plane's own address for the gateway first, as on main (codexGatewayModel.ts).
-      gatewayBaseUrl:
-        config.gatewayInternalUrl ?? config.gatewayPublicUrl ?? config.gatewayLegacyUrl,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
     };
     const infrastructure = ModelProviderModule.#composeInfrastructure({
       repositories,
+      channels,
       config: buildConfig,
       dependencies,
     });
@@ -333,10 +318,12 @@ export class ModelProviderModule implements ModelProviderApi {
   /** The collaborators `create` builds over this deployment's config, peers and registry. */
   static #composeInfrastructure({
     repositories,
+    channels,
     config,
     dependencies,
   }: {
     repositories: ModelProviderRepositories;
+    channels: ModelProviderChannels;
     config: ModelProviderBuildConfig;
     dependencies: Pick<ModelProviderSetup["dependencies"], "projects" | "managed">;
   }): ModelProviderInfrastructure {
@@ -361,13 +348,8 @@ export class ModelProviderModule implements ModelProviderApi {
         projects: dependencies.projects,
         executionProxyBaseUrl: config.executionProxyBaseUrl,
       }),
-      connectionPing: modelProviderConnectionPingChannels.live.create({
-        executionProxyBaseUrl: config.executionProxyBaseUrl,
-        nlpInternalSecret: config.nlpInternalSecret,
-      }),
-      codexGatewayPing: modelProviderCodexGatewayPingChannels.live.create({
-        gatewayBaseUrl: config.gatewayBaseUrl,
-      }),
+      connectionPing: channels.connectionPing,
+      codexGatewayPing: channels.codexGatewayPing,
       ids: PrefixedModelProviderIdService.create(),
       codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
       connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({

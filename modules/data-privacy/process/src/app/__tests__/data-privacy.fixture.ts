@@ -4,6 +4,7 @@ import { PROJECT_DEPARTMENT_ASSIGNED_EVENT_TYPE, type Team } from "@langwatch/pr
 import { ScopedSecrets } from "@langwatch/secrets";
 import { vi } from "vitest";
 
+import { MemoryDataPrivacyChannels } from "../../channels/memory/memory.data-privacy.channels.ts";
 import type { ProjectFact } from "../../eventing/__tests__/data-privacy-project-scope.fixture.ts";
 import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
@@ -103,19 +104,21 @@ export async function createDataPrivacyTestApp({
   directory: MemoryDataPrivacyDirectoryRepository;
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
 }): Promise<DataPrivacyModule> {
+  const config = {
+    googleDlpDisabled: undefined,
+    enforcement: undefined,
+    nodeEnvironment: undefined,
+    langevalsEndpoint: undefined,
+  };
   return DataPrivacyModule.create({
     repositories: {
       ...MemoryDataPrivacyRepositories.create(),
       directory,
       projectScopes: await createDataPrivacyTestScopes(),
     },
+    channels: MemoryDataPrivacyChannels.create({ config }),
     dependencies,
-    config: {
-      googleDlpDisabled: undefined,
-      enforcement: undefined,
-      nodeEnvironment: undefined,
-      langevalsEndpoint: undefined,
-    },
+    config,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     resources: { own: () => void 0, ownService: () => void 0 },
   });

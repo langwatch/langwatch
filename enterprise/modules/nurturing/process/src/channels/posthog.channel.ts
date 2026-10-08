@@ -31,6 +31,8 @@ export abstract class PostHogChannel {
   abstract groupIdentify(input: PostHogGroupInput): void;
   /** Fire and forget, as `track`. */
   abstract identify(input: PostHogIdentifyInput): void;
+  /** Flushes whatever is queued as the process stops; a channel that queues nothing keeps this. */
+  async close(): Promise<void> {}
 }
 
 /** Where server-side product analytics goes: the PostHog project key, and its host. */

@@ -19,11 +19,10 @@ import {
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { Secret } from "@langwatch/secrets";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
-import { googleDlpChannels } from "../channels/google-dlp-channels.registry.ts";
-import { presidioChannels } from "../channels/presidio-channels.registry.ts";
+import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
+import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";
 import {
   buildDataPrivacyProjectScopePipeline,
   type DataPrivacyProjectScopePipeline,
@@ -88,7 +87,8 @@ type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
   never,
   DataPrivacyServerConfig,
-  DataPrivacyRepositories
+  DataPrivacyRepositories,
+  DataPrivacyChannels
 >;
 
 /** Applies a closure to the resolved credential without handing the value out. */
@@ -104,7 +104,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
-    googleApplicationCredentials: Secret.load("GOOGLE_APPLICATION_CREDENTIALS", { optional: true }),
+    googleApplicationCredentials,
   } as const;
 
   #privacy: DataPrivacyService;
@@ -138,6 +138,7 @@ export class DataPrivacyModule implements DataPrivacyApi {
 
   static async create({
     repositories,
+    channels,
     dependencies,
     config,
     secrets,
@@ -150,14 +151,14 @@ export class DataPrivacyModule implements DataPrivacyApi {
     );
     const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
-      presidio: presidioChannels.live.create({ endpoint: config.langevalsEndpoint }),
+      presidio: channels.presidio,
       metrics,
       timeoutMs: DATA_PRIVACY_PRESIDIO_TIMEOUT_MS,
     });
     const analysis = PiiAnalysisService.create({
       presidio,
       dlp: GoogleDlpRedactionService.create({
-        dlp: googleCredentials((credential) => googleDlpChannels.live.create({ credential })),
+        dlp: channels.dlp,
         disabled: config.googleDlpDisabled === true || config.googleDlpDisabled === "true",
         metrics,
       }),

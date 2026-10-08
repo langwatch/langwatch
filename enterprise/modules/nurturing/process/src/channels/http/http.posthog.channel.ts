@@ -62,7 +62,7 @@ export class HttpPostHogChannel extends PostHogChannel {
     }
   }
 
-  async close(): Promise<void> {
+  override async close(): Promise<void> {
     await Promise.all((this.#clients ?? []).map((client) => client.shutdown()));
   }
 

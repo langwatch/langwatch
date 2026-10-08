@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * @see enterprise/modules/nurturing/specs/nurturing.feature
- */
 import { SIGNED_UP_EVENT_TYPE } from "@langwatch/auth-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
@@ -35,6 +30,12 @@ import {
 } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * @see enterprise/modules/nurturing/specs/nurturing.feature
+ */
+import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
@@ -86,8 +87,10 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
   const delivery = NurturingDeliveryService.create({
     claims: { claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)) },
     customerIo: NurturingService.create({
-      config: { customerIoApiKey: "key", customerIoRegion: "us" },
-      fetchFn: customerIoFetch,
+      channel: HttpCustomerIoChannel.create({
+        config: { customerIoApiKey: "key", customerIoRegion: "us" },
+        fetchFn: customerIoFetch,
+      }),
     }),
     posthog,
     users,

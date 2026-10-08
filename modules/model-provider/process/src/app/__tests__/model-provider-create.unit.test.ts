@@ -1,8 +1,3 @@
-/**
- * Tests that ModelProviderModule.create builds collaborators from its registry, peers and config,
- * not from hand-composed infrastructure. Regression: before regaining build step, calls
- * crashed on undefined errors (defaultFeatures, systemProviders, exists).
- */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
@@ -11,6 +6,12 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+/**
+ * Tests that ModelProviderModule.create builds collaborators from its registry, peers and config,
+ * not from hand-composed infrastructure. Regression: before regaining build step, calls
+ * crashed on undefined errors (defaultFeatures, systemProviders, exists).
+ */
+import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { ModelProviderModule } from "../model-provider.app.ts";
@@ -100,6 +101,7 @@ function createRealModelProviderApp(
 ): Promise<ModelProviderModule> {
   return ModelProviderModule.create({
     repositories,
+    channels: MemoryModelProviderChannels.create(),
     dependencies: {
       projects: createFullModelProviderTestProjects(),
       organizations: createFullModelProviderTestOrganizations(),

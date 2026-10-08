@@ -11,8 +11,7 @@ import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contr
 import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { modelProviderCodexGatewayPingChannels } from "../../channels/model-provider-codex-gateway-ping-channels.registry.ts";
-import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
+import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { CodexAccountService } from "../../services/codex-account.service.ts";
@@ -114,8 +113,7 @@ export function createModelProviderTestInfrastructure(
       projects,
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
-    connectionPing: modelProviderConnectionPingChannels.memory.create(),
-    codexGatewayPing: modelProviderCodexGatewayPingChannels.memory.create(),
+    ...MemoryModelProviderChannels.create(),
     ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({

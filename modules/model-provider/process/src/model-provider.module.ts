@@ -6,6 +6,7 @@ import {
 import { defineProcessModule } from "@langwatch/process";
 
 import { ModelProviderModule } from "./app/model-provider.app.ts";
+import { modelProviderChannels } from "./channels/model-provider-channels.registry.ts";
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task.ts";
 import { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task.ts";
@@ -19,6 +20,7 @@ import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
 export const modelProviderProcessModule = defineProcessModule("model-provider")
   .withRepositories(modelProviderRepositories)
+  .withChannels(modelProviderChannels)
   .withApi(ModelProviderModule)
   .withTransports(
     modelProviderRest,

@@ -4,7 +4,6 @@ export type {
   ModelProviderEgressRequest,
   ModelProviderEgressResponse,
 } from "./services/ssrf-model-provider-egress.service.ts";
-export { modelProviderConnectionPingChannels } from "./channels/model-provider-connection-ping-channels.registry.ts";
 export type { ModelCostPreviewSpanReader } from "./services/model-cost-preview.service.ts";
 export type {
   ModelProviderCaller,
