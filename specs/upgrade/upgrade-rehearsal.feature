@@ -70,6 +70,67 @@ Feature: The upgrade is rehearsed from real images before it ships
     When the findings are evaluated
     Then that finding is "inconclusive" and names the evidence that was missing
 
+  @unit
+  Scenario: The plan names the phases each origin runs
+    When the rehearsal is planned from an old image with no phase limit
+    Then it runs phases 0 to 5, and phase 6 only when scale is asked for
+    When the rehearsal is planned for the origin "empty"
+    Then it runs phases 0 to 2 and the second-run check, and refuses a rollback phase
+
+  @unit
+  Scenario: A rollback that breaks only where the plan documents it passes, and any other break reproduces it
+    Given the old image restarted on head's schema after head wrote DEVELOPER rows
+    When its logs show only the P16 and P31 read breaks and the HTTP smoke passes
+    Then ROLLBACK is "not-reproduced"
+    When its logs name any other missing column or relation, or the smoke fails
+    Then ROLLBACK is "reproduced"
+
+  @unit
+  Scenario: A re-upgrade after a rollback settles every step and names the steps that re-ran
+    Given the ledger before the rollback and after the re-upgrade settled
+    When the findings are evaluated
+    Then REUPGRADE names each step whose attempt or finish moved, for a reviewer to judge by kind
+    And it is "reproduced" when the upgrade failed, a step is unsettled or the rollback's queued jobs remain
+
+  @unit
+  Scenario: Losing the runner lease stops the upgrade and a re-run resumes it
+    Given the runner lease taken from an upgrade while it ran
+    Then LEASE passes only when that run exited non-zero and the re-run exited zero
+    And LEASE is "inconclusive" when the upgrade finished before its lease could be taken
+
+  @unit
+  Scenario: A step killed by SIGKILL that never settles reproduces SIGKILL
+    Given a background step running when the head worker received SIGKILL
+    When the step is not done or not-needed after the worker restarted and settled
+    Then SIGKILL is "reproduced"
+
+  @unit
+  Scenario: A second upgrade run that changes any step reproduces NO-OP
+    Given a settled ledger
+    When a second upgrade run changes any step's status, attempt or finish time
+    Then NO-OP is "reproduced"
+
+  @unit
+  Scenario: A private ClickHouse target behind the shared one reproduces TARGETS
+    Given one organisation routed to a private ClickHouse
+    When the private target's goose version differs from the shared one or it has no ledger rows
+    Then TARGETS is "reproduced"
+
+  @unit
+  Scenario: Scale is measured but judged only against ruled bounds
+    Given a scale run's memory samples and step durations
+    When no bounds file was given
+    Then SCALE reports the worker's peak memory and the slowest step and is "inconclusive"
+    When bounds are given and a step or the worker exceeds them
+    Then SCALE is "reproduced"
+
+  @e2e @unimplemented
+  Scenario: Rollback, re-upgrade and failure drills from 3.20.1 and from origin/main
+    Given phases 0 to 2 have run
+    When head stops, the old image serves head's schema and the smoke writes through it
+    And head re-upgrades with its runner lease taken once, a worker killed and ClickHouse paused
+    Then the report records ROLLBACK, REUPGRADE, LEASE, SIGKILL, NO-OP and TARGETS with their evidence
+
   @e2e @unimplemented
   Scenario: Phases 0 to 2 from 3.20.1 against today's head
     Given the published 3.20.1 image seeded through its own api, its worker paused with jobs queued

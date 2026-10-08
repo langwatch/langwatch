@@ -21,13 +21,19 @@ SEED_TRACES=200
 RUN_DIR=""
 KEEP=0
 PLAN_ONLY=0
+THROUGH=5
+SCALE=0
+SCALE_PROJECTS=20000
+SCALE_USERS=200000
+BOUNDS=""
 
 usage() {
   cat <<'EOF'
 usage: rehearse.sh [--origin 3.20.1|main|empty] [--old-image IMAGE | --build-main]
                    [--head-image IMAGE | --build-head] [--order api-first|worker-first]
                    [--settle-seconds N] [--drill-seconds N] [--seed-traces N]
-                   [--run-dir DIR] [--keep] [--plan-only]
+                   [--through 2|3|4|5] [--scale [--scale-projects N] [--scale-users N]]
+                   [--bounds FILE] [--run-dir DIR] [--keep] [--plan-only]
 EOF
 }
 
@@ -52,6 +58,11 @@ parse_args() {
       --run-dir) RUN_DIR="${2:?}"; shift 2 ;;
       --keep) KEEP=1; shift ;;
       --plan-only) PLAN_ONLY=1; shift ;;
+      --through) THROUGH="${2:?}"; shift 2 ;;
+      --scale) SCALE=1; shift ;;
+      --scale-projects) SCALE_PROJECTS="${2:?}"; shift 2 ;;
+      --scale-users) SCALE_USERS="${2:?}"; shift 2 ;;
+      --bounds) BOUNDS="${2:?}"; shift 2 ;;
       -h | --help) usage; exit 0 ;;
       *) die_usage "unknown argument: $1" ;;
     esac
@@ -74,14 +85,26 @@ resolve_plan() {
     *) die_usage "unknown origin: $ORIGIN (3.20.1, main or empty)" ;;
   esac
   case "$ORDER" in api-first | worker-first) ;; *) die_usage "unknown order: $ORDER" ;; esac
+  case "$THROUGH" in 2 | 3 | 4 | 5) ;; *) die_usage "unknown --through: $THROUGH (2 to 5)" ;; esac
+  if [[ "$ORIGIN" == "empty" && "$THROUGH" -gt 2 && "$THROUGH" -lt 5 ]]; then
+    die_usage "origin empty has no old image to roll back to; use --through 2 or 5"
+  fi
+  [[ -n "$BOUNDS" && ! -f "$BOUNDS" ]] && die_usage "no bounds file: $BOUNDS"
   if [[ -z "$HEAD_IMAGE" && "$BUILD_HEAD" -eq 0 ]]; then
     die_usage "head needs --head-image IMAGE or --build-head (builds this working tree)"
   fi
   if [[ "$BUILD_HEAD" -eq 1 ]]; then HEAD_IMAGE="${HEAD_IMAGE:-langwatch-rehearsal:head}"; fi
   local seeds="$SEED_TRACES"
   [[ "$ORIGIN" == "empty" ]] && seeds=0
-  printf 'origin=%s\nold_image=%s\nhead_image=%s\norder=%s\nseed_traces=%s\n' \
-    "$ORIGIN" "$OLD_IMAGE" "$HEAD_IMAGE" "$ORDER" "$seeds"
+  local phases="0 1 2"
+  if [[ "$ORIGIN" == "empty" ]]; then
+    [[ "$THROUGH" -ge 5 ]] && phases="$phases 5"
+  else
+    for ((n = 3; n <= THROUGH; n++)); do phases="$phases $n"; done
+  fi
+  [[ "$SCALE" -eq 1 ]] && phases="$phases 6"
+  printf 'origin=%s\nold_image=%s\nhead_image=%s\norder=%s\nseed_traces=%s\nphases=%s\n' \
+    "$ORIGIN" "$OLD_IMAGE" "$HEAD_IMAGE" "$ORDER" "$seeds" "$phases"
 }
 
 # Names every missing prerequisite at once; exits 3 when any is missing.
@@ -129,6 +152,9 @@ write_env_file() {
       echo "$key=$(secret)"
     done
     echo "ENVIRONMENT=rehearsal"
+    echo "ADMIN_EMAILS=rollback+${RUN_ID}@rehearsal.test"
+    # The second organisation's private ClickHouse route (tenancy.ts: CLICKHOUSE_URL__<label>__<org>).
+    echo "CLICKHOUSE_URL__rehearsal__rh_${RUN_ID}_org_b=http://default:langwatch@clickhouse-private:8123/langwatch"
   } >"$RUN_DIR/rehearsal.env"
 }
 
@@ -175,7 +201,7 @@ build_images() {
 
 phase0_seed() {
   log "phase 0: stores up"
-  compose up -d --wait postgres redis clickhouse
+  compose up -d --wait postgres redis clickhouse clickhouse-private
   [[ "$ORIGIN" == "empty" ]] && return 0
   log "phase 0: old image $OLD_IMAGE up"
   compose up -d old-app old-worker
@@ -190,6 +216,33 @@ phase0_seed() {
   for key in team personal orgb; do post_traces "sk-lw-rh${RUN_ID}${key}" 20; done
   sleep 5
   snapshot_queues queues-cut.json
+  log "phase 7: exporting the old image's event_log for head's parse"
+  clickhouse_at clickhouse "SELECT * FROM event_log FORMAT JSONEachRow" >"$RUN_DIR/evidence/event-log.jsonl" || true
+  [[ "$SCALE" -eq 1 ]] && phase6_seed
+  return 0
+}
+
+clickhouse_at() { compose exec -T "$1" clickhouse-client --password langwatch --database langwatch --query "$2"; }
+
+# Phase 6's tenant set at the old schema; spans at scale are not seeded yet (see README).
+phase6_seed() {
+  log "phase 6: seeding $SCALE_PROJECTS projects and $SCALE_USERS users"
+  local started=$SECONDS
+  compose exec -T postgres psql -U prisma -d mydb -v run="$RUN_ID" -v projects="$SCALE_PROJECTS" \
+    -v users="$SCALE_USERS" -f - <"$HERE/seed/scale.sql" >>"$RUN_DIR/rehearse.log"
+  printf '{"projects":%s,"users":%s,"seedSeconds":%s}' "$SCALE_PROJECTS" "$SCALE_USERS" \
+    "$((SECONDS - started))" >"$RUN_DIR/evidence/scale.json"
+}
+
+# Samples every container's memory each 5 s into memory.log until teardown.
+start_memory_sampler() {
+  (while :; do
+    ids="$(compose ps -q 2>/dev/null || true)"
+    # shellcheck disable=SC2086
+    [[ -n "$ids" ]] && docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' $ids >>"$RUN_DIR/evidence/memory.log" 2>/dev/null
+    sleep 5
+  done) &
+  SAMPLER_PID=$!
 }
 
 start_load() {
@@ -200,8 +253,9 @@ start_load() {
 
 stop_load() { [[ -n "${LOAD_PID:-}" ]] && kill "$LOAD_PID" 2>/dev/null || true; LOAD_PID=""; }
 
-f2_drill() {
-  local deadline=$((SECONDS + DRILL_SECONDS)) running="[]"
+# Signals the head worker once a background step runs; writes <name>-drill.json and restarts it.
+drill() {
+  local signal="$1" name="$2" deadline=$((SECONDS + DRILL_SECONDS)) running="[]"
   while ((SECONDS < deadline)); do
     running="$(psql_json "SELECT id FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_step\" WHERE status = 'running' AND mode = 'background'")"
     [[ "$running" != "[]" ]] && break
@@ -209,15 +263,15 @@ f2_drill() {
   done
   local signal_at exited_at
   signal_at="$(date -u +%FT%T.%3NZ)"
-  compose kill -s SIGTERM head-worker >/dev/null
+  compose kill -s "$signal" head-worker >/dev/null
   compose wait head-worker >/dev/null 2>&1 || true
   exited_at="$(date -u +%FT%T.%3NZ)"
-  ledger_query f2-after.json
+  ledger_query "$name-after.json"
   node -e '
     const [running, after, signalAt, exitedAt] = process.argv.slice(1);
     const ids = JSON.parse(running).map((r) => r.id);
     process.stdout.write(JSON.stringify({ signalAt, exitedAt, runningAtSignal: ids, after: JSON.parse(after) }, null, 2));
-  ' "$running" "$(cat "$RUN_DIR/evidence/f2-after.json")" "$signal_at" "$exited_at" >"$RUN_DIR/evidence/f2-drill.json"
+  ' "$running" "$(cat "$RUN_DIR/evidence/$name-after.json")" "$signal_at" "$exited_at" >"$RUN_DIR/evidence/$name-drill.json"
   compose up -d head-worker
 }
 
@@ -244,7 +298,7 @@ phase1_overlap() {
   compose up -d --no-deps head-api head-worker
   wait_http "http://localhost:${HEAD_API_PORT}/api/health" 600 || log "head api never answered /api/health"
   log "phase 1: SIGTERM drill on the head worker (F-2)"
-  f2_drill
+  drill SIGTERM f2
   [[ "$ORIGIN" == "empty" ]] && return 0
   if [[ "$ORDER" == "api-first" ]]; then
     compose stop old-app
@@ -272,15 +326,23 @@ collect_resolution() {
   ' "$projects" "$folded" >"$RUN_DIR/evidence/resolution.json"
 }
 
-phase2_collect() {
-  log "phase 2: settling for up to ${SETTLE_SECONDS}s"
+settle() {
   local deadline=$((SECONDS + SETTLE_SECONDS)) open
   while ((SECONDS < deadline)); do
     open="$(psql_at "SELECT count(*) FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_step\" WHERE mode = 'background' AND status IN ('pending', 'running')" 2>/dev/null || echo 1)"
     [[ "$open" == "0" ]] && break
     sleep 5
   done
+}
+
+goose_version() { clickhouse_at "$1" "SELECT max(version_id) FROM goose_db_version FORMAT JSONEachRow" 2>/dev/null | node -e 'const l=require("node:fs").readFileSync(0,"utf8").trim(); process.stdout.write(l ? String(Object.values(JSON.parse(l))[0]) : "null")'; }
+
+phase2_collect() {
+  log "phase 2: settling for up to ${SETTLE_SECONDS}s"
+  settle
   ledger_query ledger-steps.json
+  printf '{"shared":%s,"private":%s}' "$(goose_version clickhouse)" "$(goose_version clickhouse-private)" \
+    >"$RUN_DIR/evidence/goose-targets.json"
   psql_json "SELECT step_id, target, status, version, last_error FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_target\" ORDER BY step_id, target" >"$RUN_DIR/evidence/ledger-targets.json"
   psql_json "SELECT process_id, role, image, release, steps, heartbeat_at FROM \"mydb_upgrade_ledger\".\"_langwatch_serving_roster\"" >"$RUN_DIR/evidence/ledger-roster.json"
   collect_resolution
@@ -292,8 +354,117 @@ phase2_collect() {
   done
 }
 
+head_task() { compose run --rm -w /app/apps/tasks head-migrate pnpm --silent task "$@"; }
+
+# The smoke's psql, run in the postgres container; the head database's tables live in schema mydb.
+write_psql_shim() {
+  mkdir -p "$RUN_DIR/bin"
+  cat >"$RUN_DIR/bin/psql" <<EOF
+#!/usr/bin/env bash
+opts=()
+case "\$*" in */mydb*) opts=(-e PGOPTIONS=-csearch_path=mydb) ;; esac
+exec env OLD_IMAGE="$OLD_IMAGE" HEAD_IMAGE="$HEAD_IMAGE" REHEARSAL_ENV_FILE="$RUN_DIR/rehearsal.env" \\
+  REHEARSAL_PROJECT="$PROJECT" docker compose -f "$HERE/compose.yml" exec -T "\${opts[@]}" postgres psql "\$@"
+EOF
+  chmod +x "$RUN_DIR/bin/psql"
+}
+
+# Phase 3: head stops, the old image starts on head's schema with no head upgrade (a Helm rollback).
+phase3_rollback() {
+  local developer=false pre=0 serving=false smoke=1 email="rollback+${RUN_ID}@rehearsal.test"
+  if [[ "$ORIGIN" == "3.20.1" ]]; then
+    log "phase 3: head writes a DEVELOPER membership and joiner role (P31)"
+    psql_at "UPDATE mydb.\"OrganizationUser\" SET role = 'DEVELOPER' WHERE \"userId\" = 'rh_${RUN_ID}_u_never' AND \"organizationId\" = 'rh_${RUN_ID}_org_a'; UPDATE mydb.\"Organization\" SET \"joinerRole\" = 'DEVELOPER' WHERE id = 'rh_${RUN_ID}_org_a'" \
+      >>"$RUN_DIR/rehearse.log" && developer=true
+  fi
+  ledger_query ledger-steps-before-rollback.json
+  compose stop head-api head-worker
+  log "phase 3: recording the rollback to an image before the serving roster"
+  head_task upgrade pre-roster-rollback >"$RUN_DIR/evidence/logs/pre-roster-rollback.log" 2>&1 || pre=$?
+  compose rm -sf old-app old-worker >/dev/null
+  compose up -d old-app old-worker
+  wait_http "http://localhost:${OLD_APP_PORT}/api/health" 600 && serving=true
+  if [[ "$serving" == true ]]; then
+    write_psql_shim
+    local password="Rollback-$(node -e 'process.stdout.write(require("node:crypto").randomBytes(16).toString("hex"))')"
+    smoke=0
+    PATH="$RUN_DIR/bin:$PATH" DATABASE_URL="postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb" \
+      bash "$REPO_ROOT/dev/scripts/migration-compat-smoke/seed-account.sh" "$email" "$password" \
+      >"$RUN_DIR/evidence/logs/rollback-smoke.log" 2>&1 &&
+      APP_BASE="http://localhost:${OLD_APP_PORT}" SMOKE_EMAIL="$email" SMOKE_PASSWORD="$password" \
+        SMOKE_LABEL="rollback" node "$REPO_ROOT/dev/scripts/migration-compat-smoke/smoke.mjs" \
+        >>"$RUN_DIR/evidence/logs/rollback-smoke.log" 2>&1 || smoke=$?
+    sleep 30
+  fi
+  compose logs --no-color --no-log-prefix old-app >"$RUN_DIR/evidence/logs/old-app-rollback.log" 2>&1 || true
+  compose logs --no-color --no-log-prefix old-worker >"$RUN_DIR/evidence/logs/old-worker-rollback.log" 2>&1 || true
+  printf '{"serving":%s,"smokeExit":%s,"developerSeeded":%s,"preRosterExit":%s}' \
+    "$serving" "$smoke" "$developer" "$pre" >"$RUN_DIR/evidence/rollback.json"
+}
+
+# Phase 5's lease drill: takes the runner lease from a running upgrade, then re-runs it.
+lease_drill() {
+  local name="$PROJECT-lease" stolen=false exit_code rerun=0
+  compose run -d --name "$name" -w /app/apps/tasks head-migrate pnpm --silent task upgrade >/dev/null
+  for ((i = 0; i < 120; i++)); do
+    [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" == true ]] || break
+    if [[ -n "$(psql_at "UPDATE \"mydb_upgrade_ledger\".\"_langwatch_upgrade_lease\" SET owner = 'rehearsal-thief' WHERE expires_at > now() RETURNING 1" 2>/dev/null)" ]]; then
+      stolen=true
+      break
+    fi
+    sleep 0.5
+  done
+  for ((i = 0; i < 600; i++)); do
+    [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" == true ]] || break
+    sleep 1
+  done
+  docker kill "$name" >/dev/null 2>&1 || true
+  exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$name")"
+  docker logs "$name" >"$RUN_DIR/evidence/logs/head-migrate-lease.log" 2>&1 || true
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  sleep 65 # the stolen lease's 60 s expiry, so the re-run can take it
+  head_task upgrade >"$RUN_DIR/evidence/logs/head-migrate-2.log" 2>&1 || rerun=$?
+  printf '{"stolen":%s,"exit":%s,"rerunExit":%s}' "$stolen" "$exit_code" "$rerun" >"$RUN_DIR/evidence/lease-drill.json"
+  REUPGRADE_EXIT=$rerun
+}
+
+# Phase 4 re-upgrade, with phase 5's drills when --through 5: lease loss, SIGKILL, ClickHouse pause.
+phase4_reupgrade() {
+  snapshot_queues queues-rollback.json
+  compose stop old-app
+  stop_paused_worker
+  REUPGRADE_EXIT=0
+  if [[ "$THROUGH" -ge 5 ]]; then
+    lease_drill
+  else
+    head_task upgrade >"$RUN_DIR/evidence/logs/head-migrate-2.log" 2>&1 || REUPGRADE_EXIT=$?
+  fi
+  compose up -d --no-deps head-api head-worker
+  wait_http "http://localhost:${HEAD_API_PORT}/api/health" 600 || log "head api never answered after the rollback"
+  head_task upgrade old-writers-gone >"$RUN_DIR/evidence/logs/old-writers-gone.log" 2>&1 || true
+  if [[ "$THROUGH" -ge 5 ]]; then
+    drill SIGKILL kill
+    log "phase 5: a transient ClickHouse refusal (paused 20 s)"
+    compose pause clickhouse && sleep 20 && compose unpause clickhouse
+  fi
+  settle
+  ledger_query ledger-steps-reupgrade.json
+  snapshot_queues queues-reupgrade.json
+  printf '{"migrateExit":%s}' "$REUPGRADE_EXIT" >"$RUN_DIR/evidence/reupgrade.json"
+}
+
+# Phase 5: a second upgrade run over a settled ledger applies nothing.
+phase5_noop() {
+  local exit_code=0
+  ledger_query ledger-steps-noop-before.json
+  head_task upgrade >"$RUN_DIR/evidence/logs/head-migrate-noop.log" 2>&1 || exit_code=$?
+  ledger_query ledger-steps-noop-after.json
+  printf '{"exit":%s}' "$exit_code" >"$RUN_DIR/evidence/noop.json"
+}
+
 teardown() {
   stop_load
+  [[ -n "${SAMPLER_PID:-}" ]] && kill "$SAMPLER_PID" 2>/dev/null || true
   [[ "$KEEP" -eq 1 ]] && { log "kept the stack: docker compose -p $PROJECT -f $HERE/compose.yml down -v"; return; }
   compose down -v --remove-orphans >/dev/null 2>&1 || true
 }
@@ -318,10 +489,17 @@ main() {
     node -e 'const p=JSON.parse(require("node:fs").readFileSync(0,"utf8")); process.stdout.write(JSON.stringify({origin:p.origin, oldImage:p.old_image||null, headImage:p.head_image, order:p.order, startedAt:p.startedAt, runId:p.runId}, null, 2))' \
       >"$RUN_DIR/evidence/run.json"
   trap teardown EXIT
+  [[ -n "$BOUNDS" ]] && cp "$BOUNDS" "$RUN_DIR/evidence/bounds.json"
   build_images
+  start_memory_sampler
   phase0_seed
   phase1_overlap
   phase2_collect
+  if [[ "$ORIGIN" != "empty" && "$THROUGH" -ge 3 ]]; then
+    phase3_rollback
+    [[ "$THROUGH" -ge 4 ]] && phase4_reupgrade
+  fi
+  [[ "$THROUGH" -ge 5 ]] && phase5_noop
   node "$HERE/evaluate.mjs" "$RUN_DIR"
   log "report: $RUN_DIR/report.md"
 }

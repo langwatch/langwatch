@@ -17,6 +17,8 @@ x-stores-healthy: &stores-healthy
     condition: service_healthy
   clickhouse:
     condition: service_healthy
+  clickhouse-private:
+    condition: service_healthy
 
 services:
   postgres:
@@ -40,6 +42,18 @@ services:
       retries: 30
 
   clickhouse:
+    image: langwatch/clickhouse-serverless:0.2.0
+    environment:
+      CLICKHOUSE_PASSWORD: langwatch
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # The second organisation's private route (CLICKHOUSE_URL__rehearsal__<org> in the env file).
+  clickhouse-private:
     image: langwatch/clickhouse-serverless:0.2.0
     environment:
       CLICKHOUSE_PASSWORD: langwatch

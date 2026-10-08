@@ -191,9 +191,267 @@ function q09({ queuesCut, queuesSettled, headWorkerLog, headWorkerMetrics }) {
   };
 }
 
+const SETTLED_STATUSES = new Set(["done", "not-needed"]);
+const SCHEMA_MISSING = /(column|relation) "[^"]+" does not exist|P2021|P2022|Code: (47|60)\./;
+/** Read breaks the plan documents for a rollback (P16 not_onboarded, P31 DEVELOPER). */
+const DOCUMENTED_ROLLBACK_BREAK = /not_onboarded|DEVELOPER/;
+
+/** Steps of a ledger snapshot that are not done or not-needed, as `id (status)`. */
+export function unsettledSteps({ steps }) {
+  return steps.filter((s) => !SETTLED_STATUSES.has(s.status)).map((s) => `${s.id} (${s.status})`);
+}
+
+/** Steps finished before `before` whose finish or attempt moved by `after`: they re-ran. */
+export function rerunSteps({ before, after }) {
+  return after
+    .filter((step) => {
+      const was = before.find((s) => s.id === step.id);
+      return (
+        was?.status === "done" &&
+        (step.finished_at !== was.finished_at || step.attempt !== was.attempt)
+      );
+    })
+    .map((step) => step.id);
+}
+
+/** Peak MiB per container over `docker stats` samples (`<name> <usage> / <limit>` lines). */
+export function peakMemory({ samples }) {
+  const unit = { B: 1 / 1048576, KiB: 1 / 1024, kB: 1 / 1024, MiB: 1, MB: 1, GiB: 1024, GB: 1024 };
+  const peaks = {};
+  for (const line of samples.split("\n")) {
+    const match = /^(\S+)\s+([\d.]+)([A-Za-z]+)\s*\//.exec(line);
+    if (!match || !(match[3] in unit)) continue;
+    const mib = Number(match[2]) * unit[match[3]];
+    peaks[match[1]] = Math.max(peaks[match[1]] ?? 0, mib);
+  }
+  return peaks;
+}
+
+function rollback({ rollbackRun, oldAppRollbackLog, oldWorkerRollbackLog }) {
+  const title = "The old image serves head's schema after a rollback, with only P16/P17/P31 breaks";
+  if (!rollbackRun || typeof oldAppRollbackLog !== "string") {
+    return missing("ROLLBACK", title, ["rollback.json", "logs/old-app-rollback.log"]);
+  }
+  const lines = [oldAppRollbackLog, oldWorkerRollbackLog ?? ""].flatMap((log) =>
+    matchingLines({ log, pattern: SCHEMA_MISSING }),
+  );
+  const documented = lines.filter((l) => DOCUMENTED_ROLLBACK_BREAK.test(l)).length;
+  const undocumented = lines.length - documented;
+  const failed = !rollbackRun.serving || rollbackRun.smokeExit !== 0 || undocumented > 0;
+  return {
+    id: "ROLLBACK",
+    title,
+    verdict: failed ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `old api ${rollbackRun.serving ? "served" : "refused"}; smoke exit ${rollbackRun.smokeExit}; ${undocumented} undocumented and ${documented} documented schema-read errors; DEVELOPER rows ${rollbackRun.developerSeeded ? "written" : "not written"}; pre-roster-rollback exit ${rollbackRun.preRosterExit}`,
+    evidence: ["rollback.json", "logs/old-app-rollback.log", "logs/old-worker-rollback.log"],
+  };
+}
+
+function reupgrade({
+  reupgradeRun,
+  stepsBeforeRollback,
+  stepsReupgrade,
+  queuesRollback,
+  queuesReupgrade,
+}) {
+  const title =
+    "Re-upgrading after a rollback settles every step and drains what the rollback left";
+  if (!reupgradeRun || !Array.isArray(stepsBeforeRollback) || !Array.isArray(stepsReupgrade)) {
+    return missing("REUPGRADE", title, [
+      "reupgrade.json",
+      "ledger-steps-before-rollback.json",
+      "ledger-steps-reupgrade.json",
+    ]);
+  }
+  const unsettled = unsettledSteps({ steps: stepsReupgrade });
+  const reran = rerunSteps({ before: stepsBeforeRollback, after: stepsReupgrade });
+  const left =
+    queuesRollback && queuesReupgrade
+      ? (() => {
+          const at = summariseQueues({ pairs: queuesRollback });
+          const end = summariseQueues({ pairs: queuesReupgrade });
+          return [...at.pending.keys()].reduce((sum, g) => sum + (end.pending.get(g) ?? 0), 0);
+        })()
+      : null;
+  const failed = reupgradeRun.migrateExit !== 0 || unsettled.length > 0 || (left ?? 0) > 0;
+  return {
+    id: "REUPGRADE",
+    title,
+    verdict: failed ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `upgrade exit ${reupgradeRun.migrateExit}; unsettled: ${unsettled.join(", ") || "none"}; re-ran (judge against each step's kind): ${reran.join(", ") || "none"}; ${left ?? "unknown"} jobs left from the rollback's groups`,
+    evidence: [
+      "reupgrade.json",
+      "ledger-steps-reupgrade.json",
+      "queues-rollback.json",
+      "queues-reupgrade.json",
+    ],
+  };
+}
+
+function noop({ noopRun, stepsNoopBefore, stepsNoopAfter }) {
+  const title = "A second upgrade run applies nothing";
+  if (!noopRun || !Array.isArray(stepsNoopBefore) || !Array.isArray(stepsNoopAfter)) {
+    return missing("NO-OP", title, [
+      "noop.json",
+      "ledger-steps-noop-before.json",
+      "ledger-steps-noop-after.json",
+    ]);
+  }
+  const moved = stepsNoopAfter
+    .filter((step) => {
+      const was = stepsNoopBefore.find((s) => s.id === step.id);
+      return (
+        !was ||
+        was.status !== step.status ||
+        was.attempt !== step.attempt ||
+        was.finished_at !== step.finished_at
+      );
+    })
+    .map((step) => step.id);
+  return {
+    id: "NO-OP",
+    title,
+    verdict: noopRun.exit !== 0 || moved.length > 0 ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `second run exit ${noopRun.exit}; steps changed by it: ${moved.join(", ") || "none"}`,
+    evidence: ["noop.json", "ledger-steps-noop-before.json", "ledger-steps-noop-after.json"],
+  };
+}
+
+function sigkill({ killDrill, stepsReupgrade }) {
+  const title = "A step killed by SIGKILL mid-run is never done early and settles after restart";
+  if (!killDrill || !Array.isArray(killDrill.after) || !Array.isArray(stepsReupgrade)) {
+    return missing("SIGKILL", title, ["kill-drill.json", "ledger-steps-reupgrade.json"]);
+  }
+  const running = killDrill.runningAtSignal ?? [];
+  if (running.length === 0)
+    return {
+      ...missing("SIGKILL", title, ["a step running at the signal"]),
+      evidence: ["kill-drill.json"],
+    };
+  const early = killDrill.after
+    .filter((s) => running.includes(s.id) && s.status === "done")
+    .map((s) => s.id);
+  const stuck = unsettledSteps({ steps: stepsReupgrade.filter((s) => running.includes(s.id)) });
+  return {
+    id: "SIGKILL",
+    title,
+    verdict: early.length > 0 || stuck.length > 0 ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `running at SIGKILL: ${running.join(", ")}; done at the kill: ${early.join(", ") || "none"}; unsettled after restart: ${stuck.join(", ") || "none"} (checkpoint resume is read from the step's report by hand)`,
+    evidence: ["kill-drill.json", "ledger-steps-reupgrade.json"],
+  };
+}
+
+function lease({ leaseDrill }) {
+  const title = "Losing the runner lease inside upgrade stops it, and a re-run resumes";
+  if (!leaseDrill) return missing("LEASE", title, ["lease-drill.json"]);
+  if (!leaseDrill.stolen)
+    return {
+      ...missing("LEASE", title, ["a lease held while the upgrade ran"]),
+      evidence: ["lease-drill.json"],
+    };
+  const failed = leaseDrill.exit === 0 || leaseDrill.rerunExit !== 0;
+  return {
+    id: "LEASE",
+    title,
+    verdict: failed ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `upgrade exit ${leaseDrill.exit} after its lease was taken (expect non-zero); re-run exit ${leaseDrill.rerunExit} (expect 0)`,
+    evidence: ["lease-drill.json", "logs/head-migrate-lease.log"],
+  };
+}
+
+function targets({ targetRows, gooseTargets }) {
+  const title = "Every ClickHouse target, the private route included, is migrated to head";
+  if (!Array.isArray(targetRows) || !gooseTargets)
+    return missing("TARGETS", title, ["ledger-targets.json", "goose-targets.json"]);
+  const privateRows = targetRows.filter((row) => String(row.target).startsWith("private"));
+  const open = targetRows
+    .filter((row) => !SETTLED_STATUSES.has(row.status))
+    .map((row) => `${row.step_id}@${row.target}`);
+  const behind = gooseTargets.shared == null || gooseTargets.private !== gooseTargets.shared;
+  return {
+    id: "TARGETS",
+    title,
+    verdict:
+      privateRows.length === 0 || open.length > 0 || behind
+        ? VERDICT.reproduced
+        : VERDICT.notReproduced,
+    detail: `${privateRows.length} private-target ledger rows; goose shared ${gooseTargets.shared}, private ${gooseTargets.private}; not done: ${open.join(", ") || "none"}`,
+    evidence: ["ledger-targets.json", "goose-targets.json"],
+  };
+}
+
+function scale({ scaleRun, memorySamples, bounds, stepsSettled }) {
+  const title = "At scale, each step and the head worker stay within the ruled bounds";
+  if (!scaleRun) return missing("SCALE", title, ["scale.json (run with --scale)"]);
+  if (typeof memorySamples !== "string" || !Array.isArray(stepsSettled))
+    return missing("SCALE", title, ["memory.log", "ledger-steps.json"]);
+  const peaks = peakMemory({ samples: memorySamples });
+  const worker = Math.max(
+    0,
+    ...Object.entries(peaks)
+      .filter(([n]) => n.includes("head-worker"))
+      .map(([, v]) => v),
+  );
+  const seconds = Object.fromEntries(
+    stepsSettled
+      .filter((s) => s.started_at && s.finished_at)
+      .map((s) => [s.id, (Date.parse(s.finished_at) - Date.parse(s.started_at)) / 1000]),
+  );
+  const slowest = Object.entries(seconds).toSorted((a, b) => b[1] - a[1])[0];
+  const measured = `head worker peak ${Math.round(worker)} MiB; slowest step ${slowest ? `${slowest[0]} ${slowest[1]}s` : "none"}`;
+  if (!bounds)
+    return {
+      ...missing("SCALE", title, ["bounds.json (no bound ruled yet)"]),
+      detail: `${measured}; no bound ruled, so nothing is judged`,
+    };
+  const over = Object.entries(seconds)
+    .filter(([, s]) => s > bounds.stepSeconds)
+    .map(([id]) => id);
+  return {
+    id: "SCALE",
+    title,
+    verdict:
+      worker > bounds.workerMemoryMiB || over.length > 0
+        ? VERDICT.reproduced
+        : VERDICT.notReproduced,
+    detail: `${measured}; over ${bounds.stepSeconds}s: ${over.join(", ") || "none"}; memory bound ${bounds.workerMemoryMiB} MiB`,
+    evidence: ["scale.json", "memory.log", "ledger-steps.json", "bounds.json"],
+  };
+}
+
+function events({ eventParse }) {
+  const title =
+    "Every event_log row written by the old image parses with head's schemas and upcasts";
+  if (!eventParse)
+    return missing("EVENTS", title, [
+      "event-parse.json (head has no stored-event parse command yet)",
+    ]);
+  return {
+    id: "EVENTS",
+    title,
+    verdict: eventParse.refused > 0 ? VERDICT.reproduced : VERDICT.notReproduced,
+    detail: `${eventParse.parsed} rows parsed, ${eventParse.refused} refused`,
+    evidence: ["event-log.jsonl", "event-parse.json"],
+  };
+}
+
 /** Every finding the rehearsal reports, in plan order. */
 export function evaluate(evidence) {
-  return [r01(evidence), r02(evidence), f1(evidence), f2(evidence), q09(evidence)];
+  return [
+    r01(evidence),
+    r02(evidence),
+    f1(evidence),
+    f2(evidence),
+    q09(evidence),
+    targets(evidence),
+    rollback(evidence),
+    reupgrade(evidence),
+    lease(evidence),
+    sigkill(evidence),
+    noop(evidence),
+    scale(evidence),
+    events(evidence),
+  ];
 }
 
 /** The report as Markdown, one table row per finding plus the ledger's step statuses. */
@@ -235,6 +493,26 @@ function readEvidence({ dir }) {
     queuesSettled: json("queues-settled.json"),
     headWorkerLog: text("logs/head-worker.log"),
     headWorkerMetrics: text("head-worker.metrics"),
+    targetRows: json("ledger-targets.json"),
+    gooseTargets: json("goose-targets.json"),
+    rollbackRun: json("rollback.json"),
+    oldAppRollbackLog: text("logs/old-app-rollback.log"),
+    oldWorkerRollbackLog: text("logs/old-worker-rollback.log"),
+    reupgradeRun: json("reupgrade.json"),
+    stepsBeforeRollback: json("ledger-steps-before-rollback.json"),
+    stepsReupgrade: json("ledger-steps-reupgrade.json"),
+    queuesRollback: json("queues-rollback.json"),
+    queuesReupgrade: json("queues-reupgrade.json"),
+    leaseDrill: json("lease-drill.json"),
+    killDrill: json("kill-drill.json"),
+    noopRun: json("noop.json"),
+    stepsNoopBefore: json("ledger-steps-noop-before.json"),
+    stepsNoopAfter: json("ledger-steps-noop-after.json"),
+    scaleRun: json("scale.json"),
+    memorySamples: text("memory.log"),
+    bounds: json("bounds.json"),
+    stepsSettled: json("ledger-steps.json"),
+    eventParse: json("event-parse.json"),
   };
 }
 
