@@ -79,6 +79,34 @@ Feature: The worker runs declared background steps
     And a checkpoint saved after the loss is refused, so it cannot overwrite the new holder's
 
   @integration
+  Scenario: A worker stopped mid-step leaves it resumable and the next worker finishes it
+    Given a worker running a background step that has saved a checkpoint
+    When the worker is told to stop, as on SIGTERM
+    Then the step is not recorded done and returns to pending with that checkpoint
+    And another worker's sweep resumes it from that checkpoint and records it done
+
+  @integration
+  Scenario: A batch that outlasts the lease runs once across two workers
+    Given a worker running a background step whose one batch lasts longer than the lease
+    When a second worker sweeps after the lease would have expired unrenewed
+    Then the renewed lease keeps the second worker out
+    And the step runs once and is recorded done
+
+  @integration
+  Scenario: A renewal refused over the ledger stops the holder
+    Given a worker running a background step that has saved a checkpoint
+    When another worker takes its lease and the next renewal is refused
+    Then the holder's signal is aborted and the step is not recorded done
+    And a checkpoint saved after the loss is refused, so the row keeps the earlier one
+
+  @integration
+  Scenario: A transient failure over the ledger is retried after its backoff
+    Given a pending background step whose run is refused once and then succeeds
+    When the worker sweeps before the backoff has passed and again after it
+    Then the first failure leaves the step pending with its error and its checkpoint
+    And the retry resumes from that checkpoint and records the step done
+
+  @integration
   Scenario: A step that needs old writers gone waits while an old writer is live
     Given a pending background step that needs old writers gone
     And the serving roster says an old writer is still live

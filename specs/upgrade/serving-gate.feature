@@ -190,6 +190,13 @@ Feature: Serving processes refuse to start when the installation is behind their
     And the background step is declared on its roster entry
 
   @integration
+  Scenario: A serving process over a real ledger gates on the generated code step list
+    Given the image's committed code step list and every schema step done
+    When a worker's gate reads the ledger while the list's blocking step is pending
+    Then it is refused naming that step
+    And once that step is done the api is admitted and its roster entry declares the background steps
+
+  @integration
   Scenario: The api and worker declare the code steps the tasks process collects
     Given the tasks process's installed modules booted over memory stores
     When `pnpm task upgrade steps --json` lists their migration steps
