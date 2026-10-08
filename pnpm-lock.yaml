@@ -10754,6 +10754,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
