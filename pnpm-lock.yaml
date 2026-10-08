@@ -3161,6 +3161,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../modules/trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../../packages/upgrade
       '@slack/webhook':
         specifier: 'catalog:'
         version: 7.1.0(debug@4.4.3(supports-color@10.2.2))(supports-color@10.2.2)
@@ -10063,6 +10066,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       hono:
         specifier: 'catalog:'
         version: 4.13.1

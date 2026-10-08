@@ -1,4 +1,5 @@
 import { defineProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 /**
  * What a process composes billing's process-side work from: the
@@ -16,6 +17,7 @@ import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
+import { UsageBillingBackfillService } from "./services/usage-billing-backfill.service.ts";
 import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
@@ -43,6 +45,33 @@ export const billingProcessModule = defineProcessModule("billing")
   .withEventing(connectedBillingEventing)
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
+  // Background, after old writers are gone: an older image records no usage-billed fact.
+  .withMigrations(({ app, repositories }) => [
+    defineMigrationStep({
+      id: "billing:record-usage-billing-catch-up",
+      kind: "data",
+      mode: "background",
+      description:
+        "Records whether the meter bills each organisation, the fact the Instant Evals judge folds.",
+      needsOldWritersGone: true,
+      run: async ({ checkpoint, dryRun, signal }) => {
+        const resumed = checkpoint.resumeFrom?.afterOrganizationId;
+        const backfill = UsageBillingBackfillService.create({
+          peers: {
+            organizations: repositories.organizations,
+            catchUp: (input) => app.catchUpUsageBilling(input),
+          },
+        });
+        const report = await backfill.backfill({
+          after: typeof resumed === "string" ? resumed : undefined,
+          dryRun,
+          signal,
+          onPage: (page) => checkpoint.save({ report: page }),
+        });
+        return { ...report, dryRun };
+      },
+    }),
+  ])
   .withTasks(async ({ app, repositories, secrets, config }) => [
     UsageBillingCatchUpTask.create({ organizations: repositories.organizations, billing: app }),
     await secrets.into(BillingModule.secrets.stripeSecretKey, (secretKey) =>

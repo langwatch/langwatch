@@ -512,6 +512,31 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the finish is retried, under another finish reason or on another pod
       Then the spend it records again carries the same request id as the first attempt
 
+  Rule: The spend catch-up runs as an upgrade step after the usage-billing catch-up
+
+    @integration
+    Scenario: The spend catch-up is a background step that waits for old writers to go
+      When instant-eval's upgrade steps are listed
+      Then instant-eval:copy-judge-spend is a background data step
+      And it runs only once no older image serves
+
+    @unit
+    Scenario: The spend catch-up step resumes after the last page of organizations it saved
+      Given the spend catch-up step saved a checkpoint after a page of organizations
+      When the step runs again
+      Then it copies only the organizations after the saved one
+
+    @unit
+    Scenario: A dry run of the spend catch-up step copies nothing and saves no checkpoint
+      When the spend catch-up step runs as a dry run
+      Then the judge holds no new spend row
+      And no checkpoint is saved
+
+    @integration
+    Scenario: The usage-billing catch-up step is declared before the spend catch-up step
+      When the worker's installed modules list their upgrade steps
+      Then billing:record-usage-billing-catch-up comes before instant-eval:copy-judge-spend
+
   Rule: The picker offers Instant Evals behind the release flag or the organization's opt-in
 
     @integration

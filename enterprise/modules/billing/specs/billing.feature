@@ -313,3 +313,23 @@ Feature: Enterprise billing compatibility
     Scenario: The invite checkout is organization's procedure
       Then invite.upgradeWithInvites is declared by organization with organization:manage
       And billing declares no subscription.upgradeWithInvites
+
+  Rule: The usage-billing catch-up runs as an upgrade step
+
+    @integration
+    Scenario: The usage-billing catch-up is a background step that waits for old writers to go
+      When billing's upgrade steps are listed
+      Then billing:record-usage-billing-catch-up is a background data step
+      And it runs only once no older image serves
+
+    @unit
+    Scenario: The usage-billing catch-up step resumes after the last page of organizations it saved
+      Given the usage-billing catch-up step saved a checkpoint after a page of organizations
+      When the step runs again
+      Then it records only the organizations after the saved one
+
+    @unit
+    Scenario: A dry run of the usage-billing catch-up step records nothing and saves no checkpoint
+      When the usage-billing catch-up step runs as a dry run
+      Then no usage-billed fact is recorded
+      And no checkpoint is saved
