@@ -31,7 +31,10 @@ import {
   catalogueSections,
 } from "./catalogue-filter.ts";
 
-/** Templates with a board image captured from the demo seed, served at `templatePreviewSrc`. */
+/**
+ * Templates with a board image captured from preview sample data, served at `templatePreviewSrc`.
+ * @see dev/scripts/template-previews/capture.mjs, which makes them
+ */
 export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set([
   "cockpit",
   "costs",
@@ -71,9 +74,18 @@ export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set([
   "data",
 ]);
 
-/** Where a captured template image is served from. */
-export function templatePreviewSrc(templateId: string): string {
-  return `/images/dashboards/templates/${templateId}.webp`;
+/** The themes a template image is captured in. */
+export type PreviewTheme = "light" | "dark";
+
+/** Where a captured template image is served from, in one theme. */
+export function templatePreviewSrc({
+  templateId,
+  theme,
+}: {
+  templateId: string;
+  theme: PreviewTheme;
+}): string {
+  return `/images/dashboards/templates/${theme}/${templateId}.webp`;
 }
 
 /** The faint stand-in a sketched widget shows in place of its chart. */
@@ -89,7 +101,7 @@ export interface PreviewWidget {
 
 /** A card's preview: the template's real board as an image, or a sketch of its layout. */
 export type TemplatePreview =
-  | { readonly kind: "image"; readonly src: string }
+  | { readonly kind: "image"; readonly src: Readonly<Record<PreviewTheme, string>> }
   | { readonly kind: "layout"; readonly widgets: readonly PreviewWidget[] };
 
 /** One template as the finder lists it; `board` is what "Add to this project" makes. */
@@ -118,7 +130,8 @@ const UNBUILT_LAYOUT = { gridColumn: 0, gridRow: 0, colSpan: CHART_GRID_COLUMNS 
 
 function previewOf(template: CatalogueTemplate): TemplatePreview {
   if (TEMPLATE_PREVIEW_IDS.has(template.id)) {
-    return { kind: "image", src: templatePreviewSrc(template.id) };
+    const src = (theme: PreviewTheme) => templatePreviewSrc({ templateId: template.id, theme });
+    return { kind: "image", src: { light: src("light"), dark: src("dark") } };
   }
   const widgets = template.widgets.flatMap((id): PreviewWidget[] => {
     const widget = WIDGETS.get(id);

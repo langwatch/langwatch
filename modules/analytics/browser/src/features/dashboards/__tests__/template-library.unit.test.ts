@@ -159,16 +159,24 @@ describe("the templates finder", () => {
       expect(TEMPLATE_PREVIEW_IDS.size).toBeGreaterThan(0);
       for (const { board, preview } of TEMPLATE_LIBRARY) {
         if (!TEMPLATE_PREVIEW_IDS.has(board.id)) continue;
-        expect(preview, board.id).toEqual({ kind: "image", src: templatePreviewSrc(board.id) });
+        expect(preview, board.id).toEqual({
+          kind: "image",
+          src: {
+            light: templatePreviewSrc({ templateId: board.id, theme: "light" }),
+            dark: templatePreviewSrc({ templateId: board.id, theme: "dark" }),
+          },
+        });
       }
     });
 
     /** @scenario "AC107d Templates library: a card previews the template's real board" */
-    it("ships an image file for every template it calls captured", () => {
+    it("ships a light and a dark image file for every template it calls captured", () => {
       const publicDir = "../../../../../../../apps/ui/public";
-      for (const id of TEMPLATE_PREVIEW_IDS) {
-        const file = new URL(`${publicDir}${templatePreviewSrc(id)}`, import.meta.url);
-        expect(existsSync(file), id).toBe(true);
+      for (const templateId of TEMPLATE_PREVIEW_IDS) {
+        for (const theme of ["light", "dark"] as const) {
+          const src = templatePreviewSrc({ templateId, theme });
+          expect(existsSync(new URL(`${publicDir}${src}`, import.meta.url)), src).toBe(true);
+        }
       }
     });
 

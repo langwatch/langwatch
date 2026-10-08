@@ -1,9 +1,10 @@
 /**
- * A template card's preview: the top of its board as a captured image, or faint blocks where
- * its widgets sit. Decoration only: no query, no focus. Its top margin takes up the slack, so
- * previews line up when a name or job is shorter than its neighbours'.
+ * A template card's preview: the top of its board as a captured image in the theme in use, or
+ * faint blocks where its widgets sit. Decoration only: no query, no focus. Its top margin takes
+ * up the slack, so previews line up when a name or job is shorter than its neighbours'.
  */
 
+import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Grid, HStack, Image } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
@@ -84,6 +85,7 @@ function LayoutSketch({ widgets }: { widgets: readonly PreviewWidget[] }) {
 }
 
 export function TemplatePreview({ preview }: { preview: Preview }) {
+  const { colorMode } = useColorMode();
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.36);
   useEffect(() => {
@@ -114,8 +116,10 @@ export function TemplatePreview({ preview }: { preview: Preview }) {
     >
       {preview.kind === "image" ? (
         <Image
-          src={preview.src}
+          src={preview.src[colorMode]}
           alt=""
+          loading="lazy"
+          decoding="async"
           display="block"
           width="full"
           height="full"
