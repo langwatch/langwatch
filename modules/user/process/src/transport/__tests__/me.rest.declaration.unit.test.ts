@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * `/api/me`'s addresses, operation ids, door and permission, pinned. The CLI
- * and the desktop widget hold these paths.
+ * and the desktop widget hold these paths; `/usage` is governance's (me-usage.rest.ts).
  */
 import { describe, expect, it } from "vitest";
 
@@ -25,27 +25,7 @@ describe("the me REST family", () => {
     it("keeps every path, operation id and permission", () => {
       expect(
         declaration.routes.map((route) => [route.path, route.operation, route.permission]),
-      ).toEqual([
-        ["/usage", "getApiMeUsage", "project:view"],
-        ["/project", "getApiMeProject", "project:view"],
-      ]);
-    });
-
-    it("takes the resolved credential whole, because its class is half the decision", () => {
-      const usage = declaration.routes.find((route) => route.operation === "getApiMeUsage");
-
-      expect(usage?.middleware?.map((fact) => fact.name)).toEqual(["mePersonalCredential"]);
-    });
-  });
-
-  describe("given a half-specified usage window", () => {
-    it("refuses it, rather than silently answering for the default month", () => {
-      const usage = declaration.routes.find((route) => route.operation === "getApiMeUsage");
-
-      expect(usage?.query?.validate({ windowStartMs: 1 })).toBe(false);
-      expect(usage?.query?.validate({ windowStartMs: 2, windowEndMs: 1 })).toBe(false);
-      expect(usage?.query?.validate({ windowStartMs: 1, windowEndMs: 2 })).toBe(true);
-      expect(usage?.query?.validate({})).toBe(true);
+      ).toEqual([["/project", "getApiMeProject", "project:view"]]);
     });
   });
 });

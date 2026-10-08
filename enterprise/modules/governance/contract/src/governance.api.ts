@@ -117,6 +117,8 @@ import type { OttlValidationResult } from "./ottl.ts";
 import type { PersonaResolution } from "./persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./personal-budget-overview.ts";
 import type {
+  MePersonalCredential,
+  MeUsage,
   PersonalUsageQueryInput,
   PersonalUsageRollup,
   PersonalUsageWindow,
@@ -429,8 +431,14 @@ export interface GovernanceRestApi {
     projectId: string;
     departmentId: string | null;
   }): Promise<void>;
-  /** One person's own usage against a tenant the caller resolved, as main's `/api/me/usage`. */
+  /** One person's own usage against a tenant the caller resolved. */
   personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
+  /** `/api/me/usage`: the key's own usage; its credential's class is half the decision. */
+  getPersonalUsage(input: {
+    projectId: string;
+    credential: MePersonalCredential;
+    window?: { startMs: number; endMs: number };
+  }): Promise<MeUsage>;
   /** The caller's own /me rollup; `user_not_in_organization` (403) outside the organization. */
   personalUsageDashboard(
     input: { organizationId: string; window?: PersonalUsageWindow },

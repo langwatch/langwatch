@@ -6,12 +6,7 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 
-import type {
-  MeProject,
-  MePersonalCredential,
-  MeUsage,
-  UserAvatarRestParams,
-} from "./user-rest.schemas.ts";
+import type { MeProject, UserAvatarRestParams } from "./user-rest.schemas.ts";
 import type {
   UserBrowserSession,
   UserBrowserSessionEnded,
@@ -179,14 +174,8 @@ export interface UserApi {
     organizationId: string;
   }): Promise<UserHomePagePickerState>;
 
-  // -- the two REST doors ----------------------------------------------------
+  // -- the /api/me/project door ---------------------------------------------
 
-  /** One person's own AI usage, rolled up over a window, for `/api/me/usage`. */
-  getPersonalUsage(input: {
-    projectId: string;
-    credential: MePersonalCredential;
-    window?: { startMs: number; endMs: number };
-  }): Promise<MeUsage>;
   /** The identity of the project a calling key belongs to, for `/api/me/project`. */
   getKeyProject(input: { projectId: string }): Promise<MeProject>;
   /** The usage report's figures (ADR-156, section 10). */

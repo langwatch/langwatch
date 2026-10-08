@@ -2,7 +2,6 @@
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { GatewayApi, type GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
@@ -21,7 +20,7 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { PROJECT_KIND, ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
@@ -33,8 +32,6 @@ import type {
   CreatedUser,
   UserEmailInput,
   MeProject,
-  MePersonalCredential,
-  MeUsage,
   RegisterCredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
@@ -147,8 +144,6 @@ interface UserAppDependencies {
   enterpriseGateway: Pick<EnterpriseGatewayApi, "personalVirtualKeyList">;
   /** The budget pre-check the /me banner runs at a projected cost of zero. */
   gateway: Pick<GatewayApi, "checkBudget">;
-  /** The rollup behind /api/me/usage, whose door has yet to move (peer-cycle-cuts B4 U). */
-  governance: Pick<GovernanceRestApi, "personalUsage">;
   organizations: OrganizationApi;
   projects: ProjectApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
@@ -183,7 +178,6 @@ export class UserModule implements UserApi {
     authz: typeof AuthzApi;
     enterpriseGateway: typeof EnterpriseGatewayApi;
     gateway: typeof GatewayApi;
-    governance: typeof GovernanceRestApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
     projects: typeof ProjectApi;
@@ -193,7 +187,6 @@ export class UserModule implements UserApi {
     authz: AuthzApi,
     enterpriseGateway: EnterpriseGatewayApi,
     gateway: GatewayApi,
-    governance: GovernanceRestApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
     projects: ProjectApi,
@@ -958,41 +951,7 @@ export class UserModule implements UserApi {
     return { lastHomePath, firstProjectSlug };
   }
 
-  // -- the two REST doors ----------------------------------------------------
-
-  /**
-   * The personal rollup one API key may read, scoped to THIS organization's hidden
-   * governance tenant — not the personal project — both to prune partitions and to
-   * stop a person in several organizations from summing usage across them.
-   */
-  async getPersonalUsage({
-    projectId,
-    credential,
-    window,
-  }: {
-    projectId: string;
-    credential: MePersonalCredential;
-    window?: { startMs: number; endMs: number };
-  }): Promise<MeUsage> {
-    const project = await this.#requireProject({ projectId });
-    const ownerUserId = this.#account.personalUsageCallerFor({ project, credential });
-    const organizationId =
-      (credential.kind === "legacyProjectKey" ? null : credential.organizationId) ??
-      (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
-    const tenant = organizationId
-      ? await this.#peers.projects.findInternal({
-          organizationId,
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        })
-      : null;
-
-    return this.#peers.governance.personalUsage({
-      personalProjectId: project.id,
-      userId: ownerUserId,
-      ...(tenant ? { ingestionTenantId: tenant.id } : {}),
-      ...(window ? { window } : {}),
-    });
-  }
+  // -- the /api/me/project door ---------------------------------------------
 
   /** The identity of the project the calling API key belongs to. */
   async getKeyProject({ projectId }: { projectId: string }): Promise<MeProject> {

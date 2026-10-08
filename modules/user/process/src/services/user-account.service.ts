@@ -3,7 +3,6 @@ import {
   type EnsuredPersonalWorkspace,
   type FindPersonalWorkspaceInput,
   type OrganizationApi,
-  OrganizationNotFoundForTeamError,
   type PersonalWorkspace,
   TeamNotFoundError,
   type PersonalWorkspaceInput,
@@ -11,8 +10,6 @@ import {
 import {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
-  PersonalUsageServiceKeyUnsupportedError,
-  type MePersonalCredential,
   type UserBrowserSession,
   type UserBrowserSessionEnded,
 } from "@langwatch/user-contract";
@@ -43,36 +40,6 @@ export class UserAccountService {
     }
 
     return input.project.ownerUserId;
-  }
-
-  /**
-   * The same resolution for a request that presents a CREDENTIAL rather than a
-   * session. The key's class is half the decision: a service key belongs to
-   * nobody and must not be read as this workspace's own legacy key.
-   */
-  personalUsageCallerFor(input: {
-    project: { isPersonal: boolean; ownerUserId: string | null };
-    credential: MePersonalCredential;
-  }): string {
-    if (!input.project.isPersonal || !input.project.ownerUserId) {
-      throw new PersonalProjectKeyRequiredError();
-    }
-
-    if (input.credential.kind === "legacyProjectKey") return input.project.ownerUserId;
-    if (input.credential.userId === null) throw new PersonalUsageServiceKeyUnsupportedError();
-
-    return this.personalCallerFor({
-      project: input.project,
-      callerUserId: input.credential.userId,
-    });
-  }
-
-  /** The organization a personal workspace's team belongs to. */
-  findOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
-    return this.organizations.getOrganizationIdByTeamId(input).catch((error: unknown) => {
-      if (OrganizationNotFoundForTeamError.is(error)) return null;
-      throw error;
-    });
   }
 
   /**

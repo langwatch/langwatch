@@ -1,7 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
@@ -215,7 +214,6 @@ export function createUserTestApp(
       authz: AuthzApi;
       enterpriseGateway: EnterpriseGatewayApi;
       gateway: GatewayApi;
-      governance: GovernanceRestApi;
       organizations: OrganizationApi;
       projects: ProjectApi;
       storedObjects: StoredObjectApi;
@@ -238,7 +236,6 @@ export function createUserTestApp(
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
       enterpriseGateway: input.dependencies?.enterpriseGateway ?? gateways.enterpriseGateway,
       gateway: input.dependencies?.gateway ?? gateways.gateway,
-      governance: input.dependencies?.governance ?? createApiFixture<GovernanceRestApi>(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       projects: input.dependencies?.projects ?? createUserTestProjects(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),

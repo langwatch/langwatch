@@ -3,7 +3,6 @@ import type {
   EnterpriseGatewayApi,
   PersonalVirtualKey,
 } from "@langwatch/enterprise-gateway-contract";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type {
@@ -41,7 +40,6 @@ function process(
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
       "enterprise-gateway": peers.enterpriseGateway ?? createApiFixture<EnterpriseGatewayApi>(),
       gateway: peers.gateway ?? createApiFixture<GatewayApi>(),
-      governance: createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
       project: createApiFixture<ProjectApi>(),

@@ -5,6 +5,7 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
+import type { MePersonalCredential } from "@langwatch/enterprise-governance-contract";
 import { defineProcessModule } from "@langwatch/process";
 
 import { GovernanceModule } from "./app/governance.app.ts";
@@ -32,6 +33,7 @@ import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
 import { ingestionSourcesTrpcTransport } from "./transport/ingestion-sources.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
+import { mePersonalCredential, meUsageRest } from "./transport/me-usage.rest.ts";
 import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
 import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
@@ -45,6 +47,7 @@ export const governanceProcessModule = defineProcessModule("governance")
     governanceRest,
     governanceCliRest,
     governanceIngestRest,
+    meUsageRest,
     departmentsTrpcTransport,
     ingestionTemplatesTrpcTransport,
     aiToolsTrpcTransport,
@@ -71,6 +74,25 @@ export const governanceProcessModule = defineProcessModule("governance")
         return { viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId };
       }),
       bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+      // A personal-usage answer is refused for a key that is not the asking member's own,
+      // and the door's answer is the only place the key's class can be read from.
+      bindRestMiddleware(mePersonalCredential, (context): MePersonalCredential => {
+        const credential = projectCredentialOfRequest(context.req.raw);
+        if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+        if (credential.type === "cliAccessToken") {
+          return {
+            kind: "cliAccessToken",
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+          };
+        }
+
+        return {
+          kind: "apiKey",
+          userId: credential.userId,
+          organizationId: credential.organizationId,
+        };
+      }),
       bindRestCredential("cli_token", () => app.cliTokenDoor),
     ];
   })

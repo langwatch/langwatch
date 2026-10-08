@@ -196,8 +196,6 @@ export class TestUserApi implements UserApi {
   getHomePagePickerState: UserApi["getHomePagePickerState"] = (input) =>
     this.overrides.getHomePagePickerState?.(input) ?? this.unimplemented("getHomePagePickerState");
 
-  getPersonalUsage: UserApi["getPersonalUsage"] = (input) =>
-    this.overrides.getPersonalUsage?.(input) ?? this.unimplemented("getPersonalUsage");
 
   getKeyProject: UserApi["getKeyProject"] = (input) =>
     this.overrides.getKeyProject?.(input) ?? this.unimplemented("getKeyProject");

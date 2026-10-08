@@ -121,6 +121,8 @@ import {
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
   type GovernanceActorWorkspace,
+  type MePersonalCredential,
+  type MeUsage,
   type PersonalUsageQueryInput,
   type PersonalUsageRollup,
   type PersonalUsageWindow,
@@ -276,6 +278,7 @@ import { PersonListingService } from "../services/person-listing.service.ts";
 import { PersonaHomeService } from "../services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
+import { PersonalUsageKeyService } from "../services/personal-usage-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
@@ -319,6 +322,7 @@ export interface GovernanceAppDependencies {
     | "assignProjectDepartment"
     | "findLiveNonGovernanceIdsByOrganization"
     | "findLiveByRef"
+    | "findIdentity"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
   agents: Pick<AgentApi, "findConnectedInProjects">;
@@ -373,7 +377,7 @@ export interface GovernanceAppDependencies {
     ModelProviderApi,
     "countEnabledInScopes" | "findEnabledProviderKeysInScopes" | "countInOrganization"
   >;
-  users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
+  users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath" | "personalCallerFor">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
   auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   /** Where a push source's OTLP logs and webhook envelopes are collected. */
@@ -413,6 +417,7 @@ export interface GovernanceAppDependencies {
       | "getSessionPolicy"
       | "saveSessionPolicy"
       | "getSettings"
+      | "getOrganizationIdByTeamId"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -788,6 +793,12 @@ export class GovernanceModule implements GovernanceRestApi {
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });
+    this.personalUsageKeys = PersonalUsageKeyService.create({
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      users: dependencies.users,
+      rollups: this.personalUsageDashboards,
+    });
     const supportContacts = OrganizationSupportContactService.create({
       repository: repositories.supportContacts,
       organizations: dependencies.organizations,
@@ -911,6 +922,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private pulledUsageCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
+  private readonly personalUsageKeys: PersonalUsageKeyService;
   private readonly cliBootstraps: DefaultGovernanceCliBootstrapService;
   private readonly cliAccessService: GovernanceCliAccessApi;
   /** The CLI token door `governanceCliRest` authenticates at; Auth verifies the bearer. */
@@ -1980,6 +1992,15 @@ export class GovernanceModule implements GovernanceRestApi {
    */
   personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
     return this.personalUsageDashboards.rollup(input);
+  }
+
+  /** `/api/me/usage`: the rollup one personal API key may read (`personal-usage-key.service.ts`). */
+  getPersonalUsage(input: {
+    projectId: string;
+    credential: MePersonalCredential;
+    window?: { startMs: number; endMs: number };
+  }): Promise<MeUsage> {
+    return this.personalUsageKeys.read(input);
   }
 
   /**

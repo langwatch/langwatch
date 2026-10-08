@@ -1,39 +1,30 @@
-import { createErrorHandler, ProjectMissingCredentialsError } from "@langwatch/api";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
- * `GET /api/me/usage` through the installed user app; only its peers are doubles.
+ * `GET /api/me/usage` through governance's door, at user's path (R10).
  * Spec: specs/ai-gateway/governance/me-usage-rest-api.feature
  */
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import { createErrorHandler, ProjectMissingCredentialsError } from "@langwatch/api";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type {
   GovernanceRestApi,
+  MePersonalCredential,
+  PersonalUsageQueryInput,
   PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { NotificationService } from "@langwatch/notification-contract";
-import { createApp } from "@langwatch/process";
-import { memoryStores } from "@langwatch/process-stores";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   type InternalProject,
   PROJECT_KIND,
   type ProjectApi,
   type ProjectIdentity,
 } from "@langwatch/project-contract";
-import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { UserApi, type MePersonalCredential } from "@langwatch/user-contract";
+import { PersonalUsageKeyMismatchError, type UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createUserTestAuth,
-  createUserTestOrganizations,
-} from "../../app/__tests__/user.fixture.ts";
-import { userProcessModule } from "../../user.module.ts";
-import { mePersonalCredential, meRest } from "../me.rest.ts";
+import { PersonalUsageKeyService } from "../../services/personal-usage-key.service.ts";
+import { mePersonalCredential, meUsageRest } from "../me-usage.rest.ts";
 
 const ORGANIZATION_ID = "org-1";
 const OWNER_ID = "user-owner";
@@ -93,7 +84,7 @@ const OWNER_KEY: MePersonalCredential = {
   organizationId: ORGANIZATION_ID,
 };
 
-/** The user app installed over memory stores, mounted behind the REST door. */
+/** Governance's door over its real key-read service; only the peers and the rollup are doubles. */
 async function mounted({
   project = workspace({}),
   credential = OWNER_KEY,
@@ -105,29 +96,29 @@ async function mounted({
   usage?: PersonalUsageRollup;
   authenticated?: boolean;
 } = {}) {
-  const personalUsage = vi.fn(async () => usage);
-  const runtime = await createApp({ role: "api" })
-    .withModules([userProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ user: { publicBaseUrl: undefined } })
-    .withEventing(
-      new EventSourcing({ enabled: false, processStore: InMemoryProcessStore.createForTesting() }),
-    )
-    .provide({
-      auth: createUserTestAuth() as AuthApi,
-      authz: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
-      "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      governance: createApiFixture<GovernanceRestApi>({ personalUsage }),
-      notification: createApiFixture<NotificationService>(),
-      organization: createUserTestOrganizations(),
-      project: createApiFixture<ProjectApi>({
-        findIdentity: async () => project,
-        findInternal: async () => governanceProject,
-      }),
-      "stored-object": createApiFixture<StoredObjectApi>(),
-    })
-    .boot();
+  const personalUsage = vi.fn(async (_input: PersonalUsageQueryInput) => usage);
+  const keys = PersonalUsageKeyService.create({
+    projects: createApiFixture<ProjectApi>({
+      findIdentity: async () => project,
+      findInternal: async () => governanceProject,
+    }),
+    organizations: createApiFixture<OrganizationApi>({
+      getOrganizationIdByTeamId: async () => ORGANIZATION_ID,
+    }),
+    users: createApiFixture<UserApi>({
+      personalCallerFor: ({ project: owned, callerUserId }) => {
+        if (callerUserId && callerUserId !== owned.ownerUserId) {
+          throw new PersonalUsageKeyMismatchError();
+        }
+
+        return owned.ownerUserId ?? "";
+      },
+    }),
+    rollups: { rollup: personalUsage },
+  });
+  const app = createApiFixture<GovernanceRestApi>({
+    getPersonalUsage: (input) => keys.read(input),
+  });
 
   const hono = createRestRuntime({
     identity: {
@@ -140,13 +131,13 @@ async function mounted({
         };
       },
     },
-  }).mount(meRest.router(), {
-    app: () => runtime.service(UserApi),
+  }).mount(meUsageRest.router(), {
+    app: () => app,
     onError: createErrorHandler(),
     facts: [bindRestMiddleware(mePersonalCredential, () => credential)],
   });
 
-  return { hono, personalUsage, stop: () => runtime.stop() };
+  return { hono, personalUsage };
 }
 
 async function get({
@@ -154,14 +145,10 @@ async function get({
   ...options
 }: Parameters<typeof mounted>[0] & { path?: string } = {}) {
   const app = await mounted(options);
-  try {
-    const response = await app.hono.request(path);
-    const text = await response.text();
+  const response = await app.hono.request(path);
+  const text = await response.text();
 
-    return { response, text, body: JSON.parse(text) as Record<string, unknown>, ...app };
-  } finally {
-    await app.stop();
-  }
+  return { response, text, body: JSON.parse(text) as Record<string, unknown>, ...app };
 }
 
 describe("GET /api/me/usage", () => {

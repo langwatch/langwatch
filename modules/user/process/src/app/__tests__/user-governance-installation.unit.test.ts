@@ -1,25 +1,16 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
-import type {
-  GovernanceRestApi,
-  PersonalUsageRollup,
-} from "@langwatch/enterprise-governance-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import {
-  type InternalProject,
-  PROJECT_KIND,
-  type ProjectApi,
-  type ProjectIdentity,
-} from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
- * CLI token revocation, the governance project and `/api/me/usage`, through the installed app.
+ * CLI token revocation, through the installed app (`/api/me/usage` is governance's now).
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
@@ -28,44 +19,9 @@ import { describe, expect, it, vi } from "vitest";
 import { userProcessModule } from "../../user.module.ts";
 import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
-const ORGANIZATION_ID = "org-1";
-
-const personalProject: ProjectIdentity = {
-  id: "project-personal-1",
-  name: "Ada",
-  slug: "ada",
-  teamId: "team-personal-1",
-  organizationId: ORGANIZATION_ID,
-  isPersonal: true,
-  ownerUserId: "user-1",
-};
-
-const governanceProject: InternalProject = {
-  id: "project-governance-1",
-  name: "Governance",
-  slug: "governance",
-  teamId: "team-governance-1",
-  kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-  archivedAtMs: null,
-  traceSharingEnabled: false,
-};
-
-const rollup: PersonalUsageRollup = {
-  summary: {
-    spentUsd: 5,
-    billedUsd: 5,
-    requests: 3,
-    promptTokens: 30,
-    completionTokens: 15,
-    mostUsedModel: { name: "claude-opus", usagePct: 67 },
-  },
-  dailyBuckets: [{ day: "2026-09-01", spentUsd: 5, billedUsd: 5, requests: 3 }],
-  breakdownByModel: [{ label: "claude-opus", spentUsd: 5, billedUsd: 5, requests: 3 }],
-};
-
 function process(
   role: "api" | "worker",
-  peers: Readonly<{ auth?: AuthApi; governance?: GovernanceRestApi; project?: ProjectApi }>,
+  peers: Readonly<{ auth?: AuthApi; project?: ProjectApi }>,
 ) {
   return createApp({ role })
     .withModules([userProcessModule])
@@ -79,7 +35,6 @@ function process(
       authz: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
       "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
       gateway: createApiFixture<GatewayApi>(),
-      governance: peers.governance ?? createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: createUserTestOrganizations(),
       project: peers.project ?? createApiFixture<ProjectApi>(),
@@ -117,67 +72,5 @@ describe("user app over governance's seams", () => {
         }
       },
     );
-  });
-
-  describe("when a personal key reads /api/me/usage", () => {
-    /** @scenario "Ingestion-source spend is included and scoped to this organization" */
-    it("rolls up against this organization's governance project", async () => {
-      const findInternal = vi.fn(async () => governanceProject);
-      const personalUsage = vi.fn(async () => rollup);
-      const runtime = await process("api", {
-        project: createApiFixture<ProjectApi>({
-          findIdentity: async () => personalProject,
-          findInternal,
-        }),
-        governance: createApiFixture<GovernanceRestApi>({ personalUsage }),
-      }).boot();
-
-      try {
-        const usage = await runtime.service(UserApi).getPersonalUsage({
-          projectId: personalProject.id,
-          credential: { kind: "apiKey", userId: "user-1", organizationId: ORGANIZATION_ID },
-        });
-
-        expect(usage).toEqual(rollup);
-        expect(findInternal).toHaveBeenCalledWith({
-          organizationId: ORGANIZATION_ID,
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-        });
-        expect(personalUsage).toHaveBeenCalledWith({
-          personalProjectId: personalProject.id,
-          userId: "user-1",
-          ingestionTenantId: governanceProject.id,
-        });
-      } finally {
-        await runtime.stop();
-      }
-    });
-
-    it("reads the personal project alone where no governance project was minted", async () => {
-      const personalUsage = vi.fn(async () => rollup);
-      const runtime = await process("api", {
-        project: createApiFixture<ProjectApi>({
-          findIdentity: async () => personalProject,
-          findInternal: async () => null,
-        }),
-        governance: createApiFixture<GovernanceRestApi>({ personalUsage }),
-      }).boot();
-
-      try {
-        await runtime.service(UserApi).getPersonalUsage({
-          projectId: personalProject.id,
-          credential: { kind: "legacyProjectKey" },
-          window: { startMs: 1_000, endMs: 2_000 },
-        });
-
-        expect(personalUsage).toHaveBeenCalledWith({
-          personalProjectId: personalProject.id,
-          userId: "user-1",
-          window: { startMs: 1_000, endMs: 2_000 },
-        });
-      } finally {
-        await runtime.stop();
-      }
-    });
   });
 });
