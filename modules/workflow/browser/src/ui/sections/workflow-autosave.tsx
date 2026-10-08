@@ -1,4 +1,6 @@
+import { toaster } from "@langwatch/browser-host/toaster";
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { isInstantEvalJudgeOnlyRefusal } from "@langwatch/instant-eval-judge-contract";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { Check } from "lucide-react";
 import { type RefObject, useEffect, useEffectEvent, useRef, useState } from "react";
@@ -129,7 +131,17 @@ export function WorkflowAutosave({
         onRefreshVersions,
         moveBaseline: () => setAutosavedWorkflow(currentWorkflow),
       });
-    } catch {
+    } catch (error) {
+      // A refusal never heals by retrying: toast which node to change, save on the next edit.
+      if (isInstantEvalJudgeOnlyRefusal(error)) {
+        toaster.create({
+          id: "workflow-autosave-instant-eval",
+          title: "Failed to autosave",
+          type: "error",
+          error,
+        });
+        return;
+      }
       // Still queued: the baseline did not move, so the next attempt sends the same change.
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, RETRY_MAX_MS);

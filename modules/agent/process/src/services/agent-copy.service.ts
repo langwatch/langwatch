@@ -11,11 +11,18 @@ import {
   type AgentPushToCopies,
   type AgentSyncFromSource,
 } from "@langwatch/agent-contract";
+import { assertNotInstantEvalJudgeModel } from "@langwatch/instant-eval-judge-contract";
 
 import type { AgentRepository, AgentCopyRecord } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import { configForCopy } from "../rules/agent-secrets.rules.ts";
 import type { AgentVoiceReleaseService } from "./agent-voice-release.service.ts";
+
+/** A source stored on Instant Evals before the rule fails its copy loudly rather than spreading. */
+function assertSourceModelCopyable(source: Agent): void {
+  if (source.type === "signature")
+    assertNotInstantEvalJudgeModel({ model: source.config.llm?.model });
+}
 
 export class AgentCopyService {
   #repository: AgentRepository;
@@ -63,6 +70,7 @@ export class AgentCopyService {
       projectId: input.sourceProjectId,
     });
     if (source.type === "connected") throw new AgentRegisterOnlyError();
+    assertSourceModelCopyable(source);
     await this.#voiceRelease.assertWritable({
       type: source.type,
       projectIds: [input.targetProjectId],
@@ -98,6 +106,7 @@ export class AgentCopyService {
       ? copies.filter((copy) => input.copyIds?.includes(copy.id))
       : copies;
     if (selected.length === 0) throw new AgentCopySelectionError(input.sourceAgentId);
+    assertSourceModelCopyable(source);
     await this.#voiceRelease.assertWritable({
       type: source.type,
       projectIds: selected.map((copy) => copy.projectId),
@@ -128,6 +137,7 @@ export class AgentCopyService {
 
   async syncFromSource(input: AgentReferenceInput): Promise<AgentSyncFromSource> {
     const source = await this.getSourceOfCopy(input);
+    assertSourceModelCopyable(source);
     await this.#voiceRelease.assertWritable({ type: source.type, projectIds: [input.projectId] });
     const current = await this.#repository.getById({
       id: input.agentId,

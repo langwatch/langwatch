@@ -332,6 +332,13 @@ export class PromptWriteService {
     authorId?: string | null;
     organizationId?: string;
   }): Promise<VersionedPrompt> {
+    const target = await this.repository.versions.findVersionById({
+      versionId: params.versionId,
+      projectId: params.projectId,
+    });
+    // Read loosely: a version saved under an older schema still restores.
+    const { model } = (target.configData ?? {}) as { model?: unknown };
+    assertNotInstantEvalJudgeModel({ model: typeof model === "string" ? model : null });
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 

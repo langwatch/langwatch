@@ -98,6 +98,64 @@ describe("PromptWriteService with Instant Evals as the model", () => {
   });
 });
 
+/** A prompt whose one stored version names `model`, for a restore of that version. */
+function promptRestores(model: string) {
+  const restored: unknown[] = [];
+  const writes = PromptWriteService.create({
+    repository: createApiFixture<LlmConfigRepository>({
+      versions: createApiFixture<LlmConfigRepository["versions"]>({
+        findVersionById: async ({ versionId, projectId }) =>
+          ({
+            id: versionId,
+            projectId,
+            configId: "config-1",
+            configData: { prompt: "Answer kindly.", model },
+          }) as never,
+        restoreVersion: async (input) => {
+          restored.push(input);
+          return { configId: "config-1" } as never;
+        },
+      }),
+    }),
+    versionService: PromptVersionService.create(),
+    read: createApiFixture<PromptReadService>({ getPromptByIdOrHandle: async () => ({}) as never }),
+    tagLookup: createApiFixture<PromptTagLookupService>(),
+    toVersionedPrompt: () => ({}) as never,
+    modelProviders: createApiFixture(),
+  });
+
+  return { writes, restored };
+}
+
+const restore = {
+  versionId: "version-1",
+  projectId: "project-1",
+  organizationId: "organization-1",
+};
+
+describe("PromptWriteService restoring a version", () => {
+  describe("when the version names Instant Evals", () => {
+    /** @scenario "Saving Instant Evals as the model of anything but a judge is refused" */
+    it("refuses as a client error and adds no version", async () => {
+      const { writes, restored } = promptRestores(INSTANT_EVAL_JUDGE_MODEL_ID);
+
+      await expect(writes.restoreVersion(restore)).rejects.toThrow(InstantEvalJudgeOnlyModelError);
+      expect(restored).toEqual([]);
+    });
+  });
+
+  describe("when the version names any other model", () => {
+    /** @scenario "Copying, restoring or duplicating on any other model still saves" */
+    it("adds the restored version", async () => {
+      const { writes, restored } = promptRestores("openai/gpt-5-mini");
+
+      await writes.restoreVersion(restore);
+
+      expect(restored).toHaveLength(1);
+    });
+  });
+});
+
 describe("a prompt version stored with Instant Evals before the rule", () => {
   /** @scenario "A prompt or an agent stored with Instant Evals before this rule still reads" */
   it("reads as stored", () => {
