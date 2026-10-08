@@ -37,6 +37,7 @@ import {
   type MigrationStepReport,
 } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import { governanceProcessModule } from "../../governance.module.ts";
 
@@ -123,6 +124,7 @@ export async function bootGovernanceWorker({
       "audit-log": createApiFixture<AuditLogApi>(),
       log: createApiFixture<LogApi>(),
       metric: createApiFixture<MetricApi>(),
+      webhook: createApiFixture<WebhookApi>(),
     })
     .boot();
 
