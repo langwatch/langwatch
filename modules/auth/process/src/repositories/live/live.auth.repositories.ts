@@ -1,5 +1,4 @@
-import type { RateLimiter } from "@langwatch/process-stores";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { AuthRepositories } from "../auth.repositories.ts";
@@ -7,7 +6,10 @@ import { MemoryBetterAuthSecondaryStorageRepository } from "../memory/memory.bet
 import { PrismaAuthDirectoryRepository } from "../prisma/prisma.auth-directory.repository.ts";
 import { PostgresAuthRepositories } from "../prisma/prisma.auth.repositories.ts";
 import { PrismaBetterAuthHooksRepository } from "../prisma/prisma.better-auth-hooks.repository.ts";
-import { PrismaBetterAuthStorageRepository } from "../prisma/prisma.better-auth-storage.repository.ts";
+import {
+  type AuthDatabase,
+  PrismaBetterAuthStorageRepository,
+} from "../prisma/prisma.better-auth-storage.repository.ts";
 import { RedisAuthRateLimitRepository } from "../redis/redis.auth-rate-limit.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../redis/redis.better-auth-secondary-storage.repository.ts";
 import { RedisCliDeviceSessionRepository } from "../redis/redis.cli-device-session.repository.ts";
@@ -26,10 +28,10 @@ export class LiveAuthRepositories {
     rateLimiter,
     encryption,
   }: {
-    prisma: ProcessMembers["prisma"];
+    prisma: AuthDatabase;
     redis: RedisConnection;
     rateLimiter: RateLimiter;
-    encryption: ProcessMembers["encryption"];
+    encryption: Encryption;
   }): AuthRepositories {
     return {
       ...PostgresAuthRepositories.create({ prisma }),

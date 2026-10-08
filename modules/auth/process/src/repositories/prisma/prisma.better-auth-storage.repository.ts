@@ -2,12 +2,16 @@ import {
   sealedProviderConfigCipher,
   type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { BetterAuthOptions } from "better-auth/types";
 
 import { openingSsoProviderConfigs } from "../../rules/sso-provider-config.rules.ts";
 import { BetterAuthStorageRepository } from "../better-auth-storage.repository.ts";
+
+/** The client Better Auth's storage engine dials. */
+export type AuthDatabase = PrismaClient;
 
 /** Better Auth's storage engine: the stock Prisma adapter over the module's
  *  own client, with the engine's sealed dialing documents opened on the way
@@ -17,14 +21,14 @@ export class PrismaBetterAuthStorageRepository extends BetterAuthStorageReposito
     prisma,
     encryption,
   }: {
-    prisma: ProcessMembers["prisma"];
-    encryption: ProcessMembers["encryption"];
+    prisma: AuthDatabase;
+    encryption: Encryption;
   }): PrismaBetterAuthStorageRepository {
     return new PrismaBetterAuthStorageRepository(prisma, sealedProviderConfigCipher(encryption));
   }
 
   private constructor(
-    private readonly database: ProcessMembers["prisma"],
+    private readonly database: AuthDatabase,
     private readonly providerConfig: SsoProviderConfigCipher,
   ) {
     super();

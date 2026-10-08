@@ -3,7 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.repository.ts";
 
-function codexRow({ attributes, eventName }: { attributes: Record<string, string>; eventName: string }) {
+function codexRow({
+  attributes,
+  eventName,
+}: {
+  attributes: Record<string, string>;
+  eventName: string;
+}) {
   return {
     TraceId: "trace-1",
     SpanId: "span-1",
@@ -19,7 +25,9 @@ function codexRow({ attributes, eventName }: { attributes: Record<string, string
 
 async function readLogs(rows: unknown[]) {
   const query = vi.fn(async () => ({ json: async () => rows }));
-  const repository = LogRecordStorageClickHouseRepository.create((async () => ({ query })) as never);
+  const repository = LogRecordStorageClickHouseRepository.create((async () => ({
+    query,
+  })) as never);
   return repository.findLogRecordsByTraceId({ tenantId: "project-1", traceId: "trace-1" });
 }
 
@@ -35,7 +43,9 @@ describe("given a codex session whose events name themselves the OTel Event API 
   describe("when the Terminal transcript is derived from the stored logs", () => {
     /** @scenario "Codex events are rendered whichever way the agent named them" */
     it("renders an event named by the record's EventName like one named by an attribute", async () => {
-      const logs = await readLogs([codexRow({ attributes: toolAttributes, eventName: "codex.tool_result" })]);
+      const logs = await readLogs([
+        codexRow({ attributes: toolAttributes, eventName: "codex.tool_result" }),
+      ]);
 
       const transcript = buildCodingAgentTranscript({
         spans: [],

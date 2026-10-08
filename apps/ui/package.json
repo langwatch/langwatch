@@ -11,10 +11,6 @@
     "./public-config": {
       "types": "./src/behavior/public-config.ts",
       "default": "./src/behavior/public-config.ts"
-    },
-    "./design-system": {
-      "types": "./src/behavior/design-system.ts",
-      "default": "./src/behavior/design-system.ts"
     }
   },
   "scripts": {
