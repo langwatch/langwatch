@@ -16,6 +16,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   isSaas: false,
   nodeEnvironment: "test",
   nlpCodeBlockTimeoutSeconds: void 0,
+  generateTimeoutMs: 30_000,
   voiceWorkerOnly: false,
   consumedResourceClasses: ["light", "voice"],
   slotBudget: 3,
