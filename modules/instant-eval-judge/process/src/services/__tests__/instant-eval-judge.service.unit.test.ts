@@ -12,9 +12,9 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
+import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalClassifyRequest } from "../../channels/instant-eval-classifier.channel.ts";
-import { MemoryInstantEvalClassifierChannel } from "../../channels/memory/memory.instant-eval-classifier.channel.ts";
-import { MemoryInstantEvalRateLimiterChannel } from "../../channels/memory/memory.instant-eval-rate-limiter.channel.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -78,7 +78,7 @@ function harness({
   const service = InstantEvalJudgeService.create({
     repositories,
     classifier: hasClassifier ? classifier : undefined,
-    limiter: MemoryInstantEvalRateLimiterChannel.create(),
+    limiter: MemoryInstantEvalRateLimiter.create(),
     isCloud,
     // The spend pipeline's subscriber, stood in: one row per request, never rewritten.
     recordSpendPriced: async (fact) => {
@@ -357,7 +357,7 @@ describe("given a judge call the classifier answers", () => {
       const { logger, lines } = createTestLogger();
       const service = InstantEvalJudgeService.create({
         repositories,
-        limiter: MemoryInstantEvalRateLimiterChannel.create(),
+        limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: { classify: async () => answered(500) },
         isCloud: true,
         recordSpendPriced: async () => {
@@ -426,7 +426,7 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
     it("throws, so the run's finish retries onto the same request id", async () => {
       const service = InstantEvalJudgeService.create({
         repositories: MemoryInstantEvalJudgeRepositories.create(),
-        limiter: MemoryInstantEvalRateLimiterChannel.create(),
+        limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: undefined,
         isCloud: true,
         recordSpendPriced: async () => {

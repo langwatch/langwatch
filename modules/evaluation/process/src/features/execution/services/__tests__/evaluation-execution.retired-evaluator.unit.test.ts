@@ -6,7 +6,6 @@ import { HandledError } from "@langwatch/handled-error";
  * "unknown error". @see specs/npx-installer/07-lean-install.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -40,7 +39,6 @@ function run() {
     },
     modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({}),
     workflowExecutor: { run: unused("workflowExecutor.run") },
     judges: {

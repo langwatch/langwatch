@@ -7,7 +7,6 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
@@ -58,7 +57,6 @@ function buildService() {
         return { status: "processed", score: 1, passed: true };
       },
     },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {
       run: () => {

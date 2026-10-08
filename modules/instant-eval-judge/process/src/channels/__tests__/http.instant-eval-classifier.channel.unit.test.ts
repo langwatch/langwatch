@@ -17,6 +17,7 @@ import {
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import {
   HttpInstantEvalClassifierChannel,
   JEV_DEFAULT_BASE_URL,
@@ -24,9 +25,8 @@ import {
 import type {
   InstantEvalClassifyRequest,
   InstantEvalPermit,
-  InstantEvalRateLimiterChannel,
+  InstantEvalRateLimiter,
 } from "../instant-eval-classifier.channel.ts";
-import { MemoryInstantEvalRateLimiterChannel } from "../memory/memory.instant-eval-rate-limiter.channel.ts";
 
 const QUESTION: InstantEvalQuestion = {
   id: "annoyed",
@@ -45,9 +45,7 @@ const TOO_LARGE = { detail: { error_type: "max_tokens_exceeded" } };
 let agent: MockAgent;
 let waits: number[];
 
-function judge(
-  limiter: InstantEvalRateLimiterChannel = MemoryInstantEvalRateLimiterChannel.create(),
-) {
+function judge(limiter: InstantEvalRateLimiter = MemoryInstantEvalRateLimiter.create()) {
   const channel = HttpInstantEvalClassifierChannel.create({
     apiKey: "test-key",
     dispatcher: agent,
@@ -192,7 +190,7 @@ describe("given a limiter that records what each permit asks for", () => {
     /** @scenario "A classification takes its estimated tokens from one bucket shared by every pod" */
     it("takes the tokens the request will really carry, not the generic estimate", async () => {
       const permits: InstantEvalPermit[] = [];
-      const limiter: InstantEvalRateLimiterChannel = {
+      const limiter: InstantEvalRateLimiter = {
         acquire: async (permit) => {
           permits.push(permit);
         },

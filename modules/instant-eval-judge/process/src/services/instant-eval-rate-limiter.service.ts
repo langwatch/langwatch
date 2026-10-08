@@ -9,7 +9,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
   InstantEvalPermit,
-  InstantEvalRateLimiterChannel,
+  InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type {
   InstantEvalRateLimitBuckets,
@@ -48,7 +48,7 @@ interface InstantEvalRateLimiterOptions extends InstantEvalRateLimitBuckets {
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
-export class InstantEvalRateLimiterService implements InstantEvalRateLimiterChannel {
+export class InstantEvalRateLimiterService implements InstantEvalRateLimiter {
   private localTokens: number;
   private localAt: number;
   private readonly now: () => Instant;

@@ -18,7 +18,6 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { maxCausalityDepthOfSpans } from "../../../rules/evaluation-causality.rules.ts";
 import { executionResultOf } from "../../../rules/evaluation-execution-result.rules.ts";
@@ -57,7 +56,6 @@ export interface EvaluationExecutionDeps {
   spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread">;
   modelEnvResolver: Pick<EvaluatorModelEnvService, "resolveForEvaluator">;
   langevalsClient: Pick<LangevalsEvaluatorService, "evaluate">;
-  workflows: WorkflowApi;
   evaluators: EvaluatorApi;
   workflowExecutor: Pick<WorkflowEvaluationService, "run">;
   /** Answers a judge whose model is Instant Evals (ADR-174 decision 1). */

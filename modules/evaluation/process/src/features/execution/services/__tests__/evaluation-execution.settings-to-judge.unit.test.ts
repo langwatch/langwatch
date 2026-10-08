@@ -1,7 +1,6 @@
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import type { EvaluatorModelEnvService } from "../../../evaluators/services/evaluator-model-env.service.ts";
@@ -59,7 +58,6 @@ function buildService(
     spanDigest,
     modelEnvResolver,
     langevalsClient,
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {
       run: () => {

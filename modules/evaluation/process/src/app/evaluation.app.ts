@@ -425,7 +425,6 @@ export class EvaluationModule implements EvaluationApiContract {
         },
         telemetry,
       }),
-      workflows: dependencies.workflows,
       evaluators: dependencies.evaluators,
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,

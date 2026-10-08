@@ -19,7 +19,7 @@ import type { Instant } from "@langwatch/time";
 
 import type {
   InstantEvalClassifierChannel,
-  InstantEvalRateLimiterChannel,
+  InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalJudgeRepositories } from "../repositories/instant-eval-judge.repositories.ts";
 import { instantEvalJudgeBudgetOf } from "../rules/instant-eval-judge-budget.rules.ts";
@@ -43,7 +43,7 @@ type InstantEvalJudgeServiceDeps = Readonly<{
   /** LangWatch's own classifier; absent where the deployment holds no key. */
   classifier: InstantEvalClassifierChannel | undefined;
   /** Paces every classify send over the module's own rate buckets. */
-  limiter: InstantEvalRateLimiterChannel;
+  limiter: InstantEvalRateLimiter;
   /** LangWatch cloud, the only install a judge call is answered on. */
   isCloud: boolean;
   /** Appends the priced fact; the judge's spend row and gateway's ledger row follow from it. */

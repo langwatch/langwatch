@@ -12,7 +12,6 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorModelEnvService } from "../../../evaluators/services/evaluator-model-env.service.ts";
@@ -73,7 +72,6 @@ function buildService({ judge = judgedTrue }: { judge?: Judge } = {}) {
     },
     modelEnvResolver: { resolveForEvaluator },
     langevalsClient: { evaluate },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {
       run: () => {

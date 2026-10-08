@@ -7,7 +7,6 @@ import type { EvaluationApi, EvaluationCostRecord } from "@langwatch/evaluation-
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import { EvaluationGuardrailCheckService } from "../../features/execution/services/evaluation-guardrail-check.service.ts";
@@ -35,7 +34,6 @@ export function instantEvalGuardrailCheckOver({
     spanDigest: { format: unreachable("a span digest"), formatThread: unreachable("a thread") },
     modelEnvResolver: { resolveForEvaluator: unreachable("a model provider") },
     langevalsClient: { evaluate: unreachable("the evaluator service") },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: { run: unreachable("a workflow") },
     judges,

@@ -29,14 +29,12 @@ import {
 
 import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import type { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
-import {
-  type EvaluationAnalyticsData,
-  EvaluationAnalyticsFoldProjection,
-} from "./evaluation-analytics-fold.projection.ts";
+import { EvaluationAnalyticsFoldProjection } from "./evaluation-analytics-fold.projection.ts";
 import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
 } from "./evaluation-analytics-rollup.projection.ts";
+import type { EvaluationAnalyticsData } from "./evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
 import {
@@ -82,7 +80,7 @@ interface EvaluationProcessingPipelineDeps {
   executeEvaluationCommand: ExecuteEvaluationCommand;
   /** Records evaluation's lifecycle facts; absent where nothing composes a lifecycle. */
   lifecycle?: Pick<EvaluationLifecycleService, "completed">;
-  /** Each tenant's retention; a producer, which projects nothing, declares none. */
+  /** Each tenant's retention; absent where the process projects nothing. */
   retention?: RetentionPolicyResolver;
   /** Evaluation's reactions to trace's span facts (PC-3); absent where no trace pipeline runs. */
   traceReactions?: EvaluationTraceReactions;

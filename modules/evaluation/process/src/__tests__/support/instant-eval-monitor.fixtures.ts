@@ -11,7 +11,6 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
 import { EvaluationExecutionIntentService } from "../../features/execution/services/evaluation-execution-intent.service.ts";
@@ -59,7 +58,6 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
         throw new Error("a judge on Instant Evals never reaches the evaluator service");
       },
     },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {
       run: () => {

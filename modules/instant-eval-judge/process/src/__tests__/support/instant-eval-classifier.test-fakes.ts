@@ -3,7 +3,7 @@ import type { InstantEvalJudgement } from "@langwatch/instant-eval-judge-contrac
 import type {
   InstantEvalClassifierChannel,
   InstantEvalClassifyRequest,
-} from "../instant-eval-classifier.channel.ts";
+} from "../../channels/instant-eval-classifier.channel.ts";
 
 type InstantEvalClassifierAnswer = (
   request: InstantEvalClassifyRequest,

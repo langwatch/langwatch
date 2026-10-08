@@ -19,7 +19,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   classifierApiKey,
   type InstantEvalClassifierChannel,
-  type InstantEvalRateLimiterChannel,
+  type InstantEvalRateLimiter,
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalJudgeChannels } from "../channels/instant-eval-judge.channels.ts";
 import {
@@ -62,7 +62,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
 
   readonly #facts: InstantEvalJudgeFactsService;
   readonly #classifier: InstantEvalClassifierChannel | undefined;
-  readonly #limiter: InstantEvalRateLimiterChannel;
+  readonly #limiter: InstantEvalRateLimiter;
   readonly #judge: InstantEvalJudgeService;
   #spendCommands: EventingCommands<InstantEvalJudgeSpendPipeline> | undefined;
 
@@ -101,7 +101,7 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
   private static limiterOf({
     config,
     repositories,
-  }: InstantEvalJudgeSetup): InstantEvalRateLimiterChannel {
+  }: InstantEvalJudgeSetup): InstantEvalRateLimiter {
     const tokensPerSecond = config.globalTokensPerSecond;
     const tenantTokensPerSecond = Math.min(tokensPerSecond, config.tenantTokensPerSecond);
     return InstantEvalRateLimiterService.create({

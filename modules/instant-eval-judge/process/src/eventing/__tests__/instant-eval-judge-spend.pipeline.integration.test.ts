@@ -28,7 +28,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryInstantEvalRateLimiterChannel } from "../../channels/memory/memory.instant-eval-rate-limiter.channel.ts";
+import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import type { InstantEvalJudgeRepositories } from "../../repositories/instant-eval-judge.repositories.ts";
 import { MemoryInstantEvalJudgeRepositories } from "../../repositories/memory/memory.instant-eval-judge.repositories.ts";
 import { PostgresInstantEvalJudgeRepositories } from "../../repositories/prisma/prisma.instant-eval-judge.repositories.ts";
@@ -145,7 +145,7 @@ function spendCases(backend: Backend): void {
     const registered = eventing.register(live.pipeline);
     const judge = InstantEvalJudgeService.create({
       repositories,
-      limiter: MemoryInstantEvalRateLimiterChannel.create(),
+      limiter: MemoryInstantEvalRateLimiter.create(),
       classifier: undefined,
       isCloud: true,
       recordSpendPriced: (fact) => registered.commands.recordSpendPriced.send(fact),

@@ -21,7 +21,7 @@ export interface InstantEvalClassifyRequest {
   /** Every question about that text, asked in one request. */
   readonly questions: readonly InstantEvalQuestion[];
   /** Paces each send; the service owns it, over the module's own buckets. */
-  readonly limiter: InstantEvalRateLimiterChannel;
+  readonly limiter: InstantEvalRateLimiter;
 }
 
 export interface InstantEvalClassifierChannel {
@@ -46,6 +46,6 @@ export interface InstantEvalPermit {
  * deliberately: everything above cares about being allowed to send, not about
  * how many tokens are left.
  */
-export interface InstantEvalRateLimiterChannel {
+export interface InstantEvalRateLimiter {
   acquire(permit: InstantEvalPermit, signal?: AbortSignal): Promise<void>;
 }

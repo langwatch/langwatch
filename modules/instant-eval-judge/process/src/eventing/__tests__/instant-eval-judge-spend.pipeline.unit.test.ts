@@ -10,7 +10,7 @@ import type { InstantEvalJudgeSpendPricedEventData } from "@langwatch/instant-ev
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryInstantEvalRateLimiterChannel } from "../../channels/memory/memory.instant-eval-rate-limiter.channel.ts";
+import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
 import {
   MemoryInstantEvalJudgeProjectRepository,
   MemoryInstantEvalJudgeRepositories,
@@ -53,7 +53,7 @@ describe("given the judge's spend pipeline", () => {
       const { repositories, facts, append } = harness();
       const judge = InstantEvalJudgeService.create({
         repositories,
-        limiter: MemoryInstantEvalRateLimiterChannel.create(),
+        limiter: MemoryInstantEvalRateLimiter.create(),
         classifier: {
           classify: async () => ({
             verdicts: [{ questionId: "verdict", probability: 0.8 }],

@@ -6,7 +6,6 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import type { LangevalsEvaluatorService } from "../../../evaluators/services/langevals-evaluator.service.ts";
@@ -56,7 +55,6 @@ function buildService(langevalsEvaluate: Mock<LangevalsEvaluatorService["evaluat
     },
     modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
-    workflows: createApiFixture<WorkflowApi>({}),
     evaluators,
     workflowExecutor: { run: unused("workflowExecutor.run") },
     judges: {
