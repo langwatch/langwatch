@@ -177,6 +177,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("monitor_evaluator_cleanup");
       expect(pipelines).toContain("scim_sso_connections");
       expect(pipelines).toContain("agent_lifecycle");
+      expect(pipelines).toContain("agent_workflow_fields");
       expect(pipelines).toContain("workflow_agent_archive_cascade");
       expect(pipelines).toContain("share_trace_sharing_revocation");
       expect(pipelines).toContain("topic_clustering_processing");

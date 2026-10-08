@@ -26,11 +26,13 @@ import {
   type AgentReferenceState,
   type AgentName,
   type AgentPage,
+  type WorkflowAgentConfig,
 } from "@langwatch/agent-contract";
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
+import { workflowFieldsKeepingStored } from "../rules/agent-view.rules.ts";
 
 export class AgentService {
   #repository: AgentRepository;
@@ -126,6 +128,12 @@ export class AgentService {
         throw new AgentStoredCredentialsDestinationError();
       }
       config = httpSecretsKeepingStored({ stored, incoming: checked.data.config });
+    }
+    if (checked.data.type === "workflow" && existing.type === "workflow") {
+      config = workflowFieldsKeepingStored({
+        stored: existing.config as WorkflowAgentConfig,
+        incoming: checked.data.config,
+      });
     }
 
     return this.#repository.update({ ...parsed.data, type, config });

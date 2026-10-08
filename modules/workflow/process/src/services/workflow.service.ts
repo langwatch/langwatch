@@ -85,6 +85,30 @@ export class WorkflowService {
     return this.options.repository.deleteUncommitted(input);
   }
 
+  /**
+   * A live workflow's current version as a version_saved fact carries it, with its fields;
+   * none when the workflow is archived or missing, or its current version is not `versionId`.
+   */
+  async findCurrentVersionFacts(
+    input: WorkflowReference & { versionId?: string },
+  ): Promise<{ versionId: string; authorId: string; fields: WorkflowMappingFields }[]> {
+    const workflow = await this.options.repository.findById({
+      id: input.workflowId,
+      projectId: input.projectId,
+      includeVersion: true,
+    });
+    const current = workflow?.currentVersion;
+    if (!current || (input.versionId !== undefined && current.id !== input.versionId)) return [];
+
+    return [
+      {
+        versionId: current.id,
+        authorId: current.authorId ?? "",
+        fields: this.dsl.mappingFields(current.dsl),
+      },
+    ];
+  }
+
   /** Archives a live graph; an archived or missing one is left alone, so redelivery is harmless. */
   async archiveIfLive(input: WorkflowReference): Promise<void> {
     const live = await this.options.repository.findById({

@@ -99,6 +99,7 @@ function setup({
 describe("WorkflowAgentCopyService", () => {
   describe("when the source agent runs a workflow", () => {
     /** @scenario "Copying a workflow agent copies its graph first" */
+    /** @scenario "A copied workflow agent points at the graph the workflow module copied" */
     it("copies the graph as the caller, then has Agent write the copy pointing at it", async () => {
       const { service, writes, graphs } = setup();
 

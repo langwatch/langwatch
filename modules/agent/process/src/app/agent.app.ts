@@ -76,12 +76,17 @@ import {
   type AgentLifecyclePipeline,
   buildAgentLifecyclePipeline,
 } from "../eventing/agent-lifecycle.pipeline.ts";
+import {
+  type AgentWorkflowFieldsPipeline,
+  buildAgentWorkflowFieldsPipeline,
+} from "../eventing/agent-workflow-fields.pipeline.ts";
 import type { AgentRepositories } from "../repositories/agent.repositories.ts";
 import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
 import { AgentHttpSecretsService } from "../services/agent-http-secrets.service.ts";
 import { AgentVoiceReleaseService } from "../services/agent-voice-release.service.ts";
+import { AgentWorkflowFieldsService } from "../services/agent-workflow-fields.service.ts";
 import { AgentService } from "../services/agent.service.ts";
 import {
   ConnectedAgentPresenceService,
@@ -136,7 +141,6 @@ export class AgentModule implements AgentApi {
   readonly #permissions: AuthzApi;
   readonly #projects: ProjectApi;
   readonly #users: UserApi;
-  readonly #workflows: WorkflowApi;
   readonly #publicBaseUrl: string;
   readonly #lifecycle = buildAgentLifecyclePipeline();
   #lifecycleCommands: EventingCommands<AgentLifecyclePipeline> | undefined;
@@ -160,7 +164,6 @@ export class AgentModule implements AgentApi {
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
     this.#users = dependencies.users;
-    this.#workflows = dependencies.workflows;
     this.#httpTesting = HttpAgentTestService.create({
       workflows: dependencies.workflows,
       traces: dependencies.traces,
@@ -215,7 +218,9 @@ export class AgentModule implements AgentApi {
 
   async create(input: CreateAgentCommand): Promise<AgentWithFields> {
     await this.#voiceRelease.assertWritable({ type: input.type, projectIds: [input.projectId] });
-    return this.#withFields(await this.#agents.create(await this.#httpSecrets.forCreate(input)));
+    return agentWithResolvedFields(
+      await this.#agents.create(await this.#httpSecrets.forCreate(input)),
+    );
   }
 
   async update(input: UpdateAgentCommand): Promise<AgentWithFields> {
@@ -225,7 +230,9 @@ export class AgentModule implements AgentApi {
         ? input.type
         : (await this.#agents.getById({ id: input.id, projectId: input.projectId })).type;
     await this.#voiceRelease.assertWritable({ type, projectIds: [input.projectId] });
-    return this.#withFields(await this.#agents.update(await this.#httpSecrets.forUpdate(input)));
+    return agentWithResolvedFields(
+      await this.#agents.update(await this.#httpSecrets.forUpdate(input)),
+    );
   }
 
   async archive(input: GetAgentInput): Promise<Agent> {
@@ -311,6 +318,13 @@ export class AgentModule implements AgentApi {
   /** Binds the built lifecycle pipeline's own senders. */
   connectLifecycleCommands(commands: EventingCommands<AgentLifecyclePipeline>): void {
     this.#lifecycleCommands = commands;
+  }
+
+  /** Keeps linked graphs' fields from workflow's facts, from agent's own side (§9). */
+  workflowFieldsPipeline(): AgentWorkflowFieldsPipeline {
+    return buildAgentWorkflowFieldsPipeline({
+      fields: AgentWorkflowFieldsService.create({ agents: this.#agents }),
+    });
   }
 
   async #recordArchived(input: { agent: Agent; cascadedWorkflowId: string | null }): Promise<void> {
@@ -543,29 +557,16 @@ export class AgentModule implements AgentApi {
     return this.#connected;
   }
 
-  async #withFields(agent: Agent): Promise<AgentWithFields> {
-    const workflowIds = findLinkedWorkflowIds(agent);
-    const fields =
-      workflowIds.length > 0
-        ? await this.#workflows.listFields({ projectId: agent.projectId, workflowIds })
-        : {};
-    return agentWithResolvedFields(agent, fields);
-  }
-
   async #enrich(agents: Agent[], input: AgentProjectInput & { viewerUserId?: string | null }) {
     const owned = agents.map((agent) => ({ ...agent, ownerUserId: agent.ownerUserId ?? null }));
-    const workflowIds = [...new Set(agents.flatMap((agent) => findLinkedWorkflowIds(agent)))];
-    const [owners, presence, fields] = await Promise.all([
+    const [owners, presence] = await Promise.all([
       this.ownersOf(owned),
       this.#connected?.listPresence({ projectId: input.projectId, agents }) ??
         Promise.resolve(new Map<string, AgentPresence>()),
-      workflowIds.length
-        ? this.#workflows.listFields({ projectId: input.projectId, workflowIds })
-        : Promise.resolve({}),
     ]);
 
     return owned.map((agent) => ({
-      ...agentWithResolvedFields(agent, fields),
+      ...agentWithResolvedFields(agent),
       environment: agent.environment ?? null,
       ownerUserId: agent.ownerUserId ?? null,
       hostLabel: agent.hostLabel ?? null,

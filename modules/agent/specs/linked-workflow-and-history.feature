@@ -5,10 +5,30 @@ Feature: Agent coordinates linked workflows and history through their owners
   @unit @agents
   Scenario: Workflow fields describe the current graph
     Given a workflow agent points to a graph in its project
-    When AgentModule reads the agent
-    Then WorkflowApi supplies the graph's input and output fields
-    And an archived or missing graph yields no fields and fieldsResolved false
-    And a graph belonging to another project is not returned
+    And workflow records the graph's current version with its input and output fields
+    When Agent's peer subscriber handles the fact and AgentModule reads the agent
+    Then the agent reports the fields stored in its own config, with no call to workflow
+    And an archived graph, or one no fact has named, yields no fields and fieldsResolved false
+    And a fact for a graph in another project changes no agent
+
+  @unit @agents
+  Scenario: A redelivered workflow version fact writes the fields once
+    Given Agent already stored the fields of a workflow version fact
+    When the same fact is delivered again
+    Then both deliveries share one deduplication id and the agent's config is written once
+
+  @unit @agents
+  Scenario: A workflow fact older than the stored fields changes nothing
+    Given an agent whose stored fields came from a newer workflow fact
+    When an older version_saved or archived fact arrives
+    Then the stored fields are left as they are
+
+  @unit @agents
+  Scenario: Editing a workflow agent keeps the fields workflow recorded
+    Given a workflow agent with fields workflow recorded
+    When the agent is edited and still points at the same graph
+    Then the recorded fields are kept, whatever the edit sent for them
+    And pointing the agent at another graph drops them until workflow records that graph
 
   @unit @agents
   Scenario: The archive dialog names the linked workflow through Workflow

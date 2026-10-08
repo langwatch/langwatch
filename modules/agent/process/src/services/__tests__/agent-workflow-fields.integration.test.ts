@@ -1,24 +1,29 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi, WorkflowMappingFields } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+/**
+ * A workflow agent's fields come from workflow's facts, stored in agent's own config.
+ * Spec: modules/agent/specs/linked-workflow-and-history.feature
+ */
+import type { WorkflowMappingFields } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
 
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
+import {
+  archivedEvent,
+  contextOf,
+  lanesOf,
+  versionSavedEvent,
+} from "../../eventing/__tests__/agent-workflow-fields.fixture.ts";
+
+const FIELDS: WorkflowMappingFields = {
+  inputFields: [{ identifier: "question", type: "str" }],
+  outputFields: [
+    { identifier: "output", type: "str" },
+    { identifier: "chunks", type: "dict" },
+  ],
+  fieldsResolved: true,
+};
 
 async function setup() {
-  const fields: Record<string, WorkflowMappingFields> = {
-    workflow_1: {
-      inputFields: [{ identifier: "question", type: "str" }],
-      outputFields: [
-        { identifier: "output", type: "str" },
-        { identifier: "chunks", type: "dict" },
-      ],
-      fieldsResolved: true,
-    },
-  };
-  const listFields = vi.fn(async () => fields);
-  const fixture = createAgentAppFixture({
-    workflows: createApiFixture<WorkflowApi>({ listFields }),
-  });
+  const fixture = createAgentAppFixture();
   const agent = await fixture.app.create({
     id: "agent_workflow",
     projectId: "project_1",
@@ -27,28 +32,29 @@ async function setup() {
     config: { workflow_id: "workflow_1" },
     workflowId: "workflow_1",
   });
+  const lanes = lanesOf(fixture.app.workflowFieldsPipeline());
+  const saved = async (data: Parameters<typeof versionSavedEvent>[0]) => {
+    const event = versionSavedEvent(data);
+    await lanes.versionSaved.handle(event, contextOf(event));
+  };
+  await saved({ fields: FIELDS });
 
-  return { ...fixture, agent, fields, listFields };
+  return { ...fixture, agent, lanes, saved };
 }
 
 describe("AgentModule workflow field enrichment", () => {
   /** @scenario "A workflow agent reports the end node's results as its output fields" */
   it("returns all declared outputs and preserves their object type", async () => {
-    const { app, agent, listFields } = await setup();
-    const read = await app.getById(agent);
+    const { app, agent } = await setup();
 
-    expect(read.outputFields).toEqual([
+    expect((await app.getById(agent)).outputFields).toEqual([
       { identifier: "output", type: "str" },
       { identifier: "chunks", type: "dict" },
     ]);
-    expect(listFields).toHaveBeenLastCalledWith({
-      projectId: "project_1",
-      workflowIds: ["workflow_1"],
-    });
   });
 
   /** @scenario "A workflow agent reports the entry node's fields as its input fields" */
-  it("returns entry inputs from the Workflow API", async () => {
+  it("returns the entry inputs workflow recorded", async () => {
     const { app, agent } = await setup();
 
     expect((await app.getById(agent)).inputFields).toEqual([
@@ -61,21 +67,24 @@ describe("AgentModule workflow field enrichment", () => {
     const listed = await app.getAll({ projectId: agent.projectId });
 
     expect(listed).toHaveLength(1);
-    expect(listed[0]?.outputFields).toEqual(agent.outputFields);
+    expect(listed[0]?.outputFields).toEqual(FIELDS.outputFields);
     expect(listed[0]?.fieldsResolved).toBe(true);
   });
 
   /** @scenario "Workflow fields describe the current graph" */
   /** @scenario "Editing the workflow changes the agent's fields without touching the agent" */
-  it("refreshes fields without modifying the persisted Agent", async () => {
-    const { app, agent, fields, repositories } = await setup();
+  it("takes a newer version's fields and leaves the agent's own settings alone", async () => {
+    const { app, agent, saved, repositories } = await setup();
     const before = await repositories.agents.getById(agent);
-    fields.workflow_1 = {
-      inputFields: agent.inputFields,
-      outputFields: [...agent.outputFields, { identifier: "citations", type: "list" }],
-      fieldsResolved: true,
-    };
 
+    await saved({
+      versionId: "version_2",
+      occurredAt: 1_500,
+      fields: {
+        ...FIELDS,
+        outputFields: [...FIELDS.outputFields, { identifier: "citations", type: "list" }],
+      },
+    });
     const read = await app.getById(agent);
 
     expect(read.outputFields.map((field) => field.identifier)).toEqual([
@@ -83,23 +92,24 @@ describe("AgentModule workflow field enrichment", () => {
       "chunks",
       "citations",
     ]);
-    expect(read.updatedAt).toEqual(before.updatedAt);
-    expect(await repositories.agents.getById(agent)).toEqual(before);
+    expect(read.name).toBe(before.name);
+    expect(read.workflowId).toBe("workflow_1");
   });
 
   /** @scenario "A workflow agent whose workflow declares no results reports none" */
   it("preserves a resolved workflow with no outputs", async () => {
-    const { app, agent, fields } = await setup();
-    fields.workflow_1 = { inputFields: agent.inputFields, outputFields: [], fieldsResolved: true };
+    const { app, agent, saved } = await setup();
+    await saved({ occurredAt: 1_500, fields: { ...FIELDS, outputFields: [] } });
 
     expect(await app.getById(agent)).toMatchObject({ outputFields: [], fieldsResolved: true });
   });
 
   /** @scenario "Workflow fields describe the current graph" */
   /** @scenario "A workflow agent whose workflow was deleted reports no fields" */
-  it("returns unresolved fields when the Workflow API excludes an archived graph", async () => {
-    const { app, agent, fields } = await setup();
-    delete fields.workflow_1;
+  it("returns unresolved fields once workflow records the graph archived", async () => {
+    const { app, agent, lanes } = await setup();
+    const event = archivedEvent({});
+    await lanes.archived.handle(event, contextOf(event));
 
     expect(await app.getById(agent)).toMatchObject({
       id: agent.id,
@@ -111,10 +121,8 @@ describe("AgentModule workflow field enrichment", () => {
 
   /** @scenario "Workflow fields describe the current graph" */
   /** @scenario "A workflow agent pointing at no workflow at all reports no fields" */
-  it("keeps an agent whose workflow cannot be resolved in the project", async () => {
-    const { app } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ listFields: async () => ({}) }),
-    });
+  it("keeps an agent no workflow fact names, and ignores another project's graph", async () => {
+    const { app, saved } = await setup();
     const agent = await app.create({
       id: "agent_orphan",
       projectId: "project_1",
@@ -123,6 +131,12 @@ describe("AgentModule workflow field enrichment", () => {
       config: { workflow_id: "missing" },
       workflowId: "missing",
     });
+    await saved({
+      projectId: "project_2",
+      workflowId: "missing",
+      occurredAt: 1_500,
+      fields: FIELDS,
+    });
 
     expect(await app.getById(agent)).toMatchObject({
       id: agent.id,
@@ -130,5 +144,28 @@ describe("AgentModule workflow field enrichment", () => {
       outputFields: [],
       fieldsResolved: false,
     });
+  });
+
+  /** @scenario "Editing a workflow agent keeps the fields workflow recorded" */
+  it("keeps the recorded fields when the agent is edited, and drops them when it is re-pointed", async () => {
+    const { app, agent } = await setup();
+
+    const renamed = await app.update({
+      id: agent.id,
+      projectId: agent.projectId,
+      name: "Renamed",
+      type: "workflow",
+      config: { workflow_id: "workflow_1" },
+    });
+    expect(renamed).toMatchObject({ fieldsResolved: true, inputFields: FIELDS.inputFields });
+
+    const repointed = await app.update({
+      id: agent.id,
+      projectId: agent.projectId,
+      type: "workflow",
+      config: { workflow_id: "workflow_2" },
+      workflowId: "workflow_2",
+    });
+    expect(repointed).toMatchObject({ fieldsResolved: false, inputFields: [] });
   });
 });

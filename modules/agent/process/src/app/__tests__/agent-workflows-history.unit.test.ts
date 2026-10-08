@@ -40,52 +40,18 @@ describe("AgentModule workflow and audit ownership", () => {
     );
   });
 
-  /** @scenario "Workflow fields describe the current graph" */
-  it("maps workflow field metadata into an Agent view", async () => {
-    const listFields = vi.fn(async () => ({
-      workflow_1: {
-        fieldsResolved: true,
-        inputFields: [{ identifier: "question", type: "str" as const }],
-        outputFields: [
-          { identifier: "answer", type: "str" as const },
-          { identifier: "score", type: "float" as const },
-        ],
-      },
-    }));
+  it("reads no fields from Workflow and leaves a graph with no recorded fields unresolved", async () => {
     const { app, repositories } = createAgentAppFixture({
-      workflows: createApiFixture<WorkflowApi>({ listFields }),
+      workflows: createApiFixture<WorkflowApi>({}),
     });
     await repositories.agents.create(workflowAgent);
 
     expect(await app.getById(reference)).toMatchObject({
-      fieldsResolved: true,
-      inputFields: [{ identifier: "question", type: "str" }],
-      outputFields: [
-        { identifier: "answer", type: "str" },
-        { identifier: "score", type: "float" },
-      ],
-    });
-    expect(listFields).toHaveBeenCalledWith({
-      projectId: reference.projectId,
-      workflowIds: ["workflow_1"],
+      fieldsResolved: false,
+      inputFields: [],
+      outputFields: [],
     });
   });
-
-  it.each(["archived", "malformed"])(
-    "keeps an Agent readable when its %s graph resolves no fields",
-    async () => {
-      const { app, repositories } = createAgentAppFixture({
-        workflows: createApiFixture<WorkflowApi>({ listFields: async () => ({}) }),
-      });
-      await repositories.agents.create(workflowAgent);
-
-      expect(await app.getById(reference)).toMatchObject({
-        fieldsResolved: false,
-        inputFields: [],
-        outputFields: [],
-      });
-    },
-  );
 
   /** @scenario "Cascade archive uses the workflow owner" */
   it("archives the Agent and records the archive naming the linked graph for Workflow", async () => {

@@ -39,8 +39,22 @@ Feature: Workflow service boundary
   Scenario: Saving a Studio graph records the version as a fact agents react to
     Given a Studio graph saved as a version of a workflow
     When the save completes
-    Then one version_saved fact is recorded on the workflow's own pipeline, keyed by the version
+    Then one version_saved fact is recorded on the workflow's own pipeline, keyed by the version and the instant
     And recording it never fails or delays the save
+
+  @unit
+  Scenario: A version recorded again carries its fields while it is current
+    Given a workflow whose current version is saved, restored, created or brought back from an archive
+    When workflow records the version_saved fact
+    Then the fact carries the input and output fields of that version
+    And a version that is no longer current, or a workflow that is archived, carries none
+
+  @unit
+  Scenario: Archiving a workflow records the archived fact agents react to
+    Given a live workflow
+    When it is archived on its own, with its linked rows, or by agent's archive cascade
+    Then one archived fact is recorded on the workflow's own pipeline, keyed by the workflow and the instant
+    And recording it never fails or delays the archive
 
   @unit
   Scenario: A workflow created as an autosave keeps one version across later autosaves

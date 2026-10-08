@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  fieldSchema,
   studioOptimizerIdSchema,
   studioOptimizerParamsSchema,
   studioWorkflowSchema,
@@ -129,15 +130,37 @@ export const workflowCreatedEventDataSchema = z.object({
 });
 export type WorkflowCreatedEventData = z.infer<typeof workflowCreatedEventDataSchema>;
 
-/** Agent re-derives its scenario mappings from its own side on this fact (§9). */
+/** Agent keeps a linked graph's fields from its own side on this fact (§9). */
 export const WORKFLOW_VERSION_SAVED_EVENT_TYPE = "lw.workflow.version_saved" as const;
 
-/** A Studio graph was saved as a version of a workflow, by whom and when. */
+/** The input and output fields a graph's version offers to whatever maps onto it. */
+export const workflowMappingFieldsSchema = z.object({
+  inputFields: z.array(fieldSchema),
+  outputFields: z.array(fieldSchema),
+  fieldsResolved: z.boolean(),
+});
+
+/**
+ * A version of a workflow was saved, restored or recorded again, by whom and when.
+ * `fields` is present only while that version is the live workflow's current one.
+ */
 export const workflowVersionSavedEventDataSchema = z.object({
   workflowId: z.string(),
   projectId: z.string(),
   versionId: z.string(),
   authorId: z.string(),
+  fields: workflowMappingFieldsSchema.optional(),
   occurredAt: z.number().int().nonnegative(),
 });
 export type WorkflowVersionSavedEventData = z.infer<typeof workflowVersionSavedEventDataSchema>;
+
+/** Agent clears a linked graph's fields from its own side on this fact (§9). */
+export const WORKFLOW_ARCHIVED_EVENT_TYPE = "lw.workflow.archived" as const;
+
+/** A workflow was archived, and when. */
+export const workflowArchivedEventDataSchema = z.object({
+  workflowId: z.string(),
+  projectId: z.string(),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type WorkflowArchivedEventData = z.infer<typeof workflowArchivedEventDataSchema>;

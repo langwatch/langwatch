@@ -1,9 +1,10 @@
 import {
   findLinkedWorkflowIds,
   type Agent,
-  type AgentFields,
   type AgentWithFields,
   type ConnectedAgentConfig,
+  type WorkflowAgentConfig,
+  workflowAgentFieldsSchema,
 } from "@langwatch/agent-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
@@ -19,10 +20,7 @@ export function declaredAgentParameters(
 }
 
 /** The agent with its workflow's input and output fields folded in, where it has one. */
-export function agentWithResolvedFields(
-  agent: Agent,
-  fields: Record<string, AgentFields>,
-): AgentWithFields {
+export function agentWithResolvedFields(agent: Agent): AgentWithFields {
   if (agent.type !== "workflow") {
     return {
       ...agent,
@@ -33,8 +31,12 @@ export function agentWithResolvedFields(
   }
 
   const [workflowId] = findLinkedWorkflowIds(agent);
-  if (workflowId && fields[workflowId]) {
-    return { ...agent, ...fields[workflowId] };
+  const stored = workflowAgentFieldsSchema.safeParse(
+    (agent.config as WorkflowAgentConfig).workflowFields,
+  ).data;
+  if (workflowId && stored) {
+    const { inputFields, outputFields, fieldsResolved } = stored;
+    return { ...agent, inputFields, outputFields, fieldsResolved };
   }
 
   return {
@@ -43,4 +45,18 @@ export function agentWithResolvedFields(
     outputFields: [],
     fieldsResolved: false,
   };
+}
+
+/** An edited workflow agent's config keeps the fields workflow recorded while its graph stays. */
+export function workflowFieldsKeepingStored({
+  stored,
+  incoming,
+}: {
+  stored: WorkflowAgentConfig;
+  incoming: WorkflowAgentConfig;
+}): WorkflowAgentConfig {
+  const { workflowFields: _ignored, ...config } = incoming;
+  return stored.workflow_id === incoming.workflow_id && stored.workflowFields
+    ? { ...config, workflowFields: stored.workflowFields }
+    : config;
 }

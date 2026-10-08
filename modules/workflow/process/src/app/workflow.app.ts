@@ -796,8 +796,10 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     return this.#infrastructure.workflows.listSummaries(input);
   }
 
-  archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
-    return this.#infrastructure.workflows.archiveLinked(input);
+  async archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
+    const archived = await this.#infrastructure.workflows.archiveLinked(input);
+    this.#recordArchived(input);
+    return archived;
   }
 
   deleteUncommitted(input: WorkflowReference): Promise<void> {
@@ -847,6 +849,12 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     const created = await this.#infrastructure.workflows.create({ ...input, dsl, authorId: by.id });
 
     this.#recordCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
+    this.#recordVersionSaved({
+      projectId: input.projectId,
+      workflowId: created.workflow.id,
+      versionId: created.version.id,
+      authorId: by.id,
+    });
 
     return created;
   }
@@ -872,19 +880,49 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       .catch((error: unknown) => this.#infrastructure.signals.failed(error, { projectId }));
   }
 
-  /** Records a saved Studio version, never failing or delaying the save. */
+  /**
+   * Records a version that was saved, restored or brought back with its workflow, with the
+   * fields it offers while it is current; never failing or delaying the write.
+   */
   #recordVersionSaved(input: {
     projectId: string;
     workflowId: string;
-    versionId: string;
-    authorId: string;
+    versionId?: string;
+    authorId?: string;
   }): void {
+    const { projectId, workflowId, versionId, authorId } = input;
+    void this.#infrastructure.workflows
+      .findCurrentVersionFacts({ projectId, workflowId, versionId })
+      .then(async (current) => {
+        const commands = this.#lifecycleCommands;
+        if (!commands) throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+        const facts =
+          current.length > 0 || versionId === undefined || authorId === undefined
+            ? current
+            : [{ versionId, authorId, fields: undefined }];
+        for (const fact of facts) {
+          await commands.recordWorkflowVersionSaved.send({
+            tenantId: projectId,
+            occurredAt: nowInstant().epochMilliseconds,
+            projectId,
+            workflowId,
+            versionId: fact.versionId,
+            authorId: authorId ?? fact.authorId,
+            ...(fact.fields ? { fields: fact.fields } : {}),
+          });
+        }
+      })
+      .catch((error: unknown) => this.#infrastructure.signals.failed(error, { projectId }));
+  }
+
+  /** Records an archived workflow, never failing or delaying the archive. */
+  #recordArchived(input: WorkflowReference): void {
     void Promise.resolve()
       .then(() => {
         if (!this.#lifecycleCommands) {
           throw new Error("workflow_lifecycle pipeline senders are not connected yet");
         }
-        return this.#lifecycleCommands.recordWorkflowVersionSaved.send({
+        return this.#lifecycleCommands.recordWorkflowArchived.send({
           tenantId: input.projectId,
           occurredAt: nowInstant().epochMilliseconds,
           ...input,
@@ -893,6 +931,13 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       .catch((error: unknown) =>
         this.#infrastructure.signals.failed(error, { projectId: input.projectId }),
       );
+  }
+
+  /** Records an archive, or the current version of a workflow brought back from one. */
+  #recordArchiveChange(input: WorkflowReference & { unarchive?: boolean }): void {
+    const { unarchive, ...reference } = input;
+    if (unarchive) this.#recordVersionSaved(reference);
+    else this.#recordArchived(reference);
   }
 
   /** The workflow lifecycle pipeline this module registers, built once by {@link create}. */
@@ -907,7 +952,14 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
 
   /** Archives an agent's graph once agent records the archive, from workflow's own side (§9). */
   agentArchiveCascadePipeline(): WorkflowAgentArchiveCascadePipeline {
-    return buildWorkflowAgentArchiveCascadePipeline({ workflows: this.#infrastructure.workflows });
+    return buildWorkflowAgentArchiveCascadePipeline({
+      workflows: {
+        archiveIfLive: async (input) => {
+          await this.#infrastructure.workflows.archiveIfLive(input);
+          this.#recordArchived(input);
+        },
+      },
+    });
   }
 
   /** Copies a workflow into another project, attributed to its caller. */
@@ -951,8 +1003,14 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   /** Makes a stored version current again. */
-  restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    return this.#infrastructure.workflows.restoreVersion(input);
+  async restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
+    const version = await this.#infrastructure.workflows.restoreVersion(input);
+    this.#recordVersionSaved({
+      projectId: input.projectId,
+      workflowId: version.workflowId,
+      versionId: version.id,
+    });
+    return version;
   }
 
   /** Publishes one version, attributed to the caller who asked for it. */
@@ -966,8 +1024,14 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   /** Archives one workflow, or restores it when `unarchive` is set. */
-  archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
-    return this.#infrastructure.workflows.archive(input);
+  async archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
+    const workflow = await this.#infrastructure.workflows.archive(input);
+    this.#recordArchiveChange({
+      workflowId: workflow.id,
+      projectId: workflow.projectId,
+      unarchive: input.unarchive,
+    });
+    return workflow;
   }
 
   /** Runs a workflow synchronously, on its published version unless one is named. */
@@ -1393,12 +1457,14 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
    * linked evaluators and agents are archived, and the monitors those
    * evaluators back are deleted outright.
    */
-  cascadeArchive(input: {
+  async cascadeArchive(input: {
     projectId: string;
     workflowId: string;
     unarchive?: boolean;
   }): Promise<WorkflowCascadeArchive> {
-    return this.#infrastructure.lineage.cascadeArchive(input);
+    const archived = await this.#infrastructure.lineage.cascadeArchive(input);
+    this.#recordArchiveChange(input);
+    return archived;
   }
 
   // -- the Optimization Studio's publication flags ---------------------------
