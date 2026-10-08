@@ -34,7 +34,6 @@ function memberSource() {
     tier: stores.tier,
     order: [...stores.order, "eventing"],
     read: (name: string) => (name === "eventing" ? eventing : stores.read(name)),
-    close: async () => void 0,
   };
 }
 
@@ -49,7 +48,7 @@ async function bootGithub() {
     role: "api",
     modules: [githubProcessModule],
     config: { github: { appId: undefined, host: undefined, appSlug: undefined } },
-    members: memberSource(),
+    stores: memberSource(),
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [
       testPeer({ token: OrganizationApi, instance: createApiFixture<OrganizationApi>() }),

@@ -211,11 +211,10 @@ async function bootWorker() {
     role: "worker",
     modules: [scimProcessModule],
     config: { scim: { provenOffboarding: false } },
-    members: {
+    stores: {
       tier: stores.tier,
       order: [...stores.order, "eventing"],
       read: (name: string) => (name === "eventing" ? eventing : stores.read(name)),
-      close: async () => void 0,
     },
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [

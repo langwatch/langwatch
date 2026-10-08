@@ -97,7 +97,7 @@ const project = defineProcessModule("project").withApi(ProjectModule).build();
 function graph(harness: Harness, role: ServerRole = "api") {
   return new ApplicationBuilder({
     role,
-    members: memberSourceOf<DeclaredMembers>({
+    stores: memberSourceOf({
       events: harness.events,
       bootFailure: harness.bootFailure ?? null,
       startFailure: harness.startFailure ?? null,

@@ -1,5 +1,5 @@
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { EvaluationAnalyticsFoldCacheRepository } from "../evaluation-analytics-fold-cache.repository.ts";
 
@@ -9,9 +9,9 @@ const EVALUATION_ANALYTICS_FOLD_CACHE_KEY_PREFIX = "evaluation_analytics";
 const EVALUATION_ANALYTICS_FOLD_CACHE_TTL_SECONDS = 300;
 
 export class RedisEvaluationAnalyticsFoldCacheRepository implements EvaluationAnalyticsFoldCacheRepository {
-  private constructor(private readonly redis: ProcessMembers["redis"]) {}
+  private constructor(private readonly redis: RedisConnection) {}
 
-  static create(redis: ProcessMembers["redis"]): RedisEvaluationAnalyticsFoldCacheRepository {
+  static create(redis: RedisConnection): RedisEvaluationAnalyticsFoldCacheRepository {
     return new RedisEvaluationAnalyticsFoldCacheRepository(redis);
   }
 

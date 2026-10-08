@@ -46,7 +46,7 @@ describe("repository ownership", () => {
     "rejects conflicting ownership before any %s factory runs",
     async (role) => {
       created.mockClear();
-      const runtime = new ApplicationBuilder({ role, members: memberSourceOf({}) }).withModules([
+      const runtime = new ApplicationBuilder({ role, stores: memberSourceOf({}) }).withModules([
         defineProcessModule("user").withApi(UserModule).build(),
         defineProcessModule("annotation").withApi(AnnotationModule).build(),
       ]);

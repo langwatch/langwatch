@@ -254,7 +254,7 @@ describe("compiler checked process supply", () => {
   /** @scenario "Supplying nothing names everything missing at once" */
   it("names the whole missing supply in one refusal", () => {
     const refusal = diagnostics.get("all")?.join("\n");
-    const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+    const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
     for (const name of [
       "relational",
       "keyvalue",
@@ -279,9 +279,9 @@ describe("compiler checked process supply", () => {
   });
 
   it("names declared custom members and external supplies", () => {
-    expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingSupply<"connections">');
+    expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingRequirement<"connections">');
     expect(diagnostics.get("unservedPeerMissing")?.join("\n")).toContain(
-      'MissingSupply<"peer.licensing">',
+      'MissingRequirement<"peer.licensing">',
     );
   });
 
@@ -290,9 +290,9 @@ describe("compiler checked process supply", () => {
   });
 
   it("keeps config slices, members and peer gaps at 49 modules", () => {
-    expect(diagnostics.get("scale")?.join("\n")).toContain('MissingSupply<"clock">');
+    expect(diagnostics.get("scale")?.join("\n")).toContain('MissingRequirement<"clock">');
     expect(diagnostics.get("scaleConfig")?.join("\n")).toContain("m48");
-    expect(diagnostics.get("scalePeer")?.join("\n")).toContain('MissingSupply<"peer.project">');
+    expect(diagnostics.get("scalePeer")?.join("\n")).toContain('MissingRequirement<"peer.project">');
   });
 
   it("records the default diagnostic truncation boundary", () => {
@@ -300,7 +300,7 @@ describe("compiler checked process supply", () => {
       const count = index + 1;
       const name = `missing${String(count).padStart(2, "0")}`;
       const refusal = diagnostics.get(name)?.join("\n");
-      const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+      const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
       return { count, truncated: outstanding?.includes("more") ?? true };
     });
     expect(measured.filter(({ truncated }) => !truncated).at(-1)?.count).toBe(15);
@@ -309,7 +309,7 @@ describe("compiler checked process supply", () => {
 
   it("shows the real-scale all-missing diagnostic is truncated", () => {
     const refusal = diagnostics.get("scaleAll")?.join("\n");
-    const outstanding = refusal?.match(/MissingSupply<([^']+)>/)?.[1];
+    const outstanding = refusal?.match(/MissingRequirement<([^']+)>/)?.[1];
     expect(outstanding).toContain("more");
   });
 

@@ -14,8 +14,8 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/process";
 import { memoryStores, type ObjectStorage } from "@langwatch/process-stores";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -123,7 +123,7 @@ describe("given the live evaluation repositories over the process's ClickHouse m
       const repositories = LiveEvaluationRepositories.create({
         prisma: createApiFixture<PrismaClient>(),
         clickhouse,
-        redis: createApiFixture<ProcessMembers["redis"]>(),
+        redis: createApiFixture<RedisConnection>(),
         objectStorage: createApiFixture<ObjectStorage>(),
       });
 
@@ -162,7 +162,7 @@ describe("given the live run read over a tenant's retention from data retention"
           return { rows: [] };
         },
       }),
-      redis: createApiFixture<ProcessMembers["redis"]>(),
+      redis: createApiFixture<RedisConnection>(),
       objectStorage: createApiFixture<ObjectStorage>(),
     });
     const before = nowInstant().epochMilliseconds;

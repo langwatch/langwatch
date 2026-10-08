@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/module";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 /**
  * What a process builds, what each module is handed, and how a peer arrives.
  * Spec: specs/server/declarative-process-composition.feature
@@ -9,7 +10,6 @@ import { ApplicationBuilder } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingMemberError } from "../src/module-members.ts";
-import type { MemberSource } from "../src/module-members.ts";
 import { testPeer } from "../src/testing.ts";
 
 interface ProjectApi {
@@ -52,17 +52,16 @@ let handed: Readonly<Record<string, unknown>> = {};
 const annotation = defineProcessModule("annotation").withApi(AnnotationModule).build();
 
 /** A source that records which members were asked for, and in which order. */
-function recordingSource(members: Partial<Members>, asked: string[]): MemberSource<Members> {
-  const order = ["clock", "mail", "unread"] as Extract<keyof Members, string>[];
+function recordingSource(members: Partial<Members>, asked: string[]): StoresMemberSource {
+  const values: Readonly<Record<string, unknown>> = members;
   return {
-    order,
-    read<Name extends Extract<keyof Members, string>>(name: Name): Members[Name] {
+    order: ["clock", "mail", "unread"],
+    read(name: string): unknown {
       asked.push(name);
-      const value = members[name];
+      const value = values[name];
       if (value === void 0) throw new Error(`This process has no "${name}" member.`);
-      return value as Members[Name];
+      return value;
     },
-    close: () => Promise.resolve(),
   };
 }
 
@@ -75,7 +74,7 @@ describe("given a process whose modules declare what they read", () => {
       const asked: string[] = [];
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, asked),
+        stores: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, asked),
         peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
         .withModules([annotation])
@@ -90,7 +89,7 @@ describe("given a process whose modules declare what they read", () => {
     it("hands one module the members it named and nothing else", async () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, []),
+        stores: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, []),
         peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
         .withModules([annotation])
@@ -107,7 +106,7 @@ describe("given a process whose modules declare what they read", () => {
       const create = vi.spyOn(AnnotationModule, "create");
       const booting = new ApplicationBuilder({
         role: "api",
-        members: recordingSource({}, []),
+        stores: recordingSource({}, []),
         peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
         .withModules([annotation])
@@ -127,7 +126,7 @@ describe("given a peer the process answers for itself", () => {
     it("resolves the instance the caller handed in, unwrapped", async () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: recordingSource({ clock: () => "noon" }, []),
+        stores: recordingSource({ clock: () => "noon" }, []),
         peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
         .withModules([annotation])
@@ -145,7 +144,7 @@ describe("given a peer the process answers for itself", () => {
       const build = () =>
         new ApplicationBuilder({
           role: "api",
-          members: recordingSource({ clock: () => "noon" }, []),
+          stores: recordingSource({ clock: () => "noon" }, []),
           peers: [peer, peer],
         });
 
@@ -158,7 +157,7 @@ describe("given a peer the process answers for itself", () => {
     it("refuses to boot rather than choosing one", async () => {
       const booting = new ApplicationBuilder({
         role: "api",
-        members: recordingSource({ clock: () => "noon" }, []),
+        stores: recordingSource({ clock: () => "noon" }, []),
         peers: [
           testPeer({ token: ProjectApi, instance: projects }),
           testPeer({ token: AnnotationApi, instance: { stamp: () => "handed" } }),

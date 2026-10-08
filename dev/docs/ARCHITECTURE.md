@@ -365,8 +365,8 @@ of:
 **There are no members** (Alex, 2026-10-01): "member is just an abstraction over DI, and we
 already have the container". A module class receives `repositories`, `channels`,
 `dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts.
-There are no supply tokens and no `.provide`; a test stubs a peer through the module's own test
-seams (§13).
+There are no supply tokens; `.provide` stays only as a stand-in for a channel-bound Api (round 46).
+A test stubs a peer through the module's own test seams (§13).
 An installation test hands `bootInstalledProcess({ peers: [testPeer({ token, instance })] })`
 (`@langwatch/process/testing`) a stand-in for each peer it does not install; `package-boundaries`
 refuses that import outside test files.
@@ -2774,7 +2774,7 @@ const runtime = await bootInstalledProcess({
   modules: processModules.map(overMemory), // memory twins for every repository registry
   config: parseProcessConfig({ owners: processConfig(processModules, "api"), environment }),
   secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-  members: { ...storesBackedMembers(memoryStores(), stores), close: async () => void 0 },
+  stores: memoryStores(),
 });
 
 const traces = runtime.service(TraceApi);
@@ -2863,8 +2863,9 @@ to disk by default, minus a named exclusion list). While the migration runs the 
 `storesBackedMembers`, `noMembers`, the generated `serverModuleMembers`, `*.members.ts` files, a
 restated member type, and a process fact passed as a member · the `secrets`, `cache` and `telemetry`
 members (the Redis cache client itself stays until the Redis TTL work lands) ·
-`*-composition.build.ts` files (§5) · `withMember`, supply tokens (`SupplyToken`, `MissingSupply`)
-and `.provide` (§4) · a channel registry's `.live.create`/`.memory.create` called by hand in
+`*-composition.build.ts` files (§5) · `withMember`, supply tokens (`SupplyToken`, `MissingSupply`, now
+`MissingRequirement`) and `.provide` (§4), which stays only as a stand-in for a channel-bound Api (§5;
+Alex, 2026-10-08, round 46) · a channel registry's `.live.create`/`.memory.create` called by hand in
 `create()` or a service (§5) · nested `into` (§6) · `Secret.define` (§6) · a feature leaf or handle
 in `packages/config` or `packages/secrets` (§6) · the dev UI's copy of public-config leaves
 (`public-app-config.projection.ts`, §6) · `ProcessModuleApp`, `registerProcessDependencies`,

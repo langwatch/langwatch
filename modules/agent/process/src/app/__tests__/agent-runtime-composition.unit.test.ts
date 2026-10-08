@@ -29,7 +29,7 @@ async function bootAgent(role: Role) {
     role,
     modules: [agentProcessModule],
     config: { agent: { replicaCount: 1, relayMaxPayloadMb: undefined, publicBaseUrl: undefined } },
-    members: { ...memoryStores(), close: async () => void 0 },
+    stores: memoryStores(),
     peers: [
       testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),

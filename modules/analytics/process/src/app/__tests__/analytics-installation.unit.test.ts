@@ -71,7 +71,7 @@ function boot(role: "api" | "worker") {
         publicBaseUrl: PUBLIC_BASE_URL,
       },
     },
-    members: { ...memoryStores(), close: async () => void 0 },
+    stores: memoryStores(),
     peers: [
       testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),

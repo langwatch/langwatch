@@ -1,4 +1,4 @@
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
 
@@ -7,11 +7,11 @@ import { GithubInstallNonceRepository } from "../github-install-nonce.repository
  * judged here" rather than refusing every install.
  */
 export class GithubInstallNonceRedisRepository extends GithubInstallNonceRepository {
-  static create(redis: ProcessMembers["redis"]): GithubInstallNonceRedisRepository {
+  static create(redis: RedisConnection): GithubInstallNonceRedisRepository {
     return new GithubInstallNonceRedisRepository(redis);
   }
 
-  private constructor(private readonly redis: ProcessMembers["redis"]) {
+  private constructor(private readonly redis: RedisConnection) {
     super();
   }
 

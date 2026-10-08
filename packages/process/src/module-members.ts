@@ -4,81 +4,6 @@
  */
 import type { StoresMemberSource } from "@langwatch/process-stores";
 
-import type { Tier } from "./tiers.ts";
-
-/** Where a process's members come from. Built by `@langwatch/process-stores`. */
-export interface MemberSource<Members> {
-  /** The store tier stated by whoever opened these members; absent states none (§7). */
-  readonly tier?: Tier;
-  /** Every member this source can build, in construction order. */
-  readonly order: readonly (keyof Members & string)[];
-  /** Builds the member, or refuses naming it. Repeated reads answer once. */
-  read<Name extends keyof Members & string>(name: Name): Members[Name];
-  /** Closes every client this source opened, in reverse construction order. */
-  close(): Promise<void>;
-}
-
-/**
- * A process that opens no client. Absence of a member is a refusal only when
- * a module actually reads one — a test installing modules that read nothing
- * needs no source, keeping `createApp` free of the real-client package.
- */
-export function noMembers<Members>(): MemberSource<Members> {
-  return {
-    order: [],
-    read(name) {
-      throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
-    },
-    async close() {},
-  };
-}
-
-/**
- * The members a caller hands in, as a source. This is ruling 11's test seam:
- * a member passed is used, one absent is refused BY NAME when read, never
- * quietly replaced — so a frozen clock plus memory cache needs no client library.
- */
-export function membersFrom<Members>(supplied: Readonly<Partial<Members>>): MemberSource<Members> {
-  const names = Object.keys(supplied) as (keyof Members & string)[];
-
-  return {
-    order: names,
-    read(name) {
-      if (!Object.hasOwn(supplied, name)) {
-        throw new Error(`No "${name}" member was handed to this process.`);
-      }
-
-      return supplied[name] as Members[typeof name];
-    },
-    async close() {},
-  };
-}
-
-/**
- * The stores source answers every standard member; hand-supplied members
- * (bespoke names, test doubles) override it and extend its order.
- */
-export function storesBackedMembers(
-  stores: StoresMemberSource,
-  overrides: Readonly<Record<string, unknown>>,
-): MemberSource<Record<string, unknown>> {
-  const overrideNames = Object.keys(overrides);
-  const order = [
-    ...stores.order.filter((name) => !Object.hasOwn(overrides, name)),
-    ...overrideNames,
-  ];
-
-  return {
-    ...(stores.tier === void 0 ? {} : { tier: stores.tier }),
-    order,
-    read(name) {
-      if (Object.hasOwn(overrides, name)) return overrides[name];
-      return stores.read(name);
-    },
-    async close() {},
-  };
-}
-
 /** A member a module declared that this process cannot supply. */
 export class MissingMemberError extends Error {
   constructor(
@@ -107,8 +32,8 @@ export interface MemberClaim {
  * not the claim order — and hands back the record each module slices its
  * view from: `prisma` before `clickhouse`/`objectStorage`, `redis` before its members.
  */
-export function buildClaimedMembers<Members>(options: {
-  source: MemberSource<Members>;
+export function buildClaimedMembers(options: {
+  source: StoresMemberSource;
   claims: readonly MemberClaim[];
 }): Readonly<Record<string, unknown>> {
   const claimedBy = new Map<string, string>();
@@ -123,7 +48,7 @@ export function buildClaimedMembers<Members>(options: {
     const module = claimedBy.get(name);
     if (module === undefined) continue;
     try {
-      members[name] = options.source.read(name as keyof Members & string);
+      members[name] = options.source.read(name);
     } catch (error) {
       throw new MissingMemberError(module, name, { cause: error });
     }

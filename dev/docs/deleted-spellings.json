@@ -653,7 +653,7 @@
       "spelling": "MissingSupply",
       "kind": "identifier",
       "pattern": "\\bMissingSupply\\b",
-      "replacement": "the module class receives repositories, channels, peers, config and secrets",
+      "replacement": "`MissingRequirement` (Alex, 2026-10-08, round 46)",
       "section": "§4",
       "ruled": null
     },
@@ -663,7 +663,7 @@
       "replacement": "the module class receives repositories, channels, peers, config and secrets",
       "section": "§4",
       "ruled": null,
-      "note": "`.provide` is an ordinary method name in libraries."
+      "note": "`.provide` is an ordinary method name in libraries. It stays only as a stand-in for a channel-bound Api (round 46)."
     },
     {
       "spelling": "a channel registry's `.live.create`/`.memory.create` called by hand in `create()` or a service",

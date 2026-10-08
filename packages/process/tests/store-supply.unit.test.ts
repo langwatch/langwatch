@@ -116,7 +116,7 @@ describe("given an installed module that keeps relational state", () => {
         role: "worker",
         modules: [ledger],
         config: {},
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       try {

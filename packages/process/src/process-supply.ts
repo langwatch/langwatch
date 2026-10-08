@@ -9,7 +9,6 @@ import type {
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
-import { membersFrom, storesBackedMembers } from "./module-members.ts";
 import { ObservabilitySupply } from "./process-supply.options.ts";
 import type {
   InstalledPeersInAnyBranch,
@@ -96,7 +95,7 @@ type StoreSuppliedNames =
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;
-interface MissingSupply<Names extends string> {
+interface MissingRequirement<Names extends string> {
   readonly [missingSupply]: Names;
 }
 type Boot<
@@ -129,7 +128,7 @@ type Boot<
         InstalledPeerSetInAnyBranch
       >,
     ) => Promise<BootedRuntime<SupplyRecord, Rest, Trpc>>
-  : "" & MissingSupply<Missing>;
+  : "" & MissingRequirement<Missing>;
 type Exact<Left, Right> = [Left] extends [Right]
   ? [Right] extends [Left]
     ? unknown
@@ -475,9 +474,7 @@ export class ProcessSupply<
       role: state.role,
       config: state.config,
       ...(state.secrets ? { secrets: state.secrets } : {}),
-      members: state.stores
-        ? storesBackedMembers(state.stores, legacyMemberNames(state.members))
-        : membersFrom(legacyMemberNames(state.members)),
+      stores: storesWith(state.stores, legacyMemberNames(state.members)),
     };
     const transport = state.transport;
     let exposed: ExposedSurface<Rest, Trpc> | undefined;
@@ -518,6 +515,23 @@ function boundTokens(module: SupplyModule): readonly ModuleApiToken<unknown>[] {
 interface CreateAppOptions {
   readonly role: ServerRole;
   readonly secrets?: ModuleSecretsScope;
+}
+
+/** `.withMembers(...)` values answer before the stores' own and extend their order. */
+function storesWith(
+  stores: StoresMemberSource | undefined,
+  overrides: SupplyRecord,
+): StoresMemberSource {
+  const opened = stores?.order.filter((name) => !Object.hasOwn(overrides, name)) ?? [];
+  return {
+    ...(stores?.tier === void 0 ? {} : { tier: stores.tier }),
+    order: [...opened, ...Object.keys(overrides)],
+    read(name) {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      if (stores === void 0) throw new Error(`No "${name}" member was handed to this process.`);
+      return stores.read(name);
+    },
+  };
 }
 
 function legacyMemberNames(members: SupplyRecord): SupplyRecord {

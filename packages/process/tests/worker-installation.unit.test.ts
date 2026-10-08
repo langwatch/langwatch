@@ -19,7 +19,7 @@ describe("given a worker process with one feature installer", () => {
         .withSetup(setup)
         .withWorker(consumers)
         .build();
-      const runtime = await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
+      const runtime = await new ApplicationBuilder({ role: "worker", stores: memberSourceOf({}) })
         .withService({ name: "consumers", start: started, stop: () => undefined })
         .withModules([feature])
         .boot();
@@ -59,7 +59,7 @@ describe("given a worker process with two feature installers", () => {
         })
         .build();
 
-      const booting = new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
+      const booting = new ApplicationBuilder({ role: "worker", stores: memberSourceOf({}) })
         .withModules([first, second])
         .boot();
 

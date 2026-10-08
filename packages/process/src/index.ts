@@ -23,12 +23,8 @@ export {
 export {
   buildClaimedMembers,
   membersFor,
-  membersFrom,
-  noMembers,
-  storesBackedMembers,
   MissingMemberError,
   type MemberClaim,
-  type MemberSource,
 } from "./module-members.ts";
 export type { Tier } from "./tiers.ts";
 export {

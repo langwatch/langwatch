@@ -20,12 +20,11 @@ function runtime(): ProcessBoot {
         role,
         modules,
         config: {},
-        members: {
+        stores: {
           order: [],
           read(name) {
             throw new Error(`Unexpected member: ${name}`);
           },
-          async close() {},
         },
         surface: () => ({ hosts: {}, serve: () => "handler" }),
       }),

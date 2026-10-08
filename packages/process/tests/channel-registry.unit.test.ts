@@ -122,7 +122,7 @@ describe("given a module that declares its channels with .withChannels", () => {
         role: "api",
         modules: [alerts],
         config: { automation: { topic: "ops" } },
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       try {
@@ -142,7 +142,7 @@ describe("given a module that declares its channels with .withChannels", () => {
         role: "api",
         modules: [alerts],
         config: { automation: { topic: "ops" } },
-        members: liveMemberSourceOf<Record<string, unknown>>({ redis: { prefix: "redis" } }),
+        stores: liveMemberSourceOf({ redis: { prefix: "redis" } }),
       });
 
       try {
@@ -160,7 +160,7 @@ describe("given a module that declares its channels with .withChannels", () => {
         role: "api",
         modules: [alerts],
         config: { automation: { topic: "ops" } },
-        members: liveMemberSourceOf<Record<string, unknown>>({}),
+        stores: liveMemberSourceOf({}),
       });
 
       await expect(boot).rejects.toMatchObject({
@@ -180,7 +180,7 @@ describe("given a module that declares its channels with .withChannels", () => {
         role: "api",
         modules: [stored],
         config: { automation: { topic: "ops" } },
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       try {
@@ -284,7 +284,7 @@ describe("given a channel bound to another module's *Api token", () => {
         role: "api",
         modules: [scores, judges],
         config: {},
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       try {
@@ -301,7 +301,7 @@ describe("given a channel bound to another module's *Api token", () => {
         role: "api",
         modules: [scores, judges],
         config: {},
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       await expect(boot).rejects.toBeInstanceOf(FeatureApiUnavailableError);
@@ -317,7 +317,7 @@ describe("given a channel bound to another module's *Api token", () => {
         role: "api",
         modules: [scores],
         config: {},
-        members: { ...memoryStores(), close: async () => void 0 },
+        stores: memoryStores(),
       });
 
       await expect(boot).rejects.toBeInstanceOf(MissingProviderError);

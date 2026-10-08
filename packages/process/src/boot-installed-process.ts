@@ -1,4 +1,5 @@
 import type { TransportPeers } from "@langwatch/api";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 
 import { ApplicationBuilder } from "./application.ts";
 import type {
@@ -7,7 +8,6 @@ import type {
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
-import type { MemberSource } from "./module-members.ts";
 import type { ExposedSurface } from "./process-supply.ts";
 import type { TestPeer } from "./testing.ts";
 
@@ -16,7 +16,8 @@ export async function bootInstalledProcess(options: {
   role: ServerRole;
   modules: readonly InstallableServerFeature<never>[];
   config: Readonly<Record<string, unknown>>;
-  members: MemberSource<Record<string, unknown>>;
+  /** The stores this process opened; an installation test hands `memoryStores()`. */
+  stores: StoresMemberSource;
   /** Scopes the process resolver per module; omitted where none was stated. */
   secrets?: ModuleSecretsScope;
   /** Scopes the stores' operator reads per module; omitted where the stores mint none. */

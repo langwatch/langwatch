@@ -50,7 +50,7 @@ describe("defineProcessModule", () => {
     const runtime = await new ApplicationBuilder({
       role: "api",
       config: { annotation: { suffix: "directory" } },
-      members: memberSourceOf({ prefix: "tenant-" }),
+      stores: memberSourceOf({ prefix: "tenant-" }),
     })
       .withModules([directoryProcessModule])
       .boot();
@@ -80,7 +80,7 @@ describe("defineProcessModule", () => {
     const declaration = defineProcessModule("presence").withApi(ResourceApp).build();
     const runtime = await new ApplicationBuilder({
       role: "api",
-      members: memberSourceOf({ prefix: "unused" }),
+      stores: memberSourceOf({ prefix: "unused" }),
     })
       .withModules([declaration])
       .boot();

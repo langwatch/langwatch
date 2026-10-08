@@ -16,7 +16,7 @@ describe("given a module whose peer is not installed", () => {
         role: "api",
         modules: [peerModule],
         config: {},
-        members: memberSourceOf({}),
+        stores: memberSourceOf({}),
         peers: [testPeer({ token: ProjectApi, instance: standIn })],
       });
 
@@ -36,7 +36,7 @@ describe("given a module whose peer is not installed", () => {
         role: "api",
         modules: [peerModule, projectModule],
         config: {},
-        members: memberSourceOf({}),
+        stores: memberSourceOf({}),
         peers: [testPeer({ token: ProjectApi, instance: standIn })],
       });
 

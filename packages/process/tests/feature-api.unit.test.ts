@@ -234,7 +234,7 @@ const organization = defineProcessModule("organization").withApi(OrganizationApp
 
 /** Every member these modules declared, so the process can answer all of them. */
 function processMembers(harness: Harness = { events: [] }) {
-  return memberSourceOf<DeclaredMembers>({
+  return memberSourceOf({
     events: harness.events,
     inspectPeer: harness.inspectPeer ?? false,
     failOrganization: harness.failOrganization ?? null,
@@ -242,7 +242,7 @@ function processMembers(harness: Harness = { events: [] }) {
 }
 
 function graph(harness: Harness, reversed = false, role: ServerRole = "api") {
-  const builder = new ApplicationBuilder({ role, members: processMembers(harness) });
+  const builder = new ApplicationBuilder({ role, stores: processMembers(harness) });
   return builder.withModules(reversed ? [organization, project] : [project, organization]);
 }
 
@@ -295,7 +295,7 @@ describe("feature APIs", () => {
       .provides(ProjectApi)
       .build();
     await expect(
-      new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+      new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
     ).rejects.toThrow("defineProcessModule().withApi()");
@@ -364,7 +364,7 @@ describe("feature APIs", () => {
   it("rejects a missing API before constructing anything", async () => {
     const events: string[] = [];
     await expect(
-      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", stores: processMembers({ events }) })
         .withModules([project])
         .boot(),
     ).rejects.toBeInstanceOf(MissingProviderError);
@@ -422,7 +422,7 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const builder = new ApplicationBuilder({ role: "api", members: processMembers() }).withModules([
+    const builder = new ApplicationBuilder({ role: "api", stores: processMembers() }).withModules([
       project,
       defineProcessModule("project").withApi(ProjectModule).build(),
     ]);
@@ -473,7 +473,7 @@ describe("feature APIs", () => {
     it("keeps the module's own API and the process's apart", async () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: processMembers(),
+        stores: processMembers(),
         peers: [testPeer({ token: ProjectGrant, instance: { grant: () => "granted" } })],
       })
         .withModules([project, grantedOrganization])
@@ -489,7 +489,7 @@ describe("feature APIs", () => {
       await expect(
         new ApplicationBuilder({
           role: "api",
-          members: processMembers(),
+          stores: processMembers(),
           peers: [
             testPeer({
               token: ProjectApi,
@@ -515,7 +515,7 @@ describe("feature APIs", () => {
     const declaration = defineProcessModule("organization").withApi(ProjectModule).build();
 
     await expect(
-      new ApplicationBuilder({ role: "api", members: processMembers({ events }) })
+      new ApplicationBuilder({ role: "api", stores: processMembers({ events }) })
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow('cannot provide API "project"');

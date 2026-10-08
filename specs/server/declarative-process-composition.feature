@@ -27,12 +27,6 @@ Feature: Composing a process declaratively
     Then boot refuses naming the module and the member
     And no app is created
 
-  @unit
-  Scenario: A pool that lacks a member an installed module names
-    Given a module whose infrastructure interface names a member the pool lacks
-    When the module list is installed
-    Then the module list does not compile
-
   @unimplemented
   Scenario: A peer module is not infrastructure
     Given a module whose app names a peer api token

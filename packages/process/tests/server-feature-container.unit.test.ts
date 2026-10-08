@@ -68,7 +68,7 @@ describe("the server feature container", () => {
       const declaration = greetingFeature(setup);
       const application = new ApplicationBuilder({
         role: "api",
-        members: memberSourceOf({ prefix: "a" }),
+        stores: memberSourceOf({ prefix: "a" }),
       }).withModules([declaration]);
 
       expect(setup).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe("the server feature container", () => {
 
       const booted = await new ApplicationBuilder({
         role: "worker",
-        members: memberSourceOf({ prefix: "process", unread: "never built" }),
+        stores: memberSourceOf({ prefix: "process", unread: "never built" }),
       })
         .withModules([declaration])
         .boot();
@@ -107,7 +107,7 @@ describe("the server feature container", () => {
       .withRest(({ transport }) => transport)
       .build();
 
-    const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+    const runtime = await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
       .withModules([declaration])
       .boot();
 
@@ -142,7 +142,7 @@ describe("the server feature container", () => {
       .build();
     const runtime = await new ApplicationBuilder({
       role: "tasks",
-      members: memberSourceOf({ prefix: "task" }),
+      stores: memberSourceOf({ prefix: "task" }),
     })
       .withModules([declaration])
       .boot();
@@ -162,7 +162,7 @@ describe("the server feature container", () => {
       const declaration = greetingFeature(setup);
 
       const boot = Promise.resolve().then(() =>
-        new ApplicationBuilder({ role: "api", members: memberSourceOf({ prefix: "a" }) })
+        new ApplicationBuilder({ role: "api", stores: memberSourceOf({ prefix: "a" }) })
           .withModules([declaration, declaration])
           .boot(),
       );
@@ -188,7 +188,7 @@ describe("the server feature container", () => {
         .build();
 
       const boot = Promise.resolve().then(() =>
-        new ApplicationBuilder({ role: "api", members: memberSourceOf({ prefix: "a" }) })
+        new ApplicationBuilder({ role: "api", stores: memberSourceOf({ prefix: "a" }) })
           .withModules([declaration])
           .boot(),
       );
@@ -217,7 +217,7 @@ describe("the server feature container", () => {
 
       const error = await Promise.resolve()
         .then(() =>
-          new ApplicationBuilder({ role: "api", members: memberSourceOf({ prefix: "a" }) })
+          new ApplicationBuilder({ role: "api", stores: memberSourceOf({ prefix: "a" }) })
             .withModules([first, second])
             .boot(),
         )
@@ -244,7 +244,7 @@ describe("the server feature container", () => {
         })
         .build();
 
-      await new ApplicationBuilder({ role: "api", members: memberSourceOf({ prefix: "a" }) })
+      await new ApplicationBuilder({ role: "api", stores: memberSourceOf({ prefix: "a" }) })
         .withModules([queue, directory])
         .boot();
 
@@ -263,7 +263,7 @@ describe("the server feature container", () => {
         .build();
       const runtime = await new ApplicationBuilder({
         role: "api",
-        members: memberSourceOf({ prefix: "a" }),
+        stores: memberSourceOf({ prefix: "a" }),
       })
         .withModules([declaration])
         .boot();
@@ -282,7 +282,7 @@ describe("the server feature container", () => {
 
       const booted = await new ApplicationBuilder({
         role: "worker",
-        members: memberSourceOf({ prefix: "a" }),
+        stores: memberSourceOf({ prefix: "a" }),
       })
         .withModules([declaration])
         .boot();
@@ -310,7 +310,7 @@ describe("the server feature container", () => {
 
       await expect(
         Promise.resolve().then(() =>
-          new ApplicationBuilder({ role: "api", members: memberSourceOf({ prefix: "a" }) })
+          new ApplicationBuilder({ role: "api", stores: memberSourceOf({ prefix: "a" }) })
             .withModules([directory, failing])
             .boot(),
         ),
@@ -331,7 +331,7 @@ describe("the server feature container", () => {
 
       const booted = await new ApplicationBuilder({
         role: "worker",
-        members: memberSourceOf({ prefix: "a" }),
+        stores: memberSourceOf({ prefix: "a" }),
       })
         .withService({
           name: "consumers",
@@ -359,7 +359,7 @@ describe("the server feature container", () => {
       const declaration = greetingFeature(setup);
       const booted = await new ApplicationBuilder({
         role: "api",
-        members: memberSourceOf({ prefix: "one" }),
+        stores: memberSourceOf({ prefix: "one" }),
       })
         .withModules([declaration])
         .boot();
@@ -385,7 +385,7 @@ describe("runtime failure ownership", () => {
       .withSetup(() => ({}))
       .withWorker(worker)
       .build();
-    const runtime = await new ApplicationBuilder({ role: "worker", members: memberSourceOf({}) })
+    const runtime = await new ApplicationBuilder({ role: "worker", stores: memberSourceOf({}) })
       .withModules([feature])
       .boot();
     expect(worker).toHaveBeenCalledOnce();
@@ -425,7 +425,7 @@ describe("runtime failure ownership", () => {
         })
         .build();
       await expect(
-        new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+        new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
           .withModules([first, failing])
           .boot(),
       ).rejects.toBe(failure);
@@ -452,7 +452,7 @@ describe("runtime failure ownership", () => {
         throw failure;
       })
       .build();
-    const error = await new ApplicationBuilder({ role: "tasks", members: memberSourceOf({}) })
+    const error = await new ApplicationBuilder({ role: "tasks", stores: memberSourceOf({}) })
       .withModules([feature])
       .boot()
       .catch((error: unknown) => error);
@@ -464,7 +464,7 @@ describe("runtime failure ownership", () => {
   /** @scenario "Failed start rolls back partial work and shutdown continues after failures" */
   it("serialises concurrent starts and stops and closes each resource once", async () => {
     const phases: string[] = [];
-    const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+    const runtime = await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
       .withService({
         name: "listener",
         start: async () => {
@@ -496,7 +496,7 @@ describe("runtime failure ownership", () => {
         phases.push("resources");
       })
       .build();
-    const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+    const runtime = await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
       .withService({
         name: "first",
         start: () => {
@@ -542,7 +542,7 @@ describe("runtime failure ownership", () => {
         throw new Error("resource");
       })
       .build();
-    const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
+    const runtime = await new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
       .withService({
         name: "first",
         start: () => {},

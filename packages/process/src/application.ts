@@ -8,6 +8,7 @@ import {
   type TokenMap,
   tokenName,
 } from "@langwatch/module";
+import type { StoresMemberSource } from "@langwatch/process-stores";
 import type { ScopedSecrets, SecretHandle } from "@langwatch/secrets";
 
 import {
@@ -46,7 +47,7 @@ import {
   eventingConsumers,
   type EventingHost,
 } from "./module-eventing.ts";
-import { buildClaimedMembers, membersFor, noMembers, type MemberSource } from "./module-members.ts";
+import { buildClaimedMembers, membersFor } from "./module-members.ts";
 import { processProjectionReplayer } from "./projection-replayer.ts";
 import {
   assertRepositoryOwnership,
@@ -315,15 +316,12 @@ export type TransportHostSource<Rest, Trpc> =
   | TransportHostFactory<Rest, Trpc>;
 
 /** Process role, config, and member sources. */
-export interface ApplicationOptions<
-  Members,
-  Config extends ModuleConfigRecord = ModuleConfigRecord,
-> {
+export interface ApplicationOptions<Config extends ModuleConfigRecord = ModuleConfigRecord> {
   readonly role: ServerRole;
   /** Module config slices, checked at install. */
   readonly config?: Config;
-  /** Member sources; omitted means no client, module refusing by name. */
-  readonly members?: MemberSource<Members>;
+  /** The stores this process opened; omitted means none, and a module requiring one refuses. */
+  readonly stores?: StoresMemberSource;
   /**
    * Scopes the process's resolver to one module's own declared handles (§6).
    * A process that states no secrets chain omits it, and a module resolving
@@ -338,7 +336,7 @@ export interface ApplicationOptions<
 
 /** An application with its members named, collecting declarations. */
 export class ApplicationBuilder<
-  Members,
+  Members = never,
   Rest = never,
   Trpc = never,
   Config extends ModuleConfigRecord = ModuleConfigRecord,
@@ -346,15 +344,15 @@ export class ApplicationBuilder<
   private readonly state: BuilderState<Rest, Trpc>;
   private readonly role: ServerRole;
   private readonly config: Readonly<Record<string, unknown>>;
-  private readonly source: MemberSource<Members>;
+  private readonly stores: StoresMemberSource;
   private readonly secrets: ModuleSecretsScope | undefined;
   private readonly operatorReads: ModuleOperatorReadsScope | undefined;
   readonly name: string;
 
-  constructor(options: ApplicationOptions<Members, Config>, state?: BuilderState<Rest, Trpc>) {
+  constructor(options: ApplicationOptions<Config>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
     this.config = options.config ?? {};
-    this.source = options.members ?? noMembers<Members>();
+    this.stores = options.stores ?? NO_STORES;
     this.secrets = options.secrets;
     this.operatorReads = options.operatorReads;
     this.name = options.role;
@@ -376,7 +374,7 @@ export class ApplicationBuilder<
       {
         role: this.role,
         config: this.config as Config,
-        members: this.source,
+        stores: this.stores,
         ...(this.secrets ? { secrets: this.secrets } : {}),
         ...(this.operatorReads ? { operatorReads: this.operatorReads } : {}),
       },
@@ -407,7 +405,7 @@ export class ApplicationBuilder<
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
       requiredMembers: declaration.members ?? [],
-      tier: declaration.tier ?? this.source.tier,
+      tier: declaration.tier ?? this.stores.tier,
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
       eventing: declaration.eventing,
@@ -500,7 +498,7 @@ export class ApplicationBuilder<
     // refuses HERE, naming the module and the member, rather than on the first
     // request that reaches it.
     const members = buildClaimedMembers({
-      source: this.source,
+      source: this.stores,
       claims: declarations.map((declaration) => ({
         module: declaration.name,
         members: claimedBy(declaration),
@@ -515,7 +513,7 @@ export class ApplicationBuilder<
     // Belt and braces over the union above: a source that answered a claimed
     // member with null built something a factory cannot use.
     assertRepositoryBackend(declarations, selections);
-    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source), role);
+    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.stores), role);
     const consumers = eventingConsumers(eventing);
     const replayer = processProjectionReplayer({ eventing });
     const scope = new ResourceScope();
@@ -741,9 +739,9 @@ export class ApplicationBuilder<
 }
 
 /** The eventing runtime member if this process holds one and eventing is declared. */
-function eventingMemberFor<Members>(
+function eventingMemberFor(
   declarations: readonly DeclaredFeature[],
-  source: MemberSource<Members>,
+  source: StoresMemberSource,
 ): Readonly<Record<string, unknown>> {
   const named = source.order.find((member) => member === "eventing");
   if (named === void 0) return {};
@@ -754,6 +752,14 @@ function eventingMemberFor<Members>(
     return {};
   }
 }
+
+/** A process that opened no stores: a module requiring one refuses by name at boot. */
+const NO_STORES: StoresMemberSource = Object.freeze({
+  order: Object.freeze([]),
+  read(name: string): never {
+    throw new Error(`This process opened no stores, so it cannot read "${name}".`);
+  },
+});
 
 /** A module with repositories boots only on a stated tier; nothing picks one for it (§7). */
 function statedTier(feature: CollectedFeature): DeclaredFeature {

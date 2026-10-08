@@ -4,19 +4,12 @@ import { releaseVersionOf } from "@langwatch/config";
 import { ModuleApiToken } from "@langwatch/module";
 import { otlpHeadersFrom } from "@langwatch/observability/node";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
-import {
-  MEMBER_NAMES,
-  hostedMembers,
-  openStores,
-  type ProcessMemberSource,
-} from "@langwatch/process-stores";
+import { hostedMembers, openStores, type ProcessMemberSource } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
 import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
-import { storesBackedMembers } from "./module-members.ts";
-import { observabilityOwner } from "./observability-owner.ts";
 import {
   ApiProcessContainer,
   TasksProcessContainer,
@@ -138,11 +131,6 @@ export class ProcessServer implements ProcessBoot {
     let members: ProcessMemberSource | undefined;
     let operatorReads: OperatorReadsResolver | undefined;
     try {
-      const telemetryExporter = await this.resolver
-        .scopeTo(observabilityOwner.name, Object.values(observabilityOwner.secrets))
-        .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
-          telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
-        );
       const stores = await openStores({
         name: this.server.name,
         config,
@@ -195,34 +183,15 @@ export class ProcessServer implements ProcessBoot {
         // refuses every resolve attempted after boot.
         secrets: (owner, declared) => this.resolver.scopeTo(owner, declared),
         operatorReads: (scope) => operatorReadsResolver.scopeTo(scope),
-        // The stores answer the declared members; the process facts below extend them
-        // until the last module reading members takes each from its config slice (§3.3).
-        members: {
-          ...storesBackedMembers(
-            {
-              // The opened stores state their tier; boot selects every registry from it (§7).
-              ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
-              order: MEMBER_NAMES,
-              read(name) {
-                const member = MEMBER_NAMES.find((candidate) => candidate === name);
-                if (!member) throw new Error(`No process member named "${name}" is declared.`);
-                return opened.read(member);
-              },
-            },
-            {
-              // A process fact, not a module one: every module that links back
-              // to the product reads it here rather than declaring `BASE_HOST`.
-              publicBaseUrl: this.settings.baseHost,
-              serviceVersion: serviceVersionOf(this.config.observability),
-              // Observability's OTLP collector, for the module still forwarding to it (rum).
-              telemetryExporter,
-              nodeEnvironment: this.settings.nodeEnvironment,
-              isSaas: this.settings.isSaas ?? false,
-              // Role facts: the composition's word, never a deployment's.
-              processName: this.server.name,
-            },
-          ),
-          close: () => opened.close(),
+        // The opened stores state their tier; boot selects every registry from it (§7).
+        stores: {
+          ...(opened.tier === void 0 ? {} : { tier: opened.tier }),
+          order: opened.order,
+          read(name) {
+            const member = opened.order.find((candidate) => candidate === name);
+            if (!member) throw new Error(`The opened stores answer no "${name}".`);
+            return opened.read(member);
+          },
         },
         ...(surface ? { surface } : {}),
       });

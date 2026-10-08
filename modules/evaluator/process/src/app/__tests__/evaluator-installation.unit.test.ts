@@ -28,7 +28,7 @@ async function bootEvaluator() {
     role: "api",
     modules: [evaluatorProcessModule],
     config: { evaluator: { publicBaseUrl: undefined } },
-    members: { ...memoryStores(), close: async () => void 0 },
+    stores: memoryStores(),
     peers: [
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
       testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),

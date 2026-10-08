@@ -96,11 +96,10 @@ async function bootWorker({ log }: { log: RecordingSpanLog }) {
     role: "worker",
     modules: [entitlementProcessModule],
     config: { entitlement: { isSaas: false } },
-    members: {
+    stores: {
       tier: stores.tier,
       order: [...stores.order, "eventing"],
       read: (name: string) => (name === "eventing" ? eventing : stores.read(name)),
-      close: async () => void 0,
     },
     peers: Object.values(EntitlementModule.dependencies).map((token) =>
       testPeer({ token, instance: createApiFixture() }),

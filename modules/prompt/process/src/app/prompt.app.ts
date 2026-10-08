@@ -37,6 +37,8 @@ import {
   type PromptRestSyncInput,
   type PlaygroundStreamEvent,
   type PromptUsageCount,
+  promptConfig,
+  type PromptServerConfig,
 } from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -88,23 +90,16 @@ type PromptDependencies = Readonly<{
   modelProviders: typeof ModelProviderApi;
 }>;
 
-/**
- * The store members this process opens, plus the public origin the process
- * itself knows. Absent where the deployment named no `BASE_HOST`, which the
- * platform-link read below already refuses on.
- */
-type PromptMembers = Readonly<{ publicBaseUrl: string | undefined }>;
-
 type PromptSetup = FeatureSetup<
   PromptDependencies,
-  PromptMembers,
-  undefined,
+  never,
+  PromptServerConfig,
   Pick<PromptRepositories, "rateLimits">
 >;
 type PromptRepositorySetup = FeatureSetup<
   PromptDependencies,
-  PromptMembers,
-  undefined,
+  never,
+  PromptServerConfig,
   PromptRepositories
 >;
 
@@ -139,7 +134,7 @@ export class PromptModule implements PromptApi {
     workflow: WorkflowApi,
     modelProviders: ModelProviderApi,
   };
-  static readonly reads = ["publicBaseUrl"] as const;
+  static readonly config = promptConfig;
 
   static create(setup: PromptRepositorySetup): PromptModule {
     const prompts = PromptService.create({
@@ -160,7 +155,7 @@ export class PromptModule implements PromptApi {
    * seam, not a process member (see {@link PromptInfrastructure.prompts}).
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptModule {
-    const { dependencies, members } = setup;
+    const { dependencies, config } = setup;
     const logger = createLogger("langwatch:prompt");
     const lifecycle = buildPromptLifecyclePipeline();
     // Tied the knot: the callback below fires only once a request calls
@@ -189,7 +184,7 @@ export class PromptModule implements PromptApi {
       members: { prompts, afterPromptCreated },
       library: PromptLibraryService.create({ prompts, afterPromptCreated }),
       tagCatalogue: PromptTagCatalogueService.create({ prompts }),
-      publicBaseUrl: members.publicBaseUrl,
+      publicBaseUrl: config.publicBaseUrl,
       lifecycle,
     });
     appRef.current = app;

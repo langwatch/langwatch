@@ -8108,6 +8108,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -9517,6 +9520,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -13193,6 +13199,9 @@ importers:
 
   modules/prompt/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

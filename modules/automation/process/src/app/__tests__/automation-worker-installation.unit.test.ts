@@ -132,7 +132,7 @@ function bootWithout(absent: keyof ReturnType<typeof peers>) {
     Object.entries(peers()).filter(([module]) => module !== absent),
   );
   return Promise.resolve().then(() =>
-    // @ts-expect-error MissingSupply: the compiler refuses a worker missing a peer it names
+    // @ts-expect-error MissingRequirement: the compiler refuses a worker missing a peer it names
     composed("worker", eventingFor("worker")).provide(supplied).boot(),
   );
 }
