@@ -113,7 +113,7 @@ function useShareLinkMutations({
 /**
  * Transport for the trace share dialog: the tRPC reads and writes, and nothing
  * else. Returns no JSX (see dev/docs/best_practices/react.md) — the consumer
- * renders `ShareTraceDialogBody` from `@langwatch/share-browser` with this state.
+ * renders `ShareTraceDialogBody` (ui/blocks/share) with this state.
  */
 export function useShareTrace({
   projectId,
