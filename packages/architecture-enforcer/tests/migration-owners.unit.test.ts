@@ -12,7 +12,6 @@ import {
 } from "../src/policies/persistence/migration-owners.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { readFeatureCatalogue } from "../src/workspace/feature-catalogue.ts";
-import { compareRatchet, countByKey, readRatchet } from "./ratchet.ts";
 
 /**
  * @see packages/architecture-enforcer/specs/migration-owners.feature
@@ -20,7 +19,6 @@ import { compareRatchet, countByKey, readRatchet } from "./ratchet.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = join(here, "..", "..", "..");
-const LIST = join(here, "baselines", "migration-owners.json");
 const roots: string[] = [];
 
 const SCHEMA = `model Project {
@@ -180,13 +178,13 @@ describe("migration owners", () => {
     /** @scenario "A ClickHouse migration touching two owners' tables is refused naming both" */
     it("reports the file, naming both writing modules", () => {
       world.clickhouse(
-        "00009_both.sql",
+        "00200_both.sql",
         "-- +goose Up\nALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries ADD COLUMN X String;\nALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_analytics ADD COLUMN X String;\n",
       );
 
       expect(world.files()).toEqual([
         {
-          file: "packages/clickhouse-migrations/migrations/00009_both.sql",
+          file: "packages/clickhouse-migrations/migrations/00200_both.sql",
           message:
             "This migration touches the tables of 2 owners: trace (trace_summaries) and analytics (evaluation_analytics).",
         },
@@ -196,7 +194,7 @@ describe("migration owners", () => {
     /** @scenario "A ClickHouse rollback half is not read" */
     it("reads only the up half", () => {
       world.clickhouse(
-        "00009_down.sql",
+        "00201_down.sql",
         "-- +goose Up\nALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries ADD COLUMN X String;\n-- +goose Down\nALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_analytics DROP COLUMN X;\n",
       );
 
@@ -204,28 +202,33 @@ describe("migration owners", () => {
     });
   });
 
-  describe("given the tree and its shrink-only list", () => {
+  describe("given the frozen cutoffs", () => {
+    /** @scenario "Migrations below the cutoff are frozen history" */
+    it("does not read a migration below either cutoff", () => {
+      const world = fixture();
+      world.claims("project", "Project");
+      world.claims("dataset", "Dataset");
+      const sql =
+        'ALTER TABLE "Project" ADD COLUMN "x" TEXT;\nALTER TABLE "Dataset" ADD COLUMN "y" TEXT;\n';
+      world.postgres("20250101000000_old", sql);
+      world.postgres("20260913120001_last_frozen", sql);
+
+      expect(world.files()).toEqual([]);
+    });
+  });
+
+  describe("given the tree", () => {
     const catalogue = readFeatureCatalogue(REPOSITORY_ROOT, []);
-    const current = () =>
-      countByKey(
-        twoOwnerMigrations({
-          root: REPOSITORY_ROOT,
-          catalogue,
-          clickhouse: clickhouseScanAt(REPOSITORY_ROOT, catalogue),
-        }).map((migration) => migration.file),
-      );
 
-    /** @scenario "Today's two-owner migrations are listed and a new one fails" */
-    it("finds no two-owner migration missing from the list, and every listed one still there", () => {
-      const { grown, stale } = compareRatchet({
-        current: current(),
-        listed: readRatchet({ file: LIST }).findings,
-      });
+    /** @scenario "The tree has no two-owner migration above the cutoff" */
+    it("finds no two-owner migration", () => {
+      const found = twoOwnerMigrations({
+        root: REPOSITORY_ROOT,
+        catalogue,
+        clickhouse: clickhouseScanAt(REPOSITORY_ROOT, catalogue),
+      }).map((migration) => migration.file);
 
-      expect(grown, "split these migrations by owner; history is never added to the list").toEqual(
-        [],
-      );
-      expect(stale, "remove these from tests/baselines/migration-owners.json").toEqual([]);
+      expect(found, "split these migrations by owner").toEqual([]);
     }, 120_000);
   });
 });

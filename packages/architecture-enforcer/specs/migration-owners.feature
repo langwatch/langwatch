@@ -3,8 +3,8 @@ Feature: Each SQL migration belongs to one owner
   tables it touches; a migration touching two owners' tables is refused
   (Alex, 2026-10-06, D3). A Postgres table's owner is the module claiming its
   model; a ClickHouse table's owner is the module writing it, or its record.
-  Migrations already merged are history: they sit on a shrink-only list beside
-  the enforcer's tests, so only a new two-owner migration fails.
+  Migrations below a named cutoff (ClickHouse 00089, Postgres 20260914) are
+  frozen history, to be squashed per owner at the 3.20.1 floor (ruling BL-1).
 
   @unit @architecture
   Scenario: A Postgres migration touching one owner's tables passes
@@ -49,8 +49,13 @@ Feature: Each SQL migration belongs to one owner
     Then it reports nothing for that migration
 
   @unit @architecture
-  Scenario: Today's two-owner migrations are listed and a new one fails
-    Given the shrink-only list of two-owner migrations in tests/baselines/migration-owners.json
-    When the tree's two-owner migrations are compared with the list
-    Then none is missing from the list
-    And every listed migration still touches two owners
+  Scenario: Migrations below the cutoff are frozen history
+    Given a Postgres migration below the cutoff touches two owners' tables
+    When the migration-owners policy runs
+    Then it reports nothing for that migration
+
+  @unit @architecture
+  Scenario: The tree has no two-owner migration above the cutoff
+    Given the repository's migrations
+    When the tree's two-owner migrations are counted
+    Then there are none

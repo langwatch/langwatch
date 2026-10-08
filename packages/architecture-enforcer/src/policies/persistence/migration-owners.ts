@@ -14,13 +14,14 @@ import { featureClaims, prismaModelNames } from "./prisma-table-ownership.ts";
 
 /**
  * SQL stays central and each migration is attributed to its tables' owner, so
- * one touching two owners is refused (Alex, 2026-10-06, D3). Merged history is
- * a shrink-only list in tests/baselines/migration-owners.json (§17).
+ * one touching two owners is refused (Alex, 2026-10-06, D3). Migrations below
+ * the cutoffs are frozen history (ruling BL-1), squashed per owner after merge.
  */
 
 const POLICY = "migration-owners";
 const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
 const CLICKHOUSE_MIGRATIONS = "packages/clickhouse-migrations/migrations";
+const FROZEN_BELOW = { postgres: "20260914", clickhouse: "00089" } as const;
 const SQL_COMMENT = /--[^\n]*/g;
 const MATERIALISED_SUFFIX = /_mv$/;
 const ALLOWED =
@@ -60,7 +61,7 @@ function prismaMigrationFiles(root: string): string[] {
   if (!existsSync(directory)) return [];
 
   return readdirSync(directory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && entry.name >= FROZEN_BELOW.postgres)
     .map((entry) => `${PRISMA_MIGRATIONS}/${entry.name}/migration.sql`)
     .filter((file) => existsSync(join(root, file)));
 }
@@ -70,7 +71,7 @@ function clickhouseMigrationFiles(root: string): string[] {
   if (!existsSync(directory)) return [];
 
   return readdirSync(directory)
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith(".sql") && name >= FROZEN_BELOW.clickhouse)
     .map((name) => `${CLICKHOUSE_MIGRATIONS}/${name}`);
 }
 
