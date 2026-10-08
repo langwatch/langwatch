@@ -273,7 +273,6 @@ function lwqlProvisioningOperations({
 
 type AnalyticsSetup = FeatureSetup<
   AnalyticsDependencies,
-  never,
   AnalyticsServerConfig,
   AnalyticsRepositories,
   AnalyticsChannels

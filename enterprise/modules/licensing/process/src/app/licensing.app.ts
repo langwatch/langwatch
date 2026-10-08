@@ -154,7 +154,6 @@ const logger = createLogger("langwatch:licensing");
 
 type LicensingSetup = FeatureSetup<
   typeof LicensingModule.dependencies,
-  never,
   LicensingServerConfig,
   LicensingRepositories
 >;

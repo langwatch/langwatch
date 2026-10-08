@@ -81,7 +81,6 @@ const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyModule.dependencies,
-  never,
   DataPrivacyServerConfig,
   DataPrivacyRepositories,
   DataPrivacyChannels

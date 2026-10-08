@@ -711,12 +711,7 @@ type OpsRuntimeDependencies = Readonly<{
 type OpsAppRuntimeDependencies = OpsAppDependencies &
   Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
 
-type OpsSetup = FeatureSetup<
-  typeof OpsModule.dependencies,
-  never,
-  OpsServerConfig,
-  OpsRepositories
->;
+type OpsSetup = FeatureSetup<typeof OpsModule.dependencies, OpsServerConfig, OpsRepositories>;
 
 /** The badge's two integers, and when they were computed. */
 export interface OpsBadgeReading {

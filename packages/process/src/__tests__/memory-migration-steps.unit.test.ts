@@ -37,7 +37,7 @@ class MemoryRepositories {
 class ProjectModule {
   static readonly contract = moduleApi<{ ready(): boolean }>()("project");
   static readonly dependencies = {};
-  static create(_setup: FeatureSetup<{}, unknown, undefined, { projects: ProjectSource }>) {
+  static create(_setup: FeatureSetup<{}, undefined, { projects: ProjectSource }>) {
     return { ready: () => true };
   }
 }
@@ -45,7 +45,7 @@ class ProjectModule {
 class DatasetModule {
   static readonly contract = moduleApi<{ ready(): boolean }>()("dataset");
   static readonly dependencies = {};
-  static create(_setup: FeatureSetup<{}, unknown, undefined>) {
+  static create(_setup: FeatureSetup<{}, undefined>) {
     return { ready: () => true };
   }
 }

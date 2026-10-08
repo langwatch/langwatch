@@ -36,7 +36,7 @@ import { GuidedOnboardingService } from "../services/guided-onboarding.service.t
 import { OnboardingChecksService } from "../services/onboarding-checks.service.ts";
 import type { IntegrationsChecksApi } from "../transport/integrations-checks.trpc.ts";
 
-type OnboardingSetup = FeatureSetup<typeof OnboardingModule.dependencies, never, undefined>;
+type OnboardingSetup = FeatureSetup<typeof OnboardingModule.dependencies, undefined>;
 
 export class OnboardingModule implements OnboardingApiContract, IntegrationsChecksApi {
   static readonly contract = OnboardingApi;

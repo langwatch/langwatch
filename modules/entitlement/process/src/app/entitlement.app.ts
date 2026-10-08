@@ -114,7 +114,6 @@ const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
 type EntitlementSetup = FeatureSetup<
   typeof EntitlementModule.dependencies,
-  never,
   EntitlementConfig,
   EntitlementRepositories
 >;

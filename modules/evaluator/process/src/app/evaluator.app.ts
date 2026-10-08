@@ -94,7 +94,6 @@ export interface EvaluatorGraph {
 
 type EvaluatorSetup = FeatureSetup<
   typeof EvaluatorModule.dependencies,
-  never,
   EvaluatorServerConfig,
   EvaluatorRepositories
 >;

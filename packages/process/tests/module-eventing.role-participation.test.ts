@@ -82,11 +82,8 @@ class ComposedTraceApp extends TraceModule {
   record: ((note: string) => Promise<void>) | undefined;
 
   static create(
-    _setup: FeatureSetup<
-      typeof ComposedTraceApp.dependencies,
-      Readonly<{ eventing: EventSourcing }>,
-      undefined
-    >,
+    _setup: FeatureSetup<typeof ComposedTraceApp.dependencies, undefined> &
+      Readonly<{ members: Readonly<{ eventing: EventSourcing }> }>,
   ): ComposedTraceApp {
     return new ComposedTraceApp();
   }

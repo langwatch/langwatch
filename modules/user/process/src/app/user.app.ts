@@ -152,12 +152,7 @@ interface UserAppDependencies {
 /** `PASSKEYS_ENABLED` is auth's, asked of that peer. */
 export type UserFacts = Readonly<{ passkeysEnabled: boolean }>;
 
-type UserSetup = FeatureSetup<
-  typeof UserModule.dependencies,
-  never,
-  UserServerConfig,
-  UserRepositories
->;
+type UserSetup = FeatureSetup<typeof UserModule.dependencies, UserServerConfig, UserRepositories>;
 
 /** What `createForTesting` builds the module from; clock and hasher default to the real ones. */
 type UserTestSetup = Readonly<{

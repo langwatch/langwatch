@@ -93,7 +93,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly contract = Contract;
         static readonly dependencies = {};
         readonly value = "ok";
-        static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
+        static create(setup: FeatureSetup<{}, undefined>): App { return new App(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();
       new ApplicationBuilder({ role: "api", stores: memberSourceOf({}) })
@@ -118,7 +118,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly dependencies = { projects: ProjectApi };
         readonly #projects: ProjectApi;
         private constructor(projects: ProjectApi) { this.#projects = projects; }
-        static create({ dependencies }: FeatureSetup<typeof App.dependencies, {}, undefined>): App {
+        static create({ dependencies }: FeatureSetup<typeof App.dependencies, undefined>): App {
           return new App(dependencies.projects);
         }
         projectName(): string { return this.#projects.name(); }
@@ -155,7 +155,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       class App {
         static readonly contract = AnnotationApi;
         static readonly dependencies = { projects: ProjectService };
-        static create(setup: FeatureSetup<typeof App.dependencies, {}, undefined>): AnnotationApi { return { save: () => "saved" }; }
+        static create(setup: FeatureSetup<typeof App.dependencies, undefined>): AnnotationApi { return { save: () => "saved" }; }
       }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
@@ -167,7 +167,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       `
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, undefined>): App { setup.dependencies.missing; return new App(); } } // EXPECT
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined>): App { setup.dependencies.missing; return new App(); } } // EXPECT
       defineProcessModule("annotation").withApi(App).build();
     `,
     ],
@@ -178,7 +178,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       abstract class Peer { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = { peer: Peer }; readonly value = "ok"; static create(setup: FeatureSetup<{ other: typeof Peer }, undefined, undefined>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = { peer: Peer }; readonly value = "ok"; static create(setup: FeatureSetup<{ other: typeof Peer }, undefined>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -188,7 +188,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       `
       import { defineProcessModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value = "ok"; static create(setup: FeatureSetup<{}, { required: string }>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -200,7 +200,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       import { Config } from "__CONFIG__";
       import { z } from "__ZOD__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, { required: string }>): App { return new App(); } }
       defineProcessModule("annotation").withApi(App).build(); // EXPECT
     `,
     ],
@@ -265,7 +265,7 @@ describe("defineProcessModule compiler diagnostics", () => {
       class App {
         static readonly contract = App;
         static readonly dependencies = {};
-        static create({ repositories }: FeatureSetup<{}, never, undefined, Repositories>) { return new App(); }
+        static create({ repositories }: FeatureSetup<{}, undefined, Repositories>) { return new App(); }
       }
       defineProcessModule("annotation").withRepositories(repositories).withApi(App); // EXPECT
     `,
@@ -285,7 +285,7 @@ describe("defineProcessModule compiler diagnostics", () => {
         static readonly dependencies = {};
         static readonly config = Config.define((c) => ({ suffix: c.env("SUFFIX", z.string()) }));
         readonly value = "ok";
-        static create(setup: FeatureSetup<{}, {}, { suffix: string }>): App { return new App(); }
+        static create(setup: FeatureSetup<{}, { suffix: string }>): App { return new App(); }
       }
       const feature = defineProcessModule("annotation").withApi(App).build();`;
 

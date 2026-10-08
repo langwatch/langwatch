@@ -28,7 +28,8 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 
   static create(
-    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, DeclaredMembers, Config>,
+    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, Config> &
+      Readonly<{ members: DeclaredMembers }>,
   ): ComposedDirectoryApp {
     return new ComposedDirectoryApp(`${setup.members.prefix}${setup.config.suffix}`);
   }
@@ -70,7 +71,8 @@ describe("defineProcessModule", () => {
       }
 
       static create(
-        setup: FeatureSetup<typeof ResourceApp.dependencies, DeclaredMembers, undefined>,
+        setup: FeatureSetup<typeof ResourceApp.dependencies, undefined> &
+          Readonly<{ members: DeclaredMembers }>,
       ): ResourceApp {
         setup.resources.own("resource", own);
         return new ResourceApp();

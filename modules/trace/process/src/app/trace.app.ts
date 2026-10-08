@@ -750,7 +750,6 @@ const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
 
 type TraceSetup = FeatureSetup<
   typeof TraceModule.dependencies,
-  never,
   TraceServerConfig,
   TraceRepositories
 >;

@@ -26,7 +26,6 @@ const MAX_ARGS_BYTES = 4 * 1024;
 
 type AuditLogSetup = FeatureSetup<
   typeof AuditLogModule.dependencies,
-  never,
   undefined,
   AuditLogRepositories
 >;

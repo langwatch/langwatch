@@ -62,7 +62,6 @@ export type ModuleOperatorReadsScope = (input: {
 /** The complete context supplied to a server app's static factory. */
 export type FeatureSetup<
   Dependencies extends TokenMap,
-  Members,
   Config,
   Repositories = never,
   Channels = never,
@@ -75,7 +74,6 @@ export type FeatureSetup<
   /** Which process this install is in; absent only where a test builds the App by hand. */
   readonly role?: ServerRole;
 }> &
-  ([Members] extends [never] ? object : Readonly<{ readonly members: Members }>) &
   ([Repositories] extends [never]
     ? object
     : Readonly<{
@@ -85,6 +83,11 @@ export type FeatureSetup<
       }>) &
   /** Built by the container from the registry named in `.withChannels(...)` (record §5). */
   ([Channels] extends [never] ? object : Readonly<{ readonly channels: Channels }>);
+
+/** What an App's `reads(...)` declared, until the reads path goes (DS-C). */
+type WithMembers<Members> = [Members] extends [never]
+  ? object
+  : Readonly<{ readonly members: Members }>;
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
@@ -108,7 +111,8 @@ export type AppDefinition<
     /** What this App reads off the process's members, declared with `reads(...)`. */
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, NoInfer<Config>, never, Channels>,
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, never, Channels> &
+        WithMembers<Members>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -129,7 +133,8 @@ export type DeclaredConfigAppDefinition<
     readonly repositories?: FeatureRepositories;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, ConfigOf<Slice>, never, Channels>,
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, never, Channels> &
+        WithMembers<Members>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -145,7 +150,7 @@ export type AppDefinitionWithoutConfig<
     /** What this App reads off the process's members, declared with `reads(...)`. */
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, Members, undefined, never, Channels>,
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, never, Channels> & WithMembers<Members>,
     ) => NoInfer<App> | Promise<NoInfer<App>>;
   }>;
 
@@ -1145,7 +1150,7 @@ type RepositoryAppDefinition<
     readonly config?: ConfigSlice;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories, Channels> &
+      setup: FeatureSetup<NoInfer<Dependencies>, NoInfer<Config>, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;
@@ -1167,7 +1172,7 @@ type RepositoryDeclaredConfigAppDefinition<
     readonly config: Slice;
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories, Channels> &
+      setup: FeatureSetup<NoInfer<Dependencies>, ConfigOf<Slice>, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;
@@ -1183,7 +1188,7 @@ type RepositoryAppDefinitionWithoutConfig<
   Readonly<{
     readonly reads?: readonly string[];
     readonly create: (
-      setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories, Channels> &
+      setup: FeatureSetup<NoInfer<Dependencies>, undefined, Repositories, Channels> &
         Readonly<{ members: Members }>,
     ) => Created | Promise<Created>;
   }>;

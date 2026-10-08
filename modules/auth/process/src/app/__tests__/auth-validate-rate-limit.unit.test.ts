@@ -106,11 +106,6 @@ async function appFor(
       }),
     },
     channels: MemoryAuthChannels.create(),
-    members: {
-      identityEmails: undefined as never,
-      invites: null,
-      processName: "langwatch-api",
-    },
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });

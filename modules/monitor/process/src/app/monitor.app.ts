@@ -55,7 +55,6 @@ const MONITOR_KSUID_RESOURCE = "monitor";
 
 type MonitorSetup = FeatureSetup<
   typeof MonitorModule.dependencies,
-  never,
   MonitorServerConfig,
   MonitorRepositories
 >;

@@ -17,12 +17,7 @@ import type { SaasRepositories } from "../repositories/saas.repositories.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
-type SaasSetup = FeatureSetup<
-  typeof SaasModule.dependencies,
-  never,
-  SaasServerConfig,
-  SaasRepositories
->;
+type SaasSetup = FeatureSetup<typeof SaasModule.dependencies, SaasServerConfig, SaasRepositories>;
 
 export class SaasModule implements SaasApiContract {
   static readonly contract = SaasApi;

@@ -19,7 +19,6 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { nowInstant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -63,12 +62,6 @@ async function bootAuth({
       },
     })
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
-    .withMembers({
-      now: nowInstant,
-      identityEmails: void 0,
-      invites: null,
-      processName: "langwatch-api",
-    })
     .provide({
       user: createApiFixture<UserApi>({ findByEmail: async () => null }),
       "api-key": createApiFixture<ApiKeyApi>(),

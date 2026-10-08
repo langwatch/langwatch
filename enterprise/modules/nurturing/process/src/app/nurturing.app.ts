@@ -19,7 +19,6 @@ import { NurturingService } from "../services/nurturing.service.ts";
 
 type NurturingSetup = FeatureSetup<
   typeof NurturingModule.dependencies,
-  never,
   NurturingServerConfig,
   NurturingRepositories,
   NurturingChannels

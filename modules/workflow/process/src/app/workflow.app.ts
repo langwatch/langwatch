@@ -319,7 +319,6 @@ interface WorkflowInfrastructure {
 
 type WorkflowSetup = FeatureSetup<
   typeof WorkflowModule.dependencies,
-  never,
   WorkflowServerConfig,
   WorkflowRepositories,
   WorkflowChannels

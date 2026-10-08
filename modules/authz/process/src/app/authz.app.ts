@@ -76,7 +76,7 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
-export type AuthzSetup = FeatureSetup<Readonly<{}>, never, AuthzServerConfig, AuthzRepositories>;
+export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzServerConfig, AuthzRepositories>;
 
 /**
  * The legacy import speaks the command vocabulary directly: it supplies

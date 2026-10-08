@@ -109,12 +109,7 @@ import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.servic
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 
-type ScimSetup = FeatureSetup<
-  typeof ScimModule.dependencies,
-  never,
-  ScimServerConfig,
-  ScimRepositories
->;
+type ScimSetup = FeatureSetup<typeof ScimModule.dependencies, ScimServerConfig, ScimRepositories>;
 
 const CONNECTION_NOT_WRITABLE =
   "This directory token can no longer write through its single sign-on connection";

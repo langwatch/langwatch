@@ -41,11 +41,8 @@ export class ClockApp implements ClockApi {
   }
   static create({
     members,
-  }: FeatureSetup<
-    Record<never, never>,
-    { clock: () => string; unused?: number },
-    undefined
-  >): ClockApp {
+  }: FeatureSetup<Record<never, never>, undefined> &
+    Readonly<{ members: { clock: () => string; unused?: number } }>): ClockApp {
     return new ClockApp(members.clock);
   }
   now(): string {
@@ -67,9 +64,7 @@ class ConfigApp implements ConfigApi {
   private constructor(pepper: string) {
     this.#pepper = pepper;
   }
-  static create({
-    config,
-  }: FeatureSetup<Record<never, never>, Record<never, never>, { pepper: string }>): ConfigApp {
+  static create({ config }: FeatureSetup<Record<never, never>, { pepper: string }>): ConfigApp {
     return new ConfigApp(config.pepper);
   }
   pepper(): string {
@@ -89,9 +84,7 @@ class PeerApp implements PeerApi {
   private constructor(projects: ProjectApi) {
     this.#projects = projects;
   }
-  static create({
-    dependencies,
-  }: FeatureSetup<typeof PeerApp.dependencies, Record<never, never>, undefined>): PeerApp {
+  static create({ dependencies }: FeatureSetup<typeof PeerApp.dependencies, undefined>): PeerApp {
     return new PeerApp(dependencies.projects);
   }
   read(id: string): string {
@@ -133,7 +126,8 @@ class FacilityApp implements FacilityApi {
   }
   static create({
     members,
-  }: FeatureSetup<Record<never, never>, Facilities, undefined>): FacilityApp {
+  }: FeatureSetup<Record<never, never>, undefined> &
+    Readonly<{ members: Facilities }>): FacilityApp {
     return new FacilityApp(members);
   }
   read(): string {
@@ -197,12 +191,8 @@ class RepositoryApp implements RepositoryApi {
   static create({
     repositories,
     members,
-  }: FeatureSetup<
-    Record<never, never>,
-    { clock: () => string; unused?: string },
-    undefined,
-    { row(): string }
-  >): RepositoryApp {
+  }: FeatureSetup<Record<never, never>, undefined, { row(): string }> &
+    Readonly<{ members: { clock: () => string; unused?: string } }>): RepositoryApp {
     return new RepositoryApp(() => `${repositories.row()}@${members.clock()}`);
   }
   row(): string {
@@ -227,7 +217,9 @@ class ConnectionsApp implements ConnectionsApi {
   static readonly dependencies = {};
   static readonly reads = ["connections"] as const;
   private constructor(private readonly connections: Connections) {}
-  static create({ members }: FeatureSetup<{}, { connections: Connections }, undefined>) {
+  static create({
+    members,
+  }: FeatureSetup<{}, undefined> & Readonly<{ members: { connections: Connections } }>) {
     return new ConnectionsApp(members.connections);
   }
   primary(): string {
@@ -249,9 +241,7 @@ class LicenseConsumerApp implements LicenseConsumerApi {
   static readonly contract = LicenseConsumerApi;
   static readonly dependencies = { license: LicenseSource };
   private constructor(private readonly source: LicenseSource) {}
-  static create({
-    dependencies,
-  }: FeatureSetup<typeof LicenseConsumerApp.dependencies, {}, undefined>) {
+  static create({ dependencies }: FeatureSetup<typeof LicenseConsumerApp.dependencies, undefined>) {
     return new LicenseConsumerApp(dependencies.license);
   }
   plan(): string {
@@ -297,7 +287,7 @@ class ScoringApp implements ScoringApi {
 
   static create({
     channels,
-  }: FeatureSetup<Record<never, never>, never, undefined, never, VerdictChannels>): ScoringApp {
+  }: FeatureSetup<Record<never, never>, undefined, never, VerdictChannels>): ScoringApp {
     return new ScoringApp(channels.verdicts);
   }
 

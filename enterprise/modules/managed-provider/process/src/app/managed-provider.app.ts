@@ -11,11 +11,7 @@ import { ManagedProviderConfigurationService } from "../services/managed-provide
 import { ManagedProviderService } from "../services/managed-provider.service.ts";
 
 /** The directory is a credential (ADR-132): this App's own declared secret, not config. */
-type ManagedProviderSetup = FeatureSetup<
-  typeof ManagedProviderModule.dependencies,
-  never,
-  undefined
->;
+type ManagedProviderSetup = FeatureSetup<typeof ManagedProviderModule.dependencies, undefined>;
 
 export class ManagedProviderModule implements ManagedProviderApiContract {
   static readonly contract = ManagedProviderApi;

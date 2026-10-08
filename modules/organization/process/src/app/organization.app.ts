@@ -262,7 +262,6 @@ const logger = createLogger("langwatch:organization");
 
 type OrganizationSetup = FeatureSetup<
   typeof OrganizationModule.dependencies,
-  never,
   OrganizationServerConfig,
   OrganizationRepositories
 >;

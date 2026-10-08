@@ -37,7 +37,6 @@ export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthModule.dependencies,
-  never,
   PlatformHealthServerConfig,
   never,
   PlatformHealthChannels

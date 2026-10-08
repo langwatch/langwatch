@@ -47,7 +47,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
-type RoleSetup = FeatureSetup<typeof RoleModule.dependencies, never, undefined, RoleRepositories>;
+type RoleSetup = FeatureSetup<typeof RoleModule.dependencies, undefined, RoleRepositories>;
 
 const WRITE_ACKNOWLEDGED: RoleWriteAcknowledged = { success: true };
 

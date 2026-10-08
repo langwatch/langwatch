@@ -61,7 +61,6 @@ export interface FeatureFlagCache {
 
 type FeatureFlagSetup = FeatureSetup<
   typeof FeatureFlagModule.dependencies,
-  never,
   FeatureFlagServerConfig,
   FeatureFlagRepositories
 >;

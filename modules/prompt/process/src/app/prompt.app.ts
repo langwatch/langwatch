@@ -92,13 +92,11 @@ type PromptDependencies = Readonly<{
 
 type PromptSetup = FeatureSetup<
   PromptDependencies,
-  never,
   PromptServerConfig,
   Pick<PromptRepositories, "rateLimits">
 >;
 type PromptRepositorySetup = FeatureSetup<
   PromptDependencies,
-  never,
   PromptServerConfig,
   PromptRepositories
 >;

@@ -20,7 +20,7 @@ import {
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
 } from "../src/create-members.ts";
-import { MEMBER_NAMES, type ProcessConfig } from "../src/index.ts";
+import { STORE_CLIENT_NAMES, type ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all. */
 function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
@@ -170,7 +170,7 @@ describe("given a member source with several clients open", () => {
 describe("given the closed member list", () => {
   describe("when it is read in construction order", () => {
     it("opens prisma before the two members that route on it", () => {
-      const order = [...MEMBER_NAMES];
+      const order = [...STORE_CLIENT_NAMES];
 
       expect(order.indexOf("prisma")).toBeLessThan(order.indexOf("clickhouse"));
       expect(order.indexOf("prisma")).toBeLessThan(order.indexOf("objectStorage"));
@@ -180,8 +180,8 @@ describe("given the closed member list", () => {
     });
 
     it("names no audit member: the sink is the audit-log module's app", () => {
-      expect([...MEMBER_NAMES]).not.toContain("audit");
-      expect(MEMBER_NAMES).toHaveLength(16);
+      expect([...STORE_CLIENT_NAMES]).not.toContain("audit");
+      expect(STORE_CLIENT_NAMES).toHaveLength(16);
     });
   });
 });

@@ -58,7 +58,7 @@ class AlertApp {
 
   static create({
     channels,
-  }: FeatureSetup<Record<never, never>, never, { topic: string }, never, AlertChannels>): AlertApp {
+  }: FeatureSetup<Record<never, never>, { topic: string }, never, AlertChannels>): AlertApp {
     return new AlertApp(channels.bus);
   }
 
@@ -80,7 +80,6 @@ class StoredApp {
     channels,
   }: FeatureSetup<
     Record<never, never>,
-    never,
     { topic: string },
     { read(): string },
     AlertChannels
@@ -243,7 +242,7 @@ class ScoreApp implements ScoreApi {
 
   static create({
     channels,
-  }: FeatureSetup<Record<never, never>, never, undefined, never, ScoreChannels>): ScoreApp {
+  }: FeatureSetup<Record<never, never>, undefined, never, ScoreChannels>): ScoreApp {
     if (judgeWhileConstructing) channels.judge.judge("too early");
     return new ScoreApp(channels.judge);
   }

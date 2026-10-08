@@ -35,7 +35,8 @@ class AnnotationModule implements AnnotationApi {
   ) {}
 
   static create(
-    setup: FeatureSetup<typeof AnnotationModule.dependencies, Members, undefined>,
+    setup: FeatureSetup<typeof AnnotationModule.dependencies, undefined> &
+      Readonly<{ members: Members }>,
   ): AnnotationModule {
     handed = setup.members as Readonly<Record<string, unknown>>;
     return new AnnotationModule(setup.members.clock, setup.dependencies.projects);

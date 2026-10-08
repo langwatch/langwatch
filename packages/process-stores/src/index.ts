@@ -1,20 +1,19 @@
 /**
- * The stores a process opens and the members they hand its modules (ARCHITECTURE.md §7).
- * A module names the members it reads in `static readonly reads` and is handed exactly those.
+ * The stores a process opens and the typed clients they hand its repository registries
+ * (ARCHITECTURE.md §7). A module class never reads a store client itself.
  */
 export {
-  MEMBER_NAMES,
+  STORE_CLIENT_NAMES,
   type Cache,
   type Clock,
   type Encryption,
   type IdempotencyStore,
-  type MemberName,
-  type MembersRead,
+  type StoreClientName,
   type ObjectBodyFacts,
   type ObjectDigest,
   type ObjectStorage,
   type ObjectStorageDestination,
-  type ProcessMembers,
+  type StoreClients,
   type RateLimitDecision,
   type RateLimiter,
   type SecretResolver,
@@ -29,7 +28,6 @@ export {
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   StoreNotAnsweringError,
-  type MemberSource,
   type ProcessMemberSource,
   type ProcessStores,
 } from "./create-members.ts";
@@ -55,9 +53,9 @@ export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.
 export { memoryStores } from "./memory-stores.ts";
 export { memorySessionState } from "./memory-session-state.ts";
 export {
-  privateTenantListing,
   cachedTenantDirectory,
   prismaTenantDirectory,
+  privateTenantListing,
   type TenantDirectory,
 } from "./tenant-directory.ts";
 export {

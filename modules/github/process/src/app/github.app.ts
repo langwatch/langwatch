@@ -139,7 +139,6 @@ export interface GithubAppTokenCache {
 
 type GithubSetup = FeatureSetup<
   typeof GithubModule.dependencies,
-  never,
   GithubServerConfig,
   GithubRepositories,
   GithubChannels

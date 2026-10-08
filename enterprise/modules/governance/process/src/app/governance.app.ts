@@ -431,14 +431,10 @@ export interface GovernanceAppDependencies {
 
 /** How a process installs this application: its peers, its config, its secrets, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<
-    typeof GovernanceModule.dependencies,
-    never,
-    undefined
-  >["dependencies"];
+  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
-  resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
-  secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
+  resources: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceModule.dependencies, undefined>["secrets"];
   repositories: GovernanceRepositories;
 }>;
 

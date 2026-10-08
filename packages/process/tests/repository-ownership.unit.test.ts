@@ -17,7 +17,7 @@ class UserModule {
   static readonly dependencies = {};
   static readonly repositories = { users: { tables: userTables } };
   private constructor() {}
-  static create(_setup: FeatureSetup<typeof UserModule.dependencies, object, undefined>) {
+  static create(_setup: FeatureSetup<typeof UserModule.dependencies, undefined>) {
     created();
     return new UserModule();
   }
@@ -31,7 +31,7 @@ class AnnotationModule {
   static readonly dependencies = {};
   static readonly repositories = { foreign: { tables: userTables } };
   private constructor() {}
-  static create(_setup: FeatureSetup<typeof AnnotationModule.dependencies, object, undefined>) {
+  static create(_setup: FeatureSetup<typeof AnnotationModule.dependencies, undefined>) {
     created();
     return new AnnotationModule();
   }

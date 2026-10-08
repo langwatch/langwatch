@@ -69,7 +69,7 @@ type ProjectDependencies = Readonly<{
 type ProjectLogger = Readonly<{
   error: (payload: Readonly<Record<string, unknown>>, message: string) => void;
 }>;
-type ProjectSetup = FeatureSetup<ProjectDependencies, never, undefined, ProjectRepositories>;
+type ProjectSetup = FeatureSetup<ProjectDependencies, undefined, ProjectRepositories>;
 
 /**
  * The project application: what peer modules, `/api/projects` and the browser

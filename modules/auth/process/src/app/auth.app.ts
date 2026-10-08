@@ -53,7 +53,6 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   type EmailIdentifierAdded,
   IdentityApi,
-  type IdentityEmailService,
   organizationConnectionsOf,
   type RoutingDecision,
   type SignedInWith,
@@ -61,7 +60,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -154,33 +153,7 @@ import {
   type BetterAuthDeploymentIdentity,
 } from "./auth-composition.build.ts";
 
-/**
- * The invitation a landing page reads, and the reissue request behind it. Both
- * run over the organization module's rows, so both arrive from the process.
- */
-type AuthInviteDirectory = {
-  readLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
-  requestFresh(input: Readonly<{ inviteCode: string }>): Promise<void>;
-};
-
 const logger = createLogger("langwatch:auth");
-
-/** What the process hands this module beside its repositories and channels. */
-type AuthInfrastructure = Readonly<{
-  /** The address the identifier ledger holds for a person, where it holds
-   * one. `undefined` until the front-door wiring lane supplies identity's
-   * service — the session read then falls back to the stored user's own
-   * address, which is the documented chain, not a degraded one. */
-  identityEmails: IdentityEmailService | undefined;
-  /** The invitation reads, or nothing where this process composed none. */
-  invites: AuthInviteDirectory | null;
-  /** Names this process in every refusal below. */
-  processName: string;
-  /** Process time, injected so session expiry has deterministic tests. */
-  now?: (() => Instant) | undefined;
-  /** Where composition notices go, injected so a test can read the one absence line. */
-  logger?: Logger | undefined;
-}>;
 
 /** The peers the app keeps past construction; identity decides where an address signs in. */
 type AuthAppPeers = Readonly<{
@@ -191,7 +164,6 @@ type AuthAppPeers = Readonly<{
 
 type AuthSetup = FeatureSetup<
   typeof AuthModule.dependencies,
-  AuthInfrastructure,
   AuthServerConfig,
   AuthRepositories,
   AuthChannels
@@ -245,7 +217,8 @@ export class AuthModule implements AuthApiContract {
   readonly #cliSessions: CliDeviceSessionService;
   readonly #cliDeviceFlow: CliDeviceFlowService;
   readonly #signUp: SignUpVerificationService | null;
-  readonly #members: AuthInfrastructure;
+  /** Names this process in every refusal below: its role, where the container installed it. */
+  readonly #processName: string;
   /** The counters the token check and the sign-in door meter through. */
   readonly #rateLimits: AuthRateLimitRepository;
   readonly #dependencies: AuthAppPeers;
@@ -346,7 +319,7 @@ export class AuthModule implements AuthApiContract {
     cliSessions,
     cliDeviceFlow,
     signUp,
-    members,
+    processName,
     rateLimits,
     dependencies,
     legacySsoAccess,
@@ -362,7 +335,7 @@ export class AuthModule implements AuthApiContract {
     cliSessions: CliDeviceSessionService;
     cliDeviceFlow: Omit<CliDeviceFlowCollaborators, "session">;
     signUp: SignUpVerificationService | null;
-    members: AuthInfrastructure;
+    processName: string;
     rateLimits: AuthRateLimitRepository;
     dependencies: AuthAppPeers;
     legacySsoAccess: LegacySsoAccessService;
@@ -380,7 +353,7 @@ export class AuthModule implements AuthApiContract {
       collaborators: { ...cliDeviceFlow, session: (headers) => this.#cliBrowserSession(headers) },
     });
     this.#signUp = signUp;
-    this.#members = members;
+    this.#processName = processName;
     this.#rateLimits = rateLimits;
     this.#dependencies = dependencies;
     this.#legacySsoAccess = legacySsoAccess;
@@ -418,21 +391,22 @@ export class AuthModule implements AuthApiContract {
           ),
       },
       deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
-      now: members.now ?? nowInstant,
+      now: nowInstant,
     });
   }
 
   static async create(setup: AuthSetup): Promise<AuthModule> {
-    const { members, repositories, channels, dependencies, config } = setup;
+    const { repositories, channels, dependencies, config } = setup;
+    const processName = setup.role ?? "this process";
     /** Every mail auth sends goes out through notification, which owns the gateway. */
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
-    const now = members.now ?? nowInstant;
+    const now = nowInstant;
     const accountRows = repositories.betterAuthHooks;
 
     const sessions = BrowserSessionService.create({
       sessions: repositories.sessions,
       cache: repositories.sessionCache,
-      identityEmails: members.identityEmails,
+      identityEmails: dependencies.identity,
       users: dependencies.users,
       sessionBound: SessionBoundService.create({
         organizations: dependencies.organizations,
@@ -484,7 +458,7 @@ export class AuthModule implements AuthApiContract {
           return view.provider === undefined && !view.misconfigured;
         },
       }),
-      members,
+      processName,
       rateLimits: repositories.rateLimits,
       dependencies: {
         apiKeys: dependencies.apiKeys,
@@ -642,7 +616,7 @@ export class AuthModule implements AuthApiContract {
             sendResetPassword: passwordResetSender({
               mail: passwordResetMailChannels.ses.create({ mailer }),
               publicBaseUrl: config.publicBaseUrl,
-              processName: members.processName,
+              processName,
             }),
             users: dependencies.users,
             identityApi: dependencies.identity,
@@ -656,7 +630,7 @@ export class AuthModule implements AuthApiContract {
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
             isProduction: config.nodeEnvironment === "production",
-            logger: members.logger ?? logger,
+            logger,
           });
       } else {
         logger.info(
@@ -710,7 +684,7 @@ export class AuthModule implements AuthApiContract {
     if (!federatedPasswords) {
       throw new AuthUnavailableError({
         capability: "identity-provider password change",
-        processName: this.#members.processName,
+        processName: this.#processName,
       });
     }
     return federatedPasswords.changePassword(input);
@@ -734,7 +708,7 @@ export class AuthModule implements AuthApiContract {
       throw new AuthUnavailableError({
         capability:
           "browser-session identity (NEXTAUTH_SECRET and NEXTAUTH_URL), so it composes no sign-in door",
-        processName: this.#members.processName,
+        processName: this.#processName,
       });
     }
 
@@ -1084,12 +1058,13 @@ export class AuthModule implements AuthApiContract {
     await context.internalAdapter.createAccount(row);
   }
 
-  async readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
-    return this.requireInvites().readLanding(input);
+  /** No process composes the invitation reads yet; see policies-DS-2d Risks. */
+  async readInviteLanding(_input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
+    throw this.#invitesUnavailable();
   }
 
-  async requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void> {
-    return this.requireInvites().requestFresh(input);
+  async requestFreshInvite(_input: Readonly<{ inviteCode: string }>): Promise<void> {
+    throw this.#invitesUnavailable();
   }
 
   resolveAuthProvider(): Promise<string> {
@@ -1097,7 +1072,7 @@ export class AuthModule implements AuthApiContract {
     if (!authProviders) {
       throw new AuthUnavailableError({
         capability: "sign-in mode configuration, so it cannot name this deployment's auth provider",
-        processName: this.#members.processName,
+        processName: this.#processName,
       });
     }
     return authProviders.resolve();
@@ -1108,24 +1083,19 @@ export class AuthModule implements AuthApiContract {
     if (!this.#signUp) {
       throw new AuthUnavailableError({
         capability: "public base URL, so it cannot build a sign-up confirmation link",
-        processName: this.#members.processName,
+        processName: this.#processName,
       });
     }
 
     return this.#signUp;
   }
 
-  private requireInvites(): AuthInviteDirectory {
-    const invites = this.#members.invites;
-    if (!invites) {
-      throw new AuthUnavailableError({
-        capability:
-          "invitation service, so it cannot ask this organization's admins to reissue the invitation",
-        processName: this.#members.processName,
-      });
-    }
-
-    return invites;
+  #invitesUnavailable(): AuthUnavailableError {
+    return new AuthUnavailableError({
+      capability:
+        "invitation service, so it cannot ask this organization's admins to reissue the invitation",
+      processName: this.#processName,
+    });
   }
 }
 

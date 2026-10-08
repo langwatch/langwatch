@@ -125,11 +125,6 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
       }),
     },
     channels: MemoryAuthChannels.create(),
-    members: {
-      identityEmails: undefined as never,
-      invites: null,
-      processName: "langwatch-api",
-    },
     resources: { own: () => undefined } as never,
     secrets: new ScopedSecrets(async (handle, build) =>
       build({ NEXTAUTH_SECRET: "test-session-secret-test-session-secret" }[handle.id]),

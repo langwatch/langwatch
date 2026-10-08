@@ -199,7 +199,6 @@ const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
 type ExperimentSetup = FeatureSetup<
   typeof ExperimentModule.dependencies,
-  never,
   ExperimentServerConfig,
   ExperimentRepositories
 >;

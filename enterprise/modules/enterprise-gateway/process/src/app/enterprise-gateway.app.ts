@@ -50,7 +50,6 @@ import { RoutingPolicyService } from "../services/routing-policy.service.ts";
 
 type EnterpriseGatewaySetup = FeatureSetup<
   typeof EnterpriseGatewayModule.dependencies,
-  never,
   EnterpriseGatewayConfig | undefined,
   EnterpriseGatewayRepositories
 >;

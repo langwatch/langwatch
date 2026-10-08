@@ -46,7 +46,7 @@ class LedgerApp implements LedgerApi {
 
   static create({
     repositories,
-  }: FeatureSetup<{}, unknown, undefined, { entries: { count(): number } }>): LedgerApp {
+  }: FeatureSetup<{}, undefined, { entries: { count(): number } }>): LedgerApp {
     return new LedgerApp(repositories.entries);
   }
 
