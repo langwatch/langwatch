@@ -1,14 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { KEY_DISCOVERY_SETTINGS } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-query.repository.ts";
-import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import {
-  ClickHouseTraceFacetSpanAttributeKeysRepository,
-  SPAN_ATTRIBUTE_KEYS_FACET,
-} from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-span-attribute-keys.repository.ts";
-
-const traceFacetSpanAttributeKeysRepository =
-  ClickHouseTraceFacetSpanAttributeKeysRepository.create();
+import { KEY_DISCOVERY_SETTINGS } from "../clickhouse.trace-facet-query.repository.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
+import { SPAN_ATTRIBUTE_KEYS_FACET } from "../clickhouse.trace-facet-span-attribute-keys.repository.ts";
 
 const baseCtx = {
   tenantId: "tenant-A",
@@ -34,7 +28,7 @@ describe("SPAN_ATTRIBUTE_KEYS_FACET registration", () => {
 
 describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery", () => {
   describe("when no prefix is supplied", () => {
-    const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery(baseCtx);
+    const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
 
     it("filters by tenant first (multitenancy invariant)", () => {
       // CLAUDE.md: every CH query MUST include `WHERE TenantId = ...` and
@@ -110,7 +104,7 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
   });
 
   describe("when a prefix is supplied for autocomplete", () => {
-    const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery({
+    const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder({
       ...baseCtx,
       prefix: "gen_ai",
     });
@@ -129,7 +123,7 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
 
   describe("when a key is empty", () => {
     it("filters out '' rows in the outer WHERE", () => {
-      const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery(baseCtx);
+      const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
       expect(query.sql).toMatch(/WHERE key\s*!=\s*''/);
     });
   });
@@ -142,14 +136,14 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
       // facet sidebar. A span with offloaded fields will carry these keys in
       // SpanAttributes; without this filter they would surface as browsable
       // facet entries exposing raw ref JSON as values. Concern 1 / #4215.
-      const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery(baseCtx);
+      const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
       expect(query.sql).toContain("NOT startsWith(key, 'langwatch.reserved.')");
     });
 
     it("SQL would exclude langwatch.reserved.eventref.langwatch.output from discovered keys", () => {
       // Validate the filter is in the outer WHERE (post-arrayJoin) so it applies
       // before GROUP BY — the reserved key must not appear in the result set.
-      const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery(baseCtx);
+      const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
       // The filter must appear in the WHERE clause after the subquery
       const outerWhereIdx = query.sql.lastIndexOf("WHERE key");
       expect(outerWhereIdx).toBeGreaterThan(-1);
@@ -163,7 +157,7 @@ describe("traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery
       // Both the projection and the empty-map filter must stay on the keys
       // subcolumn. Touching the full `SpanAttributes` Map anywhere pulls the
       // heavy values column into memory — the cause of the prod OOM.
-      const query = traceFacetSpanAttributeKeysRepository.buildSpanAttributeKeysFacetQuery(baseCtx);
+      const query = SPAN_ATTRIBUTE_KEYS_FACET.queryBuilder(baseCtx);
       expect(query.sql).not.toMatch(/length\(SpanAttributes\)/);
       expect(query.sql).not.toContain("mapValues");
       expect(query.sql).not.toContain("SpanAttributes.values");

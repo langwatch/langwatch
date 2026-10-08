@@ -1,9 +1,12 @@
 import type { TraceSummaryData, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 const TRACK_EVENT_SPAN_NAME = "langwatch.track_event";
-import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
+import {
+  isStorableSpanTimeMs,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "@langwatch/trace-contract";
 
-import { isValidTimestamp } from "../../rules/span-timing.rules.ts";
 import { SpanTimingService } from "../span-timing.service.ts";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
@@ -257,13 +260,13 @@ describe("SpanTimingService", () => {
     });
   });
 
-  describe("isValidTimestamp()", () => {
+  describe("isStorableSpanTimeMs()", () => {
     it.each([null, undefined, 0, -1, Infinity, NaN])("rejects %s", (value) => {
-      expect(isValidTimestamp(value as number | null | undefined)).toBe(false);
+      expect(isStorableSpanTimeMs(value as number | null | undefined)).toBe(false);
     });
 
     it.each([1, 1713000000000])("accepts %d", (value) => {
-      expect(isValidTimestamp(value)).toBe(true);
+      expect(isStorableSpanTimeMs(value)).toBe(true);
     });
   });
 });

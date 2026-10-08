@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { FacetQueryContext } from "../../../features/facet/rules/trace-facet-registry.rules.ts";
-import { ClickHouseTraceFacetEvaluatorRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-evaluator.repository.ts";
-
-const traceFacetEvaluatorRepository = ClickHouseTraceFacetEvaluatorRepository.create();
+import type { FacetQueryContext } from "../../../rules/trace-facet-registry.rules.ts";
+import { EVALUATOR_FACET } from "../clickhouse.trace-facet-evaluator.repository.ts";
 
 function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   return {
@@ -20,7 +18,7 @@ describe("traceFacetEvaluatorRepository.buildEvaluatorFacetQuery", () => {
     describe("when the label projection is built", () => {
       /** @scenario Evaluator facet labels drop the type prefix */
       it("labels rows by name (or id) without the evaluator-type prefix", () => {
-        const { sql } = traceFacetEvaluatorRepository.buildEvaluatorFacetQuery(ctx());
+        const { sql } = EVALUATOR_FACET.queryBuilder(ctx());
         // The label is name-or-id only: a bracketed `[type]` prefix repeats
         // across rows and eats the room the name needs to disambiguate.
         expect(sql).not.toMatch(/concat\('\[',\s*EvaluatorType/);
@@ -30,7 +28,7 @@ describe("traceFacetEvaluatorRepository.buildEvaluatorFacetQuery", () => {
       });
 
       it("still keys the facet value off the evaluator id for query round-trips", () => {
-        const { sql } = traceFacetEvaluatorRepository.buildEvaluatorFacetQuery(ctx());
+        const { sql } = EVALUATOR_FACET.queryBuilder(ctx());
         expect(sql).toMatch(/EvaluatorId AS facet_value/);
       });
     });
@@ -38,7 +36,7 @@ describe("traceFacetEvaluatorRepository.buildEvaluatorFacetQuery", () => {
     describe("when the result aggregates are built", () => {
       /** @scenario Binary 0/1 score hides the score slider */
       it("counts distinct non-null scores capped at 3 so the drilldown can suppress a binary score slider", () => {
-        const { sql } = traceFacetEvaluatorRepository.buildEvaluatorFacetQuery(ctx());
+        const { sql } = EVALUATOR_FACET.queryBuilder(ctx());
         expect(sql).toMatch(
           /uniqUpTo\(2\)\(IF\(isNotNull\(Score\), Score, NULL\)\) AS distinct_scores/,
         );
@@ -46,7 +44,7 @@ describe("traceFacetEvaluatorRepository.buildEvaluatorFacetQuery", () => {
 
       /** @scenario Evaluator label values are filterable */
       it("aggregates top emitted-label values + counts as label_values", () => {
-        const { sql } = traceFacetEvaluatorRepository.buildEvaluatorFacetQuery(ctx());
+        const { sql } = EVALUATOR_FACET.queryBuilder(ctx());
         // sumMap tallies Label -> count in one pass; the empty bucket is
         // filtered, ranked by count desc, and capped (top-10) so the discover
         // payload can't balloon for a label-happy evaluator.

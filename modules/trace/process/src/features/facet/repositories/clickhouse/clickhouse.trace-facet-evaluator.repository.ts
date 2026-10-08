@@ -10,7 +10,7 @@ import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-qu
  */
 const LABEL_VALUES_TOP_N = 10;
 
-export class ClickHouseTraceFacetEvaluatorRepository {
+class ClickHouseTraceFacetEvaluatorRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
 
   static create(): ClickHouseTraceFacetEvaluatorRepository {

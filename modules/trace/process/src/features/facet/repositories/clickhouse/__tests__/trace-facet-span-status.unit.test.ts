@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { ClickHouseTraceFacetSpanStatusRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-span-status.repository.ts";
+import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
+import { ClickHouseTraceFacetSpanStatusRepository } from "../clickhouse.trace-facet-span-status.repository.ts";
 
 const spanStatusFacet = ClickHouseTraceFacetSpanStatusRepository.create().getSpanStatusFacet();
 

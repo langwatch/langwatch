@@ -13,7 +13,7 @@ import {
 /** Per-event cap on (metric key, value) buckets returned to the sidebar. */
 const METRIC_VALUES_TOP_N = 10;
 
-export class ClickHouseTraceFacetEventsRepository {
+class ClickHouseTraceFacetEventsRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
 
   static create(): ClickHouseTraceFacetEventsRepository {

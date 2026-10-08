@@ -7,8 +7,8 @@
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../../features/derivation/services/trace-canonicalisation.service.ts";
-import { TraceLogRecordIOService } from "../../../features/read/services/trace-log-record-io.service.ts";
+import { TraceCanonicalisationService } from "../../../derivation/services/trace-canonicalisation.service.ts";
+import { TraceLogRecordIOService } from "../trace-log-record-io.service.ts";
 
 const service = TraceLogRecordIOService.create(TraceCanonicalisationService.create());
 

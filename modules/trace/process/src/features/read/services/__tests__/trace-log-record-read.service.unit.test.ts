@@ -7,9 +7,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,
-} from "../../../repositories/log-record-storage.repository.ts";
-import { MemoryLogRecordStorageRepository } from "../../../repositories/memory/memory.log-record-storage.repository.ts";
-import { LogRecordStorageService } from "../../../features/read/services/trace-log-record-read.service.ts";
+} from "../../../../repositories/log-record-storage.repository.ts";
+import { MemoryLogRecordStorageRepository } from "../../../../repositories/memory/memory.log-record-storage.repository.ts";
+import { LogRecordStorageService } from "../trace-log-record-read.service.ts";
 
 const row: StoredLogRecordRow = {
   traceId: "trace-1",

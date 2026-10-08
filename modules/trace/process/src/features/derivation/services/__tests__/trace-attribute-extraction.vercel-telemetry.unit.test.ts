@@ -1,16 +1,10 @@
-import type { NormalizedSpan } from "@langwatch/trace-contract";
+import { extractTraceSpanAttributes, type NormalizedSpan } from "@langwatch/trace-contract";
 /**
  * The Vercel AI SDK flattens `experimental_telemetry.metadata` as
  * `ai.telemetry.metadata.<key>`. The trace summary read only
  * `langwatch.*`/`gen_ai.*`/`tag.tags`, missing Vercel's own channel entirely.
  */
 import { describe, expect, it } from "vitest";
-
-import { TraceAttributeExtractionService } from "../trace-attribute-extraction.service.ts";
-
-function makeService() {
-  return TraceAttributeExtractionService.create();
-}
 
 function makeSpan(
   overrides: Partial<Pick<NormalizedSpan, "spanAttributes" | "resourceAttributes">> = {},
@@ -22,11 +16,11 @@ function makeSpan(
   } as NormalizedSpan;
 }
 
-describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SDK metadata channel", () => {
+describe("extractTraceSpanAttributes and the Vercel AI SDK metadata channel", () => {
   describe("when a span carries ai.telemetry.metadata.labels", () => {
     /** @scenario Labels passed to experimental_telemetry reach the trace */
     it("folds them into langwatch.labels", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: {
             "ai.telemetry.metadata.labels": ["checkout", "beta"],
@@ -38,7 +32,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario Vercel labels join labels sent by another span of the same trace */
     it("unions them with langwatch.labels without duplicates", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: {
             "langwatch.labels": ["prod", "checkout"],
@@ -53,7 +47,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
   describe("when a span carries the identity metadata keys", () => {
     /** @scenario A user id passed to experimental_telemetry identifies the trace */
     it("fills the trace user id", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.user_id": "user-42" },
         }),
@@ -63,7 +57,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario A thread id passed to experimental_telemetry groups the conversation */
     it("fills the conversation id", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.thread_id": "thread-9" },
         }),
@@ -73,7 +67,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario A customer id passed to experimental_telemetry reaches the trace */
     it("fills the customer id", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.customer_id": "acme" },
         }),
@@ -83,7 +77,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario The camelCase spelling of an identity key is accepted */
     it("accepts the camelCase spelling", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.threadId": "thread-9" },
         }),
@@ -95,7 +89,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
   describe("when a span carries a metadata key that is not reserved", () => {
     /** @scenario A key that is not reserved becomes custom trace metadata */
     it("keeps it as custom trace metadata", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.tenant": "eu-west" },
         }),
@@ -105,7 +99,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario A non-string value keeps its own shape in custom metadata */
     it("writes a number as its own text", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: { "ai.telemetry.metadata.retry_count": 3 },
         }),
@@ -117,7 +111,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
   describe("when the same value arrives on both channels", () => {
     /** @scenario An explicit LangWatch attribute wins over the Vercel channel */
     it("keeps the explicit LangWatch value", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: {
             "langwatch.user.id": "explicit-user",
@@ -130,7 +124,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
 
     /** @scenario An explicit custom metadata attribute wins over the Vercel channel */
     it("keeps the explicit custom metadata value", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: {
             "metadata.tenant": "explicit",
@@ -145,7 +139,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
   describe("when a span carries Vercel telemetry keys that are not metadata", () => {
     /** @scenario The Vercel telemetry keys that are not metadata are left alone */
     it("leaves them out of trace metadata", () => {
-      const result = makeService().extractAttributes(
+      const result = extractTraceSpanAttributes(
         makeSpan({
           spanAttributes: {
             "ai.telemetry.functionId": "checkout-flow",

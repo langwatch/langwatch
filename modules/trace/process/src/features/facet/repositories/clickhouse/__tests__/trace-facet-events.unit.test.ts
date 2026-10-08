@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { FacetQueryContext } from "../../../features/facet/rules/trace-facet-registry.rules.ts";
-import { ClickHouseTraceFacetEventsRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-events.repository.ts";
-
-const traceFacetEventsRepository = ClickHouseTraceFacetEventsRepository.create();
+import type { FacetQueryContext } from "../../../rules/trace-facet-registry.rules.ts";
+import { EVENT_FACET } from "../clickhouse.trace-facet-events.repository.ts";
 
 function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   return {
@@ -18,7 +16,7 @@ function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
 describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
   describe("given an event facet request", () => {
     it("keys the facet value off the event name", () => {
-      const { sql } = traceFacetEventsRepository.buildEventsFacetQuery(ctx());
+      const { sql } = EVENT_FACET.queryBuilder(ctx());
       expect(sql).toMatch(/AS facet_value/);
       expect(sql).toMatch(/`Events\.Name`/);
     });
@@ -26,17 +24,17 @@ describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
     describe("when the per-event metric aggregates are built", () => {
       /** @scenario "Expanding the thumbs_up_down row shows its vote values with counts" */
       it("zips Events.Name with Events.Attributes so metric entries scope to their own event", () => {
-        const { sql } = traceFacetEventsRepository.buildEventsFacetQuery(ctx());
+        const { sql } = EVENT_FACET.queryBuilder(ctx());
         expect(sql).toMatch(/arrayZip\(`Events\.Name`, `Events\.Attributes`\)/);
       });
 
       it("keeps only event.metrics.-prefixed attribute entries", () => {
-        const { sql } = traceFacetEventsRepository.buildEventsFacetQuery(ctx());
+        const { sql } = EVENT_FACET.queryBuilder(ctx());
         expect(sql).toMatch(/startsWith\(x\.1, 'event\.metrics\.'\)/);
       });
 
       it("emits capped, count-ranked metric_values buckets", () => {
-        const { sql } = traceFacetEventsRepository.buildEventsFacetQuery(ctx());
+        const { sql } = EVENT_FACET.queryBuilder(ctx());
         // sumMap tallies (key SEP value) -> count in one pass per event name;
         // the outer SELECT ranks by count desc and caps the list so a
         // metric-happy tenant can't balloon the discover payload.
@@ -48,7 +46,7 @@ describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
 
       /** @scenario "Expanding the thumbs_up_down row shows its vote values with counts" */
       it("guards the scan with the key-discovery memory settings", () => {
-        const { settings } = traceFacetEventsRepository.buildEventsFacetQuery(ctx());
+        const { settings } = EVENT_FACET.queryBuilder(ctx());
         // Same unbounded Events.Attributes flatten that tripped
         // MEMORY_LIMIT_EXCEEDED for the key-discovery facets — the spill +
         // cap guard is non-negotiable here.
@@ -59,9 +57,7 @@ describe("traceFacetEventsRepository.buildEventsFacetQuery", () => {
 
     describe("when a search prefix is given", () => {
       it("filters event names by the prefix", () => {
-        const { sql, params } = traceFacetEventsRepository.buildEventsFacetQuery(
-          ctx({ prefix: "thu" }),
-        );
+        const { sql, params } = EVENT_FACET.queryBuilder(ctx({ prefix: "thu" }));
         expect(sql).toMatch(/ILIKE concat\({prefix:String}, '%'\)/);
         expect(params.prefix).toBe("thu");
       });

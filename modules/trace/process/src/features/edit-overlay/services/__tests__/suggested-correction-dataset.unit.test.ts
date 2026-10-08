@@ -12,8 +12,8 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { TraceEditOverlayRow } from "../../../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
-import { TraceEditOverlayService } from "../../../features/edit-overlay/services/trace-edit-overlay.service.ts";
+import type { TraceEditOverlayRow } from "../../repositories/trace-edit-overlay.repository.ts";
+import { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 
 const SPAN_ID = "span-search";
 

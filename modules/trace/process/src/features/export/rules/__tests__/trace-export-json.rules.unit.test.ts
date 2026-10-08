@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
-} from "../../../features/export/rules/trace-export-json.rules.ts";
+} from "../trace-export-json.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Test data builders
