@@ -35,7 +35,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
-import { HttpExternalImageChannel } from "../channels/http/http.external-image.channel.ts";
+import type { StoredObjectChannels } from "../channels/stored-object.channels.ts";
 import type { StoredObjectBytesRepository } from "../repositories/stored-object-bytes.repository.ts";
 import type { StoredObjectRateLimitRepository } from "../repositories/stored-object-rate-limit.repository.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -89,7 +89,8 @@ type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
   never,
   StoredObjectServerConfig,
-  StoredObjectRepositories
+  StoredObjectRepositories,
+  StoredObjectChannels
 >;
 
 export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi {
@@ -124,13 +125,7 @@ export class StoredObjectModule implements StoredObjectApi, StoredObjectFileApi 
       },
       repositories,
       permissions: setup.dependencies.authz,
-      images: HttpExternalImageChannel.create({
-        policy: {
-          blockLocal: setup.config.blockLocalHttpCalls,
-          allowedHosts: setup.config.allowedProxyHosts,
-          verifyTls: setup.config.isSaas,
-        },
-      }),
+      images: setup.channels.images,
     });
   }
 
