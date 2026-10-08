@@ -234,6 +234,9 @@ export const CustomModelInputSection = ({
           open={registryModalOpen}
           onClose={() => setRegistryModalOpen(false)}
           provider={provider.provider}
+          providerModels={
+            provider.provider === "custom" ? allCustomModels : undefined
+          }
           dialogBackground={dialogBackground}
         />
       )}

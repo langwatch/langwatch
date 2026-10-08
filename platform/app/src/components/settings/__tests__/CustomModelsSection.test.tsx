@@ -416,4 +416,37 @@ describe("CustomModelInputSection", () => {
       });
     });
   });
+
+  describe("when clicking See all models on a custom provider", () => {
+    /** @scenario See all models lists a custom provider's own models */
+    it("lists the provider's own models instead of the catalog", async () => {
+      const user = userEvent.setup();
+      const state = buildState({
+        customModels: [
+          { modelId: "model-a", displayName: "Model A", mode: "chat" },
+        ],
+        customEmbeddingsModels: [
+          { modelId: "embed-a", displayName: "Embed A", mode: "embedding" },
+        ],
+      });
+
+      render(
+        <CustomModelInputSection
+          state={state}
+          actions={buildActions()}
+          provider={{ ...defaultProvider, provider: "custom" }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByText("See all models"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Provider Models")).toBeTruthy();
+      });
+      expect(screen.queryByText("No models found")).toBeNull();
+      expect(screen.getAllByText("Model A").length).toBeGreaterThan(1);
+      expect(screen.getAllByText("Embed A").length).toBeGreaterThan(1);
+    });
+  });
 });

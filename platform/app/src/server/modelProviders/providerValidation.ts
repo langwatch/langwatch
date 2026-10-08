@@ -13,6 +13,11 @@ import {
   RedirectRefusedError,
   ssrfSafeFetch,
 } from "../../utils/ssrfProtection";
+import {
+  type ListedModel,
+  parseModelListingText,
+  readBoundedText,
+} from "./modelListing";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import { modelProviders } from "./registry";
 
@@ -39,7 +44,15 @@ type ProbeResponse = Awaited<ReturnType<typeof ssrfSafeFetch>>;
  * `explainSerializedError`.
  */
 export type ValidationResult =
-  | { outcome: "verified"; valid: true }
+  | {
+      outcome: "verified";
+      valid: true;
+      /**
+       * The models the accepted listing named, when its body was an
+       * OpenAI-shaped `{ data: [{ id }] }` list. Absent for any other body.
+       */
+      models?: ListedModel[];
+    }
   | { outcome: "refused"; valid: false; domainError: SerializedHandledError }
   | { outcome: "unchecked"; valid: true; reason: UncheckedReason };
 
@@ -69,7 +82,11 @@ export type UncheckedReason =
   /** Not a provider in the registry. */
   | "unknown_provider";
 
-const verified = (): ValidationResult => ({ outcome: "verified", valid: true });
+const verified = (models?: ListedModel[]): ValidationResult => ({
+  outcome: "verified",
+  valid: true,
+  ...(models ? { models } : {}),
+});
 
 const refused = (domainError: SerializedHandledError): ValidationResult => ({
   outcome: "refused",
@@ -970,7 +987,7 @@ async function probeOnce({
   context: ProbeContext;
   deadline: AbortSignal;
 }): Promise<
-  | { accepted: true; failure?: undefined }
+  | { accepted: true; failure?: undefined; models?: ListedModel[] }
   | { accepted: false; failure: RankedFailure }
 > {
   let response: ProbeResponse;
@@ -1009,12 +1026,42 @@ async function probeOnce({
     };
   }
 
-  if (response.ok) return { accepted: true };
+  if (response.ok) {
+    return {
+      accepted: true,
+      models: await readListing({ candidate, response }),
+    };
+  }
 
   return {
     accepted: false,
     failure: await handleHttpError({ response, context }),
   };
+}
+
+/**
+ * The models an accepted listing named.
+ *
+ * Only a GET is a listing; the Agent Platform probe is a generate-content
+ * POST whose body lists nothing. The read is bounded in size and rides the
+ * same deadline as the request, and any failure to read or parse is no
+ * listing rather than a failed probe: the key was accepted either way.
+ */
+async function readListing({
+  candidate,
+  response,
+}: {
+  candidate: ProbeRequest;
+  response: ProbeResponse;
+}): Promise<ListedModel[] | undefined> {
+  if ((candidate.method ?? "GET") !== "GET") return undefined;
+  try {
+    return parseModelListingText(
+      await readBoundedText({ body: response.body }),
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -1050,7 +1097,7 @@ async function runProbeChain({
     const outcome = await probeOnce({ candidate, context, deadline });
 
     if (outcome.accepted) {
-      return verified();
+      return verified(outcome.models);
     }
 
     failures.push(outcome.failure);

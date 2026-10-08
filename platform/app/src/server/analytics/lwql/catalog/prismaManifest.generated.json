@@ -9703,6 +9703,15 @@
 					"documentation": ""
 				},
 				{
+					"name": "lastListedModelIds",
+					"columnName": "lastListedModelIds",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
 					"name": "deploymentMapping",
 					"columnName": "deploymentMapping",
 					"type": "Json",

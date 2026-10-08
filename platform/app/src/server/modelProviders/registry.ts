@@ -150,6 +150,8 @@ export type MaybeStoredModelProvider = Omit<
   // Form-time shapes omit it, and the readers want a string array rather than
   // Prisma's JsonValue, so it is re-declared below.
   | "langySkipPermissionsModels"
+  // Bookkeeping for the model import on save; no reader outside the write.
+  | "lastListedModelIds"
   // Single-organization tenancy anchor (ADR-021) lands on persisted rows;
   // form-time shapes omit it, so widen to optional here.
   | "organizationId"

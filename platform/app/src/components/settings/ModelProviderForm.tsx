@@ -10,7 +10,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { readHandledError } from "~/features/errors";
+import { providerDefaultBaseUrls } from "~/features/onboarding/regions/model-providers/registry";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
+import { importsModelListing } from "~/server/modelProviders/customModelImport";
 import { skipListToInput } from "~/server/modelProviders/langySkipPermissions";
 import {
   findModelProviderById,
@@ -383,6 +385,20 @@ export const EditModelProviderForm = ({
       resetKey: providerId,
     });
 
+  // A stored provider that imports its model listing re-imports on every
+  // save, so Save stays enabled with nothing edited: pressing it picks up
+  // models the endpoint added since the last save.
+  const endpointKey = providerDefinition?.endpointKey;
+  const shouldReimportModelsOnSave =
+    Boolean(providerId) &&
+    importsModelListing({
+      provider: provider.provider,
+      baseUrl: endpointKey
+        ? String(state.customKeys[endpointKey] ?? "")
+        : undefined,
+      openAIDefaultBaseUrl: providerDefaultBaseUrls.openai,
+    });
+
   const handleSave = useCallback(async () => {
     // Clear previous errors
     setFieldErrors({});
@@ -658,7 +674,10 @@ export const EditModelProviderForm = ({
             colorPalette="orange"
             loading={state.isSaving || isValidatingApiKey}
             disabled={
-              cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)
+              cannotResolveTarget ||
+              (!state.isDirty &&
+                !isAdvancedDirty &&
+                !shouldReimportModelsOnSave)
             }
             onClick={handleSave}
           >
