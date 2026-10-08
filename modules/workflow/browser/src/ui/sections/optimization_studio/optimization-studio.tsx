@@ -412,7 +412,7 @@ export default function OptimizationStudio() {
 
         <StudioWorkflowRunUntilHereDialog />
         {/*
-        Global mounts (CurrentDrawer, GlobalTraceV2DrawerMount, GlobalUpgradeModal) not ported:
+        Global mounts (CurrentDrawer with the routed trace drawer, GlobalUpgradeModal) not ported:
         studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
         Pending app-level overlay slot in apps/ui.
       */}

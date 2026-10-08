@@ -31,7 +31,7 @@ const noop = () => undefined;
 
 /**
  * The span, view and tabs the reader has chosen live in the address like the drawer's
- * own, so a share page names the trace it shows; no drawer registers under that name.
+ * own, so a share page names the trace it shows; the declared drawer draws nothing here.
  */
 function useSharedTraceAddress(traceId: string): void {
   const { openDrawer } = useDrawer();

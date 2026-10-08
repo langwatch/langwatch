@@ -199,7 +199,7 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: The shared link renders the new Trace Explorer, read-only
 
-    @integration @unimplemented
+    @integration
     Scenario: A shared trace opens in the new Trace Explorer surface
       Given a public share link for a trace
       When an unauthenticated person opens the link

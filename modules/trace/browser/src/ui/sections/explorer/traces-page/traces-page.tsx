@@ -7,7 +7,7 @@ import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/sto
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
-import { useDismissTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { ExportProgress } from "../../../elements/explorer/export-progress.tsx";
@@ -25,7 +25,6 @@ import { useLensFilterDirtySync } from "../hooks/use-lens-filter-dirty-sync.ts";
 import { useLensSync } from "../hooks/use-lens-sync.ts";
 import { useResetSelectionOnViewChange } from "../hooks/use-reset-selection-on-view-change.ts";
 import { useRollingTimeRange } from "../hooks/use-rolling-time-range.ts";
-import { useTraceDrawerUrlHydrator } from "../hooks/use-trace-drawer-url-hydrator.ts";
 import { useTraceFreshness } from "../hooks/use-trace-freshness.ts";
 import { useTraceListExport } from "../hooks/use-trace-list-export.ts";
 import { useTraceListQuery } from "../hooks/use-trace-list-query.ts";
@@ -37,7 +36,6 @@ import { SpotlightOverlay } from "../onboarding/spotlights/spotlight-overlay.tsx
 import { SearchBar } from "../search-bar/search-bar.tsx";
 import { BulkActionBar } from "../toolbar/bulk-action-bar.tsx";
 import { Toolbar } from "../toolbar/toolbar.tsx";
-import { TraceV2DrawerShell } from "../trace-drawer/index.ts";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 import { EmptyResultsPane } from "./empty-results-pane.tsx";
 import { ExplorerLangyActions } from "./explorer-langy-actions.tsx";
@@ -82,11 +80,6 @@ export const TracesPage: React.FC = () => {
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
   useLensSync();
-  // URL → drawer store sync so a deep link / browser-back still opens
-  // the drawer. The actual mount decision is in this component (see
-  // `traceDrawerMounted` below), so the click → render path doesn't
-  // wait for React Router to commit the URL change.
-  useTraceDrawerUrlHydrator();
   useSidebarShortcut();
   useFindShortcut();
   useShortcutsHelpShortcut();
@@ -216,7 +209,6 @@ export const TracesPage: React.FC = () => {
           </HStack>
           <ExplorerLangyActions />
           <PageKeyboardShortcuts />
-          <TraceDrawerMount />
         </VStack>
         {/* Phase 2 spotlight tour overlay — floats above the page,
             non-modal. Activated by the "Show me around" toolbar button
@@ -247,16 +239,6 @@ const PaneFader: React.FC<{
     {children}
   </motion.div>
 );
-
-/**
- * Optimistic drawer mount. Reads `traceId` straight from the drawer store so a click →
- * store-update → render lands in the same frame.
- */
-const TraceDrawerMount: React.FC = () => {
-  const hasTrace = useTraceDrawer((s) => !!s.traceId);
-  if (!hasTrace) return null;
-  return <TraceV2DrawerShell />;
-};
 
 const FilterAside: React.FC<{
   dimmed?: boolean;

@@ -47,12 +47,8 @@ Feature: Trace Explorer is the default trace experience from every entry point
 
   Rule: The Trace Explorer drawer is mounted once, on every page
 
-    # This drawer is not resolved from the address the way every other drawer
-    # is. It keeps the open trace in its own store and syncs the address onto
-    # that store, so what puts it on screen is a mount above the page rather
-    # than a registry lookup. A missing mount is indistinguishable from a
-    # drawer that does not exist: the address changes and nothing opens, with
-    # no error and no log line.
+    # The address opens this drawer from the installed registry like every other
+    # drawer; a page never mounts its own copy.
     @integration
     Scenario: The trace drawer opens over a page that is not the Trace Explorer
       Given I am on a page that is not the Trace Explorer
@@ -60,10 +56,9 @@ Feature: Trace Explorer is the default trace experience from every entry point
       Then the Trace Explorer drawer opens over that page
       And I am still on the page I was on
 
-    # The Trace Explorer draws its own copy, so a second one over it would put
-    # two drawers on one trace.
+    # The routed drawer serves the Trace Explorer too, so one trace has one drawer.
     @integration
-    Scenario: The Trace Explorer is left to draw its own drawer
+    Scenario: The Trace Explorer gets the one routed trace drawer
       Given I am on the Trace Explorer
       When a trace's details are open
       Then exactly one trace drawer is on screen

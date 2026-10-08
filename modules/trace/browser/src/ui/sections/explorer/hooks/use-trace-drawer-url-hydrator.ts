@@ -20,7 +20,7 @@ interface OpenTrace {
 /**
  * Settles what follows from the address naming a trace: the correction state a new trace
  * starts from, the edit session its link asks for, and what a close takes with it. The address
- * is the one truth. Lives at the page level so one mount serves every page the drawer opens over.
+ * is the one truth. Mounted inside the routed drawer, so the drawer closing is this unmounting.
  */
 export function useTraceDrawerUrlHydrator(): void {
   const { openDrawer, closeDrawer } = useDrawer();
@@ -51,13 +51,26 @@ export function useTraceDrawerUrlHydrator(): void {
       syncEditMode({ traceId, wantsEdit: isEditing });
       return;
     }
-    const closed = lastOpen.current;
-    if (!closed) return;
-    lastOpen.current = null;
-    if (keepDrawerForUnsavedEdit({ closed, drawer: drawerRef.current })) return;
-    drawerChrome.getState().reset();
-    exitTraceEditMode();
+    settleClose({ lastOpen, drawer: drawerRef.current });
   }, [isOpen, traceId, occurredAtMs, projectId, isEditing]);
+
+  useEffect(() => () => settleClose({ lastOpen, drawer: drawerRef.current }), []);
+}
+
+/** What a close takes with it, once, for the trace the drawer was last open on. */
+function settleClose({
+  lastOpen,
+  drawer,
+}: {
+  lastOpen: { current: OpenTrace | null };
+  drawer: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">;
+}): void {
+  const closed = lastOpen.current;
+  if (!closed) return;
+  lastOpen.current = null;
+  if (keepDrawerForUnsavedEdit({ closed, drawer })) return;
+  drawerChrome.getState().reset();
+  exitTraceEditMode();
 }
 
 /**

@@ -6,6 +6,7 @@ import { drawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
+import { TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import {
   buildPreviewTraceDetail,
   buildRichArrivalTraceDetail,
@@ -36,7 +37,7 @@ export function useOpenTraceDrawer() {
       }
       // The row's span count holds the skeleton to the right height until the tree loads.
       drawerChrome.getState().expectSpanCount({ traceId: trace.traceId, count: trace.spanCount });
-      openDrawer("traceV2Details", {
+      openDrawer(TRACE_DRAWER_NAME, {
         traceId: trace.traceId,
         // `t` (timestamp) is read by useTraceHeader as a partition-pruning
         // hint when refetching the heavy summary fields.

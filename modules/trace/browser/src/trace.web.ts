@@ -1,7 +1,7 @@
 /**
  * What a browser installs when it installs trace: the Trace Explorer, the
- * public share page, and the drawer the address bar opens
- * (`?drawer.open=<name>`) under the name the product has always used.
+ * public share page, and the drawers the address bar opens
+ * (`?drawer.open=<name>`) under the names the product has always used.
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
@@ -26,10 +26,6 @@ export const traceWeb = defineBrowserModule("trace")
     mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },
   })
   .withScreens({
-    // Path-less: the route table nests every chrome page under it.
-    "layouts/trace-drawer": {
-      load: () => import("./ui/sections/explorer/trace-drawer-layout.tsx"),
-    },
     "pages/[project]/traces": {
       requires: "traces:view",
       load: () => import("./ui/sections/traces/traces-screen.tsx"),
@@ -39,6 +35,13 @@ export const traceWeb = defineBrowserModule("trace")
     },
   })
   .withDrawers({
+    // The routed singleton: every page, the Trace Explorer included, opens the trace here.
+    traceV2Details: {
+      load: async () => ({
+        default: (await import("./ui/sections/explorer/trace-v2-details-drawer.tsx"))
+          .TraceV2DetailsDrawer,
+      }),
+    },
     addDatasetRecord: {
       load: async () => ({
         default: (await import("./ui/sections/datasets/add-dataset-record-drawer.tsx"))

@@ -48,9 +48,6 @@ vi.mock("../../hooks/use-reset-selection-on-view-change.ts", () => ({
 vi.mock("../../hooks/use-rolling-time-range.ts", () => ({
   useRollingTimeRange: () => undefined,
 }));
-vi.mock("../../hooks/use-trace-drawer-url-hydrator.ts", () => ({
-  useTraceDrawerUrlHydrator: () => undefined,
-}));
 vi.mock("../../hooks/use-trace-freshness.ts", () => ({ useTraceFreshness: () => undefined }));
 vi.mock("../../hooks/use-trace-list-export.ts", () => ({
   useTraceListExport: () => ({
@@ -127,7 +124,7 @@ const follows = (first: Element, second: Element) =>
 
 describe("<TracesPage />", () => {
   describe("given the project has traces", () => {
-    it("with the filters open, puts them left, the table in the centre and the drawer right once a trace is open", () => {
+    it("with the filters open, puts them left and the table in the centre, leaving the open trace to the drawer host", () => {
       const view = renderWithDesignSystem(<TracesPage />);
 
       const filters = screen.getByRole("complementary", { name: "Trace filters" });
@@ -140,7 +137,7 @@ describe("<TracesPage />", () => {
       page.drawerTraceId = "trace-1";
       view.rerender(<TracesPage />);
 
-      expect(follows(results, screen.getByTestId("trace-drawer"))).toBe(true);
+      expect(screen.queryByTestId("trace-drawer")).not.toBeInTheDocument();
     });
   });
 
