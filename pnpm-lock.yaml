@@ -368,6 +368,9 @@ catalogs:
     '@types/ws':
       specifier: ^8.18.1
       version: 8.18.1
+    '@typescript/native-preview':
+      specifier: 7.0.0-dev.20260506.1
+      version: 7.0.0-dev.20260506.1
     '@vitejs/plugin-react':
       specifier: ^6.1.1
       version: 6.1.1
@@ -720,6 +723,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.4(@types/react@19.2.18)
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260506.1
       concurrently:
         specifier: 'catalog:'
         version: 9.2.4
