@@ -58,6 +58,13 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     When "make service svc=aigateway" resolves its environment
     Then it derives the same control-plane URL as the single-worktree default case
 
+  @unit
+  Scenario: make service loads a DEV_ENV_FILE named without a slash under any POSIX sh
+    Given DEV_ENV_FILE names a file in the current directory without a slash, such as ".env"
+    And the recipe shell is a POSIX /bin/sh that looks such names up on PATH only, as dash does
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then it sources that file by its absolute path, quoted so a checkout path with spaces still works
+
   # --- The gateway's own awareness of how it was configured ---
 
   @unit

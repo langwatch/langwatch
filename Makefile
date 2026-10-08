@@ -141,8 +141,8 @@ DEV_ENV_PATH = $(abspath $(DEV_ENV_FILE))
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
-		{ test -f $(DEV_ENV_FILE) \
-			&& set -a && . $(DEV_ENV_PATH) && set +a \
+		{ test -f "$(DEV_ENV_PATH)" \
+			&& set -a && . "$(DEV_ENV_PATH)" && set +a \
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
@@ -153,10 +153,10 @@ service:
 # Usage: make service-watch svc=aigateway
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f "$(DEV_ENV_PATH)" || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
-		set -a && . $(DEV_ENV_PATH) && set +a && \
+		set -a && . "$(DEV_ENV_PATH)" && set +a && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \
