@@ -47,3 +47,13 @@ Feature: Analytics panel error state
     When the documents section renders
     Then the total documents tab header shows the compact indicator
     And the documents table shows the compact panel message with a Retry
+
+  @integration
+  Scenario: A failed documents section stays visible and does not refetch on its own
+    Given the top used documents query always fails with "This search was too large"
+    When the documents section renders and a few seconds pass
+    Then the section and its error state with a Retry stay on screen
+    And the query is not fetched again on its own
+    When the user clicks Retry
+    Then exactly one more request is sent
+    And the section and its Retry stay on screen while it runs

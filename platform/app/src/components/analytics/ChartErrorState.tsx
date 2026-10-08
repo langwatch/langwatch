@@ -32,12 +32,15 @@ const DEFAULT_FALLBACK_TITLE = "Couldn't load this chart";
 export function ChartErrorState({
   error,
   onRetry,
+  isRetrying = false,
   fallbackTitle = DEFAULT_FALLBACK_TITLE,
   minHeight,
 }: {
   /** The panel query's error, passed straight through, handled or not. */
   error: unknown;
   onRetry: () => void;
+  /** A retry is in flight: the Retry button shows a spinner. */
+  isRetrying?: boolean;
   /** Headline for a failure the registry has no copy for. */
   fallbackTitle?: string;
   /** Keeps the panel at the height its content would have had. */
@@ -75,7 +78,13 @@ export function ChartErrorState({
             {copy.description}
           </Text>
         )}
-        <Button size="xs" variant="outline" marginTop={1.5} onClick={onRetry}>
+        <Button
+          size="xs"
+          variant="outline"
+          marginTop={1.5}
+          onClick={onRetry}
+          loading={isRetrying}
+        >
           <RefreshCw size={12} aria-hidden="true" />
           Retry
         </Button>
