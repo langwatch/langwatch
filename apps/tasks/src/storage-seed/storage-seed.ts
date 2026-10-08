@@ -35,6 +35,7 @@ import {
   seedRoleProjection,
 } from "./seed-authz.ts";
 import { seedDataPrivacyProjectScope } from "./seed-data-privacy.ts";
+import { seedDataRetentionProjectScope } from "./seed-data-retention.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
   buildAdminUserUpsertArgs,
@@ -222,6 +223,10 @@ export async function storageSeed({ connections, chain, environment }: TaskInput
         : { apiKey },
   });
   await seedDataPrivacyProjectScope({
+    prisma,
+    project: { ...project, organizationId: organization.id },
+  });
+  await seedDataRetentionProjectScope({
     prisma,
     project: { ...project, organizationId: organization.id },
   });

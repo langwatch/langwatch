@@ -136,3 +136,12 @@ Feature: Seed presets — a database that is ready to look at
     When the storage seed runs
     Then data privacy's scope row for the seeded project names its organization, team, department and personal flag
     And no fact time is recorded, so a later project lifecycle fact still folds over it
+
+  # Data retention folds its own copy of where a project sits from the same lifecycle facts,
+  # and refuses every trace projection for a project it has not folded. Bound by
+  # apps/tasks/src/storage-seed/__tests__/seed-data-retention.unit.test.ts.
+  @unit
+  Scenario: The seeded project resolves its data retention without a lifecycle fact
+    When the storage seed runs
+    Then data retention's scope row for the seeded project names its organization and team
+    And no fact time is recorded, so a later project lifecycle fact still folds over it
