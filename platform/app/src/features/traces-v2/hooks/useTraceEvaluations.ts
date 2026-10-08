@@ -94,19 +94,29 @@ export function mapScore(ev: Evaluation): number | boolean | null {
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
   const shared = useSharedTrace();
-  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
+  const { isReady, queryArgs } = useTraceQueryArgs();
+  // The project, the trace and the member, without the time hint: the
+  // evaluations read looks up by trace id and prunes nothing by time, so it
+  // neither waits for the header to backfill the hint nor re-keys when it
+  // arrives. On an aggregate it still reads the member the drawer is on
+  // (ADR-144 block F).
+  const evaluationsArgs = {
+    projectId: queryArgs.projectId,
+    traceId: queryArgs.traceId,
+    ...(queryArgs.tenantId !== undefined
+      ? { tenantId: queryArgs.tenantId }
+      : {}),
+  };
 
   // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries
   // `spanId`, `errorStacktrace`, and `retries` — the rich evaluations panel
   // surfaces all three. Until then, keep the v1 endpoint but split it off
   // the drawer batch so it doesn't block the 7 other v2 procedures the
-  // drawer fires on open. It takes the same arguments as every other
-  // per-trace read, so on an aggregate it reads the member the drawer is on
-  // (ADR-144 block F). Preview traces live entirely client-side and are
+  // drawer fires on open. Preview traces live entirely client-side and are
   // gated out by `isReady`; the evaluations tab reads whatever
   // `useOpenTraceDrawer` seeded instead.
-  const query = api.traces.getEvaluations.useQuery(queryArgs, {
-    enabled: isReady && hintReady && !shared,
+  const query = api.traces.getEvaluations.useQuery(evaluationsArgs, {
+    enabled: isReady && !shared,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     trpc: { context: { skipBatch: true } },

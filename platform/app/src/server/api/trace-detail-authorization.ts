@@ -7,20 +7,23 @@ import { requireRouteAuthorization } from "./authorization";
 /**
  * The project that owns the trace a detail read is for, as the list row or
  * the header named it (ADR-144 block F). Spread into every per-trace input,
- * on its own for a read with no time hint (a conversation, one evaluation's
- * inputs) or through {@link spanReadHintShape}. Optional: a plain project's
- * reads never need it, and an aggregate's reads fall back to the member the
- * summary read finds.
+ * on its own for a read with no time hint (a conversation, a trace's
+ * evaluations, one evaluation's inputs) or through
+ * {@link spanReadHintShape}. Optional: a plain project's reads never need
+ * it, and an aggregate's reads fall back to the member the summary read
+ * finds.
  */
 export const traceTenantShape = {
   tenantId: z.string().min(1).optional(),
 } as const;
 
 /**
- * Reusable Zod fields for the per-trace detail reads: the time hint and the
- * owning member. Spread into a procedure's input shape with `...`. Shared by
- * the v2 trace router and the v1 evaluation reads the drawer still calls, so
- * the drawer sends one set of arguments to both.
+ * Reusable Zod fields for the per-trace span and event reads: the time hint
+ * and the owning member. Spread into a procedure's input shape with `...`.
+ * Only for a read that prunes by the hint; the evaluation reads
+ * (`traces.getEvaluations`, `tracesV2.evals`) look up by trace id and take
+ * {@link traceTenantShape} alone, so the drawer runs them without waiting
+ * for the header to backfill the hint.
  */
 export const spanReadHintShape = {
   /**

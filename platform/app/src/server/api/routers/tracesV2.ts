@@ -2248,7 +2248,7 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        ...spanReadHintShape,
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")

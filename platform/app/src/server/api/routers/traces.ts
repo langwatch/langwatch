@@ -18,7 +18,6 @@ import {
 import { checkPreconditionSchema } from "../../evaluations/types";
 import {
   namedTenantAuthorization,
-  spanReadHintShape,
   traceDetailAuthorization,
   traceTenantShape,
 } from "../trace-detail-authorization";
@@ -99,7 +98,7 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        ...spanReadHintShape,
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")
