@@ -396,13 +396,11 @@ const resolveWorkspacePackage = ({ specifier, workspace, known }) => {
   const pkg = workspace.byName.get(name);
   if (!pkg) return null;
   const subpath = specifier === name ? "." : `./${specifier.slice(name.length + 1)}`;
-  const declared = pkg.entries.get(subpath) ?? pkg.entries.get(".");
-  // No exports map entry: fall back to the path as written under the package.
-  const direct =
-    subpath !== "." && !pkg.entries.has(subpath)
-      ? attemptPath({ base: join(pkg.dir, subpath), known })
-      : null;
-  return direct ?? declared ?? null;
+  const hit = matchPattern({ keys: [...pkg.entries.keys()], specifier: subpath });
+  if (hit?.key === subpath) return pkg.entries.get(subpath);
+  if (hit) return attemptPath({ base: pkg.entries.get(hit.key).replaceAll("*", hit.star), known });
+  // No exports map entry: the path as written under the package, never the root entry.
+  return subpath === "." ? null : attemptPath({ base: join(pkg.dir, subpath), known });
 };
 
 /** Resolves one specifier to a repository-relative file, or null when it leaves the workspace. */
@@ -1026,6 +1024,30 @@ const selfTest = () => {
     ["s/src/b.ts", "s/src/internal/a.ts"],
   );
 
+  const wildcard = {
+    byName: new Map([
+      [
+        "@x/up",
+        {
+          dir: "u",
+          entries: new Map([
+            [".", "u/src/index.ts"],
+            ["./*", "u/src/*/index.ts"],
+          ]),
+        },
+      ],
+    ]),
+  };
+  const wildcardKnown = new Set(["u/src/index.ts", "u/src/gate/index.ts"]);
+  const resolveIn = (specifier) =>
+    resolveSpecifier({ specifier, fromFile: "a.ts", workspace: wildcard, known: wildcardKnown });
+  // The bug that resolved every `@langwatch/upgrade/<x>` to the root index.
+  check(
+    "resolve: a `./*` export maps a subpath, a miss is null, not the root entry",
+    [resolveIn("@x/up"), resolveIn("@x/up/gate"), resolveIn("@x/up/ghost")],
+    ["u/src/index.ts", "u/src/gate/index.ts", null],
+  );
+
   for (const failure of failures) console.error(`self-test FAILED  ${failure}`);
   if (failures.length === 0) console.error(`self-test passed (${checks} cases)`);
   return failures.length === 0 ? 0 : 2;
@@ -1066,8 +1088,15 @@ const runDetectors = ({ only, files, workspace, graph, known }) => {
 
 const main = () => {
   const argv = process.argv.slice(2);
-  if (argv.includes("--self-test")) process.exit(selfTest());
-  if (selfTest() !== 0) process.exit(2);
+  // exitCode, not exit(): exit() drops whatever a pipe has not drained yet.
+  if (argv.includes("--self-test")) {
+    process.exitCode = selfTest();
+    return;
+  }
+  if (selfTest() !== 0) {
+    process.exitCode = 2;
+    return;
+  }
 
   const { asJson, only, target } = parseArguments(argv);
   const workspace = readWorkspace();
@@ -1107,7 +1136,7 @@ const main = () => {
   console.error(
     `scanned ${scoped.length} file${scoped.length === 1 ? "" : "s"}${scope} of ${all.length} tracked — ${counts}`,
   );
-  process.exit(findings.length > 0 ? 1 : 0);
+  process.exitCode = findings.length > 0 ? 1 : 0;
 };
 
 main();
