@@ -71,9 +71,8 @@ interface ClickHouseSessionGroupRow {
   SessionErrorCount: number | string;
   SessionWarningCount: number | string;
   SessionSpans: number | string;
+  /** The session's latest trace, in the session's own tenant (`TenantId`, a grouping key). */
   LastTraceId: string;
-  /** The tenant of `LastTraceId`: an aggregate reads several, and two may hold one trace id. */
-  LastTenantId: string;
 }
 
 /** The map key of a trace's previews: the id alone is not unique across the tenants an aggregate reads. */
@@ -190,8 +189,7 @@ export class SessionGroupsClickHouseRepository
           countIf(ContainsErrorStatus) AS SessionErrorCount,
           countIf(BlockedByGuardrail AND NOT ContainsErrorStatus) AS SessionWarningCount,
           sum(SpanCount) AS SessionSpans,
-          argMax(TraceId, (OccurredAt, UpdatedAt)) AS LastTraceId,
-          argMax(TenantId, (OccurredAt, UpdatedAt)) AS LastTenantId
+          argMax(TraceId, (OccurredAt, UpdatedAt)) AS LastTraceId
         FROM ${TABLE_NAME}
         WHERE ${baseWhere}
           AND ${CONVERSATION_ID_EXPR} != ''
@@ -372,7 +370,7 @@ export class SessionGroupsClickHouseRepository
     const contextSize = Number(row.MaxContextSizeTokens);
     const services = row.SessionServices ?? [];
     const preview = previews.get(
-      previewKey({ TenantId: row.LastTenantId, TraceId: row.LastTraceId }),
+      previewKey({ TenantId: row.TenantId, TraceId: row.LastTraceId }),
     );
     return {
       conversationId: row.ConversationId,
