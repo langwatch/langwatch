@@ -5,6 +5,7 @@ import {
 } from "@langwatch/config/public-app-config";
 
 import { checkHostMounts } from "./module/ui-host-mounts.ts";
+import { checkHostServices, UI_HOST_SERVICES } from "./module/ui-module-host-services.ts";
 import { checkLends } from "./module/ui-module-lends.ts";
 import { checkScreenAddresses } from "./page/ui-screen-addresses.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
@@ -208,6 +209,7 @@ export class UiSupply<
       mountedByShell: [...KERNEL_MOUNTED_HOSTS, ...this.#state.mountedByShell],
     });
     checkLends({ modules: this.#state.modules });
+    checkHostServices({ modules: this.#state.modules, services: UI_HOST_SERVICES });
     checkScreenAddresses({ modules: this.#state.modules });
     const mount = this.#resolveMount();
     const config = this.#readConfig();

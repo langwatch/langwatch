@@ -22,6 +22,7 @@ export {
   type UnrequiredHostMount,
   type UnmountedHostOwner,
 } from "./module/ui-host-mounts.ts";
+export { BrowserHostServiceRefusedError } from "./module/ui-module-host-services.ts";
 export { BrowserLendRefusedError, checkLends, findLendRefusals } from "./module/ui-module-lends.ts";
 export {
   BrowserPageClaimedTwiceError,

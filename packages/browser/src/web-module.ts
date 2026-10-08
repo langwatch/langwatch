@@ -1,5 +1,7 @@
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
 import type {
+  HostService,
+  HostServiceIdentity,
   ReleaseFlagToken,
   UiComponentToken,
   UiDrawerToken,
@@ -64,6 +66,12 @@ export type WebDrawer = Readonly<{
 }>;
 
 export type WebDrawers = Readonly<Record<string, WebDrawer>>;
+
+/** A host service this module provides, and the chunk whose default export is its source. */
+export type WebHostServiceProvision = Readonly<{
+  service: HostServiceIdentity;
+  load: () => Promise<unknown>;
+}>;
 
 /** A chunk a token's owner lends, whose default export is the token's shape. */
 type Loaded<Shape> = () => Promise<{ readonly default: Shape }>;
@@ -133,6 +141,8 @@ export type WebModuleInstallation = Readonly<{
   capabilities: WebCapabilities;
   /** What this module lends or registers by token, in declaration order. */
   lends: readonly UiLend[];
+  /** The host services this module provides, in declaration order (ARCHITECTURE.md §10.1). */
+  provides?: readonly WebHostServiceProvision[];
   api?: unknown;
   /** The contracts whose cache policies the api's reads follow. */
   apiContracts?: readonly CacheDeclaringContract[];
@@ -194,6 +204,7 @@ export class WebModule<
       hosts: { requires: [], mounts: {} },
       capabilities: {},
       lends: [],
+      provides: [],
       failureInterceptors: [],
     });
   }
@@ -294,6 +305,17 @@ export class WebModule<
       ...this.#installation,
       drawers: { ...this.#installation.drawers, [token.key]: source },
       lends: [...this.#installation.lends, { token, load: source.load }],
+    });
+  }
+
+  /** Provides a host service browser-host declares; `createUi` refuses none or two providers. */
+  provides<Source>(
+    service: HostService<Source>,
+    source: { load: Loaded<Source> },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
+    return this.#next({
+      ...this.#installation,
+      provides: [...(this.#installation.provides ?? []), { service, load: source.load }],
     });
   }
 

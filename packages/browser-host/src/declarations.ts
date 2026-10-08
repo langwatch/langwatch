@@ -63,3 +63,5 @@ export function uiDeclarations(modules: readonly UiDeclaringModule[]): UiDeclara
 
 /** A composition that installed no declarations. */
 export const NO_UI_DECLARATIONS: UiDeclarations = uiDeclarations([]);
+
+export { HostService, hostService, type HostServiceIdentity } from "./host-service.ts";
