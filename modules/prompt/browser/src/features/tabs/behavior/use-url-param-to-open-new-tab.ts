@@ -1,5 +1,5 @@
 import { promptClient } from "@langwatch/prompt-client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import { computeInitialFormValuesForPrompt } from "../../../model/prompt-form/index.ts";
@@ -29,11 +29,15 @@ export function useUrlParamToOpenNewTab() {
   // request when the URL changes.
   const resolvedDefault = usePromptDefaultModel();
   const resolvedDefaultModel = resolvedDefault.data?.model;
+  // One link opens one tab: the effect re-runs when the default model arrives.
+  const opened = useRef<string | null>(null);
 
   useEffect(() => {
     async function openNewTab() {
       if (!selectedPromptId) return;
       if (!project?.id) return;
+      if (opened.current === selectedPromptId) return;
+      opened.current = selectedPromptId;
 
       const prompt = await trpc.prompts.getByIdOrHandle.fetch({
         idOrHandle: selectedPromptId,

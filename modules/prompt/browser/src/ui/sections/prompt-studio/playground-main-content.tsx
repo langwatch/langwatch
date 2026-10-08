@@ -3,6 +3,7 @@ import { HStack } from "@langwatch/design-system/primitives";
 import { useLoadSpanIntoPromptPlayground } from "../../../behavior/use-load-span-into-prompt-studio.ts";
 import { useDraggableTabsBrowserStore } from "../../../features/tabs/behavior/use-prompt-tabs-browser-store.ts";
 import { useRestorePromptTabs } from "../../../features/tabs/behavior/use-restore-prompt-tabs.ts";
+import { useUrlParamToOpenNewTab } from "../../../features/tabs/behavior/use-url-param-to-open-new-tab.ts";
 import { PromptPlaygroundBrowser } from "./browser/prompt-playground-browser.tsx";
 import { MainContentEmptyState } from "./sidebar/main-content-empty-state.tsx";
 
@@ -18,6 +19,7 @@ export function PromptPlaygroundMainContent() {
    */
   useLoadSpanIntoPromptPlayground();
   useRestorePromptTabs();
+  useUrlParamToOpenNewTab();
   const hasNoTabs = useDraggableTabsBrowserStore(({ windows }) =>
     windows.every((w) => w.tabs.length === 0),
   );

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PromptBrowserStorage } from "../../../model/browser-capabilities.ts";
@@ -13,8 +13,10 @@ vi.mock("../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
 }));
 
-const { mockGetResolvedDefault } = vi.hoisted(() => ({
+const { mockGetResolvedDefault, fetchPrompt, query } = vi.hoisted(() => ({
   mockGetResolvedDefault: vi.fn(),
+  fetchPrompt: vi.fn(),
+  query: { value: {} as Record<string, string> },
 }));
 
 vi.mock("../../../behavior/prompt-api.ts", () => ({
@@ -27,12 +29,12 @@ vi.mock("../../../behavior/prompt-api.ts", () => ({
     }),
   },
 }));
+const utils = { prompts: { getByIdOrHandle: { fetch: fetchPrompt } } };
 vi.mock("@langwatch/prompt-client", () => ({
-  promptClient: {
-    useUtils: () => ({
-      prompts: { getByIdOrHandle: { fetch: vi.fn() } },
-    }),
-  },
+  promptClient: { useUtils: () => utils },
+}));
+vi.mock("../../../model/prompt-form/index.ts", () => ({
+  computeInitialFormValuesForPrompt: () => ({ configId: "prompt-1", handle: "greeter" }),
 }));
 
 function memoryStorage(): PromptBrowserStorage {
@@ -58,7 +60,10 @@ const capabilities = {
 };
 
 vi.mock("../../../model/prompt-host.ts", () => ({
-  usePromptHost: () => ({ tabCapabilities: () => capabilities, route: () => ({ query: {} }) }),
+  usePromptHost: () => ({
+    tabCapabilities: () => capabilities,
+    route: () => ({ query: query.value }),
+  }),
 }));
 
 const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));
@@ -72,6 +77,8 @@ function TestComponent() {
 describe("useUrlParamToOpenNewTab", () => {
   beforeEach(() => {
     renderCount.value = 0;
+    query.value = {};
+    fetchPrompt.mockReset();
     clearStoreInstances();
     mockGetResolvedDefault.mockReturnValue({ data: { model: "openai/gpt-5-mini" } });
   });
@@ -97,6 +104,24 @@ describe("useUrlParamToOpenNewTab", () => {
       });
 
       expect(renderCount.value).toBe(1);
+    });
+  });
+
+  describe("given a link carrying ?promptId= of a saved prompt", () => {
+    /** @scenario A promptId link opens that prompt in a new tab */
+    it("reads the prompt and opens it in exactly one tab", async () => {
+      query.value = { promptId: "prompt-1" };
+      fetchPrompt.mockResolvedValue({ id: "prompt-1", version: 2 });
+      const store = getStoreForTesting({ projectId: "project_1", capabilities });
+
+      const { rerender } = render(<TestComponent />);
+      mockGetResolvedDefault.mockReturnValue({ data: { model: "openai/gpt-5" } });
+      rerender(<TestComponent />);
+
+      await waitFor(() => expect(store.getState().windows.flatMap((w) => w.tabs)).toHaveLength(1));
+      expect(fetchPrompt).toHaveBeenCalledTimes(1);
+      expect(fetchPrompt).toHaveBeenCalledWith({ idOrHandle: "prompt-1", projectId: "project_1" });
+      expect(store.getState().windows[0]?.tabs[0]?.data.meta.title).toBe("greeter");
     });
   });
 });

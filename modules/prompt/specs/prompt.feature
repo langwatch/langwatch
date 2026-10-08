@@ -66,6 +66,12 @@ Feature: Prompt service
     Then the browser asks before unloading
     But a tab with nothing unsaved lets the page unload
 
+  @integration
+  Scenario: A promptId link opens that prompt in a new tab
+    Given a link to the prompts page carrying ?promptId= of a saved prompt
+    When the reader opens the link
+    Then Prompt Studio reads that prompt and opens it in exactly one new tab
+
   @unit
   Scenario: a prompt created without a model takes the project's default model
     Given the project's default model for prompts is "openai/gpt-5.6-terra"
