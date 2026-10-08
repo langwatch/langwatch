@@ -19,7 +19,7 @@ export type LicenseMintRequest = Readonly<{
   email?: string;
 }>;
 
-export type LicenseMintResult = Readonly<{
+type LicenseMintResult = Readonly<{
   organizationId: string;
   organizationName: string;
   planType: string;

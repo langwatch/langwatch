@@ -11,7 +11,7 @@ const isStale = ({ columns, own }: OrganizationLicensePair) =>
   own === null ? columns.licenseKey !== null : !sameLicense({ a: own, b: columns });
 
 /** Where a run stopped and what it did; saved as the step's checkpoint after each batch. */
-export type OrganizationLicenseCopyReport = Readonly<{
+type OrganizationLicenseCopyReport = Readonly<{
   afterOrganizationId: string | null;
   copied: number;
   wouldCopy: number;

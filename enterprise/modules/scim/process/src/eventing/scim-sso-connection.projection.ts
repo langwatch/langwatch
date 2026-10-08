@@ -106,10 +106,10 @@ export const scimSsoConnectionPeerEvents = [
   { type: MIGRATION_FINALIZED_EVENT_TYPE, data: migrationFinalizedPayloadSchema },
 ] as const;
 
-export type ScimSsoConnectionPeerEvent = PeerEvent<typeof scimSsoConnectionPeerEvents>;
+type ScimSsoConnectionPeerEvent = PeerEvent<typeof scimSsoConnectionPeerEvents>;
 
 /** Identity's reducer over one fact; the first fact names the connection init() could not. */
-export function foldScimSsoConnection(
+function foldScimSsoConnection(
   state: ScimSsoConnectionFoldState,
   event: ScimSsoConnectionPeerEvent,
 ): ScimSsoConnectionFoldState {

@@ -27,9 +27,7 @@ function scimSsoConnectionHost(store: FoldProjectionStore<ScimSsoConnectionFoldS
 }
 
 /** The host pipeline as a TYPE, derived from the builder above. */
-export type ScimSsoConnectionPipeline = ReturnType<
-  ReturnType<typeof scimSsoConnectionHost>["build"]
->;
+type ScimSsoConnectionPipeline = ReturnType<ReturnType<typeof scimSsoConnectionHost>["build"]>;
 
 export function buildScimSsoConnectionPipeline(
   store: FoldProjectionStore<ScimSsoConnectionFoldState>,
