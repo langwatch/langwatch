@@ -1,6 +1,6 @@
 import { createTenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AggregateSearchResult } from "@langwatch/ops-contract";
+import { type AggregateSearchResult, OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
 import { toEpochMs } from "@langwatch/time";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
@@ -93,6 +93,10 @@ export class EventExplorerService {
     tenantIds: string[];
     sinceMs?: number;
   }): Promise<AggregateSearchResult[]> {
+    // Unbounded by tenant and query, the read would scan the whole event log for 50 rows.
+    if (params.tenantIds.length === 0 && params.query.trim().length === 0) {
+      throw new OpsSearchQueryRequiredError();
+    }
     return this.repo.searchAggregates({
       query: params.query,
       tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,

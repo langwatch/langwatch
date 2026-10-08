@@ -12,7 +12,7 @@ import type {
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
-import { PrismaProcessStore } from "@langwatch/eventing/server";
+import { PrismaProcessAdmin, PrismaProcessStore } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -25,7 +25,6 @@ import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
-import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import type {
   DeadMessageDiscard,
   DeadMessageRedrive,
@@ -93,7 +92,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
   const PROJECT = "project_opstest";
   const NOW = Date.now();
 
-  let fleet: ProcessOpsPrismaRepository;
+  let fleet: PrismaProcessAdmin;
   let service: ManagerExplorerService;
   let store: PrismaProcessStore;
 
@@ -106,7 +105,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
-    fleet = ProcessOpsPrismaRepository.create({ prisma });
+    fleet = PrismaProcessAdmin.create({ database: prisma });
     store = PrismaProcessStore.create({ database: prisma });
     service = ManagerExplorerService.create({
       store,
@@ -407,13 +406,13 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
         prisma,
         table: "ProcessManagerOutbox",
         first: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).redriveDeadMessage({
+          PrismaProcessAdmin.create({ database: tx }).redriveDeadMessage({
             ref,
             messageId: id,
             now: NOW,
           }),
         second: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).discardDeadMessage({
+          PrismaProcessAdmin.create({ database: tx }).discardDeadMessage({
             ref,
             messageId: id,
             now: NOW,

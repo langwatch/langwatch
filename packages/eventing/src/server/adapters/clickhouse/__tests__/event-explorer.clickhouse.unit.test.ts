@@ -1,30 +1,30 @@
-/** Spec: modules/ops/specs/projection-replay-console.feature */
-import type { QueryRequest } from "@langwatch/clickhouse-client";
-import { OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
+/** Spec: packages/eventing/specs/event-table-surfaces.feature */
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
-import { EventExplorerClickHouseRepository } from "../clickhouse.event-explorer.repository.ts";
+import { ValidationError } from "../../../../services/errorHandling.ts";
+import type { EventingClickHouseReplayStatement } from "../../../clickhouse-client-resolver.ts";
+import { EventingClickHouseEventExplorer } from "../event-explorer.clickhouse.ts";
 
 /** The routed member, recording each statement the repository hands it. */
 const repoCapturingQuery = () => {
-  const statements: QueryRequest[] = [];
+  const statements: EventingClickHouseReplayStatement[] = [];
   const clickhouse = clickHouseQueryClientDouble({
-    query: async (request: QueryRequest) => {
+    query: async (request: EventingClickHouseReplayStatement) => {
       statements.push(request);
       return { rows: [] };
     },
   });
-  return { repo: EventExplorerClickHouseRepository.create({ clickhouse }), statements };
+  return { repo: EventingClickHouseEventExplorer.create({ clickhouse }), statements };
 };
 
-const capturedQuery = (statements: QueryRequest[]) => {
+const capturedQuery = (statements: EventingClickHouseReplayStatement[]) => {
   const statement = statements[0];
   if (!statement) throw new Error("the repository issued no statement");
   return { query: statement.sql, query_params: statement.params ?? {}, statement };
 };
 
-describe("EventExplorerClickHouseRepository.findAggregates", () => {
+describe("EventingClickHouseEventExplorer.findAggregates", () => {
   describe("given a caller supplies a sinceMs", () => {
     describe("when findAggregates is called", () => {
       it("filters on EventOccurredAt (the partition-key column), not on EventTimestamp", async () => {
@@ -66,22 +66,21 @@ describe("EventExplorerClickHouseRepository.findAggregates", () => {
   });
 });
 
-describe("EventExplorerClickHouseRepository.searchAggregates", () => {
+describe("EventingClickHouseEventExplorer.searchAggregates", () => {
   describe("given neither tenantIds nor a non-empty query string is supplied", () => {
     describe("when searchAggregates is called", () => {
-      /** @scenario "An event-log search that reaches the explorer with no query and no tenant is a handled client error" */
+      /** @scenario "An event search bounded by neither a tenant nor a query is refused" */
       it("rejects the call rather than scanning the whole event_log table", async () => {
         const { repo, statements } = repoCapturingQuery();
         const refusal = await repo.searchAggregates({ query: "", tenantIds: [] }).catch((e) => e);
-        expect(refusal).toBeInstanceOf(OpsSearchQueryRequiredError);
-        expect(refusal).toMatchObject({ code: "ops_search_query_required", httpStatus: 400 });
+        expect(refusal).toBeInstanceOf(ValidationError);
         expect(statements).toEqual([]);
       });
 
       it("rejects when tenantIds is omitted entirely and query is whitespace", async () => {
         const { repo } = repoCapturingQuery();
         await expect(repo.searchAggregates({ query: "   " })).rejects.toThrow(
-          /search query or pick at least one tenant/,
+          /query string or at least one tenant/,
         );
       });
     });
@@ -89,6 +88,7 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
 
   describe("given the upfront guard is satisfied and the caller supplies sinceMs", () => {
     describe("when searchAggregates is called", () => {
+      /** @scenario "An event search reads only rows inside its time bound" */
       it("applies the EventOccurredAt time bound (preserving the EventOccurredAt = 0 legacy sentinel)", async () => {
         // The ops router defaults sinceMs to `now - 365 days` for the
         // DejaView UI, surfaced as a banner under the search box. The
@@ -132,9 +132,9 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
     describe("when an operator searches for an aggregate", () => {
       /** @scenario "The operator searches the event log through the composed explorer" */
       it("reads event_log and returns the matching aggregates", async () => {
-        const statements: QueryRequest[] = [];
+        const statements: EventingClickHouseReplayStatement[] = [];
         const clickhouse = clickHouseQueryClientDouble({
-          query: async (request: QueryRequest) => {
+          query: async (request: EventingClickHouseReplayStatement) => {
             statements.push(request);
             return {
               rows: [
@@ -149,7 +149,7 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
             };
           },
         });
-        const repo = EventExplorerClickHouseRepository.create({ clickhouse });
+        const repo = EventingClickHouseEventExplorer.create({ clickhouse });
 
         const found = await repo.searchAggregates({ query: "trace-1" });
 
@@ -182,7 +182,7 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
   });
 });
 
-describe("EventExplorerClickHouseRepository.findEventsByAggregate", () => {
+describe("EventingClickHouseEventExplorer.findEventsByAggregate", () => {
   describe("given an aggregate the operator has already selected", () => {
     describe("when findEventsByAggregate is called", () => {
       it("returns the full event history with no time bound (detail-view, full fold history needed for projection replay)", async () => {

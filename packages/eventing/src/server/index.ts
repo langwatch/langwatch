@@ -17,6 +17,27 @@ export {
   type ReplayEventLean,
 } from "./adapters/clickhouse/replay-event-source.clickhouse.ts";
 export { PrismaProcessStore } from "./adapters/postgres/prisma-process-store.ts";
+export { PrismaProcessAdmin } from "./adapters/postgres/prisma-process-admin.ts";
+export { PrismaProcessPurge } from "./adapters/postgres/prisma-process-purge.ts";
+export type {
+  DeadLetterCount,
+  DeadMessageDiscard,
+  DeadMessageRedrive,
+  DeadOutboxMessageView,
+  LapsedLeaseRelease,
+  OutboxAttemptView,
+  ProcessInstanceRow,
+  ProcessNameCounts,
+  ProcessOutboxMessageView,
+  ProcessPurgeTarget,
+  ProcessWakeRow,
+} from "./adapters/postgres/process-admin.types.ts";
+export {
+  type AggregateDiscoveryRow,
+  type AggregateSearchRow,
+  EventingClickHouseEventExplorer,
+  type RawEventRow,
+} from "./adapters/clickhouse/event-explorer.clickhouse.ts";
 export type {
   EventingClickHouseClient,
   EventingClickHouseClientResolver,
@@ -94,6 +115,9 @@ export {
   type EventLogRetentionClient,
 } from "./tables/event-log-retention.ts";
 export {
+  EVENT_TABLES,
+  type EventTable,
+  type EventTableCategory,
   EVENT_TABLE_DECLARATIONS,
   type EventTableDeclaration,
   type EventTableExposedColumn,

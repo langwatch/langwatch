@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EVENT_TABLE_DECLARATIONS,
+  EVENT_TABLES,
   type EventTableExposedColumn,
   type EventTableOmittedColumn,
 } from "../event-table-declarations.ts";
@@ -93,6 +94,21 @@ describe("EVENT_TABLE_DECLARATIONS", () => {
     /** @scenario "The declarations carry no access gate" */
     it("names no permission anywhere", () => {
       expect(JSON.stringify(EVENT_TABLE_DECLARATIONS)).not.toMatch(/access|:view|:manage/);
+    });
+  });
+});
+
+describe("EVENT_TABLES", () => {
+  describe("when the list is read", () => {
+    /** @scenario "The event-table list names every table eventing owns, by store and category" */
+    it("names the event log and the four process-manager tables by store and category", () => {
+      expect(EVENT_TABLES).toEqual([
+        { table: "event_log", store: "clickhouse", category: "event-log" },
+        { table: "ProcessManagerInstance", store: "postgres", category: "process-manager" },
+        { table: "ProcessManagerInbox", store: "postgres", category: "process-manager" },
+        { table: "ProcessManagerOutbox", store: "postgres", category: "process-manager" },
+        { table: "ProcessManagerOutboxAttempt", store: "postgres", category: "process-manager" },
+      ]);
     });
   });
 });

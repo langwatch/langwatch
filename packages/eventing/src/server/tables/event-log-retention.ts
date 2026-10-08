@@ -1,6 +1,7 @@
 import { ConfigurationError, ValidationError } from "../../services/errorHandling.ts";
+import { EVENT_TABLES } from "./event-table-declarations.ts";
 
-const EVENT_LOG_TABLE = "event_log";
+const EVENT_LOG_TABLE = EVENT_TABLES[0].table;
 const MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
 const MAX_RETENTION_DAYS = 65_535;
 

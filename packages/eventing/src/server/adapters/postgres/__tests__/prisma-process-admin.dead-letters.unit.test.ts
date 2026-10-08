@@ -1,11 +1,11 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProcessOpsPrismaRepository } from "../prisma.process-ops.repository.ts";
+import { PrismaProcessAdmin } from "../prisma-process-admin.ts";
 
 /**
  * The dead-letter reads, executed against a stubbed Prisma.
- * Spec: specs/ops/process-manager-visibility.feature
+ * Spec: packages/eventing/specs/event-table-surfaces.feature
  */
 
 const NOW = new Date("2026-08-17T09:00:00.000Z");
@@ -36,12 +36,13 @@ const repoAnswering = (results: unknown[]) => {
   const queryRaw = vi.fn();
   for (const result of results) queryRaw.mockResolvedValueOnce(result);
   const prisma = prismaDouble({ $queryRaw: queryRaw });
-  return { repo: ProcessOpsPrismaRepository.create({ prisma }), queryRaw };
+  return { repo: PrismaProcessAdmin.create({ database: prisma }), queryRaw };
 };
 
-describe("ProcessOpsPrismaRepository dead-letter reads", () => {
+describe("PrismaProcessAdmin dead-letter reads", () => {
   describe("given the fleet holds a dead message", () => {
     describe("when listDeadMessages is called", () => {
+      /** @scenario "The dead-letter list answers each retired message with the ref to act on it" */
       it("issues the queries and maps the rows it got back", async () => {
         const { repo, queryRaw } = repoAnswering([[deadRow], [{ total: 1 }]]);
 

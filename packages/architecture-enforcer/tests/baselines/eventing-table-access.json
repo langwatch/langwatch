@@ -1,17 +1,6 @@
 {
   "record": "dev/docs/ARCHITECTURE.md §7, the event tables are eventing's (Alex, 2026-09-29). Shrink-only: lower a count in the change that removes the access.",
   "findings": {
-    "data-retention|modules/data-retention/contract/src/retention-tables.ts|named:event_log": 1,
-    "ops|modules/ops/process/src/repositories/clickhouse/clickhouse.event-explorer.repository.ts|sql:event_log": 3,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-manager-purge.repository.ts|named:ProcessManagerInbox": 1,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-manager-purge.repository.ts|named:ProcessManagerOutbox": 1,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-manager-purge.repository.ts|sql:ProcessManagerInbox": 3,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-manager-purge.repository.ts|sql:ProcessManagerOutbox": 3,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|delegate:ProcessManagerInstance": 2,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|delegate:ProcessManagerOutbox": 6,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|delegate:ProcessManagerOutboxAttempt": 1,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerInstance": 4,
-    "ops|modules/ops/process/src/repositories/prisma/prisma.process-ops.repository.ts|sql:ProcessManagerOutbox": 11,
-    "ops|modules/ops/process/src/services/storage-stats-collection.service.ts|named:event_log": 1
+    "data-retention|modules/data-retention/contract/src/retention-tables.ts|named:event_log": 1
   }
 }

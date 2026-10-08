@@ -4,6 +4,22 @@
  * never imports analytics. Spec: packages/eventing/specs/event-table-surfaces.feature.
  */
 
+/**
+ * Eventing's tables with their category (ET-2, Alex 2026-10-08): a module that meters, sizes or
+ * retains storage builds its own map from this list and never names an event table itself.
+ * `event-log` rows carry a per-row retention; `process-manager` rows are swept by eventing.
+ */
+export const EVENT_TABLES = [
+  { table: "event_log", store: "clickhouse", category: "event-log" },
+  { table: "ProcessManagerInstance", store: "postgres", category: "process-manager" },
+  { table: "ProcessManagerInbox", store: "postgres", category: "process-manager" },
+  { table: "ProcessManagerOutbox", store: "postgres", category: "process-manager" },
+  { table: "ProcessManagerOutboxAttempt", store: "postgres", category: "process-manager" },
+] as const;
+
+export type EventTable = (typeof EVENT_TABLES)[number];
+export type EventTableCategory = EventTable["category"];
+
 /** A column exposed under its key: `source` absent reads the column of the same name. */
 export type EventTableExposedColumn = Readonly<{
   source?: string;

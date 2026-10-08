@@ -1,3 +1,4 @@
+import { OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -175,6 +176,22 @@ describe("EventExplorerService", () => {
   });
 
   describe("searchAggregates()", () => {
+    describe("when the search has a blank query and no tenant", () => {
+      /** @scenario "An event-log search that reaches the explorer with no query and no tenant is a handled client error" */
+      it("refuses with the ops search query required error and reads nothing", async () => {
+        const repo = createMockRepo();
+        const service = EventExplorerService.create({ repo, introspection });
+
+        const refusal = await service
+          .searchAggregates({ query: "   ", tenantIds: [] })
+          .catch((error: unknown) => error);
+
+        expect(refusal).toBeInstanceOf(OpsSearchQueryRequiredError);
+        expect(refusal).toMatchObject({ code: "ops_search_query_required", httpStatus: 400 });
+        expect(repo.searchAggregates).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when tenantIds is empty", () => {
       it("passes undefined to repo", async () => {
         const repo = createMockRepo();

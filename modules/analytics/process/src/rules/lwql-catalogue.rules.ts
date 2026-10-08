@@ -10,7 +10,7 @@ import {
   type EventTableDeclaration,
   type EventTableExposedColumn,
   type EventTableOmittedColumn,
-} from "@langwatch/eventing/server";
+} from "@langwatch/eventing/tables";
 
 import type { LwqlClickHouseRows } from "./lwql-columns-manifest.generated.ts";
 import type { ColumnsManifest } from "./lwql-columns-manifest.rules.ts";

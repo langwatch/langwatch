@@ -1,29 +1,48 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { type AggregateSearchResult, OpsSearchQueryRequiredError } from "@langwatch/ops-contract";
+import { ValidationError } from "../../../services/errorHandling.ts";
+import type { EventingClickHouseReplayClient } from "../../clickhouse-client-resolver.ts";
 
-import type {
-  AggregateDiscoveryRow,
-  EventExplorerRepository,
-  RawEventRow,
-} from "../event-explorer.repository.ts";
+/** How many aggregates of one type one tenant holds since a time. */
+export interface AggregateDiscoveryRow {
+  aggregateType: string;
+  tenantId: string;
+  aggregateCount: number;
+}
+
+/** One aggregate an operator's search matched. */
+export interface AggregateSearchRow {
+  aggregateId: string;
+  aggregateType: string;
+  tenantId: string;
+  eventCount: number;
+  lastEventTime: string;
+}
+
+/** One stored event as the explorer shows it: the payload stays the stored JSON text. */
+export interface RawEventRow {
+  eventId: string;
+  eventType: string;
+  eventTimestamp: string;
+  payload: string;
+}
 
 /** A cross-tenant operator search names no tenant, so the routed member reads the shared server. */
 const ACROSS_TENANTS = "";
 
 /**
- * The event explorer's reads over the routed ClickHouse member (§7): one aggregate's history
- * reads its tenant's server, and an operator search across tenants reads the shared one.
+ * The operator's event explorer over the event log (ARCHITECTURE.md §7, ET-1), read through the
+ * routed ClickHouse member: one aggregate's history reads its tenant's server, and a search across
+ * tenants reads the shared one. Spec: packages/eventing/specs/event-table-surfaces.feature.
  */
-export class EventExplorerClickHouseRepository implements EventExplorerRepository {
+export class EventingClickHouseEventExplorer {
   static create({
     clickhouse,
   }: {
-    clickhouse: ClickHouseQueryClient;
-  }): EventExplorerClickHouseRepository {
-    return new EventExplorerClickHouseRepository(clickhouse);
+    clickhouse: Pick<EventingClickHouseReplayClient, "query">;
+  }): EventingClickHouseEventExplorer {
+    return new EventingClickHouseEventExplorer(clickhouse);
   }
 
-  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+  private constructor(private readonly clickhouse: Pick<EventingClickHouseReplayClient, "query">) {}
 
   async findAggregates(params: {
     aggregateTypes: string[];
@@ -80,20 +99,18 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
     query: string;
     tenantIds?: string[];
     sinceMs?: number;
-  }): Promise<AggregateSearchResult[]> {
-    // Defensive guard: without at least one of (tenants, query string) the query degrades to
-    // "ORDER BY EventTimestamp DESC LIMIT 50" against the entire event_log table — every
-    // weekly partition incl. cold S3, every tenant, just to surface 50 rows. The doc rule
-    // "TenantId is always required" applies, but this is an ops/admin tool so we allow the
-    // cross-tenant case when a non-empty query string at least bounds it.
+  }): Promise<AggregateSearchRow[]> {
+    // Without tenants or a query string the read scans every partition of every tenant for 50
+    // rows; an operator search across tenants is allowed only when a query string bounds it.
     const hasTenants = params.tenantIds !== undefined && params.tenantIds.length > 0;
     const trimmedQuery = params.query.trim();
     const hasQueryString = trimmedQuery.length > 0;
     if (!hasTenants && !hasQueryString) {
-      // Rationale lives in the comment above (cross-tenant unbounded scan
-      // over the whole event_log) but the message reaches the ops UI - the
-      // user-facing text should tell them what to do, not name the method.
-      throw new OpsSearchQueryRequiredError();
+      throw new ValidationError({
+        reason: "An event search needs a query string or at least one tenant",
+        field: "query",
+        value: params.query,
+      });
     }
 
     // No silent time clamp in repo; caller supplies sinceMs explicitly.

@@ -1,21 +1,33 @@
-import type { ProcessRef } from "@langwatch/eventing";
-import type {
-  DeadLetterCount,
-  DeadOutboxMessageView,
-  OutboxAttemptView,
-  ProcessInstanceRow,
-  ProcessOutboxMessageView,
-  ProcessWakeRow,
-} from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
+import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database.ts";
 import type {
+  DeadLetterCount,
   DeadMessageDiscard,
   DeadMessageRedrive,
+  DeadOutboxMessageView,
   LapsedLeaseRelease,
+  OutboxAttemptView,
+  ProcessInstanceRow,
   ProcessNameCounts,
-  ProcessOpsRepository,
-} from "../process-ops.repository.ts";
+  ProcessOutboxMessageView,
+  ProcessWakeRow,
+} from "./process-admin.types.ts";
+
+type ProcessAdminPrisma = PrismaClient | Prisma.TransactionClient;
+
+/** A client or a transaction client over the process tables; a transaction lacks `$transaction`. */
+function isProcessAdminPrisma(
+  database: EventingProcessPersistenceDatabase,
+): database is ProcessAdminPrisma {
+  const hasFunction = (name: string): boolean => typeof Reflect.get(database, name) === "function";
+  return (
+    hasFunction("$executeRaw") &&
+    hasFunction("$queryRaw") &&
+    typeof Reflect.get(database, "processManagerOutbox") === "object"
+  );
+}
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
@@ -41,19 +53,20 @@ function escapeLike(term: string): string {
 }
 
 /**
- * Fleet-level reads over the process-manager substrate's own tables.
+ * The operator's inspection and acts over the process-manager tables (ARCHITECTURE.md §7, ET-1):
+ * fleet counts, instances, outbox and dead letters, redrive, discard and lease release.
+ * Spec: packages/eventing/specs/event-table-surfaces.feature.
  */
-export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
+export class PrismaProcessAdmin {
   /** A transaction client is accepted so a race test can hold one write open on the row. */
-  static create({
-    prisma,
-  }: {
-    prisma: PrismaClient | Prisma.TransactionClient;
-  }): ProcessOpsPrismaRepository {
-    return new ProcessOpsPrismaRepository(prisma);
+  static create(options: { database: EventingProcessPersistenceDatabase }): PrismaProcessAdmin {
+    if (!isProcessAdminPrisma(options.database)) {
+      throw new Error("PrismaProcessAdmin requires a generated Prisma client or transaction.");
+    }
+    return new PrismaProcessAdmin(options.database);
   }
 
-  private constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
+  private constructor(private readonly prisma: ProcessAdminPrisma) {}
 
   async countByProcessName(params: {
     now: number;
@@ -68,7 +81,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       this.prisma.$queryRaw<
         { processName: string; instances: number; overdueWakes: number }[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
+        -- @tenancy: cross-tenant ops fleet counts; the surface is operator-gated
         SELECT "processName",
                COUNT(*)::int AS "instances",
                COUNT(*) FILTER (WHERE "nextWakeAt" < ${overdueWakeBefore})::int AS "overdueWakes"
@@ -84,7 +97,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
           deadMessages: number;
         }[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
+        -- @tenancy: cross-tenant ops fleet counts; the surface is operator-gated
         SELECT "processName",
                COUNT(*) FILTER (WHERE "status" = 'pending')::int AS "pendingMessages",
                COUNT(*) FILTER (
@@ -328,7 +341,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
           traceCarrier: unknown;
         })[]
       >(Prisma.sql`
-        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is operator-gated
         SELECT "id", "processName", "projectId", "processKey", "messageKey",
                "intentType", "status", "attempts", "nextAttemptAt",
                "leasedUntil", "createdAt", "updatedAt", "sourceEventId",
@@ -341,7 +354,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         OFFSET ${(params.page - 1) * params.pageSize}
       `),
       this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
-        -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
+        -- @tenancy: cross-tenant ops dead-letter read; the surface is operator-gated
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerOutbox"
         WHERE "status" = 'dead'
@@ -378,7 +391,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     const rows = await this.prisma.$queryRaw<
       { processName: string; count: number; oldestUpdatedAt: Date }[]
     >(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
+      -- @tenancy: cross-tenant ops dead-letter totals; the surface is operator-gated
       SELECT "processName",
              COUNT(*)::int AS "count",
              MIN("updatedAt") AS "oldestUpdatedAt"
@@ -492,9 +505,9 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
     // Raw, like the fleet-wide reads: a dead-letter sweep has no single
-    // project to name for the tenancy guard, and the surface is ops-gated.
+    // project to name for the tenancy guard, and the surface is operator-gated.
     return this.prisma.$executeRaw(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is operator-gated
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'pending',
           "attempts" = 0,
@@ -528,7 +541,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
     return this.prisma.$executeRaw(Prisma.sql`
-      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
+      -- @tenancy: cross-tenant ops dead-letter recovery; the surface is operator-gated
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'discarded',
           "updatedAt" = ${now}

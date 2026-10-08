@@ -1,4 +1,8 @@
-import { PrismaProcessStore } from "@langwatch/eventing/server";
+import {
+  PrismaProcessAdmin,
+  PrismaProcessPurge,
+  PrismaProcessStore,
+} from "@langwatch/eventing/server";
 import { prismaRepositories } from "@langwatch/prisma-client";
 
 import type { OpsRepositories } from "../ops.repositories.ts";
@@ -9,8 +13,6 @@ import { PrismaPostgresHealthRepository } from "./prisma.datastore-health.reposi
 import { PrismaAdminBackofficeRepository } from "./prisma.instance-admin.repository.ts";
 import { PrismaMigrationMembershipRepository } from "./prisma.migration-membership.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "./prisma.organization-tenant-source.repository.ts";
-import { PrismaProcessManagerPurgeRepository } from "./prisma.process-manager-purge.repository.ts";
-import { ProcessOpsPrismaRepository } from "./prisma.process-ops.repository.ts";
 import { PrismaProjectTenantSourceRepository } from "./prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "./prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "./prisma.system-migration-state.repository.ts";
@@ -56,7 +58,7 @@ export const PostgresOpsRepositories = {
     return {
       ...claimedOpsRepositories.create(members),
       processStore: PrismaProcessStore.create({ database: prisma }),
-      processManagerPurge: PrismaProcessManagerPurgeRepository.create({ database: prisma }),
+      processManagerPurge: PrismaProcessPurge.create({ database: prisma }),
       credentialsReseal: PrismaCredentialsResealRepository.create({ database: prisma }),
       migrationState: PrismaSystemMigrationStateRepository.create({ prisma }),
       migrationEnrollments: PrismaSystemMigrationEnrollmentRepository.create({ prisma }),
@@ -67,7 +69,7 @@ export const PostgresOpsRepositories = {
       organizationMemberTenants: PrismaOrganizationMemberTenantSourceRepository.create({ prisma }),
       instanceAdmin: PrismaAdminBackofficeRepository.create(prisma),
       impersonation: PrismaImpersonationRepository.create(prisma),
-      processFleet: ProcessOpsPrismaRepository.create({ prisma }),
+      processFleet: PrismaProcessAdmin.create({ database: prisma }),
       postgresHealth: PrismaPostgresHealthRepository.create(prisma),
       upgradeLedger: PrismaUpgradeLedgerRepository.create({ prisma }),
     };

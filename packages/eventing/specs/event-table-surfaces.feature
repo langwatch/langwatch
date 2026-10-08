@@ -5,7 +5,10 @@
 # retention, and analytics publishes the tables as operator views. The ruling
 # (Q205, 2026-10-06) gives both to eventing as surfaces: a retention operation
 # the retention owner calls, and plain declarations of the tables' LWQL entries
-# that analytics composes, so eventing never imports analytics.
+# that analytics composes, so eventing never imports analytics. Ops' process
+# explorer, dead-letter acts, retention purge and event explorer ran raw SQL over
+# the same tables; ET-1 (2026-10-08) gives them to eventing as an operator surface
+# ops calls, and ET-2 has eventing publish its table list for modules that meter it.
 
 @event-sourcing
 Feature: Eventing's own surfaces over its tables
@@ -68,3 +71,30 @@ Feature: Eventing's own surfaces over its tables
     Scenario: The declarations carry no access gate
       When the declarations are read
       Then none names a permission, so the composing module keeps deciding who reads each view
+
+  Rule: Operator work over the process-manager tables and the event log is eventing's surface
+
+    @unit
+    Scenario: The dead-letter list answers each retired message with the ref to act on it
+      Given dead outbox messages across process managers
+      When the operator surface lists dead messages
+      Then each row carries its process name, project, process key and trace id
+      And the total counts every dead message the filter matches
+
+    @unit
+    Scenario: An event search bounded by neither a tenant nor a query is refused
+      When the event explorer is asked to search with a blank query and no tenant
+      Then it refuses as invalid input and reads nothing
+
+    @unit
+    Scenario: An event search reads only rows inside its time bound
+      When the event explorer searches with a lower time bound
+      Then the read filters on the event log's partition time, keeping legacy rows
+
+  Rule: Eventing publishes its table list with categories
+
+    @unit
+    Scenario: The event-table list names every table eventing owns, by store and category
+      When the event-table list is read
+      Then it names the event log as an event-log table in ClickHouse
+      And the four process-manager tables as process-manager tables in Postgres

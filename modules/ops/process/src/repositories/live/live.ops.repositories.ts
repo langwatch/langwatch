@@ -1,10 +1,10 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
+import { EventingClickHouseEventExplorer } from "@langwatch/eventing/server";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { ClickHouseClickHouseRoutesRepository } from "../clickhouse/clickhouse.clickhouse-routes.repository.ts";
 import { ClickHouseClickHouseHealthRepository } from "../clickhouse/clickhouse.datastore-health.repository.ts";
-import { EventExplorerClickHouseRepository } from "../clickhouse/clickhouse.event-explorer.repository.ts";
 import { ClickHouseStorageFootprintRepository } from "../clickhouse/clickhouse.storage-footprint.repository.ts";
 import { EventingPipelineDefinitionsRepository } from "../eventing/eventing.pipeline-definitions.repository.ts";
 import type { OpsRepositories } from "../ops.repositories.ts";
@@ -55,7 +55,7 @@ export const LiveOpsRepositories = {
     storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
     redisHealth: RedisRedisHealthRepository.create(redis),
     clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
-    events: EventExplorerClickHouseRepository.create({ clickhouse }),
+    events: EventingClickHouseEventExplorer.create({ clickhouse }),
     storageFootprint: ClickHouseStorageFootprintRepository.create({ clickhouse }),
   }),
 };

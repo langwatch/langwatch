@@ -22,6 +22,10 @@
     "./server": {
       "types": "./dist/server/index.d.ts",
       "default": "./src/server/index.ts"
+    },
+    "./tables": {
+      "types": "./dist/server/tables/event-table-declarations.d.ts",
+      "default": "./src/server/tables/event-table-declarations.ts"
     }
   },
   "scripts": {
