@@ -33,7 +33,14 @@ function projectNotice() {
     processStore: InMemoryProcessStore.createForTesting(),
   });
   const lifecycle = eventing.register(
-    buildProjectLifecyclePipeline({ recordProjectCreated: async () => {} }),
+    buildProjectLifecyclePipeline({
+      recordProjectCreated: async () => {},
+      personalProjects: {
+        archive: async () => {},
+        revive: async () => {},
+        setFeatures: async () => {},
+      },
+    }),
   );
 
   const logger = { error: vi.fn() };

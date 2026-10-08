@@ -118,3 +118,49 @@ export const personalWorkspaceProvisionedEventDataSchema = z.object({
 export type PersonalWorkspaceProvisionedEventData = z.infer<
   typeof personalWorkspaceProvisionedEventDataSchema
 >;
+
+/** A removed member's personal teams were archived; project archives their personal projects. */
+export const PERSONAL_WORKSPACE_ARCHIVED_EVENT_TYPE =
+  "lw.organization.personal_workspace_archived" as const;
+
+export const personalWorkspaceArchivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  teamIds: z.array(z.string().min(1)).min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceArchivedEventData = z.infer<
+  typeof personalWorkspaceArchivedEventDataSchema
+>;
+
+/** A returning member's personal team was revived; project revives its personal project. */
+export const PERSONAL_WORKSPACE_REVIVED_EVENT_TYPE =
+  "lw.organization.personal_workspace_revived" as const;
+
+export const personalWorkspaceRevivedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  teamId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceRevivedEventData = z.infer<
+  typeof personalWorkspaceRevivedEventDataSchema
+>;
+
+/** The owner switched their personal workspace's features; project stores them on its project. */
+export const PERSONAL_WORKSPACE_FEATURES_CHANGED_EVENT_TYPE =
+  "lw.organization.personal_workspace_features_changed" as const;
+
+export const personalWorkspaceFeaturesChangedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1).nullable(),
+  userId: z.string().min(1),
+  projectId: z.string().min(1),
+  features: personalFeaturesSchema,
+  occurredAt: z.number().int().nonnegative(),
+});
+export type PersonalWorkspaceFeaturesChangedEventData = z.infer<
+  typeof personalWorkspaceFeaturesChangedEventDataSchema
+>;

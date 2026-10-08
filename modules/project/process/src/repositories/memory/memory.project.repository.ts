@@ -1,3 +1,4 @@
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
   ProjectNotFoundError,
@@ -23,7 +24,7 @@ import {
   type ProjectIdPageInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
   ProjectRepository,
@@ -542,6 +543,31 @@ export class MemoryProjectRepository implements ProjectRepository {
     this.#database.putProject({ ...project, apiKey: input.token });
 
     return true;
+  }
+
+  async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {
+    for (const project of this.#database.projects()) {
+      if (!input.teamIds.includes(project.teamId)) continue;
+      if (!project.isPersonal || project.archivedAt !== null) continue;
+      this.#database.putProject({ ...project, archivedAt: toDate(input.archivedAt) });
+    }
+  }
+
+  async revivePersonalInTeam(input: { teamId: string }): Promise<void> {
+    for (const project of this.#database.projects()) {
+      if (project.teamId !== input.teamId) continue;
+      if (!project.isPersonal || project.archivedAt === null) continue;
+      this.#database.putProject({ ...project, archivedAt: null });
+    }
+  }
+
+  async updatePersonalFeatures(input: {
+    projectId: string;
+    features: PersonalFeatures;
+  }): Promise<void> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project?.isPersonal) return;
+    this.#database.putProject({ ...project, personalFeatures: input.features });
   }
 
   async findPersonalProjectOwner(input: {

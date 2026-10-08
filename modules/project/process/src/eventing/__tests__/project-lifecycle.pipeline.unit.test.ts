@@ -144,7 +144,14 @@ describe("project's lifecycle pipeline", () => {
   });
 
   it("hosts no reaction on its own events", () => {
-    const definition = buildProjectLifecyclePipeline({ recordProjectCreated: async () => void 0 });
+    const definition = buildProjectLifecyclePipeline({
+      recordProjectCreated: async () => void 0,
+      personalProjects: {
+        archive: async () => {},
+        revive: async () => {},
+        setFeatures: async () => {},
+      },
+    });
 
     expect(definition.eventSubscribers.size).toBe(0);
   });
@@ -196,7 +203,14 @@ describe("given organization records a newly created personal workspace", () => 
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());
     const lifecycle = eventing.register(
-      buildProjectLifecyclePipeline({ recordProjectCreated: (input) => notice.record(input) }),
+      buildProjectLifecyclePipeline({
+        recordProjectCreated: (input) => notice.record(input),
+        personalProjects: {
+          archive: async () => {},
+          revive: async () => {},
+          setFeatures: async () => {},
+        },
+      }),
     );
     notice.connect({
       recordProjectCreated: lifecycle.commands.recordProjectCreated,

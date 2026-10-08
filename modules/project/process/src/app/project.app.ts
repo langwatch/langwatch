@@ -36,6 +36,7 @@ import type * as projectContractModule from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import { PersonalProjectService } from "../services/personal-project.service.ts";
 import {
   ProjectCreatedNoticeService,
   type ProjectLifecycleSenders,
@@ -102,6 +103,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #lifecycle: ProjectCreatedNoticeService;
   readonly #authorization: AuthzApi;
   readonly #dataPrivacy: DataPrivacyApi;
+  readonly #personalProjects: PersonalProjectService;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
@@ -112,18 +114,21 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     lifecycle,
     authorization,
     dataPrivacy,
+    personalProjects,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
     authorization: AuthzApi;
     dataPrivacy: DataPrivacyApi;
+    personalProjects: PersonalProjectService;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
     this.#authorization = authorization;
     this.#dataPrivacy = dataPrivacy;
+    this.#personalProjects = personalProjects;
   }
 
   static create({
@@ -154,6 +159,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       lifecycle,
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
+      personalProjects: PersonalProjectService.create({ projects: repositories.projects }),
     });
   }
 
@@ -176,6 +182,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     input: Readonly<{ projectId: string; organizationId: string }>,
   ): Promise<void> {
     return this.#lifecycle.record(input);
+  }
+
+  /** Project's reactions to organization's personal-workspace facts, for the lifecycle pipeline. */
+  personalProjects(): PersonalProjectService {
+    return this.#personalProjects;
   }
 
   /** Records one organization's existing projects as created, for the backfill task. */

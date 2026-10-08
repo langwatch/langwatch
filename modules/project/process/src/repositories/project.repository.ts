@@ -1,4 +1,5 @@
 import type { OnboardingVariant } from "@langwatch/onboarding-contract";
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 import type {
   ActiveProjectsByScopesInput,
   CreateProjectInput,
@@ -113,6 +114,12 @@ export interface ProjectRepository {
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
+  /** Archives the live personal projects in these teams; a second call changes nothing. */
+  archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void>;
+  /** Revives the archived personal project in this team; a second call changes nothing. */
+  revivePersonalInTeam(input: { teamId: string }): Promise<void>;
+  /** Stores a personal project's feature switches; a shared project is left untouched. */
+  updatePersonalFeatures(input: { projectId: string; features: PersonalFeatures }): Promise<void>;
   /** Main `personal-team-scope.ts:90-97`: a personal project's owner, archived or not. */
   findPersonalProjectOwner(input: {
     organizationId: string;

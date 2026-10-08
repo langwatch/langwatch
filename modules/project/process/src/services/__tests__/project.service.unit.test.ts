@@ -97,6 +97,18 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 });
 
 class StubRepository implements ProjectRepository {
+  archivePersonalInTeams(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  revivePersonalInTeam(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  updatePersonalFeatures(): Promise<void> {
+    return Promise.resolve();
+  }
+
   findPaths = vi.fn(async () => []);
   findProjectsWithDepartments = vi.fn(async () => []);
   assignProjectDepartment = vi.fn(async () => false);

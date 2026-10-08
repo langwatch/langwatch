@@ -1,4 +1,5 @@
 import { parseOnboardingVariant } from "@langwatch/onboarding-contract";
+import type { PersonalFeatures } from "@langwatch/organization-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { Prisma, type Project as PrismaProject } from "@langwatch/prisma-client/generated";
 import {
@@ -25,7 +26,7 @@ import {
   type ProjectIdPageInput,
   type ProjectUsageCount,
 } from "@langwatch/project-contract";
-import { fromDate, toDate } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
   ProjectRepository,
@@ -660,6 +661,30 @@ export class PrismaProjectRepository
       data: { apiKey: input.token },
     });
     return result.count > 0;
+  }
+
+  async archivePersonalInTeams(input: { teamIds: string[]; archivedAt: Instant }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { teamId: { in: input.teamIds }, isPersonal: true, archivedAt: null },
+      data: { archivedAt: toDate(input.archivedAt) },
+    });
+  }
+
+  async revivePersonalInTeam(input: { teamId: string }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { teamId: input.teamId, isPersonal: true, archivedAt: { not: null } },
+      data: { archivedAt: null },
+    });
+  }
+
+  async updatePersonalFeatures(input: {
+    projectId: string;
+    features: PersonalFeatures;
+  }): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: { id: input.projectId, isPersonal: true },
+      data: { personalFeatures: input.features },
+    });
   }
 
   async findPersonalProjectOwner(input: {
