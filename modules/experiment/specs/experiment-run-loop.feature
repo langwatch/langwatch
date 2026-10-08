@@ -21,6 +21,25 @@ Feature: An experiment run executes on its pipeline
     But a poll still reads the run's progress from Redis
 
   @unit
+  Scenario: A run link reads BASE_HOST before NEXT_PUBLIC_BASE_URL
+    Given a process with both BASE_HOST and NEXT_PUBLIC_BASE_URL set
+    When a run link's origin is chosen
+    Then it is BASE_HOST, and nothing is deprecated
+
+  @unit
+  Scenario: A run link falls back to NEXT_PUBLIC_BASE_URL with one deprecation warning
+    Given a process with NEXT_PUBLIC_BASE_URL set and no BASE_HOST
+    When the process boots
+    Then run links use NEXT_PUBLIC_BASE_URL
+    And one warning says NEXT_PUBLIC_BASE_URL will be removed in a future release
+
+  @unit
+  Scenario: A run link has no origin when neither address is set
+    Given a process with neither BASE_HOST nor NEXT_PUBLIC_BASE_URL
+    When a run link's origin is chosen
+    Then there is none, and runs are refused naming the public address
+
+  @unit
   Scenario: A run's stop signal is shared through the deployment's Redis
     Given a process with Redis and a public address
     When a stop is requested for a run

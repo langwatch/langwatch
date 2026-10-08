@@ -110,6 +110,7 @@ async function bootWorker({
         allowedProxyHosts: [],
         runConcurrency: 10,
         publicBaseUrl: undefined,
+        legacyPublicBaseUrl: undefined,
         isSaas: false,
       },
     })

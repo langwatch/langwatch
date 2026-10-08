@@ -16,6 +16,14 @@ export const experimentConfig = Config.define((c) => ({
   runConcurrency: c.env("EVAL_V3_CONCURRENCY", z.coerce.number().int().positive().default(10)),
   /** The shared deployment origin: the link a polled run answers with; absent, runs are refused. */
   publicBaseUrl,
+  /** Main's run-link origin, read only when BASE_HOST is unset; deprecated, warned at boot. */
+  legacyPublicBaseUrl: c.env(
+    "NEXT_PUBLIC_BASE_URL",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
   /** LangWatch's own cloud, where a run's outbound calls verify TLS. */
   isSaas,
 }));

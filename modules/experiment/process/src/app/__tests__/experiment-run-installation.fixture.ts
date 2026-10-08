@@ -357,6 +357,7 @@ function boot({
         allowedProxyHosts: [],
         runConcurrency,
         publicBaseUrl,
+        legacyPublicBaseUrl: undefined,
         isSaas: false,
       },
     })

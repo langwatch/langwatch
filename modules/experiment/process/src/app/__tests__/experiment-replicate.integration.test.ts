@@ -61,6 +61,7 @@ async function boot() {
         allowedProxyHosts: [],
         runConcurrency: 10,
         publicBaseUrl: undefined,
+        legacyPublicBaseUrl: undefined,
         isSaas: false,
       },
     })

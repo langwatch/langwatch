@@ -41,6 +41,7 @@ import {
   runRefusalsOf,
   type ExperimentRunRefusals,
 } from "../../../rules/experiment-run-availability.rules.ts";
+import { runLinkBaseOf } from "../../../rules/experiment-run-url.rules.ts";
 import { ExperimentAgentOwnershipService } from "../../../services/experiment-agent-ownership.service.ts";
 import { ExperimentAttachmentInputService } from "../../../services/experiment-attachment-input.service.ts";
 import { ExperimentAttachmentLimitService } from "../../../services/experiment-attachment-limit.service.ts";
@@ -102,7 +103,12 @@ type ExperimentRunDeps = Readonly<{
   peers: ExperimentRunPeers;
   config: Pick<
     ExperimentServerConfig,
-    "blockLocalHttpCalls" | "allowedProxyHosts" | "runConcurrency" | "publicBaseUrl" | "isSaas"
+    | "blockLocalHttpCalls"
+    | "allowedProxyHosts"
+    | "runConcurrency"
+    | "publicBaseUrl"
+    | "legacyPublicBaseUrl"
+    | "isSaas"
   >;
   /** The role this process serves, named in a start's refusal. */
   role: string;
@@ -112,7 +118,13 @@ type ExperimentRunDeps = Readonly<{
 export class ExperimentRunService {
   static create(deps: ExperimentRunDeps): ExperimentRunService {
     const { commands, experiments, runStores, peers, config, role } = deps;
-    const { publicBaseUrl } = config;
+    const { baseUrl: publicBaseUrl, deprecated } = runLinkBaseOf(config);
+    if (deprecated) {
+      createLogger("langwatch:experiment:run").warn(
+        { deprecated: "NEXT_PUBLIC_BASE_URL", use: "BASE_HOST" },
+        "NEXT_PUBLIC_BASE_URL is deprecated for run links and will be removed in a future release; set BASE_HOST",
+      );
+    }
     const { retention } = peers;
     const repositories = runStores.open({
       defaultRetentionDays: () => retention.getPlatformDefaultRetentionDays(),
