@@ -8,7 +8,7 @@ import { baseSpanSchema, lLMSpanSchema, type Span } from "@langwatch/trace-contr
 import { describe, expect, it, vi } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
-import { SpanCostSuggestionService } from "../../services/span-cost-suggestion.service.ts";
+import { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TracesSpanReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";

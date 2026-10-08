@@ -1,8 +1,8 @@
-import { ClickHouseTraceFacetRegistryRepository } from "../../../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
-import { TraceQueryEvaluationScopeService } from "../../trace-query-evaluation-scope.service.ts";
-import { TraceQueryEvaluationService } from "../../trace-query-evaluation.service.ts";
-import { TraceQueryFieldsService } from "../../trace-query-fields.service.ts";
-import { TraceQueryTranslationService } from "../../trace-query-translation.service.ts";
+import { ClickHouseTraceFacetRegistryRepository } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import { TraceQueryEvaluationScopeService } from "../../../features/query/services/trace-query-evaluation-scope.service.ts";
+import { TraceQueryEvaluationService } from "../../../features/query/services/trace-query-evaluation.service.ts";
+import { TraceQueryFieldsService } from "../../../features/query/services/trace-query-fields.service.ts";
+import { TraceQueryTranslationService } from "../../../features/query/services/trace-query-translation.service.ts";
 
 /** The trace query services over the ClickHouse facet registry, composed as `trace.app.ts` does. */
 const facetRegistry = ClickHouseTraceFacetRegistryRepository.create();

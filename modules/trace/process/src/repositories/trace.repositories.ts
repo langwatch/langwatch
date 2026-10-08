@@ -11,22 +11,22 @@ import type { TraceAnnotationScoresReadRepository } from "./trace-annotation-sco
 import type { TraceAnnotationsReadRepository } from "./trace-annotations.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
-import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
+import type { TraceClusteringSampleRepository } from "../features/topic/repositories/trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
-import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
+import type { TraceEditOverlayRepository } from "../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
-import type { TraceExportSlotRepository } from "./trace-export-slot.repository.ts";
-import type { TraceIngestSourceBillingRepository } from "./trace-ingest-source-billing.repository.ts";
+import type { TraceExportSlotRepository } from "../features/export/repositories/trace-export-slot.repository.ts";
+import type { TraceIngestSourceBillingRepository } from "../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 import type { TraceInstantEvalRunsReadRepository } from "./trace-instant-eval-runs.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
-import type { TraceRateLimitRepository } from "./trace-rate-limit.repository.ts";
+import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
 import type { TraceSpanDedupRepository } from "./trace-span-dedup.repository.ts";
 import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
-import type { TraceTopicNamesReadRepository } from "./trace-topic-names.repository.ts";
+import type { TraceTopicNamesReadRepository } from "../features/topic/repositories/trace-topic-names.repository.ts";
 import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
 
 /**

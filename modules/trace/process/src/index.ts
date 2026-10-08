@@ -17,7 +17,7 @@ export {
   type EventingTracePipelineAdapterOptions,
 } from "./eventing/trace-processing-projections.pipeline.ts";
 export type { TraceProjectMetadata } from "./eventing/project-metadata.subscriber.ts";
-export type { TraceModelCostCatalog } from "./services/span-cost-enrichment.service.ts";
+export type { TraceModelCostCatalog } from "./features/span/services/span-cost-enrichment.service.ts";
 export {
   PROJECT_METADATA_WINDOW_MS,
   createProjectMetadataHandler,

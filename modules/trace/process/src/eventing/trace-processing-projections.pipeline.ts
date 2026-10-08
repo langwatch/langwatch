@@ -28,11 +28,11 @@ import {
 import {
   clampSpanShardCount,
   spanCommandGroupKey,
-} from "../rules/trace-span-command-shard.rules.ts";
-import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
-import type { TraceIoExtraction } from "../services/trace-io-extraction.service.ts";
-import type { TraceMediaReferenceResolver } from "../services/trace-media-reference.service.ts";
-import type { TraceModelCost } from "../services/trace-model-cost.service.ts";
+} from "../features/ingestion/rules/trace-span-command-shard.rules.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
+import type { TraceIoExtraction } from "../features/derivation/services/trace-io-extraction.service.ts";
+import type { TraceMediaReferenceResolver } from "../features/media/services/trace-media-reference.service.ts";
+import type { TraceModelCost } from "../features/derivation/services/trace-model-cost.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
 import { SpanStorageMapProjection } from "./span-storage.projection.ts";

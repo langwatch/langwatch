@@ -1,6 +1,6 @@
 import type { NormalizedSpan, ScenarioRoleMetrics } from "@langwatch/trace-contract";
 
-import type { SpanCostService } from "../services/span-cost.service.ts";
+import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
 
 // Minimal shape for scenario role cost/latency aggregation; decoupled from
 // NormalizedSpan so the aggregator is pure and dependency-free

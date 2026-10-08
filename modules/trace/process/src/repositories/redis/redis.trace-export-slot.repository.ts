@@ -1,6 +1,6 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 
-import { TraceExportSlotRepository } from "../trace-export-slot.repository.ts";
+import { TraceExportSlotRepository } from "../../features/export/repositories/trace-export-slot.repository.ts";
 
 /** Export slots over the process's Redis: a claim is one `SET key value EX seconds NX`. */
 export class RedisTraceExportSlotRepository extends TraceExportSlotRepository {

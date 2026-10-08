@@ -6,8 +6,8 @@ import {
 import { defineProcessModule } from "@langwatch/process";
 
 import { TraceModule } from "./app/trace.app.ts";
-import { traceCollectorEvaluationsEventing } from "./eventing/trace-collector-evaluations.pipeline.ts";
-import { traceIngestSourceBillingEventing } from "./eventing/trace-ingest-source-billing.pipeline.ts";
+import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
+import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";

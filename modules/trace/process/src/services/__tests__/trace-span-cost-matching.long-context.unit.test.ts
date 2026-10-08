@@ -1,7 +1,7 @@
 import { getStaticModelCostRates, findMatchingModelCost } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 
 /** Long-context [1m] suffix is absorbed by prefix-anchored regexes, so base
  * model rates apply (no [1m] premium). */

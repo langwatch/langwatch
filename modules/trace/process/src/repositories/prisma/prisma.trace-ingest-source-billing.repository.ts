@@ -5,7 +5,7 @@ import {
   type IngestSourceBilling,
   type IngestSourceKey,
   TraceIngestSourceBillingRepository,
-} from "../trace-ingest-source-billing.repository.ts";
+} from "../../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 
 type PrismaTraceIngestSourceBillingDatabase = PrismaModelClient<"TraceIngestSourceBilling">;
 

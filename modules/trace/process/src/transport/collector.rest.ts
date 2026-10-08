@@ -44,7 +44,7 @@ import {
   type CollectorIngestOutcome,
   type CollectorMetadata,
   type CollectorRejection,
-} from "#rules/trace-collector-body.rules";
+} from "#features/ingestion/rules/trace-collector-body.rules";
 
 const logger = createLogger("langwatch.collector");
 

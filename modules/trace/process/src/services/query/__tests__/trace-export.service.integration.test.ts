@@ -13,8 +13,8 @@ import type {
  */
 import { describe, expect, it } from "vitest";
 
-import { TraceExportService } from "../../trace-export.service.ts";
-import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
+import { TraceExportService } from "../../../features/export/services/trace-export.service.ts";
+import type { TraceLegacyReadService } from "../../../features/legacy/services/trace-legacy-read.service.ts";
 import { legacyReadAnswering } from "./support/trace-legacy-read.support.ts";
 
 const fullProtections: Protections = {

@@ -7,11 +7,11 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceEditOverlayRow } from "../../../repositories/trace-edit-overlay.repository.ts";
+import type { TraceEditOverlayRow } from "../../../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 import {
   TraceEditOverlayService,
   type TraceEditRemoval,
-} from "../../trace-edit-overlay.service.ts";
+} from "../../../features/edit-overlay/services/trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
   ({

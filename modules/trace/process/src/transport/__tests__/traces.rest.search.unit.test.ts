@@ -24,13 +24,13 @@ import {
   andFilterConditions,
   findHiddenOriginConditions,
 } from "#rules/trace-filter-hidden-origins.rules";
-import type * as projectionCompileRules from "#rules/trace-projection-compile.rules";
-import { compileProjection } from "#rules/trace-projection-compile.rules";
+import type * as projectionCompileRules from "#features/projection/rules/trace-projection-compile.rules";
+import { compileProjection } from "#features/projection/rules/trace-projection-compile.rules";
 
 import { traceQueryTranslation } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
-vi.mock("#rules/trace-projection-compile.rules", async (importOriginal) => {
+vi.mock("#features/projection/rules/trace-projection-compile.rules", async (importOriginal) => {
   const actual = await importOriginal<typeof projectionCompileRules>();
   return { ...actual, compileProjection: vi.fn(actual.compileProjection) };
 });

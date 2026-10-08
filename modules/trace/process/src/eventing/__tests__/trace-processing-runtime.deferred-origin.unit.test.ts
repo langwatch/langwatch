@@ -7,7 +7,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import { DEFERRED_ORIGIN_SUBSCRIBER_NAME } from "../deferred-origin.subscriber.ts";
 import {
   type TraceProcessingPipelineInput,

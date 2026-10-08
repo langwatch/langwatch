@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
-import { TraceTranscriptReadService } from "../../services/trace-transcript-read.service.ts";
+import { TraceTranscriptReadService } from "../../features/read/services/trace-transcript-read.service.ts";
 import {
   createTranscriptApp,
   createTranscriptReadPorts,

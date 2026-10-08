@@ -9,14 +9,14 @@ import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/
 
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
-import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
-import { OtlpSpanTokenEstimationService } from "../services/span-token-estimation.service.ts";
-import { TraceIoExtractionAdapterService } from "../services/trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceService } from "../services/trace-media-reference.service.ts";
-import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
+import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
+import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
+import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
+import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
+import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import {
   createProjectMetadataHandler,

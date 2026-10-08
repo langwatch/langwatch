@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import * as TraceContentArrayService from "../../rules/trace-content-array.rules.ts";
+import * as TraceContentArrayService from "../../features/conversation/rules/trace-content-array.rules.ts";
 
 describe("TraceContentArrayService.coerceContentToArray", () => {
   describe("when content is already an array", () => {

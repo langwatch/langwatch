@@ -7,9 +7,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
-import { TraceListService } from "../trace-list-read.service.ts";
+import { TraceListService } from "../../features/read/services/trace-list-read.service.ts";
 
 const TENANT = "tenant-discover-updates";
 

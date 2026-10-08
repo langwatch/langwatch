@@ -41,8 +41,8 @@ import {
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
-} from "../services/trace-io-accumulation.service.ts";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
+} from "../features/derivation/services/trace-io-accumulation.service.ts";
+import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-summary-fold");

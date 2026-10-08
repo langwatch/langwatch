@@ -15,9 +15,9 @@ import {
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
-} from "../rules/trace-span-storage-group.rules.ts";
-import type { SpanCostService } from "../services/span-cost.service.ts";
-import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
+} from "../features/span/rules/trace-span-storage-group.rules.ts";
+import type { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import type { TraceSpanNormalization } from "../features/span/services/span-normalization.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-map");
 

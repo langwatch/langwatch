@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
+import { TraceAttributeAccumulationService } from "../../features/derivation/services/trace-attribute-accumulation.service.ts";
 import { TraceOriginService } from "../../services/trace-origin.service.ts";
 import { needsOriginResolution } from "../deferred-origin.subscriber.ts";
 import { createOtlpSpan, createSpanReceivedEvent } from "./trace-subscriber.fixtures.ts";

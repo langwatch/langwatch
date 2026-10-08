@@ -34,8 +34,8 @@ import {
   generateAsciiTree,
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
-import { unkeyedLegacyFilterViolations } from "#rules/trace-legacy-filter-keys.rules";
-import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
+import { unkeyedLegacyFilterViolations } from "#features/legacy/rules/trace-legacy-filter-keys.rules";
+import { traceLegacySearchBodySchema } from "#features/legacy/rules/trace-legacy-search-body.rules";
 
 import { tracesRestCredential } from "./traces.rest.ts";
 /**

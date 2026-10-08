@@ -1,9 +1,9 @@
 import type { TraceSummaryData, Span } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
-import * as TraceLegacySummaryMappingService from "../../rules/trace-legacy-summary-mapping.rules.ts";
+import * as TraceLegacySummaryMappingService from "../../features/legacy/rules/trace-legacy-summary-mapping.rules.ts";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 

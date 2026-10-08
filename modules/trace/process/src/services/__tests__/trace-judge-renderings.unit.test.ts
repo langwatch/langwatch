@@ -9,11 +9,11 @@ import {
   deserializeAttributes,
   serializeAttributes,
 } from "../../repositories/clickhouse/stored-span-row.mapper.ts";
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { extractLlmMessagesForTrace } from "../../rules/trace-llm-messages.rules.ts";
+import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
+import { extractLlmMessagesForTrace } from "../../features/conversation/rules/trace-llm-messages.rules.ts";
 import { formatSpansDigest } from "../../rules/trace-readable-span.rules.ts";
-import { SpanNormalizationPipelineService } from "../span-normalization.service.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { SpanNormalizationPipelineService } from "../../features/span/services/span-normalization.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   genAiToolAgentTrace,
   type JudgeLabTrace,

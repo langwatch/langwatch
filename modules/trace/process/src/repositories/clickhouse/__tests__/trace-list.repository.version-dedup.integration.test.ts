@@ -8,7 +8,7 @@ import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trac
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
-import { FACET_REGISTRY } from "../clickhouse.trace-facet-registry.mapper.ts";
+import { FACET_REGISTRY } from "../../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,

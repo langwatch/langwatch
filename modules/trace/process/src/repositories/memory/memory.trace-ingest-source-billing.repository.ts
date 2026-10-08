@@ -2,7 +2,7 @@ import {
   type IngestSourceBilling,
   type IngestSourceKey,
   TraceIngestSourceBillingRepository,
-} from "../trace-ingest-source-billing.repository.ts";
+} from "../../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
 
 /** In-memory twin of trace's Postgres fold of the coding-assistant billing fact. */
 export class MemoryTraceIngestSourceBillingRepository extends TraceIngestSourceBillingRepository {

@@ -2,19 +2,19 @@ import { EventNotFoundError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 
-import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
+import type { TraceIOExtractionService } from "#features/derivation/services/trace-io-extraction.service";
 
 /**
  * Bulk read-path resolution of offloaded trace event refs (ADR-022). Resolving each trace of a
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
-import type { ResolveTraceSpansBatchFn } from "../repositories/trace-legacy-read.repository.ts";
+import type { ResolveTraceSpansBatchFn } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import { TraceEventPayloadFieldNotFoundError } from "../repositories/trace-payload-reader.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
-import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
-import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
-import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../features/media/services/trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "../features/legacy/services/trace-legacy-read.service.ts";
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service.ts";
 
 const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");

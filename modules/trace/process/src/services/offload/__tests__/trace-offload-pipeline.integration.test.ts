@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Offload pipeline wiring test: leanForProjection, eventref resolution, and
  * output recomputation with in-process stubs (no external services).
  */
-import { leanForProjection, IO_PREVIEW_BYTES } from "../../../rules/trace-projection-lean.rules.ts";
+import { leanForProjection, IO_PREVIEW_BYTES } from "../../../features/projection/rules/trace-projection-lean.rules.ts";
 import {
   TraceOffloadResolutionService,
   type WarnLogger,
@@ -56,11 +56,11 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 import { blobStoreResolving } from "../../__tests__/support/trace-blob-store.support.ts";
-import { type TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
+import { type TraceBlobStoreService } from "../../../features/media/services/trace-blob-store.service.ts";
+import { TraceIOExtractionService } from "../../../features/derivation/services/trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Constants and helpers

@@ -15,9 +15,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";
 import type { TracesListReader } from "../../app/trace.app.ts";
-import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { TraceFacetValuesService } from "../../services/trace-facet-values.service.ts";
-import { TraceTopicNamingService } from "../../services/trace-topic-naming.service.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { TraceFacetValuesService } from "../../features/facet/services/trace-facet-values.service.ts";
+import { TraceTopicNamingService } from "../../features/topic/services/trace-topic-naming.service.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 

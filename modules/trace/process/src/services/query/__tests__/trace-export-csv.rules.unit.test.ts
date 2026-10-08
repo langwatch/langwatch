@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
 import {
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
-} from "../../../rules/trace-export-csv.rules.ts";
-import { TraceExportService } from "../../trace-export.service.ts";
+} from "../../../features/export/rules/trace-export-csv.rules.ts";
+import { TraceExportService } from "../../../features/export/services/trace-export.service.ts";
 
 // ---------------------------------------------------------------------------
 // Test data builders

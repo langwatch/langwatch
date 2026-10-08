@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import { TraceCanonicalisationService } from "#features/derivation/services/trace-canonicalisation.service";
 
 /** Derives content from raw LLM API bodies at ingest time for cheap queryable
  * access and reduced parsing overhead downstream. */

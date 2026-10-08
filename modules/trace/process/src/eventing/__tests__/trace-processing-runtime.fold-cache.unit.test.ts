@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { RedisTraceAnalyticsFoldCacheRepository } from "../../repositories/redis/redis.trace-analytics-fold-cache.repository.ts";
 import { RedisTraceSummaryFoldCacheRepository } from "../../repositories/redis/redis.trace-summary-fold-cache.repository.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
   TraceProcessingRuntimeAdapter,

@@ -204,11 +204,11 @@ import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channel
 import {
   buildTraceCollectorEvaluationsPipeline,
   type TraceCollectorEvaluationsDefinition,
-} from "../eventing/trace-collector-evaluations.pipeline.ts";
+} from "../features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import {
   buildTraceIngestSourceBillingPipeline,
   type TraceIngestSourceBillingPipeline,
-} from "../eventing/trace-ingest-source-billing.pipeline.ts";
+} from "../features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import {
@@ -217,8 +217,8 @@ import {
 } from "../eventing/trace-project-milestones.pipeline.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
-import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { ClickHouseTraceFacetRegistryRepository } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import { CLICKHOUSE_FACET_CATALOG } from "../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { ClickHouseTraceFacetRegistryRepository } from "../features/facet/repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import {
   ResolverTraceClickHouse,
   type TraceClickHouseResolver,
@@ -227,20 +227,20 @@ import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/
 import {
   TraceLegacyReadClickHouseRepository,
   type ClickHouseTraceLegacyReadOptions,
-} from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+} from "../features/legacy/repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
-} from "../repositories/query-field-values.repository.ts";
+} from "../features/query/repositories/query-field-values.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
-import type { TraceRateLimitRepository } from "../repositories/trace-rate-limit.repository.ts";
+import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
@@ -250,14 +250,14 @@ import {
   enrichSingleSpanWithClaudeLogContent,
   isCodingAgentShapedSpan,
   mapSummaryRowsToClaudeRefs,
-} from "../rules/claude-code-log-enrichment.rules.ts";
-import type { ClaudeSpanRef } from "../rules/claude-code-message-index.rules.ts";
-import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
-import { restoreWithheldEdits } from "../rules/trace-edit-overlay-restore.rules.ts";
+} from "../features/claude-code/rules/claude-code-log-enrichment.rules.ts";
+import type { ClaudeSpanRef } from "../features/claude-code/rules/claude-code-message-index.rules.ts";
+import { redactPatchForViewer } from "../features/edit-overlay/rules/trace-edit-overlay-redaction.rules.ts";
+import { restoreWithheldEdits } from "../features/edit-overlay/rules/trace-edit-overlay-restore.rules.ts";
 import {
   createFacetFilterResolver,
   type FacetFilterResolver,
-} from "../rules/trace-facet-filter.rules.ts";
+} from "../features/facet/rules/trace-facet-filter.rules.ts";
 import {
   andFilterConditions,
   explorerOriginExclusion,
@@ -267,72 +267,72 @@ import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import {
   type GenerateFilterConditionsResult,
   translateLegacyFilters,
-} from "../rules/trace-legacy-filter-conditions.rules.ts";
+} from "../features/legacy/rules/trace-legacy-filter-conditions.rules.ts";
 import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
-} from "../rules/trace-legacy-search-body.rules.ts";
+} from "../features/legacy/rules/trace-legacy-search-body.rules.ts";
 import {
   extractLlmMessagesForSpan,
   extractLlmMessagesForTrace,
-} from "../rules/trace-llm-messages.rules.ts";
+} from "../features/conversation/rules/trace-llm-messages.rules.ts";
 import { tracePath, tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
-import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
-import { compile as compileLangWatchQLTraceFilter } from "../rules/trace-query-langwatch-ql.rules.ts";
-import { extractFreeTextTerms } from "../rules/trace-query.rules.ts";
+import { IO_PREVIEW_BYTES, utf8Preview } from "../features/projection/rules/trace-projection-lean.rules.ts";
+import { compile as compileLangWatchQLTraceFilter } from "../features/query/rules/trace-query-langwatch-ql.rules.ts";
+import { extractFreeTextTerms } from "../features/query/rules/trace-query.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
-import { renderThreadConversation } from "../rules/trace-thread-conversation.rules.ts";
+import { renderThreadConversation } from "../features/conversation/rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
-import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
-import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
+import { ClaudeCodeLogEnrichmentService } from "../features/claude-code/services/claude-code-log-enrichment.service.ts";
+import { LegacyFilterMatchingService } from "../features/legacy/services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import {
   SpanCostSuggestionService,
   type TraceSpanCostSuggestion,
-} from "../services/span-cost-suggestion.service.ts";
-import { SpanCostService } from "../services/span-cost.service.ts";
-import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
-import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
-import { TraceCanonicalisationService as TraceCanonicalisation } from "../services/trace-canonicalisation.service.ts";
-import { TraceCollectorEvaluationsService } from "../services/trace-collector-evaluations.service.ts";
-import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
-import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
-import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
-import { TraceEdgeMediaTelemetryService } from "../services/trace-edge-media-telemetry.service.ts";
-import { TraceEdgeSpoolService } from "../services/trace-edge-spool.service.ts";
-import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
-import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
-import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
+} from "../features/span/services/span-cost-suggestion.service.ts";
+import { SpanCostService } from "../features/span/services/span-cost.service.ts";
+import { TraceAiQueryService } from "../features/query/services/trace-ai-query.service.ts";
+import { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
+import { TraceCanonicalisationService as TraceCanonicalisation } from "../features/derivation/services/trace-canonicalisation.service.ts";
+import { TraceCollectorEvaluationsService } from "../features/ingestion/services/trace-collector-evaluations.service.ts";
+import { TraceCollectorSpanService } from "../features/ingestion/services/trace-collector-span.service.ts";
+import { TraceContentReadService as ConcreteTraceContentReadService } from "../features/read/services/trace-content-read.service.ts";
+import { TraceEdgeMediaPayloadService } from "../features/media/services/trace-edge-media-payload.service.ts";
+import { TraceEdgeMediaTelemetryService } from "../features/media/services/trace-edge-media-telemetry.service.ts";
+import { TraceEdgeSpoolService } from "../features/ingestion/services/trace-edge-spool.service.ts";
+import type { TraceEditRemoval } from "../features/edit-overlay/services/trace-edit-overlay.service.ts";
+import { TraceEditOverlayService } from "../features/edit-overlay/services/trace-edit-overlay.service.ts";
+import { TraceEventDerivationService } from "../features/derivation/services/trace-event-derivation.service.ts";
 import {
   TraceExportBoundsService,
   type TraceExportBounds,
-} from "../services/trace-export-bounds.service.ts";
-import { TraceExportDownloadService } from "../services/trace-export-download.service.ts";
-import { TraceExportService } from "../services/trace-export.service.ts";
-import { TraceIngestAllowanceService } from "../services/trace-ingest-allowance.service.ts";
-import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import { TraceIngestSourceBillingService } from "../services/trace-ingest-source-billing.service.ts";
+} from "../features/export/services/trace-export-bounds.service.ts";
+import { TraceExportDownloadService } from "../features/export/services/trace-export-download.service.ts";
+import { TraceExportService } from "../features/export/services/trace-export.service.ts";
+import { TraceIngestAllowanceService } from "../features/ingestion/services/trace-ingest-allowance.service.ts";
+import { TraceIngestCredentialService } from "../features/ingestion/services/trace-ingest-credential.service.ts";
+import { TraceIngestSourceBillingService } from "../features/ingestion/services/trace-ingest-source-billing.service.ts";
 import {
   TraceIngestionService,
   TraceIngressCommand,
   type CodingAgentIngestFilter,
-} from "../services/trace-ingestion.service.ts";
+} from "../features/ingestion/services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
-import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../features/derivation/services/trace-io-extraction.service.ts";
 import {
   AmbiguousTraceIdPrefixError,
   TraceLegacyReadService,
   type BlobResolutionDeps,
-} from "../services/trace-legacy-read.service.ts";
-import { TraceListService } from "../services/trace-list-read.service.ts";
-import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
-import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
+} from "../features/legacy/services/trace-legacy-read.service.ts";
+import { TraceListService } from "../features/read/services/trace-list-read.service.ts";
+import { TraceLogRecordIOService } from "../features/read/services/trace-log-record-io.service.ts";
+import { LogRecordStorageService } from "../features/read/services/trace-log-record-read.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
 } from "../services/trace-metadata-write.service.ts";
-import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -342,24 +342,24 @@ import { TraceProjectMilestonesService } from "../services/trace-project-milesto
 import {
   TraceQueryClassificationService,
   type TraceQueryClassifier,
-} from "../services/trace-query-classification.service.ts";
-import { TraceQueryEvaluationScopeService } from "../services/trace-query-evaluation-scope.service.ts";
-import { TraceQueryEvaluationService } from "../services/trace-query-evaluation.service.ts";
-import { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
-import { TraceQueryTranslationService } from "../services/trace-query-translation.service.ts";
-import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
+} from "../features/query/services/trace-query-classification.service.ts";
+import { TraceQueryEvaluationScopeService } from "../features/query/services/trace-query-evaluation-scope.service.ts";
+import { TraceQueryEvaluationService } from "../features/query/services/trace-query-evaluation.service.ts";
+import { TraceQueryFieldsService } from "../features/query/services/trace-query-fields.service.ts";
+import { TraceQueryTranslationService } from "../features/query/services/trace-query-translation.service.ts";
+import { TraceReadBoundsService } from "../features/read/services/trace-read-bounds.service.ts";
 import {
   TraceReadFullIoService,
   type TraceFullIo,
-} from "../services/trace-read-full-io.service.ts";
+} from "../features/read/services/trace-read-full-io.service.ts";
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
-import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
-import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
+import { TraceScenarioEventMediaService } from "../features/media/services/trace-scenario-event-media.service.ts";
+import { TraceSearchRouterService } from "../features/query/services/trace-search-router.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
-import { TraceStoredMediaStoreService } from "../services/trace-stored-media-store.service.ts";
-import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
-import { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
+import { SpanStorageService } from "../features/read/services/trace-span-storage-read.service.ts";
+import { TraceStoredMediaStoreService } from "../features/media/services/trace-stored-media-store.service.ts";
+import { TraceSummaryService } from "../features/read/services/trace-summary-read.service.ts";
+import { TraceTopicClusteringReadService } from "../features/topic/services/trace-topic-clustering-read.service.ts";
 import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import {
   TraceViewerProtectionService,
@@ -385,7 +385,7 @@ import type * as traceContractModule from "@langwatch/trace-contract";
 import type {
   CollectorIngestInput,
   CollectorIngestOutcome,
-} from "../rules/trace-collector-body.rules.ts";
+} from "../features/ingestion/rules/trace-collector-body.rules.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
@@ -406,12 +406,12 @@ import {
   type CollectorEvaluationReportInput,
   type CollectorSpanIngestInput,
   type CollectorSpanIngestResult,
-} from "../services/trace-collector-dispatch.service.ts";
-import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
-import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
-import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
+} from "../features/ingestion/services/trace-collector-dispatch.service.ts";
+import { TraceExportProgressService } from "../features/export/services/trace-export-progress.service.ts";
+import { TraceFacetValuesService } from "../features/facet/services/trace-facet-values.service.ts";
+import { TraceSharedReadService } from "../features/read/services/trace-shared-read.service.ts";
 import { TraceTenantUpdateStreamService } from "../services/trace-tenant-update-stream.service.ts";
-import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
+import { TraceTranscriptReadService } from "../features/read/services/trace-transcript-read.service.ts";
 import type {
   TraceLegacyReads,
   TraceLegacySearchFields,

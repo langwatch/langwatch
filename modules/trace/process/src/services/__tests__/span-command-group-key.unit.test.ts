@@ -6,7 +6,7 @@ import {
   resolveSpanCommandShardCount,
   spanCommandGroupKey,
   spanShardIndex,
-} from "../../rules/trace-span-command-shard.rules.ts";
+} from "../../features/ingestion/rules/trace-span-command-shard.rules.ts";
 
 const TRACE_ID = "534bd8a1bf83e7c58e8aaacefb047cc2";
 

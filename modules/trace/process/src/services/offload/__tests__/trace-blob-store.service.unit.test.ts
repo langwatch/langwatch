@@ -14,13 +14,13 @@ import {
   type S3ClientResolver,
   S3TraceLegacySpoolChannel,
 } from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
-import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";
+import { SPOOL_REF_V2 } from "../../../features/ingestion/rules/trace-spool-location.rules.ts";
 import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,
   SpoolDestinationUnsupportedError,
   type SpoolStorage,
-} from "../../trace-blob-store.service.ts";
+} from "../../../features/media/services/trace-blob-store.service.ts";
 import { StreamTooLargeError } from "../../trace-stream-buffer.service.ts";
 
 /**

@@ -20,8 +20,8 @@ import {
   type TraceEventRollup,
 } from "@langwatch/trace-contract";
 
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
+import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
+import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as

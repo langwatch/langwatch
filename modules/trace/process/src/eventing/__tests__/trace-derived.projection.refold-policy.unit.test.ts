@@ -3,7 +3,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { MAX_PROCESSED_SPANS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,

@@ -13,7 +13,7 @@ import {
   traceQueryEvaluation,
   traceQueryTranslation,
 } from "../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
-import type { ExpressionCategoricalDef, RangeFacetDef } from "../trace-facet-registry.rules.ts";
+import type { ExpressionCategoricalDef, RangeFacetDef } from "../../features/facet/rules/trace-facet-registry.rules.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
   traceQueryEvaluation.traceMatchesQuery(queryText, trace);

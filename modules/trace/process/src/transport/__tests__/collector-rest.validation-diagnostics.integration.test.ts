@@ -7,7 +7,7 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import type * as observabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CollectorIngestInput } from "../../rules/trace-collector-body.rules.ts";
+import type { CollectorIngestInput } from "../../features/ingestion/rules/trace-collector-body.rules.ts";
 
 const logCalls: { level: string; fields: unknown; message: string }[] = [];
 
@@ -34,7 +34,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 const { collectorRest } = await import("../collector.rest.ts");
 const { TraceCollectorDispatchService } =
-  await import("../../services/trace-collector-dispatch.service.ts");
+  await import("../../features/ingestion/services/trace-collector-dispatch.service.ts");
 
 const project = { id: "project-123", teamId: "team-1", organizationId: "org-1" };
 

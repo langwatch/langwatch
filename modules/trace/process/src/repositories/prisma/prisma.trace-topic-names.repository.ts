@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { TraceTopicNamesReadRepository } from "../trace-topic-names.repository.ts";
+import type { TraceTopicNamesReadRepository } from "../../features/topic/repositories/trace-topic-names.repository.ts";
 
 /** Only the shared delegate this reader touches; it claims no table (R40). */
 type PrismaTraceTopicNamesDatabase = Pick<PrismaClient, "topic">;

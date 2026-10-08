@@ -2,8 +2,8 @@
  * transcript content search. Only implicit-field terms qualify. */
 import { describe, expect, it } from "vitest";
 
-import { MAX_VALUE_LENGTH } from "../trace-query-values.rules.ts";
-import { extractFreeTextTerms } from "../trace-query.rules.ts";
+import { MAX_VALUE_LENGTH } from "../../features/query/rules/trace-query-values.rules.ts";
+import { extractFreeTextTerms } from "../../features/query/rules/trace-query.rules.ts";
 
 describe("given plain free text", () => {
   describe("when extracting the content terms", () => {

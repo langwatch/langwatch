@@ -8,7 +8,7 @@ import {
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 
-import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
+import { TraceCollectorSpanService } from "../features/ingestion/services/trace-collector-span.service.ts";
 
 export interface TraceSpanIngest {
   recordSpan(data: RecordSpanCommandData): Promise<unknown>;

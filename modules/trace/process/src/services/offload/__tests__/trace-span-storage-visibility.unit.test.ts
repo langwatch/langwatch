@@ -2,7 +2,7 @@ import type { Span } from "@langwatch/trace-contract";
 import { TEASER_ELLIPSIS, TEASER_MAX_CHARS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
+import { SpanStorageService } from "../../../features/read/services/trace-span-storage-read.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

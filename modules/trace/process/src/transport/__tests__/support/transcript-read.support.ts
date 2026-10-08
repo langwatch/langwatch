@@ -22,7 +22,7 @@ import {
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "../../../rules/trace-read-redaction.rules.ts";
-import type { TracesReadMembers } from "../../../services/trace-transcript-read.service.ts";
+import type { TracesReadMembers } from "../../../features/read/services/trace-transcript-read.service.ts";
 import type { TraceViewerProtectionService } from "../../../services/trace-viewer-protection.service.ts";
 
 // Real TraceModule required: readSpans decides tenant key and visibility cutoff.

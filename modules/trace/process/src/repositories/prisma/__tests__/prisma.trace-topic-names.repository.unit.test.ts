@@ -6,7 +6,7 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceTopicNamingService } from "../../../services/trace-topic-naming.service.ts";
+import { TraceTopicNamingService } from "../../../features/topic/services/trace-topic-naming.service.ts";
 import { PrismaTraceTopicNamesRepository } from "../prisma.trace-topic-names.repository.ts";
 
 const PROJECT = "project-1";

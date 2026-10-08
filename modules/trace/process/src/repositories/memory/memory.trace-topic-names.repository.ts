@@ -1,4 +1,4 @@
-import { TraceTopicNamesReadRepository } from "../trace-topic-names.repository.ts";
+import { TraceTopicNamesReadRepository } from "../../features/topic/repositories/trace-topic-names.repository.ts";
 
 /** A topic as a test seeds it, with the project that owns it. */
 type SeededTopic = { projectId: string; id: string; name: string };
