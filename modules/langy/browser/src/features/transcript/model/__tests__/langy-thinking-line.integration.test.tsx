@@ -6,7 +6,7 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line.tsx";
+import { LangyThinkingLine } from "../../ui/sections/langy-thinking-line.tsx";
 import type { ThinkingMessage } from "../langy-thinking-line.ts";
 import { THINKING_STUCK_MS } from "../langy-thinking-line.ts";
 

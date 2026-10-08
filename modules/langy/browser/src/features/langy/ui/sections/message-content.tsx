@@ -32,9 +32,6 @@ import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
-import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
-import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
 import {
   type GuidedPullRequest,
   guidedPathCompletedIn,
@@ -46,6 +43,8 @@ import {
 import { questionToolCardParts } from "../../../tools/model/langy-question-tool.ts";
 import { sayToolText } from "../../../tools/model/langy-say-tool.ts";
 import { secretSnippetCalls } from "../../../tools/model/langy-secret-snippet-tool.ts";
+import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-access-card.tsx";
+import { LangySecretSnippetCard } from "../../../tools/ui/sections/langy-secret-snippet-card.tsx";
 import {
   hasLangyBlockParts,
   type LangyAnswerSegment,
@@ -66,6 +65,7 @@ import {
   type LangyTranscriptRun,
   langyTranscriptRuns,
 } from "../../../transcript/model/langy-transcript.ts";
+import { LangyDerivedCardView } from "../../../transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";

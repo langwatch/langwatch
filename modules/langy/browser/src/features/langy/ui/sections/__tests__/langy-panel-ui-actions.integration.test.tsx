@@ -13,7 +13,7 @@ import { z } from "zod";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { type LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.

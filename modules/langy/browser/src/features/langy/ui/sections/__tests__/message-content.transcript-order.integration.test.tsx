@@ -19,7 +19,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../ui/sections/derived-cards/langy-code-access-card.tsx", () => ({
+vi.mock("../../../../tools/ui/sections/langy-code-access-card.tsx", () => ({
   LangyCodeAccessCard: ({ callId }: { callId: string }) => (
     <div data-testid="code-access-card">{callId}</div>
   ),

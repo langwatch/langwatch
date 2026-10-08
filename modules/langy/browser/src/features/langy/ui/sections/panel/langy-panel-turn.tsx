@@ -10,10 +10,10 @@ import type { LangyTurnSignals } from "../../../../../behavior/use-langy-turn-si
 import type { resolveLangyActivityOwnership } from "../../../../../model/langy-activity-ownership.ts";
 import type { langyPlan } from "../../../../../model/langy-plan.ts";
 import { LangyCardBoundary } from "../../../../../ui/elements/langy-card-boundary.tsx";
-import { LangyDerivedCardView } from "../../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
-import { LangyThinkingLine } from "../../../../../ui/sections/langy-thinking-line.tsx";
 import { StreamingStatusLine } from "../../../../../ui/sections/streaming-status-line.tsx";
 import { readableDate } from "../../../../transcript/model/langy-row-format.ts";
+import { LangyDerivedCardView } from "../../../../transcript/ui/sections/langy-derived-card-view.tsx";
+import { LangyThinkingLine } from "../../../../transcript/ui/sections/langy-thinking-line.tsx";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
 import type { useLangyLocalWaits } from "../../../behavior/panel/use-langy-local-waits.ts";
 import type { useLangyTranscriptReads } from "../../../behavior/panel/use-langy-panel-display.ts";

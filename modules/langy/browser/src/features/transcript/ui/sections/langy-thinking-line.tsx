@@ -4,16 +4,16 @@ import { nowInstant } from "@langwatch/time";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
-import { useCyclingVerb } from "../../behavior/use-cycling-verb.ts";
+import { useCyclingVerb } from "../../../../behavior/use-cycling-verb.ts";
+import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
+import { LANGY_THINKING_VERBS } from "../../../../model/values/langy-thinking-verbs.ts";
+import { STATUS_LINE_ROW, StatusOrb } from "../../../../ui/sections/streaming-status-line.tsx";
 import type {
   LangyThinkingTone,
   LangyToolNarrator,
   ThinkingMessage,
-} from "../../features/transcript/model/langy-thinking-line.ts";
-import { langyThinkingLine } from "../../features/transcript/model/langy-thinking-line.ts";
-import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer.ts";
-import { LANGY_THINKING_VERBS } from "../../model/values/langy-thinking-verbs.ts";
-import { STATUS_LINE_ROW, StatusOrb } from "./streaming-status-line.tsx";
+} from "../../model/langy-thinking-line.ts";
+import { langyThinkingLine } from "../../model/langy-thinking-line.ts";
 
 const MotionText = motion.create(Box);
 

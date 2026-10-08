@@ -61,7 +61,7 @@ import {
   type LangyHostTeam,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { useLangy } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangy } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import ProjectLangyLayout from "../project-langy-layout.tsx";
 
 function LangySidecarStub() {

@@ -10,11 +10,11 @@ import {
 } from "@langwatch/langy-contract";
 import { Fragment, useMemo, useRef, type ReactNode } from "react";
 
-import { StreamingText } from "../streaming-text.tsx";
 import {
   LangyDerivedCardView,
   type LangyDerivedCardViewProps,
-} from "./langy-derived-card-view.tsx";
+} from "../../../features/transcript/ui/sections/langy-derived-card-view.tsx";
+import { StreamingText } from "../streaming-text.tsx";
 
 type StreamSegment =
   | { type: "text"; text: string }

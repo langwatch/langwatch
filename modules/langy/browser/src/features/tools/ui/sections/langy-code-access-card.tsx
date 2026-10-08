@@ -22,19 +22,16 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Check, FolderCode, FolderOpen, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { describeError } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/langy-api.ts";
-import { useLangyLocalControlStore } from "../../../behavior/langy-local-control.store.ts";
-import { LangyGitHubConnectCard } from "../../../features/langy/ui/sections/github/langy-git-hub-connect-card.tsx";
-import {
-  readLocalFolderPick,
-  writeLocalFolderPick,
-} from "../../../features/tools/model/langy-code-access-pick.ts";
+import { describeError } from "../../../../behavior/errors.tsx";
+import { api } from "../../../../behavior/langy-api.ts";
+import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import {
   type LangyLocalWorkspaceRead,
   parseLangyLocalWorkspace,
-} from "../../../model/langy-local-workspace.ts";
-import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
+} from "../../../../model/langy-local-workspace.ts";
+import { LangyCopyButton } from "../../../../ui/elements/langy-copy-button.tsx";
+import { LangyGitHubConnectCard } from "../../../langy/ui/sections/github/langy-git-hub-connect-card.tsx";
+import { readLocalFolderPick, writeLocalFolderPick } from "../../model/langy-code-access-pick.ts";
 
 /** The option ids the selection carries, so the message reads the same words. */
 export const LANGY_CODE_ACCESS_OPTIONS = {

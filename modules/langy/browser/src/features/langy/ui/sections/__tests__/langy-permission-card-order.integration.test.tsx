@@ -224,7 +224,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
 import { MemoryRouter } from "react-router";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

@@ -12,11 +12,11 @@ import {
   useState,
 } from "react";
 
-import { useLangyPageContextStore } from "../../behavior/langy-page-context.store.ts";
-import { useLangyRegistrationsStore } from "../../behavior/langy-registrations.store.ts";
-import { type LangyContextChip } from "../../behavior/langy.store.ts";
-import type { ProposalHandlers } from "../../features/tools/model/langy-proposal-handlers.ts";
-import type { LangyUiActionHandlers } from "../../model/ui-actions/langy-ui-action-types.ts";
+import { useLangyPageContextStore } from "../../../../behavior/langy-page-context.store.ts";
+import { useLangyRegistrationsStore } from "../../../../behavior/langy-registrations.store.ts";
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+import type { LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
+import type { ProposalHandlers } from "../../model/langy-proposal-handlers.ts";
 
 /**
  * Per-page registration surface for Langy (proposal handlers + precise page context).

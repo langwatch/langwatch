@@ -5,9 +5,9 @@ import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LangyDerivedCardView } from "../../../../features/transcript/ui/sections/langy-derived-card-view.tsx";
 import { LangyFailedCard } from "../../../elements/derived-cards/langy-failed-card.tsx";
 import { LangyChoicesCard } from "../langy-choices-card.tsx";
-import { LangyDerivedCardView } from "../langy-derived-card-view.tsx";
 
 afterEach(cleanup);
 

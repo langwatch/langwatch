@@ -223,7 +223,7 @@ import {
   LangyHostProvider,
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangyProvider } from "../../../../tools/ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 
 /**

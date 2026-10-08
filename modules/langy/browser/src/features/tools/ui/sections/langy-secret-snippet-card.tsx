@@ -7,15 +7,15 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-sy
 import { KeyRound } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 
-import { describeError, readHandledError } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/langy-api.ts";
-import { useLangySecretRevealStore } from "../../../behavior/langy-secret-reveal.store.ts";
+import { describeError, readHandledError } from "../../../../behavior/errors.tsx";
+import { api } from "../../../../behavior/langy-api.ts";
+import { useLangySecretRevealStore } from "../../../../behavior/langy-secret-reveal.store.ts";
+import { LangyCopyButton } from "../../../../ui/elements/langy-copy-button.tsx";
 import {
   type LangySecretSnippetCall,
   maskedSecretValue,
   renderSecretSnippet,
-} from "../../../features/tools/model/langy-secret-snippet-tool.ts";
-import { LangyCopyButton } from "../../elements/langy-copy-button.tsx";
+} from "../../model/langy-secret-snippet-tool.ts";
 
 /** The line over a snippet whose value is on screen. */
 export const LANGY_SECRET_SHOWN_ONCE_LINE = "Shown once. Copy it now, it will not be shown again.";

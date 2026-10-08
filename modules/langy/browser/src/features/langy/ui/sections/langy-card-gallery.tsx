@@ -31,9 +31,9 @@ import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { LangyPermissionCardData } from "../../../../model/langy-local-waits.ts";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
+import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-access-card.tsx";
 import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
