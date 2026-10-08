@@ -1,13 +1,12 @@
 /**
  * @vitest-environment node
- * Re-running backfill-project-created teaches the Instant Evals judge every existing project:
- * the task records through project's own lifecycle pipeline, and the judge's real fold over
- * memory tables learns from it (ADR-174 decisions 15, 17).
+ * Re-running backfill-project-created records every existing project through project's own
+ * lifecycle pipeline, which peers such as the Instant Evals judge fold (ADR-174 decisions 15, 17).
+ * The judge's fold and refusal are bound in the judge's suite.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { instantEvalJudgeOverMemory } from "@langwatch/instant-eval-judge-process/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -26,9 +25,9 @@ const PROJECTS: Readonly<Record<string, string>> = {
   "project-beta": OTHER_ORGANIZATION,
 };
 
-/** Project's notice and the judge's folds on one eventing; `failCreated` drops a live record. */
-function projectBesideJudge() {
-  const judge = instantEvalJudgeOverMemory();
+/** Project's notice over its lifecycle pipeline, recording sends; `failCreated` drops one. */
+function projectNotice() {
+  const recorded: { projectId: string; organizationId: string }[] = [];
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),
@@ -36,9 +35,6 @@ function projectBesideJudge() {
   const lifecycle = eventing.register(
     buildProjectLifecyclePipeline({ recordProjectCreated: async () => {} }),
   );
-  eventing.register(judge.factsPipeline());
-  const spend = eventing.register(judge.spendPipeline());
-  judge.connectSpend((fact) => spend.commands.recordSpendPriced.send(fact));
 
   const logger = { error: vi.fn() };
   const notice = ProjectCreatedNoticeService.create({
@@ -68,6 +64,7 @@ function projectBesideJudge() {
     recordProjectCreated: {
       send: async (payload) => {
         if (failCreated) throw new Error("event store down");
+        recorded.push({ projectId: payload.projectId, organizationId: payload.organizationId });
         await lifecycle.commands.recordProjectCreated.send(payload);
       },
     },
@@ -91,15 +88,10 @@ function projectBesideJudge() {
     });
     failCreated = false;
   };
-  return { judge, eventing, runTask, loseNextCreated, logger, taskLogger };
+  return { eventing, recorded, runTask, loseNextCreated, logger, taskLogger };
 }
 
-const JUDGE_CALL = {
-  text: "Thanks so much for your help!",
-  questions: [{ id: "polite", kind: "boolean", instructions: "Is it polite?" }],
-} as const;
-
-describe("ProjectCreatedBackfillTask beside the Instant Evals judge", () => {
+describe("ProjectCreatedBackfillTask", () => {
   let close: (() => Promise<void>) | undefined;
   afterEach(async () => {
     await close?.();
@@ -109,47 +101,24 @@ describe("ProjectCreatedBackfillTask beside the Instant Evals judge", () => {
   describe("given projects created before the judge existed, and one whose created fact failed", () => {
     describe("when the project catch-up runs twice", () => {
       /** @scenario "The project catch-up teaches the judge every existing project" */
-      it("knows each project's organization, and holds each project once", async () => {
-        const { judge, eventing, runTask, loseNextCreated, logger } = projectBesideJudge();
+      it("records each project with its organization, the lost one included", async () => {
+        const { eventing, recorded, runTask, loseNextCreated, logger } = projectNotice();
         close = () => eventing.close();
         await loseNextCreated({ projectId: "project-lost" });
         expect(logger.error).toHaveBeenCalled();
-        expect(judge.rows.projects.size).toBe(0);
+        expect(recorded).toEqual([]);
 
         await runTask();
         await runTask();
 
-        await vi.waitFor(() =>
-          expect(Object.fromEntries(judge.rows.projects)).toEqual({
-            "project-old-1": expect.objectContaining({ organizationId: ORGANIZATION }),
-            "project-old-2": expect.objectContaining({ organizationId: ORGANIZATION }),
-            "project-lost": expect.objectContaining({ organizationId: ORGANIZATION }),
-            "project-beta": expect.objectContaining({ organizationId: OTHER_ORGANIZATION }),
-          }),
+        const byProject = Object.fromEntries(
+          recorded.map(({ projectId, organizationId }) => [projectId, organizationId]),
         );
-        expect(judge.rows.projects.size).toBe(4);
-      });
-    });
-  });
-
-  describe("given the judge was just deployed and holds no projects", () => {
-    describe("when a judge call arrives for a project created before the deploy", () => {
-      /** @scenario "The judge refuses calls until the project catch-up has run, then judges them" */
-      it("refuses it as unknown, then classifies the same call once the catch-up has run", async () => {
-        const { judge, eventing, runTask } = projectBesideJudge();
-        close = () => eventing.close();
-        const call = { projectId: "project-old-1", ...JUDGE_CALL };
-
-        const before = await judge.judges.judge(call);
-        expect(before).toMatchObject({ outcome: "refused", code: "instant_eval_project_unknown" });
-
-        await runTask();
-        await vi.waitFor(() => expect(judge.rows.projects.has("project-old-1")).toBe(true));
-        const after = await judge.judges.judge(call);
-
-        expect(after).toMatchObject({
-          outcome: "judged",
-          judgement: { verdicts: [{ questionId: "polite", probability: 1 }] },
+        expect(byProject).toEqual({
+          "project-old-1": ORGANIZATION,
+          "project-old-2": ORGANIZATION,
+          "project-lost": ORGANIZATION,
+          "project-beta": OTHER_ORGANIZATION,
         });
       });
     });
@@ -158,7 +127,7 @@ describe("ProjectCreatedBackfillTask beside the Instant Evals judge", () => {
   describe("given four existing projects over two organizations", () => {
     describe("when the project catch-up runs with --dry-run", () => {
       it("records nothing and logs how many projects it would record", async () => {
-        const { judge, eventing, runTask, taskLogger } = projectBesideJudge();
+        const { eventing, recorded, runTask, taskLogger } = projectNotice();
         close = () => eventing.close();
 
         await runTask({ args: ["--dry-run"] });
@@ -167,15 +136,13 @@ describe("ProjectCreatedBackfillTask beside the Instant Evals judge", () => {
           { isDryRun: true, organizations: 2, projects: 4 },
           expect.any(String),
         );
-        // Give a stray fact the time a real one takes to fold, then check none arrived.
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        expect(judge.rows.projects.size).toBe(0);
+        expect(recorded).toEqual([]);
       });
     });
 
     describe("when it runs for real", () => {
       it("logs the projects it recorded", async () => {
-        const { eventing, runTask, taskLogger } = projectBesideJudge();
+        const { eventing, runTask, taskLogger } = projectNotice();
         close = () => eventing.close();
 
         await runTask();

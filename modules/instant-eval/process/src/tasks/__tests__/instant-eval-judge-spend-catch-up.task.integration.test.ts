@@ -1,18 +1,17 @@
 /**
  * @vitest-environment node
- * The spend catch-up copies the gateway ledger's confirmed Instant Evals rows into the judge's
- * real spend over memory tables, by request id, with no cutover (ADR-174 decision 17).
+ * The spend catch-up copies the gateway ledger's confirmed Instant Evals rows to the judge by
+ * request id, with no cutover (ADR-174 decision 17). The judge is its contract here; its own
+ * spend rows are bound in the judge's suite.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { GatewayApi, GatewayConfirmedSpendRow } from "@langwatch/gateway-contract";
 import {
   INSTANT_EVAL_REQUEST_TYPE,
-  INSTANT_EVAL_SPEND_MODEL,
+  type InstantEvalJudgeApi,
 } from "@langwatch/instant-eval-judge-contract";
-import { instantEvalJudgeOverMemory } from "@langwatch/instant-eval-judge-process/testing";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it, vi } from "vitest";
 
 import { InstantEvalJudgeSpendCatchUpService } from "../../services/instant-eval-judge-spend-catch-up.service.ts";
 import { InstantEvalJudgeSpendCatchUpTask } from "../instant-eval-judge-spend-catch-up.task.ts";
@@ -61,14 +60,22 @@ function ledgerRow({
   return { tenantId, requestId, costNanoUsd: cents * CENTS, occurredAt: OCCURRED_AT };
 }
 
-function catchUpBesideJudge({ ledger }: { ledger: LedgerRow[] }) {
-  const judge = instantEvalJudgeOverMemory();
-  const eventing = new EventSourcing({
-    eventStore: EventStoreMemory.createForTesting(),
-    processStore: InMemoryProcessStore.createForTesting(),
+/** A judge that holds spend by request id, answering as the contract says. */
+function judgeHolding() {
+  const held = new Map<string, number>();
+  const judges = createApiFixture<Pick<InstantEvalJudgeApi, "copyLedgerSpend">>({
+    copyLedgerSpend: async ({ requestId, spendNanoUsd }) => {
+      if (held.has(requestId)) return { outcome: "already_held" };
+      held.set(requestId, spendNanoUsd);
+      return { outcome: "copied" };
+    },
   });
-  const spend = eventing.register(judge.spendPipeline());
-  judge.connectSpend((fact) => spend.commands.recordSpendPriced.send(fact));
+  const spendNanoUsd = () => [...held.values()].reduce((sum, nanoUsd) => sum + nanoUsd, 0);
+  return { judges, held, spendNanoUsd };
+}
+
+function catchUpBesideJudge({ ledger }: { ledger: LedgerRow[] }) {
+  const judge = judgeHolding();
   const service = InstantEvalJudgeSpendCatchUpService.create({
     peers: {
       listProjectIds: async ({ organizationId }) =>
@@ -85,22 +92,15 @@ function catchUpBesideJudge({ ledger }: { ledger: LedgerRow[] }) {
   });
   const runTask = ({ args = [] }: { args?: string[] } = {}) =>
     task.run({ args, signal: new AbortController().signal });
-  const spendOf = () => judge.spendNanoUsdOf({ organizationId: ORGANIZATION });
-  return { judge, eventing, spend, runTask, spendOf, logger };
+  return { judge, runTask, logger };
 }
 
 describe("InstantEvalJudgeSpendCatchUpTask", () => {
-  let close: (() => Promise<void>) | undefined;
-  afterEach(async () => {
-    await close?.();
-    close = undefined;
-  });
-
   describe("given $0.40 of Instant Evals spend in the gateway ledger over two requests", () => {
     describe("when the spend catch-up runs twice", () => {
       /** @scenario "The spend catch-up copies every ledger row once" */
       it("holds $0.40 for the organization, one row for each request", async () => {
-        const { judge, eventing, runTask, spendOf } = catchUpBesideJudge({
+        const { judge, runTask } = catchUpBesideJudge({
           ledger: [
             ledgerRow({ requestId: "instanteval_run-1", cents: 15 }),
             ledgerRow({ requestId: "instanteval_run-2", cents: 25, tenantId: "project-2" }),
@@ -108,13 +108,12 @@ describe("InstantEvalJudgeSpendCatchUpTask", () => {
             ledgerRow({ requestId: "instanteval_elsewhere", cents: 99, tenantId: "project-x" }),
           ],
         });
-        close = () => eventing.close();
 
         await runTask();
         await runTask();
 
-        expect(await spendOf()).toBe(BigInt(40 * CENTS));
-        expect([...judge.rows.spend.values()].map((row) => row.requestId).toSorted()).toEqual([
+        expect(judge.spendNanoUsd()).toBe(40 * CENTS);
+        expect([...judge.held.keys()].toSorted()).toEqual([
           "instanteval_run-1",
           "instanteval_run-2",
         ]);
@@ -130,53 +129,16 @@ describe("InstantEvalJudgeSpendCatchUpTask", () => {
           ledgerRow({ requestId: "instanteval_run-1", cents: 15 }),
           ledgerRow({ requestId: "instanteval_run-2", cents: 25 }),
         ];
-        const { eventing, runTask, spendOf } = catchUpBesideJudge({ ledger });
-        close = () => eventing.close();
+        const { judge, runTask } = catchUpBesideJudge({ ledger });
         await runTask();
-        expect(await spendOf()).toBe(BigInt(40 * CENTS));
+        expect(judge.spendNanoUsd()).toBe(40 * CENTS);
 
         ledger.push(ledgerRow({ requestId: "instanteval_run-rollback", cents: 20 }));
         await runTask();
 
-        expect(await spendOf()).toBe(BigInt(60 * CENTS));
+        expect(judge.spendNanoUsd()).toBe(60 * CENTS);
       });
     });
-  });
-
-  describe("given the gateway ledger holds a $0.10 Instant Evals request", () => {
-    /** @scenario "A request in both the ledger and the judge is counted once" */
-    it.each([{ when: "before" }, { when: "after" }])(
-      "counts it once when the judge's priced event is folded $when the spend catch-up runs",
-      async ({ when }) => {
-        const requestId = "instanteval_run-both";
-        const { judge, eventing, spend, runTask, spendOf } = catchUpBesideJudge({
-          ledger: [ledgerRow({ requestId, cents: 10 })],
-        });
-        close = () => eventing.close();
-        const foldPriced = async () => {
-          await spend.commands.recordSpendPriced.send({
-            tenantId: ORGANIZATION,
-            occurredAt: OCCURRED_AT,
-            organizationId: ORGANIZATION,
-            projectId: "project-1",
-            requestId,
-            model: INSTANT_EVAL_SPEND_MODEL,
-            rateVersion: "instant_eval@0.042x1.3",
-            inputTokens: 1_000,
-            priceNanoUsd: 10 * CENTS,
-            costNanoUsd: 7_692_308,
-          });
-          await vi.waitFor(() => expect(judge.rows.spend.size).toBe(1));
-        };
-
-        if (when === "before") await foldPriced();
-        await runTask();
-        if (when === "after") await foldPriced();
-
-        expect(await spendOf()).toBe(BigInt(10 * CENTS));
-        expect(judge.rows.spend.size).toBe(1);
-      },
-    );
   });
 
   describe("given $0.40 of Instant Evals spend in the gateway ledger over two requests", () => {
@@ -187,10 +149,7 @@ describe("InstantEvalJudgeSpendCatchUpTask", () => {
 
     describe("when the spend catch-up runs with --dry-run", () => {
       it("copies nothing and logs the ledger rows and spend it would offer the judge", async () => {
-        const { judge, eventing, runTask, spendOf, logger } = catchUpBesideJudge({
-          ledger: ledger(),
-        });
-        close = () => eventing.close();
+        const { judge, runTask, logger } = catchUpBesideJudge({ ledger: ledger() });
 
         await runTask({ args: ["--dry-run"] });
 
@@ -205,15 +164,13 @@ describe("InstantEvalJudgeSpendCatchUpTask", () => {
           },
           expect.any(String),
         );
-        expect(judge.rows.spend.size).toBe(0);
-        expect(await spendOf()).toBe(0n);
+        expect(judge.held.size).toBe(0);
       });
     });
 
     describe("when it runs for real after one request was already held", () => {
       it("logs the rows it read, copied and found held", async () => {
-        const { eventing, runTask, logger } = catchUpBesideJudge({ ledger: ledger() });
-        close = () => eventing.close();
+        const { runTask, logger } = catchUpBesideJudge({ ledger: ledger() });
         await runTask();
         logger.info.mockClear();
 
