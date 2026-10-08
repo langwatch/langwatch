@@ -66,7 +66,7 @@ describe("reportScheduleSchema", () => {
   describe("given a cron the scheduler would choke on", () => {
     it("rejects it here, before an active report row is ever written", () => {
       // Previously these sailed through the router and only blew up inside
-      // computeNextRunAt — after the active Trigger row was committed, leaving
+      // the next-run computation — after the active Trigger row was committed, leaving
       // a report that shows as live and can never fire.
       expect(issuePaths("not a cron", "UTC")).toEqual(["cron"]);
       expect(issuePaths("99 99 * * *", "UTC")).toEqual(["cron"]);
