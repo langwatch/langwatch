@@ -15,6 +15,7 @@ function service(overrides: Partial<InstantEvalOptInPeers> = {}) {
   const peers: InstantEvalOptInPeers = {
     findOrganizationId: async () => "organization-1",
     isSaas: () => true,
+    judgeRoute: async () => "own_key",
     isEnterprisePlan: async () => false,
     mayManageOrganization: async () => true,
     isReleased: async () => false,
@@ -35,6 +36,7 @@ describe("given an organization on the hosted service that is not on an enterpri
       await expect(service().optIns.getAccess(asked)).resolves.toEqual({
         released: false,
         offer: "enable",
+        viaConnect: false,
       });
     });
   });
@@ -51,7 +53,11 @@ describe("given an organization on the hosted service that is not on an enterpri
     /** @scenario "Enable records the moment and the member, once" */
     it("records the member against the project's organization", async () => {
       const { optIns, recorded } = service();
-      await expect(optIns.optIn(asked)).resolves.toEqual({ released: true, offer: "enable" });
+      await expect(optIns.optIn(asked)).resolves.toEqual({
+        released: true,
+        offer: "enable",
+        viaConnect: false,
+      });
       expect(recorded).toEqual([{ organizationId: "organization-1", userId: "user-1" }]);
     });
   });
@@ -77,6 +83,9 @@ describe("given an organization on an enterprise plan", () => {
       const { optIns, recorded } = service({ isEnterprisePlan: async () => true });
       await expect(optIns.optIn(asked)).rejects.toMatchObject({
         code: "instant_eval_opt_in_not_offered",
+        meta: { deployment: "enterprise" },
+        message:
+          "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
       });
       expect(recorded).toEqual([]);
     });
@@ -85,7 +94,6 @@ describe("given an organization on an enterprise plan", () => {
 
 describe("given a self-hosted install", () => {
   describe("when the popover asks what to offer", () => {
-    /** @scenario "A self-hosted install is offered a word with us" */
     it("offers a word with us without reading the plan", async () => {
       const { optIns } = service({
         isSaas: () => false,
@@ -94,6 +102,45 @@ describe("given a self-hosted install", () => {
         },
       });
       await expect(optIns.getAccess(asked)).resolves.toMatchObject({ offer: "contact_us" });
+    });
+  });
+
+  describe("when a request tries to throw the switch anyway", () => {
+    /** @scenario "The server refuses a switch the popover did not offer" */
+    it("refuses it naming the license, or whoever runs an install with its own key", async () => {
+      const { optIns, recorded } = service({ isSaas: () => false });
+      await expect(optIns.optIn(asked)).rejects.toMatchObject({
+        code: "instant_eval_opt_in_not_offered",
+        meta: { deployment: "self_hosted" },
+        message:
+          "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+      });
+      expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when the access read asks whether the install judges through LangWatch", () => {
+    /** @scenario "A judgement that fails on an install judging through LangWatch names the addresses it needs" */
+    it("says so only where its judge runs through Connect", async () => {
+      const through = service({ isSaas: () => false, judgeRoute: async () => "connect" });
+      await expect(through.optIns.getAccess(asked)).resolves.toMatchObject({ viaConnect: true });
+      for (const route of ["off", "own_key", "disconnected"] as const) {
+        const other = service({ isSaas: () => false, judgeRoute: async () => route });
+        await expect(other.optIns.getAccess(asked)).resolves.toMatchObject({ viaConnect: false });
+      }
+    });
+  });
+});
+
+describe("given the hosted service", () => {
+  describe("when the access read asks whether it judges through LangWatch", () => {
+    it("answers no without asking where its judge runs", async () => {
+      const { optIns } = service({
+        judgeRoute: () => {
+          throw new Error("the judge route was read");
+        },
+      });
+      await expect(optIns.getAccess(asked)).resolves.toMatchObject({ viaConnect: false });
     });
   });
 });

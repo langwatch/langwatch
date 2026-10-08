@@ -12,11 +12,15 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
+import type { InstantEvalJudgeRoute } from "../rules/instant-eval-judge-choice.rules.ts";
+
 /** The peers the offer and the switch ask, each narrowed to one question. */
 export interface InstantEvalOptInPeers {
   findOrganizationId(projectId: string): Promise<string | undefined>;
   /** Whether this is the hosted service; a self-hosted install is never offered the switch. */
   isSaas(): boolean;
+  /** Where the deployment's judge runs; asked on a self-hosted install only. */
+  judgeRoute(): Promise<InstantEvalJudgeRoute>;
   isEnterprisePlan(organizationId: string): Promise<boolean>;
   /** The authority the switch's route declares (`organization:manage`), asked of the reader. */
   mayManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean>;
@@ -40,11 +44,12 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInAccess> {
     const organizationId = await this.organizationOf(projectId);
-    const [released, offer] = await Promise.all([
+    const [released, offer, viaConnect] = await Promise.all([
       this.peers.isReleased({ projectId }),
       this.offerFor({ organizationId, userId }),
+      this.judgesThroughConnect(),
     ]);
-    return { released, offer };
+    return { released, offer, viaConnect };
   }
 
   /**
@@ -59,9 +64,19 @@ export class InstantEvalOptInService {
     userId: string;
   }): Promise<InstantEvalOptInAccess> {
     const organizationId = await this.organizationOf(projectId);
-    if (!(await this.switchOffered(organizationId))) throw new InstantEvalOptInNotOfferedError();
+    if (!(await this.switchOffered(organizationId))) {
+      const deployment = this.peers.isSaas() ? "enterprise" : "self_hosted";
+      throw new InstantEvalOptInNotOfferedError({ deployment });
+    }
     await this.peers.recordOptIn({ organizationId, userId });
-    return { released: true, offer: "enable" };
+    // The switch is thrown on the hosted service only, which never judges through Connect.
+    return { released: true, offer: "enable", viaConnect: false };
+  }
+
+  /** A self-hosted install judging through LangWatch: "can't run" then names its two hosts. */
+  private async judgesThroughConnect(): Promise<boolean> {
+    if (this.peers.isSaas()) return false;
+    return (await this.peers.judgeRoute()) === "connect";
   }
 
   private async offerFor({

@@ -22,7 +22,7 @@ import { api } from "../../../../behavior/trace-api.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
-import type { InstantEvalRefusal } from "../instant-eval-refusal-popover.tsx";
+import { type InstantEvalRefusal, isSelfHostedRefusal } from "../instant-eval-refusal-popover.tsx";
 
 /**
  * Under this estimate a run starts on its own; at or over it, the dialog
@@ -315,12 +315,13 @@ function useInstantEvalSwitch({
   return { enableInstantEvals, dismissRefusal, isEnabling: enable.isPending };
 }
 
-/** The refusal an organization without Instant Evals meets, by what its reader is offered. */
+/** The refusal an organization without Instant Evals meets; a self-hosted install, its reason. */
 function unreleasedRefusalOf(
   optInOffer: ExplorerInstantEvalOptInAccess["offer"] | undefined,
 ): InstantEvalRefusal {
   if (optInOffer === "enable") return { kind: "opt_in" };
   if (optInOffer === "ask_admin") return { kind: "ask_admin" };
+  if (isSelfHostedRefusal(optInOffer)) return { kind: optInOffer };
   return { kind: "unreleased" };
 }
 

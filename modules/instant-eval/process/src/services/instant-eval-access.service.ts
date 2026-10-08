@@ -1,7 +1,7 @@
 /**
- * Whether a project may run Instant Evals: the flag or the organization's own switch is the
- * product decision, a judge for the project's organization the operational one, and a rollout
- * rule distinguishes the PROJECT, never the member.
+ * Whether a project may run Instant Evals: the flag, the organization's license (main #8416) or
+ * its own switch is the product decision, a judge for the project's organization the operational
+ * one, and a rollout rule distinguishes the PROJECT, never the member.
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 
@@ -30,6 +30,7 @@ export interface InstantEvalOptInReader {
 export class InstantEvalAccessService {
   private readonly flags: InstantEvalFlagReader;
   private readonly projects: InstantEvalProjectReader;
+  private readonly judgesThroughConnect: boolean;
   private readonly optIns: InstantEvalOptInReader;
   private readonly isJudgeConfigured: () => boolean;
   private readonly judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
@@ -37,12 +38,14 @@ export class InstantEvalAccessService {
   private constructor(options: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
+    judgesThroughConnect: boolean;
     optIns: InstantEvalOptInReader;
     isJudgeConfigured: () => boolean;
     judge: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
   }) {
     this.flags = options.flags;
     this.projects = options.projects;
+    this.judgesThroughConnect = options.judgesThroughConnect;
     this.optIns = options.optIns;
     this.isJudgeConfigured = options.isJudgeConfigured;
     this.judge = options.judge;
@@ -51,12 +54,18 @@ export class InstantEvalAccessService {
   static create({
     flags,
     projects,
+    judgesThroughConnect = false,
     optIns,
     isJudgeConfigured,
     judge = {},
   }: {
     flags: InstantEvalFlagReader;
     projects: InstantEvalProjectReader;
+    /**
+     * A self-hosted install judging through LangWatch: there the license that names hosted
+     * judging, left on by an admin, releases them; an install's own key never does.
+     */
+    judgesThroughConnect?: boolean;
     /** The organization's own switch, read only when the flag says no. */
     optIns: InstantEvalOptInReader;
     /** Reads the deployment's own configuration, injected so a test states it. */
@@ -64,7 +73,14 @@ export class InstantEvalAccessService {
     /** The judge, where it judges for some organizations and not others. */
     judge?: Pick<InstantEvalJudgeChannel, "isAvailableForOrganization">;
   }): InstantEvalAccessService {
-    return new InstantEvalAccessService({ flags, projects, optIns, isJudgeConfigured, judge });
+    return new InstantEvalAccessService({
+      flags,
+      projects,
+      judgesThroughConnect,
+      optIns,
+      isJudgeConfigured,
+      judge,
+    });
   }
 
   /**
@@ -91,7 +107,7 @@ export class InstantEvalAccessService {
     return this.releasedFor({ projectId, organizationId });
   }
 
-  /** The flag is cached and answers for the operator; the consent row is read only on a no. */
+  /** The flag is cached and answers for the operator; the license, then the consent row, on no. */
   private async releasedFor({
     projectId,
     organizationId,
@@ -106,6 +122,13 @@ export class InstantEvalAccessService {
     });
     if (released) return true;
     if (organizationId === undefined) return false;
+    if (await this.isLicensed(organizationId)) return true;
     return this.optIns.isOptedIn(organizationId);
+  }
+
+  /** The judge's own per-organization answer is the license's: named, and not switched off. */
+  private async isLicensed(organizationId: string): Promise<boolean> {
+    if (!this.judgesThroughConnect || !this.judge.isAvailableForOrganization) return false;
+    return this.judge.isAvailableForOrganization(organizationId);
   }
 }

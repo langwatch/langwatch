@@ -13,6 +13,8 @@ export interface InstantEvalAccess {
   isAvailable: boolean;
   /** What the popover offers a refused reader: the switch, an admin, or us. */
   optInOffer: ExplorerInstantEvalOptInAccess["offer"] | undefined;
+  /** The install judges through LangWatch: "can't run right now" names the two addresses. */
+  viaConnect: boolean;
 }
 
 export function useInstantEvalAccess({
@@ -34,5 +36,6 @@ export function useInstantEvalAccess({
   return {
     isAvailable: flagReleased || flagLoading || !!access.data?.released || access.isLoading,
     optInOffer: access.data?.offer,
+    viaConnect: !!access.data?.viaConnect,
   };
 }

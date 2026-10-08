@@ -33,7 +33,7 @@ const PROGRESS: ExplorerInstantEvalProgress = {
   finishedAtMs: null,
 };
 
-const OFFERED = { released: false, offer: "enable" } as const;
+const OFFERED = { released: false, offer: "enable", viaConnect: false } as const;
 
 function harness({ permitted = () => true }: { permitted?: (permission: string) => boolean } = {}) {
   const getExplorerEvalRun = vi.fn<TraceApi["getExplorerEvalRun"]>(async () => PROGRESS);
@@ -46,6 +46,7 @@ function harness({ permitted = () => true }: { permitted?: (permission: string) 
   const enableExplorerEvals = vi.fn<TraceApi["enableExplorerEvals"]>(async () => ({
     released: true,
     offer: "enable" as const,
+    viaConnect: false,
   }));
   const app = createApiFixture<TraceApi>({
     getExplorerEvalAccess,
@@ -179,6 +180,7 @@ describe("given the opt-in procedures", () => {
       await expect(caller.enable({ projectId: "project-1" })).resolves.toEqual({
         released: true,
         offer: "enable",
+        viaConnect: false,
       });
       expect(enableExplorerEvals).toHaveBeenCalledWith({
         projectId: "project-1",

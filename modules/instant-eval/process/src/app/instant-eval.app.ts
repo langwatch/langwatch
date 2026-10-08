@@ -47,7 +47,11 @@ import {
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
 import type { InstantEvalCancellationRepository } from "../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
-import { instantEvalJudgeKind } from "../rules/instant-eval-judge-choice.rules.ts";
+import {
+  type InstantEvalJudgeKind,
+  instantEvalJudgeKind,
+  instantEvalJudgeRoute,
+} from "../rules/instant-eval-judge-choice.rules.ts";
 import {
   toInstantEvalEstimateWire,
   toInstantEvalJudgmentWire,
@@ -186,13 +190,19 @@ export class InstantEvalModule implements InstantEvalApiContract {
     apiKey: string | undefined,
   ): InstantEvalModule {
     const repositories = setup.repositories;
-    const judge = InstantEvalModule.judgeOf(setup, apiKey);
+    const kind = instantEvalJudgeKind({
+      classifier: setup.config.classifier,
+      hasOwnKey: Boolean(apiKey),
+      isProduction: setup.config.nodeEnvironment === "production",
+    });
+    const judge = InstantEvalModule.judgeOf({ setup, apiKey, kind });
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
     const { analytics, projects, plans, gateway, traces } = setup.dependencies;
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
+      judgesThroughConnect: !setup.config.isSaas && judge instanceof InstantEvalConnectJudgeService,
       optIns: {
         isOptedIn: (organizationId) =>
           setup.dependencies.organizations.isInstantEvalsOptedIn({ organizationId }),
@@ -200,7 +210,7 @@ export class InstantEvalModule implements InstantEvalApiContract {
       isJudgeConfigured: () => !(judge instanceof MemoryInstantEvalJudgeChannel),
       judge,
     });
-    const optIns = InstantEvalModule.optInsOf({ setup, access });
+    const optIns = InstantEvalModule.optInsOf({ setup, access, kind });
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
       judgments: repositories.judgments,
@@ -342,16 +352,24 @@ export class InstantEvalModule implements InstantEvalApiContract {
   private static optInsOf({
     setup,
     access,
+    kind,
   }: {
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
+    kind: InstantEvalJudgeKind;
   }): InstantEvalOptInService {
-    const { projects, plans, organizations, authz } = setup.dependencies;
+    const { projects, plans, organizations, authz, licensing } = setup.dependencies;
 
     return InstantEvalOptInService.create({
       peers: {
         findOrganizationId: (projectId) => projects.findOrganizationId(projectId),
         isSaas: () => setup.config.isSaas,
+        judgeRoute: async () =>
+          instantEvalJudgeRoute({
+            kind,
+            isConnectPermitted:
+              kind === "connect" && (await licensing.getConnectDeployment()).permitted,
+          }),
         isEnterprisePlan: async (organizationId) =>
           isEnterpriseTier((await plans.getActivePlan({ organizationId })).type),
         mayManageOrganization: ({ userId, organizationId }) =>
@@ -465,15 +483,15 @@ export class InstantEvalModule implements InstantEvalApiContract {
   }
 
   /** The judge `instantEvalJudgeKind` names; `none` skips every question, refusing none. */
-  private static judgeOf(
-    setup: InstantEvalSetup,
-    apiKey: string | undefined,
-  ): InstantEvalJudgeChannel {
-    const kind = instantEvalJudgeKind({
-      classifier: setup.config.classifier,
-      hasOwnKey: Boolean(apiKey),
-      isProduction: setup.config.nodeEnvironment === "production",
-    });
+  private static judgeOf({
+    setup,
+    apiKey,
+    kind,
+  }: {
+    setup: InstantEvalSetup;
+    apiKey: string | undefined;
+    kind: InstantEvalJudgeKind;
+  }): InstantEvalJudgeChannel {
     if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
     if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();
     if (kind === "connect" || !apiKey) {

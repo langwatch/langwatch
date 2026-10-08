@@ -37,20 +37,24 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
 }
 
 /**
- * The organization's own switch was thrown where the popover does not offer it:
- * an enterprise plan, or a self-hosted install. A word with us is the remedy.
+ * The organization's own switch was thrown where the popover does not offer it.
+ * `meta.deployment` says which refused, since each reads differently: an enterprise
+ * plan is switched on by us; a self-hosted install by its license, or by its operator.
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 export class InstantEvalOptInNotOfferedError extends HandledError {
   declare readonly code: "instant_eval_opt_in_not_offered";
 
-  constructor() {
+  constructor({ deployment }: { readonly deployment: "enterprise" | "self_hosted" }) {
     super(
       "instant_eval_opt_in_not_offered",
-      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+      deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
       {
         httpStatus: 403,
         fault: "customer",
+        meta: { deployment },
         ...remediation("instant_eval_opt_in_not_offered"),
       },
     );

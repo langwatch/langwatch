@@ -483,9 +483,14 @@ export const instantEvalOptInOfferSchema = z.union([
 ]);
 export type InstantEvalOptInOffer = z.infer<typeof instantEvalOptInOfferSchema>;
 
-/** Whether the project is released, and what the popover offers when it is not. */
+/**
+ * Whether the project is released, what the popover offers when it is not, and
+ * whether the install judges through LangWatch (`viaConnect`), which is when the
+ * "can't run right now" popover names the two addresses it needs (main #8416).
+ */
 export const instantEvalOptInAccessSchema = z.object({
   released: z.boolean(),
   offer: instantEvalOptInOfferSchema,
+  viaConnect: z.boolean(),
 });
 export type InstantEvalOptInAccess = z.infer<typeof instantEvalOptInAccessSchema>;

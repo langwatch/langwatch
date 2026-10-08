@@ -217,3 +217,69 @@ describe("given the release flag is on for the project", () => {
     });
   });
 });
+
+describe("given a self-hosted install that judges through LangWatch, with the release flag off", () => {
+  const flagOff: InstantEvalFlagReader = { isEnabled: async () => false };
+  const projects: InstantEvalProjectReader = { findOrganizationId: async () => "organization-1" };
+  const LOUD_OPT_INS: InstantEvalOptInReader = {
+    isOptedIn: () => {
+      throw new Error("the gate read the switch");
+    },
+  };
+
+  describe("when the organization's license names Instant Evals and no admin switched them off", () => {
+    /** @scenario "A license that names Instant Evals releases them without the flag" */
+    it("may judge, from the license, without reading the organization's switch", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: flagOff,
+        projects,
+        judgesThroughConnect: true,
+        optIns: LOUD_OPT_INS,
+        isJudgeConfigured: () => true,
+        judge: { isAvailableForOrganization: async () => true },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(true);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+    });
+  });
+
+  describe("when the license names them but an admin switched them off", () => {
+    /** @scenario "An admin who switched hosted judging off keeps it off" */
+    it("may not judge", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: flagOff,
+        projects,
+        judgesThroughConnect: true,
+        optIns: NEVER_OPTED_IN,
+        isJudgeConfigured: () => true,
+        judge: { isAvailableForOrganization: async () => false },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given a self-hosted install that judges with its own key, with the release flag off", () => {
+  describe("when the project asks whether it may judge", () => {
+    /** @scenario "An install with its own judge key still waits for the release flag" */
+    it("is not released by the license", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: { isEnabled: async () => false },
+        projects: { findOrganizationId: async () => "organization-1" },
+        judgesThroughConnect: false,
+        optIns: NEVER_OPTED_IN,
+        isJudgeConfigured: () => true,
+        judge: {
+          isAvailableForOrganization: () => {
+            throw new Error("the gate read the license");
+          },
+        },
+      });
+
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(false);
+    });
+  });
+});

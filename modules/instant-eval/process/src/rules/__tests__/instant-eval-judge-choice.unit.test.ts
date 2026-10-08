@@ -7,7 +7,7 @@
 import { InstantEvalMemoryJudgeInProductionError } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
-import { instantEvalJudgeKind } from "../instant-eval-judge-choice.rules.ts";
+import { instantEvalJudgeKind, instantEvalJudgeRoute } from "../instant-eval-judge-choice.rules.ts";
 
 describe("instantEvalJudgeKind", () => {
   /** @scenario "An install with its own judge key keeps using it" */
@@ -55,5 +55,17 @@ describe("instantEvalJudgeKind", () => {
     expect(() =>
       instantEvalJudgeKind({ classifier: "memory", hasOwnKey: false, isProduction: true }),
     ).toThrow(InstantEvalMemoryJudgeInProductionError);
+  });
+});
+
+describe("instantEvalJudgeRoute", () => {
+  it("names the route a refusal reads, from the judge and whether Connect may call out", () => {
+    expect(instantEvalJudgeRoute({ kind: "none", isConnectPermitted: true })).toBe("off");
+    expect(instantEvalJudgeRoute({ kind: "own_key", isConnectPermitted: true })).toBe("own_key");
+    expect(instantEvalJudgeRoute({ kind: "memory", isConnectPermitted: true })).toBe("own_key");
+    expect(instantEvalJudgeRoute({ kind: "connect", isConnectPermitted: true })).toBe("connect");
+    expect(instantEvalJudgeRoute({ kind: "connect", isConnectPermitted: false })).toBe(
+      "disconnected",
+    );
   });
 });

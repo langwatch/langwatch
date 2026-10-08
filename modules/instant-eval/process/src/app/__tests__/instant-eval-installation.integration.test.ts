@@ -626,7 +626,7 @@ describe("given an organization's own Instant Evals switch", () => {
         api.getOptInAccess({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: false, offer: "enable" });
+      expect(access).toEqual({ released: false, offer: "enable", viaConnect: false });
     });
   });
 
@@ -654,7 +654,7 @@ describe("given an organization's own Instant Evals switch", () => {
         (api) => api.optIn({ projectId: PROJECT, userId: "member-1" }),
       );
 
-      expect(access).toEqual({ released: true, offer: "enable" });
+      expect(access).toEqual({ released: true, offer: "enable", viaConnect: false });
       expect(recorded).toEqual([{ organizationId: ORGANIZATION, userId: "member-1" }]);
     });
   });

@@ -366,6 +366,7 @@ export const SearchBar: React.FC = () => {
         onClose={instantEval.dismissRefusal}
         onEnable={instantEval.enableInstantEvals}
         isEnabling={instantEval.isEnabling}
+        viaConnect={instantEvalAccess.viaConnect}
       >
         <Box position="absolute" left={3} bottom={0} width="1px" height="1px" aria-hidden="true" />
       </InstantEvalRefusalPopover>

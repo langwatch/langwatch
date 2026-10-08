@@ -10,7 +10,7 @@ import {
   type InstantEvalServerConfig,
 } from "@langwatch/instant-eval-contract";
 
-type InstantEvalJudgeKind = "none" | "own_key" | "connect" | "memory";
+export type InstantEvalJudgeKind = "none" | "own_key" | "connect" | "memory";
 
 export function instantEvalJudgeKind({
   classifier,
@@ -28,4 +28,23 @@ export function instantEvalJudgeKind({
   if (classifier === "null") return "none";
   if (classifier === "connect") return "connect";
   return hasOwnKey ? "own_key" : "connect";
+}
+
+/**
+ * Where the deployment's judge runs, as a refusal reads it (main #8416): `off`, its own key
+ * (the deterministic stand-in counts as one), through LangWatch, or a Connect judge with
+ * Connect switched off for the deployment, which nothing can judge through.
+ */
+export type InstantEvalJudgeRoute = "off" | "own_key" | "connect" | "disconnected";
+
+export function instantEvalJudgeRoute({
+  kind,
+  isConnectPermitted,
+}: {
+  kind: InstantEvalJudgeKind;
+  isConnectPermitted: boolean;
+}): InstantEvalJudgeRoute {
+  if (kind === "none") return "off";
+  if (kind === "own_key" || kind === "memory") return "own_key";
+  return isConnectPermitted ? "connect" : "disconnected";
 }
