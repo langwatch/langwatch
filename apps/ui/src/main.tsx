@@ -1,6 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import { createUi } from "@langwatch/browser";
+import { createUi, type UiRenderResult } from "@langwatch/browser";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import type {
   UiDeployment,
@@ -171,6 +171,7 @@ class BrowserUiShell extends UiShell {
     hosts,
     failures,
     rootCapabilities,
+    hostServices,
   }: {
     config: UiFeatureConfig;
     isDevelopment: boolean;
@@ -183,6 +184,7 @@ class BrowserUiShell extends UiShell {
     hosts: readonly UiModuleHostMount[];
     failures: readonly UiFailureInterceptor[];
     rootCapabilities: UiRootCapabilities;
+    hostServices: UiRenderResult["hostServices"];
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
     return new BrowserUiShell(
@@ -200,6 +202,7 @@ class BrowserUiShell extends UiShell {
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
+          hostServices,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
@@ -298,6 +301,7 @@ export async function startUi(): Promise<void> {
       hosts: installedModuleHostMounts(installed.modules),
       failures: installedModuleFailures(installed.modules),
       rootCapabilities,
+      hostServices: installed.hostServices,
     }),
   }).start();
 }

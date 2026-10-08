@@ -1,17 +1,27 @@
+import {
+  UNAVAILABLE_UI_FEEDBACK,
+  UNAVAILABLE_UI_SCOPE,
+  UNAVAILABLE_UI_SESSION,
+  type UiHostServiceInput,
+  type UiHostServiceSource,
+} from "@langwatch/browser-host/capabilities";
 import { hostService } from "@langwatch/browser-host/declarations";
 import { describe, expect, it } from "vitest";
 
 import {
   BrowserHostServiceRefusedError,
+  loadHostServices,
   resolveHostServices,
+  runHostServices,
 } from "../module/ui-module-host-services.ts";
 import { createUi } from "../ui-supply.ts";
 import { defineBrowserModule } from "../web-module.ts";
+import { createUiFeatureApiClient } from "../wire/transport.ts";
 
 type Clock = { now: () => number };
-const ClockService = hostService<Clock>("clock");
-const PulseService = hostService<Clock>("pulse");
-const clock = { load: () => Promise.resolve({ default: { now: () => 1 } }) };
+const ClockService = hostService<UiHostServiceSource<Clock>>("clock");
+const PulseService = hostService<UiHostServiceSource<Clock>>("pulse");
+const clock = { load: () => Promise.resolve({ default: (): Clock => ({ now: () => 1 }) }) };
 
 describe("resolveHostServices", () => {
   describe("given each service provided by one installed module", () => {
@@ -70,6 +80,43 @@ describe("createUi", () => {
       ]);
 
       await expect(ui.render()).rejects.toBeInstanceOf(BrowserHostServiceRefusedError);
+    });
+  });
+});
+
+describe("runHostServices", () => {
+  describe("given two host services whose sources are loaded", () => {
+    /** @scenario Each provided source runs with the shared input, in the runtime's order */
+    it("calls each source with the one input, in order, and keeps each value under its service", async () => {
+      const calls: { name: string; input: UiHostServiceInput }[] = [];
+      const sourceOf = (name: string) => ({
+        load: () =>
+          Promise.resolve({
+            default: (input: UiHostServiceInput): Clock => {
+              calls.push({ name, input });
+              return { now: () => name.length };
+            },
+          }),
+      });
+      const sources = await loadHostServices({
+        modules: [
+          defineBrowserModule("trace").provides(PulseService, sourceOf("pulse")),
+          defineBrowserModule("time").provides(ClockService, sourceOf("clock")),
+        ],
+        services: [ClockService, PulseService],
+      });
+      const input: UiHostServiceInput = {
+        transport: createUiFeatureApiClient({ fetch: () => Promise.reject(new Error("offline")) }),
+        feedback: UNAVAILABLE_UI_FEEDBACK,
+        session: UNAVAILABLE_UI_SESSION,
+        scope: UNAVAILABLE_UI_SCOPE,
+      };
+
+      const values = runHostServices({ sources, input });
+
+      expect(calls.map(({ name }) => name)).toEqual(["clock", "pulse"]);
+      expect(calls.every((call) => call.input === input)).toBe(true);
+      expect([...values.keys()]).toEqual(["clock", "pulse"]);
     });
   });
 });

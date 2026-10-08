@@ -14,6 +14,7 @@ import {
   type UiRpc,
   type UiSessionCapabilities,
   type UiSessionSource,
+  UiHostServiceProvider,
 } from "@langwatch/browser-host/capabilities";
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
@@ -45,6 +46,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { runHostServices, type UiHostServiceRun } from "./module/ui-module-host-services.ts";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
 import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature.ts";
 import type { UiProviderShell } from "./ui-outer-providers.tsx";
@@ -100,6 +102,8 @@ export type UiFeatureShellInstall = {
    * read. `useBrowserUiSession` is the one this package ships.
    */
   session?: UiSessionSource;
+  /** Each host service's loaded source, run on every render in this order (record §10.1). */
+  hostServices?: readonly UiHostServiceRun[];
   /** Whether this browser composition is a development build. */
   isDevelopment?: boolean;
   /**
@@ -244,6 +248,7 @@ export function createUiFeatureShell({
   queryStore,
   failures = [],
   session,
+  hostServices = [],
   isDevelopment = false,
   sessionQueryKey,
 }: UiFeatureShellInstall): UiProviderShell {
@@ -272,9 +277,15 @@ export function createUiFeatureShell({
     // The installed feedback port, resolved ahead of the session rather than
     // read back out of the resolution: a refused session read is told through
     // it, and it is the only failure with nobody else to tell.
+    const feedback = capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK;
     const live: UiSessionCapabilities = useSessionCapability({
       transport: sessionTransport,
-      feedback: capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK,
+      feedback,
+    });
+    // The same sources on every render, so the hooks inside them keep their order.
+    const hostServiceValues = runHostServices({
+      sources: hostServices,
+      input: { transport: sessionTransport, feedback, session: live.session, scope: live.scope },
     });
     const queryClient = useQueryClient();
     const userId =
@@ -344,16 +355,18 @@ export function createUiFeatureShell({
     // session with nothing resolved publishes none and the hook reads unresolved.
     return (
       <UiCapabilityContextProvider value={resolved}>
-        <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
-          {/* Nothing is answering on the API's address, so the reader waits
+        <UiHostServiceProvider value={hostServiceValues}>
+          <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
+            {/* Nothing is answering on the API's address, so the reader waits
               here rather than being signed out of a stack that is booting. */}
-          <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
-            <ModuleHosts>
-              {children}
-              <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
-            </ModuleHosts>
-          </UiApiWaitingGate>
-        </UiScopeHostProvider>
+            <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
+              <ModuleHosts>
+                {children}
+                <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
+              </ModuleHosts>
+            </UiApiWaitingGate>
+          </UiScopeHostProvider>
+        </UiHostServiceProvider>
       </UiCapabilityContextProvider>
     );
   }

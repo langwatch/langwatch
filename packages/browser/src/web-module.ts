@@ -1,4 +1,5 @@
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import type { UiHostServiceSource } from "@langwatch/browser-host/capabilities";
 import type {
   HostService,
   HostServiceIdentity,
@@ -70,7 +71,7 @@ export type WebDrawers = Readonly<Record<string, WebDrawer>>;
 /** A host service this module provides, and the chunk whose default export is its source. */
 export type WebHostServiceProvision = Readonly<{
   service: HostServiceIdentity;
-  load: () => Promise<unknown>;
+  load: Loaded<UiHostServiceSource<unknown>>;
 }>;
 
 /** A chunk a token's owner lends, whose default export is the token's shape. */
@@ -309,7 +310,7 @@ export class WebModule<
   }
 
   /** Provides a host service browser-host declares; `createUi` refuses none or two providers. */
-  provides<Source>(
+  provides<Source extends UiHostServiceSource<unknown>>(
     service: HostService<Source>,
     source: { load: Loaded<Source> },
   ): WebModule<Name, Requirements, Config, Declaration, Precise> {

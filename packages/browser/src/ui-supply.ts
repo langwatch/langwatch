@@ -5,7 +5,12 @@ import {
 } from "@langwatch/config/public-app-config";
 
 import { checkHostMounts } from "./module/ui-host-mounts.ts";
-import { checkHostServices, UI_HOST_SERVICES } from "./module/ui-module-host-services.ts";
+import {
+  checkHostServices,
+  loadHostServices,
+  type UiHostServiceRun,
+  UI_HOST_SERVICES,
+} from "./module/ui-module-host-services.ts";
 import { checkLends } from "./module/ui-module-lends.ts";
 import { checkScreenAddresses } from "./page/ui-screen-addresses.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
@@ -35,6 +40,8 @@ export type UiRenderResult<Config extends object = SupplyRecord> = Readonly<{
   modules: readonly SupplyModule[];
   config: Config;
   supplied: SupplyRecord;
+  /** Each host service's loaded source, in the runtime's order; the shell runs them. */
+  hostServices: readonly UiHostServiceRun[];
 }>;
 
 export class BrowserConfigMissingError extends Error {
@@ -213,12 +220,17 @@ export class UiSupply<
     checkScreenAddresses({ modules: this.#state.modules });
     const mount = this.#resolveMount();
     const config = this.#readConfig();
+    const hostServices = await loadHostServices({
+      modules: this.#state.modules,
+      services: UI_HOST_SERVICES,
+    });
     return {
       document: this.#state.document,
       mount,
       modules: this.#state.modules,
       config,
       supplied: this.#state.supplied,
+      hostServices,
     };
   }
 

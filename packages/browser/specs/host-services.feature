@@ -27,3 +27,16 @@ Feature: Host services resolved from their one provider
     Given a composition installing two providers of one host service
     When it renders
     Then the render is refused before anything mounts
+
+  @unit
+  Scenario: Each provided source runs with the shared input, in the runtime's order
+    Given two host services whose sources are loaded
+    When the runtime runs them for one render
+    Then each source is called with the one transport, feedback, session and scope, in the runtime's order
+    And each service's value is kept under its name
+
+  @integration
+  Scenario: A host service's hook reads the value its source produced this render
+    Given the runtime published a host service's value
+    When a screen reads that service through its hook
+    Then it gets the value its source produced

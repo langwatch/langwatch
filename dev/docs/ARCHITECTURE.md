@@ -2484,7 +2484,9 @@ invented:
   **A host service is provided by its owner and resolved by the browser runtime.** browser-host declares
   `hostService<Source>(name)`; the owner declares `.provides(Service, { load })`; `createUi` resolves
   each to its one installed provider, refuses none or two, and runs the sources in the runtime's
-  order. apps/ui names no provider.
+  order. apps/ui names no provider. A source is a hook the shell calls on every render, in
+  `UI_HOST_SERVICES` order, with one input `{ transport, feedback, session, scope }`; its value goes
+  into a context keyed by the service, read through that service's browser-host hook (Alex, 2026-10-08).
 
   **browser-host and browser depend on no module contract.** A feature type in a framework package
   is a central map every browser program compiles: before tokens, 39 packages compiled 14 contracts

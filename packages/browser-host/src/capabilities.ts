@@ -8,7 +8,7 @@ import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
 import { createContext, useContext } from "react";
 
 import { ABSENT_UI_COPY_TARGETS, UiCopyTargets, type UiCopyTarget } from "./copy-targets.ts";
-import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
+import { type HostService, NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiAnalytics } from "./telemetry/analytics.ts";
@@ -517,6 +517,39 @@ export type UiSessionSource = (input: {
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
 }) => UiSessionCapabilities;
+
+/** What every host service's source is called with, on each render (ARCHITECTURE.md §10.1). */
+export type UiHostServiceInput = Readonly<{
+  transport: ModuleApiClient<ModuleApiMap>;
+  feedback: UiFeedback;
+  session: UiSession;
+  scope: UiScope;
+}>;
+
+/** A host service's source: a hook the runtime calls on every render, in the runtime's order. */
+export type UiHostServiceSource<Value> = (input: UiHostServiceInput) => Value;
+
+/** This render's value of each host service, keyed by the service's name. */
+export type UiHostServiceValues = ReadonlyMap<string, unknown>;
+
+const UiHostServiceContext = createContext<UiHostServiceValues>(new Map());
+
+/** Publishes the host services' values to everything a screen renders. */
+export const UiHostServiceProvider = UiHostServiceContext.Provider;
+
+/** One service's value this render, or undefined outside a shell; a service's own hook reads it. */
+export function useHostService<Source extends UiHostServiceSource<unknown>>(
+  service: HostService<Source>,
+): ReturnType<Source> | undefined {
+  const value = useContext(UiHostServiceContext).get(service.name);
+  return isSourceValue<Source>(value) ? value : undefined;
+}
+
+function isSourceValue<Source extends UiHostServiceSource<unknown>>(
+  value: unknown,
+): value is ReturnType<Source> {
+  return value !== undefined;
+}
 
 class UnavailableUiScope extends UiScope {
   activeScope(): never {

@@ -3,6 +3,11 @@
  * two provide it. ARCHITECTURE.md §10.1 "A host service is provided by its owner".
  */
 
+import type {
+  UiHostServiceInput,
+  UiHostServiceSource,
+  UiHostServiceValues,
+} from "@langwatch/browser-host/capabilities";
 import type { HostServiceIdentity } from "@langwatch/browser-host/declarations";
 
 import type { SupplyModule } from "../web-module.ts";
@@ -23,7 +28,7 @@ export class BrowserHostServiceRefusedError extends Error {
 export type UiHostServiceProvider = Readonly<{
   service: string;
   module: string;
-  load: () => Promise<unknown>;
+  load: () => Promise<{ readonly default: UiHostServiceSource<unknown> }>;
 }>;
 
 type ResolveInput = Readonly<{
@@ -59,6 +64,33 @@ export function resolveHostServices(input: ResolveInput): readonly UiHostService
   checkHostServices(input);
   const providers = providersByService({ modules: input.modules });
   return input.services.flatMap(({ name }) => providers.get(name) ?? []);
+}
+
+/** One resolved service and its loaded source, as the runtime runs it. */
+export type UiHostServiceRun = Readonly<{
+  service: string;
+  source: UiHostServiceSource<unknown>;
+}>;
+
+/** Each service's source loaded before render, in the runtime's order. */
+export async function loadHostServices(input: ResolveInput): Promise<readonly UiHostServiceRun[]> {
+  return Promise.all(
+    resolveHostServices(input).map(async ({ service, load }) => ({
+      service,
+      source: (await load()).default,
+    })),
+  );
+}
+
+/** Calls each source as a hook with the one shared input, in order; the values keyed by service. */
+export function runHostServices({
+  sources,
+  input,
+}: {
+  sources: readonly UiHostServiceRun[];
+  input: UiHostServiceInput;
+}): UiHostServiceValues {
+  return new Map(sources.map(({ service, source }) => [service, source(input)]));
 }
 
 function providersByService({
