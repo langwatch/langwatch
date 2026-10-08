@@ -1,5 +1,5 @@
+import { isStorableSpanTimeMs } from "./span-storability.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
-import { isStorableSpanTimeMs } from "./trace-summary-attribute-values.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 
 const SYNTHETIC_SPAN_NAMES: ReadonlySet<string> = new Set(["langwatch.track_event"]);

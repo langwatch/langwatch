@@ -4,6 +4,7 @@ import { generate } from "@langwatch/ksuid";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import {
+  MAX_PROCESSED_SPANS,
   SYNTHETIC_TRACE_SPAN_NAMES,
   isSpanReceivedEvent,
   type TraceProcessingEvent,
@@ -18,7 +19,6 @@ import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
 } from "./origin-guarded.subscriber.ts";
-import { MAX_PROCESSED_SPANS } from "./trace-summary.projection.ts";
 
 /** Queues an online-evaluator run for an ingested trace; Evaluation owns its delay and dedup. */
 export interface TraceEvaluationDispatch {

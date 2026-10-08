@@ -38,3 +38,10 @@ export { TraceloopCanonicaliserService } from "./traceloopCanonicaliser.ts";
 export { capPayloadString, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "./tracePayloadCap.ts";
 export { VercelCanonicaliserService } from "./vercelCanonicaliser.ts";
 export { VertexAdkCanonicaliserService } from "./vertexAdkCanonicaliser.ts";
+export {
+  type CanonicalisedLogRecord,
+  type CanonicalisedSpanAttributes,
+  canonicaliseLogRecord,
+  canonicaliseSpanAttributes,
+  orderedSpanCanonicalisers,
+} from "./spanCanonicalisation.ts";

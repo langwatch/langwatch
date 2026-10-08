@@ -1,5 +1,6 @@
 export * from "./span-cost-metrics.ts";
 export * from "./span-rollup-contribution.ts";
+export * from "./span-storability.ts";
 export * from "./span-status-fold.ts";
 export * from "./span-timing-fold.ts";
 export * from "./trace-analytics-fold.ts";
@@ -7,6 +8,7 @@ export * from "./trace-attribute-accumulation.ts";
 export * from "./trace-attribute-extraction.ts";
 export * from "./trace-name-resolution.ts";
 export * from "./trace-origin-hoisting.ts";
+export * from "./trace-storage-anchor.ts";
 export * from "./trace-summary-attribute-values.ts";
 export * from "./derive-trace-origin.ts";
 export * from "./derive-trace-status.ts";

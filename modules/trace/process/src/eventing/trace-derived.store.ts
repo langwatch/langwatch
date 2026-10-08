@@ -3,9 +3,9 @@ import type {
   ProjectionStoreContext,
   FoldStateRead,
 } from "@langwatch/eventing";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 
 import type { TraceAnalyticsProjectionRepository } from "../repositories/trace-analytics-projection.repository.ts";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,

@@ -32,10 +32,12 @@ import {
   type TraceCanonicalisationService,
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+  anchorStorageTime,
+  MAX_PROCESSED_SPANS,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
-import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
@@ -53,13 +55,6 @@ const COMPUTED_IO_SCHEMA_VERSION = "2026-04-28" as const;
 const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 
 // ─── Main composition ───────────────────────────────────────────────
-
-/**
- * Max spans fully processed (normalize + derive) into a trace summary. A
- * handful of traces accumulate tens of thousands (reused trace_id, runaway
- * loops); past the cap we only keep counting, to stay visible.
- */
-export const MAX_PROCESSED_SPANS = 512;
 
 /**
  * ±7 days, aligned with TRACE_ANALYTICS_READ_WINDOW_MS — see the `options`

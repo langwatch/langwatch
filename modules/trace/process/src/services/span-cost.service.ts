@@ -1,5 +1,6 @@
 import {
   accumulateSpanTokens,
+  deriveSpanPriceInput,
   deriveSpanStorageCost,
   extractSpanCacheTokens,
   extractSpanModels,
@@ -36,14 +37,7 @@ export class SpanCostService {
 
   /** The span's own cost (USD) from its token counts, model and any custom rates it carries. */
   estimateSpanCost(span: NormalizedSpan): number {
-    const { promptTokens, completionTokens } = extractSpanTokenCounts(span);
-
-    return this.modelCosts.estimate({
-      attributes: span.spanAttributes,
-      model: extractSpanModels(span)[0],
-      promptTokens,
-      completionTokens,
-    });
+    return this.modelCosts.estimate(deriveSpanPriceInput(span));
   }
 
   extractModelsFromSpan(span: NormalizedSpan): string[] {

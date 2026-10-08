@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   accumulateSpanTokens,
+  deriveSpanPriceInput,
   deriveSpanRollupContribution,
   deriveSpanStorageCost,
   extractSpanCacheTokens,
@@ -255,5 +256,22 @@ describe("deriveRagContextsWithIds", () => {
 
   it("answers undefined when the span carries no contexts", () => {
     expect(deriveRagContextsWithIds({})).toBeUndefined();
+  });
+});
+
+describe("deriveSpanPriceInput", () => {
+  it("hands the price lookup the span's attributes, first model and token counts", () => {
+    const priced = span({ spanAttributes: llmAttributes });
+
+    expect(deriveSpanPriceInput(priced)).toEqual({
+      attributes: priced.spanAttributes,
+      model: "gpt-resp",
+      promptTokens: 1000,
+      completionTokens: 500,
+    });
+  });
+
+  it("names no model when the span carries none", () => {
+    expect(deriveSpanPriceInput(span()).model).toBeUndefined();
   });
 });

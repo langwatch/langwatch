@@ -1,35 +1,15 @@
 import { CODEX_EXEC_SCOPE, isCodexScope } from "@langwatch/coding-agent-contract";
 import {
   type AttributeCanonicaliser,
-  canonicalLogRecordStore,
-  canonicalSpanStore,
+  canonicaliseLogRecord,
+  canonicaliseSpanAttributes,
   claudeCacheWritesLongLived,
-  ClaudeCodeCanonicaliserService,
   ClaudeCodeRequestService,
   ClaudeCodeResponseService,
-  CodexCanonicaliserService,
-  CopilotCanonicaliserService,
   extractLastUserMessageText,
   extractMessageContentText,
-  type ExtractorContext,
-  FallbackCanonicaliserService,
-  GenAICanonicaliserService,
-  HaystackCanonicaliserService,
   isConversationalQuerySource,
-  LangWatchCanonicaliserService,
-  LegacyOtelCanonicaliserService,
-  type LogExtractorContext,
-  LogfireCanonicaliserService,
-  MastraCanonicaliserService,
-  OpenInferenceCanonicaliserService,
-  parseJsonStringValues,
-  remainingAttributes,
-  remainingEvents,
-  SpringAICanonicaliserService,
-  StrandsCanonicaliserService,
-  TraceloopCanonicaliserService,
-  VercelCanonicaliserService,
-  VertexAdkCanonicaliserService,
+  orderedSpanCanonicalisers,
 } from "@langwatch/span-normalisation";
 import {
   classifyClaudeCallInputSchema,
@@ -63,26 +43,9 @@ const claudeCodeResponseService = ClaudeCodeResponseService.create();
 const claudeCodeRequestService = ClaudeCodeRequestService.create();
 
 export class TraceCanonicalisationService extends TraceCanonicalisationServiceContract {
-  private readonly extractors: AttributeCanonicaliser[] = [
-    LangWatchCanonicaliserService.create(),
-    GenAICanonicaliserService.create(),
-    VertexAdkCanonicaliserService.create(),
-    MastraCanonicaliserService.create(),
-    OpenInferenceCanonicaliserService.create(),
-    TraceloopCanonicaliserService.create(),
-    VercelCanonicaliserService.create(),
-    // Native CLI emitters can arrive as spans as well as log records.
-    ClaudeCodeCanonicaliserService.create(),
-    CodexCanonicaliserService.create({ scopes: { isCodexScope, execScope: CODEX_EXEC_SCOPE } }),
-    // Copilot adds its extras after GenAI establishes the standard attributes.
-    CopilotCanonicaliserService.create(),
-    SpringAICanonicaliserService.create(),
-    StrandsCanonicaliserService.create(),
-    LogfireCanonicaliserService.create(),
-    HaystackCanonicaliserService.create(),
-    LegacyOtelCanonicaliserService.create(),
-    FallbackCanonicaliserService.create(),
-  ];
+  private readonly canonicalisers: readonly AttributeCanonicaliser[] = orderedSpanCanonicalisers({
+    codexScopes: { isCodexScope, execScope: CODEX_EXEC_SCOPE },
+  });
 
   private constructor() {
     super();
@@ -96,94 +59,18 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     input: CanonicalizeSpanAttributesInput,
   ): CanonicalizeSpanAttributesResult {
     const parsed = canonicalizeSpanAttributesInputSchema.parse(input);
-    const bag = canonicalSpanStore({
-      spanAttributes: parseJsonStringValues(parsed.spanAttributes),
-      events: parsed.events,
-    });
-    const out: ExtractorContext["out"] = {};
-    const appliedRules: string[] = [];
 
-    const recordRule = (ruleId: string) => appliedRules.push(ruleId);
-
-    const setAttr = (key: string, value: unknown) => {
-      if (value === null || value === void 0) {
-        return;
-      }
-
-      out[key] = value;
-    };
-
-    const setAttrIfAbsent = (key: string, value: unknown) => {
-      if (bag.attrs.has(key) || out[key] !== void 0) {
-        return;
-      }
-
-      setAttr(key, value);
-    };
-
-    for (const ex of this.extractors) {
-      ex.apply({
-        bag,
-        out,
-        recordRule,
-        span: parsed.span,
-        setAttr,
-        setAttrIfAbsent,
-      });
-    }
-
-    const merged: ExtractorContext["out"] = {
-      ...remainingAttributes(bag.attrs),
-      ...out,
-    };
-
-    return canonicalizeSpanAttributesResultSchema.parse({
-      attributes: merged,
-      events: remainingEvents(bag.events),
-      appliedRules,
-    });
+    return canonicalizeSpanAttributesResultSchema.parse(
+      canonicaliseSpanAttributes({ canonicalisers: this.canonicalisers, ...parsed }),
+    );
   }
 
   canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult {
     const parsed = canonicalizeLogRecordInputSchema.parse(input);
-    const bag = canonicalLogRecordStore({
-      scopeName: parsed.scopeName,
-      body: parsed.body,
-      attributes: parseJsonStringValues(parsed.attributes),
-    });
-    const out: LogExtractorContext["out"] = {};
-    const appliedRules: string[] = [];
 
-    const recordRule = (ruleId: string) => appliedRules.push(ruleId);
-    const setAttr = (key: string, value: unknown) => {
-      if (value === null || value === void 0) {
-        return;
-      }
-
-      out[key] = value;
-    };
-    const setAttrIfAbsent = (key: string, value: unknown) => {
-      if (out[key] !== void 0) {
-        return;
-      }
-
-      setAttr(key, value);
-    };
-
-    for (const extractor of this.extractors) {
-      extractor.applyLog?.({
-        bag,
-        out,
-        recordRule,
-        setAttr,
-        setAttrIfAbsent,
-      });
-    }
-
-    return canonicalizeLogRecordResultSchema.parse({
-      attributes: out,
-      appliedRules,
-    });
+    return canonicalizeLogRecordResultSchema.parse(
+      canonicaliseLogRecord({ canonicalisers: this.canonicalisers, ...parsed }),
+    );
   }
 
   extractMessageText(input: ExtractMessageTextInput): string | null {

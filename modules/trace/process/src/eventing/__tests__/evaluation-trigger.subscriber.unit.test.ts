@@ -4,6 +4,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
+  MAX_PROCESSED_SPANS,
   ORIGIN_RESOLVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -34,7 +35,6 @@ import {
   detectCausalityLoop,
   detectFoldedCausalityLoop,
 } from "../evaluation-trigger.subscriber.ts";
-import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 import { createInitState, createTestSpan } from "./trace-summary-test.fixtures.ts";
 
 /**

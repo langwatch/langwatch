@@ -6,8 +6,9 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
-  SPAN_MAX_PAST_MS,
+  isStorableSpanTimeMs,
   type Span,
+  SPAN_MAX_PAST_MS,
 } from "@langwatch/trace-contract";
 
 import type {
@@ -19,8 +20,6 @@ import type {
   SpanDispatchOutcome,
 } from "#rules/trace-collector-body.rules";
 import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
-
-import { isStorableSpanTimeMs } from "../rules/storable-span-time.rules.ts";
 
 const logger = createLogger("langwatch.collector");
 

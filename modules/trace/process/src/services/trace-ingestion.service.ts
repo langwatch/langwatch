@@ -3,14 +3,16 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
   instrumentationScopeSchema,
-  resourceSchema,
-  SPAN_MAX_PAST_MS,
-  spanSchema,
   type OtlpInstrumentationScope,
   type OtlpResource,
   type OtlpSpan,
   type PIIRedactionLevel,
   type RecordSpanCommandData,
+  resourceSchema,
+  SPAN_MAX_PAST_MS,
+  spanSchema,
+  storableSpanTimesOf,
+  type UnstorableSpanTime,
 } from "@langwatch/trace-contract";
 import { normalizeOtlpId } from "@langwatch/trace-contract/otlp-decoding";
 import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
@@ -23,7 +25,6 @@ import {
   stampCodexHelperThread,
   type ScopedSpans,
 } from "../rules/codex-helper-thread.rules.ts";
-import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
 import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
 
 type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";

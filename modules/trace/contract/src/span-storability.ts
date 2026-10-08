@@ -1,9 +1,11 @@
 import { Temporal } from "@langwatch/time";
-import type { OtlpSpan, SpanReceivedEvent } from "@langwatch/trace-contract";
+
 import {
   convertUnixNanoToUnixMs,
   normalizeOtlpUnixNano,
-} from "@langwatch/trace-contract/otlp-decoding";
+} from "./otlp-decoding/otlp-span-identity.ts";
+import type { SpanReceivedEvent } from "./trace-ingress.events.ts";
+import type { OtlpSpan } from "./trace.otlp.ts";
 
 /**
  * The latest instant a span time may carry: the `DateTime64(3)` ceiling, and

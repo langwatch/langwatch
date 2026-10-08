@@ -10,9 +10,10 @@ import {
   isSpanTokenAccumulationSkipped,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import type { SpanCostService } from "../services/span-cost.service.ts";
 import type { TraceSpanNormalization } from "../services/span-normalization.service.ts";
 

@@ -1,14 +1,9 @@
-import type { NormalizedAttributes } from "@langwatch/trace-contract";
+import type { SpanPriceInput } from "@langwatch/trace-contract";
 
 import { computeSpanCost } from "../rules/trace-span-cost-matching.rules.ts";
 
 export interface TraceModelCost {
-  estimate(input: {
-    attributes: NormalizedAttributes;
-    model: string | undefined;
-    promptTokens: number | null;
-    completionTokens: number | null;
-  }): number;
+  estimate(input: SpanPriceInput): number;
 }
 
 /**
@@ -21,12 +16,7 @@ export class TraceModelCostService implements TraceModelCost {
 
   private constructor() {}
 
-  estimate(input: {
-    attributes: NormalizedAttributes;
-    model: string | undefined;
-    promptTokens: number | null;
-    completionTokens: number | null;
-  }): number {
+  estimate(input: SpanPriceInput): number {
     return computeSpanCost({
       attrs: input.attributes,
       ...(input.model === undefined ? {} : { model: input.model }),

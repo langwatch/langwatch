@@ -147,6 +147,26 @@ export function isSpanTokenAccumulationSkipped(span: NormalizedSpan): boolean {
   return markerIsTrue(span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]);
 }
 
+/** What a price lookup reads from a span: its attributes, first model and token counts. */
+export interface SpanPriceInput {
+  attributes: NormalizedSpan["spanAttributes"];
+  model: string | undefined;
+  promptTokens: number | null;
+  completionTokens: number | null;
+}
+
+/** The input a model price table prices a span from; the caller owns the table. */
+export function deriveSpanPriceInput(span: NormalizedSpan): SpanPriceInput {
+  const { promptTokens, completionTokens } = extractSpanTokenCounts(span);
+
+  return {
+    attributes: span.spanAttributes,
+    model: extractSpanModels(span)[0],
+    promptTokens,
+    completionTokens,
+  };
+}
+
 /** The span's stored cost and bundled portion, given its already-priced `spanCost`. */
 export function deriveSpanStorageCost({
   span,

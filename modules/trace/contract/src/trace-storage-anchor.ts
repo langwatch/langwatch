@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
-import { isValidTimestamp } from "./span-timing.rules.ts";
+import { isStorableSpanTimeMs } from "./span-storability.ts";
 
 // Storage-anchor rule of ADR-071; shared by every trace-processing fold that
 // writes PARTITION BY / TTL column. Frozen on first usable business time.
@@ -12,7 +12,7 @@ const MAX_ANCHOR_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
 // Usable storage anchor: valid timestamp not implausibly far in future.
 // Injected now for testability; narrowing is load-bearing at call sites.
 function isUsableAnchorMs(value: number | undefined, now: number): value is number {
-  return isValidTimestamp(value) && value <= now + MAX_ANCHOR_FUTURE_SKEW_MS;
+  return isStorableSpanTimeMs(value) && value <= now + MAX_ANCHOR_FUTURE_SKEW_MS;
 }
 
 // First usable candidate from isUsableAnchorMs, falling back to now. Every
@@ -58,3 +58,17 @@ export function anchorStorageTime<State extends AnchorableTraceState>({
   if (!isUsableAnchorMs(candidate, now)) return state;
   return { ...state, storageAnchorMs: candidate };
 }
+
+/**
+ * The pre-split stamp — DECODED in place, not a store miss: rejecting it
+ * would re-anchor the whole population from replay (ADR-071 consequences
+ * 1-3). `OccurredAt` doubles as the correct `EarliestSpanStartMs` here.
+ */
+export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT = "2026-07-27" as const;
+
+/**
+ * Max spans fully processed (normalize + derive) into a trace summary. A
+ * handful of traces accumulate tens of thousands (reused trace_id, runaway
+ * loops); past the cap we only keep counting, to stay visible.
+ */
+export const MAX_PROCESSED_SPANS = 512;

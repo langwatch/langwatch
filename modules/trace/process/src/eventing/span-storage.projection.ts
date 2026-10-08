@@ -5,12 +5,13 @@ import {
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
+  type NormalizedSpan,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
-  type NormalizedSpan,
+  spanStorabilityOf,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,

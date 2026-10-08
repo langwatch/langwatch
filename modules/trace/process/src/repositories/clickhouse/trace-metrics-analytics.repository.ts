@@ -1,10 +1,10 @@
 import { queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../../rules/trace-analytics-projection-version.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,

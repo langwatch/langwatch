@@ -4,12 +4,12 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
+  firstUsableAnchor,
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,

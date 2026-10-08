@@ -8,44 +8,46 @@ import { createLogger } from "@langwatch/observability";
 import { NON_BILLABLE_ATTR } from "@langwatch/span-normalisation";
 import { nowInstant } from "@langwatch/time";
 import {
-  annotationAddedEventSchema,
-  annotationRemovedEventSchema,
-  annotationsBulkSyncedEventSchema,
+  anchorStorageTime,
   type AnnotationAddedEvent,
+  annotationAddedEventSchema,
   type AnnotationRemovedEvent,
+  annotationRemovedEventSchema,
   type AnnotationsBulkSyncedEvent,
+  annotationsBulkSyncedEventSchema,
+  firstUsableAnchor,
   foldSpanIntoTraceAnalytics,
   type LogContributedEvent,
-  type LogRecordReceivedEvent,
   logContributedEventSchema,
+  type LogRecordReceivedEvent,
   logRecordReceivedEventSchema,
+  MAX_PROCESSED_SPANS,
   mergeModelsMostRecentFirst,
-  metricDataPointCorrelatedEventSchema,
+  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   type MetricDataPointCorrelatedEvent,
-  RESERVED_CACHE_CREATION_TOKENS,
-  RESERVED_CACHE_READ_TOKENS,
-  RESERVED_REASONING_TOKENS,
+  metricDataPointCorrelatedEventSchema,
   type NormalizedSpan,
   type OriginResolvedEvent,
   originResolvedEventSchema,
+  RESERVED_CACHE_CREATION_TOKENS,
+  RESERVED_CACHE_READ_TOKENS,
+  RESERVED_REASONING_TOKENS,
   type SpanReceivedEvent,
   spanReceivedEventSchema,
+  spanStorabilityOf,
   SYNTHETIC_TRACE_SPAN_NAMES,
   type TopicAssignedEvent,
   topicAssignedEventSchema,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  type TraceCanonicalisationService,
   type TraceNameChangedEvent,
   traceNameChangedEventSchema,
-  type TraceCanonicalisationService,
   type TraceSummaryData,
-  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   trimAttributesForAnalytics,
+  UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
-import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
-import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
-import { MAX_PROCESSED_SPANS } from "./trace-summary.projection.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
 
