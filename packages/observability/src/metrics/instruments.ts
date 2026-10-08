@@ -36,6 +36,7 @@ let meter: { value: Meter; generation: number } | undefined;
 const moduleScopeObservations: (() => void)[] = [];
 const installedCallbacks: (() => void)[] = [];
 let activated = false;
+let lagSampler: ReturnType<typeof setInterval> | undefined;
 
 function currentMeter(): Meter {
   if (!meter || meter.generation !== generation) {
@@ -52,6 +53,7 @@ export function activateMetrics(): void {
   generation += 1;
   activated = true;
   for (const install of moduleScopeObservations) install();
+  lagSampler ??= startEventLoopLagSampler();
 }
 
 /**
@@ -71,6 +73,8 @@ export function deactivateMetrics(): void {
   generation += 1;
   meter = void 0;
   activated = false;
+  clearInterval(lagSampler);
+  lagSampler = void 0;
   moduleScopeObservations.length = 0;
   for (const remove of installedCallbacks.splice(0)) remove();
 }
@@ -196,4 +200,19 @@ export function observableGauge(
   // belongs to the booted graph and goes when its provider shuts down.
   if (activated) install();
   else moduleScopeObservations.push(install);
+}
+
+const eventLoopLag = histogram({
+  name: "event_loop_lag_milliseconds",
+  description: "Event loop lag in milliseconds",
+});
+
+/** Main's sampler: every 500 ms, how long a setImmediate waits for the loop. */
+function startEventLoopLagSampler(): ReturnType<typeof setInterval> {
+  const timer = setInterval(() => {
+    const start = performance.now();
+    setImmediate(() => eventLoopLag.observe(performance.now() - start));
+  }, 500);
+  timer.unref();
+  return timer;
 }
