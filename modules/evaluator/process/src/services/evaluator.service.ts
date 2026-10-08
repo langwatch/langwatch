@@ -1,4 +1,5 @@
 import {
+  assertInstantEvalOnlyOnJudgeEvaluator,
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
   type CodeEvaluatorExecutionInput,
@@ -202,6 +203,7 @@ export class EvaluatorService {
     if (parsed.data === "code") {
       codeEvaluatorConfigSchema.parse(config);
     }
+    assertInstantEvalOnlyOnJudgeEvaluator({ name: input.name, config });
 
     if (input.workflowId) {
       await this.options.workflows.assertInProject({
@@ -251,6 +253,11 @@ export class EvaluatorService {
       if ((input.data.type ?? existing.type) === "code") {
         codeEvaluatorConfigSchema.parse(config);
       }
+      assertInstantEvalOnlyOnJudgeEvaluator({
+        name: input.data.name ?? existing.name,
+        config,
+        storedConfig: existing.config,
+      });
     }
 
     if (input.data.workflowId) {
@@ -358,6 +365,7 @@ export class EvaluatorService {
     const allowed = input.allowedProjectIds ? new Set(input.allowedProjectIds) : undefined;
     const writable = allowed ? selected.filter((copy) => allowed.has(copy.projectId)) : selected;
     const config = evaluatorConfigSchema.safeParse(source.config);
+    assertInstantEvalOnlyOnJudgeEvaluator({ name: source.name, config: source.config });
     await Promise.all(
       writable.map((copy) =>
         this.options.repository.updateNameAndConfig({
@@ -382,6 +390,7 @@ export class EvaluatorService {
       evaluatorId: input.evaluatorId,
     });
     const config = evaluatorConfigSchema.safeParse(source.config);
+    assertInstantEvalOnlyOnJudgeEvaluator({ name: source.name, config: source.config });
     await this.options.repository.updateNameAndConfig({
       id: copy.id,
       projectId: input.projectId,

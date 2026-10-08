@@ -1,6 +1,6 @@
 /**
- * Instant Evals answers evaluator judges only, so a graph naming it on a node that calls a model
- * is refused, naming the node.
+ * Instant Evals answers LLM judges only, so a graph naming it on a node that calls a model, or on
+ * an evaluator node that is not a judge, is refused, naming the node.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -63,6 +63,22 @@ const judgeNode = {
   },
 };
 
+const ragasNode = ({
+  id,
+  evaluator = "ragas/faithfulness",
+  parameters = [],
+  settings,
+}: {
+  id: string;
+  evaluator?: string;
+  parameters?: unknown[];
+  settings?: Record<string, unknown>;
+}) => ({
+  id,
+  type: "evaluator",
+  data: { name: id, evaluator, parameters, ...(settings ? { localConfig: { settings } } : {}) },
+});
+
 describe("instantEvalJudgeModelNodesOf()", () => {
   describe("when a node that calls a model names Instant Evals", () => {
     /** @scenario "A workflow or a workbench naming Instant Evals outside a judge is refused where it sits" */
@@ -91,6 +107,38 @@ describe("instantEvalJudgeModelNodesOf()", () => {
 
       expect(place?.length).toBeLessThanOrEqual(64);
       expect(place).toMatch(/^node "A+…"$/);
+    });
+  });
+
+  describe("when an evaluator node that is not an LLM judge names Instant Evals", () => {
+    /** @scenario "A workflow or a workbench naming Instant Evals on an evaluator that is not a judge is refused where it sits" */
+    it("names the node, in its model setting or its unsaved settings", () => {
+      const dsl = graph([
+        ragasNode({
+          id: "Grounded",
+          parameters: [{ identifier: "model", type: "str", value: INSTANT_EVAL_JUDGE_MODEL_ID }],
+        }),
+        ragasNode({ id: "Unsaved", settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID } }),
+        ragasNode({
+          id: "Fine",
+          parameters: [{ identifier: "model", type: "str", value: "openai/gpt-5-mini" }],
+        }),
+        judgeNode,
+      ]);
+
+      expect(instantEvalJudgeModelNodesOf({ dsl })).toEqual(['node "Grounded"', 'node "Unsaved"']);
+    });
+
+    it("leaves a node naming a saved evaluator to that evaluator's own save", () => {
+      const dsl = graph([
+        ragasNode({
+          id: "Saved",
+          evaluator: "evaluators/evaluator_1",
+          settings: { model: INSTANT_EVAL_JUDGE_MODEL_ID },
+        }),
+      ]);
+
+      expect(instantEvalJudgeModelNodesOf({ dsl })).toEqual([]);
     });
   });
 
