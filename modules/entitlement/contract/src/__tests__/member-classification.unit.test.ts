@@ -1,7 +1,7 @@
-import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
-import * as MemberClassificationService from "../../rules/member-classification.rules.ts";
+import * as MemberClassificationService from "../member-classification.ts";
 
 /**
  * Unit tests for member classification functions.

@@ -1842,14 +1842,14 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return (this.#budgetOverview ??= BudgetOverviewService.create({
       organizations: deps.organizations,
       featureFlags: deps.featureFlags,
-      // The service asks for one principal's own active keys; this application
-      // has no narrower read than the org's full key list, so it filters the
-      // same way the service's own Prisma-backed reader would.
       personalVirtualKeys: {
         listActiveForPrincipal: async ({ userId, organizationId }) =>
-          (await this.#dependencies.virtualKeys.getAll(organizationId))
-            .filter((vk) => vk.principalUserId === userId && vk.revokedAt === null)
-            .map((vk) => ({ id: vk.id })),
+          (
+            await this.#dependencies.virtualKeys.findLiveWithPrincipal({
+              organizationId,
+              principalUserId: userId,
+            })
+          ).map((vk) => ({ id: vk.id })),
       },
       budgetDecisions: this.#dependencies.budgetDecisions,
       providerLabels: {

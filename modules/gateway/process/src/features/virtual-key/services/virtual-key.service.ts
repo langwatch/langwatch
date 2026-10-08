@@ -118,15 +118,6 @@ export class VirtualKeyService {
     return this.repository.findLiveWithPrincipal(input);
   }
 
-  async listActiveForPrincipal(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<VirtualKeyWithScopes[]> {
-    const keys = await this.repository.findAllInOrganization(input.organizationId);
-
-    return keys.filter((key) => key.principalUserId === input.userId && key.status !== "REVOKED");
-  }
-
   /** One page of the organization's keys, newest first. */
   async getPage(args: {
     organizationId: string;
