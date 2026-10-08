@@ -13,19 +13,26 @@ import { FakeSsoHost, renderWithSsoHost } from "../../../testing.tsx";
 import { SsoOverviewCard } from "../sso-overview-card.tsx";
 
 const { state } = vi.hoisted(() => ({
-  state: { view: null as unknown, error: null as unknown },
+  state: {
+    view: null as unknown,
+    error: null as unknown,
+    options: [] as ({ enabled?: boolean } | undefined)[],
+  },
 }));
 
 vi.mock("../../../behavior/sso-api.ts", () => ({
   ssoApi: {
     ssoSetup: {
       getSetup: {
-        useQuery: () => ({
-          data: state.error ? void 0 : state.view,
-          isLoading: false,
-          isError: state.error !== null,
-          error: state.error,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          state.options.push(options);
+          return {
+            data: state.error ? void 0 : state.view,
+            isLoading: false,
+            isError: state.error !== null,
+            error: state.error,
+          };
+        },
       },
     },
   },
@@ -82,6 +89,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
 beforeEach(() => {
   state.view = null;
   state.error = null;
+  state.options = [];
 });
 
 const renderCard = ({ canManage = true } = {}) =>
@@ -159,17 +167,27 @@ describe("given an organization that has claimed no domain", () => {
 
 describe("when the reader may not see single sign-on", () => {
   /** @scenario "Verifying a domain is answerable from here" */
-  it("says who can tell them, rather than showing a failure", () => {
-    state.error = Object.assign(new Error("FORBIDDEN"), {
-      data: { code: "FORBIDDEN", httpStatus: 403 },
-    });
-    renderCard();
+  it("sends no request and says who can tell them", () => {
+    renderWithSsoHost(
+      <SsoOverviewCard organizationId="org-1" />,
+      new FakeSsoHost({ canView: false }),
+    );
 
+    expect(state.options.length).toBeGreaterThan(0);
+    expect(state.options.every((options) => options?.enabled === false)).toBe(true);
     expect(screen.getByTestId("domains-no-access")).toHaveTextContent(/administrator/i);
     expect(screen.queryByTestId("sso-load-failure")).toBeNull();
   });
 
-  it("still says a read that failed for another reason out loud", () => {
+  it("asks for the read when the reader holds sso:view", () => {
+    state.view = viewWith(null);
+    renderCard();
+
+    expect(state.options.every((options) => options?.enabled === true)).toBe(true);
+    expect(screen.queryByTestId("domains-no-access")).toBeNull();
+  });
+
+  it("says a read that failed out loud", () => {
     state.error = Object.assign(new Error("INTERNAL_SERVER_ERROR"), {
       data: { code: "INTERNAL_SERVER_ERROR", httpStatus: 500 },
     });

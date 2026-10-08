@@ -22,7 +22,6 @@ import {
 import { domainProofChipFor } from "../../model/domain-proof-chip.ts";
 import { domainRowsFor } from "../../model/domain-rows.ts";
 import { updateChipFor } from "../../model/migration-route.ts";
-import { isReadRefused } from "../../model/read-refusal.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, goLiveFactsOf, routedDomainEvidenceOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
@@ -34,11 +33,13 @@ const PROVIDER_PAGE = "/settings/authentication/provider";
 type SetupConnection = NonNullable<SsoSetupPageView["connection"]>;
 
 export function SsoOverviewCard({ organizationId }: { organizationId: string }) {
-  const canManage = useSsoHost().canManage();
-  const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId });
+  const host = useSsoHost();
+  const canManage = host.canManage();
+  const canView = host.canView();
+  const setup = ssoApi.ssoSetup.getSetup.useQuery({ organizationId }, { enabled: canView });
 
+  if (!canView) return <ReadRefusedCard />;
   if (setup.isLoading) return <Skeleton height="220px" width="full" />;
-  if (setup.isError && isReadRefused(setup.error)) return <ReadRefusedCard />;
   if (setup.isError) return <LoadFailure error={setup.error} what="single sign-on" />;
 
   const view = setup.data;
