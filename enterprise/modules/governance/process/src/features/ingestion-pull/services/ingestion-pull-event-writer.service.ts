@@ -3,14 +3,12 @@ import type {
   NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import { Temporal, toEpochMs } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
-import type {
-  GovernanceOcsfEventInput,
-  GovernanceOcsfEventSink,
-} from "../../../repositories/governance.repositories.ts";
+import type { GovernanceOcsfEventSink } from "../../../repositories/governance.repositories.ts";
 import type { IngestionSourceRepository } from "../../../repositories/ingestion-source.repository.ts";
 import { azureBillSourceId } from "../../microsoft/rules/azure-bill-identity.rules.ts";
+import { mapToOcsfRow } from "../rules/ocsf-pull-event-mapping.rules.ts";
 import type { IngestionPullDiagnosticsSink } from "./ingestion-pull-log.service.ts";
 import type {
   GovernanceProjectDirectory,
@@ -18,11 +16,6 @@ import type {
   PulledUsageEntitlements,
 } from "./ingestion-pull-worker.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
-
-const OCSF_CLASS_API_ACTIVITY = 6003;
-const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
-const OCSF_ACTIVITY_INVOKE = 6;
-const OCSF_SEVERITY_INFO = 1;
 
 export type UnpricedWindowStore = Pick<
   IngestionSourceRepository,
@@ -78,7 +71,7 @@ export class IngestionPullEventWriterService {
     const observedAt = Temporal.Instant.fromEpochMilliseconds(this.now());
     for (const event of input.events) {
       await this.sink.insertEvent(
-        this.toOcsfRow({
+        mapToOcsfRow({
           event,
           tenantId: project.id,
           ingestionSourceId: input.source.id,
@@ -203,64 +196,5 @@ export class IngestionPullEventWriterService {
       { ingestionSourceId: source.id },
     );
     await this.unpricedWindows.updateUnpricedUsageWindow(source.id, { since: null, through: null });
-  }
-
-  private toOcsfRow(input: {
-    event: NormalizedPullEvent;
-    tenantId: string;
-    ingestionSourceId: string;
-    sourceType: string;
-  }): GovernanceOcsfEventInput {
-    const parsedMs = toEpochMs(input.event.event_timestamp);
-    const eventTime = Temporal.Instant.fromEpochMilliseconds(
-      Number.isFinite(parsedMs) ? parsedMs : this.now(),
-    );
-    const eventId = `${input.sourceType}:${input.ingestionSourceId}:${input.event.source_event_id}`;
-    const rawOcsfJson = JSON.stringify({
-      class_uid: OCSF_CLASS_API_ACTIVITY,
-      category_uid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
-      activity_id: OCSF_ACTIVITY_INVOKE,
-      type_uid: OCSF_CLASS_API_ACTIVITY * 100 + OCSF_ACTIVITY_INVOKE,
-      severity_id: OCSF_SEVERITY_INFO,
-      time: eventTime.epochMilliseconds,
-      actor: {
-        user: { uid: "", email_addr: input.event.actor },
-        enduser: { uid: "" },
-      },
-      api: { operation: input.event.action },
-      dst_endpoint: { name: input.event.target },
-      metadata: {
-        product: { name: "LangWatch", vendor_name: "LangWatch" },
-        extension: {
-          uid: "langwatch.governance",
-          source_type: input.sourceType,
-          source_id: input.ingestionSourceId,
-          ingest_mode: "pull",
-          cost_usd: input.event.cost_usd,
-          tokens_input: input.event.tokens_input,
-          tokens_output: input.event.tokens_output,
-          raw_event: input.event.raw_payload,
-          ...input.event.extra,
-        },
-      },
-    });
-
-    return {
-      tenantId: input.tenantId,
-      eventId,
-      traceId: `pull:${eventId}`,
-      sourceId: input.ingestionSourceId,
-      sourceType: input.sourceType,
-      activityId: OCSF_ACTIVITY_INVOKE,
-      severityId: OCSF_SEVERITY_INFO,
-      eventTime,
-      actorUserId: "",
-      actorEmail: input.event.actor,
-      actorEnduserId: "",
-      actionName: input.event.action,
-      targetName: input.event.target,
-      anomalyAlertId: "",
-      rawOcsfJson,
-    };
   }
 }

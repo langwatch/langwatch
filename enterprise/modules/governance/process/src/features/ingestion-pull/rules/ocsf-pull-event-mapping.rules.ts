@@ -13,7 +13,7 @@ import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
-import { nowInstant, Temporal } from "@langwatch/time";
+import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 
 import type { GovernanceOcsfEventInput } from "../../../repositories/governance.repositories.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../../../rules/ocsf-codes.rules.ts";
@@ -117,15 +117,10 @@ export function mapToOcsfRow({
   ingestionSourceId: string;
   sourceType: string;
 }): GovernanceOcsfEventInput {
-  const safeEventTime = (() => {
-    try {
-      return Temporal.Instant.from(event.event_timestamp);
-    } catch {
-      return nowInstant();
-    }
-  })();
+  // Parsed as main's `new Date(...)` does, so a date-only or offset-less stamp keeps its day.
+  const parsedMs = toEpochMs(event.event_timestamp);
+  const occurredAtMs = Number.isFinite(parsedMs) ? parsedMs : nowInstant().epochMilliseconds;
   const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
-  const occurredAtMs = safeEventTime.epochMilliseconds;
   const { actorUserId, actorEmail } = ocsfActorFields(event.actor);
   const rawOcsfJson = JSON.stringify({
     class_uid: 6003,

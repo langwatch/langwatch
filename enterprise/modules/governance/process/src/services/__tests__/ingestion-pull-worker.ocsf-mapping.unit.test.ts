@@ -1,5 +1,6 @@
 import {
   PULLED_USAGE_HINT_KEY,
+  type GovernanceIngestionSource,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
 import { Temporal } from "@langwatch/time";
@@ -11,6 +12,11 @@ import {
   mapToOcsfRow,
   ocsfActorFields,
 } from "../../features/ingestion-pull/rules/ocsf-pull-event-mapping.rules.ts";
+import { IngestionPullEventWriterService } from "../../features/ingestion-pull/services/ingestion-pull-event-writer.service.ts";
+import { silentIngestionPullDiagnostics } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import { PulledUsagePricingService } from "../../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../features/ingestion-pull/services/pulled-usage-record.service.ts";
+import type { GovernanceOcsfEventInput } from "../../repositories/governance.repositories.ts";
 
 const baseEvent: NormalizedPullEvent = {
   source_event_id: "evt-123",
@@ -93,6 +99,14 @@ describe("given a pulled provider event", () => {
 
       expect(row.eventTime).toBeInstanceOf(Temporal.Instant);
       expect(Number.isFinite(row.eventTime.epochMilliseconds)).toBe(true);
+    });
+  });
+
+  describe("when event_timestamp carries a date but no offset", () => {
+    it("keeps the provider's day rather than falling back to now", () => {
+      const row = mapEvent({ ...baseEvent, event_timestamp: "2026-05-03" });
+
+      expect(row.eventTime.epochMilliseconds).toBe(Date.UTC(2026, 4, 3));
     });
   });
 });
@@ -309,6 +323,78 @@ describe("given a day whose cost was read once and exported", () => {
       // record is added for the same day.
       expect(corrected.eventId).toBe(first.eventId);
       expect(moneyOf(corrected.rawOcsfJson).cost_amount).toBe("19.99");
+    });
+  });
+});
+
+const PULL_SOURCE: GovernanceIngestionSource = {
+  id: "src_a",
+  organizationId: "org-1",
+  teamId: null,
+  sourceType: "copilot_studio_dataverse",
+  name: "Dataverse",
+  description: null,
+  ingestSecretHash: "",
+  parserConfig: {},
+  pollerCursor: null,
+  errorCount: 0,
+  pullSchedule: null,
+  status: "active",
+  lastEventAt: null,
+  archivedAt: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  createdById: null,
+};
+
+/** The rows the worker's writer hands the OCSF sink, for one batch of pulled events. */
+async function writtenRows(events: NormalizedPullEvent[]): Promise<GovernanceOcsfEventInput[]> {
+  const rows: GovernanceOcsfEventInput[] = [];
+  const writer = IngestionPullEventWriterService.create({
+    projects: {
+      ensureInternal: async () => ({
+        id: "gov-proj-1",
+        name: "test",
+        slug: "test",
+        teamId: "test-team",
+        kind: "internal_governance",
+        archivedAtMs: null,
+        traceSharingEnabled: false,
+      }),
+    },
+    sink: { insertEvent: async (row) => void rows.push(row) },
+    usageEntitlement: { isEnabled: async () => false },
+    usageRecords: PulledUsageRecordService.create(
+      PulledUsagePricingService.create({ rate: () => ({ costNanoUsd: 0, rateVersion: "test" }) }),
+    ),
+    unpricedWindows: {
+      getUnpricedUsageWindow: async () => ({ since: null, through: null }),
+      updateUnpricedUsageWindow: async () => undefined,
+    },
+    diagnostics: silentIngestionPullDiagnostics,
+    now: () => 0,
+  });
+  await writer.writeEvents({ events, source: PULL_SOURCE });
+  return rows;
+}
+
+describe("given the worker writing a pulled batch to the audit table", () => {
+  describe("when the batch holds an opaque actor and a euro bill with a colliding extra key", () => {
+    /** @scenario "An exported usage record names the currency beside its amount" */
+    it("stores the row exactly as the shared mapping builds it", async () => {
+      const opaque = { ...baseEvent, actor: "user-A1b2C3d4E5" };
+      const bill = euroBillEvent({ extra: { ...euroBillEvent().extra, cost_currency: "USD" } });
+
+      const [opaqueRow, billRow] = await writtenRows([opaque, bill]);
+
+      expect(opaqueRow?.actorUserId).toBe("user-A1b2C3d4E5");
+      expect(opaqueRow?.actorEmail).toBe("");
+      expect(actorOf(opaqueRow?.rawOcsfJson ?? "{}").user.uid).toBe("user-A1b2C3d4E5");
+      const money = moneyOf(billRow?.rawOcsfJson ?? "{}");
+      expect(money.cost_amount).toBe("12.34");
+      expect(money.cost_currency).toBe("EUR");
+      expect(money.cost_usd).toBe("0");
+      expect(billRow).toEqual(mapBill(bill));
     });
   });
 });
