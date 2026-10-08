@@ -42,6 +42,6 @@ Anything else instant-eval needs belongs to another module and is reached throug
 
 ## Who depends on instant-eval
 
-[analytics](../analytics/README.md), [licensing](../../enterprise/modules/licensing/README.md), [ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
+[analytics](../analytics/README.md), [evaluator](../evaluator/README.md), [licensing](../../enterprise/modules/licensing/README.md), [ops](../ops/README.md), [trace](../trace/README.md) (as a peer).
 
 <!-- readme:generated:end -->

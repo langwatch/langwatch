@@ -11,9 +11,11 @@ import {
   codeEvaluatorConfigSchema,
   EvaluatorApi,
   evaluatorConfig,
+  evaluatorFallbackModel,
   EvaluatorInvalidConfigError,
   EvaluatorSourcePermissionDeniedError,
   EvaluatorWorkflowEvaluatorExistsError,
+  isLlmJudgeEvaluator,
   newEvaluatorId,
   type CodeEvaluatorExecutionInput,
   type Evaluator,
@@ -37,8 +39,14 @@ import {
 } from "@langwatch/evaluator-contract";
 import { preconditionMatchInputSchema } from "@langwatch/evaluator-contract/evaluation-types";
 import { ValidationError } from "@langwatch/handled-error";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
-import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  hasPickableChatModel,
+  ModelNotConfiguredError,
+  ModelProviderApi,
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -63,6 +71,8 @@ import { EvaluatorWorkflowArchiveService } from "../services/evaluator-workflow-
 import { EvaluatorWorkflowPublicationService } from "../services/evaluator-workflow-publication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 import type { EvaluatorBrowserApi } from "../transport/evaluator.trpc.ts";
+
+const logger = createLogger("langwatch:evaluator:app");
 
 /** The workflow rows an evaluator is entangled with, read through their owner. */
 export interface EvaluatorGraph {
@@ -100,6 +110,7 @@ type EvaluatorSetup = FeatureSetup<
 type EvaluatorAppParts = Readonly<{
   evaluators: EvaluatorRuntimeService;
   modelProviders: ModelProviderApi;
+  instantEvals: InstantEvalApi;
   permissions: AuthzApi;
   graph: EvaluatorGraph;
   deletionFacts: EvaluatorDeletionFactsService;
@@ -121,6 +132,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     workflows: WorkflowApi,
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
+    /** Whether a new judge with no model to run may start on Instant Evals. */
+    instantEvals: InstantEvalApi,
   };
 
   static create(setup: EvaluatorSetup): EvaluatorModule {
@@ -150,6 +163,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return new EvaluatorModule({
       evaluators,
       modelProviders: dependencies.modelProviders,
+      instantEvals: dependencies.instantEvals,
       permissions: dependencies.permissions,
       graph,
       deletionFacts: EvaluatorDeletionFactsService.create(),
@@ -377,7 +391,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   /**
    * Creates an evaluator against the project's resolved models: the public API
    * names a config but no model, so `evaluator.create_default` is what it runs
-   * on. The embeddings model is optional where the default model is not.
+   * on, or the type's fallback when that resolves nothing. The embeddings model
+   * is optional where the default model is not.
    */
   async createWithResolvedDefaults(input: {
     projectId: string;
@@ -385,11 +400,8 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     config: EvaluatorConfig;
     id?: string;
   }): Promise<Evaluator> {
-    const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-      this.#dependencies.modelProviders.resolveModelForFeature({
-        projectId: input.projectId,
-        featureKey: "evaluator.create_default",
-      }),
+    const [defaultModel, resolvedEmbedding] = await Promise.all([
+      this.#resolveDefaultModel(input.projectId, input.config),
       this.#resolveEmbeddingsModel(input.projectId, input.config),
     ]);
 
@@ -400,7 +412,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
       type: "evaluator",
       config: input.config,
       resolved: {
-        defaultModel: resolvedDefault.model,
+        defaultModel,
         embeddingsModel: resolvedEmbedding?.model ?? null,
       },
     });
@@ -550,6 +562,49 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
     return copies.filter((_, index) => decisions[index] === true);
   }
 
+  /** The project's default model, else the type's fallback, else today's refusal. */
+  async #resolveDefaultModel(projectId: string, config: EvaluatorConfig): Promise<string> {
+    try {
+      const resolved = await this.#dependencies.modelProviders.resolveModelForFeature({
+        projectId,
+        featureKey: "evaluator.create_default",
+      });
+      return resolved.model;
+    } catch (error) {
+      if (!(error instanceof ModelNotConfiguredError) || error.role !== "DEFAULT") throw error;
+      if (namesModel(config)) throw error;
+      const fallback = await this.#findFallbackModel(projectId, evaluatorTypeOf(config));
+      if (fallback === null) throw error;
+      return fallback;
+    }
+  }
+
+  /**
+   * Skips the release and provider reads for a type no fallback could apply to. A failed
+   * read means no fallback, so the caller keeps today's refusal rather than a server error.
+   */
+  async #findFallbackModel(
+    projectId: string,
+    evaluatorType: string | undefined,
+  ): Promise<string | null> {
+    if (!evaluatorType || !isLlmJudgeEvaluator(evaluatorType)) return null;
+    const reads = await Promise.all([
+      this.#dependencies.instantEvals.isReleased({ projectId }),
+      this.#dependencies.modelProviders.listForProject({ projectId }),
+    ]).catch((error: unknown) => {
+      logger.warn({ projectId, error }, "Could not read the new evaluator's fallback model");
+      return null;
+    });
+    if (reads === null) return null;
+    const [released, providers] = reads;
+    return evaluatorFallbackModel({
+      evaluatorType,
+      released,
+      hasUsableProvider: hasPickableChatModel(providers),
+      platformDefault: null,
+    });
+  }
+
   /**
    * Null only when the project has no default AND the evaluator type
    * declares none (#7556); when the type DOES declare one, absence stays a
@@ -605,9 +660,19 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   }
 }
 
+function evaluatorTypeOf(config: EvaluatorConfig): string | undefined {
+  return typeof config.evaluatorType === "string" ? config.evaluatorType : void 0;
+}
+
+/** A create that picks its own model keeps today's refusal rather than a fallback. */
+function namesModel(config: EvaluatorConfig): boolean {
+  const settings = config.settings;
+  return typeof settings === "object" && settings !== null && "model" in settings;
+}
+
 /** Whether the evaluator type's own settings declare an embeddings model. */
 function usesEmbeddingsModel(config: EvaluatorConfig): boolean {
-  const evaluatorType = typeof config.evaluatorType === "string" ? config.evaluatorType : void 0;
+  const evaluatorType = evaluatorTypeOf(config);
   if (!evaluatorType) return false;
 
   const definition = AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS];

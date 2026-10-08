@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -33,6 +34,7 @@ async function bootEvaluator() {
       testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
       testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
       testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+      testPeer({ token: InstantEvalApi, instance: createApiFixture<InstantEvalApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

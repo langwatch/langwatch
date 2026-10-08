@@ -607,6 +607,25 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
         | on   | a model provider  | LLM judge                        |
         | on   | no model provider | LLM evaluator that is not a judge |
 
+    @unit
+    Scenario: A judge created through the API with no model provider starts on Instant Evals when released
+      Given a project with release_instant_evals on, no model provider and no default model configured
+      When an LLM judge is created through the evaluators API, which names no model
+      Then the judge is created with Instant Evals as its model
+
+    @unit
+    Scenario Outline: An evaluator created through the API with no default model is refused otherwise
+      Given a project with release_instant_evals <flag>, <providers> and no default model configured
+      When an <evaluator> is created through the evaluators API, which names no model
+      Then it is refused as having no default model configured, as today
+      And no evaluator is created
+
+      Examples:
+        | flag | providers         | evaluator                         |
+        | off  | no model provider | LLM judge                         |
+        | on   | a model provider  | LLM judge                         |
+        | on   | no model provider | LLM evaluator that is not a judge |
+
     @integration
     Scenario: The score range shows only for Instant Evals
       Given a score judge

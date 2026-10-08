@@ -29,6 +29,7 @@ Anything else evaluator needs belongs to another module and is reached through i
 | Name             | Token              | Module                                        |
 | ---------------- | ------------------ | --------------------------------------------- |
 | `auditLog`       | `AuditLogApi`      | [audit-log](../audit-log/README.md)           |
+| `instantEvals`   | `InstantEvalApi`   | [instant-eval](../instant-eval/README.md)     |
 | `modelProviders` | `ModelProviderApi` | [model-provider](../model-provider/README.md) |
 | `permissions`    | `AuthzApi`         | [authz](../authz/README.md)                   |
 | `users`          | `UserApi`          | [user](../user/README.md)                     |
