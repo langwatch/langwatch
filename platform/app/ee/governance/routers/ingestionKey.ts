@@ -70,7 +70,10 @@ export const ingestionKeyRouter = createTRPCRouter({
         sourceType: input.sourceType,
         ingestionTemplateId: input.templateId ?? null,
       });
-      void auditLog({
+      // Await the audit write so the row is durable before the mutation
+      // answers, matching `revoke` below and every other governance mutation.
+      // The `catch` keeps a failed audit from swallowing the minted token.
+      await auditLog({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         action: "ingestionKey.mint",
@@ -108,7 +111,10 @@ export const ingestionKeyRouter = createTRPCRouter({
         sourceType: input.sourceType,
         ingestionTemplateId: input.templateId ?? null,
       });
-      void auditLog({
+      // Await the audit write so the row is durable before the mutation
+      // answers, matching `revoke` below and every other governance mutation.
+      // The `catch` keeps a failed audit from swallowing the minted token.
+      await auditLog({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         action: "ingestionKey.rotate",
