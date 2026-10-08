@@ -9,6 +9,9 @@ import { MemoryAnalyticsRateLimitRepository } from "./memory.analytics-rate-limi
 import { MemoryAnalyticsRecencyRepository } from "./memory.analytics-recency.repository.ts";
 import { MemoryAnalyticsSessionsRepository } from "./memory.analytics-sessions.repository.ts";
 import { MemoryAnalyticsRepository } from "./memory.analytics.repository.ts";
+import { MemoryTraceAnalyticsFoldCacheRepository } from "./memory.trace-analytics-fold-cache.repository.ts";
+import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
+import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 
 /** The memory tier has no ClickHouse server to probe: it answers nothing, as a silent one does. */
 class MemoryLangWatchQLAppFunctionStoreRepository extends LangWatchQLAppFunctionStoreRepository {
@@ -49,6 +52,9 @@ export class MemoryAnalyticsRepositories {
           throw new Error("Memory stores provide no PostgreSQL for LangWatchQL provisioning.");
         },
       },
+      traceAnalyticsProjection: MemoryTraceAnalyticsRepository.create(),
+      traceAnalyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
+      traceAnalyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
     };
   }
 }

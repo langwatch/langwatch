@@ -87,8 +87,6 @@ function buildPipeline({
   return EventingTracePipelineAdapter.create({
     spanStore: createApiFixture<Options["spanStore"]>(),
     summaryStore: createApiFixture<Options["summaryStore"]>(),
-    derivedStore: createApiFixture<Options["derivedStore"]>(),
-    rollupStore: createApiFixture<Options["rollupStore"]>(),
     canonicalisation: collaborators.canonicalisation,
     ioExtraction: collaborators.ioExtraction,
     mediaReferences: collaborators.mediaReferences,

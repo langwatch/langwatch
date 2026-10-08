@@ -15,8 +15,6 @@ import { SpanStorageClickHouseRepository } from "../../repositories/clickhouse/s
 import type { SpanSummaryQueryRow } from "../../repositories/clickhouse/span-storage.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { SpanStorageMapProjection } from "../span-storage.projection.ts";
-import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
-import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
@@ -72,31 +70,10 @@ function traceSummaryCost(extra: CallExtra): number | null {
   return projection.handleTraceSpanReceived(claudeCallEvent(extra), projection.init()).totalCost;
 }
 
-/** The analytics fold, which answers cost-over-time when the rollup cannot. */
-function traceAnalyticsCost(extra: CallExtra): number | null {
-  const projection = TraceAnalyticsFoldProjection.create({
-    store: noopFoldStore,
-    traceCanonicalisation: TraceCanonicalisationService.create(),
-    runtime,
-  });
-  return projection.handleTraceSpanReceived(claudeCallEvent(extra), projection.init()).totalCost;
-}
-
-/** The per-minute rollup the analytics graphs read by default. */
 /** Every span here has ordinary times, so a `null` map means a broken fixture. */
 function mapped<Row>(record: Row | null): Row {
   if (record === null) throw new Error("expected the span to map to a record");
   return record;
-}
-
-function analyticsRollupCost(extra: CallExtra): number {
-  return mapped(
-    TraceAnalyticsRollupMapProjection.create({
-      store: noopAppendStore,
-      spanCostService: runtime.spanCost,
-      spanNormalization: runtime.spanNormalization,
-    }).mapTraceSpanReceived(claudeCallEvent(extra)),
-  ).costSum;
 }
 
 function storedSpan(extra: CallExtra) {
@@ -164,8 +141,6 @@ function recomputedSummaryRowCost(extra: CallExtra): number | null {
 function allSurfaces(extra: CallExtra = {}): Record<string, number | null> {
   return {
     traceSummary: traceSummaryCost(extra),
-    traceAnalytics: traceAnalyticsCost(extra),
-    analyticsRollup: analyticsRollupCost(extra),
     storedSpan: storedSpanCost(extra),
     recomputedSummaryRow: recomputedSummaryRowCost(extra),
   };
@@ -181,7 +156,6 @@ function surfaceMismatches(extra: CallExtra, expected: number): string[] {
 describe("the cost of one claude code model call", () => {
   describe("given a main-thread call, whose cache writes are hour-long", () => {
     describe("when every surface prices it", () => {
-      /** @scenario "A trace rollup projection totals a call the same as every other pricing surface" */
       /** @scenario Every surface prices one call at one number */
       it("reaches the amount the provider charged, on all of them", () => {
         expect(surfaceMismatches({ "llm_request.context": "interaction" }, CHARGED_USD)).toEqual(

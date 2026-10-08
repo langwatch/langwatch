@@ -60,6 +60,12 @@ import { Secret } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
+import {
+  buildTraceAnalyticsPipeline,
+  type TraceAnalyticsPipeline,
+  type TraceAnalyticsRepositories,
+  type TraceAnalyticsRetention,
+} from "../eventing/trace-analytics.pipeline.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -184,6 +190,8 @@ export interface AnalyticsAppDependencies {
   lwqlProvisioning: LwqlProvisioningOperations;
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
+  /** The per-project retention the trace analytics lanes stamp their rows with (round 20). */
+  retention: TraceAnalyticsRetention;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -436,6 +444,7 @@ export class AnalyticsModule
             ? { target: { connection, sourceDatabase: admin.target.database } }
             : {}),
         }),
+        retention: setup.dependencies.retention,
       },
       setup.config.publicBaseUrl,
     );
@@ -462,6 +471,15 @@ export class AnalyticsModule
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
+  }
+
+  /** trace_analytics: analytics' peer fold and map over trace's facts, on the worker (Q207). */
+  traceAnalyticsPipeline({
+    repositories,
+  }: {
+    repositories: TraceAnalyticsRepositories;
+  }): TraceAnalyticsPipeline {
+    return buildTraceAnalyticsPipeline({ repositories, retention: this.#dependencies.retention });
   }
 
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */

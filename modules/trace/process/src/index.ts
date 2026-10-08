@@ -59,9 +59,6 @@ export type {
   TraceClickHouseWriteResolver,
 } from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 export type { SpanDedupClaim, SpanDedupRef } from "./repositories/trace-span-dedup.repository.ts";
-export { type TraceAnalyticsData } from "./eventing/trace-derived.projection.ts";
 export { SpanStorageStore } from "./eventing/span-storage.store.ts";
-export { TraceAnalyticsStore } from "./eventing/trace-derived.store.ts";
-export { TraceAnalyticsRollupStore } from "./eventing/trace-rollup.store.ts";
 export { TraceSummaryStore } from "./eventing/trace-summary.store.ts";
 export { createEvaluationTriggerSubscriber } from "./eventing/evaluation-trigger.subscriber.ts";

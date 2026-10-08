@@ -34,7 +34,7 @@ Feature: Analytics owns the trace analytics tables
     Then the delivery fails and is retried
     And the trace's row is written once the insert succeeds
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace's process installs without the trace analytics writers
     Given the trace process module
     When its pipeline is composed
@@ -47,8 +47,39 @@ Feature: Analytics owns the trace analytics tables
     Then it applies the predicate analytics owns
     And the predicate opens every door the fold's signal test opens
 
-  @unit @unimplemented
+  @unit
   Scenario: Trace holds no copy of the has-signal predicate
     Given the trace process module
     When its source is searched for the has-signal predicate
     Then only analytics defines it
+
+  @unit
+  Scenario: Analytics hosts the trace analytics fold and rollup as peer lanes on trace's facts
+    Given analytics' trace_analytics pipeline
+    When it is composed
+    Then it declares no event of its own
+    And it hosts the slim fold and the per-span rollup as peer lanes
+
+  @unit
+  Scenario: Analytics' trace_analytics fold reads through the Redis fold cache under main's keyspace
+    Given analytics' trace_analytics pipeline built over the process's Redis
+    When the slim fold stores one trace's state
+    Then it is cached under main's keyspace, trace_analytics
+
+  @unit
+  Scenario: Analytics' trace analytics lanes stamp each row with its project's retention
+    Given analytics' trace_analytics pipeline built with the retention peer
+    When a lane resolves the retention for a project
+    Then it asks the retention peer for that project's resolved retention
+
+  @unit
+  Scenario: Analytics' trace analytics fold and rollup price a call the same as every other pricing surface
+    Given one model call priced by every server-side surface
+    When the analytics fold and the rollup total it
+    Then their totals match every other surface's price for the same call
+
+  @unit @unimplemented
+  Scenario: A late-arriving span updates the rollup it belongs to
+    Given a trace already rolled up
+    When a further span for that trace arrives
+    Then the rollup includes it

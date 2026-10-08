@@ -1,9 +1,10 @@
-Feature: Trace rollups and span storage fold idempotently
+Feature: Trace folds and span storage fold idempotently
 
-  A trace rolled up or a span stored twice must not double a total, and a
-  subscriber must only ever act on the origin it was built to guard.
+  A span stored twice must not double a total, and a subscriber must only ever
+  act on the origin it was built to guard. The trace analytics fold and rollup
+  are analytics' (modules/analytics/specs/trace-analytics-ownership.feature).
 
-  # trace-rollup.projection.ts, span-storage.projection.ts,
+  # span-storage.projection.ts,
   # custom-evaluation-sync.subscriber.ts, origin-guarded.subscriber.ts,
   # trace-attribute-cap.rules.ts, trace-payload-cap.rules.ts,
   # trace-retention-floor.service.ts
@@ -11,27 +12,9 @@ Feature: Trace rollups and span storage fold idempotently
   @unit
   Scenario: The worker's trace folds read through the Redis fold cache under main's keyspaces
     Given the worker's trace pipeline built over the process's Redis
-    When the summary and analytics folds store one trace's state
-    Then each is cached under main's keyspace, trace_summaries and trace_analytics
+    When the summary fold stores one trace's state
+    Then it is cached under main's keyspace, trace_summaries
     And a cache miss falls through to the durable projection
-
-  @unit @unimplemented
-  Scenario: A trace rolled up twice reports one set of totals, not doubled ones
-    Given a trace whose spans have already been rolled up
-    When the same spans are folded again
-    Then the totals are unchanged
-
-  @unit
-  Scenario: A trace rollup projection totals a call the same as every other pricing surface
-    Given one model call priced by every server-side surface
-    When the rollup projection totals it
-    Then its total matches every other surface's price for the same call
-
-  @unit @unimplemented
-  Scenario: A late-arriving span updates the rollup it belongs to
-    Given a trace already rolled up
-    When a further span for that trace arrives
-    Then the rollup includes it
 
   @unit @unimplemented
   Scenario: A span exceeding the attribute cap is stored truncated, not rejected

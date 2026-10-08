@@ -5438,6 +5438,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1

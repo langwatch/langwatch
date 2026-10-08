@@ -9,11 +9,9 @@ import { ClickHouseTraceModelSpendRepository } from "../clickhouse/clickhouse.tr
 import { LogRecordStorageClickHouseRepository } from "../clickhouse/log-record-storage.repository.ts";
 import { SessionGroupsClickHouseRepository } from "../clickhouse/session-groups.repository.ts";
 import { SpanStorageClickHouseRepository } from "../clickhouse/span-storage.repository.ts";
-import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../clickhouse/trace-derivation-span.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../clickhouse/trace-existence.repository.ts";
 import { TraceListClickHouseRepository } from "../clickhouse/trace-list.repository.ts";
-import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import {
   TraceSummaryClickHouseRepository,
   TraceSummaryProjectionClickHouseRepository,
@@ -38,7 +36,6 @@ export class PostgresTraceRepositories {
   ): Omit<
     TraceRepositories,
     | "summaryFoldCache"
-    | "analyticsFoldCache"
     | "spanDedup"
     | "exportSlots"
     | "rateLimits"
@@ -54,8 +51,6 @@ export class PostgresTraceRepositories {
         prisma: members.prisma,
       }),
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
-      analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
-      analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),
       spanStorage: SpanStorageClickHouseRepository.create(traceClickHouse),
       existence: ClickHouseTraceExistenceRepository.create({
         resolveClient: traceClickHouse,

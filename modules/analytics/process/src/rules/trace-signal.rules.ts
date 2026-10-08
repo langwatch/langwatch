@@ -1,5 +1,3 @@
-export const MAX_PROCESSED_SPANS = 512;
-
 export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
   `(SpanCount > 0` +
   ` OR EarliestSpanStartMs > 0` +

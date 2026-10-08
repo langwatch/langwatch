@@ -8,7 +8,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { RedisTraceAnalyticsFoldCacheRepository } from "../../repositories/redis/redis.trace-analytics-fold-cache.repository.ts";
 import { RedisTraceSummaryFoldCacheRepository } from "../../repositories/redis/redis.trace-summary-fold-cache.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
@@ -31,7 +30,6 @@ function compose() {
     repositories: {
       ...MemoryTraceRepositories.create(),
       summaryFoldCache: RedisTraceSummaryFoldCacheRepository.create(redis),
-      analyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create(redis),
     },
     canonicalisation: TraceCanonicalisationService.create(),
     commands: createApiFixture<TraceProcessingPipelineInput["commands"]>(),
@@ -48,17 +46,26 @@ const context = { aggregateId: "trace-1", tenantId: createTenantId("project-1") 
 describe("TraceProcessingRuntimeAdapter", () => {
   describe("given the worker's trace pipeline built over the process's Redis", () => {
     /** @scenario "The worker's trace folds read through the Redis fold cache under main's keyspaces" */
-    it.each([
-      ["traceSummary", "fold:trace_summaries:project-1:trace-1"],
-      ["traceAnalytics", "fold:trace_analytics:project-1:trace-1"],
-    ])("caches the %s fold under main's keyspace", async (foldName, expectedKey) => {
+    it("caches the traceSummary fold under main's keyspace", async () => {
       const { pipeline, set } = compose();
-      const fold = pipeline.foldProjections.get(foldName);
-      expect(fold, `the pipeline registered no ${foldName} fold`).toBeDefined();
+      const fold = pipeline.foldProjections.get("traceSummary");
+      expect(fold, "the pipeline registered no traceSummary fold").toBeDefined();
 
       await fold?.open((definition) => definition.store.store(definition.init(), context));
 
-      expect(set.mock.calls.map((call) => call.at(0))).toContain(expectedKey);
+      expect(set.mock.calls.map((call) => call.at(0))).toContain(
+        "fold:trace_summaries:project-1:trace-1",
+      );
+    });
+
+    /** @scenario "Trace's process installs without the trace analytics writers" */
+    it("registers neither trace analytics lane nor a store for them, which analytics hosts", () => {
+      const { pipeline } = compose();
+      const repositories = Object.keys(MemoryTraceRepositories.create());
+
+      expect(pipeline.foldProjections.has("traceAnalytics")).toBe(false);
+      expect(pipeline.mapProjections.has("traceAnalyticsRollup")).toBe(false);
+      expect(repositories.filter((name) => name.startsWith("analytics"))).toEqual([]);
     });
 
     /** @scenario "The worker's trace folds read through the Redis fold cache under main's keyspaces" */

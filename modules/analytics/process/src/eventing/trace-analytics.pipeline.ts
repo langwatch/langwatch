@@ -1,7 +1,10 @@
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   type AppendStore,
   defineAggregate,
+  defineEventingModule,
   definePipeline,
+  type EventingSetup,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
 import {
@@ -18,14 +21,18 @@ import {
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
+import type { AnalyticsModule } from "../app/analytics.app.ts";
+import type { AnalyticsRepositories } from "../repositories/analytics.repositories.ts";
 import {
   type TraceAnalyticsRollupRow,
   TraceAnalyticsRollupMapProjection,
 } from "./trace-analytics-rollup.projection.ts";
+import { TraceAnalyticsRollupStore } from "./trace-analytics-rollup.store.ts";
 import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-analytics.projection.ts";
+import { TraceAnalyticsStore } from "./trace-analytics.store.ts";
 
 /** Hosts analytics' peer fold and map over trace's facts (round 8, named in round 18). */
 export const TRACE_ANALYTICS_PIPELINE_NAME = "trace_analytics" as const;
@@ -76,10 +83,47 @@ function traceAnalyticsHost({
 /** The host pipeline as a TYPE, derived from the builder above. */
 export type TraceAnalyticsPipeline = ReturnType<ReturnType<typeof traceAnalyticsHost>["build"]>;
 
-/** Not installed yet: the switch retires trace's two lanes in the same change (handoff ta-host). */
-export function buildTraceAnalyticsPipeline(stores: {
-  foldStore: FoldProjectionStore<TraceAnalyticsData>;
-  rollupStore: AppendStore<TraceAnalyticsRollupRow>;
+/** The retention peer's two reads the host lanes stamp each row's TTL with. */
+export type TraceAnalyticsRetention = Pick<
+  DataRetentionApi,
+  "getPlatformDefaultRetentionDays" | "getResolvedForProject"
+>;
+
+/** The three repositories behind the host's two lanes. */
+export type TraceAnalyticsRepositories = Pick<
+  AnalyticsRepositories,
+  "traceAnalyticsProjection" | "traceAnalyticsRollup" | "traceAnalyticsFoldCache"
+>;
+
+/** The stores trace's runtime built, and the host's retention its peer lanes take (round 20). */
+export function buildTraceAnalyticsPipeline({
+  repositories,
+  retention,
+}: {
+  repositories: TraceAnalyticsRepositories;
+  retention: TraceAnalyticsRetention;
 }): TraceAnalyticsPipeline {
-  return traceAnalyticsHost(stores).build();
+  const defaultRetentionDays = (): number => retention.getPlatformDefaultRetentionDays();
+  return traceAnalyticsHost({
+    foldStore: repositories.traceAnalyticsFoldCache.cached(
+      TraceAnalyticsStore.create({
+        storage: repositories.traceAnalyticsProjection,
+        defaultRetentionDays,
+      }),
+    ),
+    rollupStore: TraceAnalyticsRollupStore.create({
+      storage: repositories.traceAnalyticsRollup,
+      defaultRetentionDays,
+    }),
+  })
+    .withRetention({
+      resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
+    })
+    .build();
 }
+
+export const traceAnalyticsEventing = defineEventingModule({
+  pipeline: TRACE_ANALYTICS_PIPELINE_NAME,
+  build: ({ app, repositories }: EventingSetup<AnalyticsRepositories, AnalyticsModule>) =>
+    app.traceAnalyticsPipeline({ repositories }),
+});
