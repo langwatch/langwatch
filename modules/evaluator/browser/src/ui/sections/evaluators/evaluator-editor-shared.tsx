@@ -34,7 +34,6 @@ import type {
   TargetConfig,
 } from "@langwatch/experiment-contract";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { toEpochMs } from "@langwatch/time";
 import type { AvailableSource, FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import debounce from "lodash-es/debounce";
@@ -45,6 +44,7 @@ import { z } from "zod";
 
 import { ComparisonConfigForm } from "../../../behavior/lent-peers.tsx";
 import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
+import { useEvaluatorFallbackModel } from "../../../behavior/use-evaluator-fallback-model.ts";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../model/workflow/platform-defaults.ts";
 import type { EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
@@ -321,6 +321,7 @@ export function useEvaluatorEditorController(
   const settingsSchema = useMemo(() => settingsSchemaOf(evaluatorType), [evaluatorType]);
 
   const { defaultSettings, isLoading: resolvedDefaultsLoading } = useResolvedDefaultSettings({
+    evaluatorType,
     evaluatorDef,
     project,
     isOpen,
@@ -1020,10 +1021,12 @@ function useRequiredToggle({
 
 /** The evaluator's defaults, preferring the models this project actually has configured. */
 function useResolvedDefaultSettings({
+  evaluatorType,
   evaluatorDef,
   project,
   isOpen,
 }: {
+  evaluatorType: string | undefined;
   evaluatorDef: Parameters<typeof getEvaluatorDefaultSettings>[0];
   project: { id: string } | undefined;
   isOpen: boolean;
@@ -1036,6 +1039,7 @@ function useResolvedDefaultSettings({
     projectId: project?.id,
     enabled: isOpen,
   });
+  const fallback = useEvaluatorFallbackModel({ evaluatorType });
 
   const defaultSettings = useMemo(() => {
     if (!evaluatorDef || !project) return {};
@@ -1047,7 +1051,7 @@ function useResolvedDefaultSettings({
           embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
         },
         {
-          defaultModel: DEFAULT_MODEL,
+          defaultModel: fallback.fallbackModel,
           embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
         },
       ) ?? {}
@@ -1057,10 +1061,12 @@ function useResolvedDefaultSettings({
     project,
     resolvedDefaultModel.data?.model,
     resolvedDefaultEmbeddings.data?.model,
+    fallback.fallbackModel,
   ]);
   return {
     defaultSettings,
-    isLoading: resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading,
+    isLoading:
+      resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading || fallback.isLoading,
   };
 }
 

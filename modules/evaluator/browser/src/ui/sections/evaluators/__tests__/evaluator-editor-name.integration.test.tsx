@@ -21,10 +21,17 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), canGoBack: false, goBack: vi.fn() }),
   useDrawerParams: () => ({}),
 }));
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 vi.mock("../../../../behavior/evaluator-api.ts", () => ({
   evaluatorApi: {
     modelProvider: {
       getResolvedDefault: { useQuery: () => ({ data: null, isLoading: false }) },
+      listAllForProjectForFrontend: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    instantEval: {
+      access: { useQuery: () => ({ data: { released: false }, isLoading: false }) },
     },
   },
 }));
