@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Routing policies and personal gateway keys: the Enterprise half of the AI Gateway.
 
-Peers call these through the token, declared at `../contract/src/enterprise-gateway.api.ts:29`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-gateway.api.ts:30`; nothing else in this package is public.
 
 #### `listRoutingPolicies`
 
@@ -44,6 +44,14 @@ How many policies an organization holds (governance's setup checklist).
 
 ```typescript
 countRoutingPolicies(input: { organizationId: string }): Promise<number>;
+```
+
+#### `getPersonalContext`
+
+The caller's personal workspace, provisioned lazily, and the routing policy it inherits.
+
+```typescript
+getPersonalContext(input: { userId: string; organizationId: string }): Promise<PersonalContext>;
 ```
 
 #### `routingPolicyTierSuggestions`
@@ -136,13 +144,14 @@ Contract `../contract/src/personal-virtual-keys.trpc.ts:14`, router `src/transpo
 
 ### `routingPolicy`
 
-Contract `../contract/src/routing-policy.trpc.ts:26`, router `src/transport/routing-policy.trpc.ts:9`.
+Contract `../contract/src/routing-policy.trpc.ts:27`, router `src/transport/routing-policy.trpc.ts:9`.
 
 | Procedure                       | Kind     | Gate                                | Input                            | Output                                     |
 | ------------------------------- | -------- | ----------------------------------- | -------------------------------- | ------------------------------------------ |
 | `routingPolicy.list`            | query    | Permission `routingPolicies:view`   | `listRoutingPoliciesInputSchema` | inline                                     |
 | `routingPolicy.get`             | query    | Permission `routingPolicies:view`   | `policyInOrganization`           | `routingPolicySchema`                      |
 | `routingPolicy.tierSuggestions` | query    | Permission `routingPolicies:view`   | inline                           | inline                                     |
+| `routingPolicy.personalContext` | query    | Permission `organization:view`      | inline                           | `personalContextSchema`                    |
 | `routingPolicy.create`          | mutation | Permission `routingPolicies:manage` | inline                           | `routingPolicySchema`                      |
 | `routingPolicy.update`          | mutation | Permission `routingPolicies:manage` | inline                           | `routingPolicySchema`                      |
 | `routingPolicy.setDefault`      | mutation | Permission `routingPolicies:manage` | `policyInOrganization`           | `routingPolicySchema`                      |

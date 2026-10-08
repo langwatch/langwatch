@@ -545,17 +545,20 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:259`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:260`           |
-| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:17` |
-| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:18` |
-| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:19` |
-| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:20` |
-| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:26` |
-| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:27` |
-| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:28` |
-| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:29` |
-| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:30` |
-| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:31` |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:267`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:268`           |
+| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:20` |
+| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:21` |
+| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:22` |
+| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:23` |
+| config | `gatewayInternalUrl`                         | `LW_GATEWAY_INTERNAL_URL`                      | `../contract/src/model-provider.config.ts:24` |
+| config | `gatewayPublicUrl`                           | `LW_GATEWAY_PUBLIC_URL`                        | `../contract/src/model-provider.config.ts:25` |
+| config | `gatewayLegacyUrl`                           | `LW_GATEWAY_BASE_URL`                          | `../contract/src/model-provider.config.ts:26` |
+| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:32` |
+| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:33` |
+| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:34` |
+| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:35` |
+| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:36` |
+| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:37` |
 
 <!-- readme:generated:end -->

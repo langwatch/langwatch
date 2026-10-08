@@ -124,11 +124,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `share_trace_sharing_revocation` (aggregate `global`)
 
-Declared at `src/eventing/share-trace-sharing-revocation.pipeline.ts:33`.
+Declared at `src/eventing/share-trace-sharing-revocation.pipeline.ts:40`.
 
-| Kind            | Name                               | Handles                                                                     | Declared at                                                  |
-| --------------- | ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| peer subscriber | `shareProjectTraceSharingDisabled` | `lw.project.trace_sharing_disabled` from [project](../../project/README.md) | `src/eventing/share-trace-sharing-revocation.pipeline.ts:40` |
+| Kind            | Name                                    | Handles                                                                                    | Declared at                                                  |
+| --------------- | --------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| peer subscriber | `shareProjectTraceSharingDisabled`      | `lw.project.trace_sharing_disabled` from [project](../../project/README.md)                | `src/eventing/share-trace-sharing-revocation.pipeline.ts:47` |
+| peer subscriber | `shareOrganizationTraceSharingDisabled` | `lw.organization.trace_sharing_disabled` from [organization](../../organization/README.md) | `src/eventing/share-trace-sharing-revocation.pipeline.ts:60` |
 
 ## Configuration
 

@@ -11,8 +11,8 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | project                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:166` (39 operations) |
-| Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:116`                                    |
+| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:181` (40 operations) |
+| Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:75`                                     |
 | Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:70`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
@@ -30,7 +30,6 @@ Anything else project needs belongs to another module and is reached through its
 
 | Name            | Token             | Module                                    |
 | --------------- | ----------------- | ----------------------------------------- |
-| `apiKeys`       | `ApiKeyApi`       | [api-key](../api-key/README.md)           |
 | `auditLog`      | `AuditLogApi`     | [audit-log](../audit-log/README.md)       |
 | `authorization` | `AuthzApi`        | [authz](../authz/README.md)               |
 | `dataPrivacy`   | `DataPrivacyApi`  | [data-privacy](../data-privacy/README.md) |

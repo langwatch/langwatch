@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/workflow.module.ts:21`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withTransportFacts(…)`, `src/workflow.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -644,13 +644,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `workflow_agent_archive_cascade` (aggregate `global`)
+
+Declared at `src/eventing/workflow-agent-archive-cascade.pipeline.ts:29`.
+
+| Kind            | Name                    | Handles                                                 | Declared at                                                  |
+| --------------- | ----------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| peer subscriber | `workflowAgentArchived` | `lw.agent.archived` from [agent](../../agent/README.md) | `src/eventing/workflow-agent-archive-cascade.pipeline.ts:36` |
+
 ### Pipeline `workflow_lifecycle` (aggregate `workflow`)
 
-Declared at `src/eventing/workflow-lifecycle.pipeline.ts:29`. Events: `workflowCreatedEventSchema`.
+Declared at `src/eventing/workflow-lifecycle.pipeline.ts:33`. Events: `workflowCreatedEventSchema`, `workflowVersionSavedEventSchema`.
 
-| Kind    | Name                    | Handles | Declared at                                      |
-| ------- | ----------------------- | ------- | ------------------------------------------------ |
-| command | `recordWorkflowCreated` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:34` |
+| Kind    | Name                         | Handles | Declared at                                      |
+| ------- | ---------------------------- | ------- | ------------------------------------------------ |
+| command | `recordWorkflowCreated`      | –       | `src/eventing/workflow-lifecycle.pipeline.ts:38` |
+| command | `recordWorkflowVersionSaved` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:39` |
 
 ### Pipeline `workflow_nlp_lambda_cleanup` (aggregate `global`)
 
@@ -672,8 +681,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:606`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:607`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:610`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:611`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

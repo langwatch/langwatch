@@ -6,7 +6,7 @@ The server half of [api-key](../README.md). API keys: creating and updating them
 
 ## Installation
 
-`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyTrpcTransport).withTransportFacts(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:24`.
+`defineProcessModule("api-key").withRepositories(apiKeyRepositories).withApi(ApiKeyModule).withTransports(apiKeyRest, apiKeyProjectsRest, apiKeyTrpcTransport).withTransportFacts(…).withEventing(apiKeyEventing)`, `src/api-key.module.ts:25`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -352,6 +352,41 @@ listOrganizationMembers(input: { organizationId: string }, by: ApiKeyManagementC
 
 ## REST transport
 
+### `apiKeyProjectsRest`
+
+|             |                                             |
+| ----------- | ------------------------------------------- |
+| Declared at | `src/transport/api-key-projects.rest.ts:79` |
+| Base URL    | none: each route's path is its address      |
+| Addressing  | literal                                     |
+| Credential  | organization                                |
+
+#### `GET /api/projects` · `listProjects`
+
+List projects
+
+Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:85`.
+
+Answers at `/api/projects`.
+
+```typescript
+type Query = z.infer<typeof projectRestPaginationQuerySchema>; // ../contract/src/api-key-rest.schemas.ts:118
+type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-key.rest.ts:76
+```
+
+#### `POST /api/projects` · `createProject`
+
+Create a project
+
+Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:111`.
+
+Answers at `/api/projects`.
+
+```typescript
+type Body = z.infer<typeof projectRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:123
+type Response = z.infer<typeof projectRestCreatedSchema>; // ../contract/src/api-key.rest.ts:95
+```
+
 ### `apiKeyRest`
 
 |             |                                          |
@@ -371,7 +406,7 @@ Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:284`.
 Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-keys/2026-08-07`, `/api/v1/api-keys/2026-08-07`, `/api/api-keys/latest`, `/api/v1/api-keys/latest`.
 
 ```typescript
-type Response = z.infer<typeof apiKeyRestListSchema>; // ../contract/src/api-key.rest.ts:35
+type Response = z.infer<typeof apiKeyRestListSchema>; // ../contract/src/api-key.rest.ts:36
 ```
 
 #### `POST /` · `createApiKey`
@@ -384,7 +419,7 @@ Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-ke
 
 ```typescript
 type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:51
+type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
 ```
 
 #### `GET /:id` · `getApiKey`
@@ -397,7 +432,7 @@ Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:39
+type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
 ```
 
 #### `PATCH /:id` · `updateApiKey`
@@ -411,7 +446,7 @@ Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/ap
 ```typescript
 type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
 type Body = z.infer<typeof apiKeyRestUpdateSchema>; // ../contract/src/api-key-rest.schemas.ts:99
-type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:39
+type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
 ```
 
 #### `DELETE /:id` · `revokeApiKey`
@@ -424,7 +459,7 @@ Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/ap
 
 ```typescript
 type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-type Response = z.infer<typeof apiKeyRestRevokedSchema>; // ../contract/src/api-key.rest.ts:62
+type Response = z.infer<typeof apiKeyRestRevokedSchema>; // ../contract/src/api-key.rest.ts:63
 ```
 
 #### `POST /ingestion` · `createIngestionApiKey`
@@ -437,7 +472,7 @@ Answers at `/api/api-keys/ingestion`, `/api/v1/api-keys/ingestion`; also, undocu
 
 ```typescript
 type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:51
+type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
 ```
 
 #### `POST /full-access` · `createFullAccessApiKey`
@@ -450,7 +485,7 @@ Answers at `/api/api-keys/full-access`, `/api/v1/api-keys/full-access`; also, un
 
 ```typescript
 type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:51
+type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
 ```
 
 ## tRPC transport
@@ -490,9 +525,9 @@ Declared at `src/eventing/api-key.pipeline.ts:85`.
 
 | Kind   | Leaf                 | Environment variable          | Declared at                  |
 | ------ | -------------------- | ----------------------------- | ---------------------------- |
-| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:162` |
-| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:163` |
-| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:164` |
-| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:166` |
+| secret | `pepper`             | `API_KEY_PEPPER`              | `src/app/api-key.app.ts:169` |
+| secret | `pepperFallback`     | `CREDENTIALS_SECRET`          | `src/app/api-key.app.ts:170` |
+| secret | `pepperLastFallback` | `NEXTAUTH_SECRET`             | `src/app/api-key.app.ts:171` |
+| secret | `pepperPrevious`     | `CREDENTIALS_SECRET_PREVIOUS` | `src/app/api-key.app.ts:173` |
 
 <!-- readme:generated:end -->

@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withTransportFacts(…).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:13`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -136,6 +136,14 @@ findLiveByRef(input: Readonly<{ projectRef: string; organizationId: string }>): 
 
 ```typescript
 create(input: Readonly<{ organizationId: string; teamId?: string | undefined; newTeamName?: string | undefined; name: string; language: string; framework: string; }>, by: Readonly<{ id: string }>): Promise<Project>;
+```
+
+#### `createInOrganization`
+
+Provisions a project for a management credential, which may be a service key acting as nobody: the actor is nullable here, unlike `create`'s.
+
+```typescript
+createInOrganization(input: Readonly<{ organizationId: string; userId: string | null; teamId?: string | undefined; newTeamName?: string | undefined; name: string; language: string; framework: string; }>): Promise<Project>;
 ```
 
 #### `updateSettings`
@@ -296,50 +304,24 @@ findSharedProjectSlugs(input: { organizationId: string; memberUserId?: string; l
 
 ### `projectRest`
 
-|             |                                     |
-| ----------- | ----------------------------------- |
-| Declared at | `src/transport/project.rest.ts:149` |
-| Base URL    | `/api/projects`                     |
-| Addressing  | dated                               |
-| Credential  | organization                        |
-| Versions    | `2026-08-07`                        |
-
-#### `GET /` · `listProjects`
-
-List projects
-
-Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/project.rest.ts:156`.
-
-Answers at `/api/projects`; also, undocumented, `/api/projects/2026-08-07`, `/api/projects/latest`.
-
-```typescript
-type Query = z.infer<typeof projectRestPaginationQuerySchema>; // ../contract/src/project-rest.schemas.ts:4
-type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/project.responses.ts:92
-```
-
-#### `POST /` · `createProject`
-
-Create a project
-
-Permission `project:create`. Declared at `src/transport/project.rest.ts:183`.
-
-Answers at `/api/projects`; also, undocumented, `/api/projects/2026-08-07`, `/api/projects/latest`.
-
-```typescript
-type Body = z.infer<typeof projectRestCreateSchema>; // ../contract/src/project-rest.schemas.ts:9
-type Response = z.infer<typeof projectRestCreatedSchema>; // ../contract/src/project.responses.ts:111
-```
+|             |                                    |
+| ----------- | ---------------------------------- |
+| Declared at | `src/transport/project.rest.ts:91` |
+| Base URL    | `/api/projects`                    |
+| Addressing  | dated                              |
+| Credential  | organization                       |
+| Versions    | `2026-08-07`                       |
 
 #### `GET /:id` · `getProject`
 
 Get a project
 
-Permission `project:view`. Declared at `src/transport/project.rest.ts:223`.
+Permission `project:view`. Declared at `src/transport/project.rest.ts:98`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
 type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
 ```
 
@@ -347,13 +329,13 @@ type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/proj
 
 Update a project
 
-Permission `project:update`. Declared at `src/transport/project.rest.ts:241`.
+Permission `project:update`. Declared at `src/transport/project.rest.ts:116`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
-type Body = z.infer<typeof projectRestUpdateSchema>; // ../contract/src/project-rest.schemas.ts:32
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
+type Body = z.infer<typeof projectRestUpdateSchema>; // ../contract/src/project-rest.schemas.ts:4
 type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
 ```
 
@@ -361,25 +343,25 @@ type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/proj
 
 Archive a project
 
-Permission `project:delete`. Declared at `src/transport/project.rest.ts:258`.
+Permission `project:delete`. Declared at `src/transport/project.rest.ts:133`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
-type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:118
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
+type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:84
 ```
 
 #### `GET /:id/api-key` · `getProjectApiKey`
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:280`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:155`.
 
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:30
 ```
 
@@ -387,13 +369,13 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:299`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:174`.
 
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:42
-type Body = z.infer<typeof projectRestRegenerateApiKeyInputSchema>; // ../contract/src/project-rest.schemas.ts:45
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
+type Body = z.infer<typeof projectRestRegenerateApiKeyInputSchema>; // ../contract/src/project-rest.schemas.ts:17
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:30
 ```
 

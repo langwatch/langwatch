@@ -156,14 +156,6 @@ One dataset by slug, or null.
 findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
 ```
 
-#### `findExperimentBySlug`
-
-One experiment by slug, or null.
-
-```typescript
-findExperimentBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
-```
-
 #### `findModelForFeature`
 
 The model the project's cascade resolves for one feature key, or null.
@@ -242,7 +234,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:188` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:169` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -251,67 +243,54 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:196`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:177`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:203)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:184)
 ```
 
 #### `POST /api/evaluations/:evaluator/evaluate` · `postApiEvaluationsByEvaluatorEvaluate`
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:224`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:205`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:227)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:230)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:208)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:211)
 ```
 
 #### `POST /api/evaluations/:evaluator/:subpath/evaluate` · `postApiEvaluationsByEvaluatorBySubpathEvaluate`
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:255`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:236`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof namespacedEvaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:16
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:261)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:264)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:242)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:245)
 ```
 
 #### `POST /api/guardrails/:evaluator/evaluate` · `postApiGuardrailsByEvaluatorEvaluate`
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:289`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:270`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:291)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:294)
-```
-
-#### `POST /api/dataset/evaluate` · `postApiDatasetEvaluate`
-
-Evaluate a dataset
-
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:319`.
-
-Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
-
-```typescript
-// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:321)
-// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:324)
+// Rawbody: "text" (inline, src/transport/evaluations-legacy.rest.ts:272)
+// Response: "protocol" (inline, src/transport/evaluations-legacy.rest.ts:275)
 ```
 
 ## tRPC transport
@@ -363,8 +342,8 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:82`. Even
 
 | Kind   | Leaf                             | Environment variable                 | Declared at                               |
 | ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:275`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:276`           |
+| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:266`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:267`           |
 | config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:26` |
 | config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:27` |
 | config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:28` |

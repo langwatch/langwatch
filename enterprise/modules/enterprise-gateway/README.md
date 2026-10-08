@@ -11,7 +11,7 @@ The Enterprise half of the AI Gateway: routing policies and personal gateway key
 | Classification | enterprise (`modules/catalogue.json`)                                                                                                           |
 | Subjects       | enterprise-gateway, personal-virtual-key, routing-policy                                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                                             |
-| Api token      | `EnterpriseGatewayApi` = `moduleApi<EnterpriseGatewayApi>()("enterprise-gateway")`, `contract/src/enterprise-gateway.api.ts:72` (15 operations) |
+| Api token      | `EnterpriseGatewayApi` = `moduleApi<EnterpriseGatewayApi>()("enterprise-gateway")`, `contract/src/enterprise-gateway.api.ts:75` (16 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                                                    |
 
 ## What enterprise-gateway owns
@@ -33,6 +33,7 @@ Anything else enterprise-gateway needs belongs to another module and is reached 
 | `modelProviders` | `ModelProviderApi` | [model-provider](../../../modules/model-provider/README.md) |
 | `organizations`  | `OrganizationApi`  | [organization](../../../modules/organization/README.md)     |
 | `projects`       | `ProjectApi`       | [project](../../../modules/project/README.md)               |
+| `users`          | `UserApi`          | [user](../../../modules/user/README.md)                     |
 
 ## Who depends on enterprise-gateway
 

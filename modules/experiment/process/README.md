@@ -6,13 +6,13 @@ The server half of [experiment](../README.md). Experiments: saved definitions, t
 
 ## Installation
 
-`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:27`.
+`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:28`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ExperimentApi`)
 
-Peers call these through the token, declared at `../contract/src/experiment.api.ts:145`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/experiment.api.ts:149`; nothing else in this package is public.
 
 #### `getById`
 
@@ -206,6 +206,14 @@ Records one SDK batch evaluation: its run, its rows and its verdicts.
 
 ```typescript
 logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
+```
+
+#### `evaluateDataset`
+
+Runs one evaluator over an entry of a saved dataset and records it against an experiment.
+
+```typescript
+evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome>;
 ```
 
 #### `computeRunMetrics`
@@ -484,6 +492,28 @@ Answers at `/api/evaluations/batch/log_results`, `/api/v1/evaluations/batch/log_
 ```typescript
 // Rawbody: "text" (inline, src/transport/experiment-batch-log.rest.ts:92)
 // Response: "protocol" (inline, src/transport/experiment-batch-log.rest.ts:95)
+```
+
+### `experimentDatasetEvaluationRest`
+
+|             |                                                          |
+| ----------- | -------------------------------------------------------- |
+| Declared at | `src/transport/experiment-dataset-evaluation.rest.ts:79` |
+| Base URL    | none: each route's path is its address                   |
+| Addressing  | literal                                                  |
+| Credential  | project                                                  |
+
+#### `POST /api/dataset/evaluate` · `postApiDatasetEvaluate`
+
+Evaluate a dataset
+
+Permission `evaluations:manage`. Declared at `src/transport/experiment-dataset-evaluation.rest.ts:85`.
+
+Answers at `/api/dataset/evaluate`, `/api/v1/dataset/evaluate`.
+
+```typescript
+// Rawbody: "text" (inline, src/transport/experiment-dataset-evaluation.rest.ts:87)
+// Response: "protocol" (inline, src/transport/experiment-dataset-evaluation.rest.ts:90)
 ```
 
 ### `experimentDspyStepsRest`

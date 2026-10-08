@@ -289,7 +289,7 @@ Declared at `src/eventing/instant-eval-processing.pipeline.ts:60`. Events: `inst
 
 | Kind   | Leaf                    | Environment variable                    | Declared at                                 |
 | ------ | ----------------------- | --------------------------------------- | ------------------------------------------- |
-| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval.app.ts:143`           |
+| secret | `classifierApiKey`      | `JEV_API_KEY`                           | `src/app/instant-eval.app.ts:147`           |
 | config | `classifier`            | `INSTANT_EVAL_CLASSIFIER`               | `../contract/src/instant-eval.config.ts:12` |
 | config | `classifierBaseUrl`     | `JEV_BASE_URL`                          | `../contract/src/instant-eval.config.ts:17` |
 | config | `classifierModel`       | `JEV_MODEL`                             | `../contract/src/instant-eval.config.ts:25` |

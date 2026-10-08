@@ -680,6 +680,8 @@ personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
 
 #### `personalUsageDashboard`
 
+The caller's own /me rollup; `user_not_in_organization` (403) outside the organization.
+
 ```typescript
 personalUsageDashboard(input: { organizationId: string; window?: PersonalUsageWindow }, by: GovernanceCaller): Promise<PersonalUsageRollup>;
 ```
@@ -1078,16 +1080,19 @@ Contract `../contract/src/governance-people.ts:55`, router `src/transport/govern
 
 ### `governance`
 
-Contract `../contract/src/governance.trpc.ts:22`, router `src/transport/governance.trpc.ts:12`.
+Contract `../contract/src/governance.trpc.ts:25`, router `src/transport/governance.trpc.ts:13`.
 
-| Procedure                                | Kind     | Gate                               | Input               | Output                            |
-| ---------------------------------------- | -------- | ---------------------------------- | ------------------- | --------------------------------- |
-| `governance.resolveActorPersonalProject` | query    | Permission `governance:view`       | inline              | inline                            |
-| `governance.resolveHome`                 | query    | Permission `organization:view`     | `organizationScope` | `personaResolutionSchema`         |
-| `governance.setupState`                  | query    | Permission `governance:view`       | `organizationScope` | `governanceSetupStateSchema`      |
-| `governance.ocsfExport`                  | query    | Permission `complianceExport:view` | inline              | `governanceOcsfExportPageSchema`  |
-| `governance.quarantineFillStats`         | query    | Permission `governance:view`       | inline              | `quarantineFillStatsSchema`       |
-| `governance.recordWorkspaceView`         | mutation | Permission `governance:view`       | inline              | `recordWorkspaceViewResultSchema` |
+| Procedure                                | Kind     | Gate                               | Input               | Output                                  |
+| ---------------------------------------- | -------- | ---------------------------------- | ------------------- | --------------------------------------- |
+| `governance.resolveActorPersonalProject` | query    | Permission `governance:view`       | inline              | inline                                  |
+| `governance.resolveHome`                 | query    | Permission `organization:view`     | `organizationScope` | `personaResolutionSchema`               |
+| `governance.setupState`                  | query    | Permission `governance:view`       | `organizationScope` | `governanceSetupStateSchema`            |
+| `governance.ocsfExport`                  | query    | Permission `complianceExport:view` | inline              | `governanceOcsfExportPageSchema`        |
+| `governance.quarantineFillStats`         | query    | Permission `governance:view`       | inline              | `quarantineFillStatsSchema`             |
+| `governance.recordWorkspaceView`         | mutation | Permission `governance:view`       | inline              | `recordWorkspaceViewResultSchema`       |
+| `governance.personalUsage`               | query    | Permission `organization:view`     | inline              | `personalUsageRollupSchema`             |
+| `governance.budgetOverview`              | query    | Permission `organization:view`     | inline              | `governanceBudgetOverviewForUserSchema` |
+| `governance.cliBootstrap`                | query    | Permission `organization:view`     | `organizationScope` | `cliBootstrapResultSchema`              |
 
 ### `ingestionKey`
 

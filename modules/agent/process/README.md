@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:21`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withEventing(agentLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Agent application.
 
-Peers call these through the token, declared at `../contract/src/agent.api.ts:43`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/agent.api.ts:42`; nothing else in this package is public.
 
 #### `listWorkflowConfigs`
 
@@ -186,12 +186,6 @@ update(input: UpdateAgentCommand): Promise<AgentWithFields>;
 
 ```typescript
 archive(input: ArchiveAgentCommand): Promise<Agent>;
-```
-
-#### `relatedEntities`
-
-```typescript
-relatedEntities(input: { id: string; projectId: string }): Promise<RelatedAgentEntities>;
 ```
 
 #### `cascadeArchive`
@@ -530,26 +524,25 @@ type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/conn
 
 ### `agents`
 
-Contract `../contract/src/agent.trpc.ts:28`, router `src/transport/agent.trpc.ts:16`.
+Contract `../contract/src/agent.trpc.ts:27`, router `src/transport/agent.trpc.ts:16`.
 
-| Procedure                   | Kind     | Gate                            | Input                               | Output                           |
-| --------------------------- | -------- | ------------------------------- | ----------------------------------- | -------------------------------- |
-| `agents.getAll`             | query    | Permission `evaluations:view`   | `agentApiProjectInputSchema`        | inline                           |
-| `agents.getById`            | query    | Permission `evaluations:view`   | `agentApiAgentInputSchema`          | `agentWithLegacyCopyCountSchema` |
-| `agents.create`             | mutation | Permission `evaluations:manage` | `createAgentCommandSchema`          | `agentWithFieldsSchema`          |
-| `agents.update`             | mutation | Permission `evaluations:manage` | `updateAgentCommandSchema`          | `agentWithFieldsSchema`          |
-| `agents.getRelatedEntities` | query    | Permission `evaluations:view`   | `agentApiAgentInputSchema`          | `relatedAgentEntitiesSchema`     |
-| `agents.cascadeArchive`     | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentCascadeArchiveSchema`      |
-| `agents.delete`             | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentSchema`                    |
-| `agents.getCopies`          | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
-| `agents.copy`               | mutation | Permission `evaluations:manage` | `agentApiCopyRequestSchema`         | `agentCopyCreatedSchema`         |
-| `agents.pushToCopies`       | mutation | Permission `evaluations:manage` | `agentApiPushToCopiesInputSchema`   | `agentPushToCopiesSchema`        |
-| `agents.syncFromSource`     | mutation | Permission `evaluations:manage` | `agentApiAgentReferenceInputSchema` | `agentSyncFromSourceSchema`      |
-| `agents.getHistory`         | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
+| Procedure               | Kind     | Gate                            | Input                               | Output                           |
+| ----------------------- | -------- | ------------------------------- | ----------------------------------- | -------------------------------- |
+| `agents.getAll`         | query    | Permission `evaluations:view`   | `agentApiProjectInputSchema`        | inline                           |
+| `agents.getById`        | query    | Permission `evaluations:view`   | `agentApiAgentInputSchema`          | `agentWithLegacyCopyCountSchema` |
+| `agents.create`         | mutation | Permission `evaluations:manage` | `createAgentCommandSchema`          | `agentWithFieldsSchema`          |
+| `agents.update`         | mutation | Permission `evaluations:manage` | `updateAgentCommandSchema`          | `agentWithFieldsSchema`          |
+| `agents.cascadeArchive` | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentCascadeArchiveSchema`      |
+| `agents.delete`         | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentSchema`                    |
+| `agents.getCopies`      | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
+| `agents.copy`           | mutation | Permission `evaluations:manage` | `agentApiCopyRequestSchema`         | `agentCopyCreatedSchema`         |
+| `agents.pushToCopies`   | mutation | Permission `evaluations:manage` | `agentApiPushToCopiesInputSchema`   | `agentPushToCopiesSchema`        |
+| `agents.syncFromSource` | mutation | Permission `evaluations:manage` | `agentApiAgentReferenceInputSchema` | `agentSyncFromSourceSchema`      |
+| `agents.getHistory`     | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
 
 ### `httpProxy`
 
-Contract `../contract/src/agent.trpc.ts:79`, router `src/transport/http-proxy.trpc.ts:5`.
+Contract `../contract/src/agent.trpc.ts:74`, router `src/transport/http-proxy.trpc.ts:5`.
 
 | Procedure           | Kind     | Gate                            | Input                      | Output                  |
 | ------------------- | -------- | ------------------------------- | -------------------------- | ----------------------- |
@@ -562,6 +555,14 @@ Contract `../contract/src/agent.trpc.ts:79`, router `src/transport/http-proxy.tr
 | websocket | `/api/v1/agents/connect` | –        | `src/transport/agent-connect.ws.ts:23` |
 
 ## Workers
+
+### Pipeline `agent_lifecycle` (aggregate `agent`)
+
+Declared at `src/eventing/agent-lifecycle.pipeline.ts:29`. Events: `agentArchivedEventSchema`.
+
+| Kind    | Name                  | Handles | Declared at                                   |
+| ------- | --------------------- | ------- | --------------------------------------------- |
+| command | `recordAgentArchived` | –       | `src/eventing/agent-lifecycle.pipeline.ts:34` |
 
 ### Tasks
 

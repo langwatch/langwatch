@@ -31,6 +31,6 @@ Anything else secret needs belongs to another module and is reached through its 
 
 ## Who depends on secret
 
-[agent](../agent/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [scenario](../scenario/README.md), [workflow](../workflow/README.md) (as a peer).
+[agent](../agent/README.md), [gateway](../gateway/README.md), [langy](../langy/README.md), [model-provider](../model-provider/README.md), [scenario](../scenario/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

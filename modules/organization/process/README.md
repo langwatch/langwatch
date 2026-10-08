@@ -544,10 +544,26 @@ updateSentPlanLimitAlert(input: Readonly<{ organizationId: string; sentAt: Insta
 
 #### `setLicense`
 
-Main's mint script write: the licence and its expiry, the validated stamp cleared.
+The licence and its expiry; the mint stamps `validatedAt` null, an activation now.
 
 ```typescript
-setLicense(input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant }>): Promise<void>;
+setLicense(input: Readonly<{ organizationId: string; licenseKey: string; expiresAt: Instant; validatedAt: Instant | null; }>): Promise<void>;
+```
+
+#### `clearLicense`
+
+The licence and both its dates cleared; throws `OrganizationNotFoundError`.
+
+```typescript
+clearLicense(input: Readonly<{ organizationId: string }>): Promise<void>;
+```
+
+#### `findSupportContact`
+
+The support contact set in settings, else the longest-seated enabled administrator's email.
+
+```typescript
+findSupportContact(input: Readonly<{ organizationId: string }>): Promise<string | null>;
 ```
 
 #### `claimBillingCustomerId`
@@ -1711,16 +1727,17 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:30`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:32`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`.
 
 | Kind    | Name                                 | Handles | Declared at                                          |
 | ------- | ------------------------------------ | ------- | ---------------------------------------------------- |
-| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:42` |
-| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:43` |
-| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:44` |
-| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:45` |
-| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:46` |
-| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:47` |
+| command | `recordSignedUp`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:45` |
+| command | `recordMembersInvited`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:46` |
+| command | `recordInviteAccepted`               | –       | `src/eventing/organization-lifecycle.pipeline.ts:47` |
+| command | `recordIntegrationMethodChosen`      | –       | `src/eventing/organization-lifecycle.pipeline.ts:48` |
+| command | `recordPersonalWorkspaceProvisioned` | –       | `src/eventing/organization-lifecycle.pipeline.ts:49` |
+| command | `recordPresenceSettingChanged`       | –       | `src/eventing/organization-lifecycle.pipeline.ts:50` |
+| command | `recordTraceSharingDisabled`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:51` |
 
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
@@ -1742,7 +1759,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:351`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:346`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |
