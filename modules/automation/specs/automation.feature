@@ -348,3 +348,9 @@ Feature: Automation ownership
     Given a Slack automation form on a bot connection whose token Slack refuses
     When the form asks for the connection's channels
     Then no channels are offered and the listing carries Slack's error code
+
+  @unit
+  Scenario: Only a caller who may change automations lists Slack channels or test-fires
+    Given a caller who may view automations but not change them
+    When they list a Slack connection's channels or test-fire a template
+    Then both are refused before the service runs, the door asking triggers:update as main's did
