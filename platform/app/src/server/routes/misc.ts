@@ -69,8 +69,8 @@ import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { extractLLMCallInfo } from "~/server/experiments/dspyLLMCallCost";
 import {
-  type DSPyLLMCall,
   type DSPyStepRESTParams,
   dSPyStepRESTParamsSchema,
 } from "~/server/experiments/types";
@@ -78,14 +78,7 @@ import { filterFieldsEnum } from "~/server/filters/types";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import {
-  getLLMModelCosts,
-  type MaybeStoredLLMModelCost,
-} from "~/server/modelProviders/llmModelCost";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/tracer/collector/cost";
+import { getLLMModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
@@ -1505,37 +1498,6 @@ async function resolveOrganizationId(teamId: string): Promise<string | null> {
 const generateHash = (data: object) => {
   return crypto.createHash("md5").update(JSON.stringify(data)).digest("hex");
 };
-
-const extractLLMCallInfo =
-  (llmModelCosts: MaybeStoredLLMModelCost[]) =>
-  (call: DSPyLLMCall): DSPyLLMCall => {
-    if (
-      call.__class__ === "dsp.modules.gpt3.GPT3" ||
-      call.response?.object === "chat.completion"
-    ) {
-      const model = call.response?.model;
-      const llmModelCost =
-        model &&
-        matchModelCostWithFallbacks(call.response.model, llmModelCosts);
-      const promptTokens = call.response?.usage?.prompt_tokens;
-      const completionTokens = call.response?.usage?.completion_tokens;
-      const cost =
-        llmModelCost &&
-        estimateCost({
-          llmModelCost,
-          inputTokens: promptTokens ?? 0,
-          outputTokens: completionTokens ?? 0,
-        });
-      return {
-        ...call,
-        model,
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        cost,
-      };
-    }
-    return call;
-  };
 
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, index, experiment_id, experiment_slug } = param;

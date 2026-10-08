@@ -18,10 +18,14 @@ vi.mock("~/server/tracer/collector/cost", async () => {
     // Keep the real estimateCost (pure arithmetic) and stub only the
     // DB-backed model-cost lookup.
     estimateCost: actual.estimateCost,
+    matchModelCostWithFallbacks: actual.matchModelCostWithFallbacks,
     getMatchingLLMModelCost,
   };
 });
 
+import { VARIABLE_PRICE_ROUTERS } from "~/server/modelProviders/__tests__/variablePriceRouters.test-helpers";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
 import { priceMetrics } from "../orchestrator";
 
 const MODEL_COST = {
@@ -87,6 +91,32 @@ describe("priceMetrics", () => {
         completion_tokens: 50,
       });
       expect(cost).toBeUndefined();
+    });
+  });
+});
+
+describe("priceMetrics for a variable-price router", () => {
+  beforeEach(() => {
+    // The lookup reads the real static registry, which is where a router's
+    // catalog rate would come from; only the database half is left out.
+    getMatchingLLMModelCost.mockReset();
+    getMatchingLLMModelCost.mockImplementation(
+      async (_projectId: string, model: string) =>
+        matchModelCostWithFallbacks(model, getStaticModelCosts()),
+    );
+  });
+
+  describe("given an evaluation cell that ran a router", () => {
+    /** @scenario An evaluation cell run on a router is never costed below zero */
+    it.each(
+      VARIABLE_PRICE_ROUTERS,
+    )("never costs %s below zero", async (model) => {
+      const cost = await priceMetrics("project-1", {
+        model,
+        prompt_tokens: 1000,
+        completion_tokens: 500,
+      });
+      expect(cost ?? 0).toBeGreaterThanOrEqual(0);
     });
   });
 });

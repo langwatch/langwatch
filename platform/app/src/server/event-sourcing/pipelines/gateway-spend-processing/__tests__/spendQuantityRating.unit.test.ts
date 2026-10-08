@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { VARIABLE_PRICE_ROUTERS } from "~/server/modelProviders/__tests__/variablePriceRouters.test-helpers";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../schemas/commands";
 import {
   NO_RATE_RULE_CODE,
@@ -280,6 +281,19 @@ describe("rateSpendNanoUsd", () => {
         usage: usage({}),
       });
       expect(warned).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("rateSpendNanoUsd for a variable-price router", () => {
+  describe("given a gateway request routed through a router", () => {
+    /** @scenario A router call through the gateway never lowers spend */
+    it.each(VARIABLE_PRICE_ROUTERS)("never rates %s below zero", (model) => {
+      const { costNanoUsd } = rateSpendNanoUsd({
+        model,
+        usage: usage({ input_tokens: 1000, output_tokens: 500 }),
+      });
+      expect(costNanoUsd).toBeGreaterThanOrEqual(0);
     });
   });
 });

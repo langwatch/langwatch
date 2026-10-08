@@ -4,7 +4,10 @@ import {
   getStaticModelCosts,
   resolveAudioOutputRate,
   resolveCacheWrite1hRate,
+  withoutNegativeRates,
 } from "../llmModelCost";
+import { llmModels } from "../loadModelCatalog";
+import { VARIABLE_PRICE_ROUTERS } from "./variablePriceRouters.test-helpers";
 
 describe("getStaticModelCosts", () => {
   const costs = getStaticModelCosts();
@@ -205,12 +208,34 @@ describe("hour-long cache write rate", () => {
 
     /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
     it("leaves models from other providers without one", () => {
+      // A provider whose own catalog entry states an hour-long price (such
+      // as Doubleword) carries that price; no other provider gets a derived one.
+      const catalogStates1h = (modelId: string) =>
+        llmModels.models[modelId]?.pricing?.inputCacheWrite1hPerToken != null;
       const others = costs.filter(
         (c) =>
           !/^~?anthropic\//.test(c.model) &&
+          !catalogStates1h(c.model) &&
           c.cacheCreation1hCostPerToken !== undefined,
       );
       expect(others).toEqual([]);
+    });
+  });
+
+  describe("given another provider's catalog entry states an hour-long price", () => {
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("carries exactly the price the catalog states", () => {
+      const stated = costs.filter(
+        (c) =>
+          !/^~?anthropic\//.test(c.model) &&
+          llmModels.models[c.model]?.pricing?.inputCacheWrite1hPerToken != null,
+      );
+      expect(stated.length).toBeGreaterThan(0);
+      for (const entry of stated) {
+        expect(entry.cacheCreation1hCostPerToken, entry.model).toBe(
+          llmModels.models[entry.model]?.pricing?.inputCacheWrite1hPerToken,
+        );
+      }
     });
   });
 });
@@ -450,6 +475,72 @@ describe("the ElevenLabs conversational entry", () => {
           "elevenlabs/scribe_v1",
         );
       });
+    });
+  });
+});
+
+/**
+ * A router picks another model per request and has no rate of its own; the
+ * upstream catalog marks it with -1 per token. Read as a price, that bills a
+ * routed call below zero, so a negative rate must never reach the registry.
+ */
+describe("variable-price routers", () => {
+  const costs = getStaticModelCosts();
+
+  describe("when the catalog prices a router at -1 per token", () => {
+    /** @scenario A catalog rate below zero is not used as a price */
+    it("still has routers in the catalog to guard against", () => {
+      // The precondition every router test rests on. If a sync stops
+      // publishing a negative price for routers, these guards (and the
+      // shared router list) can be retired rather than left passing on
+      // nothing.
+      expect(VARIABLE_PRICE_ROUTERS).toContain("nvidia/switchyard");
+      expect(
+        llmModels.models["nvidia/switchyard"]?.pricing?.inputCostPerToken,
+      ).toBeLessThan(0);
+    });
+
+    /** @scenario A catalog rate below zero is not used as a price */
+    it("keeps every negative rate out of the cost registry", () => {
+      // Every numeric field on a registry entry is a rate, so reading the
+      // entry's own values covers a rate field added later as well.
+      const negative = costs.flatMap((entry) =>
+        Object.entries(entry)
+          .filter(([, rate]) => typeof rate === "number" && rate < 0)
+          .map(([field]) => `${entry.model}.${field}`),
+      );
+      expect(negative).toEqual([]);
+    });
+
+    /** @scenario A catalog rate below zero is not used as a price */
+    it("leaves the router out of the registry", () => {
+      expect(
+        costs.filter((entry) => VARIABLE_PRICE_ROUTERS.includes(entry.model)),
+      ).toEqual([]);
+    });
+
+    /** @scenario A router name matches no registry price */
+    it("matches no registry entry for a router span", () => {
+      expect(
+        matchModelCostWithFallbacks("nvidia/switchyard", costs),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when a catalog entry states one negative rate beside real prices", () => {
+    /** @scenario A single negative rate beside real prices drops only that rate */
+    it("keeps the real prices and drops only the negative one", () => {
+      const pricing = withoutNegativeRates({
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+        inputCacheReadPerToken: -1,
+      });
+
+      expect(pricing).toEqual({
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+      });
+      expect(pricing).not.toHaveProperty("inputCacheReadPerToken");
     });
   });
 });

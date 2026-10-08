@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { VARIABLE_PRICE_ROUTERS } from "~/server/modelProviders/__tests__/variablePriceRouters.test-helpers";
 import { computeSpanCost } from "../model-cost-matching";
 
 describe("computeSpanCost", () => {
@@ -383,6 +384,21 @@ describe("cache write TTL pricing through computeSpanCost", () => {
         2 * 0.000001 + 210 * 0.000002 + 18443 * 0.000001 + 17854 * 0.000004,
         10,
       );
+    });
+  });
+});
+
+describe("computeSpanCost for a variable-price router", () => {
+  describe("given a span naming a router and its token usage", () => {
+    /** @scenario A router span on a trace is never costed below zero */
+    it.each(VARIABLE_PRICE_ROUTERS)("never costs %s below zero", (model) => {
+      const result = computeSpanCost({
+        attrs: {},
+        model,
+        promptTokens: 1000,
+        completionTokens: 500,
+      });
+      expect(result).toBeGreaterThanOrEqual(0);
     });
   });
 });
