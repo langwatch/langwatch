@@ -86,7 +86,9 @@ function catchUpBesideJudge({ ledger }: { ledger: LedgerRow[] }) {
   });
   const logger = { info: vi.fn() };
   const task = InstantEvalJudgeSpendCatchUpTask.create({
-    organizations: { findAllIds: async () => [ORGANIZATION, "org-without-projects"] },
+    organizations: {
+      listAllIds: async () => ({ ids: [ORGANIZATION, "org-without-projects"], next: null }),
+    },
     instantEvals: { copyLedgerSpendToJudge: (input) => service.copyLedgerSpend(input) },
     logger,
   });

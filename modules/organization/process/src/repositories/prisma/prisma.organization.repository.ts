@@ -16,6 +16,8 @@ import {
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type OrganizationIdPage,
+  type OrganizationIdPageInput,
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
@@ -66,9 +68,17 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     );
   }
 
-  async findAllIds(): Promise<string[]> {
-    const rows = await this.database.organization.findMany({ select: { id: true } });
-    return rows.map((row) => row.id);
+  async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
+    const rows = await this.database.organization.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+    });
+    const ids = rows.map((row) => row.id);
+    if (limit === undefined || ids.length <= limit) return { ids, next: null };
+    const page = ids.slice(0, limit);
+    return { ids: page, next: page[page.length - 1] ?? null };
   }
 
   async countUsage({

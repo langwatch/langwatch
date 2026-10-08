@@ -1,9 +1,10 @@
+import { ORGANIZATION_ID_PAGE_LIMIT } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
 import type { OrganizationModule } from "../app/organization.app.ts";
 
 type BackfillPeers = Readonly<{
-  organizations: Pick<OrganizationModule, "findAllIds" | "recordStoredPresenceSetting">;
+  organizations: Pick<OrganizationModule, "listAllIds" | "recordStoredPresenceSetting">;
 }>;
 
 /**
@@ -25,9 +26,17 @@ export class OrganizationPresenceSettingBackfillTask extends Task {
   }
 
   async run({ signal }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    for (const organizationId of await this.peers.organizations.findAllIds()) {
-      signal.throwIfAborted();
-      await this.peers.organizations.recordStoredPresenceSetting({ organizationId });
-    }
+    let after: string | undefined;
+    do {
+      const page = await this.peers.organizations.listAllIds({
+        after,
+        limit: ORGANIZATION_ID_PAGE_LIMIT,
+      });
+      for (const organizationId of page.ids) {
+        signal.throwIfAborted();
+        await this.peers.organizations.recordStoredPresenceSetting({ organizationId });
+      }
+      after = page.next ?? undefined;
+    } while (after !== undefined);
   }
 }

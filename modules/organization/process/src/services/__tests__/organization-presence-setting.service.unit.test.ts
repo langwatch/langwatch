@@ -141,7 +141,7 @@ describe("given two organizations whose presence settings were stored before the
       const repository = MemoryOrganizationRepository.create({ memory: database });
       const task = OrganizationPresenceSettingBackfillTask.create({
         organizations: {
-          findAllIds: () => repository.findAllIds(),
+          listAllIds: (input) => repository.listAllIds(input),
           recordStoredPresenceSetting: (input) => service.recordStoredPresenceSetting(input),
         },
       });

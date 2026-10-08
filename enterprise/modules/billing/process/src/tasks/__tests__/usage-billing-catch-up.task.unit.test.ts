@@ -13,7 +13,9 @@ describe("UsageBillingCatchUpTask", () => {
     it("throws, and never records the third", async () => {
       const attempted: string[] = [];
       const task = UsageBillingCatchUpTask.create({
-        organizations: { findAllIds: async () => ["org-1", "org-2", "org-3"] },
+        organizations: {
+          listAllIds: async () => ({ ids: ["org-1", "org-2", "org-3"], next: null }),
+        },
         billing: {
           catchUpUsageBilling: async ({ organizationId }) => {
             attempted.push(organizationId);

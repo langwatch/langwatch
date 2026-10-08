@@ -42,6 +42,8 @@ import {
   type UpdateOrganizationTeamWithMembersInput,
   type UpdateOrganizationSettingsInput,
   type UpdateOrganizationSettingsResult,
+  type OrganizationIdPage,
+  type OrganizationIdPageInput,
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
   type PricingModel,
@@ -149,8 +151,8 @@ export class OrganizationService extends OrganizationServiceContract {
    * Which of the named organizations this person belongs to, resolved in one
    * read rather than one per organization.
    */
-  findAllIds(): Promise<string[]> {
-    return this.repository.findAllIds();
+  listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage> {
+    return this.repository.listAllIds(input);
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

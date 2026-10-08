@@ -372,3 +372,34 @@ Feature: Instant Evals inside the Trace Explorer
       When the Explorer receives an Instant Eval payload
       Then the phrase search is applied
       And the refusal's copy is shown from the presentation registry
+
+  # ---------------------------------------------------------------------------
+  # Routing a sentence: instant-eval classifies, trace routes
+  # ---------------------------------------------------------------------------
+
+  Rule: The browser asks Instant Eval to classify before trace routes the sentence
+
+    @unit
+    Scenario: A sentence classified as a judgement routes to Instant Eval
+      Given Instant Evals are released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with that classification and Instant Evals available
+      And the route is an Instant Eval decided by the classifier
+      And trace does not ask Instant Eval anything itself
+
+    @unit
+    Scenario: A sentence routes to the plain search when Instant Evals are unavailable
+      Given Instant Evals are not released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with Instant Evals unavailable
+      And the route is a filter or the phrase search, never an Instant Eval
+
+    @integration @unimplemented
+    Scenario: A missing classification falls back as it does today
+      Given Instant Eval's classifier skips, fails, or is not composed
+      When the user submits "frustrated users"
+      Then trace routes the search with no classification
+      And the model decides and builds the route, as when no classifier is configured
+      And Instant Evals count as unavailable unless the browser says otherwise
