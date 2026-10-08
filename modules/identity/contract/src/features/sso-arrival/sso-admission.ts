@@ -60,7 +60,9 @@ export type SsoUserResolution =
       code:
         | "OAuthAccountNotLinked"
         | "sso_existing_account_unconfirmed"
-        | "sso_domain_not_verified";
+        | "sso_domain_not_verified"
+        | "identity_link_proposed"
+        | "identity_jit_disabled";
     }>;
 
 /**

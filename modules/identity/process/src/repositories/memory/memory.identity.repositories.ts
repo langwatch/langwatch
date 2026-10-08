@@ -23,6 +23,12 @@ import { MemoryIdentityRateLimitRepository } from "./memory.identity-rate-limit.
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
 import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin-accounts.repository.ts";
 import {
+  MemoryIdentityAccountsRepository,
+  MemoryIdentityConnectionIssuersRepository,
+  MemoryIdentityPasskeyRemovalRepository,
+  MemoryIdentityResolutionRepository,
+} from "./memory.identity-storage.repositories.ts";
+import {
   MemoryIdentityBackfillRepository,
   MemoryIdentityHeadsRepository,
   MemoryIdentityReservationRepository,
@@ -61,6 +67,10 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
   return {
     heads: MemoryIdentityHeadsRepository.create(store),
     latch: MemoryIdentityLatchRepository.create(store),
+    accounts: MemoryIdentityAccountsRepository.create(),
+    resolution: MemoryIdentityResolutionRepository.create(),
+    connectionIssuers: new MemoryIdentityConnectionIssuersRepository(),
+    passkeyRemoval: new MemoryIdentityPasskeyRemovalRepository(),
     users: MemoryIdentityUsersRepository.create(store),
     signInAccounts: MemoryIdentitySignInAccountsRepository.create(store),
     accountRekey: MemoryIdentityAccountRekeyRepository.create(store),

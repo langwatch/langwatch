@@ -3,6 +3,7 @@
  * A member whose membership was disabled before they sign in is refused by identity's
  * read of the committed membership. Spec: specs/identity/scim-sso-signin.feature.
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
   emptySsoConnection,
@@ -108,6 +109,10 @@ describe.skipIf(!DB_URL)("a directory-provisioned member disabled before they si
           teams: [],
         };
       },
+    }),
+    proposals: { proposeLink: async () => [] },
+    auditLog: createApiFixture<AuditLogApi>({
+      record: async () => ({ id: "audit_1", occurredAt: 0 }),
     }),
     isHosted: false,
   });

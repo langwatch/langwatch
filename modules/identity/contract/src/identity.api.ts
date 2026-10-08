@@ -1,5 +1,7 @@
 import { moduleApi } from "@langwatch/module";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { BetterAuthOptions } from "better-auth";
+import type { AdapterFactory, DBAdapter } from "better-auth/adapters";
 import type { z } from "zod";
 
 import type {
@@ -806,6 +808,8 @@ export interface IdentityApi {
   identity(): IdentityLedgerApi;
   newbornSweep(): IdentityNewbornSweepApi;
   ceremonies(): IdentityCeremoniesApi;
+  /** better-auth's whole `database:` entry: the identity storage adapter (ADR-116 §1). */
+  createStorageAdapter(input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions>;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
   /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */
@@ -832,3 +836,14 @@ export interface IdentityApi {
 }
 
 export const IdentityApi = moduleApi<IdentityApi>()("identity");
+
+/** better-auth's own storage engine, built but not yet bound to options. */
+export type BetterAuthLegacyEngine = (options: BetterAuthOptions) => DBAdapter;
+
+/** What auth hands the identity storage adapter: its engine and one real Postgres transaction. */
+export interface IdentityStorageAdapterInput {
+  legacyEngine: BetterAuthLegacyEngine;
+  postgresTransaction: <R>(
+    work: (legacyEngine: BetterAuthLegacyEngine) => Promise<R>,
+  ) => Promise<R>;
+}

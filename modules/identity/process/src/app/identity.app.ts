@@ -40,6 +40,7 @@ import {
   type TwoStepDisabled,
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
+  type IdentityStorageAdapterInput,
 } from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -55,6 +56,8 @@ import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
+import type { BetterAuthOptions } from "better-auth";
+import type { AdapterFactory } from "better-auth/adapters";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { systemHostAddresses } from "../channels/dns.host-addresses.channel.ts";
@@ -168,7 +171,11 @@ import type { IdentityRepositories } from "../repositories/identity.repositories
 import { LocalDoorBreakGlassBindingRepository } from "../repositories/local/local.door-break-glass-binding.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
+import { BetterAuthAccountBranchService } from "../services/better-auth-account-branch.service.ts";
 import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
+import { BetterAuthIdentityRoutingService } from "../services/better-auth-identity-routing.service.ts";
+import { BetterAuthIdentityStorageService } from "../services/better-auth-identity-storage.service.ts";
+import { BetterAuthUserBranchService } from "../services/better-auth-user-branch.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -206,6 +213,7 @@ type IdentitySetup = FeatureSetup<typeof IdentityModule.dependencies, IdentitySe
 type IdentityAppParts = {
   emails: IdentityEmailService;
   ceremonies: IdentityCeremoniesService;
+  storage: (input: IdentityStorageAdapterInput) => AdapterFactory<BetterAuthOptions>;
   identityGuards: IdentityGuardsService;
   mfaGuards: MfaGuardsService;
   reservations: IdentityRepositories["reservations"];
@@ -524,6 +532,37 @@ export class IdentityModule
       isLatched,
       clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
+    const isAnyoneOnIdentityWrites = latch.anyoneGate();
+    const { accounts, resolution } = setup.repositories;
+    // better-auth's `database:` (ADR-116 §1); routing and both branches once per bound engine.
+    const storage = (input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions> =>
+      BetterAuthIdentityStorageService.create({
+        legacyEngine: input.legacyEngine,
+        postgresTransaction: input.postgresTransaction,
+        routing: ({ legacy, naming }) =>
+          BetterAuthIdentityRoutingService.create({
+            legacy,
+            naming,
+            accounts,
+            isUserOnIdentityWrites: isLatched,
+            passkeyRemoval: setup.repositories.passkeyRemoval,
+            connectionIssuers: setup.repositories.connectionIssuers,
+            accountBranch: BetterAuthAccountBranchService.create({
+              legacy,
+              accounts,
+              resolution,
+              ceremonies,
+              isUserOnIdentityWrites: isLatched,
+              isAnyoneOnIdentityWrites,
+            }),
+            userBranch: BetterAuthUserBranchService.create({
+              naming,
+              resolution,
+              ceremonies,
+              isUserOnIdentityWrites: isLatched,
+            }),
+          }).adapter(),
+      }).factory();
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
     const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
@@ -655,6 +694,8 @@ export class IdentityModule
         directory: setup.dependencies.scim,
         memberships: setup.dependencies.organizations,
         isHosted: setup.config.isSaas,
+        proposals: identity,
+        auditLog: setup.dependencies.auditLog,
       }),
     });
     const joinRequests = JoinRequestsService.create({
@@ -810,6 +851,7 @@ export class IdentityModule
     return new IdentityModule({
       emails,
       ceremonies,
+      storage,
       identityGuards,
       mfaGuards,
       reservations,
@@ -1121,6 +1163,10 @@ export class IdentityModule
 
   ceremonies(): IdentityCeremoniesService {
     return this.#parts.ceremonies;
+  }
+
+  createStorageAdapter(input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions> {
+    return this.#parts.storage(input);
   }
 
   newbornSweep(): IdentityNewbornReconciliationService {

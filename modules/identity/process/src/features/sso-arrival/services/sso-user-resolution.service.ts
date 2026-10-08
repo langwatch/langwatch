@@ -1,6 +1,10 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
+  type LinkProposalReason,
   normalizeDomain,
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
@@ -10,9 +14,12 @@ import {
   type SsoUserResolution,
   type SsoUserResolutionInput,
 } from "@langwatch/identity-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
+import type { IdentityLinkProposalWrites } from "../../../rules/identity-writes.rules.ts";
 import type { SsoConnectionReadRepository } from "../../sso-connection/repositories/sso-connection.repository.ts";
 import type {
   SsoRegistrantReadRepository,
@@ -31,6 +38,9 @@ interface SsoUserResolutionServiceDeps {
   directory: Pick<ScimApi, "isDirectoryUserInactive" | "findDirectoryConnectionsForUser">;
   /** Whether the person's membership is live: organization owns those rows. */
   memberships: Pick<OrganizationApi, "getMember">;
+  /** What an administrator confirms when a match is not good enough to link. */
+  proposals: IdentityLinkProposalWrites;
+  auditLog: Pick<AuditLogApi, "record">;
   /** LangWatch Cloud, where anybody may register a password account. */
   isHosted: boolean;
 }
@@ -52,13 +62,33 @@ export class SsoUserResolutionService {
     const connection = await this.deps.connections.getConnection({
       connectionId: input.providerId,
     });
+    const resolution = await this.chooseResolution({ connection, input });
+    if (resolution.action === "link") {
+      await this.recordLinkAttempt({ connection, input, userId: resolution.userId });
+    }
+    return resolution;
+  }
+
+  private async chooseResolution({
+    connection,
+    input,
+  }: {
+    connection: SsoConnectionState;
+    input: SsoUserResolutionInput;
+  }): Promise<SsoUserResolution> {
     const email = normalizeIdentifierValue(input.email);
     const candidates = await this.deps.people.findUsersByEmail({ email });
 
     if (await this.isDirectoryInactive({ connection, input, candidates })) return REFUSE;
-    if (candidates.length > 1) return REFUSE;
+    if (candidates.length > 1) {
+      // One proposal per candidate: picking one to hang it on would be the guess.
+      for (const candidate of candidates) {
+        await this.propose({ input, userId: candidate.id, reason: "ambiguous_candidates" });
+      }
+      return refuseWith({ error: new IdentityLinkProposedError(), providerId: input.providerId });
+    }
     const user = candidates[0];
-    if (!user) return CONTINUE;
+    if (!user) return this.resolveNewcomer({ connection, input });
 
     if (this.isUnvouched(input)) return this.resolveUnvouchedAddress({ connection, input, user });
     if (user.emailVerified) {
@@ -73,6 +103,24 @@ export class SsoUserResolutionService {
       return REFUSE;
     }
     return this.resolveOwnedUser({ input, userId: user.id, email });
+  }
+
+  /** Nobody holds the address: a known subject still signs in, otherwise the
+   *  connection's arrival policy says whether the library may create them. */
+  private async resolveNewcomer({
+    connection,
+    input,
+  }: {
+    connection: SsoConnectionState;
+    input: SsoUserResolutionInput;
+  }): Promise<SsoUserResolution> {
+    if (connection.arrivalPolicy !== "refuse") return CONTINUE;
+    const holders = await this.deps.people.findBindingHolderIds({
+      connectionId: input.providerId,
+      accountKey: input.accountKey,
+    });
+    if (holders.length > 0) return CONTINUE;
+    return refuseWith({ error: new IdentityJitDisabledError(), providerId: input.providerId });
   }
 
   /**
@@ -185,6 +233,7 @@ export class SsoUserResolutionService {
     if (await this.directoryOwns({ connection, input, userId: user.id })) return CONTINUE;
     // A returning person: the library signs an existing binding in without asking again.
     if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
+    await this.propose({ input, userId: user.id, reason: "unverified_orphan" });
     return refuseUnconfirmed({
       providerId: input.providerId,
       detail:
@@ -212,6 +261,7 @@ export class SsoUserResolutionService {
     if (user.deactivated) return REFUSE;
     if (await this.holdsThisBinding({ input, userId: user.id })) return CONTINUE;
     if (!connectionProvesDomainOf({ connection, email: input.email })) {
+      await this.propose({ input, userId: user.id, reason: "unverified_orphan" });
       return refuseUnconfirmed({
         providerId: input.providerId,
         detail: "the connection has no qualified proof for the unconfirmed account's domain",
@@ -259,6 +309,67 @@ export class SsoUserResolutionService {
     });
     if (proven) return REFUSE;
     return { action: "link", userId, profile: "preserve" };
+  }
+
+  /** Best-effort: the refusal stands alone, so a failed proposal write never becomes a link. */
+  private async propose({
+    input,
+    userId,
+    reason,
+  }: {
+    input: SsoUserResolutionInput;
+    userId: string;
+    reason: LinkProposalReason;
+  }): Promise<void> {
+    try {
+      await this.deps.proposals.proposeLink({
+        tenantId: userId,
+        userId,
+        commandId: generate("idcmd").toString(),
+        proposalId: generate("idlink").toString(),
+        connectionId: input.providerId,
+        provider: input.protocol,
+        providerAccountId: input.accountKey.accountId,
+        value: input.email,
+        reason,
+        occurredAtMs: nowInstant().epochMilliseconds,
+        actor: { type: "system", id: null },
+      });
+    } catch (error) {
+      logger.error(
+        { userId, providerId: input.providerId, reason, error },
+        "Refused a single sign-on link but could not record the proposal an administrator would resolve",
+      );
+    }
+  }
+
+  /** Before the library commits the link, so a failed link leaves the attempt
+   *  standing; the identifier the account ceremony attaches is the after record.
+   *  The domain only, never the address. Throws: no link goes unrecorded. */
+  private async recordLinkAttempt({
+    connection,
+    input,
+    userId,
+  }: {
+    connection: SsoConnectionState;
+    input: SsoUserResolutionInput;
+    userId: string;
+  }): Promise<void> {
+    await this.deps.auditLog.record({
+      userId,
+      organizationId: connection.organizationId,
+      action: "identity.sso.link_attempted",
+      args: {
+        connectionId: input.providerId,
+        protocol: input.protocol,
+        issuer: input.accountKey.issuer,
+        subject: input.accountKey.accountId,
+        // The domain gate admitted this address on its domain, so it has one.
+        domain: normalizeDomain(input.email.slice(input.email.lastIndexOf("@") + 1)),
+      },
+      targetKind: "user",
+      targetId: userId,
+    });
   }
 
   /** Whether the account already holds this connection's exact subject. */
@@ -332,6 +443,18 @@ function connectionProvesDomainOf({
   }
   const domain = normalizeDomain(email.slice(at + 1));
   return qualifySsoDomainOwnership({ state: connection, domain }).status === "QUALIFIED";
+}
+
+/** Logged with its cause because the library carries only the code onward. */
+function refuseWith({
+  error,
+  providerId,
+}: {
+  error: IdentityLinkProposedError | IdentityJitDisabledError;
+  providerId: string;
+}): SsoUserResolution {
+  logger.info({ code: error.code, providerId }, "single sign-on sign-in refused");
+  return { action: "reject", code: error.code };
 }
 
 /** A confirmed account the provider did not vouch for, on a domain the

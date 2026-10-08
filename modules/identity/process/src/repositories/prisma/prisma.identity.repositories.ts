@@ -18,13 +18,17 @@ import { PrismaSsoDomainReproofTargetRepository } from "../../features/sso-domai
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
+import { PrismaIdentityAccountsRepository } from "./prisma.identity-accounts.repository.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
+import { PrismaIdentityConnectionIssuersRepository } from "./prisma.identity-connection-issuers.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 import { PrismaIdentityLookupRepository } from "./prisma.identity-lookup.repository.ts";
 import { PrismaIdentityMigrationRepository } from "./prisma.identity-migration.repository.ts";
+import { PrismaIdentityPasskeyRemovalRepository } from "./prisma.identity-passkey-removal.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
+import { PrismaIdentityResolutionRepository } from "./prisma.identity-resolution.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
 import { PrismaIdentitySignInAccountsRepository } from "./prisma.identity-signin-accounts.repository.ts";
 import { PrismaIdentityUsersRepository } from "./prisma.identity-users.repository.ts";
@@ -61,6 +65,10 @@ export class PostgresIdentityRepositories {
     return {
       heads: PrismaIdentityHeadsRepository.create(database),
       latch: PrismaIdentityLatchRepository.create(database),
+      accounts: PrismaIdentityAccountsRepository.create(database),
+      resolution: PrismaIdentityResolutionRepository.create(database),
+      connectionIssuers: PrismaIdentityConnectionIssuersRepository.create(database),
+      passkeyRemoval: PrismaIdentityPasskeyRemovalRepository.create(database),
       users: PrismaIdentityUsersRepository.create(database),
       signInAccounts: PrismaIdentitySignInAccountsRepository.create(database),
       accountRekey: PrismaIdentityAccountRekeyRepository.create(database),

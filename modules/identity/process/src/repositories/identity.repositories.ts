@@ -28,13 +28,16 @@ import type { SsoEngineProviderRepository } from "../features/sso-connection/rep
 import type { SsoRegistrantReadRepository } from "../features/sso-connection/repositories/sso-registrant.repository.ts";
 import type { SsoDomainOwnershipRepository } from "../features/sso-domain/repositories/sso-domain-ownership.repository.ts";
 import type { SsoDomainReproofTargetRepository } from "../features/sso-domain/repositories/sso-domain-reproof.repository.ts";
+import type { IdentityAccounts, IdentityResolver } from "../rules/identity-storage.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
+import type { IdentityConnectionIssuersRepository } from "./identity-connection-issuers.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityMigrationRepository } from "./identity-migration.repository.ts";
+import type { IdentityPasskeyRemovalRepository } from "./identity-passkey-removal.repository.ts";
 import type { IdentityRateLimitRepository } from "./identity-rate-limit.repository.ts";
 import type { IdentityReservationRepository } from "./identity-reservations.repository.ts";
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
@@ -49,6 +52,11 @@ import type { IdentityVerificationRepository } from "./identity-verification.rep
 export interface IdentityRepositories {
   readonly heads: IdentityHeadsRepository;
   readonly latch: IdentityLatchRepository;
+  /** The identity branch of better-auth's storage adapter (ADR-116 §1, §6). */
+  readonly accounts: IdentityAccounts;
+  readonly resolution: IdentityResolver;
+  readonly connectionIssuers: IdentityConnectionIssuersRepository;
+  readonly passkeyRemoval: IdentityPasskeyRemovalRepository;
   readonly users: IdentityUsersRepository;
   /** The legacy half of the sign-in router's one per-user read (ADR-117). */
   readonly signInAccounts: IdentitySignInAccountsRepository;

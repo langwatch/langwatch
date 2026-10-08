@@ -1,7 +1,9 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
   emptySsoConnection,
   type IdentifierFact,
+  type ProposeLinkCommandData,
   type SsoConnectionState,
   type SsoDomainVerification,
   type SsoUserResolutionInput,
@@ -53,6 +55,8 @@ function createWorld({
   state = "ACTIVE",
   proof = PROOF,
   confirmed = false,
+  arrivalPolicy = "admit",
+  proposalsFail = false,
 }: {
   hosted?: boolean;
   proved?: boolean;
@@ -62,6 +66,8 @@ function createWorld({
   state?: SsoConnectionState["state"];
   proof?: SsoDomainVerification;
   confirmed?: boolean;
+  arrivalPolicy?: SsoConnectionState["arrivalPolicy"];
+  proposalsFail?: boolean;
 } = {}) {
   const store = MemoryIdentityStore.create();
   const connection: SsoConnectionState = {
@@ -69,6 +75,7 @@ function createWorld({
     organizationId: ORGANIZATION_ID,
     state,
     replacesConnectionId: REPLACED_ID,
+    arrivalPolicy,
     verifiedDomains: proved ? [DOMAIN] : [],
     domainVerifications: proved ? [proof] : [],
   };
@@ -81,6 +88,8 @@ function createWorld({
     userHashKey: null,
     payload: {},
   });
+  const proposals: ProposeLinkCommandData[] = [];
+  const audits: Parameters<AuditLogApi["record"]>[0][] = [];
   const service = SsoUserResolutionService.create({
     people: MemorySsoRegistrantReadRepository.create(store),
     connections: MemorySsoConnectionReadRepository.create(store),
@@ -103,9 +112,22 @@ function createWorld({
         };
       },
     }),
+    proposals: {
+      proposeLink: async (data) => {
+        if (proposalsFail) throw new Error("ledger unavailable");
+        proposals.push(data);
+        return [];
+      },
+    },
+    auditLog: createApiFixture<AuditLogApi>({
+      record: async (input) => {
+        audits.push(input);
+        return { id: `audit_${audits.length}`, occurredAt: 0 };
+      },
+    }),
     isHosted: hosted,
   });
-  return { store, service };
+  return { store, service, proposals, audits };
 }
 
 function assertion(over: Partial<SsoUserResolutionInput> = {}): SsoUserResolutionInput {
@@ -161,6 +183,10 @@ const LINKED_AND_CONFIRMED = {
 const LINKED = { action: "link", userId: USER_ID, profile: "preserve" } as const;
 const NOT_LINKED = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const UNCONFIRMED = { action: "reject", code: "sso_existing_account_unconfirmed" } as const;
+const LINK_PROPOSED = { action: "reject", code: "identity_link_proposed" } as const;
+/** Two holders of one address get a proposal; every other conflict keeps the library's refusal. */
+const refusalFor = (failure: string) =>
+  failure === "ambiguous-email" ? LINK_PROPOSED : NOT_LINKED;
 /** The provider said the address is not verified. */
 const UNVERIFIED_ASSERTION = assertion({ emailVerified: false, emailVerification: "unverified" });
 /** Entra ID without `xms_edov`: no verification claim at all. */
@@ -294,7 +320,7 @@ describe("given a member this connection's directory provisioned", () => {
         });
       }
 
-      await expect(service.resolveUser(assertion())).resolves.toEqual(NOT_LINKED);
+      await expect(service.resolveUser(assertion())).resolves.toEqual(refusalFor(failure));
     });
 
     /** @scenario "SCIM ownership cannot override conflicting sign-in evidence" */
@@ -604,4 +630,134 @@ describe("given a verified local account and a managed SAML connection", () => {
       expect(store.users.get(USER_ID)).toEqual(before);
     },
   );
+});
+
+describe("given the callback linking rule (ADR-117 section 3)", () => {
+  describe("when the one account holding the address is linked on the connection's word", () => {
+    /** @scenario "An unambiguous verified match is auto-linked with an audit trail" */
+    it("links it and records the attempt before the library writes, by domain only", async () => {
+      const { service, audits, proposals } = createWorld({ confirmed: true });
+
+      await expect(service.resolveUser(assertion({ protocol: "saml" }))).resolves.toEqual(LINKED);
+      expect(audits).toEqual([
+        {
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          action: "identity.sso.link_attempted",
+          args: {
+            connectionId: CONNECTION_ID,
+            protocol: "saml",
+            issuer: ISSUER,
+            subject: SUBJECT,
+            domain: DOMAIN,
+          },
+          targetKind: "user",
+          targetId: USER_ID,
+        },
+      ]);
+      expect(JSON.stringify(audits)).not.toContain(EMAIL);
+      expect(proposals).toEqual([]);
+    });
+
+    /** @scenario "An unambiguous verified match is auto-linked with an audit trail" */
+    it("records no attempt when the library signs a returning subject in itself", async () => {
+      const { service, store, audits } = createWorld({ confirmed: true });
+      bind({ store });
+
+      await expect(service.resolveUser(assertion({ protocol: "saml" }))).resolves.toEqual({
+        action: "continue",
+      });
+      expect(audits).toEqual([]);
+    });
+  });
+
+  describe("when the account holds the address with no verification evidence", () => {
+    /** @scenario "An unverified orphan is never auto-linked" */
+    it("refuses with guidance and records a proposal instead of linking", async () => {
+      const { service, proposals, audits } = createWorld({ owners: [] });
+
+      await expect(service.resolveUser(UNVERIFIED_ASSERTION)).resolves.toEqual(UNCONFIRMED);
+      expect(proposals).toEqual([
+        expect.objectContaining({
+          tenantId: USER_ID,
+          userId: USER_ID,
+          connectionId: CONNECTION_ID,
+          provider: "oidc",
+          providerAccountId: SUBJECT,
+          value: EMAIL,
+          reason: "unverified_orphan",
+          actor: { type: "system", id: null },
+        }),
+      ]);
+      expect(audits).toEqual([]);
+    });
+
+    /** @scenario "An unverified orphan is never auto-linked" */
+    it("proposes the same way for SAML on a domain the connection has not proved", async () => {
+      const { service, proposals } = createWorld({ owners: [] });
+
+      await expect(service.resolveUser(assertion({ protocol: "saml" }))).resolves.toEqual(
+        UNCONFIRMED,
+      );
+      expect(proposals.map((proposal) => proposal.reason)).toEqual(["unverified_orphan"]);
+    });
+
+    it("keeps the refusal when the proposal cannot be recorded", async () => {
+      const { service } = createWorld({ owners: [], proposalsFail: true });
+
+      await expect(service.resolveUser(UNVERIFIED_ASSERTION)).resolves.toEqual(UNCONFIRMED);
+    });
+  });
+
+  describe("when more than one account holds the address", () => {
+    /** @scenario "An ambiguous match becomes a proposal, not a guess" */
+    it("proposes against every holder and refuses with guidance", async () => {
+      const { service, store, proposals, audits } = createWorld({ confirmed: true });
+      store.users.set("user_twin", {
+        id: "user_twin",
+        email: EMAIL.toUpperCase(),
+        emailVerified: true,
+        createdAtMs: 0,
+        userHashKey: null,
+        payload: {},
+      });
+
+      await expect(service.resolveUser(assertion())).resolves.toEqual(LINK_PROPOSED);
+      expect(proposals.map(({ userId, reason }) => [userId, reason])).toEqual([
+        [USER_ID, "ambiguous_candidates"],
+        ["user_twin", "ambiguous_candidates"],
+      ]);
+      expect(audits).toEqual([]);
+    });
+  });
+
+  describe("when nobody holds the address", () => {
+    const stranger = assertion({
+      email: `new@${DOMAIN}`,
+      accountKey: { issuer: ISSUER, accountId: "subject-new" },
+    });
+
+    /** @scenario "No match provisions just-in-time only where the connection allows" */
+    it("leaves creation to the library only where the connection admits newcomers", async () => {
+      const admitting = createWorld({ arrivalPolicy: "admit" });
+      const refusing = createWorld({ arrivalPolicy: "refuse" });
+
+      await expect(admitting.service.resolveUser(stranger)).resolves.toEqual({
+        action: "continue",
+      });
+      await expect(refusing.service.resolveUser(stranger)).resolves.toEqual({
+        action: "reject",
+        code: "identity_jit_disabled",
+      });
+    });
+
+    it("still signs a known subject in on a connection that refuses newcomers", async () => {
+      const { service, store } = createWorld({ arrivalPolicy: "refuse" });
+      bind({ store });
+
+      await expect(service.resolveUser(assertion({ email: `renamed@${DOMAIN}` }))).resolves.toEqual(
+        { action: "continue" },
+      );
+    });
+  });
 });
