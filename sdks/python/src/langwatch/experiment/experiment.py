@@ -1775,8 +1775,7 @@ class Experiment:
         duration: Optional[int] = None
 
         start_time = time.time()
-        result = langwatch.evaluations.evaluate(
-            span=langwatch.get_current_span(),
+        result = langwatch.evaluation.evaluate(
             slug=evaluator_id,
             name=name or evaluator_id,
             settings=settings,
