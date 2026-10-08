@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:langy:process-effects");
  * transactional commit that retires the message.
  */
 
-export interface CreateLangyEffectRepositoryOptions {
+interface CreateLangyEffectRepositoryOptions {
   handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped">;
   worker: LangyWorker;
   mintSessionKey: (args: {

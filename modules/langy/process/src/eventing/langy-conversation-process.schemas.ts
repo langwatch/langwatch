@@ -29,9 +29,6 @@ export type LangyProcessEventView = z.infer<typeof langyProcessEventViewSchema>;
  * identities, statuses, and flags only; sensitive data stays in domain tables or Redis. */
 export const LANGY_CONVERSATION_PROCESS_NAME = "langyConversation";
 
-/** Worker dispatch budget used by both the worker adapter and process lease. */
-export { LANGY_AGENT_DISPATCH_TIMEOUT_MS };
-
 /** Margin kept between a worker dispatch timeout and its process lease. */
 const LANGY_OUTBOX_LEASE_MARGIN_MS = 30_000;
 

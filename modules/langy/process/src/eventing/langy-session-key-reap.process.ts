@@ -17,7 +17,7 @@ export const langySessionKeyReapSchema = z.object({
 export const langySessionKeyReapStateSchema = z.object({
   lastReapAt: z.number().nullable(),
 });
-export type LangySessionKeyReapState = z.infer<typeof langySessionKeyReapStateSchema>;
+type LangySessionKeyReapState = z.infer<typeof langySessionKeyReapStateSchema>;
 
 type LangySessionKeyReapIntents = {
   reap: IntentSpec<typeof langySessionKeyReapSchema>;

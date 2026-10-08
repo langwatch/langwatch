@@ -48,7 +48,7 @@ import {
 } from "./langy-web-push.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
-export interface RedisLangyConversationRuntimeRepository {
+interface RedisLangyConversationRuntimeRepository {
   failAgentResponse(data: {
     tenantId: string;
     occurredAt: number;
@@ -67,7 +67,7 @@ export interface RedisLangyConversationRuntimeRepository {
   }): Promise<void>;
 }
 
-export interface EventingLangyConversationAdapterOptions {
+interface EventingLangyConversationAdapterOptions {
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */

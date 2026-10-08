@@ -1,5 +1,6 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
@@ -44,7 +45,6 @@ import {
   type LangyPanelMode,
   useLangyStore,
 } from "../../../../behavior/langy.store.ts";
-import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
 import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";

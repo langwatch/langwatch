@@ -60,7 +60,7 @@ import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:session");
 
-export interface LocalControlSessionCoreOptions {
+interface LocalControlSessionCoreOptions {
   /** The directory the worker's session key is resolved through. */
   apiKeys: ApiKeyApi;
   /** Reads the credential off the connecting frame. */

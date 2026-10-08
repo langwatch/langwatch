@@ -38,7 +38,7 @@ const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
  */
 export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissions());
 
-export type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
+type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
 
 export class LangySessionKeyService extends LangySessionKey {
   private readonly repository: LangySessionKeyRepository;

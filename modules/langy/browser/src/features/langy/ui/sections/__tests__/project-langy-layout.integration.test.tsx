@@ -79,6 +79,10 @@ function LangySidecarStub() {
   );
 }
 
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: gate.flagEnabled, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   constructor(
     private readonly state: {
@@ -115,9 +119,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return this.state.isDemoProject;
-  }
-  featureFlag() {
-    return this.state.flagEnabled;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };

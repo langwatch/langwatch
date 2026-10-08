@@ -97,7 +97,7 @@ export function advanceSettlement({
 }
 
 /** The terminal a settled fold implies once the heartbeat went stale; never over a live beat. */
-export function deriveSyntheticTerminal({
+function deriveSyntheticTerminal({
   status,
   lastError,
   heartbeatStale,

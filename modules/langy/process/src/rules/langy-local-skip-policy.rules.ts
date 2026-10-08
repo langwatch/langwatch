@@ -14,10 +14,7 @@ import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 const logger = createLogger("langwatch:langy:local-control:skip-policy");
 
 /** The model gate, injected so a test needs no provider rows. */
-export type SkipGate = (args: {
-  projectId: string;
-  model: string;
-}) => Promise<{ allowed: boolean }>;
+type SkipGate = (args: { projectId: string; model: string }) => Promise<{ allowed: boolean }>;
 
 /**
  * The skip policy of one conversation, with the model applied. Answers the

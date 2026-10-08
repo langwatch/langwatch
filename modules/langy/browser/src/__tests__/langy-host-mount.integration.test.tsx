@@ -19,8 +19,11 @@ const session = {
   }),
   currentUser: () => ({ id: "user_1", name: "Member", email: "m@example.com", image: null }),
   hasPermission: (permission: string) => granted.includes(permission),
-  featureFlag: () => true,
 };
+
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
 
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

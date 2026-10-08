@@ -17,9 +17,9 @@ export type LangyIdentityToken =
       project: { id: string; organizationId: string };
     };
 
-export type LangyIdentityDenialReason = "unowned" | "no-access";
+type LangyIdentityDenialReason = "unowned" | "no-access";
 
-export type LangyKeyIdentity =
+type LangyKeyIdentity =
   | { ok: true; userId: string }
   | { ok: false; reason: LangyIdentityDenialReason; message: string };
 

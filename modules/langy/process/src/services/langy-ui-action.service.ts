@@ -51,7 +51,7 @@ export interface UiActionCompletion {
 }
 
 /** The dispatch answer the CLI prints for the agent. */
-export interface UiActionOutcome {
+interface UiActionOutcome {
   status: "done";
   executedVia: "browser" | "backend";
   actionId: string;
@@ -75,7 +75,7 @@ export type UiActionBackendRunner = (args: {
 }) => Promise<unknown>;
 
 /** The one slice of the conversation service dispatch needs. */
-export interface UiActionConversations {
+interface UiActionConversations {
   /** Throws `LangyConversationNotFoundError` when the conversation is missing or not visible. */
   getById(args: {
     id: string;

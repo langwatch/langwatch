@@ -231,6 +231,10 @@ import { LangySidecar } from "../langy-panel.tsx";
  * conversation. Route reading and navigation are inert: nothing in this
  * scenario reads the address bar.
  */
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project() {
     return { id: PROJECT_ID, slug: "demo", name: "demo" };
@@ -254,9 +258,6 @@ class FakeLangyHost extends LangyHostApi {
     return false;
   }
   isDemoProject() {
-    return false;
-  }
-  featureFlag() {
     return false;
   }
   route(): LangyRouteReading {

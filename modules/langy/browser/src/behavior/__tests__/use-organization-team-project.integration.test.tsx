@@ -59,9 +59,6 @@ class ProjectGrantingLangyHost extends LangyHostApi {
   isDemoProject() {
     return false;
   }
-  featureFlag() {
-    return false;
-  }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/demo" };
   }

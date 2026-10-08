@@ -2,8 +2,10 @@
  * Langy's visibility gate — "does this user have Langy?". Three layers:
  */
 
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+
 import { useRequiredSession } from "../../../behavior/auth-session.ts";
-import { useFeatureFlag } from "../../../behavior/use-feature-flag.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /** The flag the server gate reads under the same name. */
@@ -23,6 +25,8 @@ export interface LangyVisibility {
 export function useLangyVisibility(): LangyVisibility {
   const { status: sessionStatus } = useRequiredSession();
   const {
+    project,
+    organization,
     isDemoProject,
     hasPermission,
     isLoading: contextLoading,
@@ -36,14 +40,17 @@ export function useLangyVisibility(): LangyVisibility {
   // server refuses the demo project outright, so the panel would only 403 there.
   const mayReadLangy = !isDemoProject && hasPermission("langy:view");
 
-  const { data: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG);
+  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG, {
+    projectId: project?.id ?? NOT_TARGETED,
+    organizationId: organization?.id ?? NOT_TARGETED,
+  });
 
   // Deliberately never waits on something that may never arrive: a reader with
   // no project at all is DECIDED (they cannot have Langy), not pending.
   const isResolving =
     sessionStatus === "loading" || contextLoading || (mayReadLangy && flagLoading);
 
-  return { show: mayReadLangy && releaseLangy === true, isResolving };
+  return { show: mayReadLangy && releaseLangy, isResolving };
 }
 
 /**

@@ -22,6 +22,10 @@ import { LangyEvalRunCard } from "../langy-eval-run-card.tsx";
 
 const navigateMock = vi.fn();
 
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
@@ -46,9 +50,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };

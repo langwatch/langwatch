@@ -8,7 +8,7 @@ import type { LangyGithubPrCountRepository } from "../repositories/langy-github-
  */
 export const LANGY_GITHUB_PRS_PER_DAY = 20;
 
-export type GithubPrLimitResult = {
+type GithubPrLimitResult = {
   allowed: boolean;
   remaining: number;
   /** When the day-bucket rolls over (epoch ms). */

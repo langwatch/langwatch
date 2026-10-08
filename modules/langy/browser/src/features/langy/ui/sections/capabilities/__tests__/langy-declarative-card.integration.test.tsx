@@ -30,6 +30,10 @@ import { LangyDeclarativeCard } from "../langy-declarative-card.tsx";
  * `useRouter`, which throws outside a `LangyHostProvider` — the component
  * moved from reading Next's router directly to reading it off the host.
  */
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
+  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
+}));
+
 class FakeLangyHost extends LangyHostApi {
   project(): LangyHostProject | undefined {
     return { id: "project-acme", slug: "acme", name: "acme" };
@@ -54,9 +58,6 @@ class FakeLangyHost extends LangyHostApi {
   }
   isDemoProject() {
     return false;
-  }
-  featureFlag() {
-    return true;
   }
   route(): LangyRouteReading {
     return { params: {}, query: {}, pathname: "/" };

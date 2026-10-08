@@ -82,7 +82,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/use-feature-flag.ts", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 
