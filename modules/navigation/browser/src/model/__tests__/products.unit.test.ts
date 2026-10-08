@@ -5,11 +5,12 @@ import { PRODUCTS, productById, productFromPathname, seatReachesProduct } from "
 describe("product registry", () => {
   describe("given the five products the registry declares", () => {
     describe("when the registry is read", () => {
-      it("declares the five products in their fixed order", () => {
+      /** @scenario Dashboards leads the product switcher */
+      it("declares the five products in their fixed order, Dashboards first", () => {
         expect(PRODUCTS.map((product) => product.id)).toEqual([
+          "dashboards",
           "me",
           "llm-ops",
-          "dashboards",
           "gateway",
           "governance",
         ]);

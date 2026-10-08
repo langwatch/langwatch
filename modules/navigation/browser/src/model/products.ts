@@ -36,7 +36,18 @@ export interface ProductDefinition {
   gates: ProductAccessGate[];
 }
 
+// The switcher lists products in this order. Dashboards leads: it is the overview every
+// other product feeds, so it is the first place to look.
 export const PRODUCTS: readonly ProductDefinition[] = [
+  {
+    id: "dashboards",
+    label: "Dashboards",
+    pitch: "Your saved dashboards, in one place",
+    icon: LayoutDashboard,
+    scopeKind: "project",
+    homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
+    gates: [{ flag: "release_dashboards" }, { permission: "analytics:view" }],
+  },
   {
     id: "me",
     label: "Me",
@@ -54,15 +65,6 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     scopeKind: "project",
     homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}` : null),
     gates: [],
-  },
-  {
-    id: "dashboards",
-    label: "Dashboards",
-    pitch: "Your saved dashboards, in one place",
-    icon: LayoutDashboard,
-    scopeKind: "project",
-    homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
-    gates: [{ flag: "release_dashboards" }, { permission: "analytics:view" }],
   },
   {
     id: "gateway",
