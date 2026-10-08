@@ -24,6 +24,7 @@ import {
 } from "./clickhouse.aggregation-builder.mapper.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
+import type { ClickHouseAnalyticsStatementLimitRepository } from "./clickhouse.analytics-statement-limit.repository.ts";
 import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
@@ -40,6 +41,7 @@ class AnalyticsClientUnavailableError extends Error {
 type TimeseriesBuilder = (input: TimeseriesQueryInput) => {
   sql: string;
   params: Record<string, unknown>;
+  settings?: Record<string, string | number>;
 };
 
 const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
@@ -66,8 +68,10 @@ const builderFor = (table: AnalyticsTable): TimeseriesBuilder => {
 export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   static create(options: {
     resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+    /** Bounds how many panel reads one project runs at once; wraps the query and its rows. */
+    statementLimiter: ClickHouseAnalyticsStatementLimitRepository;
   }): ClickHouseAnalyticsRepository {
-    return new ClickHouseAnalyticsRepository(options.resolveClient);
+    return new ClickHouseAnalyticsRepository(options.resolveClient, options.statementLimiter);
   }
 
   private readonly logger = createLogger("langwatch:analytics:timeseries-repository");
@@ -76,6 +80,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     private readonly resolveClient: (
       tenantId: string,
     ) => Promise<EvaluationAnalyticsClickHouseClient | null>,
+    private readonly statementLimiter: ClickHouseAnalyticsStatementLimitRepository,
   ) {
     super();
   }
@@ -109,22 +114,28 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     const built = builderFor(query.table)(builderInput);
 
     try {
-      const response = await client.query({
-        query: built.sql,
-        query_params: built.params,
-        format: "JSONEachRow",
-        clickhouse_settings: {
-          ...ANALYTICS_CLICKHOUSE_SETTINGS,
-          log_comment: `analytics:timeseries:${query.table}`,
-          ...(query.maxResultRows === undefined
-            ? {}
-            : {
-                max_result_rows: String(query.maxResultRows),
-                result_overflow_mode: "throw",
-              }),
+      const rows = await this.statementLimiter.run({
+        tenantId: query.tenantId,
+        task: async () => {
+          const response = await client.query({
+            query: built.sql,
+            query_params: built.params,
+            format: "JSONEachRow",
+            clickhouse_settings: {
+              ...ANALYTICS_CLICKHOUSE_SETTINGS,
+              ...built.settings,
+              log_comment: `analytics:timeseries:${query.table}`,
+              ...(query.maxResultRows === undefined
+                ? {}
+                : {
+                    max_result_rows: String(query.maxResultRows),
+                    result_overflow_mode: "throw",
+                  }),
+            },
+          });
+          return response.json();
         },
       });
-      const rows = await response.json();
       const result = parseTimeseriesRows({
         rows: Array.isArray(rows) ? rows : [],
         series: query.input.series,
@@ -153,40 +164,27 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       endDate: new Date(input.endDate),
       filters: input.filters,
     });
-    const parts = built.sql.split(";");
-    const [topDocsSql, totalSql] = parts;
-    const isTwoStatements =
-      parts.length === 2 && Boolean(topDocsSql?.trim()) && Boolean(totalSql?.trim());
-    if (!isTwoStatements || !topDocsSql || !totalSql) {
-      throw new Error(
-        `Expected topDocuments query to have exactly 2 non-empty statements separated by semicolon, got ${parts.length} parts`,
-      );
-    }
     try {
-      const [topDocsResult, totalResult] = await Promise.all([
-        client.query({
-          query: topDocsSql,
-          query_params: built.params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-        client.query({
-          query: totalSql,
-          query_params: built.params,
-          format: "JSONEachRow",
-          clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-        }),
-      ]);
-      const topDocs = (await topDocsResult.json()) as {
-        documentId: string;
-        count: string | number;
-        traceId: string;
-        content?: string;
-      }[];
-      const totals = (await totalResult.json()) as {
-        total: string | number;
-      }[];
-      const total = totals[0]?.total ?? 0;
+      const topDocs = await this.statementLimiter.run({
+        tenantId: input.projectId,
+        task: async () => {
+          const result = await client.query({
+            query: built.sql,
+            query_params: built.params,
+            format: "JSONEachRow",
+            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
+          return (await result.json()) as {
+            documentId: string;
+            count: string | number;
+            traceId: string;
+            content?: string;
+            total: string | number;
+          }[];
+        },
+      });
+      // Every row carries the distinct-document total; no rows means none.
+      const total = topDocs[0]?.total ?? 0;
       return {
         topDocuments: topDocs.map((doc) => ({
           documentId: doc.documentId,

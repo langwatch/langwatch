@@ -595,18 +595,53 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
 }
 
 /**
- * Build a JOIN-subquery projection that materializes only the referenced keys of
- * `SpanAttributes` as a narrow reconstructed map, e.g. `map('langwatch.span.type',
- * SpanAttributes['langwatch.span.type']) AS SpanAttributes`.
+ * A projection that rebuilds a `Map` column from only the given keys, under the
+ * column's own name, so outer `alias.Column['key']` reads are unchanged while the
+ * multi-megabyte values of other keys are never buffered.
  */
+function mapNarrowProjection({
+  column,
+  keys,
+}: {
+  column: string;
+  keys: readonly string[];
+}): string {
+  const entries = keys.map((key) => `'${key}', ${column}['${key}']`).join(", ");
+  return `map(${entries}) AS ${column}`;
+}
+
+/** {@link mapNarrowProjection} for stored_spans `SpanAttributes`. */
 export function spanAttributesNarrowProjection(keys: readonly string[]): string {
-  const entries = keys.map((key) => `'${key}', SpanAttributes['${key}']`).join(", ");
-  return `map(${entries}) AS SpanAttributes`;
+  return mapNarrowProjection({ column: "SpanAttributes", keys });
 }
 
 /**
- * Narrow the `SpanAttributes` entry of a stored_spans required-column set to a
- * reconstructed map of only the referenced keys, when it is safe to do so.
+ * A `Map` column narrowed to the keys a query reads when every mention is a literal
+ * key access (`Column['key']`); otherwise the bare column, as a generic use needs it whole.
+ */
+export function narrowMapColumnProjection({
+  column,
+  expressions,
+}: {
+  column: string;
+  expressions: readonly string[];
+}): string {
+  const joined = expressions.join(" ");
+  const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const allRefs = joined.match(new RegExp(`(?<!\\w)${escaped}\\b`, "g")) ?? [];
+  const keyMatches = [
+    ...joined.matchAll(new RegExp(`(?<!\\w)${escaped}\\['([^'\\]\\\\]+)'\\]`, "g")),
+  ];
+  if (keyMatches.length === 0 || keyMatches.length !== allRefs.length) {
+    return column;
+  }
+  const keys = [...new Set(keyMatches.map((match) => match[1]!))];
+  return mapNarrowProjection({ column, keys });
+}
+
+/**
+ * Narrow the `SpanAttributes` entry of a stored_spans required-column set to the
+ * referenced keys (see {@link narrowMapColumnProjection}).
  */
 export function narrowSpanAttributesColumns({
   columns,
@@ -618,25 +653,14 @@ export function narrowSpanAttributesColumns({
   if (!columns.has("SpanAttributes")) {
     return columns;
   }
-
-  const joined = expressions.join(" ");
-  const allRefs = joined.match(/SpanAttributes/g) ?? [];
-  const keyMatches = [...joined.matchAll(/SpanAttributes\['([^'\]]+)'\]/g)];
-
-  // Only narrow when EVERY SpanAttributes reference is a clean keyed access;
-  // any generic or unparseable use means we cannot know which values are needed.
-  if (keyMatches.length === 0 || allRefs.length !== keyMatches.length) {
-    return columns;
-  }
-
-  const keys = [
-    ...new Set(
-      keyMatches.map((match) => match[1]).filter((key): key is string => key !== undefined),
-    ),
-  ];
+  const projection = narrowMapColumnProjection({
+    column: "SpanAttributes",
+    expressions,
+  });
+  if (projection === "SpanAttributes") return columns;
   const narrowed = new Set(columns);
   narrowed.delete("SpanAttributes");
-  narrowed.add(spanAttributesNarrowProjection(keys));
+  narrowed.add(projection);
   return narrowed;
 }
 

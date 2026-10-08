@@ -18,6 +18,7 @@ import {
   type EvaluationAnalyticsClickHouseClient,
 } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
+import { ClickHouseAnalyticsStatementLimitRepository } from "../clickhouse/clickhouse.analytics-statement-limit.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 
 const serviceOver = (options: {
@@ -25,7 +26,10 @@ const serviceOver = (options: {
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
-    repository: ClickHouseAnalyticsRepository.create({ resolveClient: options.resolveClient }),
+    repository: ClickHouseAnalyticsRepository.create({
+      resolveClient: options.resolveClient,
+      statementLimiter: ClickHouseAnalyticsStatementLimitRepository.create({ maxConcurrent: 4 }),
+    }),
     evaluationRepository: options.clickhouseEnabled
       ? ClickHouseAnalyticsEvaluationRepository.create({
           resolveClient: options.resolveClient,
@@ -148,6 +152,56 @@ describe("AnalyticsService", () => {
     );
 
     expect(repository.lastQuery?.adjustedTimeScale).toBe(24 * 60);
+  });
+
+  describe("when the panel skips the previous period", () => {
+    /** @scenario A panel that hides the previous period does not scan it */
+    it("collapses the previous window to an empty range at the current start", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      await service.getTimeseries(input({ timeScale: 60, shouldSkipPreviousPeriod: true }));
+
+      expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
+        repository.lastQuery?.startDate.epochMilliseconds,
+      );
+    });
+  });
+
+  describe("when the evaluations summary sends an empty evaluator key", () => {
+    /** @scenario The evaluations summary reads the slim evaluation table */
+    it("routes it to the slim evaluation table with the key dropped", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      await service.getTimeseries(
+        input({
+          series: [{ metric: "evaluations.evaluation_runs", aggregation: "cardinality", key: "" }],
+          groupBy: "evaluations.evaluation_passed",
+          timeScale: "full",
+        }),
+      );
+
+      expect(repository.lastQuery?.table).toBe("evaluation_analytics");
+      expect(repository.lastQuery?.input.series[0]?.key).toBeUndefined();
+    });
+  });
+
+  describe("when the error trend groups traces by error state", () => {
+    it("routes it to the slim trace table", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+
+      await service.getTimeseries(
+        input({
+          series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
+          groupBy: "error.has_error",
+          timeScale: 1440,
+        }),
+      );
+
+      expect(repository.lastQuery?.table).toBe("trace_analytics");
+    });
   });
 
   it("keeps the legacy calendar-day previous-period envelope and row ceiling", async () => {
@@ -312,6 +366,7 @@ describe("AnalyticsService", () => {
                     count: "3",
                     traceId: "trace-1",
                     content: "hello",
+                    total: "7",
                   },
                 ]
               : [
@@ -326,11 +381,7 @@ describe("AnalyticsService", () => {
                     },
                   },
                 ];
-            const isDocumentTotal = query.includes("uniq(toString(context.document_id))");
-
-            return {
-              json: async () => (isDocumentTotal ? [{ total: "7" }] : documentRows),
-            };
+            return { json: async () => documentRows };
           },
         }),
     });
@@ -370,7 +421,7 @@ describe("AnalyticsService", () => {
       topDocuments: [{ documentId: "doc-1", count: 3, traceId: "trace-1", content: "hello" }],
       totalUniqueDocuments: 7,
     });
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(2);
     for (const call of calls) {
       expect(call.clickhouse_settings).toMatchObject({
         max_bytes_before_external_group_by: 500_000_000,

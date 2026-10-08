@@ -39,11 +39,17 @@ type CacheEntry = {
   readonly result: AnalyticsTimeseriesResult;
 };
 
-function currentAndPreviousDates(
-  startDate: Instant,
-  endDate: Instant,
-  period?: number,
-): {
+function currentAndPreviousDates({
+  startDate,
+  endDate,
+  period,
+  shouldSkipPreviousPeriod,
+}: {
+  startDate: Instant;
+  endDate: Instant;
+  period?: number;
+  shouldSkipPreviousPeriod?: boolean;
+}): {
   readonly startDate: Instant;
   readonly endDate: Instant;
   readonly previousPeriodStartDate: Instant;
@@ -56,9 +62,26 @@ function currentAndPreviousDates(
     periodInDays,
     differenceInCalendarDays(endDate.epochMilliseconds, startDate.epochMilliseconds) + 1,
   );
-  const previousPeriodStartDate = fromDate(addDays(startDate.epochMilliseconds, -days));
+  // Skipping the previous period collapses its window to [startDate,
+  // startDate): every builder's previous-period predicate then matches no row
+  // and prunes no extra partition, so the scan covers the current window only.
+  const previousPeriodStartDate = shouldSkipPreviousPeriod
+    ? startDate
+    : fromDate(addDays(startDate.epochMilliseconds, -days));
 
   return { startDate, endDate, previousPeriodStartDate };
+}
+
+function withoutEmptySeriesKeys(input: AnalyticsTimeseriesInput): AnalyticsTimeseriesInput {
+  if (!input.series.some((s) => s.key === "" || s.subkey === "")) return input;
+  return {
+    ...input,
+    series: input.series.map((s) => ({
+      ...s,
+      key: s.key === "" ? undefined : s.key,
+      subkey: s.subkey === "" ? undefined : s.subkey,
+    })),
+  };
 }
 
 /**
@@ -193,21 +216,27 @@ export class AnalyticsService extends AnalyticsServiceContract {
   ): Promise<AnalyticsTimeseriesResult> {
     const startDate = Temporal.Instant.fromEpochMilliseconds(parsed.startDate);
     const endDate = Temporal.Instant.fromEpochMilliseconds(parsed.endDate);
-    const { previousPeriodStartDate } = currentAndPreviousDates(
+    const { previousPeriodStartDate } = currentAndPreviousDates({
       startDate,
       endDate,
-      typeof parsed.timeScale === "number" ? parsed.timeScale : undefined,
-    );
+      period: typeof parsed.timeScale === "number" ? parsed.timeScale : undefined,
+      shouldSkipPreviousPeriod: parsed.shouldSkipPreviousPeriod,
+    });
     const adjustedTimeScale = adjustTimeScaleForBucketCap({
       timeScale: parsed.timeScale,
       startDate,
       endDate,
     });
-    const table = this.repository.tableFor(parsed);
+    // An empty series key ("") means "every evaluator / event", exactly like
+    // an absent one, and the legacy builder already reads it that way. Routing
+    // must too: counted as keyed, it sent the dashboard's evaluations summary
+    // past the evaluation rollup to `evaluation_runs`.
+    const routedInput = withoutEmptySeriesKeys(parsed);
+    const table = this.repository.tableFor(routedInput);
     const query = {
       table,
       tenantId: parsed.projectId,
-      input: parsed,
+      input: routedInput,
       startDate,
       endDate,
       previousPeriodStartDate,

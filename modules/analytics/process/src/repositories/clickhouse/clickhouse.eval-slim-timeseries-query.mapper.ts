@@ -7,6 +7,7 @@
 import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
+import { latestVersionSubquery } from "./clickhouse.latest-version-dedup.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   dateTrunc,
@@ -15,6 +16,7 @@ import {
   isEvalMetricKey,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./clickhouse.timeseries-query-shared.mapper.ts";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
@@ -73,11 +75,10 @@ function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
     case "evaluations.evaluator_type":
       return `if(${ea}.EvaluatorType = '', 'unknown', ${ea}.EvaluatorType)`;
     case "evaluations.evaluation_passed":
-      // Nullable(Bool) → display string for group_key. Status-gated like the
-      // metric columns: a historical errored row carrying a stray verdict
-      // must bucket as 'unknown', not 'failed' — the legacy per-evaluator
-      // path gates the same way (aggregation-builder.ts, #6833).
-      return `if(${ea}.Status != 'processed' OR ${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
+      // Status-gated like the metric columns, so a stray verdict on an errored
+      // row buckets as 'unknown' (#6833). No OR: the tenant guard refuses one
+      // above the deduped read's tenant predicate.
+      return `if(${ea}.Status = 'processed' AND ${ea}.Passed IS NOT NULL, if(${ea}.Passed, 'passed', 'failed'), 'unknown')`;
     case "evaluations.evaluation_label":
       // Same status gate — an errored run's label is not a verdict (#6833).
       return `if(${ea}.Status != 'processed', 'unknown', coalesce(${ea}.Label, 'unknown'))`;
@@ -92,9 +93,14 @@ function buildEvalSlimGroupByExpression(groupBy?: string): string | null {
 
 // isPercentile + percentileFor moved to _shared.
 
+/**
+ * Eval slim aggregation expression. Percentiles use `quantileTDigest`, like
+ * the trace slim builder: the read spans the whole range, and an exact
+ * quantile keeps every value of the group in memory.
+ */
 function evalSlimAggExpression(agg: AnalyticsAggregation, column: string): string {
   if (isPercentile(agg)) {
-    return `quantileExact(${percentileFor(agg)})(${column})`;
+    return `quantileTDigest(${percentileFor(agg)})(${column})`;
   }
   switch (agg) {
     case "sum":
@@ -114,24 +120,28 @@ function evalSlimAggExpression(agg: AnalyticsAggregation, column: string): strin
 }
 
 /**
- * Build a deduped FROM-clause for the eval slim table — IN-tuple dedup
- * against `(TenantId, EvaluationId, UpdatedAt)` because slim is
- * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the trace slim builder.
+ * Deduped FROM-clause for the eval slim table: the latest version of each
+ * evaluation, by the spillable {@link latestVersionSubquery} collapse, carrying
+ * only the columns the outer query reads.
  */
-function dedupedSlim(alias: string, dateClause: string): string {
-  return `(
-    SELECT *
-    FROM ${SLIM_TABLE}
-    WHERE TenantId = {tenantId:String}
-      ${dateClause}
-      AND (TenantId, EvaluationId, UpdatedAt) IN (
-        SELECT TenantId, EvaluationId, max(UpdatedAt)
-        FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${dateClause}
-        GROUP BY TenantId, EvaluationId
-      )
-  ) ${alias}`;
+function dedupedSlim({
+  alias,
+  dateClause,
+  expressions,
+}: {
+  alias: string;
+  dateClause: string;
+  expressions: readonly string[];
+}): string {
+  const keyColumns = ["TenantId", "EvaluationId"];
+  const columns = referencedAliasColumns({ alias, expressions, keyColumns });
+  return latestVersionSubquery({
+    table: SLIM_TABLE,
+    alias,
+    keyColumns,
+    columns: columns.map((name) => ({ name })),
+    where: `TenantId = {tenantId:String} ${dateClause}`,
+  });
 }
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
@@ -225,7 +235,11 @@ export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): Built
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim(ea, SLIM_DATE_FILTER_BOTH_PERIODS)}
+    FROM ${dedupedSlim({
+      alias: ea,
+      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
+      expressions: selectExprs,
+    })}
     WHERE (${ea}.TenantId = {tenantId:String}
       AND (
         (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})
