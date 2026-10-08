@@ -7,28 +7,21 @@ import {
   Grid,
   Heading,
   HStack,
-  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { ArrowUpRight, Plus } from "lucide-react";
-import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
-import {
-  DocumentsCountsSummary,
-  DocumentsCountsTable,
-} from "../../../components/analytics/DocumentsCountsTable";
+import { DocumentsMetrics } from "../../../components/analytics/DocumentsMetrics";
 import { UserMetrics } from "../../../components/analytics/UserMetrics";
-import { useTopUsedDocuments } from "../../../components/analytics/useTopUsedDocuments";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../components/filters/FilterSidebar";
 import GraphsLayout from "../../../components/GraphsLayout";
 import { LLMMetrics } from "../../../components/LLMMetrics";
 import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import { useFilterParams } from "../../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 
@@ -67,63 +60,6 @@ function AnalyticsContent() {
         <FilterSidebar hideTopics={true} />
       </HStack>
     </GraphsLayout>
-  );
-}
-
-function DocumentsMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-  const params = useMemo(
-    () => ({ filterParams, queryOpts }),
-    [filterParams, queryOpts],
-  );
-  const documents = useTopUsedDocuments(params);
-
-  const count = documents.data?.totalUniqueDocuments;
-
-  // A failed query says nothing about whether there are documents, so the
-  // section stays up and its panels show the error with a Retry.
-  if (!documents.error && (!count || count === 0)) {
-    return null;
-  }
-
-  return (
-    <>
-      <HStack width="full" align="top">
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
-          Documents
-        </Heading>
-      </HStack>
-      <Card.Root width="full">
-        <Card.Body>
-          <Tabs.Root variant="plain" defaultValue="total-documents">
-            <Tabs.List gap={12}>
-              <Tabs.Trigger
-                value="total-documents"
-                paddingX={0}
-                paddingBottom={4}
-              >
-                <VStack align="start">
-                  <Text color="fg">Total documents</Text>
-                  <Box textStyle="2xl" color="fg" fontWeight="bold">
-                    <DocumentsCountsSummary params={params} />
-                  </Box>
-                </VStack>
-              </Tabs.Trigger>
-              <Tabs.Indicator
-                mt="-1.5px"
-                height="4px"
-                bg="orange.400"
-                borderRadius="1px"
-                bottom={0}
-              />
-            </Tabs.List>
-            <Tabs.Content value="total-documents">
-              <DocumentsCountsTable params={params} />
-            </Tabs.Content>
-          </Tabs.Root>
-        </Card.Body>
-      </Card.Root>
-    </>
   );
 }
 
