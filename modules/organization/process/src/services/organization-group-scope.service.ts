@@ -1,7 +1,4 @@
-import {
-  OrganizationGroupService as OrganizationGroupServiceContract,
-  type OrganizationGroupGrant,
-} from "@langwatch/organization-contract";
+import type { OrganizationGroupGrant } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { OrganizationService } from "./organization.service.ts";
@@ -10,7 +7,7 @@ import type { OrganizationService } from "./organization.service.ts";
 type GroupScopeOrganizations = Pick<OrganizationService, "listTeams" | "getBillingProfile">;
 
 /** Resolves the display names of group binding scopes for the group surfaces. */
-export class OrganizationGroupScopeService extends OrganizationGroupServiceContract {
+export class OrganizationGroupScopeService {
   static create(dependencies: {
     organizations: GroupScopeOrganizations;
     projects: ProjectApi;
@@ -23,9 +20,7 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
       organizations: GroupScopeOrganizations;
       projects: ProjectApi;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   async resolveBindingScopeNames(input: {
     organizationId: string;

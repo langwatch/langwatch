@@ -107,7 +107,6 @@ import {
   type TeamWithProjects,
   type OrganizationDirectoryCounts,
   type OrganizationInvitedMemberIds,
-  type OrganizationGroupService,
   type OrganizationFounding,
   type OrganizationMemberSeats,
   type LimitCheckResult,
@@ -252,7 +251,7 @@ export interface OrganizationCaller {
 export interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
   membership: OrganizationMembershipService;
-  groups: OrganizationGroupService;
+  groups: OrganizationGroupScopeService;
   projects: OrganizationProjectApi;
   /** The one permission service every door on this application asks. */
   permissions: AuthzApi;
