@@ -218,6 +218,13 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       And none of them names JEV_API_KEY
 
     @unit
+    Scenario: The self-hosted switch refusal names Connect and never a key of one's own
+      Given the copy shown when a self-hosted install is refused the Instant Evals switch
+      Then the error tip and the error copy the customer reads each name Connect and a license
+      And none of them mentions a key of the install's own
+      And none of them names JEV_API_KEY
+
+    @unit
     Scenario: A guardrail check on the stream chunk direction is skipped
       Given a judge on Instant Evals
       When a guardrail check evaluates it on the stream chunk direction
