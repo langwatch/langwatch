@@ -455,3 +455,7 @@ recommendation, and "default taken" if a lane proceeded on it.
 ## Held (2026-10-07, codex-ping-restore 11)
 
 - Codex gateway handle for model-provider: the ping (and Codex execution) needs langy's virtual key and the gateway URL; model-provider -> langy would cycle (langy-process depends on model-provider-contract). Options: A compose the existing ModelProviderCodexHandle seam (model-provider-execution-handle.service.ts:23,67) as a real channel, filled by the process from langy's key and URL (apps/** lines); B a new LangyApi operation (new op plus a cycle); C a different Codex check (contradicts RESTORE). Coordinator leans A; ask with the next batch.
+
+## Held (2026-10-08, port-8416 section 11)
+
+- LicensingApi.getConnectServiceState({ organizationId, service }) -> { isEntitled, isSwitchedOn } (new operation, one row read over findEntitledServices/findEnabledServices) so a self-hosted install is told not_in_license vs switched_off as on main (instant-eval-opt-in.feature:72). Until ruled, self-hosted refusals keep the "contact us" answer. Coordinator leans yes (a restore of main's behaviour).
