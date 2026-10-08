@@ -15558,9 +15558,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
