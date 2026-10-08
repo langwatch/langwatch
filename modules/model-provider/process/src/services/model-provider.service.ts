@@ -43,7 +43,9 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 
+import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
@@ -81,6 +83,8 @@ interface ModelProviderServiceOptions {
   authorization: AuthzApi;
   translation: ModelTranslation;
   connectionPing: ModelProviderConnectionPing;
+  codexGatewayPing: ModelProviderCodexGatewayPing;
+  secrets: Pick<SecretApi, "getValues">;
   ids: ModelProviderIdService;
 }
 
@@ -122,6 +126,8 @@ export class ModelProviderService {
       connectionRateLimiter: options.connectionRateLimiter,
       connectionPing: ModelProviderConnectionPingService.create({
         channel: options.connectionPing,
+        codexChannel: options.codexGatewayPing,
+        secrets: options.secrets,
         modelProviders: this,
       }),
       writeAuthorization,

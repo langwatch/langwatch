@@ -8,8 +8,10 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
+import { modelProviderCodexGatewayPingChannels } from "../../channels/model-provider-codex-gateway-ping-channels.registry.ts";
 import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
@@ -113,6 +115,7 @@ export function createModelProviderTestInfrastructure(
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
     connectionPing: modelProviderConnectionPingChannels.memory.create(),
+    codexGatewayPing: modelProviderCodexGatewayPingChannels.memory.create(),
     ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
@@ -135,6 +138,7 @@ export function createModelProviderTestApp(
       permissions: AuthzApi;
       dataPrivacy: DataPrivacyApi;
       managed: ManagedProviderApi;
+      secrets: SecretApi;
     }>;
   }> = {},
 ): ModelProviderModule {
@@ -149,8 +153,14 @@ export function createModelProviderTestApp(
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
       managed: input.dependencies?.managed ?? createModelProviderTestManagedProviders(),
+      secrets: input.dependencies?.secrets ?? createModelProviderTestSecrets(),
     },
   });
+}
+
+/** A project store holding no secret: Codex's gateway ping finds no virtual key. */
+export function createModelProviderTestSecrets(values: Record<string, string> = {}): SecretApi {
+  return createApiFixture<SecretApi>({ getValues: async () => values });
 }
 
 /** A deployment with no managed provider: every provider is the customer's own. */

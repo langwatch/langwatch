@@ -18,10 +18,12 @@ import {
 } from "@langwatch/model-provider-contract";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memory/memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
 import type { ModelCostRepository } from "../../repositories/model-cost.repository.ts";
 import type {
@@ -847,6 +849,8 @@ function service(
     authorization: authorizationApi(authorization),
     translation: new Translator(),
     connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+    codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+    secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
     ids: new Ids(),
   });
 }
@@ -1392,6 +1396,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation,
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1424,6 +1430,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1823,6 +1831,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     });
 
@@ -1871,6 +1881,8 @@ describe("ModelProviderService", () => {
       authorization: authorizationApi(),
       translation: new Translator(),
       connectionPing: MemoryModelProviderConnectionPingChannel.create(),
+      codexGatewayPing: MemoryModelProviderCodexGatewayPingChannel.create(),
+      secrets: createApiFixture<SecretApi>({ getValues: async () => ({}) }),
       ids: new Ids(),
     }).upsert({ projectId: "project_1", provider: "openai", enabled: true });
 

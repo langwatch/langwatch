@@ -71,8 +71,11 @@ import {
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { nlpInternalSecret, openAiApiKey, Secret } from "@langwatch/secrets";
 
+import { modelProviderCodexGatewayPingChannels } from "../channels/model-provider-codex-gateway-ping-channels.registry.ts";
+import type { ModelProviderCodexGatewayPing } from "../channels/model-provider-codex-gateway-ping.channel.ts";
 import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
@@ -142,6 +145,8 @@ export interface ModelProviderInfrastructure {
   translation: ModelTranslation;
   /** The one real generation Test Connection sends to the provider. */
   connectionPing: ModelProviderConnectionPing;
+  /** The same ping for Codex, through the AI gateway on the project's virtual key. */
+  codexGatewayPing: ModelProviderCodexGatewayPing;
   /** The identifier format every row this module writes is minted in. */
   ids: ModelProviderIdFactory;
   /** The OAuth exchange a stored Codex token is refreshed through. */
@@ -203,6 +208,8 @@ type ModelProviderBuildConfig = Readonly<{
   executionProxyBaseUrl: string;
   /** The engine hop's shared credential, as the process resolved it. */
   nlpInternalSecret: string | undefined;
+  /** The AI gateway as the control plane reaches it; unset when unconfigured. */
+  gatewayBaseUrl: string | undefined;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -226,6 +233,7 @@ export class ModelProviderModule implements ModelProviderApi {
     permissions: AuthzApi,
     dataPrivacy: DataPrivacyApi,
     managed: ManagedProviderApi,
+    secrets: SecretApi,
   };
   static readonly config = modelProviderConfig;
   /**
@@ -300,6 +308,9 @@ export class ModelProviderModule implements ModelProviderApi {
       },
       executionProxyBaseUrl,
       nlpInternalSecret,
+      // The control plane's own address for the gateway first, as on main (codexGatewayModel.ts).
+      gatewayBaseUrl:
+        config.gatewayInternalUrl ?? config.gatewayPublicUrl ?? config.gatewayLegacyUrl,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
@@ -353,6 +364,9 @@ export class ModelProviderModule implements ModelProviderApi {
       connectionPing: modelProviderConnectionPingChannels.live.create({
         executionProxyBaseUrl: config.executionProxyBaseUrl,
         nlpInternalSecret: config.nlpInternalSecret,
+      }),
+      codexGatewayPing: modelProviderCodexGatewayPingChannels.live.create({
+        gatewayBaseUrl: config.gatewayBaseUrl,
       }),
       ids: PrefixedModelProviderIdService.create(),
       codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
@@ -449,6 +463,8 @@ export class ModelProviderModule implements ModelProviderApi {
       catalog: infrastructure.catalog,
       translation: infrastructure.translation,
       connectionPing: infrastructure.connectionPing,
+      codexGatewayPing: infrastructure.codexGatewayPing,
+      secrets: dependencies.secrets,
       ids: infrastructure.ids,
       codexTokenRefresher: infrastructure.codexTokenRefresher,
       connectionRateLimiter: infrastructure.connectionRateLimiter,

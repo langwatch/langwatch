@@ -17,6 +17,7 @@ import { ModelProviderModule } from "../model-provider.app.ts";
 import {
   createModelProviderTestDataPrivacy,
   createModelProviderTestManagedProviders,
+  createModelProviderTestSecrets,
 } from "./model-provider.fixture.ts";
 
 function testProject(id: string) {
@@ -105,12 +106,16 @@ function createRealModelProviderApp(
       permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       dataPrivacy: createModelProviderTestDataPrivacy(),
       managed: createModelProviderTestManagedProviders(),
+      secrets: createModelProviderTestSecrets(),
     },
     config: {
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
       defaultModel: undefined,
       nlpServiceUrl: undefined,
+      gatewayInternalUrl: undefined,
+      gatewayPublicUrl: undefined,
+      gatewayLegacyUrl: undefined,
       probeBaseUrls: {
         gemini: undefined,
         deepseek: undefined,

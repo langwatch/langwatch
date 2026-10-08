@@ -3,9 +3,11 @@ import {
   type ModelProviderApi,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
+import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryModelProviderCodexGatewayPingChannel } from "../../channels/memory/memory.model-provider-codex-gateway-ping.channel.ts";
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";
 import type { ModelProviderPingReply } from "../../channels/model-provider-connection-ping.channel.ts";
 import { ModelProviderConnectionPingService } from "../model-provider-connection-ping.service.ts";
@@ -24,8 +26,13 @@ function failed(overrides: Partial<Extract<ModelProviderPingReply, { outcome: "f
   };
 }
 
-function setup(reply?: ModelProviderPingReply) {
+function setup(
+  reply?: ModelProviderPingReply,
+  storedSecrets: Record<string, string> = { [LANGY_VK_SECRET_NAME]: "vk-langy" },
+) {
   const channel = MemoryModelProviderConnectionPingChannel.create(reply);
+  const codexChannel = MemoryModelProviderCodexGatewayPingChannel.create(reply);
+  const secrets = createApiFixture<SecretApi>({ getValues: async () => storedSecrets });
   const prepared: { model: string; projectId?: string }[] = [];
   const modelProviders = createApiFixture<ModelProviderApi>({
     prepareExecution: async (input) => {
@@ -35,8 +42,14 @@ function setup(reply?: ModelProviderPingReply) {
   });
   return {
     channel,
+    codexChannel,
     prepared,
-    pings: ModelProviderConnectionPingService.create({ channel, modelProviders }),
+    pings: ModelProviderConnectionPingService.create({
+      channel,
+      codexChannel,
+      secrets,
+      modelProviders,
+    }),
   };
 }
 
@@ -147,17 +160,46 @@ describe("ModelProviderConnectionPingService", () => {
       ).resolves.toBe(VERIFIED);
       expect(channel.sent).toEqual([]);
     });
+  });
 
-    it("keeps the credential's verdict for Codex, which has no execution road here", async () => {
-      const { pings, channel } = setup();
+  describe("given the Codex provider, which has no listing endpoint", () => {
+    const CODEX_ROW = { ...ROW, provider: "openai_codex" };
 
-      await pings.verify({
-        row: { ...ROW, provider: "openai_codex" },
-        projectId: "project_1",
-        credential: VERIFIED,
+    describe("when the connection is tested", () => {
+      /** @scenario "A subscription-billed provider with no listing endpoint is testable" */
+      it("pings it through the AI gateway, the way Langy reaches it", async () => {
+        const { pings, channel, codexChannel } = setup();
+
+        const verdict = await pings.verify({
+          row: CODEX_ROW,
+          projectId: "project_1",
+          credential: VERIFIED,
+        });
+
+        expect(verdict).toEqual(VERIFIED);
+        expect(codexChannel.sent).toEqual([
+          { model: expect.stringMatching(/^openai_codex\//), virtualKey: "vk-langy" },
+        ]);
+        expect(channel.sent).toEqual([]);
       });
+    });
 
-      expect(channel.sent).toEqual([]);
+    describe("when the project holds no gateway virtual key yet", () => {
+      it("refuses it as unreachable without sending anything", async () => {
+        const { pings, codexChannel } = setup(undefined, {});
+
+        const verdict = await pings.verify({
+          row: CODEX_ROW,
+          projectId: "project_1",
+          credential: VERIFIED,
+        });
+
+        expect(verdict).toMatchObject({
+          outcome: "refused",
+          domainError: { code: "provider_unreachable" },
+        });
+        expect(codexChannel.sent).toEqual([]);
+      });
     });
   });
 });

@@ -68,3 +68,31 @@ export function classifyPingRefusal({
   }
   return "other";
 }
+
+/** What a failed generation said, read off whatever the AI SDK threw. */
+export function readPingFailure(error: unknown): {
+  status: number | undefined;
+  message: string;
+  responseBody: string;
+  thrownAs: string;
+} {
+  const status =
+    error instanceof Error && "statusCode" in error && typeof error.statusCode === "number"
+      ? error.statusCode
+      : undefined;
+  const responseBody =
+    error instanceof Error && "responseBody" in error && typeof error.responseBody === "string"
+      ? error.responseBody
+      : "";
+  let message = "";
+  if (error instanceof Error) message = error.message;
+  else if (typeof error === "string") message = error;
+  const thrownAs = error instanceof Error && error.name ? error.name : typeof error;
+  return { status, message, responseBody, thrownAs };
+}
+
+/** The gateway's address normalised to /v1, the root its Responses endpoint hangs off. */
+export function ensureGatewayV1BaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
+}

@@ -1,6 +1,7 @@
 import { generateText } from "ai";
 
 import { handleForParameters } from "../../rules/execution-handle.rules.ts";
+import { readPingFailure } from "../../rules/provider-ping.rules.ts";
 import {
   ModelProviderConnectionPing,
   type ModelProviderPingReply,
@@ -51,23 +52,7 @@ export class HttpModelProviderConnectionPingChannel extends ModelProviderConnect
       });
       return { outcome: "generated" };
     } catch (error) {
-      return this.failureOf(error);
+      return { outcome: "failed", ...readPingFailure(error) };
     }
-  }
-
-  private failureOf(error: unknown): ModelProviderPingReply {
-    const status =
-      error instanceof Error && "statusCode" in error && typeof error.statusCode === "number"
-        ? error.statusCode
-        : undefined;
-    const responseBody =
-      error instanceof Error && "responseBody" in error && typeof error.responseBody === "string"
-        ? error.responseBody
-        : "";
-    let message = "";
-    if (error instanceof Error) message = error.message;
-    else if (typeof error === "string") message = error;
-    const thrownAs = error instanceof Error && error.name ? error.name : typeof error;
-    return { outcome: "failed", status, message, responseBody, thrownAs };
   }
 }
