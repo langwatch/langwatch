@@ -1,5 +1,6 @@
 export * from "./experiment.ts";
 export * from "./experiment-comparison.ts";
+export * from "./experiment-dataset-evaluation.ts";
 export * from "./experiment-dspy.ts";
 export * from "./experiment-legacy.ts";
 export * from "./experiment-workbench.ts";

@@ -26,6 +26,8 @@ import {
   type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
+  type DatasetEvaluationInput,
+  type DatasetEvaluationOutcome,
   type LogBatchEvaluationInput,
   type ComputeExperimentRunMetricsCommandData,
   type ExperimentIdLookupResult,
@@ -120,6 +122,7 @@ import {
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentBatchLogService } from "../services/experiment-batch-log.service.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
+import { ExperimentDatasetEvaluationService } from "../services/experiment-dataset-evaluation.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
@@ -188,6 +191,8 @@ export interface ExperimentAppDependencies {
   runProcessing?: ExperimentRunProcessing;
   /** The SDK's batch result log; absent where a suite builds none. */
   batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
+  /** The SDK's dataset evaluation; absent where a suite builds none. */
+  datasetEvaluation?: Pick<ExperimentDatasetEvaluationService, "evaluate">;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -284,6 +289,10 @@ export class ExperimentModule implements ExperimentApi {
         runs: experiments,
         report: dependencies.evaluation,
         limits: dataset,
+      }),
+      datasetEvaluation: ExperimentDatasetEvaluationService.create({
+        experiments,
+        evaluation: dependencies.evaluation,
       }),
     });
   }
@@ -553,6 +562,14 @@ export class ExperimentModule implements ExperimentApi {
 
   logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void> {
     return this.#batchLog().log(input);
+  }
+
+  evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome> {
+    const datasetEvaluation = this.#dependencies.datasetEvaluation;
+    if (!datasetEvaluation)
+      throw new Error("this experiment process composes no dataset evaluation");
+
+    return datasetEvaluation.evaluate(input);
   }
 
   #batchLog(): NonNullable<ExperimentAppDependencies["batchLog"]> {

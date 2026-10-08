@@ -32,7 +32,6 @@ describe("given an evaluate door", () => {
       "/api/evaluations/basic/evaluate",
       "/api/evaluations/langevals/valid_format/evaluate",
       "/api/guardrails/basic/evaluate",
-      "/api/dataset/evaluate",
     ])("answers %s with main's 400 body before the handler", async (path) => {
       const runtime = createRestRuntime({
         identity: {

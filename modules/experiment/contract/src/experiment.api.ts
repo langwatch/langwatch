@@ -13,6 +13,10 @@ import type {
 } from "@langwatch/workflow-contract";
 
 import type {
+  DatasetEvaluationInput,
+  DatasetEvaluationOutcome,
+} from "./experiment-dataset-evaluation.ts";
+import type {
   ExperimentDspyStep,
   ExperimentDspyStepLookup,
   ExperimentDspyStepSummary,
@@ -195,6 +199,8 @@ export interface ExperimentApi {
   assertBatchLogWithinLimit(input: { projectId: string; payloadBytes: number }): Promise<void>;
   /** Records one SDK batch evaluation: its run, its rows and its verdicts. */
   logBatchEvaluation(input: LogBatchEvaluationInput): Promise<void>;
+  /** Runs one evaluator over an entry of a saved dataset and records it against an experiment. */
+  evaluateDataset(input: DatasetEvaluationInput): Promise<DatasetEvaluationOutcome>;
   /** One experiment trace's cost, sent to the run pipeline to fold into its run. */
   computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void>;
   /** The experiment a run was recorded against, or that no experiment recorded it. */

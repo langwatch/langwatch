@@ -13,7 +13,6 @@ const CREDENTIALED = [
   "postApiEvaluationsByEvaluatorEvaluate",
   "postApiEvaluationsByEvaluatorBySubpathEvaluate",
   "postApiGuardrailsByEvaluatorEvaluate",
-  "postApiDatasetEvaluate",
 ];
 
 describe("the public evaluation REST family", () => {
@@ -40,7 +39,6 @@ describe("the public evaluation REST family", () => {
           "postApiEvaluationsByEvaluatorBySubpathEvaluate",
         ],
         ["post", "/api/guardrails/:evaluator/evaluate", "postApiGuardrailsByEvaluatorEvaluate"],
-        ["post", "/api/dataset/evaluate", "postApiDatasetEvaluate"],
       ]);
     });
 
@@ -82,7 +80,6 @@ describe("the public evaluation REST family", () => {
       expect(caps.postApiEvaluationsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiEvaluationsByEvaluatorBySubpathEvaluate).toBe(30 * 1024 * 1024);
       expect(caps.postApiGuardrailsByEvaluatorEvaluate).toBe(30 * 1024 * 1024);
-      expect(caps.postApiDatasetEvaluate).toBe(30 * 1024 * 1024);
     });
   });
 });

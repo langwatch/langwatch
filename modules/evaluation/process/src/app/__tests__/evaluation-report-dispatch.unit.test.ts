@@ -4,7 +4,6 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -44,7 +43,6 @@ async function installed() {
       evaluator: createApiFixture<EvaluatorApi>(),
       monitor: createApiFixture<MonitorApi>(),
       dataset: createApiFixture<DatasetApi>(),
-      experiment: createApiFixture<ExperimentApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),

@@ -170,12 +170,10 @@ describe("rest-namespace-owners", () => {
     });
     expect(
       transport("modules/evaluation/process/src/transport/evaluations-legacy.rest.ts"),
-    ).toEqual(
-      expect.arrayContaining([
-        { namespace: "evaluations", owner: "experiment" },
-        { namespace: "dataset", owner: "dataset" },
-      ]),
-    );
+    ).toEqual(expect.arrayContaining([{ namespace: "evaluations", owner: "experiment" }]));
+    expect(
+      transport("modules/experiment/process/src/transport/experiment-dataset-evaluation.rest.ts"),
+    ).toEqual([{ namespace: "dataset", owner: "dataset" }]);
     expect(transport("modules/webhook/process/src/transport/webhook-spend-replay.rest.ts")).toEqual(
       [{ namespace: "gateway", owner: "gateway" }],
     );

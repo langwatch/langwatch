@@ -9,7 +9,6 @@ import type {
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -144,10 +143,9 @@ function unreachable(what: string): () => never {
 
 export function createEvaluationTestDoorInfrastructure(): Pick<
   EvaluationInfrastructure,
-  "experiments" | "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
+  "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
 > {
   return {
-    experiments: { findBySlug: unreachable("experiment directory") },
     slugs: {
       findMonitorBySlug: unreachable("monitor directory"),
       findDatasetBySlug: unreachable("dataset directory"),
@@ -194,7 +192,6 @@ export function createEvaluationTestApp(
       monitors: MonitorApi;
       analytics: AnalyticsApi;
       datasets: DatasetApi;
-      experiments: ExperimentApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -216,7 +213,6 @@ export function createEvaluationTestApp(
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
-      experiments: input.dependencies?.experiments ?? createApiFixture<ExperimentApi>(),
     },
     clustering:
       input.clustering ??

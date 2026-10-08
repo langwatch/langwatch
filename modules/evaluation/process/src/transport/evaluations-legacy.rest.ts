@@ -13,32 +13,29 @@ import {
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
-  EvaluationRestExperimentNotFoundError,
   EvaluatorMissingFieldError,
-  batchEvaluationInputSchema,
   evaluateErrorSchema,
   evaluateResponseSchema,
   evaluationInputSchema,
   evaluatorCatalogueResponseSchema,
   evaluatorParamsSchema,
   getEvaluatorDataForParams,
-  legacySentenceErrorSchema,
+  getEvaluatorIncludingCustom,
   namespacedEvaluatorParamsSchema,
-  type BatchEvaluationRESTParams,
   type EvaluationDispatchData,
+  type EvaluatorIncludingCustom,
   type EvaluationMonitorSummary,
   type EvaluationRESTParams,
   type EvaluationRESTResult,
 } from "@langwatch/evaluation-contract";
 import {
-  AVAILABLE_EVALUATORS,
+  type AVAILABLE_EVALUATORS,
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
   EvaluatorWorkflowNotFoundError,
   evaluatorsSchema,
   getEvaluatorDefaultSettings,
   type CustomEvaluatorDefinition,
-  type EvaluationResult,
   type EvaluatorDefinition,
   type EvaluatorTypes,
   type SingleEvaluationResult,
@@ -51,7 +48,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError as ZodErrorClass } from "zod";
@@ -73,10 +69,6 @@ const logger = createLogger("langwatch:evaluations-legacy");
  */
 const EVALUATION_KSUID_PREFIX = "eval";
 const COST_KSUID_PREFIX = "cost";
-/** A throwaway slug, minted only when the caller named neither — a lookup that always misses. */
-const LEGACY_EVAL_SLUG_KSUID_PREFIX = "evalslug";
-/** The ksuid prefix a dataset-evaluation row is minted with. Same reason as above. */
-const BATCH_EVALUATION_KSUID_PREFIX = "batchevaluation";
 
 /**
  * The model an evaluator falls back to when the project's cascade names none.
@@ -94,10 +86,6 @@ const EVALUATE_MAX_BYTES = 30 * 1024 * 1024;
  */
 const PRODUCES_JSON = "application/json";
 
-/**
- * A `POST /api/dataset/evaluate` named an experiment slug this project holds no
- * experiment for.
- */
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
@@ -170,13 +158,6 @@ let evaluatorCatalogue: Record<string, unknown> | undefined;
 const EXPERIMENT_NAMESPACE = {
   owner: "experiment",
   reason: "released SDKs call the legacy evaluation doors at their original paths",
-  deprecate: "move under a namespace evaluation owns in the next API version",
-} as const;
-
-/** The dataset evaluation door kept its path in dataset's namespace (§8, R10). */
-const DATASET_NAMESPACE = {
-  owner: "dataset",
-  reason: "released SDKs call the dataset evaluation door at its original path",
   deprecate: "move under a namespace evaluation owns in the next API version",
 } as const;
 
@@ -316,170 +297,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
     ),
   )
 
-  .post("/api/dataset/evaluate", "postApiDatasetEvaluate")
-  .withSharedPath(DATASET_NAMESPACE)
-  .withRawBody("text", { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
-  .withPermission("evaluations:manage")
-  .withBodyLimit({ maxBytes: EVALUATE_MAX_BYTES, onExceeded: payloadTooLarge })
-  .withResponse("protocol", {
-    produces: PRODUCES_JSON,
-    because: LEGACY_PROTOCOL_REASON,
-    refusal: EVALUATE_MALFORMED,
-  })
-  .withDocs({
-    summary: "Evaluate a dataset",
-    requestBody: { schema: batchEvaluationInputSchema },
-    description:
-      "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
-    tags: ["Datasets"],
-    responses: {
-      200: {
-        description: "The evaluator ran; branch on `status`",
-        content: { [PRODUCES_JSON]: { schema: resolver(evaluateResponseSchema) } },
-      },
-      400: {
-        description:
-          "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
-        content: { [PRODUCES_JSON]: { schema: resolver(legacySentenceErrorSchema) } },
-      },
-      401: {
-        description: "Missing or invalid API key",
-        content: { [PRODUCES_JSON]: { schema: resolver(legacySentenceErrorSchema) } },
-      },
-      403: {
-        description: "The API key lacks evaluations:manage",
-        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
-      },
-      404: {
-        description: "No dataset with that slug",
-        content: { [PRODUCES_JSON]: { schema: resolver(evaluateErrorSchema) } },
-      },
-      413: {
-        description:
-          "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
-        content: { "text/plain": { schema: { type: "string" } } },
-      },
-    },
-  })
-  .handle(async ({ app, raw, scope, response }) =>
-    response.write(await evaluateDataset({ app, raw, projectId: scope.id })),
-  )
   .build();
-
-// ============ The batch result log ============
-// ============ The dataset evaluation ============
-
-async function evaluateDataset({
-  app,
-  raw,
-  projectId,
-}: {
-  app: EvaluationApi;
-  raw: string;
-  projectId: string;
-}): Promise<LegacyAnswer> {
-  const body = parseJson(raw);
-
-  if (!body) return answer({ message: "Bad request" }, 400);
-
-  let params: BatchEvaluationRESTParams;
-
-  try {
-    params = batchEvaluationInputSchema.parse(body);
-  } catch (error) {
-    logger.error({ error, projectId }, "invalid evaluation params received");
-
-    return answer({ error: sentenceFor(error) }, 400);
-  }
-
-  const { datasetSlug } = params;
-  const experimentSlug =
-    params.experimentSlug ?? params.batchId ?? generate(LEGACY_EVAL_SLUG_KSUID_PREFIX).toString();
-  const evaluation = params.evaluation;
-  const monitor = await app.findMonitorBySlug({ projectId, slug: evaluation });
-  const checkType = monitor?.checkType ?? evaluation;
-  const settings = monitor ? monitor.parameters : null;
-
-  let evaluator: EvaluatorIncludingCustom;
-  try {
-    evaluator = await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes);
-  } catch (error) {
-    if (error instanceof HandledError && error.code === "evaluator_not_found") {
-      return answer({ error: `Evaluator not found: ${checkType}` }, 400);
-    }
-    throw error;
-  }
-
-  let data: EvaluationDispatchData;
-
-  try {
-    data = getEvaluatorDataForParams(checkType, params.data ?? {});
-
-    if (!evaluator.requiredFields.every((field: string) => field in data.data)) {
-      return answer(
-        {
-          error: `Missing required field for ${checkType}`,
-          requiredFields: evaluator.requiredFields,
-        },
-        400,
-      );
-    }
-  } catch (error) {
-    logger.error({ error, body, projectId }, "invalid evaluation data received");
-
-    return answer({ error: sentenceFor(error) }, 400);
-  }
-
-  const dataset = await app.findDatasetBySlug({ projectId, slug: datasetSlug });
-
-  if (!dataset) return answer({ error: "Dataset not found" }, 404);
-
-  const result = await runOrReportInternalError(() =>
-    app.runEvaluator({
-      projectId,
-      data,
-      evaluatorType: checkType,
-      settings: (settings as Record<string, unknown>) ?? {},
-    }),
-  );
-
-  const experiment = await app.findExperimentBySlug({ projectId, slug: experimentSlug });
-
-  if (!experiment) throw new EvaluationRestExperimentNotFoundError(experimentSlug);
-
-  if ("cost" in result && result.cost) {
-    await app.recordEvaluationCost({
-      id: generate(COST_KSUID_PREFIX).toString(),
-      projectId,
-      costType: "BATCH_EVALUATION",
-      costName: evaluation,
-      referenceType: "BATCH",
-      referenceId: experiment.id,
-      amount: result.cost.amount,
-      currency: result.cost.currency,
-    });
-  }
-
-  const { score, passed, details, cost, status, label } = result as EvaluationResult;
-
-  await app.recordDatasetEvaluationRow({
-    id: generate(BATCH_EVALUATION_KSUID_PREFIX).toString(),
-    experimentId: experiment.id,
-    projectId,
-    data: data.data,
-    status,
-    score: score ?? 0,
-    passed: passed ?? false,
-    label: label ?? null,
-    details: details ?? "",
-    cost: cost?.amount ?? 0,
-    evaluation,
-    datasetSlug,
-    datasetId: dataset.id,
-  });
-
-  return answer(result, 200);
-}
 
 // ============ The three evaluate doors ============
 
@@ -973,11 +791,10 @@ async function resolveEvaluatorDefinition({
 }): Promise<{ evaluatorDefinition: EvaluatorIncludingCustom } | { refusal: LegacyAnswer }> {
   try {
     return {
-      evaluatorDefinition: await getEvaluatorIncludingCustom(
-        app,
-        projectId,
-        checkType as EvaluatorTypes,
-      ),
+      evaluatorDefinition: getEvaluatorIncludingCustom({
+        checkType: checkType as EvaluatorTypes,
+        customEvaluators: await app.listCustomEvaluators({ projectId }),
+      }),
     };
   } catch (error) {
     if (error instanceof HandledError && error.code === "evaluator_not_found") {
@@ -1046,17 +863,6 @@ function logInvalid({
   );
 }
 
-/** A run that threw is an errored result, not a refusal. */
-async function runOrReportInternalError(
-  run: () => Promise<SingleEvaluationResult>,
-): Promise<SingleEvaluationResult> {
-  try {
-    return await run();
-  } catch (error) {
-    return internalErrorResult(error instanceof Error ? error.message : "Internal error");
-  }
-}
-
 /** An evaluator that ran out of time is retried exactly once. */
 function timedOut(result: SingleEvaluationResult): boolean {
   if (result.status !== "error") return false;
@@ -1064,7 +870,7 @@ function timedOut(result: SingleEvaluationResult): boolean {
   return result.details.toLowerCase().includes("timed out");
 }
 
-/** The evaluate doors publish a thrown string as the detail; the dataset door does not. */
+/** The evaluate doors publish a thrown string as the detail. */
 function detailOf(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -1075,48 +881,6 @@ function detailOf(error: unknown): string {
 function internalErrorResult(details: string): SingleEvaluationResult {
   return { status: "error", error_type: "INTERNAL_ERROR", details, traceback: [] };
 }
-
-type EvaluatorIncludingCustom =
-  | EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS>
-  | CustomEvaluatorDefinition;
-
-/**
- * A built-in or project custom evaluator by type; throws `EvaluatorNotFoundError` when neither
- * has it.
- */
-const getEvaluatorIncludingCustom = async (
-  app: EvaluationApi,
-  projectId: string,
-  checkType: EvaluatorTypes,
-): Promise<EvaluatorIncludingCustom> => {
-  const availableCustomEvaluators = await app.listCustomEvaluators({ projectId });
-  const customEntries: [string, CustomEvaluatorDefinition][] = [];
-
-  for (const evaluator of availableCustomEvaluators) {
-    const dsl = evaluator.versions[0]?.dsl;
-
-    if (!dsl) continue;
-
-    const cloned = JSON.parse(JSON.stringify(dsl)) as
-      | { edges?: StudioEdge[]; nodes?: StudioNode[] }
-      | undefined;
-    const { inputs } = getInputsOutputs(cloned?.edges ?? [], cloned?.nodes ?? []);
-    const requiredFields = inputs
-      .map((input) => input.identifier)
-      .filter((id): id is string => typeof id === "string");
-
-    customEntries.push([`custom/${evaluator.id}`, { name: evaluator.name, requiredFields }]);
-  }
-
-  const availableEvaluators = {
-    ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(customEntries),
-  };
-
-  const evaluator: EvaluatorIncludingCustom | undefined = availableEvaluators[checkType];
-  if (!evaluator) throw new EvaluatorNotFoundError(checkType);
-  return evaluator;
-};
 
 /**
  * Resolves the project's cascade-configured DEFAULT and EMBEDDINGS models into

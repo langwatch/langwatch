@@ -9,7 +9,6 @@ import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/datas
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi, MonitorWithEvaluator } from "@langwatch/monitor-contract";
@@ -52,14 +51,12 @@ async function boot({
   modelProviders = createApiFixture<ModelProviderApi>(),
   workflows = createApiFixture<WorkflowApi>(),
   datasets = createApiFixture<DatasetApi>(),
-  experiments = createApiFixture<ExperimentApi>(),
 }: {
   monitors?: MonitorApi;
   evaluators?: EvaluatorApi;
   modelProviders?: ModelProviderApi;
   workflows?: WorkflowApi;
   datasets?: DatasetApi;
-  experiments?: ExperimentApi;
 } = {}) {
   const runtime = await createApp({ role: "api" })
     .withModules([installableEvaluation])
@@ -73,7 +70,6 @@ async function boot({
       evaluator: evaluators,
       monitor: monitors,
       dataset: datasets,
-      experiment: experiments,
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
@@ -365,48 +361,6 @@ describe("given a dataset evaluation names a dataset by slug", () => {
       await evaluation.recordDatasetEvaluationRow(row);
 
       expect(written).toEqual([row]);
-    } finally {
-      await runtime.stop();
-    }
-  });
-});
-
-const NIGHTLY: Experiment = {
-  id: "experiment-1",
-  name: "Nightly",
-  type: "BATCH_EVALUATION_V2",
-  slug: "nightly",
-  projectId: PROJECT_ID,
-  workflowId: null,
-  createdAt: new Date(0),
-  updatedAt: new Date(0),
-  archivedAt: null,
-  workbenchState: null,
-  workbenchVersion: 0,
-};
-
-describe("given a dataset evaluation names an experiment by slug", () => {
-  function recordingExperiments() {
-    const experiments = createApiFixture<ExperimentApi>({
-      findBySlug: async ({ projectId, slug }) =>
-        projectId === PROJECT_ID && slug === "nightly" ? NIGHTLY : null,
-    });
-
-    return { experiments };
-  }
-
-  /** @scenario "A dataset evaluation's experiment slug resolves through the experiment owner" */
-  it("answers the experiment a dataset evaluation names by slug", async () => {
-    const { experiments } = recordingExperiments();
-    const { runtime, evaluation } = await boot({ experiments });
-
-    try {
-      await expect(
-        evaluation.findExperimentBySlug({ projectId: PROJECT_ID, slug: "nightly" }),
-      ).resolves.toMatchObject({ id: "experiment-1" });
-      await expect(
-        evaluation.findExperimentBySlug({ projectId: PROJECT_ID, slug: "absent" }),
-      ).resolves.toBeNull();
     } finally {
       await runtime.stop();
     }

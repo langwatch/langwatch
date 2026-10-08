@@ -141,12 +141,6 @@ Feature: Evaluation service boundary
     And the scored entry is written as a batch-evaluation row by the dataset owner
 
   @unit
-  Scenario: A dataset evaluation's experiment slug resolves through the experiment owner
-    Given a process that installs the evaluation feature beside an experiment owner
-    When a dataset evaluation names an experiment by slug
-    Then the experiment's id comes back, and a slug the project does not hold answers no experiment
-
-  @unit
   Scenario: An evaluate call reads the project's default models from the cascade
     Given a process that installs the evaluation feature beside a model provider owner
     When an evaluate call asks for the model a feature resolves to

@@ -99,8 +99,6 @@ export interface EvaluationApi {
   findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
   /** One dataset by slug, or null. */
   findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
-  /** One experiment by slug, or null. */
-  findExperimentBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
   /** The model the project's cascade resolves for one feature key, or null. */
   findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
   /** Records what a run of an evaluator cost. */

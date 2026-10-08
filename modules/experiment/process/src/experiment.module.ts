@@ -13,6 +13,7 @@ import { experimentRunProcessingEventing } from "./eventing/experiment-run-proce
 import { experimentRepositories } from "./repositories/experiment-repositories.registry.ts";
 import { batchRecordTrpcTransport } from "./transport/batch-record.trpc.ts";
 import { experimentBatchLogRest } from "./transport/experiment-batch-log.rest.ts";
+import { experimentDatasetEvaluationRest } from "./transport/experiment-dataset-evaluation.rest.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import {
@@ -41,6 +42,8 @@ export const experimentProcessModule = defineProcessModule("experiment")
     experimentWorkbenchRunLegacyRest,
     // `/api/evaluations/batch/log_results`, the SDK's batch result log.
     experimentBatchLogRest,
+    // `/api/dataset/evaluate`, the SDK's dataset evaluation, in dataset's namespace.
+    experimentDatasetEvaluationRest,
     experimentTrpcTransport,
     batchRecordTrpcTransport,
   )

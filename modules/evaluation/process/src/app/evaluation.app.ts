@@ -34,7 +34,6 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -66,10 +65,6 @@ import { EvaluationExecutionIntentService } from "../services/evaluation-executi
 import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
 import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
-import {
-  EvaluationExperimentLookupService,
-  type EvaluationExperimentDirectory,
-} from "../services/evaluation-experiment-lookup.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { EvaluationGuardrailCheckService } from "../services/evaluation-guardrail-check.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
@@ -107,10 +102,9 @@ export type EvaluationInfrastructure = Readonly<{
   warmup: EvaluationWarmupProbe;
   analytics: EvaluationRunAnalytics;
   report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
-  // What the public evaluation doors reach beyond the module: the experiment
-  // a dataset evaluation names, the rows a slug names, the saved-evaluator
-  // directory, the model cascade, the cost ledger and the evaluator runtime.
-  experiments: EvaluationExperimentDirectory;
+  // What the public evaluation doors reach beyond the module: the rows a slug
+  // names, the saved-evaluator directory, the model cascade, the cost ledger
+  // and the evaluator runtime.
   slugs: EvaluationSlugDirectory;
   savedEvaluators: EvaluationSavedEvaluatorDirectory;
   models: EvaluationModelCascade;
@@ -137,7 +131,6 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
     warmup: { probe: async () => unavailable("evaluator warmup runtime") },
     analytics: { evaluationRan: () => void 0 },
     report: { reportEvaluation: async () => unavailable("evaluation report pipeline") },
-    experiments: { findBySlug: async () => unavailable("experiment directory") },
     slugs: {
       findMonitorBySlug: async () => unavailable("monitor directory"),
       findDatasetBySlug: async () => unavailable("dataset directory"),
@@ -268,8 +261,6 @@ export class EvaluationModule implements EvaluationApiContract {
     analytics: AnalyticsApi,
     /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
     datasets: DatasetApi,
-    /** The experiment a dataset evaluation names by slug. */
-    experiments: ExperimentApi,
   };
   static readonly secrets = {
     openAi: openAiApiKey,
@@ -286,7 +277,6 @@ export class EvaluationModule implements EvaluationApiContract {
   readonly #report: Pick<EvaluationCommandDispatcherService, "reportEvaluation">;
   readonly #autoslug: EvaluationNameAutoslugService;
   readonly #filterMatching: EvaluationFilterMatchingService;
-  readonly #experiments: EvaluationExperimentDirectory;
   readonly #slugs: EvaluationSlugDirectory;
   readonly #savedEvaluators: EvaluationSavedEvaluatorDirectory;
   readonly #models: EvaluationModelCascade;
@@ -339,7 +329,6 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#warmup = members.warmup;
     this.#analytics = members.analytics;
     this.#report = members.report;
-    this.#experiments = members.experiments;
     this.#slugs = members.slugs;
     this.#savedEvaluators = members.savedEvaluators;
     this.#models = members.models;
@@ -386,7 +375,6 @@ export class EvaluationModule implements EvaluationApiContract {
     const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
     const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
     const datasets = EvaluationDatasetLookupService.create(dependencies.datasets);
-    const experiments = EvaluationExperimentLookupService.create(dependencies.experiments);
     const costs = EvaluationCostService.create({ repository: repositories.costs });
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
@@ -428,7 +416,6 @@ export class EvaluationModule implements EvaluationApiContract {
         customEvaluators: {
           findAll: (input) => dependencies.workflows.findEvaluatorWorkflows(input),
         },
-        experiments,
         slugs: {
           findMonitorBySlug: (input) => monitorLookup.findMonitorBySlug(input),
           findDatasetBySlug: (input) => datasets.findDatasetBySlug(input),
@@ -613,8 +600,6 @@ export class EvaluationModule implements EvaluationApiContract {
     this.#slugs.findMonitorBySlug(input);
   findDatasetBySlug: EvaluationApiContract["findDatasetBySlug"] = (input) =>
     this.#slugs.findDatasetBySlug(input);
-  findExperimentBySlug: EvaluationApiContract["findExperimentBySlug"] = (input) =>
-    this.#experiments.findBySlug(input);
   findModelForFeature: EvaluationApiContract["findModelForFeature"] = (input) =>
     this.#models.findModelForFeature(input);
   recordEvaluationCost: EvaluationApiContract["recordEvaluationCost"] = (input) =>
