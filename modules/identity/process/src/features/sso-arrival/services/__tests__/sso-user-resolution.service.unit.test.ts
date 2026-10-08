@@ -434,6 +434,25 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
+  describe("when the provider signs in the subject it already bound", () => {
+    /** @scenario "A known provider subject signs straight in" */
+    it("hands them to the library's own binding and writes nothing", async () => {
+      const unbound = createWorld({ owners: [], proved: false });
+      await expect(unbound.service.resolveUser(assertion())).resolves.toMatchObject({
+        action: "reject",
+      });
+
+      const { store, service } = createWorld({ owners: [], proved: false });
+      bind({ store });
+      const accountsBefore = structuredClone(store.accounts);
+      const identifiersBefore = structuredClone(store.identifiers);
+
+      await expect(service.resolveUser(assertion())).resolves.toEqual({ action: "continue" });
+      expect(store.accounts).toEqual(accountsBefore);
+      expect(store.identifiers).toEqual(identifiersBefore);
+    });
+  });
+
   describe("when the installation is LangWatch Cloud", () => {
     /** @scenario "On LangWatch Cloud an unconfirmed password account is not linked by single sign-on" */
     it("leaves the link to the library's own rule, which refuses an unconfirmed address", async () => {

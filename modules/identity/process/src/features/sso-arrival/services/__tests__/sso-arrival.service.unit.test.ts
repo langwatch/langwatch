@@ -181,6 +181,7 @@ beforeEach(() => {
 
 describe("given somebody arriving through a live connection on a domain it proved", () => {
   describe("when the answer is that they ask and an administrator approves", () => {
+    /** @scenario "An arrival on a connection that asks keeps the account and waits" */
     it("stands a request to join, and makes them no member", async () => {
       const parts = serviceOver({ row: connection() });
 
