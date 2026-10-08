@@ -14,6 +14,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
+import { CONTACT_SALES_URL } from "../../ee/licensing/constants";
 import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
 import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
 import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
@@ -265,6 +266,56 @@ export const DashboardPageBody = ({
               </Alert.Content>
             </Alert.Root>
           )}
+        {usage.data?.seatLimitInfo?.status === "exceeded" && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+            data-testid="seat-limit-banner"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              {usage.data.activePlan.type === "ENTERPRISE" ? (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={CONTACT_SALES_URL}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Contact sales
+                  </Link>{" "}
+                  to add seats.
+                </Text>
+              ) : (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={planManagementUrl}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Upgrade your plan
+                  </Link>{" "}
+                  to keep everyone.
+                </Text>
+              )}
+            </Alert.Content>
+          </Alert.Root>
+        )}
         {usage.data &&
           usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
             <Alert.Root
