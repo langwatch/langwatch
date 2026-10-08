@@ -22,7 +22,7 @@ import {
 } from "./governance-cost-rollup-cell.rules.ts";
 
 /** How long a pull's touch keeps a day provisional (main `GOVERNANCE_SETTLING_WINDOW_DAYS`). */
-const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;
+export const GOVERNANCE_SETTLING_WINDOW_DAYS = 30;
 const DAY_MS = 86_400_000;
 
 export function laneWithoutFigure(): GovernanceCostLane {

@@ -417,6 +417,7 @@ export interface GovernanceAppDependencies {
       | "saveSessionPolicy"
       | "getSettings"
       | "getOrganizationIdByTeamId"
+      | "listAllIds"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -561,6 +562,7 @@ export class GovernanceModule implements GovernanceRestApi {
     );
     this.codingAssistantBilling = CodingAssistantBillingFactService.create({
       policies: repositories.costAttributionPolicies,
+      organizationIds: (input) => dependencies.organizations.listAllIds(input),
       // The command's schema is the event data with the envelope merged in, never a wrapper.
       record: ({ tenantId, occurredAt, data }) =>
         this.codingAssistantBillingSender("recordCodingAssistantBilling").send({

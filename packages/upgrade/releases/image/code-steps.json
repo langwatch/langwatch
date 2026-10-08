@@ -21,6 +21,20 @@
     "description": "Seeds entitlement's trace meter from trace's span log at deploy."
   },
   {
+    "id": "governance:record-coding-assistant-billing",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest."
+  },
+  {
+    "id": "governance:replay-cost-charges",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Fills the cost drift check's charge map from pulled usage over the settling window."
+  },
+  {
     "id": "identity:reopen-unproven-accounts",
     "kind": "data",
     "mode": "blocking",

@@ -17,6 +17,10 @@ function world({
   const policies = MemoryCostAttributionPolicyRepository.create({ seed });
   const facts = CodingAssistantBillingFactService.create({
     policies,
+    organizationIds: async ({ after }) => {
+      const ids = ["org-1", "org-2", "org-3"].filter((id) => after === undefined || id > after);
+      return { ids, next: null };
+    },
     clock: () => AT,
     record: async (command) => {
       if (failing) throw new Error("queue unavailable");
@@ -94,7 +98,7 @@ describe("CodingAssistantBillingFactService", () => {
 
   describe("when the backfill runs", () => {
     /** @scenario "A backfill records the billing fact for configs written before it existed" */
-    it("records facts for every organization holding an enabled coding-assistant config", async () => {
+    it("records facts for every organization, a page of ids at a time", async () => {
       const { facts, sent } = world({
         seed: [
           { organizationId: "org-1", config: { assistantKind: "codex", bundledPlan: false } },
@@ -104,7 +108,7 @@ describe("CodingAssistantBillingFactService", () => {
 
       const totals = await facts.backfill();
 
-      expect(totals).toEqual({ organizations: 2, recorded: 14 });
+      expect(totals).toEqual({ afterOrganizationId: "org-3", organizations: 3, recorded: 21 });
       expect(billedBySource(sent, "org-1").codex).toBe(true);
       expect(billedBySource(sent, "org-2").cursor).toBe(false);
     });
