@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:99`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -130,6 +130,14 @@ One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, 
 
 ```typescript
 judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
+```
+
+#### `getJudgeLimits`
+
+The limits of the judge `judgeQuery` sends to, so a caller trims a conversation to them before asking (Alex, 2026-10-08, round 26 CD-4). Published by the judge, never assumed.
+
+```typescript
+getJudgeLimits(): InstantEvalClassifierLimits;
 ```
 
 #### `priceOf`
