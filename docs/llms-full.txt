@@ -8283,7 +8283,7 @@ Open **Settings > Model Providers**, click **Add Model Provider** and select **D
 |---|---|
 | `DOUBLEWORD_API_KEY` | A Doubleword API key from [app.doubleword.ai/api-keys](https://app.doubleword.ai/api-keys). |
 
-Use an inference key. Doubleword refuses inference calls made with a platform key.
+Create the key for inference (the "realtime" purpose). Doubleword refuses model calls made with a key whose purpose is "platform", with HTTP 403.
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 

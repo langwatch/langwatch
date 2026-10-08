@@ -1,3 +1,6 @@
+// no-test: static SVG markup with no logic.
+
+/** The Doubleword logo, shown next to the Doubleword model provider. */
 export function Doubleword() {
   return (
     <svg
