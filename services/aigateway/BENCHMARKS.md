@@ -132,10 +132,6 @@ Apple M3 Pro, loopback, 2026-10-04, median of three runs:
 
 The target is under 5 ms at p50 in-region. The relay's own cost is three orders of magnitude below it, so the hop a client sees is the network distance to the gateway. A message up to 1 MiB is relayed as one frame from one buffer; a larger one is streamed in 32 KiB chunks.
 
-## Improvement opportunities
-
-See `services/aigateway/PERF-ROADMAP.md` for the prioritised list of optimisations.
-
 ## When to re-run
 
 Before cutting a release, after touching any file in:
