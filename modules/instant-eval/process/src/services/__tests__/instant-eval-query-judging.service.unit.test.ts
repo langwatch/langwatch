@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
-} from "../../channels/instant-eval-judge.channel.ts";
+} from "../../channels/instant-eval-judging.channel.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 import { InstantEvalJudgeRowsService } from "../instant-eval-judge-rows.service.ts";

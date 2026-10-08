@@ -14,7 +14,7 @@ import {
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
-} from "../channels/instant-eval-judge.channel.ts";
+} from "../channels/instant-eval-judging.channel.ts";
 
 export class InstantEvalJudgeChoiceService implements InstantEvalJudgeChannel {
   readonly limits = INSTANT_EVAL_CLASSIFIER_LIMITS;

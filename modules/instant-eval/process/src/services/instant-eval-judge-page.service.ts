@@ -9,7 +9,7 @@ import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 import type {
   InstantEvalPageOutcome,
   InstantEvalRunExecutor,

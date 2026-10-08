@@ -18,7 +18,7 @@ import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
-} from "../../channels/instant-eval-judge.channel.ts";
+} from "../../channels/instant-eval-judging.channel.ts";
 import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
 import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";

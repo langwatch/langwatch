@@ -11,7 +11,7 @@ import {
   type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 import {
   assertInstantEvalPageBudget,
   instantEvalJudgedRows,

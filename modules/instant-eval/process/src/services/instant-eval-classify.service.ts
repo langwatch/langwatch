@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/instant-eval-judge-contract";
 import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 
 export class InstantEvalClassifyService {
   private constructor(private readonly judge: InstantEvalJudgeChannel) {}

@@ -37,12 +37,12 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 import type { InstantEvalChannels } from "../channels/instant-eval.channels.ts";
 import {
   DeterministicInstantEvalJudgeChannel,
   MemoryInstantEvalJudgeChannel,
-} from "../channels/memory/memory.instant-eval-judge.channel.ts";
+} from "../channels/memory/memory.instant-eval-judging.channel.ts";
 import type { InstantEvalRunExecutor } from "../eventing/instant-eval-processing.intent.ts";
 import {
   InstantEvalProcessingPipelineAdapter,

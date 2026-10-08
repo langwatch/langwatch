@@ -15,7 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { DeterministicInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
+import { DeterministicInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judging.channel.ts";
 import { InstantEvalFinishService } from "../instant-eval-finish.service.ts";
 import { InstantEvalJudgeRowsService } from "../instant-eval-judge-rows.service.ts";
 import { InstantEvalJudgedSpendService } from "../instant-eval-judged-spend.service.ts";

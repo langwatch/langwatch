@@ -19,7 +19,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
-} from "../channels/instant-eval-judge.channel.ts";
+} from "../channels/instant-eval-judging.channel.ts";
 
 /** How long an organization's opt-in is held: one read per run, no restart after a switch. */
 export const CONNECT_JUDGE_STATE_TTL_MS = 30_000;

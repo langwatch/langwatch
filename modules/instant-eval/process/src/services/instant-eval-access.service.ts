@@ -7,7 +7,7 @@
 
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
 
-import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 
 /** The feature-flag peer, narrowed to the one question this service asks. */
 export interface InstantEvalFlagReader {

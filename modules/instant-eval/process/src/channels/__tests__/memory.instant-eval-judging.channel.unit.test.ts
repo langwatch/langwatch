@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import {
   DeterministicInstantEvalJudgeChannel,
   MemoryInstantEvalJudgeChannel,
-} from "../memory/memory.instant-eval-judge.channel.ts";
+} from "../memory/memory.instant-eval-judging.channel.ts";
 
 const questions: InstantEvalQuestion[] = [
   { id: "q1", kind: "boolean", instructions: "Is it polite?" },

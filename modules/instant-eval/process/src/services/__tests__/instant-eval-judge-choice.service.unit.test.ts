@@ -9,8 +9,8 @@ import {
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judge.channel.ts";
-import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
+import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judging.channel.ts";
+import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judging.channel.ts";
 import { InstantEvalCloudJudgeService } from "../instant-eval-cloud-judge.service.ts";
 import { InstantEvalJudgeChoiceService } from "../instant-eval-judge-choice.service.ts";
 
