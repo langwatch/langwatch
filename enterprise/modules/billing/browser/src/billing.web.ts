@@ -6,11 +6,11 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 import {
-  billingWebConfigSchema,
   ContactSalesToken,
   LicenseBillingSectionToken,
   SeatProrationPreviewToken,
-} from "@langwatch/enterprise-billing-contract";
+} from "@langwatch/enterprise-billing-client";
+import { billingWebConfigSchema } from "@langwatch/enterprise-billing-contract";
 
 export const billingWeb = defineBrowserModule("billing")
   .withConfig({ billing: billingWebConfigSchema }, ({ billing }) => billing)

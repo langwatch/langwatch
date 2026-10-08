@@ -2960,9 +2960,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-licensing-client':
+        specifier: workspace:*
+        version: link:../../licensing/client
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
@@ -3024,6 +3030,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  enterprise/modules/billing/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   enterprise/modules/billing/contract:
     dependencies:
@@ -3811,9 +3827,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../billing/contract
+      '@langwatch/enterprise-licensing-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -3869,6 +3891,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  enterprise/modules/licensing/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   enterprise/modules/licensing/contract:
     dependencies:
@@ -4378,6 +4410,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../governance/contract
+      '@langwatch/enterprise-scim-client':
+        specifier: workspace:*
+        version: link:../client
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4442,6 +4477,16 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  enterprise/modules/scim/client:
+    dependencies:
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   enterprise/modules/scim/contract:
     dependencies:
@@ -6412,6 +6457,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -9113,6 +9161,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -11795,6 +11846,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -12167,12 +12221,21 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/enterprise-licensing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/client
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-scim-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/scim/client
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/scim/contract

@@ -19,7 +19,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
 
 /** An audit row as the browser receives it: its instant is an ISO string. */

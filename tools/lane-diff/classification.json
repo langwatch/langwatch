@@ -271,21 +271,21 @@
     },
     {
       "match": "log_processing:subscriber:codingAgentLogFactsDispatch",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to coding_agent_processing's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "coding_agent_processing aliases it to its peer subscriber codingAgentLogFactsDispatch until 3.21.0 is cut (coding-agent-processing.pipeline.ts, MAIN_FACTS_DISPATCH_ALIASES)"
     },
     {
       "match": "metric_processing:subscriber:codingAgentMetricFactsDispatch",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to coding_agent_processing's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "coding_agent_processing aliases it to its peer subscriber codingAgentMetricFactsDispatch until 3.21.0 is cut (coding-agent-processing.pipeline.ts, MAIN_FACTS_DISPATCH_ALIASES)"
     },
     {
       "match": "trace_processing:subscriber:codingAgentSpanFactsDispatch",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to coding_agent_processing's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "coding_agent_processing aliases it until 3.21.0 is cut: a span_facts_lifted job to command contributeSpanFacts (its data is the command's), a whole span_received to the peer subscriber; a span_referenced claim-check has no successor and still blocks (coding-agent-processing.pipeline.ts, MAIN_FACTS_DISPATCH_ALIASES)"
     },
     {
       "match": "gateway_spend_processing:subscriber:pm:webhookDelivery",

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
-import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-contract";
+import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-client";
 import { describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../licensing.web.ts";

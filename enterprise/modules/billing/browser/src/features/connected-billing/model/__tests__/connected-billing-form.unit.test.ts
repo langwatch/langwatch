@@ -1,5 +1,5 @@
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
-import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-contract";
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-client";
 import { describe, expect, it } from "vitest";
 
 import { billingFormFrom, contractPayload, onboardPayload } from "../connected-billing-form.ts";

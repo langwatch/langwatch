@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { LicenseBillingSectionToken } from "@langwatch/enterprise-billing-contract";
+import { LicenseBillingSectionToken } from "@langwatch/enterprise-billing-client";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";

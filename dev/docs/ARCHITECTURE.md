@@ -1898,6 +1898,7 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
 lint names any drain older than one release; a fresh install plans upcast steps by their mode (Alex,
 2026-10-06, rounds 15 and 16).
+A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data?, removeAfter }])` on its pipeline: jobs the previous release queued under `from` run on that lane, its own or its peer lane, for one release. They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A key or type no alias takes still retries and blocks, and the worker installation test refuses an alias once its `removeAfter` release has been cut (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and

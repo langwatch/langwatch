@@ -10,7 +10,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   SeatProrationPreviewToken,
   type SeatProrationPreviewProps,
-} from "@langwatch/enterprise-billing-contract";
+} from "@langwatch/enterprise-billing-client";
 import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 

@@ -5,7 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { DirectorySummaryToken } from "@langwatch/enterprise-scim-contract";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-client";
 import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 
 export const scimWeb = defineBrowserModule("scim")

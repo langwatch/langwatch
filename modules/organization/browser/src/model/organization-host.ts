@@ -1,7 +1,7 @@
 /** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-contract";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import type { AuthenticationOverviewCardProps } from "@langwatch/organization-client";
 import { createContext, useContext } from "react";
 import type { ComponentType, ReactNode } from "react";

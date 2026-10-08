@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { ContactSalesToken } from "@langwatch/enterprise-billing-contract";
+import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import {
   History,
   MoreVertical,

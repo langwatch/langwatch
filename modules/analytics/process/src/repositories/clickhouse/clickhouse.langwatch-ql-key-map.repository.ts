@@ -12,8 +12,11 @@ export const LWQL_KEY_MAP_INSERT_SETTINGS = {
   wait_for_async_insert: 1,
 } as const;
 
+const LWQL_KEY_MAP_TABLE = "lwql_api_key_tenant_map";
+
 /**
- * The one place runtime code writes the LangWatchQL key-map table.
+ * The one place runtime code writes the LangWatchQL key-map table, qualified
+ * with the app's own database (`sourceDatabase`).
  */
 export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
   private constructor(private readonly resolveClient: ClickHouseClientResolver) {
@@ -26,11 +29,16 @@ export class LwqlKeyMapClickHouseRepository extends LwqlKeyMapRepository {
     return new LwqlKeyMapClickHouseRepository(options.resolveClient);
   }
 
-  /** @param table Already mode-qualified via `lwqlKeyMapTableQualifiedName`. */
-  async insertRow({ table, row }: { table: string; row: LwqlKeyMapRow }): Promise<void> {
+  async insertRow({
+    row,
+    sourceDatabase,
+  }: {
+    row: LwqlKeyMapRow;
+    sourceDatabase: string;
+  }): Promise<void> {
     const client = await this.resolveClient(row.TenantId);
     await client.insert({
-      table,
+      table: `${sourceDatabase}.${LWQL_KEY_MAP_TABLE}`,
       // A fresh literal, not `row` itself: `LwqlKeyMapRow` names its two
       // columns rather than an index signature, so it does not satisfy the
       // session's `Record<string, unknown>` row shape on its own.

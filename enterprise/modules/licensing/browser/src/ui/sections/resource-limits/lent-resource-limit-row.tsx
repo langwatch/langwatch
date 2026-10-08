@@ -1,7 +1,5 @@
-import {
-  LIMIT_TYPE_DISPLAY_LABELS,
-  type ResourceLimitRowProps,
-} from "@langwatch/enterprise-licensing-contract";
+import { type ResourceLimitRowProps } from "@langwatch/enterprise-licensing-client";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "@langwatch/enterprise-licensing-contract";
 
 import { ResourceLimitRow } from "./resource-limit-row.tsx";
 

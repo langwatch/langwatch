@@ -1,6 +1,5 @@
 export * from "./scim.contract.ts";
 export * from "./scim-drawers.ts";
-export * from "./scim-components.ts";
 export {
   ScimApi,
   type ScimDeliveryReceipt,

@@ -54,6 +54,12 @@ import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import type { EventReadSeat } from "./stores/eventReadSeat.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
 import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
+import {
+  type LaneAlias,
+  laneAliasTakes,
+  laneAliasTargetKeys,
+  readAliasedBody,
+} from "./upcast/laneAlias.ts";
 import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
@@ -148,7 +154,8 @@ export class EventSourcing {
     string,
     { pipeline: string; jobNames: ReadonlyMap<string, string> }
   >();
-  /** Retired lanes by `<living pipeline>:<job name>`, each with the lane it drains into. */
+  /** Former lane keys by the successors that consume them, each with its alias (round 49 E4). */
+  private readonly _laneAliases = new Map<string, { pipeline: string; alias: LaneAlias }[]>();
   private _initialized = false;
   private _consumersHeld = false;
   private _consumersPaused = false;
@@ -579,6 +586,10 @@ export class EventSourcing {
       parseEvent: definition.parseEvent,
     });
     this.registerUpcastDrain(definition.upcasts);
+    this.registerLaneAliases({
+      pipeline: definition.metadata.name,
+      aliases: definition.laneAliases,
+    });
 
     const serviceOptions = buildServiceOptions(definition);
 
@@ -779,6 +790,53 @@ export class EventSourcing {
     });
   }
 
+  /** A successor's aliases, consulted for a key no lane and no drain answers. */
+  private registerLaneAliases({
+    pipeline,
+    aliases,
+  }: {
+    pipeline: string;
+    aliases: readonly LaneAlias[] | undefined;
+  }): void {
+    for (const alias of aliases ?? []) {
+      const successors = this._laneAliases.get(alias.from) ?? [];
+      this._laneAliases.set(alias.from, [...successors, { pipeline, alias }]);
+    }
+  }
+
+  /** The successor that takes a job queued under a former key, with the body it reads, if any. */
+  private aliasedJob({
+    registryKey,
+    clean,
+  }: {
+    registryKey: string;
+    clean: Record<string, unknown>;
+  }): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
+    for (const { pipeline, alias } of this._laneAliases.get(registryKey) ?? []) {
+      if (!laneAliasTakes({ alias, stored: clean })) continue;
+      const body = readAliasedBody({ alias, stored: clean });
+      for (const key of laneAliasTargetKeys({ pipeline, to: alias.to })) {
+        const entry = this._globalJobRegistry.get(key);
+        if (entry) return { entry, clean: body };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * A job under a key a successor aliases, whose event type none of its aliases takes: the head
+   * deliberately reacts to fewer types, so it is acknowledged with a log line, not blocked.
+   */
+  private acknowledgeUnclaimedAlias(payload: Record<string, unknown>): boolean {
+    const registryKey = `${payload.__pipelineName}:${payload.__jobType}:${payload.__jobName}`;
+    if (!this._laneAliases.has(registryKey)) return false;
+    logger.info(
+      EventSourcing.jobIdentity(payload),
+      "No successor of this former lane takes the job's event type; acknowledging it",
+    );
+    return true;
+  }
+
   /** The lane a job queued under a former pipeline's key drains into, if declared. */
   private drainedEntry(job: {
     pipelineName: string;
@@ -822,13 +880,6 @@ export class EventSourcing {
     }
 
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
-    const entry =
-      this._globalJobRegistry.get(registryKey) ??
-      this.drainedEntry({ pipelineName, jobType, jobName });
-    if (!entry) {
-      logger.debug({ registryKey }, "No handler registered for job");
-      return null;
-    }
     const {
       __pipelineName: _p,
       __jobType: _t,
@@ -836,7 +887,12 @@ export class EventSourcing {
       [JOB_ROUTING_FIELD]: _r,
       ...clean
     } = payload;
-    return { entry, clean };
+    const entry =
+      this._globalJobRegistry.get(registryKey) ??
+      this.drainedEntry({ pipelineName, jobType, jobName });
+    const routed = entry ? { entry, clean } : this.aliasedJob({ registryKey, clean });
+    if (!routed) logger.debug({ registryKey }, "No handler registered for job");
+    return routed;
   }
 
   /**
@@ -1014,6 +1070,7 @@ export class EventSourcing {
   ): Promise<void> {
     const result = this.lookupEntry(payload);
     if (!result) {
+      if (this.acknowledgeUnclaimedAlias(payload)) return;
       this.rejectUnroutableJob(payload, queueName);
     }
     const job = this.readDequeued({
@@ -1044,11 +1101,13 @@ export class EventSourcing {
   ): Promise<void> {
     if (payloads.length === 0) return;
     // Reject unroutable payloads upfront so lookupEntry returns only non-null.
-    const routed = payloads.map((payload) => {
+    const routed = payloads.flatMap((payload) => {
       const result = this.lookupEntry(payload);
+      if (!result && this.acknowledgeUnclaimedAlias(payload)) return [];
       if (!result) this.rejectUnroutableJob(payload, queueName);
-      return { ...result, payload };
+      return [{ ...result, payload }];
     });
+    if (routed.length === 0) return;
 
     // Every payload is read and tenant-gated before any runs: a misrouted job must never reach
     // its handler, alone or folded into a coalesced batch. A mixed batch (the GroupQueue only

@@ -28,6 +28,11 @@ export {
   EventUpcastReader,
   type UpcastCoverageSource,
 } from "./upcast/eventUpcastReader.ts";
+export {
+  type LaneAlias,
+  laneAliasesPastWindow,
+  type PipelineLaneAliases,
+} from "./upcast/laneAlias.ts";
 export { pipelineUpcastsOf, upcastReplayEventSource } from "./upcast/upcastReplayEventSource.ts";
 
 // Commands

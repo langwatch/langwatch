@@ -5,7 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-contract";
+import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-client";
 
 import { reportLicenseFailure } from "./ui/sections/license-error-interceptor/index.ts";
 

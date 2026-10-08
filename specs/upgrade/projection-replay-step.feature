@@ -72,6 +72,36 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the step replays the lane
     Then every tenant is discovered and replayed in one pass, as before
 
+  # Round 51 (Alex, 2026-10-08): the shared log lists only the shared server's tenants, so the
+  # tenant directory lists the tenants of privately routed organisations from Postgres and the
+  # replay discovery unions the two. Each tenant is still replayed through its routed target.
+
+  @unit
+  Scenario: A tenant held only on a private dataplane is replayed
+    Given the shared log lists one tenant
+    And the tenant directory lists another tenant of a privately routed organisation
+    When the step replays the lane
+    Then both tenants are discovered and replayed, each under its own tenant id
+
+  @unit
+  Scenario: A tenant listed by both the shared log and the tenant directory is replayed once
+    Given the shared log and the tenant directory both list the same tenant
+    When the step replays the lane
+    Then that tenant is discovered and replayed once
+
+  @unit
+  Scenario: The tenant directory pages a privately routed organisation's tenants with a cursor
+    Given a privately routed organisation with more projects than one page holds
+    When the tenant directory lists its tenants
+    Then the organisation and each of its projects are listed once
+    And each page is read after the last id of the page before, never the whole table at once
+
+  @unit
+  Scenario: A process with no private route lists only the shared log's tenants
+    Given a process whose ClickHouse member has no private route
+    When a replay lists its tenants
+    Then the tenant directory is not asked
+
   @unit
   Scenario: Each completed tenant is saved with the cursor its run completes through
     Given a replay over two tenants

@@ -52,10 +52,19 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/scim/client/tsconfig.build.json"
     },
     {
       "path": "../../../enterprise/modules/scim/contract/tsconfig.build.json"
