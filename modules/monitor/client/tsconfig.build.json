@@ -5,7 +5,7 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/workflow-client": ["./src/index.ts"]
+      "@langwatch/monitor-client": ["./src/index.ts"]
     }
   },
   "files": ["./src/index.ts"],
@@ -14,9 +14,6 @@
   "references": [
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

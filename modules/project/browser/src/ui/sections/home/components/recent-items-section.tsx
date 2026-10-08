@@ -9,12 +9,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
-import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
 
-import type { RecentItem, RecentItemType } from "../../../../behavior/home-api.ts";
-import { homeApi } from "../../../../behavior/home-api.ts";
+import type { RecentItemType } from "../../../../behavior/home-api.ts";
+import { type HomeRecentItem, useRecentItems } from "../../../../behavior/use-recent-items.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { fallbackRecentItemType, recentItemTypes } from "../../../../model/recent-item-types.ts";
 import NextLink from "../../../../ui/elements/app-link.tsx";
@@ -33,8 +32,10 @@ const getLabelForType = (type: RecentItemType): string =>
  * Group items by type — kept for consumers/tests even though the section now
  * renders one flat list (each row carries its own type label instead).
  */
-export const groupItemsByType = (items: RecentItem[]): Map<RecentItemType, RecentItem[]> => {
-  const grouped = new Map<RecentItemType, RecentItem[]>();
+export const groupItemsByType = (
+  items: HomeRecentItem[],
+): Map<RecentItemType, HomeRecentItem[]> => {
+  const grouped = new Map<RecentItemType, HomeRecentItem[]>();
   for (const item of items) {
     const existing = grouped.get(item.type) ?? [];
     grouped.set(item.type, [...existing, item]);
@@ -49,7 +50,7 @@ const MAX_RECENT_ROWS = 8;
  * how long ago you touched it — a work log line, not a tile. More useful than the old card
  * grid: twice the items in half the height, with recency visible at a glance.
  */
-function RecentItemRow({ item }: { item: RecentItem }) {
+function RecentItemRow({ item }: { item: HomeRecentItem }) {
   const timeAgo = formatTimeAgo(toEpochMs(item.updatedAt));
   return (
     <ChakraLink asChild _hover={{ textDecoration: "none" }} width="full" display="block">
@@ -134,18 +135,7 @@ export function RecentItemsSection({
     isLoading,
     error,
     refetch,
-  } = homeApi.home.getRecentItems.useQuery(
-    { projectId: project?.id ?? "", limit: 12 },
-    {
-      enabled: !!project?.id,
-      // Same cache policy as the briefing (which shares this exact query
-      // key): paint instantly from cache, refresh quietly in the background —
-      // the section shouldn't sit in a skeleton for ages on every visit.
-      staleTime: 60_000,
-      gcTime: 10 * 60_000,
-      placeholderData: keepPreviousData,
-    },
-  );
+  } = useRecentItems({ projectId: project?.id, projectSlug: project?.slug, limit: 12 });
 
   const recentItems =
     fetchedItems && priorityTypes?.length

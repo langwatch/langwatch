@@ -1,8 +1,8 @@
 {
-  "name": "@langwatch/annotation-client",
+  "name": "@langwatch/monitor-client",
   "version": "0.1.0",
   "private": true,
-  "description": "The tokens annotations lends other modules' screens (ARCHITECTURE.md §10.1).",
+  "description": "The typed tRPC hooks generated from Monitor's own contract.",
   "files": [
     "src"
   ],
@@ -19,9 +19,8 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/module": "workspace:*"
+    "@langwatch/monitor-contract": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:"

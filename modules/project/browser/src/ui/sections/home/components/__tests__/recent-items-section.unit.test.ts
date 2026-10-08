@@ -5,14 +5,14 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { RecentItem } from "../../../../../behavior/home-api.ts";
+import type { HomeRecentItem } from "../../../../../behavior/use-recent-items.ts";
 import { groupItemsByType } from "../recent-items-section.tsx";
 
 describe("groupItemsByType", () => {
   describe("when items have different types", () => {
     /** @scenario By type tab groups items by entity type */
     it("groups items by their type", () => {
-      const items: RecentItem[] = [
+      const items: HomeRecentItem[] = [
         {
           id: "1",
           type: "prompt",
@@ -53,7 +53,7 @@ describe("groupItemsByType", () => {
 
   describe("when all items are the same type", () => {
     it("groups all items under that type", () => {
-      const items: RecentItem[] = [
+      const items: HomeRecentItem[] = [
         {
           id: "1",
           type: "dataset",

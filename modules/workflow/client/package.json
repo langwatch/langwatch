@@ -19,6 +19,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*"
   },
