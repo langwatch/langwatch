@@ -34,6 +34,9 @@
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
+      "path": "../../coding-agent/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
@@ -61,6 +64,9 @@
       "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
@@ -83,6 +89,9 @@
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

@@ -5369,6 +5369,9 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../../coding-agent/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -5396,6 +5399,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
@@ -5420,6 +5426,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
