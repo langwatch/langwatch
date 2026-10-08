@@ -1,7 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-import type { AiActionErrorDetails } from "./trace-ai-query.ts";
-import { FILTER_TOO_COMPLEX_MESSAGE } from "./trace-query-analysis.ts";
+import type { AiActionErrorDetails } from "./features/query/trace-ai-query.ts";
+import { FILTER_TOO_COMPLEX_MESSAGE } from "./features/query/trace-query-analysis.ts";
 
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {

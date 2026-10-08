@@ -3,36 +3,6 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
-import type { ExportProgressEvent } from "./export-progress.trpc.ts";
-import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
-import type {
-  ClassifyClaudeCallInput,
-  ClassifyClaudeCallResult,
-  CanonicalizeLogRecordInput,
-  CanonicalizeLogRecordResult,
-  CanonicalizeSpanAttributesInput,
-  CanonicalizeSpanAttributesResult,
-  DeriveClaudeResponseContentInput,
-  DeriveClaudeResponseContentResult,
-} from "./trace-canonicalisation.ts";
-import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
-import type {
-  EvaluationTraceReadInput,
-  EvaluationTraceSpan,
-  EvaluationTraceEvent,
-} from "./trace-evaluation.contract.ts";
-import type { TraceExportDownload, TraceExportDownloadInput } from "./trace-export.vocabulary.ts";
-import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
-import type {
-  TraceFullReadInput,
-  TraceFullRecord,
-  TraceFullThreadReadInput,
-} from "./trace-full-read.contract.ts";
-import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
-import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
-import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
-import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -52,22 +22,75 @@ import type {
   TraceModelSpendWindow,
   TraceProjectValueSpend,
   TraceSpendSummary,
-} from "./trace-model-spend.ts";
-import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
+} from "./features/analytics/trace-model-spend.ts";
+import type {
+  TraceTopicClusteringCounts,
+  TraceTopicClusteringPage,
+  TraceTopicClusteringPageInput,
+} from "./features/analytics/trace-topic-clustering-read.ts";
+import type {
+  ClassifyClaudeCallInput,
+  ClassifyClaudeCallResult,
+  CanonicalizeLogRecordInput,
+  CanonicalizeLogRecordResult,
+  CanonicalizeSpanAttributesInput,
+  CanonicalizeSpanAttributesResult,
+  DeriveClaudeResponseContentInput,
+  DeriveClaudeResponseContentResult,
+} from "./features/attribute/trace-canonicalisation.ts";
+import type {
+  TraceEditOverlayDto,
+  TraceEditOverlayPatch,
+} from "./features/edit-overlay/trace-edit-overlay.contract.ts";
+import type {
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  EvaluationTraceEvent,
+} from "./features/evaluation/trace-evaluation.contract.ts";
+import type { ResolvedInstantEvalRun } from "./features/evaluation/trace-instant-eval-chips.ts";
+import type { ExportProgressEvent } from "./features/export/export-progress.trpc.ts";
+import type {
+  TraceExportDownload,
+  TraceExportDownloadInput,
+} from "./features/export/trace-export.vocabulary.ts";
+import type { TraceOtlpIngestApi } from "./features/ingest/otlp-ingest.rest.ts";
 import type {
   AssignTopicCommandData,
   RecordCapturedSpanInput,
   RecordMetricCorrelationCommandData,
   RecordSpanCommandData,
-} from "./trace-processing.commands.ts";
-import type { LogRecordReceivedEventData } from "./trace-processing.events.ts";
-import type { TraceSummaryData } from "./trace-projection.ts";
-import type { TraceQueryEvaluationRun } from "./trace-query-evaluation.types.ts";
+} from "./features/ingest/trace-processing.commands.ts";
+import type { LogRecordReceivedEventData } from "./features/ingest/trace-processing.events.ts";
+import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
+import type {
+  DiscoverResult,
+  FacetValuesResult,
+  TraceListPage,
+} from "./features/list/trace-list-view.ts";
+import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
+import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
 import type {
   TraceQueryClassification,
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
-} from "./trace-query.contract.ts";
+} from "./features/query/trace-query.contract.ts";
+import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
+import type {
+  SpanSummaryRow,
+  SpanResourceInfo,
+  TraceEventRollup,
+  TraceLogRecordDto,
+  ModelUsageStatsRow,
+  ModelSpanSampleRow,
+} from "./features/span/trace-span-read-model.ts";
+import type { Trace, Span, ElasticSearchEvent } from "./trace-format.schemas.ts";
+import type {
+  TraceFullReadInput,
+  TraceFullRecord,
+  TraceFullThreadReadInput,
+} from "./trace-full-read.contract.ts";
+import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import type { CheckPreconditions } from "./trace-precondition.schemas.ts";
 import type {
   TraceCost,
   TraceLegacyListInput,
@@ -83,19 +106,6 @@ import type {
   TraceMetadataUpdate,
 } from "./trace-rest.schemas.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
-import type {
-  SpanSummaryRow,
-  SpanResourceInfo,
-  TraceEventRollup,
-  TraceLogRecordDto,
-  ModelUsageStatsRow,
-  ModelSpanSampleRow,
-} from "./trace-span-read-model.ts";
-import type {
-  TraceTopicClusteringCounts,
-  TraceTopicClusteringPage,
-  TraceTopicClusteringPageInput,
-} from "./trace-topic-clustering-read.ts";
 import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {

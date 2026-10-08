@@ -1,6 +1,6 @@
 import { Temporal } from "@langwatch/time";
 
-import { PRESETS_BY_ID } from "../../../trace-time-range-presets.ts";
+import { PRESETS_BY_ID } from "../../../features/list/trace-time-range-presets.ts";
 import { type SetTimeRangePayload, setTimeRangePayloadSchema } from "../schemas.ts";
 import { ExplorerTransformError, type ExplorerTransform } from "./types.ts";
 

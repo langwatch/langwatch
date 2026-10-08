@@ -8,19 +8,22 @@ import { defineTrpcContract } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
-import { aiActionResultSchema, aiQueryResultSchema } from "./trace-ai-query.ts";
+import { explorerInstantEvalRunsSchema } from "./features/evaluation/trace-instant-eval.schemas.ts";
+import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./features/ingest/trace-project-milestones.events.ts";
+import { discoverResultSchema, facetValuesResultSchema } from "./features/list/trace-list-view.ts";
+import { aiActionResultSchema, aiQueryResultSchema } from "./features/query/trace-ai-query.ts";
+import {
+  routeSearchInputSchema,
+  routeSearchResultSchema,
+} from "./features/query/trace-search-route.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
-import { explorerInstantEvalRunsSchema } from "./trace-instant-eval.schemas.ts";
-import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
-import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./trace-project-milestones.events.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
 import { traceMetadataResponseSchema, traceMetadataUpdateSchema } from "./trace-rest.schemas.ts";
-import { routeSearchInputSchema, routeSearchResultSchema } from "./trace-search-route.ts";
 import { sharedTraceDtoSchema } from "./trace-share.schemas.ts";
 import {
   spanDetailSchema,

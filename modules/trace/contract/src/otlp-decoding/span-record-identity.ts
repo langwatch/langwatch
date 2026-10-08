@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 
-import type { SpanReceivedEvent } from "../trace-ingress.events.ts";
+import type { SpanReceivedEvent } from "../features/ingest/trace-ingress.events.ts";
 import {
   convertUnixNanoToUnixMs,
   normalizeOtlpUnixNano,

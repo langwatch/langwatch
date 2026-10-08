@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { anchorStorageTime, firstUsableAnchor } from "../trace-storage-anchor.ts";
+import { anchorStorageTime, firstUsableAnchor } from "../features/ingest/trace-storage-anchor.ts";
 
 const NOW = 1_700_000_000_000;
 const DAY_MS = 24 * 60 * 60 * 1000;

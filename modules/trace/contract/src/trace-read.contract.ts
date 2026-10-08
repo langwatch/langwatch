@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { TraceSummaryData } from "./features/ingest/trace-projection.ts";
 import { evaluationResultSchema, evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import type {
   ChatMessage,
@@ -11,7 +12,6 @@ import type {
   Trace,
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import type { TraceSummaryData } from "./trace-projection.ts";
 
 /**
  * The results the legacy trace read answers with. They are the contract between that read and

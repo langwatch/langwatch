@@ -1,4 +1,4 @@
-import { convertMediaPartToMediaData } from "../trace-media-part.collector.ts";
+import { convertMediaPartToMediaData } from "../features/content/trace-media-part.collector.ts";
 import { isRecord, parseJSON } from "./content-format.ts";
 import type { ChatMessage, ContentBlock } from "./types.ts";
 

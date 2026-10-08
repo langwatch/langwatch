@@ -5,8 +5,18 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
-import { evaluationRunDataSchema } from "./trace-evaluation.schemas.ts";
+import { traceEditOverlayPatchSchema } from "./features/edit-overlay/trace-edit-overlay.contract.ts";
+import { evaluationRunDataSchema } from "./features/evaluation/trace-evaluation.schemas.ts";
+import { traceListPageSchema, traceListViewItemSchema } from "./features/list/trace-list-view.ts";
+import {
+  sessionGroupCodingAgentDtoSchema,
+  sessionGroupDtoSchema,
+  sessionGroupsResultSchema,
+} from "./features/list/trace-session-group.ts";
+import {
+  traceEventRollupSchema,
+  traceLogRecordDtoSchema,
+} from "./features/span/trace-span-read-model.ts";
 import {
   chatMessageSchema,
   errorCaptureSchema,
@@ -14,13 +24,6 @@ import {
   spanMetricsSchema,
   spanTimestampsSchema,
 } from "./trace-format.schemas.ts";
-import { traceListPageSchema, traceListViewItemSchema } from "./trace-list-view.ts";
-import {
-  sessionGroupCodingAgentDtoSchema,
-  sessionGroupDtoSchema,
-  sessionGroupsResultSchema,
-} from "./trace-session-group.ts";
-import { traceEventRollupSchema, traceLogRecordDtoSchema } from "./trace-span-read-model.ts";
 import { spanDetailSchema, spanLangwatchSignalsSchema } from "./trace-view.contract.ts";
 import { spanTreeNodeSchema } from "./trace.ts";
 

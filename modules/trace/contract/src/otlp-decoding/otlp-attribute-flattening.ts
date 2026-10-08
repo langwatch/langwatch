@@ -1,4 +1,4 @@
-import { safeUnflatten } from "../trace-attribute-unflatten.ts";
+import { safeUnflatten } from "../features/attribute/trace-attribute-unflatten.ts";
 import type { NormalizedAttributes } from "../trace.spans.ts";
 
 const SEP = ".";
