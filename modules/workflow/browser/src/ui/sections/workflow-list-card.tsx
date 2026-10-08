@@ -8,6 +8,7 @@ import { toEpochMs } from "@langwatch/time";
 import type { WorkflowCascadeArchive, WorkflowRelatedEntities } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
+import { useWorkflowArchivePreview } from "../../behavior/use-workflow-archive-preview.ts";
 import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
@@ -44,10 +45,11 @@ export function WorkflowListCard({
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
 
-  const relatedEntitiesQuery = workflowApi.workflow.getRelatedEntities.useQuery(
-    { workflowId: workflowId ?? "", projectId: projectId ?? "" },
-    { enabled: isDeleteDialogOpen && !!workflowId && !!projectId },
-  );
+  const relatedEntitiesQuery = useWorkflowArchivePreview({
+    workflowId,
+    projectId,
+    enabled: isDeleteDialogOpen,
+  });
 
   const workflow = workflowId
     ? workflows?.find((candidate) => candidate.id === workflowId)
@@ -198,7 +200,9 @@ function describeCascadeArchive({
   related,
 }: {
   result: Pick<WorkflowCascadeArchive, "archivedAgentsCount">;
-  related: Pick<WorkflowRelatedEntities, "evaluators" | "monitors"> | undefined;
+  related:
+    | (Pick<WorkflowRelatedEntities, "monitors"> & { evaluators: readonly { id: string }[] })
+    | undefined;
 }): string[] {
   return [
     ...countLabel(related?.evaluators.length ?? 0, "evaluator"),

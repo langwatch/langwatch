@@ -205,9 +205,8 @@ export const workflowPushToCopiesSchema = z.object({
   ),
 });
 
-/** What archiving a workflow would take with it. */
+/** What archiving a workflow takes with it; its evaluators are evaluator's to name. */
 export const workflowRelatedEntitiesSchema = z.object({
-  evaluators: z.array(z.object({ id: z.string(), name: z.string() })),
   agents: z.array(z.object({ id: z.string(), name: z.string() })),
   monitors: z.array(z.object({ id: z.string(), name: z.string(), evaluatorId: z.string() })),
 });

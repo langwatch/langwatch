@@ -14,11 +14,11 @@ const { state } = vi.hoisted(() => ({
     workflows: [] as Record<string, unknown>[],
     isLoading: false,
     related: {
-      evaluators: [] as { id: string; name: string }[],
       agents: [] as { id: string; name: string }[],
       monitors: [] as { id: string; name: string }[],
     },
     relatedLoading: false,
+    evaluators: [] as { id: string; name: string; workflowId: string | null }[],
   },
 }));
 
@@ -64,6 +64,14 @@ vi.mock("../../../../behavior/workflow-api.ts", () => {
   };
 });
 
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: {
+      getAll: { useQuery: () => ({ data: state.evaluators, isLoading: false }) },
+    },
+  },
+}));
+
 const workflowRow = (overrides: Record<string, unknown> = {}) => ({
   id: "wf_1",
   projectId: "project-1",
@@ -82,8 +90,9 @@ describe("given the workflows library", () => {
     vi.clearAllMocks();
     state.workflows = [];
     state.isLoading = false;
-    state.related = { evaluators: [], agents: [], monitors: [] };
+    state.related = { agents: [], monitors: [] };
     state.relatedLoading = false;
+    state.evaluators = [];
   });
   afterEach(() => cleanup());
 
@@ -152,11 +161,11 @@ describe("given the workflows library", () => {
     it("names what goes with it before the reader confirms, and takes the cascade", async () => {
       const user = userEvent.setup();
       state.workflows = [workflowRow()];
-      state.related = {
-        evaluators: [{ id: "ev_1", name: "Answer relevance" }],
-        agents: [],
-        monitors: [{ id: "mo_1", name: "Nightly relevance" }],
-      };
+      state.related = { agents: [], monitors: [{ id: "mo_1", name: "Nightly relevance" }] };
+      state.evaluators = [
+        { id: "ev_1", name: "Answer relevance", workflowId: "wf_1" },
+        { id: "ev_2", name: "Another workflow's judge", workflowId: "wf_2" },
+      ];
       calls.cascadeArchive.mockReturnValue({ archivedAgentsCount: 0 });
 
       const { host } = renderWithWorkflowHost(<WorkflowsScreen />);
@@ -166,6 +175,7 @@ describe("given the workflows library", () => {
       // The names, before the confirmation is possible.
       expect(await screen.findByText("Answer relevance")).toBeTruthy();
       expect(screen.getByText("Nightly relevance")).toBeTruthy();
+      expect(screen.queryByText("Another workflow's judge")).toBeNull();
 
       const confirm = screen.getByTestId("cascade-archive-confirm-input");
       await user.type(confirm, "delete");

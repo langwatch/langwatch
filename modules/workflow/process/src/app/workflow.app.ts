@@ -14,7 +14,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
@@ -63,7 +62,6 @@ import {
   type WorkflowEvaluationStarted,
   type WorkflowLineageRow,
   type WorkflowListRow,
-  type WorkflowMappingFields,
   type PublishedWorkflowAnswer,
   type WorkflowPublicationFlags,
   type WorkflowReference,
@@ -209,9 +207,9 @@ export interface WorkflowLineageReads {
     workflowId: string;
     projectId: string;
   }): Promise<readonly Readonly<{ id: string; name: string }>[]>;
-  listMonitorsForEvaluators(input: {
+  listMonitors(input: {
+    workflowId: string;
     projectId: string;
-    evaluatorIds: readonly string[];
   }): Promise<readonly Readonly<{ id: string; name: string; evaluatorId: string }>[]>;
   cascadeArchive(input: {
     projectId: string;
@@ -317,8 +315,6 @@ interface WorkflowInfrastructure {
   executeSyncRelay: WorkflowExecuteSyncRelayService;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
-  /** The evaluators an archive preview names. */
-  evaluators: EvaluatorApi;
   /** The dataset copies a Studio graph carries with it into another project. */
   datasets: DatasetApi;
   /** How a Studio graph is prepared before any version of it is written. */
@@ -507,7 +503,7 @@ function lineageOf({
     findWorkflowWithCopies: (input) => rows.findWorkflowWithCopies(input),
     findLatestVersionNumber: (input) => rows.findLatestVersionNumber(input),
     listAgents: (input) => linked.listAgents(input),
-    listMonitorsForEvaluators: (input) => linked.listMonitorsForEvaluators(input),
+    listMonitors: (input) => linked.listMonitors(input),
     cascadeArchive: (input) => linked.cascadeArchive(input),
   };
 }
@@ -593,8 +589,6 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
 export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
-    /** The evaluators an archive preview names - a peer's App, not a member. */
-    evaluators: EvaluatorApi,
     /** Resolves a Studio graph's models before any version of it is written. */
     modelProviders: ModelProviderApi,
     /** The agent mappings a saved Studio graph refreshes, best effort. */
@@ -607,7 +601,7 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     apiKeys: ApiKeyApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
-    /** The monitors an archived workflow's evaluators back, deleted with it. */
+    /** The monitors an archive preview names, the ones its evaluators back. */
     monitors: MonitorApi,
     /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
     secrets: SecretApi,
@@ -672,7 +666,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
         : { publicBaseUrl: setup.config.publicBaseUrl }),
       workflows,
       datasets,
-      evaluators: setup.dependencies.evaluators,
       studioDsl: ModelProviderWorkflowStudioDslService.create({
         modelProviders: setup.dependencies.modelProviders,
       }),
@@ -779,13 +772,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   /** Verifies that a workflow belongs to the requested project. */
   assertInProject(input: { workflowId: string; projectId: string }): Promise<void> {
     return this.#infrastructure.workflows.assertInProject(input);
-  }
-
-  listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>> {
-    return this.#infrastructure.workflows.listFields(input);
   }
 
   listSummaries(input: {
@@ -975,14 +961,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
         },
       },
     });
-  }
-
-  /** Copies a workflow into another project, attributed to its caller. */
-  copy(
-    input: Omit<CopyWorkflowCommand, "authorId">,
-    by: WorkflowCaller,
-  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    return this.#infrastructure.workflows.copy({ ...input, authorId: by.id });
   }
 
   /** This module's own application, which the browser door reads through. */
@@ -1269,13 +1247,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     });
   }
 
-  // -- the evaluators an archive preview names --------------------------------
-
-  /** Every evaluator in the project. */
-  listEvaluators(input: { projectId: string }): Promise<Evaluator[]> {
-    return this.#infrastructure.evaluators.getAll(input);
-  }
-
   // -- what the caller may see elsewhere -------------------------------------
 
   hasProjectPermission(input: {
@@ -1384,34 +1355,20 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   /**
-   * What archiving this workflow would take with it - the evaluators and
-   * agents bound to it, and the monitors those evaluators back.
+   * What archiving this workflow takes with it: the agents that run it and the monitors its
+   * evaluators back. The browser names the evaluators themselves from evaluator's client.
    */
   async getRelatedEntities(input: {
     workflowId: string;
     projectId: string;
   }): Promise<WorkflowRelatedEntities> {
-    const evaluators = (await this.listEvaluators({ projectId: input.projectId }))
-      .filter((evaluator) => evaluator.workflowId === input.workflowId)
-      .map(({ id, name }) => ({ id, name }));
+    // Copied out of the readonly views: the dialog types these lists as plain arrays.
+    const [agents, monitors] = await Promise.all([
+      this.#infrastructure.lineage.listAgents(input),
+      this.#infrastructure.lineage.listMonitors(input),
+    ]);
 
-    // Copied out of the readonly views: the confirmation dialog these lists
-    // feed types them as plain arrays, and a readonly element type would
-    // narrow a client payload that is identical on the wire.
-    const agents = [...(await this.#infrastructure.lineage.listAgents(input))];
-
-    const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
-    const monitors =
-      evaluatorIds.length > 0
-        ? [
-            ...(await this.#infrastructure.lineage.listMonitorsForEvaluators({
-              projectId: input.projectId,
-              evaluatorIds,
-            })),
-          ]
-        : [];
-
-    return { evaluators, agents, monitors };
+    return { agents: [...agents], monitors: [...monitors] };
   }
 
   /**

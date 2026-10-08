@@ -2,7 +2,6 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -21,7 +20,6 @@ import { WorkflowModule } from "../workflow.app.ts";
 async function appWith(experiments: ExperimentApi): Promise<WorkflowModule> {
   return WorkflowModule.create({
     dependencies: {
-      evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),

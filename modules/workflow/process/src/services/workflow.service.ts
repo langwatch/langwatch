@@ -61,15 +61,6 @@ type WorkflowServiceOptions = {
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
 export class WorkflowService {
-  async listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>> {
-    const sources = await this.options.repository.findFieldSources(input);
-
-    return Object.fromEntries(sources.map(({ id, dsl }) => [id, this.dsl.mappingFields(dsl)]));
-  }
-
   listSummaries(input: {
     projectId: string;
     workflowIds: string[];

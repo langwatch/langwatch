@@ -1,5 +1,4 @@
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { Evaluator } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
@@ -189,10 +188,6 @@ export interface WorkflowApi {
     projectId: string;
   }): Promise<WorkflowWithVersion>;
   assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
-  listFields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, WorkflowMappingFields>>;
   listSummaries(input: {
     projectId: string;
     workflowIds: string[];
@@ -201,10 +196,6 @@ export interface WorkflowApi {
   deleteUncommitted(input: WorkflowReference): Promise<void>;
   create(
     input: Omit<CreateWorkflowCommand, "authorId">,
-    by: WorkflowCaller,
-  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
-  copy(
-    input: Omit<CopyWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   /** Copies a workflow once the caller may create workflows in its source project too. */
@@ -303,10 +294,6 @@ export interface WorkflowApi {
     prevDsl: StudioWorkflow;
     newDsl: StudioWorkflow;
   }): Promise<string>;
-
-  // -- the evaluators an archive preview names --------------------------------
-
-  listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
 
   // -- what the caller may see in a project other than the scoped one -------
 

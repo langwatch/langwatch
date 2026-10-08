@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Workflow application.
 
-Peers call these through the token, declared at `../contract/src/workflow.api.ts:172`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/workflow.api.ts:171`; nothing else in this package is public.
 
 #### `executeComponent`
 
@@ -56,12 +56,6 @@ getWithMigratedDsl(input: { workflowId: string; projectId: string; }): Promise<W
 assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
 ```
 
-#### `listFields`
-
-```typescript
-listFields(input: { projectId: string; workflowIds: string[]; }): Promise<Record<string, WorkflowMappingFields>>;
-```
-
 #### `listSummaries`
 
 ```typescript
@@ -84,12 +78,6 @@ deleteUncommitted(input: WorkflowReference): Promise<void>;
 
 ```typescript
 create(input: Omit<CreateWorkflowCommand, "authorId">, by: WorkflowCaller): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
-```
-
-#### `copy`
-
-```typescript
-copy(input: Omit<CopyWorkflowCommand, "authorId">, by: WorkflowCaller): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
 ```
 
 #### `copyFromPermittedSource`
@@ -254,12 +242,6 @@ A short commit message for the change between two graphs.
 
 ```typescript
 generateCommitMessage(input: { projectId: string; prevDsl: StudioWorkflow; newDsl: StudioWorkflow; }): Promise<string>;
-```
-
-#### `listEvaluators`
-
-```typescript
-listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
 ```
 
 #### `hasProjectPermission`
@@ -663,8 +645,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:618`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:619`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:612`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:613`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

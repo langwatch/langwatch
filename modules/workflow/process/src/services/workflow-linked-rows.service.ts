@@ -10,7 +10,7 @@ type WorkflowScope = Readonly<{ workflowId: string; projectId: string }>;
 type WorkflowLinkedRowsServiceOptions = {
   workflows: Pick<WorkflowService, "archive">;
   agents: Pick<AgentApi, "listWorkflowConfigs" | "getNamesByIds" | "archive">;
-  monitors: Pick<MonitorApi, "findByEvaluator">;
+  monitors: Pick<MonitorApi, "list">;
 };
 
 /**
@@ -20,7 +20,7 @@ type WorkflowLinkedRowsServiceOptions = {
  */
 export class WorkflowLinkedRowsService implements Pick<
   WorkflowLineageReads,
-  "listAgents" | "listMonitorsForEvaluators" | "cascadeArchive"
+  "listAgents" | "listMonitors" | "cascadeArchive"
 > {
   static create(options: WorkflowLinkedRowsServiceOptions): WorkflowLinkedRowsService {
     return new WorkflowLinkedRowsService(options);
@@ -40,19 +40,17 @@ export class WorkflowLinkedRowsService implements Pick<
     });
   }
 
-  async listMonitorsForEvaluators(input: {
-    projectId: string;
-    evaluatorIds: readonly string[];
-  }): Promise<readonly Readonly<{ id: string; name: string; evaluatorId: string }>[]> {
-    const perEvaluator = await Promise.all(
-      input.evaluatorIds.map(async (evaluatorId) =>
-        (
-          await this.options.monitors.findByEvaluator({ projectId: input.projectId, evaluatorId })
-        ).map(({ id, name }) => ({ id, name, evaluatorId })),
-      ),
-    );
+  /** The monitors the workflow's live evaluators back, which go when the evaluators do. */
+  async listMonitors(
+    input: WorkflowScope,
+  ): Promise<readonly Readonly<{ id: string; name: string; evaluatorId: string }>[]> {
+    const monitors = await this.options.monitors.list({ projectId: input.projectId });
 
-    return perEvaluator.flat();
+    return monitors.flatMap(({ id, name, evaluator }) =>
+      evaluator?.workflowId === input.workflowId && evaluator.archivedAt === null
+        ? [{ id, name, evaluatorId: evaluator.id }]
+        : [],
+    );
   }
 
   /** Restoring brings back the workflow only; its evaluators and agents stay archived. */

@@ -16126,9 +16126,6 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
