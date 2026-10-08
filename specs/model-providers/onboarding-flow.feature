@@ -284,6 +284,16 @@ Feature: Onboarding Flow
     Then exactly one provider write is sent
     And it carries the API key, the base URL and the scope the form chose
 
+  # The step's model select carries full model ids, so the save's check that the
+  # default model belongs to the provider being saved passes.
+  @integration
+  Scenario: A default chat model picked in the setup card saves with the provider
+    Given a new organization with no "openai" provider
+    When I pick a default chat model from the list, enter an API key and click "Save"
+    Then the provider is saved in one write
+    And that model becomes the default chat model
+
+
   @integration
   Scenario: No enabled provider is ever stored without its credentials
     Given a new organization with no "openai" provider

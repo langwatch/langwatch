@@ -462,6 +462,12 @@ describe("Feature: Langy prompts for a model when the project has none configure
         expect(useLangyStore.getState().pendingPrompt).toBe(
           "Set up my first evaluator",
         );
+        expect(
+          screen.getByText("Set up my first evaluator"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("Langy sends this once a model is set up."),
+        ).toBeInTheDocument();
 
         resolvedDefaultRef.current = {
           data: { model: "gpt-5-mini" },

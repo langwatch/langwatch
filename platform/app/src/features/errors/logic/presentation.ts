@@ -575,8 +575,10 @@ const presentations = {
   },
   instant_eval_opt_in_not_offered: {
     title: "Ask us to switch Instant Evals on",
-    describe: () =>
-      "LangWatch turns on Instant Evals for enterprise plans and self-hosted installs. Contact us to get them.",
+    describe: (error) =>
+      error.meta.deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",
@@ -4824,6 +4826,11 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
+    // A refused key has one fix, so the headline names it like the body does.
+    titleFor: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+        ? "This provider rejected the API key"
+        : undefined,
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";

@@ -29,6 +29,7 @@ const server = vi.hoisted(() => {
     data: { providers: {} as Record<string, unknown>, modelMetadata: {} },
     updates: [] as Array<Record<string, unknown>>,
     completedAfterWrites: [] as number[],
+    roleAssignments: [] as Array<Record<string, unknown>>,
     probes: [] as Array<Record<string, unknown>>,
     nextId: 1,
   };
@@ -46,6 +47,7 @@ const server = vi.hoisted(() => {
       state.data = { providers: {}, modelMetadata: {} };
       state.updates = [];
       state.completedAfterWrites = [];
+      state.roleAssignments = [];
       state.probes = [];
       state.nextId = 1;
     },
@@ -121,7 +123,12 @@ vi.mock("../../../../../../utils/api", () => {
   };
   const update = { mutateAsync: applyUpdate };
   const refetch = async () => undefined;
-  const setRole = { mutateAsync: async () => ({}) };
+  const setRole = {
+    mutateAsync: async (input: Record<string, unknown>) => {
+      server.state.roleAssignments.push(structuredClone(input));
+      return {};
+    },
+  };
   const validate = {
     mutateAsync: async (input: Record<string, unknown>) => {
       server.state.probes.push(structuredClone(input));
@@ -237,6 +244,24 @@ describe("Feature: saving a first provider from onboarding or the Langy gate", (
           },
           scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
         });
+      });
+
+      /** @scenario A default chat model picked in the setup card saves with the provider */
+      it("saves when a default chat model from that provider is picked", async () => {
+        renderSetup();
+        const picker = screen.getByRole("combobox");
+        const firstModel = Array.from(picker.querySelectorAll("option"))
+          .map((option) => option.value)
+          .find((value) => value !== "");
+        await userEvent.selectOptions(picker, firstModel ?? "");
+
+        await fillAndSave();
+
+        expect(firstModel).toMatch(/^openai\//);
+        expect(server.state.updates).toHaveLength(1);
+        expect(
+          server.state.roleAssignments.map((assignment) => assignment.model),
+        ).toContain(firstModel);
       });
 
       /** @scenario No enabled provider is ever stored without its credentials */

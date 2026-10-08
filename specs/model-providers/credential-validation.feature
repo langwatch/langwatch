@@ -642,7 +642,7 @@ Feature: Credential Validation
 
   @unit
   Scenario: An address the gateway will not call cannot pass the check
-    Given an "openai" provider whose endpoint lists models at "<base URL>/models" only
+    Given an "openai" provider whose endpoint lists models at "https://llm.acme.test/api/models" only
     When the API key is validated
     Then only the gateway's address is asked
     And the key is not reported as verified

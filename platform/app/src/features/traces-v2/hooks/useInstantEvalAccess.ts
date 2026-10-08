@@ -12,6 +12,11 @@ export interface InstantEvalAccess {
   isAvailable: boolean;
   /** What the popover offers a refused reader: the switch, or a word with us. */
   optInOffer: InstantEvalOptInOffer | undefined;
+  /**
+   * The install judges through LangWatch, so a judge that can't be reached
+   * may be the network, and the popover names the two addresses it needs.
+   */
+  viaConnect: boolean;
 }
 
 /**
@@ -44,5 +49,6 @@ export function useInstantEvalAccess({
       !!access.data?.released ||
       access.isLoading,
     optInOffer: access.data?.offer,
+    viaConnect: !!access.data?.viaConnect,
   };
 }

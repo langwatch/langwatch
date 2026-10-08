@@ -448,9 +448,11 @@ describe("explainHandledError", () => {
       "UNAUTHENTICATED",
       "PERMISSION_DENIED",
     ])("explains the provider's own %s code as a refused credential", (code) => {
-      const { description } = explainHandledError(
+      const { title, description } = explainHandledError(
         shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
       );
+
+      expect(title).toBe("This provider rejected the API key");
 
       expect(description).toBe(
         "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
@@ -965,6 +967,40 @@ describe("agent_payload_too_large", () => {
       );
 
       expect(description).toContain("The result is above the size limit");
+    });
+  });
+});
+
+describe("instant_eval_opt_in_not_offered", () => {
+  describe("when a self-hosted install is refused the switch", () => {
+    it("says the license, or the operator of an install with its own judge key, is what adds Instant Evals", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "self_hosted" },
+        }),
+      );
+
+      expect(description).toBe(
+        "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license.",
+      );
+    });
+  });
+
+  describe("when an enterprise organization is refused the switch", () => {
+    it("says LangWatch switches them on for the plan", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "enterprise" },
+        }),
+      );
+
+      expect(description).toBe(
+        "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+      );
     });
   });
 });
