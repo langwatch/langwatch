@@ -251,7 +251,14 @@ export class ProcessServer implements ProcessBoot {
       await this.running?.holdWork?.(!serving);
     };
     this.server.with(
-      upgradeGateComponent({ server: this.server.name, role, gate, logger, onServingChange }),
+      upgradeGateComponent({
+        server: this.server.name,
+        role,
+        gate,
+        logger,
+        onServingChange,
+        onHolding: (holding) => this.server.holdForUpgrade(holding),
+      }),
     );
   }
 

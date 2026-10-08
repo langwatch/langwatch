@@ -37,3 +37,23 @@ Feature: The liveness door holds browsers on a static page while an upgrade runs
     Given the liveness thread was holding for an upgrade
     When the hold is lifted
     Then a request is proxied to the main thread again
+
+  @unit
+  Scenario: A WebSocket upgrade is refused while an upgrade holds the door
+    Given the liveness thread is holding for an upgrade
+    When a client asks to upgrade a connection to a WebSocket
+    Then it answers 503 with a Retry-After header
+    And the main thread never sees the connection
+
+  @unit
+  Scenario: The holding page names only the phase when no step is outstanding
+    Given an upgrade with no outstanding step ids
+    When the holding page is rendered
+    Then it names the phase and shows no step list
+
+  @unit
+  Scenario: A waiting upgrade gate holds the door until it admits the process
+    Given a process whose liveness thread is open and whose upgrade gate has not answered
+    When a browser requests a page
+    Then it sees the holding page naming the upgrade-gate phase
+    And once the gate admits the process the request reaches the main thread

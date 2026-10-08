@@ -13,6 +13,7 @@ import {
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
+  type UpgradeHolding,
 } from "./lifecycle/liveness-thread.ts";
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
@@ -204,6 +205,15 @@ export class Server {
   openLiveness(): Promise<void> {
     this.livenessOffLoop = true;
     return this.openHealth();
+  }
+
+  /**
+   * Answers every request but the probes with the upgrade holding page until called with
+   * `undefined`. A door on the main loop has no thread to hold it.
+   * Spec: upgrade-holding-page.feature
+   */
+  async holdForUpgrade(holding: UpgradeHolding | undefined): Promise<void> {
+    await this.livenessThread?.hold(holding);
   }
 
   private openHealth(): Promise<void> {

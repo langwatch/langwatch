@@ -4,6 +4,7 @@
  * `@langwatch/upgrade/gate` answers it. Spec: specs/upgrade/serving-gate.feature.
  */
 import type { ServerRole } from "../feature-installer.ts";
+import type { UpgradeHolding } from "../lifecycle/liveness-thread.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
@@ -68,9 +69,9 @@ export function assertGatedRole(role: string): asserts role is UpgradeGatedRole 
 }
 
 /**
- * Hosted by the preamble, so it starts after boot and before the application runtime, and stops
- * after it: the roster entry outlives the last write. A refusal, or an unanswering gate, throws.
- * Once admitted, a lapse fails readiness and `onServingChange` hears each turn (round 22).
+ * Hosted by the preamble: starts after boot and before the application runtime, stops after it.
+ * A refusal, or an unanswering gate, throws; once admitted, a lapse fails readiness and
+ * `onServingChange` hears each turn (round 22). `onHolding` holds the upgrading page (Q-U4).
  */
 export function upgradeGateComponent({
   server,
@@ -78,6 +79,7 @@ export function upgradeGateComponent({
   gate,
   logger,
   onServingChange,
+  onHolding,
   pollEveryMs = UPGRADE_GATE_SERVING_POLL_MS,
 }: {
   server: string;
@@ -85,6 +87,7 @@ export function upgradeGateComponent({
   gate: UpgradeGate;
   logger: ServerLogger;
   onServingChange?: (serving: boolean) => void | Promise<void>;
+  onHolding?: (holding: UpgradeHolding | undefined) => Promise<void>;
   pollEveryMs?: number;
 }): ServerComponent {
   let admitted = false;
@@ -112,11 +115,15 @@ export function upgradeGateComponent({
         `${server} (${role}): checking the upgrade ledger before serving`,
       );
       let verdict: UpgradeGateVerdict;
+      // Only the gate's phase: its steps are behind `admit`, and a refusal's text is never shown.
+      await onHolding?.({ phase: GATE_PHASE, outstandingStepIds: [] });
       try {
         verdict = await gate.admit();
       } catch (error) {
         const cause = `the upgrade ledger could not be read (DATABASE_URL): ${messageOf(error)}`;
         return refuse(cause, LEDGER_UNREADABLE_NEXT);
+      } finally {
+        await onHolding?.(undefined);
       }
       if (!verdict.admitted) return refuse(verdict.refusal, REFUSED_NEXT);
       admitted = true;

@@ -1,5 +1,5 @@
 import http from "node:http";
-import type { AddressInfo } from "node:net";
+import net, { type AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -93,6 +93,33 @@ describe("the upgrade holding page", () => {
       });
     });
 
+    describe("when a client asks to upgrade to a WebSocket", () => {
+      /** @scenario "A WebSocket upgrade is refused while an upgrade holds the door" */
+      it("answers 503 with a retry header and never reaches the main thread", async () => {
+        const onProxied = vi.fn();
+        const thread = await bootThread({ onProxied });
+        await thread.hold(holding);
+
+        const reply = await new Promise<string>((resolve, reject) => {
+          const socket = net.connect({ host: "127.0.0.1", port: thread.address.port }, () =>
+            socket.write(
+              "GET /api/stream HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\n" +
+                "Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+            ),
+          );
+          let received = "";
+          socket.on("data", (chunk) => (received += chunk.toString()));
+          socket.on("close", () => resolve(received));
+          socket.on("error", reject);
+        });
+
+        expect(reply.startsWith("HTTP/1.1 503")).toBe(true);
+        expect(reply).toContain("Retry-After: 10");
+        expect(onProxied).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the kubelet probes liveness", () => {
       /** @scenario "Liveness still answers while an upgrade holds the door" */
       it("answers 200", async () => {
@@ -121,6 +148,17 @@ describe("the upgrade holding page", () => {
         expect(await response.text()).toBe("main");
         expect(onProxied).toHaveBeenCalledOnce();
       });
+    });
+  });
+
+  describe("given an upgrade with no outstanding step ids", () => {
+    /** @scenario "The holding page names only the phase when no step is outstanding" */
+    it("renders the phase and no step list", () => {
+      const page = renderUpgradeHoldingPage({ phase: "upgrade-gate", outstandingStepIds: [] });
+
+      expect(page).toContain("<strong>upgrade-gate</strong>");
+      expect(page).not.toContain("Outstanding steps");
+      expect(page).not.toContain("<ul>");
     });
   });
 

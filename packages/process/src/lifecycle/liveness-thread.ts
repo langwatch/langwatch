@@ -123,6 +123,10 @@ const server = http.createServer((req, res) => {
   req.pipe(upstream);
 });
 server.on("upgrade", (req, socket, head) => {
+  if (holdingPage !== null) {
+    socket.end("HTTP/1.1 503 Service Unavailable\\r\\nRetry-After: " + workerData.retryAfterSeconds + "\\r\\nConnection: close\\r\\nContent-Length: 0\\r\\n\\r\\n");
+    return;
+  }
   const upstream = net.connect(target, () => {
     let lines = req.method + " " + req.url + " HTTP/" + req.httpVersion + "\\r\\n";
     for (let i = 0; i < req.rawHeaders.length; i += 2) {
