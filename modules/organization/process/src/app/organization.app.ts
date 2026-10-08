@@ -125,7 +125,6 @@ import {
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
@@ -171,8 +170,6 @@ import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
-import { OrganizationCeremonyService } from "../services/organization-ceremony.service.ts";
-import type { OrganizationCeremony } from "../services/organization-ceremony.service.ts";
 import { OrganizationDirectoryService } from "../services/organization-directory.service.ts";
 import type { OrganizationDirectory } from "../services/organization-directory.service.ts";
 import { OrganizationGrantCeilingService } from "../services/organization-grant-ceiling.service.ts";
@@ -289,7 +286,6 @@ export type OrganizationInfrastructure = Readonly<{
   seatLimits: SeatLimitNoticeService;
   /** Where a sign-up, an invitation batch and an acceptance are recorded (§9). */
   lifecycle: OrganizationLifecycleNoticeService;
-  ceremony: OrganizationCeremony;
   directory: OrganizationDirectory;
   /** The demo organization's person and project, or empty strings when unset. */
   demoProject: OrganizationDemoProject;
@@ -314,7 +310,6 @@ const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
 export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
-    projects: ProjectApi,
     permissions: AuthzApi,
     users: UserApi,
     apiKeys: ApiKeyApi,
@@ -426,7 +421,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
     application.#joinRequests = infrastructure.joinRequests;
     application.#initialization = OrganizationInitializationService.create({
-      ceremony: infrastructure.ceremony,
       signals: infrastructure.signals,
       lifecycle: infrastructure.lifecycle,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
@@ -511,7 +505,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       lifecycle: OrganizationLifecycleNoticeService.create({
         reportError: (error) => signals.reportError(error),
       }),
-      ceremony: OrganizationCeremonyService.create({ projects: dependencies.projects }),
       directory: OrganizationDirectoryService.create({
         identity: dependencies.identity,
         userDirectory,
@@ -1920,7 +1913,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   initializeOrganization(
     input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
-  ): Promise<OrganizationInitialized> {
+  ): Promise<Omit<OrganizationInitialized, "projectSlug">> {
     return this.#initialization.initialize(input, by);
   }
 

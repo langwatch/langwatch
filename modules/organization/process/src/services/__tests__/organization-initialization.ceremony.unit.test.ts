@@ -8,7 +8,6 @@ import type { OnboardingInitializeOrganizationInput } from "@langwatch/onboardin
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { OrganizationCeremony } from "../organization-ceremony.service.ts";
 import { OrganizationInitializationService } from "../organization-initialization.service.ts";
 import type { OrganizationSignals } from "../organization-signals.service.ts";
 
@@ -28,14 +27,9 @@ function request(
 }
 
 function harness(
-  overrides: Partial<OrganizationCeremony & OrganizationSignals> = {},
+  overrides: Partial<OrganizationSignals> = {},
   createAndAssign = vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM })),
 ) {
-  const ceremony = {
-    createProject: vi.fn(async () => ({ success: true, projectSlug: "acme-project" })),
-    ...overrides,
-  };
-
   const signals = {
     trackServerEvent: vi.fn(),
     sendSlackSignupEvent: vi.fn(async () => undefined),
@@ -48,13 +42,11 @@ function harness(
   const lifecycle = { signedUp: vi.fn(), integrationMethodChosen: vi.fn() };
 
   return {
-    ceremony,
     signals,
     lifecycle,
     createAndAssign,
     ensurePersonalWorkspace,
     onboarding: OrganizationInitializationService.create({
-      ceremony,
       signals,
       lifecycle,
       createAndAssign,
@@ -67,16 +59,6 @@ function harness(
 
 describe("given a customer who declared no intent", () => {
   describe("when the ceremony runs", () => {
-    it("names the first project after the organization's own team", async () => {
-      const { onboarding, ceremony } = harness();
-
-      await onboarding.initialize(request(), CALLER);
-
-      expect(ceremony.createProject).toHaveBeenCalledWith(
-        expect.objectContaining({ name: TEAM.name, language: "other", framework: "other" }),
-      );
-    });
-
     it("provisions no personal workspace", async () => {
       const { onboarding, ensurePersonalWorkspace } = harness();
 
@@ -84,42 +66,11 @@ describe("given a customer who declared no intent", () => {
 
       expect(ensurePersonalWorkspace).not.toHaveBeenCalled();
     });
-
-    it("refuses by name when the first project cannot be created", async () => {
-      const { onboarding } = harness({
-        createProject: vi.fn(async () => ({ success: false, projectSlug: "" })),
-      });
-
-      await expect(onboarding.initialize(request(), CALLER)).rejects.toMatchObject({
-        code: "project_creation_failed",
-      });
-    });
   });
 });
 
 describe("given a customer who declared the coding-agent intent", () => {
   describe("when the ceremony runs", () => {
-    /** @scenario "Governance signup creates organization and team, but no shared project" */
-    it("skips the shared project and answers a null project slug", async () => {
-      const { onboarding, ceremony } = harness();
-
-      const result = await onboarding.initialize(
-        request({
-          orgName: "Acme Corp",
-          primaryIntent: "AGENT_GOVERNANCE",
-          projectName: "Acme Project",
-        }),
-        CALLER,
-      );
-
-      expect(ceremony.createProject).not.toHaveBeenCalled();
-      expect(result).toMatchObject({
-        success: true,
-        organizationId: ORGANIZATION.id,
-        projectSlug: null,
-      });
-    });
-
     /** @scenario "Governance signup provisions the personal workspace" */
     it("provisions the signer's own personal workspace", async () => {
       const { onboarding, ensurePersonalWorkspace } = harness();
@@ -163,16 +114,6 @@ describe("given a customer who declared the coding-agent intent", () => {
 
 describe("given a customer who declared the LLM-app intent", () => {
   describe("when the ceremony runs", () => {
-    /** @scenario "LLMOps signup still creates the default project" */
-    it("still creates the default project", async () => {
-      const { onboarding, ceremony } = harness();
-
-      const result = await onboarding.initialize(request({ primaryIntent: "LLM_OPS" }), CALLER);
-
-      expect(ceremony.createProject).toHaveBeenCalledTimes(1);
-      expect(result.projectSlug).toBe("acme-project");
-    });
-
     /** @scenario "LLMOps signup provisions no personal workspace" */
     it("provisions no personal workspace", async () => {
       const { onboarding, ensurePersonalWorkspace } = harness();

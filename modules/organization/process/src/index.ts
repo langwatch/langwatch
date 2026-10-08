@@ -63,7 +63,6 @@ export {
 } from "./transport/organization.trpc.ts";
 export { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
 export { teamTrpcTransport } from "./transport/team.trpc.ts";
-export type { OrganizationCeremony } from "./services/organization-ceremony.service.ts";
 export type { OrganizationDemoProject } from "./services/organization-visibility.service.ts";
 export type { OrganizationDirectory } from "./services/organization-directory.service.ts";
 export type {

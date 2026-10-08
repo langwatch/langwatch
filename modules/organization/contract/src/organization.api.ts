@@ -833,7 +833,7 @@ export interface OrganizationApi {
   initializeOrganization(
     input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
-  ): Promise<OrganizationInitialized>;
+  ): Promise<Omit<OrganizationInitialized, "projectSlug">>;
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void;
 
   readPersonalWorkspaceFeatures(

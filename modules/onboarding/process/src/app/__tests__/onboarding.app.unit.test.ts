@@ -8,6 +8,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
  * guided-onboarding read and write. Binds the `@integration` scenarios over
  * a memory fixture of `OrganizationApi`, pending its process-side read/write.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
+ * @see specs/features/onboarding/intent-fork.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -19,7 +20,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
-import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
+import { ProjectNotFoundError, type Project, type ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -41,12 +42,43 @@ const INITIALIZED: OrganizationInitialized = {
   organizationId: ORGANIZATION_ID,
   projectSlug: "acme-project",
 };
+const FIRST_PROJECT: Project = {
+  id: PROJECT_ID,
+  name: "ACME",
+  slug: "acme-project",
+  apiKey: "sk-lw-test",
+  lwqlKey: "lwql-test",
+  teamId: "team_1",
+  language: "python",
+  framework: "other",
+  kind: "application",
+  firstMessage: false,
+  integrated: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: null,
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+};
 
 function buildApp(
   options: {
     permitted?: boolean;
     publicGatewayUrl?: string;
     record?: GuidedOnboardingRecord;
+    projectFailure?: Error;
   } = {},
 ) {
   let record: GuidedOnboardingRecord = options.record ?? {
@@ -61,6 +93,10 @@ function buildApp(
   });
   const initializeOrganization = vi.fn(async () => INITIALIZED);
   const recordIntegrationMethod = vi.fn();
+  const createProject = vi.fn(async () => {
+    if (options.projectFailure) throw options.projectFailure;
+    return FIRST_PROJECT;
+  });
 
   const app = OnboardingModule.create({
     dependencies: {
@@ -86,6 +122,7 @@ function buildApp(
           if (projectId !== PROJECT_ID) throw new ProjectNotFoundError();
           return ORGANIZATION_ID;
         },
+        create: createProject,
       }),
       workflows: createApiFixture<WorkflowApi>({}),
       dashboards: createApiFixture<DashboardApi>({}),
@@ -108,6 +145,7 @@ function buildApp(
     writeGuidedOnboardingState,
     initializeOrganization,
     recordIntegrationMethod,
+    createProject,
   };
 }
 
@@ -220,6 +258,63 @@ describe("OnboardingModule", () => {
       },
       caller,
     );
+  });
+
+  /** @scenario "LLMOps signup still creates the default project" */
+  it("creates the first project after the organization, named after its team", async () => {
+    const { app, createProject } = buildApp();
+    const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+
+    const initialized = await app.initializeOrganization(
+      { orgName: "ACME", primaryIntent: "LLM_OPS", language: "python", framework: "other" },
+      caller,
+    );
+
+    expect(createProject).toHaveBeenCalledWith(
+      {
+        organizationId: ORGANIZATION_ID,
+        teamId: INITIALIZED.teamId,
+        name: INITIALIZED.teamName,
+        language: "python",
+        framework: "other",
+      },
+      { id: USER_ID },
+    );
+    expect(initialized.projectSlug).toBe(FIRST_PROJECT.slug);
+  });
+
+  /** @scenario "Governance signup creates organization and team, but no shared project" */
+  it("skips the shared project and answers a null project slug", async () => {
+    const { app, createProject } = buildApp();
+    const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+
+    const initialized = await app.initializeOrganization(
+      {
+        orgName: "ACME",
+        primaryIntent: "AGENT_GOVERNANCE",
+        projectName: "Acme Project",
+        language: "other",
+        framework: "other",
+      },
+      caller,
+    );
+
+    expect(createProject).not.toHaveBeenCalled();
+    expect(initialized).toMatchObject({ organizationId: ORGANIZATION_ID, projectSlug: null });
+  });
+
+  it("refuses with the project's own error once the organization is signed up", async () => {
+    const failure = new Error("project store down");
+    const { app, initializeOrganization } = buildApp({ projectFailure: failure });
+    const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+
+    await expect(
+      app.initializeOrganization(
+        { orgName: "ACME", language: "other", framework: "other" },
+        caller,
+      ),
+    ).rejects.toBe(failure);
+    expect(initializeOrganization).toHaveBeenCalledTimes(1);
   });
 
   it("forwards the picked integration method to the organization module", () => {

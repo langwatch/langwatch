@@ -5,7 +5,6 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { ResourceScope } from "@langwatch/process";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -33,7 +32,6 @@ export function organizationModuleSetup(
   const { memory = MemoryOrganizationDatabase.create() } = peers;
   return {
     dependencies: {
-      projects: peers.projects ?? createApiFixture<ProjectApi>({}, "ProjectApi"),
       permissions: peers.permissions ?? createApiFixture<AuthzApi>({}, "AuthzApi"),
       users: peers.users ?? createApiFixture<UserApi>({}, "UserApi"),
       apiKeys: peers.apiKeys ?? createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),

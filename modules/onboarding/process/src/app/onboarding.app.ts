@@ -45,7 +45,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     permissions: AuthzApi,
     /** Where an app on this instance points; the gateway owns the address. */
     gateway: GatewayApi,
-    /** The project-to-organization hop a project-scoped read resolves through. */
+    /** The project-to-organization hop, and the sign-up's first project. */
     projects: ProjectApi,
     /** The owners the setup checklist asks for each of its figures. */
     workflows: WorkflowApi,
@@ -65,7 +65,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     OrganizationApi,
     "initializeOrganization" | "recordIntegrationMethod"
   >;
-  readonly #projects: Pick<ProjectApi, "getOrganizationId">;
+  readonly #projects: Pick<ProjectApi, "getOrganizationId" | "create">;
   readonly #lifecycle: GuidedOnboardingLifecyclePipeline;
   readonly #senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> };
 
@@ -75,7 +75,7 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     permissions: AuthzApi;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
     organizations: Pick<OrganizationApi, "initializeOrganization" | "recordIntegrationMethod">;
-    projects: Pick<ProjectApi, "getOrganizationId">;
+    projects: Pick<ProjectApi, "getOrganizationId" | "create">;
     lifecycle: GuidedOnboardingLifecyclePipeline;
     senders: { commands?: EventingCommands<GuidedOnboardingLifecyclePipeline> };
   }) {
@@ -229,18 +229,32 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
     });
   }
 
-  initializeOrganization(
+  async initializeOrganization(
     input: OnboardingInitializeOrganizationInput,
     by: OnboardingSignUpCaller,
   ): Promise<OrganizationInitialized> {
     const { onboardingVariant, ...rest } = input;
-    if (onboardingVariant === undefined)
-      return this.#organizations.initializeOrganization(rest, by);
-
-    return this.#organizations.initializeOrganization(
-      { ...rest, signUpData: { ...rest.signUpData, onboardingVariant } },
+    const initialized = await this.#organizations.initializeOrganization(
+      onboardingVariant === undefined
+        ? rest
+        : { ...rest, signUpData: { ...rest.signUpData, onboardingVariant } },
       by,
     );
+    // A null slug lands the coding-agent track on its personal portal (ADR-038 v6).
+    if (input.primaryIntent === "AGENT_GOVERNANCE") return { ...initialized, projectSlug: null };
+
+    const project = await this.#projects.create(
+      {
+        organizationId: initialized.organizationId,
+        teamId: initialized.teamId,
+        // The organization's own team names the project when the customer did not.
+        name: input.projectName ?? initialized.teamName,
+        language: input.language,
+        framework: input.framework,
+      },
+      { id: by.id },
+    );
+    return { ...initialized, projectSlug: project.slug };
   }
 
   recordIntegrationMethod(input: { userId: string; selection: string }): void {
