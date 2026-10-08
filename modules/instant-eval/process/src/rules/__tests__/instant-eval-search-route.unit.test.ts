@@ -80,6 +80,7 @@ describe("given the classifier's input", () => {
       expect(question.options.map((option) => option.name)).toEqual(["filter", "free_text"]);
     });
 
+    /** @scenario "A sentence about what the agent did is offered to the classifier as a judgement" */
     it("offers what the agent did as a judgement, not as a phrase", () => {
       const options = new Map(
         buildRouteQuestion({ isLangyAvailable: true, isInstantEvalAvailable: true }).options.map(

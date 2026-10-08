@@ -65,9 +65,9 @@ export const routeSearchInputSchema = z.object({
   lensId: z.string().max(200).optional(),
   /** Whether the assistant route is open to this user. Defaults to true. */
   isLangyAvailable: z.boolean().optional(),
-  /** The route Instant Eval's classifier answered; absent when it had none. */
+  /** The route Instant Eval's classifier answered; absent, the model decides and builds. */
   classified: z.enum(SEARCH_ROUTE_KINDS).optional(),
-  /** Whether Instant Evals are open to this project, as Instant Eval's door said. */
+  /** Whether Instant Evals are open to this project, as Instant Eval's door said; absent, false. */
   isInstantEvalAvailable: z.boolean().optional(),
 });
 

@@ -17,7 +17,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { TraceSearchRouterService } from "../trace-search-router.service.ts";
-import { answering, deps, input } from "./trace-search-router.harness.ts";
+import { deps, input } from "./trace-search-router.harness.ts";
 
 /** A provider failure as the AI composer raises it, meta and all. */
 class ProviderFailed extends HandledError {
@@ -49,12 +49,17 @@ describe("given a route that degraded", () => {
     /** @scenario "A provider failure is logged curated, never raw" */
     it("names the code, the model, the provider and the status in the message", async () => {
       const d = deps({
-        classifier: answering("instant_eval"),
         buildQuestion: vi.fn(async () => {
           throw new ProviderFailed();
         }),
       });
-      await TraceSearchRouterService.create(d).route(input({ text: "frustrated users" }));
+      await TraceSearchRouterService.create(d).route(
+        input({
+          text: "frustrated users",
+          classified: "instant_eval",
+          isInstantEvalAvailable: true,
+        }),
+      );
       expect(warnedMessages()).toEqual([
         "Instant Eval question could not be written; judging the sentence as typed (ai_query_provider_error openai/gpt-5-mini openai HTTP 429)",
       ]);
@@ -63,12 +68,11 @@ describe("given a route that degraded", () => {
     /** @scenario "A provider failure is logged curated, never raw" */
     it("carries nothing the provider itself wrote", async () => {
       const d = deps({
-        classifier: answering("filter"),
         buildFilter: vi.fn(async () => {
           throw new ProviderFailed();
         }),
       });
-      await TraceSearchRouterService.create(d).route(input());
+      await TraceSearchRouterService.create(d).route(input({ classified: "filter" }));
       // The handled message is ours, but it is copy: the log reads the code
       // and the curated fields, never the sentence.
       expect(warnedMessages().join("\n")).not.toContain("did not answer usably");
@@ -79,12 +83,11 @@ describe("given a route that degraded", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
     it("names the error's type, since it has no curated fields", async () => {
       const d = deps({
-        classifier: answering("filter"),
         buildFilter: vi.fn(async () => {
           throw new TypeError("fetch failed against https://api.example.com");
         }),
       });
-      await TraceSearchRouterService.create(d).route(input());
+      await TraceSearchRouterService.create(d).route(input({ classified: "filter" }));
       const messages = warnedMessages();
       expect(messages).toEqual([
         "Filter route could not be built; searching the phrase instead (TypeError)",
@@ -93,11 +96,10 @@ describe("given a route that degraded", () => {
     });
   });
 
-  describe("when the deployment has no classifier and the model decides", () => {
+  describe("when the browser brought no classification and the model decides", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
     it("names the cause on that path too", async () => {
       const d = deps({
-        classifier: null,
         routeWithModel: vi.fn(async () => {
           throw new ProviderFailed();
         }),

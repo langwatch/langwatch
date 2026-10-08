@@ -1,18 +1,14 @@
 /**
- * The stub classifier, stub builders and inputs the search-router tests share.
+ * The stub builders and inputs the search-router tests share.
  * Not a test file: it holds no assertions, only the world the tests beside it
  * put the router in.
  */
 
 import { HandledError } from "@langwatch/handled-error";
-import type { RouteSearchInput, SearchRouteKind } from "@langwatch/trace-contract";
+import type { RouteSearchInput } from "@langwatch/trace-contract";
 import { vi, type Mock } from "vitest";
 
-import type {
-  TraceSearchClassification,
-  TraceSearchClassifyRequest,
-  TraceSearchRouterDeps,
-} from "../trace-search-router.service.ts";
+import type { TraceSearchRouterDeps } from "../trace-search-router.service.ts";
 
 export const RANGE = { from: 1_000_000, to: 1_000_000 + 24 * 3_600_000 };
 
@@ -23,16 +19,6 @@ export const input = (overrides: Partial<RouteSearchInput> = {}): RouteSearchInp
   activeQuery: "",
   ...overrides,
 });
-
-export function answering(label: SearchRouteKind | null) {
-  const classify = vi.fn(
-    async (_request: TraceSearchClassifyRequest): Promise<TraceSearchClassification> =>
-      label
-        ? { verdicts: [{ questionId: "route", label }] }
-        : { verdicts: [], skippedReason: "classifier_rate_limited" },
-  );
-  return { classify };
-}
 
 export class ProviderDisabled extends HandledError {
   declare readonly code: "model_provider_disabled";
@@ -62,7 +48,6 @@ export function deps(
   overrides: Partial<Omit<TraceSearchRouterDeps, "recordDecision">> = {},
 ): TraceSearchRouterDeps & { recordDecision: Mock<TraceSearchRouterDeps["recordDecision"]> } {
   return {
-    classifier: null,
     buildFilter: vi.fn(async () => ({
       ok: true as const,
       kind: "apply_query" as const,
@@ -78,7 +63,6 @@ export function deps(
       evaluators: ["ragas/faithfulness"],
       events: ["thumbs_up_down"],
     })),
-    isInstantEvalReleased: vi.fn(async () => true),
     recordDecision: vi.fn<TraceSearchRouterDeps["recordDecision"]>(),
     ...overrides,
   };

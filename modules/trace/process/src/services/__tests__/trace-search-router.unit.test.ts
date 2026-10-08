@@ -1,8 +1,9 @@
 /**
- * The decision table with a classifier that answers: the four routes, the
- * merge of explicit terms, and what each falls back to.
- * Spec: specs/traces-v2/search.feature
+ * The decision table given the classification the browser brought from
+ * Instant Eval: the four routes, the merge of explicit terms, and what each
+ * falls back to. Spec: specs/traces-v2/search.feature
  */
+import type { RouteSearchInput, SearchRouteKind } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,7 +11,6 @@ import {
   type TraceSearchRouterDeps,
 } from "../trace-search-router.service.ts";
 import {
-  answering,
   deps,
   input,
   NoModel,
@@ -21,32 +21,41 @@ import {
 
 const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(deps);
 
+/** A submit Instant Eval's door classified, with the judgement route open. */
+const classifiedAs = (
+  classified: SearchRouteKind,
+  overrides: Partial<RouteSearchInput> = {},
+): RouteSearchInput => input({ classified, isInstantEvalAvailable: true, ...overrides });
+
 describe("given a text with only field:value terms", () => {
   describe("when routed", () => {
     it("answers a filter as typed without asking anyone", async () => {
-      const classifier = answering("langy");
-      const d = deps({ classifier });
+      const d = deps();
 
-      const result = await router(d).route(input({ text: "status:error AND model:gpt-5-mini" }));
+      const result = await router(d).route(
+        classifiedAs("langy", { text: "status:error AND model:gpt-5-mini" }),
+      );
 
       expect(result).toEqual({
         kind: "filter",
         query: "status:error AND model:gpt-5-mini",
         decidedBy: "fallback",
       });
-      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(d.buildFilter).not.toHaveBeenCalled();
       expect(d.routeWithModel).not.toHaveBeenCalled();
     });
   });
 });
 
-describe("given the classifier is configured", () => {
+describe("given the browser brings Instant Eval's classification", () => {
   describe("when it answers filter", () => {
     /** @scenario "A sentence the filter language can express becomes chips" */
     it("builds the filter with the composer's builder and merges the explicit terms", async () => {
-      const d = deps({ classifier: answering("filter") });
+      const d = deps();
 
-      const result = await router(d).route(input({ text: "errors from gpt-4 service:checkout" }));
+      const result = await router(d).route(
+        classifiedAs("filter", { text: "errors from gpt-4 service:checkout" }),
+      );
 
       expect(result).toEqual({
         kind: "filter",
@@ -64,7 +73,6 @@ describe("given the classifier is configured", () => {
     /** @scenario "A filter the model could not write becomes a phrase search" */
     it("falls through to the phrase when the model answers an empty query", async () => {
       const d = deps({
-        classifier: answering("filter"),
         buildFilter: vi.fn(async () => ({
           ok: true as const,
           kind: "apply_query" as const,
@@ -72,7 +80,7 @@ describe("given the classifier is configured", () => {
         })),
       });
 
-      const result = await router(d).route(input());
+      const result = await router(d).route(classifiedAs("filter"));
 
       expect(result).toEqual({
         kind: "free_text",
@@ -84,13 +92,12 @@ describe("given the classifier is configured", () => {
 
     it("falls through to the phrase when the builder throws, flagging a missing model", async () => {
       const d = deps({
-        classifier: answering("filter"),
         buildFilter: vi.fn(async () => {
           throw new NoModel();
         }),
       });
 
-      const result = await router(d).route(input());
+      const result = await router(d).route(classifiedAs("filter"));
 
       expect(result).toMatchObject({
         kind: "free_text",
@@ -104,13 +111,12 @@ describe("given the classifier is configured", () => {
     /** @scenario "A classified route that finds the provider disabled says a model is unavailable" */
     it("searches the phrase and says a model is unavailable", async () => {
       const d = deps({
-        classifier: answering("filter"),
         buildFilter: vi.fn(async () => {
           throw new ProviderDisabled();
         }),
       });
 
-      const result = await router(d).route(input({ text: "failing calls" }));
+      const result = await router(d).route(classifiedAs("filter", { text: "failing calls" }));
 
       expect(result).toEqual({
         kind: "free_text",
@@ -125,10 +131,13 @@ describe("given the classifier is configured", () => {
   describe("when it answers instant_eval", () => {
     /** @scenario "A sentence that needs a judgement becomes an Instant Eval question" */
     it("returns the judge question, the target from the lens and the phrase fallback", async () => {
-      const d = deps({ classifier: answering("instant_eval") });
+      const d = deps();
 
       const result = await router(d).route(
-        input({ text: "annoyed users status:error", lensId: "conversations" }),
+        classifiedAs("instant_eval", {
+          text: "annoyed users status:error",
+          lensId: "conversations",
+        }),
       );
 
       expect(result).toEqual({
@@ -151,9 +160,9 @@ describe("given the classifier is configured", () => {
     });
 
     it("judges traces on every lens but Conversations", async () => {
-      const d = deps({ classifier: answering("instant_eval") });
+      const d = deps();
 
-      const result = await router(d).route(input({ lensId: "all-traces" }));
+      const result = await router(d).route(classifiedAs("instant_eval", { lensId: "all-traces" }));
 
       expect(result).toMatchObject({ kind: "instant_eval", target: "traces" });
     });
@@ -161,12 +170,13 @@ describe("given the classifier is configured", () => {
     /** @scenario "A judge question no model could write is judged as typed" */
     it("judges the sentence as typed when the question cannot be written", async () => {
       const d = deps({
-        classifier: answering("instant_eval"),
         buildQuestion: vi.fn(async () => {
           throw new ProviderError();
         }),
       });
-      const result = await router(d).route(input({ text: "frustrated users status:error" }));
+      const result = await router(d).route(
+        classifiedAs("instant_eval", { text: "frustrated users status:error" }),
+      );
       expect(result).toEqual({
         kind: "instant_eval",
         question: { instructions: "frustrated users" },
@@ -186,12 +196,13 @@ describe("given the classifier is configured", () => {
     /** @scenario "A project with no model still judges the sentence" */
     it("names the missing model when there is none to write the question", async () => {
       const d = deps({
-        classifier: answering("instant_eval"),
         buildQuestion: vi.fn(async () => {
           throw new NoModel();
         }),
       });
-      const result = await router(d).route(input({ text: "frustrated users" }));
+      const result = await router(d).route(
+        classifiedAs("instant_eval", { text: "frustrated users" }),
+      );
       expect(result).toMatchObject({
         kind: "instant_eval",
         question: { instructions: "frustrated users" },
@@ -202,7 +213,6 @@ describe("given the classifier is configured", () => {
     /** @scenario "An existing evaluator answers the judgement as a filter" */
     it("returns a filter with the reason when an existing evaluator answers it", async () => {
       const d = deps({
-        classifier: answering("instant_eval"),
         buildQuestion: vi.fn(async () => ({
           kind: "filter" as const,
           query: "evaluator:ragas/faithfulness AND evaluatorVerdict:fail",
@@ -210,7 +220,9 @@ describe("given the classifier is configured", () => {
         })),
       });
 
-      const result = await router(d).route(input({ text: "hallucinated answers" }));
+      const result = await router(d).route(
+        classifiedAs("instant_eval", { text: "hallucinated answers" }),
+      );
 
       expect(result).toEqual({
         kind: "filter",
@@ -224,10 +236,10 @@ describe("given the classifier is configured", () => {
   describe("when it answers free_text", () => {
     /** @scenario "A literal phrase is searched as one phrase" */
     it("quotes the sentence and merges the explicit terms", async () => {
-      const d = deps({ classifier: answering("free_text") });
+      const d = deps();
 
       const result = await router(d).route(
-        input({ text: "cannot connect to database service:api" }),
+        classifiedAs("free_text", { text: "cannot connect to database service:api" }),
       );
 
       expect(result).toEqual({
@@ -243,9 +255,11 @@ describe("given the classifier is configured", () => {
   describe("when it answers langy", () => {
     /** @scenario "A question for the assistant goes to Langy with the view attached" */
     it("hands the whole typed text over as the question", async () => {
-      const d = deps({ classifier: answering("langy") });
+      const d = deps();
 
-      const result = await router(d).route(input({ text: "why did errors spike this morning" }));
+      const result = await router(d).route(
+        classifiedAs("langy", { text: "why did errors spike this morning" }),
+      );
 
       expect(result).toEqual({
         kind: "langy",
@@ -253,54 +267,27 @@ describe("given the classifier is configured", () => {
         decidedBy: "classifier",
       });
     });
-
-    it("never offers the Langy option when Langy is not available", async () => {
-      const classifier = answering("free_text");
-
-      await router(deps({ classifier })).route(input({ isLangyAvailable: false }));
-
-      const question = classifier.classify.mock.calls[0]?.[0]?.questions[0];
-      expect(question?.kind).toBe("category");
-      expect(question?.options.map((option) => option.name)).toEqual([
-        "filter",
-        "instant_eval",
-        "free_text",
-      ]);
-    });
   });
+});
 
-  describe("when Instant Evals are not released for the project", () => {
+describe("given Instant Evals are not available to the project", () => {
+  describe("when the classification answers instant_eval", () => {
     /** @scenario "With Instant Evals not released for the project the router does not offer the judgement route" */
-    it("asks the classifier without the instant_eval option", async () => {
-      const classifier = answering("free_text");
+    it("searches it as a filter, never as an Instant Eval", async () => {
+      const d = deps();
 
-      await router(deps({ classifier, isInstantEvalReleased: vi.fn(async () => false) })).route(
-        input(),
+      const result = await router(d).route(
+        input({ classified: "instant_eval", isInstantEvalAvailable: false }),
       );
-
-      const question = classifier.classify.mock.calls[0]?.[0]?.questions[0];
-      expect(question?.options.map((option) => option.name)).toEqual([
-        "filter",
-        "free_text",
-        "langy",
-      ]);
-    });
-
-    it("searches a judgement answer from the classifier as a filter, never as an Instant Eval", async () => {
-      const d = deps({
-        classifier: answering("instant_eval"),
-        isInstantEvalReleased: vi.fn(async () => false),
-      });
-
-      const result = await router(d).route(input());
 
       expect(result).toEqual({ kind: "filter", query: "status:error", decidedBy: "classifier" });
       expect(d.buildQuestion).not.toHaveBeenCalled();
     });
+  });
 
+  describe("when the model decides", () => {
     it("tells the model the route is closed and searches a judgement answer as the phrase", async () => {
       const d = deps({
-        isInstantEvalReleased: vi.fn(async () => false),
         routeWithModel: vi.fn(async () => ({
           route: "instant_eval" as const,
           instructions: "Is the user annoyed?",
@@ -308,7 +295,7 @@ describe("given the classifier is configured", () => {
         })),
       });
 
-      const result = await router(d).route(input());
+      const result = await router(d).route(input({ isInstantEvalAvailable: false }));
 
       expect(d.routeWithModel).toHaveBeenCalledWith(
         expect.objectContaining({ isInstantEvalAvailable: false }),
@@ -322,49 +309,6 @@ describe("given the classifier is configured", () => {
         query: '"annoyed users"',
         decidedBy: "model",
       });
-    });
-
-    it("routes without the judgement route when the release cannot be read", async () => {
-      const classifier = answering("free_text");
-
-      await router(
-        deps({
-          classifier,
-          isInstantEvalReleased: vi.fn(async () => {
-            throw new Error("flags down");
-          }),
-        }),
-      ).route(input());
-
-      const question = classifier.classify.mock.calls[0]?.[0]?.questions[0];
-      expect(question?.options.map((option) => option.name)).not.toContain("instant_eval");
-    });
-  });
-
-  describe("when it skips or fails", () => {
-    it("lets the model decide instead", async () => {
-      const d = deps({
-        classifier: answering(null),
-        routeWithModel: vi.fn(async () => ({ route: "filter" as const, query: "status:error" })),
-      });
-
-      const result = await router(d).route(input());
-
-      expect(result).toEqual({ kind: "filter", query: "status:error", decidedBy: "model" });
-    });
-
-    it("survives a classifier that throws", async () => {
-      const d = deps({
-        classifier: {
-          classify: vi.fn(async () => {
-            throw new Error("socket hang up");
-          }),
-        },
-      });
-
-      const result = await router(d).route(input());
-
-      expect(result).toMatchObject({ kind: "free_text", decidedBy: "model" });
     });
   });
 });
