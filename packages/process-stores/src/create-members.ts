@@ -390,7 +390,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 }
 
 /** Host before the runtime so its stores close after the runtime stops; ready once they answer. */
-export function hostedMembers(source: ProcessMemberSource) {
+export function hostedStores(source: ProcessMemberSource) {
   return {
     name: "process stores",
     stop: () => source.close(),

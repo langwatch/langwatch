@@ -24,7 +24,7 @@ export {
   type UploadFacts,
 } from "./members.ts";
 export {
-  hostedMembers,
+  hostedStores,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
   StoreNotAnsweringError,
