@@ -18,6 +18,21 @@ export type SeatProrationPreviewProps = {
   onClose: () => void;
 };
 
+/** What ops' license drawer hands the Billing section of a linked license. */
+export type LicenseBillingSectionProps = {
+  organizationId: string;
+  organizationName: string;
+  email: string;
+  issuedAt: string;
+  expiresAt: string;
+  maxMembers: number;
+  seatRateCents: number | null;
+  seatCurrency: "USD" | "EUR" | null;
+  commitUsdCents: number;
+};
+
+export const LicenseBillingSectionToken =
+  uiTokens("billing").component<LicenseBillingSectionProps>("licenseBillingSection");
 export const ContactSalesToken = uiTokens("billing").component<ContactSalesProps>("contactSales");
 export const SeatProrationPreviewToken =
   uiTokens("billing").component<SeatProrationPreviewProps>("seatProrationPreview");

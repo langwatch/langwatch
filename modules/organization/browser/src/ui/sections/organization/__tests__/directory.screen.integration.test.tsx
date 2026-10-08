@@ -4,7 +4,7 @@
  * @see specs/identity/directory-administration.feature
  */
 import "@testing-library/jest-dom/vitest";
-import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-contract";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -150,7 +150,7 @@ vi.mock("../../../../behavior/use-required-session.ts", () => ({
   useRequiredSession: () => ({ data: { user: { id: "ana" } } }),
 }));
 
-function StatusBand({ organizationId, canReadMembership }: UiDirectorySummaryProps) {
+function StatusBand({ organizationId, canReadMembership }: DirectorySummaryProps) {
   return (
     <div data-testid="directory-status-band">
       {organizationId}:{String(canReadMembership)}

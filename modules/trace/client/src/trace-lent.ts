@@ -100,6 +100,70 @@ export type TracePreviewHoverCardProps = {
   children: ReactNode;
 };
 
+/** A trace field a mapping row reads, as dataset's mapping editor names it (restated, §10.1). */
+type TraceMappingSource =
+  | "trace_id"
+  | "thread_id"
+  | "timestamp"
+  | "input"
+  | "output"
+  | "contexts"
+  | "contexts.string_list"
+  | "metrics.total_cost"
+  | "metrics.first_token_ms"
+  | "metrics.total_time_ms"
+  | "metrics.prompt_tokens"
+  | "metrics.completion_tokens"
+  | "metrics.total_tokens"
+  | "spans"
+  | "spans.llm.input"
+  | "spans.llm.output"
+  | "metadata"
+  | "evaluations"
+  | "annotations"
+  | "events"
+  | "threads"
+  | "threads_until_current"
+  | "spans.llm.span_id"
+  | "spans.all.span_id"
+  | "annotations.id"
+  | "events.event_id"
+  | "formatted_trace"
+  | "";
+
+/** A thread field a mapping row reads (restated, §10.1). */
+type ThreadMappingSource = "thread_id" | "traces" | "formatted_traces" | "";
+
+/** The mapping a check form edits: fields to read and the expansions that fan them out. */
+export type EvaluatorTracesMappingState = {
+  mapping: Record<
+    string,
+    | {
+        source: TraceMappingSource;
+        key?: string;
+        subkey?: string;
+        selectedFields?: string[];
+        type?: "trace";
+      }
+    | {
+        source: ThreadMappingSource;
+        key?: string;
+        subkey?: string;
+        selectedFields?: string[];
+        type: "thread";
+      }
+  >;
+  expansions: ("spans.llm.span_id" | "spans.all.span_id" | "annotations.id" | "events.event_id")[];
+};
+
+/** What a check form hands trace's mapping editor, which reads its own sample traces. */
+export type EvaluatorTracesMappingProps = {
+  targetFields: string[];
+  traceMapping?: EvaluatorTracesMappingState;
+  setTraceMapping?: (mapping: EvaluatorTracesMappingState) => void;
+  disableExpansions?: boolean;
+};
+
 const trace = uiTokens("trace");
 
 export const RenderInputOutputToken = trace.component<RenderInputOutputProps>("renderInputOutput");
@@ -109,6 +173,8 @@ export const SetupWithAgentButtonToken =
 export const AnnotationQueueConversationToken = trace.component<AnnotationQueueConversationProps>(
   "annotationQueueConversation",
 );
+export const EvaluatorTracesMappingToken =
+  trace.component<EvaluatorTracesMappingProps>("evaluatorTracesMapping");
 export const TraceEditButtonToken = trace.component<TraceEditButtonProps>("traceEditButton");
 export const AgentActionsMenuToken = trace.component<AgentActionsMenuProps>("agentActionsMenu");
 export const ConversationThreadToken =

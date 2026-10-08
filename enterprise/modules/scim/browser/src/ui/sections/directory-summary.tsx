@@ -1,4 +1,3 @@
-import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
 import { Link } from "@langwatch/browser-host/link";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -17,6 +16,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
+import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";
 import { Boxes, Clock, Plug, Plus, Users, UserX } from "lucide-react";
@@ -35,7 +35,7 @@ type DirectoryFactsRead = ReturnType<typeof useDirectoryFacts>;
 export default function DirectorySummary({
   organizationId,
   canReadMembership,
-}: UiDirectorySummaryProps) {
+}: DirectorySummaryProps) {
   const facts = useDirectoryFacts({ organizationId, canReadMembership });
   const { reconciliation } = facts;
 

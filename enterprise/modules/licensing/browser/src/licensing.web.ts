@@ -5,6 +5,7 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-contract";
 
 import { reportLicenseFailure } from "./ui/sections/license-error-interceptor/index.ts";
 
@@ -34,11 +35,9 @@ export const licensingWeb = defineBrowserModule("licensing")
     },
   })
   /** The usage row billing and organization both draw (§3.4 rule 7). */
-  .withCapabilities({
-    resourceLimitRow: {
-      load: async () => ({
-        default: (await import("./ui/sections/resource-limits/lent-resource-limit-row.tsx"))
-          .LentResourceLimitRow,
-      }),
-    },
+  .lends(ResourceLimitRowToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/resource-limits/lent-resource-limit-row.tsx"))
+        .LentResourceLimitRow,
+    }),
   });

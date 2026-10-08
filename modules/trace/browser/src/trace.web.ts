@@ -9,6 +9,7 @@ import {
   AgentActionsMenuToken,
   AnnotationQueueConversationToken,
   ConversationThreadToken,
+  EvaluatorTracesMappingToken,
   RenderInputOutputToken,
   SetupWithAgentButtonToken,
   TraceEditButtonToken,
@@ -56,14 +57,8 @@ export const traceWeb = defineBrowserModule("trace")
       }),
     },
   })
-  /** Held: evaluator's traces mapping and the presence menu item still travel by name. */
+  /** Held: the presence menu item still travels by name. */
   .withCapabilities({
-    evaluatorTracesMapping: {
-      load: async () => ({
-        default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
-          .EvaluatorTracesMapping,
-      }),
-    },
     presenceMenuItem: {
       load: async () => ({
         default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
@@ -74,6 +69,12 @@ export const traceWeb = defineBrowserModule("trace")
   .lends(AgentActionsMenuToken, {
     load: async () => ({
       default: (await import("./ui/sections/setup-with-agent-button.tsx")).AgentActionsMenu,
+    }),
+  })
+  .lends(EvaluatorTracesMappingToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
+        .EvaluatorTracesMapping,
     }),
   })
   .lends(ConversationThreadToken, {

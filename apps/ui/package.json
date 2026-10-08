@@ -74,6 +74,7 @@
     "@langwatch/ops-browser": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/presence-browser": "workspace:*",
     "@langwatch/project-browser": "workspace:*",

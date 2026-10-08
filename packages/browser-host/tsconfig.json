@@ -25,9 +25,6 @@
       "path": "../config/tsconfig.build.json"
     },
     {
-      "path": "../../modules/dataset/contract/tsconfig.build.json"
-    },
-    {
       "path": "../design-system/tsconfig.build.json"
     },
     {
@@ -50,9 +47,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../vitest-config/tsconfig.build.json"

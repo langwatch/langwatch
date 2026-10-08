@@ -25,6 +25,13 @@ export type JoinOfferProps = {
   origin?: "web" | "cli";
 };
 
+/** What organization's Authentication overview hands each card a peer lends it. */
+export type AuthenticationOverviewCardProps = {
+  organizationId: string;
+  /** `organization:manage`: groups and member provenance are its reads. */
+  canReadMembership: boolean;
+};
+
 /** What project's settings form hands organization's lent department row. */
 export type ProjectDepartmentFieldProps = {
   organizationId: string;
@@ -44,6 +51,9 @@ export const CreateTeamDrawerToken = organization.drawer<UiCreateTeamDrawerProps
 export const InviteMemberDrawerToken =
   organization.drawer<UiInviteMemberDrawerProps>("inviteMember");
 export const PersonDrawerToken = organization.drawer<UiPersonDrawerProps>("person");
+/** A card on the Authentication overview, lent by any module (sso, scim), read in install order. */
+export const AuthenticationOverviewCardToken =
+  organization.extension<AuthenticationOverviewCardProps>("authenticationOverviewCard");
 export const JoinOfferToken = organization.component<JoinOfferProps>("joinOffer");
 export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");

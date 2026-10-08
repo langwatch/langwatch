@@ -1,17 +1,16 @@
 /** What analytics, trace, experiment and prompt lend this module (§3.4 rule 7). */
 
 import { FilterSidebarToken, type FilterSidebarProps } from "@langwatch/analytics-client";
-import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
-import type {
-  UiEvaluatorTracesMappingProps,
-  UiLlmConfigPopoverProps,
-} from "@langwatch/browser-host/declarations";
 import { Lent } from "@langwatch/browser-host/lent";
 import {
   ComparisonConfigFormToken,
   type ComparisonConfigFormProps,
 } from "@langwatch/experiment-client";
-import { lazy, Suspense, useMemo } from "react";
+import { LlmConfigPopoverToken, type LlmConfigPopoverProps } from "@langwatch/prompt-client";
+import {
+  EvaluatorTracesMappingToken,
+  type EvaluatorTracesMappingProps,
+} from "@langwatch/trace-client";
 
 /** Analytics' filter sidebar for the sample traces. */
 export function FilterSidebar(props: FilterSidebarProps) {
@@ -19,20 +18,8 @@ export function FilterSidebar(props: FilterSidebarProps) {
 }
 
 /** Trace's mapping editor over the project's recent sample traces. */
-export function EvaluatorTracesMapping(props: UiEvaluatorTracesMappingProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("evaluatorTracesMapping")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function EvaluatorTracesMapping(props: EvaluatorTracesMappingProps) {
+  return <Lent of={EvaluatorTracesMappingToken} props={props} />;
 }
 
 /** Experiment's form for a comparison evaluator's variants. */
@@ -41,18 +28,6 @@ export function ComparisonConfigForm(props: ComparisonConfigFormProps) {
 }
 
 /** Prompt's LLM parameter popover content. */
-export function LLMConfigPopover(props: UiLlmConfigPopoverProps) {
-  const declarations = useUiDeclarations();
-  const lent = useMemo(
-    () =>
-      declarations
-        .declared("llmConfigPopover")
-        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
-    [declarations],
-  );
-  return lent.map(({ key, Lent }) => (
-    <Suspense key={key} fallback={null}>
-      <Lent {...props} />
-    </Suspense>
-  ));
+export function LLMConfigPopover(props: LlmConfigPopoverProps) {
+  return <Lent of={LlmConfigPopoverToken} props={props} />;
 }

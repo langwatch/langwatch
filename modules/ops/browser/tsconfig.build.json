@@ -64,6 +64,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     }
   ]
 }

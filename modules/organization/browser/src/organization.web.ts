@@ -88,10 +88,7 @@ export const organizationWeb = defineBrowserModule("organization")
       default: (await import("./ui/sections/person-drawer.tsx")).PersonDrawer,
     }),
   })
-  /**
-   * The post-login join offer the shell renders over a dashboard (and the
-   * onboarding welcome): it RUNS joinRequests queries, so it is declared, not kitted.
-   */
+  /** What the composition root installs: scope, copy targets, facts and the waiting screen. */
   .withCapabilities({
     /** Where they are standing: the composition root awaits this before it renders. */
     scope: { load: () => import("./behavior/scope-capability.ts") },
@@ -99,13 +96,10 @@ export const organizationWeb = defineBrowserModule("organization")
     copyTargets: { load: () => import("./behavior/copy-targets-capability.ts") },
     /** The organization graph the chrome draws its switchers from. */
     organizationFacts: { load: () => import("./behavior/ui-organization-facts.ts") },
-    joinOffer: {
-      load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
-    },
     /** Shown in place of the dashboard body to a member on none of its teams. */
     teamAccessWaiting: { load: () => import("./ui/sections/team-access-waiting.tsx") },
   })
-  /** The join offer onboarding's welcome draws; the shell still prefetches it by name above. */
+  /** The join offer onboarding's welcome and the shell's dashboard body draw. */
   .lends(JoinOfferToken, {
     load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
   })

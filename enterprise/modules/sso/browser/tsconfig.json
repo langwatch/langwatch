@@ -47,6 +47,9 @@
     },
     {
       "path": "../../../../packages/vitest-config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/client/tsconfig.build.json"
     }
   ]
 }

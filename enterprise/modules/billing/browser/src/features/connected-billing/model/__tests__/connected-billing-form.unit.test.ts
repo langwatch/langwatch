@@ -1,10 +1,10 @@
-import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 /** @see specs/self-hosting/connected-services/connected-billing.feature */
+import type { LicenseBillingSectionProps } from "@langwatch/enterprise-billing-contract";
 import { describe, expect, it } from "vitest";
 
 import { billingFormFrom, contractPayload, onboardPayload } from "../connected-billing-form.ts";
 
-const license: UiLicenseBillingSectionProps = {
+const license: LicenseBillingSectionProps = {
   organizationId: "org-acme",
   organizationName: "Acme Corp",
   email: "buyer@acme.example",

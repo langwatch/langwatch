@@ -161,6 +161,9 @@
       "path": "../../modules/organization/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/organization/client/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {

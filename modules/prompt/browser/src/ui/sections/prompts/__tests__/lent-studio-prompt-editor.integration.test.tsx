@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import type { UiStudioPromptEditorProps } from "@langwatch/browser-host/declarations";
-import type { Signature } from "@langwatch/workflow-contract";
+import type { StudioPromptEditorProps } from "@langwatch/prompt-client";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,9 +22,9 @@ import { LentStudioPromptEditor } from "../lent-studio-prompt-editor.tsx";
 
 afterEach(cleanup);
 
-const nodeData: Signature = { name: "LLM Call", parameters: [] };
+const nodeData: StudioPromptEditorProps["nodeData"] = { name: "LLM Call", parameters: [] };
 
-function props(): UiStudioPromptEditorProps {
+function props(): StudioPromptEditorProps {
   return {
     nodeData,
     onClose: vi.fn(),

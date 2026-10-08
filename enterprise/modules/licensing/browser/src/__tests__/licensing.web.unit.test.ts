@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { createUi } from "@langwatch/browser";
+import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
 import { licensingWeb } from "../licensing.web.ts";
@@ -36,7 +37,10 @@ describe("given a browser that installs licensing", () => {
 
   describe("when billing or organization reads the resourceLimitRow capability", () => {
     it("resolves the lent usage row", async () => {
-      const loaded = await licensingWeb.installation.capabilities.resourceLimitRow.load();
+      const lend = licensingWeb.installation.lends.find(
+        ({ token }) => token.key === ResourceLimitRowToken.key,
+      );
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
 
       expect(loaded).toHaveProperty("default");
     }, 30_000);

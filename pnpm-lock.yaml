@@ -2173,6 +2173,9 @@ importers:
       '@langwatch/organization-browser':
         specifier: workspace:*
         version: link:../../modules/organization/browser
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../modules/organization/client
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../modules/organization/contract
@@ -4387,6 +4390,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/client
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -4600,6 +4606,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/client
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -6625,6 +6634,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-client':
+        specifier: workspace:*
+        version: link:../../trace/client
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -8220,6 +8232,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/prompt-client':
+        specifier: workspace:*
+        version: link:../../prompt/client
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
@@ -11765,6 +11780,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/sso/contract
@@ -12137,6 +12155,12 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/scim/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -16564,9 +16588,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../modules/dataset/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
@@ -16591,9 +16612,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../modules/workflow/contract
       '@microsoft/fetch-event-source':
         specifier: ^2.0.1
         version: 2.0.1

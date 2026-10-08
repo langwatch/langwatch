@@ -5,6 +5,8 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-contract";
+import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 
 export const scimWeb = defineBrowserModule("scim")
   .withHosts({
@@ -38,10 +40,10 @@ export const scimWeb = defineBrowserModule("scim")
     },
   })
   // How accounts arrive, drawn on organization's Authentication overview.
-  .withCapabilities({
-    authenticationOverviewCard: {
-      load: () => import("./ui/sections/directory-overview-card.tsx"),
-    },
-    // What the directory has been doing, above organization's Directory tabs.
-    directorySummary: { load: () => import("./ui/sections/directory-summary.tsx") },
+  .lends(AuthenticationOverviewCardToken, {
+    load: () => import("./ui/sections/directory-overview-card.tsx"),
+  })
+  // What the directory has been doing, above organization's Directory tabs.
+  .lends(DirectorySummaryToken, {
+    load: () => import("./ui/sections/directory-summary.tsx"),
   });

@@ -3,6 +3,9 @@
   "references": [
     {
       "path": "../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../prompt/client/tsconfig.build.json"
     }
   ]
 }

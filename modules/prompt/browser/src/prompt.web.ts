@@ -3,7 +3,14 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { PromptEditorDrawerToken, PromptListDrawerToken } from "@langwatch/prompt-client";
+import {
+  LlmConfigFieldToken,
+  LlmConfigPopoverToken,
+  OutputsSectionToken,
+  PromptEditorDrawerToken,
+  PromptListDrawerToken,
+  StudioPromptEditorToken,
+} from "@langwatch/prompt-client";
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
 
 import { promptApi } from "./behavior/prompt-api.ts";
@@ -33,28 +40,25 @@ export const promptWeb = defineBrowserModule("prompt")
       default: (await import("./ui/sections/prompts/prompt-editor-drawer.tsx")).PromptEditorDrawer,
     }),
   })
-  /** The prompt editor, embedded headless in the studio's signature node panel (§3.4 rule 7). */
-  .withCapabilities({
-    llmConfigField: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentLlmConfigField,
-      }),
-    },
-    llmConfigPopover: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx"))
-          .LentLlmConfigPopover,
-      }),
-    },
-    outputsSection: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentOutputsSection,
-      }),
-    },
-    studioPromptEditor: {
-      load: async () => ({
-        default: (await import("./ui/sections/prompts/lent-studio-prompt-editor.tsx"))
-          .LentStudioPromptEditor,
-      }),
-    },
+  /** The prompt editor and its fields, embedded headless in the studio's node panels (§10.1). */
+  .lends(LlmConfigFieldToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentLlmConfigField,
+    }),
+  })
+  .lends(LlmConfigPopoverToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentLlmConfigPopover,
+    }),
+  })
+  .lends(OutputsSectionToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/lent-prompt-fields.tsx")).LentOutputsSection,
+    }),
+  })
+  .lends(StudioPromptEditorToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/prompts/lent-studio-prompt-editor.tsx"))
+        .LentStudioPromptEditor,
+    }),
   });

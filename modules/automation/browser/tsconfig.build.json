@@ -64,6 +64,9 @@
     },
     {
       "path": "../../webhook/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/client/tsconfig.build.json"
     }
   ]
 }

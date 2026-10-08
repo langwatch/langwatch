@@ -6,16 +6,17 @@
 
 import {
   useUiCapabilities,
-  useUiDeclarations,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
-import { useLent } from "@langwatch/browser-host/lent";
+import { useLent, useLentAll } from "@langwatch/browser-host/lent";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { DirectorySummaryToken } from "@langwatch/enterprise-scim-contract";
+import { AuthenticationOverviewCardToken } from "@langwatch/organization-client";
 import { ProjectSwitcherToken } from "@langwatch/project-client";
 import type { ProjectSwitcherProps } from "@langwatch/project-contract";
-import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
+import { Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   OrganizationHostApi,
@@ -179,24 +180,12 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
   const facts = useUiOrganizationFacts();
   const sessionActor = session.currentUser();
   const reading = route.reading();
-  const declarations = useUiDeclarations();
-  // `lazy` once per declaration, never per render, so a card is not remounted.
+  const lentCards = useLentAll(AuthenticationOverviewCardToken);
   const overviewCards = useMemo(
-    () =>
-      declarations
-        .declared("authenticationOverviewCard")
-        .toSorted(
-          (left, right) =>
-            Number(right.capability.section === "sign-in") -
-            Number(left.capability.section === "sign-in"),
-        )
-        .map(({ module, capability }) => ({ key: module, Card: lazy(capability.load) })),
-    [declarations],
+    () => lentCards.map(({ owner, Component }) => ({ key: owner, Card: Component })),
+    [lentCards],
   );
-  const directorySummary = useMemo(() => {
-    const [lent] = declarations.declared("directorySummary");
-    return lent ? lazy(lent.capability.load) : void 0;
-  }, [declarations]);
+  const directorySummary = useLent(DirectorySummaryToken);
   const Switcher = useLent(ProjectSwitcherToken);
 
   const host = useMemo(

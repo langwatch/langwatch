@@ -29,6 +29,7 @@
     "@langwatch/error-views": "workspace:*",
     "@langwatch/identity-client": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"

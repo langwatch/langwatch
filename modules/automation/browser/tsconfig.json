@@ -67,6 +67,9 @@
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/client/tsconfig.build.json"
     }
   ]
 }

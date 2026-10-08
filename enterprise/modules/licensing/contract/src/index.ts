@@ -37,3 +37,4 @@ export * from "./license-registry.errors.ts";
 export * from "./license-sync.ts";
 export * from "./self-hosted-instance.ts";
 export * from "./self-hosted-instance.errors.ts";
+export * from "./licensing-components.ts";
