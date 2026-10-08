@@ -3,6 +3,7 @@
  * `created` is set once and kept: the takeover reads it while the organization list catches up.
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { onboardingApi } from "../../../behavior/onboarding-api.ts";
@@ -36,6 +37,7 @@ export function useGuidedOrganizationCreate({
   createGuidedOrganization: () => void;
 } {
   const host = useOnboardingHost();
+  const analytics = useUiAnalytics();
   const initializeOrganization = onboardingApi.onboarding.initializeOrganization.useMutation();
   const utils = onboardingApi.useUtils();
   const [created, setCreated] = useState<GuidedOrganization | null>(null);
@@ -63,7 +65,7 @@ export function useGuidedOrganizationCreate({
       },
       {
         onSuccess: (response) => {
-          registerOnboardingExperiment("guided");
+          registerOnboardingExperiment({ analytics, variant: "guided" });
           setCreated({
             organizationId: response.organizationId,
             projectSlug: response.projectSlug ?? "",
@@ -81,7 +83,7 @@ export function useGuidedOrganizationCreate({
         onError: (error) => host.failed({ error, fallbackTitle: ORG_SETUP_FAILED }),
       },
     );
-  }, [getFormData, mutate, navigation, utils, fadeMs, host]);
+  }, [analytics, getFormData, mutate, navigation, utils, fadeMs, host]);
 
   return {
     created,

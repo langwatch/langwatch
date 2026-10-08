@@ -323,7 +323,9 @@ describe("WelcomeScreen in the guided variant", () => {
           terms: true,
         }),
       });
-      expect(registerExperiment).toHaveBeenCalledWith("guided");
+      expect(registerExperiment).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "guided" }),
+      );
       expect(invalidateOrganizations).toHaveBeenCalledTimes(1);
 
       const takeover = await screen.findByTestId("guided-takeover");

@@ -37,10 +37,14 @@ export type UiAnalyticsGroup = Readonly<{ id: string; name?: string }>;
 
 /**
  * Where a module's named events go, and who they are about. Identity is the
- * shell's to set from the session; a module only ever tracks.
+ * shell's to set from the session; a module tracks and keeps its own
+ * super-properties.
  */
 export abstract class UiAnalytics {
   abstract track(event: UiAnalyticsEvent): void;
+  /** Properties every later event carries, until {@link unregister}ed. */
+  register(_properties: Readonly<Record<string, unknown>>): void {}
+  unregister(_property: string): void {}
   abstract identify(reader: UiAnalyticsReader): void;
   abstract group(organization: UiAnalyticsGroup): void;
   /** Forgets the reader: sign-out, or a different person signing in. */

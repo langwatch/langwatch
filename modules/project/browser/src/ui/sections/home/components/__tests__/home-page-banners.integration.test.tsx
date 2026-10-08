@@ -10,10 +10,6 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-vi.mock("posthog-js", () => ({
-  default: { capture: vi.fn() },
-}));
-
 // The Langy announcement starts its conversation in place rather than routing.
 const askLangy = vi.fn();
 vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({

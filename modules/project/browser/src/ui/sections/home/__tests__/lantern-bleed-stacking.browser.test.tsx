@@ -20,7 +20,6 @@ import {
 import { HomePage } from "../home-screen.tsx";
 
 vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
-vi.mock("posthog-js", () => ({ default: { capture: vi.fn() } }));
 vi.mock("../../../../behavior/langy/langy.store.ts", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy: vi.fn() }),
 }));

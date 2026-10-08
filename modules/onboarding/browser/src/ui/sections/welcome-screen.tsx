@@ -337,7 +337,7 @@ export const WelcomeScreen: React.FC = () => {
       },
       {
         onSuccess: (response) => {
-          registerOnboardingExperiment(onboardingVariant);
+          registerOnboardingExperiment({ analytics, variant: onboardingVariant });
           // `trackEventOnce("organization_initialized")` did not travel: product
           // analytics is the application's, and a port method the host could only
           // answer with nothing is worse than its absence.

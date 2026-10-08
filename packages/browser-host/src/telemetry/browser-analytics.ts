@@ -43,6 +43,8 @@ type AnalyticsDestination = {
   identify?: (reader: UiAnalyticsReader) => void;
   group?: (organization: UiAnalyticsGroup) => void;
   reset?: () => void;
+  register?: (properties: Readonly<Record<string, unknown>>) => void;
+  unregister?: (property: string) => void;
 };
 
 const CONSOLE_DESTINATION: AnalyticsDestination = {
@@ -91,6 +93,8 @@ function postHogDestination(client: PostHog): AnalyticsDestination {
         organization.name ? { name: organization.name } : {},
       ),
     reset: () => client.reset(),
+    register: (properties) => client.register({ ...properties }),
+    unregister: (property) => client.unregister(property),
   };
 }
 
@@ -139,6 +143,14 @@ class BrowserUiAnalytics extends UiAnalytics {
 
   reset(): void {
     this.#each("reset", (destination) => destination.reset?.());
+  }
+
+  override register(properties: Readonly<Record<string, unknown>>): void {
+    this.#each("register", (destination) => destination.register?.(properties));
+  }
+
+  override unregister(property: string): void {
+    this.#each("unregister", (destination) => destination.unregister?.(property));
   }
 
   #each(what: string, call: (destination: AnalyticsDestination) => void): void {

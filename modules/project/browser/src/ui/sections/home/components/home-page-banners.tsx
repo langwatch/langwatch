@@ -1,3 +1,4 @@
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { LangyMark } from "@langwatch/design-system/langy-mark";
 import {
@@ -18,7 +19,6 @@ import {
   useAnimationFrame,
   useMotionValue,
 } from "motion/react";
-import posthog from "posthog-js";
 import {
   type Dispatch,
   type MutableRefObject,
@@ -509,6 +509,7 @@ export function HomePageBanners({
   const project = useProjectHomeHost().project();
   const projectId = project?.id;
   const projectSlug = project?.slug;
+  const analytics = useUiAnalytics();
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
   const reduceMotion = useProjectHomeHost().reducedMotion();
   const isDark = useColorModeValue(false, true);
@@ -621,9 +622,9 @@ export function HomePageBanners({
   if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
 
   const handleCta = (slideToOpen: Slide) => {
-    posthog.capture(slideToOpen.posthogEvent, {
-      surface: "home_banner",
-      projectId,
+    analytics.track({
+      name: slideToOpen.posthogEvent,
+      attributes: { surface: "home_banner", projectId },
     });
     // Following the link is NOT dismissing the announcement. It used to snooze the slide for a
     // week, which meant the people most interested in a feature were the ones who lost the way
