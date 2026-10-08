@@ -44,7 +44,7 @@ const MAX_PARAM_COUNT = 50;
 const MAX_CONTENT_TERMS = 8;
 
 /** Compiles an evaluator and the result conditions bound to it as one evaluation. */
-export type EvaluationScopeTranslator = (scope: EvaluationScope, ctx: TranslationContext) => string;
+type EvaluationScopeTranslator = (scope: EvaluationScope, ctx: TranslationContext) => string;
 
 /**
  * Translates trace filters to ClickHouse SQL with value binding and free text.

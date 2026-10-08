@@ -11,7 +11,7 @@ import {
 /** All of the fact this subscriber reads: the evaluation as the collector door built it. */
 export const traceCollectorEvaluationSchema = collectorEvaluationReceivedEventDataSchema;
 
-export interface TraceCollectorEvaluationDeps {
+interface TraceCollectorEvaluationDeps {
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<void>;
 }
 

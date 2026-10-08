@@ -1,10 +1,10 @@
 /** Where an oversized evaluation input lives (ADR-172): kind, class, tenant, content hash. */
-export const EVALUATION_INPUTS_PREFIX = "evaluation-inputs";
+const EVALUATION_INPUTS_PREFIX = "evaluation-inputs";
 
 /** The published retention classes in days; a project's retention rounds up to the next one. */
-export const EVALUATION_INPUT_RETENTION_CLASS_DAYS = [90, 180, 365, 730] as const;
+const EVALUATION_INPUT_RETENTION_CLASS_DAYS = [90, 180, 365, 730] as const;
 
-export const INDEFINITE_RETENTION_CLASS = "r-indefinite" as const;
+const INDEFINITE_RETENTION_CLASS = "r-indefinite" as const;
 
 export type EvaluationInputRetentionClass =
   | `r${(typeof EVALUATION_INPUT_RETENTION_CLASS_DAYS)[number]}`

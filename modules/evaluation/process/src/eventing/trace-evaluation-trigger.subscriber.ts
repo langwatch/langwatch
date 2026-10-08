@@ -30,13 +30,13 @@ export const traceEvaluationTriggerSpanSchema = z.object({
 export const traceEvaluationTriggerOriginSchema = z.object({});
 
 /** The trace event in front of the trigger: its type, instant and, for a span, its attributes. */
-export interface TraceEvaluationTriggerEvent {
+interface TraceEvaluationTriggerEvent {
   type: string;
   occurredAt: number;
   spanAttributes?: { key: string; value: unknown }[];
 }
 
-export interface TraceEvaluationTriggerDeps {
+interface TraceEvaluationTriggerDeps {
   /** Trace's folded summary, read at handling (§9: the folded state is read through TraceApi). */
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;

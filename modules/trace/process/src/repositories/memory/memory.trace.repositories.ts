@@ -37,7 +37,7 @@ import { MemoryTraceTopicNamesRepository } from "./memory.trace-topic-names.repo
 import { MemoryTraceUsageCountRepository } from "./memory.trace-usage-count.repository.ts";
 
 /** No cache tier in memory: the durable store is already as fast as a cache. */
-export class MemoryTraceAnalyticsFoldCacheRepository implements TraceAnalyticsFoldCacheRepository {
+class MemoryTraceAnalyticsFoldCacheRepository implements TraceAnalyticsFoldCacheRepository {
   private constructor() {}
 
   static create(): MemoryTraceAnalyticsFoldCacheRepository {
@@ -50,7 +50,7 @@ export class MemoryTraceAnalyticsFoldCacheRepository implements TraceAnalyticsFo
 }
 
 /** The memory tier opens no ClickHouse: a raw tenant client is refused by name, never faked. */
-export class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
+class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
   static create(): MemoryTraceClickHouseClientsRepository {
     return new MemoryTraceClickHouseClientsRepository();
   }
@@ -68,7 +68,7 @@ export class MemoryTraceClickHouseClientsRepository extends TraceClickHouse {
  * Memory-backed payloads return null for offloaded fields: event_log is unavailable,
  * and callers treat absence as "never offloaded".
  */
-export class MemoryTracePayloadReaderRepository extends TracePayloadReaderRepository {
+class MemoryTracePayloadReaderRepository extends TracePayloadReaderRepository {
   static create(): MemoryTracePayloadReaderRepository {
     return new MemoryTracePayloadReaderRepository();
   }
@@ -83,7 +83,7 @@ export class MemoryTracePayloadReaderRepository extends TracePayloadReaderReposi
 }
 
 /** No cache tier in memory: the durable store is already as fast as a cache. */
-export class MemoryTraceSummaryFoldCacheRepository implements TraceSummaryFoldCacheRepository {
+class MemoryTraceSummaryFoldCacheRepository implements TraceSummaryFoldCacheRepository {
   private constructor() {}
 
   static create(): MemoryTraceSummaryFoldCacheRepository {

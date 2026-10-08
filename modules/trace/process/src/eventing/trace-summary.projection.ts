@@ -64,9 +64,9 @@ const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Reserved keys for cache/reasoning token sums (per-span numbers don't reach
 // the attribute allowlist, so we fold sums here instead of adding CH columns)
-export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
-export const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
-export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
+const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation_tokens";
+const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
 /**
  * Anthropic's cache-creation split by TTL, summed across the trace's model
  * calls. Rides ONLY api_response_body log events (no span attribute carries

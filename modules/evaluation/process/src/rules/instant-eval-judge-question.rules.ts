@@ -51,12 +51,12 @@ export interface InstantEvalJudgeInputs {
   readonly contexts?: readonly string[];
 }
 
-export type InstantEvalJudgeRequest =
+type InstantEvalJudgeRequest =
   | { readonly kind: "ask"; readonly question: InstantEvalQuestion; readonly text: string }
   | { readonly kind: "nothing_to_judge" };
 
 /** The score range a judge's settings name, with unset bounds read as 0 to 1. */
-export type InstantEvalJudgeScoreRange = Pick<SettingsOf<"langevals/llm_score">, "min" | "max">;
+type InstantEvalJudgeScoreRange = Pick<SettingsOf<"langevals/llm_score">, "min" | "max">;
 
 export function buildInstantEvalJudgeRequest({
   judge,
