@@ -164,6 +164,44 @@ Feature: An aggregate project reads its member projects
     Then exactly those two projects are members
     And the list may include projects that are not personal
 
+  @integration
+  Scenario: An admin creates an aggregate from the new project drawer by picking projects
+    When ana opens "Create New Project" and checks "Governance"
+    Then she sees the organisation's projects in two sections, "Personal projects" and "LLMOps projects"
+    When she picks two projects and creates the project
+    Then the new project is an aggregate whose explicit rule names exactly those two projects
+
+  @integration
+  Scenario: The admin sees every member's personal workspace under Personal projects
+    Given two members who each have a personal workspace
+    When ana lists the projects she may pick for an aggregate
+    Then both personal workspaces are listed as personal, each naming the member who owns it
+    And a project on a shared team is listed as not personal
+    And a member who is not an admin is refused the list
+
+  @integration
+  Scenario: The project picker leaves out aggregates and the governance project
+    Given an aggregate project and the hidden governance project
+    When ana lists the projects she may pick for an aggregate
+    Then neither of them is listed
+
+  @integration
+  Scenario: Create stays disabled until a project is picked
+    When ana checks "Governance" and has picked no project
+    Then the "Create" button is disabled
+    When she picks one project
+    Then the "Create" button is enabled
+
+  @integration
+  Scenario: A member who is not an admin sees no Governance checkbox
+    When sam opens "Create New Project"
+    Then there is no "Governance" checkbox
+
+  @integration
+  Scenario: Without Governance the drawer creates an ordinary project
+    When ana creates a project from "Create New Project" without checking "Governance"
+    Then the request names no project kind and no rule, as before
+
   @unit
   Scenario: A rule that names a project in another organisation is refused
     When a rule names a project that belongs to a different organisation

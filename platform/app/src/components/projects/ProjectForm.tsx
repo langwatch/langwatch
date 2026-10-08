@@ -22,7 +22,9 @@ import {
 import { applyHandledErrorToForm, HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { Checkbox } from "../ui/checkbox";
 import { Select } from "../ui/select";
+import { AggregateMemberPicker } from "./AggregateMemberPicker";
 import {
   NEW_TEAM_VALUE,
   validateNewTeamName,
@@ -33,6 +35,10 @@ export interface ProjectFormData {
   name: string;
   teamId: string;
   newTeamName?: string;
+  /** ADR-144: create an aggregate that reads the picked projects. */
+  isAggregate: boolean;
+  /** The projects the aggregate's explicit rule names. */
+  aggregateProjectIds: string[];
 }
 
 export interface ProjectFormProps {
@@ -46,6 +52,12 @@ export interface ProjectFormProps {
   /** Required for creating projects in a different organization via the dropdown menu.
    * Ensures teams are fetched from the target organization, not the current context. */
   organizationId?: string;
+  /**
+   * Offer the Governance checkbox, which turns the new project into an
+   * aggregate (ADR-144). Only organisation admins may create one; the server
+   * refuses everyone else whatever this says.
+   */
+  canCreateAggregate?: boolean;
 }
 
 export function ProjectForm(props: ProjectFormProps): React.ReactElement {
@@ -55,6 +67,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     error,
     defaultTeamId,
     organizationId: organizationIdProp,
+    canCreateAggregate,
   } = props;
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
@@ -71,6 +84,8 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
       // "Either teamId or newTeamName must be provided" because the
       // teams.useQuery-driven useEffect below never fired a reset).
       teamId: defaultTeamId ?? "",
+      isAggregate: false,
+      aggregateProjectIds: [],
     },
   });
   const {
@@ -83,6 +98,8 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   } = form;
 
   const teamId = watch("teamId");
+  const isAggregate = watch("isAggregate");
+  const aggregateProjectIds = watch("aggregateProjectIds");
 
   /**
    * The part of the submit failure the form itself could not put on a field.
@@ -208,6 +225,14 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           </>
         )}
 
+        {canCreateAggregate && (
+          <GovernanceFields
+            control={control}
+            isAggregate={isAggregate}
+            organizationId={effectiveOrganizationId}
+          />
+        )}
+
         {!!unclaimedError && (
           <HandledErrorAlert
             error={unclaimedError}
@@ -221,13 +246,85 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             colorPalette="orange"
             type="submit"
             loading={isLoading}
-            disabled={isLoading}
+            disabled={isSubmitDisabled({
+              isLoading,
+              isAggregate,
+              aggregateProjectIds,
+            })}
           >
             Create
           </Button>
         </HStack>
       </VStack>
     </form>
+  );
+}
+
+/**
+ * Create waits for an in-flight submit, and for an aggregate also for at least
+ * one picked project: an explicit rule naming none is refused by the server.
+ */
+function isSubmitDisabled({
+  isLoading,
+  isAggregate,
+  aggregateProjectIds,
+}: {
+  isLoading: boolean;
+  isAggregate: boolean;
+  aggregateProjectIds: string[];
+}): boolean {
+  if (isLoading) return true;
+  return isAggregate && aggregateProjectIds.length === 0;
+}
+
+/**
+ * ADR-144: the Governance checkbox and, once checked, the projects the new
+ * aggregate reads. Shown to organisation admins only.
+ */
+function GovernanceFields({
+  control,
+  isAggregate,
+  organizationId,
+}: {
+  control: Control<ProjectFormData>;
+  isAggregate: boolean;
+  organizationId: string | undefined;
+}) {
+  return (
+    <VStack align="stretch" gap={3}>
+      <Controller
+        control={control}
+        name="isAggregate"
+        render={({ field }) => (
+          <Field.Root>
+            <Checkbox
+              checked={field.value}
+              onCheckedChange={({ checked }) =>
+                field.onChange(checked === true)
+              }
+            >
+              Governance
+            </Checkbox>
+            <Field.HelperText>
+              Reads traces from the projects you pick. Takes no data of its own.
+            </Field.HelperText>
+          </Field.Root>
+        )}
+      />
+      {isAggregate && organizationId && (
+        <Controller
+          control={control}
+          name="aggregateProjectIds"
+          render={({ field }) => (
+            <AggregateMemberPicker
+              organizationId={organizationId}
+              value={field.value}
+              onChange={field.onChange}
+            />
+          )}
+        />
+      )}
+    </VStack>
   );
 }
 

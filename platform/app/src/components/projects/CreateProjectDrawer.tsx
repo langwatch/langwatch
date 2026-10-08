@@ -1,7 +1,15 @@
 import { Heading } from "@chakra-ui/react";
 import type React from "react";
+import type { AggregateRule } from "~/server/app-layer/projects/aggregate-rule";
+import {
+  AGGREGATE_PROJECT_KIND,
+  aggregateProjectRouteViolation,
+} from "~/server/app-layer/projects/project-kinds";
 import { useDrawer } from "../../hooks/useDrawer";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import {
+  organizationRoleOf,
+  useOrganizationTeamProject,
+} from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
@@ -18,6 +26,46 @@ function invalidateProjectListQueries(
   void utils.team.getTeamsWithMembers.invalidate();
   void utils.team.getTeamWithMembers.invalidate();
   void utils.team.getTeamsWithRoleBindings.invalidate();
+}
+
+/**
+ * Whether the caller may create an aggregate in this organization: the same
+ * rule the server applies (ADR-144 decision 5), asked of the caller's role in
+ * the organization the project is created in, which need not be the one being
+ * viewed.
+ */
+function canCreateAggregateIn({
+  organizations,
+  organizationId,
+}: {
+  organizations:
+    | Array<
+        { id: string } & NonNullable<Parameters<typeof organizationRoleOf>[0]>
+      >
+    | undefined;
+  organizationId: string | undefined;
+}): boolean {
+  const organization = organizations?.find(
+    (candidate) => candidate.id === organizationId,
+  );
+  return (
+    aggregateProjectRouteViolation({
+      kind: AGGREGATE_PROJECT_KIND,
+      organizationRole: organizationRoleOf(organization),
+    }) === null
+  );
+}
+
+/** The kind fields of the create request: none unless Governance is checked. */
+function aggregateFieldsOf(data: ProjectFormData): {
+  kind?: typeof AGGREGATE_PROJECT_KIND;
+  aggregateRule?: AggregateRule;
+} {
+  if (!data.isAggregate) return {};
+  return {
+    kind: AGGREGATE_PROJECT_KIND,
+    aggregateRule: { kind: "explicit", projectIds: data.aggregateProjectIds },
+  };
 }
 
 export function CreateProjectDrawer({
@@ -41,9 +89,14 @@ export function CreateProjectDrawer({
    * the new project, e.g. select it in a picker once lists refresh. */
   onCreated?: (result: { projectSlug: string }) => void;
 }): React.ReactElement {
-  const { organization: currentOrganization } = useOrganizationTeamProject();
+  const { organization: currentOrganization, organizations } =
+    useOrganizationTeamProject();
 
   const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
+  const canCreateAggregate = canCreateAggregateIn({
+    organizations,
+    organizationId: effectiveOrganizationId,
+  });
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
 
@@ -78,6 +131,7 @@ export function CreateProjectDrawer({
         newTeamName: data.newTeamName,
         language: data.language,
         framework: data.framework,
+        ...aggregateFieldsOf(data),
       },
       {
         onSuccess: (result) => {
@@ -136,6 +190,7 @@ export function CreateProjectDrawer({
             error={createProject.error}
             defaultTeamId={defaultTeamId}
             organizationId={effectiveOrganizationId}
+            canCreateAggregate={canCreateAggregate}
           />
         </Drawer.Body>
       </Drawer.Content>
