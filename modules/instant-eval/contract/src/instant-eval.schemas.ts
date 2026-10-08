@@ -290,7 +290,6 @@ export const instantEvalSampleQuerySchema = z.object({
     .describe("Rows to re-read, at most twenty five."),
 });
 
-export type InstantEvalListQuery = z.infer<typeof instantEvalListQuerySchema>;
 export type InstantEvalResultsQuery = z.infer<typeof instantEvalResultsQuerySchema>;
 export type InstantEvalSampleQuery = z.infer<typeof instantEvalSampleQuerySchema>;
 

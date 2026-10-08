@@ -36,9 +36,6 @@ export const INSTANT_EVAL_TARGETS = ["traces", "threads", "llm_spans"] as const;
 
 export type InstantEvalTarget = (typeof INSTANT_EVAL_TARGETS)[number];
 
-/** The parameters the shorthand binds its resolved window under. */
-export const INSTANT_EVAL_WINDOW_PARAMETERS = ["start_at", "end_at"] as const;
-
 /**
  * The parameter a resolved selection is bound under, used when the filter
  * names a field the trace view cannot answer: ten thousand ids are a bound

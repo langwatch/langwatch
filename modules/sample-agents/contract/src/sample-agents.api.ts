@@ -17,8 +17,6 @@ export const hotelBotHeadersSchema = z.object({
   "x-auth-token": z.string().optional(),
 });
 
-export type HotelBotHeaders = z.infer<typeof hotelBotHeadersSchema>;
-
 export const hotelBotRunInputSchema = z.object({ authToken: z.string().optional() });
 
 export type HotelBotRunInput = z.infer<typeof hotelBotRunInputSchema>;
