@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   dashboardWidgetQuerySchema,
   validateDashboardWidgetQueryParams,
-} from "../dashboard-widget-definition";
+} from "../dashboard-widget-definition.ts";
 
 describe("queryParameterDeclarationSchema (via dashboardWidgetQuerySchema)", () => {
   describe("given a parameter named like a reserved JavaScript property", () => {
@@ -16,6 +16,19 @@ describe("queryParameterDeclarationSchema (via dashboardWidgetQuerySchema)", () 
 
       expect(result.success).toBe(false);
     });
+
+    it.each(["__proto__", "constructor", "prototype"])(
+      "names the refused input %s in the message",
+      (name) => {
+        const result = dashboardWidgetQuerySchema.safeParse({
+          name: "q",
+          sql: "select 1",
+          parameters: [{ name, type: "string" }],
+        });
+
+        expect(result.error?.issues[0]?.message).toContain(`"${name}" is a reserved`);
+      },
+    );
   });
 
   describe("given an ordinary parameter name", () => {

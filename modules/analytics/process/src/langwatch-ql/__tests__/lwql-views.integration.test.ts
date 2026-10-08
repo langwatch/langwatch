@@ -15,7 +15,6 @@ import {
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
@@ -49,6 +48,7 @@ import {
   startLangWatchQLPostgres,
 } from "./lwql-clickhouse-harness.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
+import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();

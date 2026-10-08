@@ -4,12 +4,12 @@
  * from the card that opened it, so both read/write the exact same state.
  */
 
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { Box, Button, Spacer, Tabs } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Plus } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
-import type { DashboardWidgetQuery } from "../../../../model/dashboard-widget-definition.ts";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
 import {

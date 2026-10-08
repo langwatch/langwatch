@@ -6,7 +6,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -22,6 +21,7 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness.ts";
+import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const accessAudit = LangWatchQLAccessAuditService.create();

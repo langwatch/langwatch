@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { LangWatchQLAccessAuditService } from "../../../../services/langwatch-ql-access-audit.service.ts";
+import { LangWatchQLAccessAuditService } from "../../../../langwatch-ql/__tests__/support/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../../services/langwatch-ql-access-model-definition.service.ts";
 import { LangWatchQLAccessModelService } from "../../../../services/langwatch-ql-access-model.service.ts";
 import {

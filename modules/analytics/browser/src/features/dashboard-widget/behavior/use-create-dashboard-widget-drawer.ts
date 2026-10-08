@@ -1,9 +1,9 @@
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useEffect, useMemo, useState } from "react";
 
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
-import type { DashboardWidgetQuery } from "../../../model/dashboard-widget-definition.ts";
 import {
   STARTER_WIDGET_CODE,
   STARTER_WIDGET_QUERIES,

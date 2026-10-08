@@ -11,6 +11,10 @@
  */
 
 import {
+  DASHBOARD_CONTEXT_PARAMETER_PREFIX,
+  type RESERVED_PARAMETERS,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
   Badge,
   Box,
   Button,
@@ -23,10 +27,6 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
-import {
-  DASHBOARD_CONTEXT_PARAMETER_PREFIX,
-  type RESERVED_PARAMETERS,
-} from "../../../../model/dashboard-widget-definition.ts";
 import { FieldTypeSelect } from "../../../../ui/sections/prompt/variables/variable-type/field-type-select.tsx";
 import { VariableTypeIcon } from "../../../../ui/sections/prompt/variables/variable-type/variable-type-icon.tsx";
 

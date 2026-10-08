@@ -7,7 +7,7 @@ import { DashboardWidgetInPlaceEditor } from "../../features/dashboard-widget/ui
 import { LangWatchQLDashboardWidget } from "../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-widget.tsx";
 import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
-import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../model/dashboard-widget-draft.ts";
 import { CustomGraph } from "./custom-graph.tsx";
 import { GraphCardHeader } from "./graph-card-header.tsx";
 import { useDraggableGraphCard } from "./use-draggable-graph-card";

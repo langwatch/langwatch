@@ -5,6 +5,10 @@
  */
 
 import {
+  type DashboardWidgetQuery,
+  RESERVED_PARAMETERS,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
   chakra,
   Accordion,
   Box,
@@ -26,10 +30,6 @@ import {
 } from "../../../../behavior/use-editable-query-name.ts";
 import { useLwqlDiagnostics } from "../../../../behavior/use-lwql-diagnostics.ts";
 import { useLwqlSchema } from "../../../../behavior/use-lwql-schema.ts";
-import {
-  type DashboardWidgetQuery,
-  RESERVED_PARAMETERS,
-} from "../../../../model/dashboard-widget-definition.ts";
 import { formatNumber } from "../../../../model/format.ts";
 import { type LwqlParameter } from "../../../../model/lwql-language/lwql-completion.ts";
 import { LwqlEditor } from "../../../../ui/sections/lwql-editor.tsx";

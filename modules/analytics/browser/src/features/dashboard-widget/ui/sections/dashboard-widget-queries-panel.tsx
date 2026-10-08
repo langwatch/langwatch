@@ -4,10 +4,10 @@
  * `lastRuns`/`onRun` come from the card's shared executor, so Run here or in the chart agree.
  */
 
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { Accordion, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
-import type { DashboardWidgetQuery } from "../../../../model/dashboard-widget-definition.ts";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import { DashboardWidgetQueryRow } from "./dashboard-widget-query-row.tsx";
 

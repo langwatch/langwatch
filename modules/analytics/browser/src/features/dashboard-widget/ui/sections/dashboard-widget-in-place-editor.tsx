@@ -4,7 +4,7 @@
  * since the frame fully remounts (fresh CDN/Babel) on identity change, not on every keystroke.
  */
 
-import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-draft.ts";
 import { useDashboardWidgetInPlaceEditor } from "../../behavior/use-dashboard-widget-in-place-editor.ts";
 import { DashboardWidgetEditDrawer } from "./dashboard-widget-edit-drawer.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";

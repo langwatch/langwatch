@@ -40,13 +40,13 @@ import {
   type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { postgresModelSeedStatements } from "./lwql-postgres-model-seed.ts";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
   LangWatchQLServerConfigService,
-} from "../../services/langwatch-ql-server-config.service.ts";
-import { postgresModelSeedStatements } from "./lwql-postgres-model-seed.ts";
+} from "./support/langwatch-ql-server-config.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 

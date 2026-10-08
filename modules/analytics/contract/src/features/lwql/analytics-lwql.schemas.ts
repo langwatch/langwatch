@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
 import { lwqlTimeWindowSchema, type LangWatchQLProtections } from "./analytics.lwql.ts";
+import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
 
 /**
  * The caller-specific content gates the catalog understands, as a value a
@@ -65,12 +66,7 @@ export const langWatchQLKeyReach = defineRestMiddleware(
   langWatchQLKeyReachSchema,
 );
 
-/**
- * Longest statement any LangWatchQL surface accepts. A shape ceiling rather
- * than a cost one — the cost ceilings are pinned server-side by the settings
- * profile.
- */
-export const MAX_LWQL_LENGTH = 50_000;
+export { MAX_LWQL_LENGTH };
 
 /**
  * A bound parameter's value. Scalars only: a parameter is a *value*, and

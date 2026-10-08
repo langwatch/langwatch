@@ -1,6 +1,5 @@
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useEffect, useState } from "react";
-
-import type { DashboardWidgetQuery } from "../../../model/dashboard-widget-definition.ts";
 
 interface WidgetDraftSeed {
   name: string;

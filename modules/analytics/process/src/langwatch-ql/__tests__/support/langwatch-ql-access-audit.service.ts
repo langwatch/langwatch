@@ -2,11 +2,11 @@
  * LangWatchQL analytics SQL — the queries that prove the access model holds.
  * @see ./langwatch-ql-access-model.service.ts — the model these audit
  */
-import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { clickHouseLiteral } from "../../../rules/langwatch-ql-sql-literal.rules.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
-} from "./langwatch-ql-access-model.service.ts";
+} from "../../../services/langwatch-ql-access-model.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 

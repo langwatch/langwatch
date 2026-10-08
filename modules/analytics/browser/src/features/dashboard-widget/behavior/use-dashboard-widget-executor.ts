@@ -11,6 +11,10 @@ import type {
   ChartQueryResult,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { toChartQueryResult } from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  type DashboardWidgetQuery,
+  validateDashboardWidgetQueryParams,
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
@@ -19,10 +23,6 @@ import { useCallback, useMemo, useState } from "react";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
-import {
-  type DashboardWidgetQuery,
-  validateDashboardWidgetQueryParams,
-} from "../../../model/dashboard-widget-definition.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */

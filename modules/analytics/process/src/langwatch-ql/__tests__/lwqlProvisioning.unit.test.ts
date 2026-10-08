@@ -17,7 +17,7 @@ import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLServerConfigService } from "../../services/langwatch-ql-server-config.service.ts";
+import { LangWatchQLServerConfigService } from "./support/langwatch-ql-server-config.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const serverConfig = LangWatchQLServerConfigService.create();

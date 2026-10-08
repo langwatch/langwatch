@@ -89,8 +89,8 @@ const queryParameterDeclarationSchema = z
       // adding an own key, so the value is silently dropped. Refuse the name
       // at the schema rather than lose the value at bind time.
       .refine((name) => !FORBIDDEN_PARAMETER_NAMES.has(name), {
-        error: (payload) =>
-          `"${String(payload.value)}" is a reserved JavaScript property name — pick a different parameter name`,
+        error: (issue) =>
+          `"${String(issue.input)}" is a reserved JavaScript property name — pick a different parameter name`,
       }),
     type: queryParameterTypeSchema,
     /**

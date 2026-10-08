@@ -1,13 +1,11 @@
+import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useMemo, useState } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
-import {
-  dashboardWidgetDefinitionSchema,
-  type DashboardWidgetDraft,
-} from "../../model/dashboard-widget-definition.ts";
+import type { DashboardWidgetDraft } from "../../model/dashboard-widget-draft.ts";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**

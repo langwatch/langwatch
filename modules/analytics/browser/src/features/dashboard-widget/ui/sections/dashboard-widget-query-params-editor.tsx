@@ -8,7 +8,8 @@ import {
   type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
   RESERVED_PARAMETERS,
-} from "../../../../model/dashboard-widget-definition.ts";
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
+
 import {
   type QueryParameterRowVM,
   QueryParametersPanel,

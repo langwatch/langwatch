@@ -14,7 +14,6 @@ import {
   LangWatchQLAppFunctionStatementsService,
   LWQL_SQL_UDF_ORIGIN,
 } from "../../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
 import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
@@ -25,6 +24,7 @@ import {
   selectRows,
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness.ts";
+import { LangWatchQLAccessAuditService } from "./support/langwatch-ql-access-audit.service.ts";
 
 const statements = LangWatchQLAppFunctionStatementsService.create();
 const accessModel = LangWatchQLAccessModelService.create();
