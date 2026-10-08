@@ -11,6 +11,7 @@ import { Select } from "@langwatch/design-system/select";
 import { shareVisibilitySchema, type ShareVisibility } from "@langwatch/share-contract";
 import { useState } from "react";
 
+import type { CreateShareLinkDraft } from "../../../model/share/create-share-link-draft.ts";
 import {
   isShareExpiryOption,
   SHARE_EXPIRY_OPTIONS,
@@ -42,12 +43,6 @@ const expiryCollection = createListCollection<{
 }>({
   items: SHARE_EXPIRY_OPTIONS.map((value) => ({ value, label: EXPIRY_LABELS[value] })),
 });
-
-export interface CreateShareLinkDraft {
-  visibility: ShareVisibility;
-  expiry: ShareExpiryOption;
-  isSingleView: boolean;
-}
 
 /** The "mint a new link" controls: audience, expiry, one-time-view + button. */
 export function CreateShareLinkForm({

@@ -19,7 +19,7 @@ vi.mock("../../../../../behavior/explorer/use-project-has-traces.ts", () => ({
   useProjectHasTraces: () => ({ hasAnyTraces: true }),
 }));
 
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({
     data: [{ kind: "categorical", key: "status", label: "Status", topValues: [] }],
     isLoading: false,
@@ -28,7 +28,7 @@ vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", (
 
 // The counts read: mocked out here so these render tests keep proving what the
 // discovery alone puts on the rail.
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-filtered-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-filtered-trace-facets.ts", () => ({
   useFilteredTraceFacets: () => ({
     data: undefined,
     isPlaceholderData: false,

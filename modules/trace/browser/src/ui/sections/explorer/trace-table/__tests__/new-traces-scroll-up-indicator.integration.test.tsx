@@ -15,7 +15,7 @@ import { NewTracesScrollUpIndicator } from "../new-traces-scroll-up-indicator.ts
 
 const arrivals = vi.hoisted(() => ({ count: 0, acknowledge: vi.fn() }));
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-new-count.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-new-count.ts", () => ({
   useTraceNewCount: () => ({ count: arrivals.count, acknowledge: arrivals.acknowledge }),
 }));
 

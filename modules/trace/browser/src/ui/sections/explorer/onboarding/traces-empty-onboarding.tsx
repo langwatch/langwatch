@@ -9,6 +9,10 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  ARRIVAL_PREVIEW_TRACES,
+  RICH_ARRIVAL_TRACE_ID,
+} from "../../../../behavior/explorer/onboarding/data/sample-preview-traces.ts";
+import {
   hasCompletedJourney,
   hasDensityBeenConfirmed,
   markDensityConfirmed,
@@ -18,7 +22,7 @@ import {
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { Density } from "../../../../features/explorer/behavior/density.store.ts";
-import { useOpenTraceDrawer } from "../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts";
+import { useOpenTraceDrawer } from "../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
 import {
   findStageDef,
   type HeroLayout,
@@ -29,7 +33,6 @@ import { BeadStrip } from "../../../elements/explorer/onboarding/bead-strip.tsx"
 import { HotkeyBindings } from "../../../elements/explorer/onboarding/hotkey-bindings.tsx";
 import { OutroPanel } from "../../../elements/explorer/onboarding/outro-panel.tsx";
 import { ReturningUserHub } from "../../../elements/explorer/onboarding/returning-user-hub.tsx";
-import { ARRIVAL_PREVIEW_TRACES, RICH_ARRIVAL_TRACE_ID } from "./data/sample-preview-traces.ts";
 import { DensitySpotlight } from "./density-spotlight.tsx";
 import { IntegrateDrawer } from "./integrate-drawer.tsx";
 

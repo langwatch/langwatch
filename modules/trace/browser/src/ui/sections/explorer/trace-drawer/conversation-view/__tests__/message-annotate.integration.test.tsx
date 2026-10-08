@@ -58,10 +58,13 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { useAnnotationDraftStore } from "../../../../../../features/annotation/behavior/annotation-draft.store.ts";
 import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 import type { TurnLayout } from "../chat-turn-row.tsx";
 

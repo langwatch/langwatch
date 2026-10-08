@@ -44,7 +44,7 @@ let visibleIdsResult = {
 
 // useVisibleTraceIds is in hooks/ (same level as useTraceFreshness), so
 // from __tests__/ the path to reach it is ../useVisibleTraceIds.
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-visible-trace-ids.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-visible-trace-ids.ts", () => ({
   useVisibleTraceIds: () => visibleIdsResult,
 }));
 

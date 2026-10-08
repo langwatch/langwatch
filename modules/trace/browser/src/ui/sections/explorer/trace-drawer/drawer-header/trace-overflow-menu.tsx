@@ -20,16 +20,16 @@ import {
   LuScanSearch,
 } from "react-icons/lu";
 
+import { enterTraceEditMode } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   usePinTrace,
   useTracePinRead,
   useUnpinTrace,
 } from "../../../../../behavior/writes/use-trace-writes.ts";
-import { useConversationTurns } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts";
+import { useConversationTurns } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
-import { enterTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 interface TraceOverflowMenuProps {
   traceId: string;

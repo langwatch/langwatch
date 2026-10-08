@@ -20,7 +20,7 @@ const mockCounts = {
   instantEval: null,
   summary: explorerCountSummary({ totalHits: 583, itemNoun: "traces", instantEval: null }),
 };
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => mockCounts,
 }));
 

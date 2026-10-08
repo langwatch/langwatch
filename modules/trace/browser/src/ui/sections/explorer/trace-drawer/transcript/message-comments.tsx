@@ -1,11 +1,11 @@
 import { createContext, type ReactNode, useMemo } from "react";
 
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import {
   type TraceAnchor,
   useAnchoredAnnotations,
-} from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+} from "../../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button.tsx";
 
 interface MessageCommentScopeValue {

@@ -1,4 +1,7 @@
-import type { TraceListItem, TraceStatus } from "../../../../types/trace.ts";
+import type {
+  TraceListItem,
+  TraceStatus,
+} from "../../../../../../../behavior/explorer/types/trace.ts";
 
 export type GroupBy = "service" | "model" | "user";
 

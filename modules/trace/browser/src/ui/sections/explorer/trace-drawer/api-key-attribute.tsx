@@ -2,10 +2,10 @@ import { Link } from "@langwatch/browser-host/link";
 import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Key } from "lucide-react";
 
+import { useIsReadOnlyTrace } from "../../../../behavior/explorer/context/trace-viewer-context.tsx";
 import { useApiKeyName } from "../../../../behavior/reads/use-project-reads.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { apiKeySettingsHref } from "../../../../model/api-key-anchor.ts";
-import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 /**
  * Resource attribute the ingestion receiver stamps on every authenticated

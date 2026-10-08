@@ -6,8 +6,8 @@ import { cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { TraceListItem } from "../../../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import {
   TraceStatisticsProvider,
   useTraceStatistics,

@@ -3,11 +3,11 @@ import { Badge, Text } from "@langwatch/design-system/primitives";
 import { originColorPalette, originLabel } from "@langwatch/trace-contract";
 
 import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import { SpanTypeBadge } from "../../../../../../elements/explorer/trace-table/registry/cells/trace/span-type-badge.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import { StatusIndicator } from "../../../status-row.tsx";
 import type { CellDef } from "../../types.ts";
 

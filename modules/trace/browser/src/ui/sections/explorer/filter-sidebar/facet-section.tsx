@@ -21,7 +21,7 @@ import {
   MAX_VISIBLE_FACETS,
 } from "../../../../features/facet/behavior/facet-constants.ts";
 import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
-import { useFacetSearch } from "../../../../features/facet/ui/sections/hooks/use-facet-search.ts";
+import { useFacetSearch } from "../../../../features/facet/behavior/use-facet-search.ts";
 import { dedupeByValue } from "../../../../model/dedupe-by-value.ts";
 import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row.tsx";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";

@@ -6,9 +6,9 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import type React from "react";
 
 import { useSelectionStore } from "../../../../../../behavior/explorer.store.ts";
+import type { ConversationGroup } from "../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
 import { ariaCheckedFor, checkboxStateFor } from "../../../../../../model/tri-state-checkbox.ts";
-import type { TraceListItem } from "../../../types/trace.ts";
-import type { ConversationGroup } from "../../conversation-groups.ts";
 import { withoutPlaceholderTraceIds } from "../../skeleton-placeholders.ts";
 import type { CellDef } from "../types.ts";
 import type { TraceGroup } from "./group/types.ts";

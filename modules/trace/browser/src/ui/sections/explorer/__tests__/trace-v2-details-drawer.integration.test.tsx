@@ -18,12 +18,9 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ pathname: window.location.pathname }),
 }));
 
-vi.mock(
-  "../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-url-hydrator.ts",
-  () => ({
-    useTraceDrawerUrlHydrator: () => undefined,
-  }),
-);
+vi.mock("../../../../features/trace-drawer/behavior/use-trace-drawer-url-hydrator.ts", () => ({
+  useTraceDrawerUrlHydrator: () => undefined,
+}));
 
 vi.mock("../trace-drawer/index.ts", () => ({
   TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" />,

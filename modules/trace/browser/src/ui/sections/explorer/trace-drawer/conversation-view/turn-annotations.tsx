@@ -5,6 +5,10 @@ import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-syste
 import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
 import { useState } from "react";
 
+import {
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceAnnotations } from "../../../../../behavior/reads/use-annotation-reads.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
@@ -18,10 +22,6 @@ import {
   HoverActionCluster,
 } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster.tsx";
 import { PersonAvatar } from "../../../person-avatar.tsx";
-import {
-  openTraceEditorFromConversation,
-  tracePartitionHint,
-} from "../../utils/trace-edit-mode.ts";
 import { AnnotationPopover } from "./annotation-popover.tsx";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];

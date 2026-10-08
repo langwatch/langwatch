@@ -13,8 +13,8 @@ import {
 import { memo, useMemo } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 
-import type { TraceAnchor } from "../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
-import { useTextTranslation } from "../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
+import type { TraceAnchor } from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import { panelChatMessages } from "../../../../model/transcript/panel-messages.ts";
 import { groupMessagesIntoTurns } from "../../../../model/transcript/turns.ts";

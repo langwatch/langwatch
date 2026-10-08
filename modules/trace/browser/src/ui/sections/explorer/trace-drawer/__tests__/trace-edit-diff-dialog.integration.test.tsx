@@ -43,13 +43,13 @@ const header = vi.hoisted((): { current: TraceHeader } => ({
 
 const spansFull = vi.hoisted(() => ({ current: [] as SpanDetail[] }));
 
-vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: header.current }),
 }));
 
-vi.mock("../../../../../features/span/ui/sections/hooks/use-spans-full.ts", async () => {
+vi.mock("../../../../../features/span/behavior/use-spans-full.ts", async () => {
   const actual = await vi.importActual<typeof useSpansFullModule>(
-    "../../../../../features/span/ui/sections/hooks/use-spans-full.ts",
+    "../../../../../features/span/behavior/use-spans-full.ts",
   );
   return {
     ...actual,
@@ -57,7 +57,7 @@ vi.mock("../../../../../features/span/ui/sections/hooks/use-spans-full.ts", asyn
   };
 });
 
-import type * as useSpansFullModule from "../../../../../features/span/ui/sections/hooks/use-spans-full.ts";
+import type * as useSpansFullModule from "../../../../../features/span/behavior/use-spans-full.ts";
 import { TraceEditDiffDialog } from "../trace-edit-diff-dialog.tsx";
 
 function renderDialog(patch: TraceEditOverlayPatch) {

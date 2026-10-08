@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "../../../../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { useDensityTokens } from "../../../../../hooks/use-density-tokens.ts";
-import type { TraceListItem } from "../../../../../types/trace.ts";
 import { buildTracePlaceholderRows } from "../../../../skeleton-placeholders.ts";
 import { OriginCell } from "../simple-cells.tsx";
 

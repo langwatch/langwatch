@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import {
   applyOverlayToSpansFull,
   useSpansFullCanonical,
-} from "../../../../features/span/ui/sections/hooks/use-spans-full.ts";
-import { useTraceHeaderCanonical } from "../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts";
+} from "../../../../features/span/behavior/use-spans-full.ts";
+import { useTraceHeaderCanonical } from "../../../../features/trace-drawer/behavior/use-trace-header.ts";
 import {
   computeLineDiff,
   type DiffLine,

@@ -22,7 +22,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-evaluator-options.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 

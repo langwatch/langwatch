@@ -50,7 +50,7 @@ vi.mock("../../explorer/trace-drawer/conversation-view/conversation-view.tsx", (
   },
 }));
 
-vi.mock("../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
     data: mocks.state.turns,
     isLoading: mocks.state.turnsLoading,
@@ -58,7 +58,7 @@ vi.mock("../../../../features/conversation/ui/sections/hooks/use-conversation-tu
   }),
 }));
 
-vi.mock("../../../../features/trace-drawer/ui/sections/hooks/use-drawer-project-id.ts", () => ({
+vi.mock("../../../../features/trace-drawer/behavior/use-drawer-project-id.ts", () => ({
   useDrawerProjectId: () => "project-1",
 }));
 

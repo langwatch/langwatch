@@ -3,8 +3,8 @@ import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
 
 import { useFilterStore, useViewStore } from "../../../../../../../behavior/explorer.store.ts";
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import { truncateId } from "../../../../../../../model/display-formatters.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import { IOPreview } from "../../../io-preview.tsx";
 import type { CellDef, RowActions } from "../../types.ts";
 

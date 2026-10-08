@@ -12,9 +12,9 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { formatISOTimestamp } from "../../../../../../../../model/display-formatters.ts";
 import { useDensityTokens } from "../../../../../hooks/use-density-tokens.ts";
-import type { TraceListItem } from "../../../../../types/trace.ts";
 import { buildTracePlaceholderRows } from "../../../../skeleton-placeholders.ts";
 import type { CellDef } from "../../../types.ts";
 import { PromptCell } from "../prompt-cell.tsx";

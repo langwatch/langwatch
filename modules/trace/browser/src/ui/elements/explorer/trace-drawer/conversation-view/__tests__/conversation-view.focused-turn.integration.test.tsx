@@ -16,42 +16,30 @@ const mocks = vi.hoisted(() => {
   return { thread, turns: thread };
 });
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts",
-  () => ({
-    useConversationTurns: () => ({
-      data: { items: mocks.turns },
-      isLoading: false,
-    }),
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
+  useConversationTurns: () => ({
+    data: { items: mocks.turns },
+    isLoading: false,
   }),
-);
+}));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-annotations.ts",
-  () => ({
-    useConversationAnnotations: () => ({
-      byTrace: new Map(),
-      byAnchor: new Map(),
-      all: [],
-      hasAny: false,
-      isLoading: false,
-    }),
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
+  useConversationAnnotations: () => ({
+    byTrace: new Map(),
+    byAnchor: new Map(),
+    all: [],
+    hasAny: false,
+    isLoading: false,
   }),
-);
+}));
 
-vi.mock(
-  "../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
-  () => ({
-    useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
-  }),
-);
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
+  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+}));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turn-events.ts",
-  () => ({
-    useConversationTurnEvents: (rows: TraceListItem[]) => rows,
-  }),
-);
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
+  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+}));
 
 vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
@@ -88,8 +76,8 @@ vi.mock(
   }),
 );
 
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view.tsx";
-import type { TraceListItem } from "../../../../../sections/explorer/types/trace.ts";
 import { FOCUS_SCROLL_REST_MS } from "../focused-turn.tsx";
 
 function renderView({

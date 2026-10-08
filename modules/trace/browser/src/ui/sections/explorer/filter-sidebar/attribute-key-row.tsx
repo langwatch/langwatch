@@ -11,7 +11,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
 import { type FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
-import { useAttributeValues } from "../../../../features/facet/ui/sections/hooks/use-attribute-values.ts";
+import { useAttributeValues } from "../../../../features/facet/behavior/use-attribute-values.ts";
 import { NoneAttributeRow } from "../../../blocks/explorer/filter-sidebar/none-attribute-row.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import { AttributeValueRow } from "./attribute-value-row.tsx";

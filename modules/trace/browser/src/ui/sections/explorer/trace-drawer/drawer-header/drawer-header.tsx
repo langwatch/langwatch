@@ -36,13 +36,14 @@ import {
 
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
+import { guardTraceEditExit } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceDrawer, type TraceDrawerState } from "../../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { useConversationContext } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts";
-import { usePinnedAttributes } from "../../../../../features/facet/ui/sections/hooks/use-pinned-attributes.ts";
-import { useSpanTree } from "../../../../../features/span/ui/sections/hooks/use-span-tree.ts";
+import { useConversationContext } from "../../../../../features/conversation/behavior/use-conversation-context.ts";
+import { usePinnedAttributes } from "../../../../../features/facet/behavior/use-pinned-attributes.ts";
+import { useSpanTree } from "../../../../../features/span/behavior/use-span-tree.ts";
 import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
-import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts";
+import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import {
   formatAbsoluteTime,
   formatRelativeTimeAgo,
@@ -70,7 +71,6 @@ import { useTraceRefresh } from "../../hooks/use-trace-refresh.ts";
 import { useTraceResources } from "../../hooks/use-trace-resources.ts";
 import { CostBreakdownTooltipContent } from "../../shared/cost-breakdown-tooltip.tsx";
 import { ModelsTooltip } from "../../trace-table/registry/cells/trace/model-cell.tsx";
-import { guardTraceEditExit } from "../../utils/trace-edit-mode.ts";
 import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle.tsx";
 import { ModeSwitch } from "../mode-switch.tsx";
 import { RawJsonDialog } from "../raw-json-dialog.tsx";

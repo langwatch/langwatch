@@ -4,7 +4,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useSseStatusStore } from "../../../../features/explorer/behavior/sse-status.store.ts";
-import { useTraceNewCount } from "../../../../features/explorer/ui/sections/hooks/use-trace-new-count.ts";
+import { useTraceNewCount } from "../../../../features/explorer/behavior/use-trace-new-count.ts";
 
 const SCROLL_THRESHOLD_PX = 80;
 

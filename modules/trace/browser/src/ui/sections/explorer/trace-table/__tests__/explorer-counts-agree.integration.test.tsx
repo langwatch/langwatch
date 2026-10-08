@@ -33,10 +33,10 @@ const mockSessions = {
   error: null,
 };
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list-query.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list-query.ts", () => ({
   useTraceListQuery: () => mockList,
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-session-groups.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-session-groups.ts", () => ({
   useSessionGroups: () => mockSessions,
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));

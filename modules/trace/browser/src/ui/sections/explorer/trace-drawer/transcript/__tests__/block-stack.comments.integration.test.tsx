@@ -29,22 +29,19 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock(
-  "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
-  async () => {
-    const actual = await vi.importActual<typeof useAnchoredAnnotationsModule>(
-      "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
-    );
-    return {
-      ...actual,
-      useAnchoredAnnotations: () => ({
-        commentsAt: () => mocks.comments,
-        all: mocks.comments,
-        isLoading: false,
-      }),
-    };
-  },
-);
+vi.mock("../../../../../../features/annotation/behavior/use-anchored-annotations.ts", async () => {
+  const actual = await vi.importActual<typeof useAnchoredAnnotationsModule>(
+    "../../../../../../features/annotation/behavior/use-anchored-annotations.ts",
+  );
+  return {
+    ...actual,
+    useAnchoredAnnotations: () => ({
+      commentsAt: () => mocks.comments,
+      all: mocks.comments,
+      isLoading: false,
+    }),
+  };
+});
 
 vi.mock("../../../../me/use-personal-feature-gate.ts", () => ({
   usePersonalFeatureGate: () => ({
@@ -99,7 +96,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 import { withBlockKeys } from "@langwatch/trace-contract/transcript";
 import type { ContentBlock } from "@langwatch/trace-contract/transcript";
 
-import type * as useAnchoredAnnotationsModule from "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
+import type * as useAnchoredAnnotationsModule from "../../../../../../features/annotation/behavior/use-anchored-annotations.ts";
 import { TerminalOutput } from "../../../../../elements/coding-agent/trace/terminal-output.tsx";
 import { TranscriptRenderProvider } from "../../../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../../../traces/trace-media-part.tsx";

@@ -11,13 +11,13 @@ import { CircleHelp } from "lucide-react";
 import type React from "react";
 
 import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "../../../../../../blocks/model-providers/icons-map.tsx";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 // When the +N popover would otherwise render a wall of model names,

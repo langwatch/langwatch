@@ -5,7 +5,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import type { TraceEditButtonProps } from "@langwatch/trace-contract";
 import { Pencil } from "lucide-react";
 
-import { openTraceEditorFromConversation } from "../explorer/utils/trace-edit-mode.ts";
+import { openTraceEditorFromConversation } from "../../../behavior/explorer/utils/trace-edit-mode.ts";
 
 export function TraceEditButton({ traceId, occurredAtMs, disabled }: TraceEditButtonProps) {
   const { openDrawer } = useDrawer();

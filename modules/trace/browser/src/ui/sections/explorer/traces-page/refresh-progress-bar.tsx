@@ -3,7 +3,7 @@ import type React from "react";
 import { useEffect } from "react";
 
 import { useRefreshUIStore } from "../../../../features/explorer/behavior/refresh-ui.store.ts";
-import { useTraceListRefresh } from "../../../../features/explorer/ui/sections/hooks/use-trace-list-refresh.ts";
+import { useTraceListRefresh } from "../../../../features/explorer/behavior/use-trace-list-refresh.ts";
 import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg.tsx";
 
 const FADE_MASK =

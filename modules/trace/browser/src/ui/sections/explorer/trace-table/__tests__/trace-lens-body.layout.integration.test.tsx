@@ -11,9 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
 import type { LensConfig } from "../../../../../behavior/view.slice.ts";
 import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
-import type { TraceListItem } from "../../types/trace.ts";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 import { TraceLensBody } from "../trace-lens-body.tsx";
 import { TraceTableLayout } from "../trace-table-layout.tsx";
@@ -28,18 +28,18 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
     hasPermission: () => true,
   }),
 }));
-vi.mock("../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts", () => ({
+vi.mock("../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts", () => ({
   useOpenTraceDrawer: () => vi.fn(),
 }));
-vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-evaluator-options.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ totalHits: 0, itemNoun: "traces", instantEval: null, summary: "" }),
 }));
 vi.mock("../column-education-dialog.tsx", () => ({ ColumnEducationDialog: () => null }));
 vi.mock("../../traces-page/refresh-progress-bar.tsx", () => ({ RefreshProgressBar: () => null }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-new-count.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-new-count.ts", () => ({
   useTraceNewCount: () => ({ count: 0, acknowledge: vi.fn() }),
 }));
 

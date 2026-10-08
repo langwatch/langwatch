@@ -2,6 +2,7 @@ import { Button, Icon, Text, VStack } from "@langwatch/design-system/primitives"
 import { Edit3 } from "lucide-react";
 
 import { useRequiredSession } from "../../../../../behavior/auth-session.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   type AnnotationDraft,
@@ -9,7 +10,6 @@ import {
   type OpenAnnotationDraftParams,
   useAnnotationDraftStore,
 } from "../../../../../features/annotation/behavior/annotation-draft.store.ts";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { useScoreNamesById } from "../../../use-score-names-by-id.ts";
 import { AnnotationCard } from "./annotation-card.tsx";
 import { AnnotationEditorCard } from "./annotation-editor-card.tsx";

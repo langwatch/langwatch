@@ -9,9 +9,9 @@ import type React from "react";
 import { useMemo, useState } from "react";
 
 import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import { type LensConfig, groupByForGrouping } from "../../../../behavior/view.slice.ts";
 import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
-import type { TraceListItem } from "../types/trace.ts";
 import { buildGroupColumns } from "./columns.ts";
 import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry/index.ts";
 import { groupSelectColumnDef } from "./select-column.tsx";

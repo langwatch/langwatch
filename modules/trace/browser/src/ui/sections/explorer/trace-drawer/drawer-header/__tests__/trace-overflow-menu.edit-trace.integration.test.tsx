@@ -31,12 +31,9 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts",
-  () => ({
-    useConversationTurns: () => ({ data: undefined }),
-  }),
-);
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
+  useConversationTurns: () => ({ data: undefined }),
+}));
 
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },

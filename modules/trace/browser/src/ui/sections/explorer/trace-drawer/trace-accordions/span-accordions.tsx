@@ -13,9 +13,9 @@ import { LuCircleX } from "react-icons/lu";
 
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
-import { useAnchoredAnnotations } from "../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
-import { useSpanDetail } from "../../../../../features/span/ui/sections/hooks/use-span-detail.ts";
-import { useSpanLogs } from "../../../../../features/span/ui/sections/hooks/use-span-logs.ts";
+import { useAnchoredAnnotations } from "../../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import { useSpanDetail } from "../../../../../features/span/behavior/use-span-detail.ts";
+import { useSpanLogs } from "../../../../../features/span/behavior/use-span-logs.ts";
 import {
   logEventTone,
   summarizeLogEvent,

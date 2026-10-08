@@ -8,51 +8,36 @@ import "@testing-library/jest-dom/vitest";
 
 const turns: TraceListItem[] = [];
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts",
-  () => ({
-    useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
-  }),
-);
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
+  useConversationTurns: () => ({ data: { items: turns }, isLoading: false }),
+}));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-annotations.ts",
-  () => ({
-    useConversationAnnotations: () => ({
-      byTrace: new Map(),
-      byAnchor: new Map(),
-      all: [],
-      hasAny: false,
-      isLoading: false,
-    }),
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-annotations.ts", () => ({
+  useConversationAnnotations: () => ({
+    byTrace: new Map(),
+    byAnchor: new Map(),
+    all: [],
+    hasAny: false,
+    isLoading: false,
   }),
-);
+}));
 
-vi.mock(
-  "../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
-  () => ({
-    useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
-  }),
-);
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
+  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+}));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-turn-events.ts",
-  () => ({
-    useConversationTurnEvents: (rows: TraceListItem[]) => rows,
-  }),
-);
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-turn-events.ts", () => ({
+  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+}));
 
-vi.mock(
-  "../../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts",
-  () => ({
-    useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
-      displayTexts: texts,
-      isActive: false,
-      isLoading: false,
-      toggle: () => undefined,
-    }),
+vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
   }),
-);
+}));
 
 vi.mock("../../../../../blocks/markdown/rendered-markdown.tsx", () => ({
   RenderedMarkdown: () => null,
@@ -88,7 +73,10 @@ vi.mock("../../../../simulations/media-part.tsx", () => ({
 
 import type { TraceMediaRef } from "@langwatch/trace-contract";
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 
 const CALLER_RECORDING = "/api/files/project-1/caller";

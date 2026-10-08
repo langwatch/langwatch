@@ -6,7 +6,7 @@ import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useRowPulseStore } from "../../../../features/explorer/behavior/row-pulse.store.ts";
 import { useSseStatusStore } from "../../../../features/explorer/behavior/sse-status.store.ts";
-import { useVisibleTraceIds } from "../../../../features/explorer/ui/sections/hooks/use-visible-trace-ids.ts";
+import { useVisibleTraceIds } from "../../../../features/explorer/behavior/use-visible-trace-ids.ts";
 import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
 
 // Facets (`traces.discover`) are ~10x more expensive than the table list

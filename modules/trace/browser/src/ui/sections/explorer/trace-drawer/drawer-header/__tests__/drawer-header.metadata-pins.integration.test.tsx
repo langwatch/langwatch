@@ -67,38 +67,32 @@ vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   }),
 }));
 
-vi.mock(
-  "../../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts",
-  () => ({
-    useConversationContext: () => ({
-      turns: [],
-      position: null,
-      total: 0,
-      previous: null,
-      next: null,
-      isLoading: false,
-    }),
+vi.mock("../../../../../../features/conversation/behavior/use-conversation-context.ts", () => ({
+  useConversationContext: () => ({
+    turns: [],
+    position: null,
+    total: 0,
+    previous: null,
+    next: null,
+    isLoading: false,
   }),
-);
+}));
 
 vi.mock("../../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn(), isRefreshing: false }),
 }));
 
-vi.mock(
-  "../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts",
-  () => ({
-    useTraceDrawerNavigation: () => ({
-      canGoBack: false,
-      goBack: vi.fn(),
-      goBackTo: vi.fn(),
-      backStackDepth: 0,
-      backStack: [],
-    }),
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts", () => ({
+  useTraceDrawerNavigation: () => ({
+    canGoBack: false,
+    goBack: vi.fn(),
+    goBackTo: vi.fn(),
+    backStackDepth: 0,
+    backStack: [],
   }),
-);
+}));
 
-vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-tree.ts", () => ({
+vi.mock("../../../../../../features/span/behavior/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [], isLoading: false }),
 }));
 

@@ -10,7 +10,7 @@ import "@testing-library/jest-dom/vitest";
 
 import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
 import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
-import { useJumpToAnnotationAnchor } from "../../../../../features/annotation/ui/sections/hooks/use-jump-to-annotation-anchor.ts";
+import { useJumpToAnnotationAnchor } from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
 import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
 import { useSpanPulseStore } from "../../../../../features/trace-drawer/behavior/span-pulse.store.ts";
 import { useSectionFocusGlow } from "../../trace-drawer/trace-accordions/use-section-focus-glow.ts";

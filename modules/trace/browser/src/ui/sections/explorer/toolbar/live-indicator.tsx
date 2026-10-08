@@ -10,7 +10,7 @@ import {
   type LiveUpdatesMode,
   useSseStatusStore,
 } from "../../../../features/explorer/behavior/sse-status.store.ts";
-import { useTraceListRefresh } from "../../../../features/explorer/ui/sections/hooks/use-trace-list-refresh.ts";
+import { useTraceListRefresh } from "../../../../features/explorer/behavior/use-trace-list-refresh.ts";
 
 const SSE_STATE_STYLE: Record<ConnectionState, { dotColor: string; pulse: boolean }> = {
   connected: { dotColor: "green.solid", pulse: true },

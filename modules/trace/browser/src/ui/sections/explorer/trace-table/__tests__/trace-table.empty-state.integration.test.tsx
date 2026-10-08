@@ -22,7 +22,7 @@ let mockTraceListResult = {
   newIds: new Set<string>(),
 };
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list.ts", () => ({
   useTraceList: () => mockTraceListResult,
 }));
 
@@ -39,7 +39,7 @@ let mockSessionGroupsResult = {
   error: null as unknown,
 };
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-session-groups.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-session-groups.ts", () => ({
   useSessionGroups: () => mockSessionGroupsResult,
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
@@ -63,7 +63,7 @@ const mockFilterState = {
 
 // The page-wide count read, answering from whichever source the active lens
 // paginates, the way the real selector does.
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () =>
     mockGrouping === "by-conversation"
       ? {

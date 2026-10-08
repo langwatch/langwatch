@@ -7,8 +7,8 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import {
   type TraceAnchor,
   useAnchoredAnnotations,
-} from "../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts";
-import type { useTextTranslation } from "../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
+} from "../../../../features/annotation/behavior/use-anchored-annotations.ts";
+import type { useTextTranslation } from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button.tsx";
 import {
   PlaygroundButton,

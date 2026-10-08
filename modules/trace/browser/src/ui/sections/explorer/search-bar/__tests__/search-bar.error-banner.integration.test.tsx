@@ -18,12 +18,9 @@ vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: true, isLoading: false }),
 }));
 
-vi.mock(
-  "../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-access.ts",
-  () => ({
-    useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
-  }),
-);
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-access.ts", () => ({
+  useInstantEvalAccess: () => ({ isAvailable: true, optInOffer: undefined }),
+}));
 
 vi.mock("../use-instant-eval-route.ts", () => ({
   useInstantEvalRoute: () => ({
@@ -62,14 +59,14 @@ vi.mock("../../../use-model-providers-settings.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-trace-facets.ts", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
 // top level. These tests don't wrap with a tRPC provider, so stub the hook
 // out — server search is covered by its own dedicated suite.
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-facet-search.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 

@@ -3,9 +3,9 @@ import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ReactElement } from "react";
 
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { CostBreakdownTooltipContent } from "../../../../shared/cost-breakdown-tooltip.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import type { CellDef } from "../../types.ts";
 
 // `totalCost` is the grand list-price cost; `nonBilledCost` is the bundled

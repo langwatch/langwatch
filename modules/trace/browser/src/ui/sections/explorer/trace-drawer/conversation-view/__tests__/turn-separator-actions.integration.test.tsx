@@ -57,6 +57,11 @@ import {
   openTraceDrawerAt,
   setWindowAddress,
 } from "../../../../../../__tests__/window-location-router.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../behavior/explorer/types/trace.ts";
+import { enterTraceEditMode } from "../../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import {
   isSessionMarked,
@@ -64,8 +69,6 @@ import {
 } from "../../../../../../features/annotation/behavior/annotation-queue-session.store.ts";
 import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
 import { useTraceEditStore } from "../../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
-import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";

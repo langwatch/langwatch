@@ -18,8 +18,10 @@ import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import { useTimeFormatStore } from "../../../../../../../features/explorer/behavior/time-format.store.ts";
-import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts";
+import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
 import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
 import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import {
@@ -31,9 +33,7 @@ import { dash } from "../../../../../../elements/explorer/trace-table/registry/c
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";
 import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
 import { useRelativeTime } from "../../../../utils/use-relative-time.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import {
   ROW_STYLES,
   type RowStyle,

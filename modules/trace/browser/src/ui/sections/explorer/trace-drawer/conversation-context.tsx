@@ -21,7 +21,7 @@ import {
 
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import { useConversationContext } from "../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts";
+import { useConversationContext } from "../../../../features/conversation/behavior/use-conversation-context.ts";
 import {
   getDrawerDensityTokens,
   useDensityStore,
@@ -30,8 +30,8 @@ import { useDisplayRoleVisuals } from "../../../../features/trace-drawer/behavio
 import {
   type UseTextTranslationResult,
   useTextTranslation,
-} from "../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
-import { useTraceDrawerNavigation } from "../../../../features/trace-drawer/ui/sections/hooks/use-trace-drawer-navigation.ts";
+} from "../../../../features/trace-drawer/behavior/use-text-translation.ts";
+import { useTraceDrawerNavigation } from "../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
 import { RedactedInline } from "../../redacted-field.tsx";

@@ -28,10 +28,10 @@ import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useSearchSubmitRequestStore } from "../../../../features/explorer/behavior/search-submit-request.store.ts";
 import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
-import { useTraceFacets } from "../../../../features/facet/ui/sections/hooks/use-trace-facets.ts";
+import { useTraceFacets } from "../../../../features/facet/behavior/use-trace-facets.ts";
 import { useInstantEvalRunStore } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
-import { useInstantEvalAccess } from "../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-access.ts";
-import { useInstantEvalRuns } from "../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-runs.ts";
+import { useInstantEvalAccess } from "../../../../features/instant-eval/behavior/use-instant-eval-access.ts";
+import { useInstantEvalRuns } from "../../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import {
   instantEvalChipMarks,
   isInstantEvalBusy,

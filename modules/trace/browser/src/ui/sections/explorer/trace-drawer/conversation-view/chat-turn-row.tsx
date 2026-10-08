@@ -16,6 +16,7 @@ import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useMemo, useState } from "react";
 
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import {
   isSessionMarked,
@@ -25,7 +26,7 @@ import { useIsScenarioRole } from "../../../../../features/trace-drawer/behavior
 import {
   type UseTextTranslationResult,
   useTextTranslation,
-} from "../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts";
+} from "../../../../../features/trace-drawer/behavior/use-text-translation.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
 import { formatRelativeTimeAgo } from "../../../../../model/display-formatters.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
@@ -38,7 +39,6 @@ import {
   type BubbleSide,
   truncateMarkdown,
 } from "../../trace-table/registry/addons/conversation/bubble.tsx";
-import type { TraceListItem } from "../../types/trace.ts";
 import { getRolePalette, ReasoningBlock } from "../transcript/index.ts";
 import {
   MessageAnnotateCluster,

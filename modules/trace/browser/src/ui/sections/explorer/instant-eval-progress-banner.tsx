@@ -12,7 +12,7 @@ import {
   selectInstantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../../../features/instant-eval/behavior/instant-eval-run.store.ts";
-import { useInstantEvalRuns } from "../../../features/instant-eval/ui/sections/hooks/use-instant-eval-runs.ts";
+import { useInstantEvalRuns } from "../../../features/instant-eval/behavior/use-instant-eval-runs.ts";
 import { InstantEvalProgressBar } from "../../elements/explorer/instant-eval-progress.tsx";
 
 export function InstantEvalProgressBanner() {

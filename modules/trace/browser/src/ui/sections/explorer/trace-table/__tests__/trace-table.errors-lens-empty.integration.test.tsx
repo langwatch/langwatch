@@ -12,7 +12,7 @@ import "@testing-library/jest-dom/vitest";
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { TraceTable } from "../trace-table.tsx";
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list.ts", () => ({
   useTraceList: () => ({
     data: [],
     totalHits: 0,
@@ -24,7 +24,7 @@ vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list.ts", 
     newIds: new Set<string>(),
   }),
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-session-groups.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-session-groups.ts", () => ({
   useSessionGroups: () => ({
     groups: [],
     totalHits: 0,
@@ -37,7 +37,7 @@ vi.mock("../../../../../features/explorer/ui/sections/hooks/use-session-groups.t
   }),
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({
     totalHits: 0,
     itemNoun: "traces",
@@ -49,7 +49,7 @@ vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.
     summary: "0 traces",
   }),
 }));
-vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-runs.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [] }),
 }));
 vi.mock("../trace-lens-body.tsx", () => ({

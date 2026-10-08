@@ -5,7 +5,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Row } from "@tanstack/react-table";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceListItem } from "../../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { ROW_STYLES } from "../../../../status-row.tsx";
 import { IOPreviewAddon } from "../io-preview-addon.tsx";
 

@@ -1,8 +1,8 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
 import { readableDate } from "../../../../../model/display-formatters.ts";
 import { PersonAvatar } from "../../../person-avatar.tsx";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 
 /**
  * What has already been said about one part of the trace, read above the composer that

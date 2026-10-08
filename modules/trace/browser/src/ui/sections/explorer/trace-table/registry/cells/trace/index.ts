@@ -1,4 +1,4 @@
-import type { TraceListItem } from "../../../../types/trace.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
 import type { TraceColumnId } from "../../../columns.ts";
 import type { CellDef } from "../../types.ts";
 import { type SELECT_COLUMN_ID, TraceSelectCell } from "../select-cells.tsx";

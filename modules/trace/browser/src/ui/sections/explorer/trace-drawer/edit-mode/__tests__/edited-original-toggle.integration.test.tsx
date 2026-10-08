@@ -9,12 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const overlayData = vi.hoisted<{ current: TraceEditOverlayDto | null }>(() => ({ current: null }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: overlayData.current }),
   useAppliedTraceEditPatch: () => overlayData.current?.patch ?? null,
 }));
 
-vi.mock("../../../../../../features/trace-drawer/ui/sections/hooks/use-trace-header.ts", () => ({
+vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("react-router", async (importOriginal) => ({
   ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
-vi.mock("../../../../../../features/span/ui/sections/hooks/use-spans-full.ts", () => ({
+vi.mock("../../../../../../features/span/behavior/use-spans-full.ts", () => ({
   useSpansFullCanonical: () => ({ data: undefined }),
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));

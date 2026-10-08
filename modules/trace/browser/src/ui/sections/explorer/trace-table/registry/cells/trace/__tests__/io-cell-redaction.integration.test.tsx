@@ -24,7 +24,10 @@ vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () 
   }),
 }));
 
-import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../../types/trace.ts";
+import {
+  NO_TRACE_EVENTS,
+  type TraceListItem,
+} from "../../../../../../../../behavior/explorer/types/trace.ts";
 import type { CellRenderContext } from "../../../types.ts";
 import { InputCell } from "../input-cell.tsx";
 import { OutputCell } from "../output-cell.tsx";

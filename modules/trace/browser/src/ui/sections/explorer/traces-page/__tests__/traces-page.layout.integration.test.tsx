@@ -32,19 +32,16 @@ vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
 vi.mock("../../../presence/hooks/use-traces-v2-presence.ts", () => ({
   useTracesPresence: () => undefined,
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ totalHits: 0, pageTraceIds: [], itemNoun: "traces" }),
 }));
-vi.mock(
-  "../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-run-watch.ts",
-  () => ({
-    useInstantEvalRunWatch: () => undefined,
-  }),
-);
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-lens-filter-dirty-sync.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-run-watch.ts", () => ({
+  useInstantEvalRunWatch: () => undefined,
+}));
+vi.mock("../../../../../features/facet/behavior/use-lens-filter-dirty-sync.ts", () => ({
   useLensFilterDirtySync: () => undefined,
 }));
-vi.mock("../../../../../features/facet/ui/sections/hooks/use-lens-sync.ts", () => ({
+vi.mock("../../../../../features/facet/behavior/use-lens-sync.ts", () => ({
   useLensSync: () => undefined,
 }));
 vi.mock("../../hooks/use-reset-selection-on-view-change.ts", () => ({
@@ -54,7 +51,7 @@ vi.mock("../../hooks/use-rolling-time-range.ts", () => ({
   useRollingTimeRange: () => undefined,
 }));
 vi.mock("../../hooks/use-trace-freshness.ts", () => ({ useTraceFreshness: () => undefined }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list-export.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list-export.ts", () => ({
   useTraceListExport: () => ({
     isDialogOpen: false,
     openExportDialog: vi.fn(),
@@ -65,7 +62,7 @@ vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list-expor
     cancelExport: vi.fn(),
   }),
 }));
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-trace-list-query.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-trace-list-query.ts", () => ({
   useTraceListQuery: () => ({ data: [] }),
 }));
 vi.mock("../../hooks/use-url-sync.ts", () => ({ useURLSync: () => undefined }));

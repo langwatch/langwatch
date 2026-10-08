@@ -8,7 +8,7 @@ import {
   chipOverlayLabel,
   type TokenRef,
 } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
-import { useFacetValueLabelResolver } from "../../../../features/facet/ui/sections/hooks/use-facet-value-labels.ts";
+import { useFacetValueLabelResolver } from "../../../../features/facet/behavior/use-facet-value-labels.ts";
 
 /**
  * The search bar's at-rest invitation. One constant, so the cold placeholder

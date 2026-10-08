@@ -1,4 +1,4 @@
-import type { ConversationGroup } from "../../../conversation-groups.ts";
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import type { CellDef } from "../../types.ts";
 import { ConversationSelectCell } from "../select-cells.tsx";
 import { ConversationCell } from "./conversation-cell.tsx";

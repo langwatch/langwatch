@@ -41,8 +41,8 @@ import {
   selectVisibilityFor,
   useFacetVisibilityStore,
 } from "../../../../../features/facet/behavior/facet-visibility.store.ts";
-import { useFilteredTraceFacets } from "../../../../../features/facet/ui/sections/hooks/use-filtered-trace-facets.ts";
-import { useTraceFacets } from "../../../../../features/facet/ui/sections/hooks/use-trace-facets.ts";
+import { useFilteredTraceFacets } from "../../../../../features/facet/behavior/use-filtered-trace-facets.ts";
+import { useTraceFacets } from "../../../../../features/facet/behavior/use-trace-facets.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
 import {
   type FacetCountState,

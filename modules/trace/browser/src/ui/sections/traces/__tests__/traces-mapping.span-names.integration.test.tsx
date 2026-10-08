@@ -44,7 +44,7 @@ vi.mock("../../use-project-event-types.ts", () => ({
   }),
 }));
 
-vi.mock("../../use-annotations-by-trace-ids.ts", () => ({
+vi.mock("../../../../behavior/use-annotations-by-trace-ids.ts", () => ({
   useAnnotationsByTraceIds: () => ({ data: [] }),
 }));
 

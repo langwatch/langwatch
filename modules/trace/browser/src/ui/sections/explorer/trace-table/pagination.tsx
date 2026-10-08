@@ -4,7 +4,7 @@ import type React from "react";
 import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 import { type PageCursor } from "../../../../behavior/query.slice.ts";
-import { useExplorerCounts } from "../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts";
+import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
 import { Pagination as PaginationBar } from "../../../elements/pagination.tsx";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;

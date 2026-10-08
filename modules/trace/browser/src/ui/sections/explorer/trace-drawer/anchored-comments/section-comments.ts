@@ -1,5 +1,5 @@
-import { focusSectionForAnchorPath } from "../../../../../features/annotation/ui/sections/hooks/use-jump-to-annotation-anchor.ts";
-import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../behavior/use-annotations-by-trace-ids.ts";
+import { focusSectionForAnchorPath } from "../../../../../features/annotation/behavior/use-jump-to-annotation-anchor.ts";
 
 /**
  * How many comments each section of one element carries, by section id.

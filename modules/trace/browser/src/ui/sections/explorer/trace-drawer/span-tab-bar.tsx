@@ -30,7 +30,7 @@ import {
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
-import { usePrefetchSpanDetail } from "../../../../features/span/ui/sections/hooks/use-prefetch-span-detail.ts";
+import { usePrefetchSpanDetail } from "../../../../features/span/behavior/use-prefetch-span-detail.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { PresenceMarker } from "../../../elements/presence/presence-marker.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";

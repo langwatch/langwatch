@@ -2,7 +2,7 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../../behavior/trace-api.ts";
-import { useConversationContext } from "../../../../../features/conversation/ui/sections/hooks/use-conversation-context.ts";
+import { useConversationContext } from "../../../../../features/conversation/behavior/use-conversation-context.ts";
 import {
   CONVERSATION_TURN_CAP,
   type EarlierTotals,

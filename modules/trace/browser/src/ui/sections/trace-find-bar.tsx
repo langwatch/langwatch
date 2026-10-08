@@ -3,7 +3,7 @@ import { Box, Flex, Icon, IconButton, Input, Text } from "@langwatch/design-syst
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
 
-import { useTraceList } from "../../features/explorer/ui/sections/hooks/use-trace-list.ts";
+import { useTraceList } from "../../features/explorer/behavior/use-trace-list.ts";
 import { useFindAutoFocusInput } from "../../features/find/behavior/find-auto-focus-input.ts";
 import { useFindMatchCycling } from "../../features/find/behavior/find-match-cycling.ts";
 import { useFindScrollTraceIntoView } from "../../features/find/behavior/find-scroll-trace-into-view.ts";

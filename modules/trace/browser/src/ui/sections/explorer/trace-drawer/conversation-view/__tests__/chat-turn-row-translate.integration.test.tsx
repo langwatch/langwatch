@@ -84,9 +84,9 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 
 import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../behavior/explorer/types/trace.ts";
 import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
-import type { TraceListItem } from "../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 function turn(over: Partial<TraceListItem>): TraceListItem {

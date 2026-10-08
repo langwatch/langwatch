@@ -7,7 +7,7 @@ import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   comments: [] as AnnotationByTrace[],
@@ -38,29 +38,26 @@ vi.mock("../../../../me/personal-feature-gate-dialog.tsx", () => ({
   PersonalFeatureGateDialog: () => null,
 }));
 
-vi.mock(
-  "../../../../../../features/annotation/ui/sections/hooks/use-anchored-annotations.ts",
-  () => ({
-    useAnchoredAnnotations: () => ({
-      commentsAt: () => [],
-      all: mocks.comments,
-      isLoading: false,
-    }),
+vi.mock("../../../../../../features/annotation/behavior/use-anchored-annotations.ts", () => ({
+  useAnchoredAnnotations: () => ({
+    commentsAt: () => [],
+    all: mocks.comments,
+    isLoading: false,
   }),
-);
+}));
 
-vi.mock("../../../hooks/use-trace-query-args.ts", () => ({
+vi.mock("../../../../../../behavior/explorer/use-trace-query-args.ts", () => ({
   useTraceQueryArgs: () => ({ traceId: "trace-1" }),
 }));
 
-vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-langwatch-signals.ts", () => ({
+vi.mock("../../../../../../features/span/behavior/use-span-langwatch-signals.ts", () => ({
   useSpanLangwatchSignals: () => ({
     signalsBySpanId: new Map(),
     isFetched: true,
   }),
 }));
 
-vi.mock("../../../../../../features/span/ui/sections/hooks/use-span-logs.ts", () => ({
+vi.mock("../../../../../../features/span/behavior/use-span-logs.ts", () => ({
   useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
 }));
 

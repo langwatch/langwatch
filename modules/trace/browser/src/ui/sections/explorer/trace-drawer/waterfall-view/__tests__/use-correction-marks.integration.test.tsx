@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
   patch: null as unknown,
 }));
 
-vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: { patch: harness.patch } }),
 }));
 

@@ -4,7 +4,9 @@ import { Box, Button, Flex, HStack, Icon, Text, VStack } from "@langwatch/design
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 
-import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/ui/sections/hooks/use-open-trace-drawer.ts";
+import type { ConversationGroup } from "../../../../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../../../../behavior/explorer/types/trace.ts";
+import { useOpenTraceDrawer } from "../../../../../../../features/trace-drawer/behavior/use-open-trace-drawer.ts";
 import {
   findMessageContent,
   parseSystemPrompt,
@@ -13,8 +15,6 @@ import { EXPANDED_BG_CSS } from "../../../../../../../model/explorer/trace-table
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner.tsx";
 import { TraceIdPeek } from "../../../../trace-id-peek.tsx";
-import type { TraceListItem } from "../../../../types/trace.ts";
-import type { ConversationGroup } from "../../../conversation-groups.ts";
 import { type RowStyle, StatusDot } from "../../../status-row.tsx";
 import { Bubble } from "./bubble.tsx";
 import { ConversationSummaryLine } from "./conversation-summary.tsx";

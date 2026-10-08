@@ -11,12 +11,12 @@ import { setWindowAddress } from "../../../../../__tests__/window-location-route
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
+import type { ConversationGroup } from "../../../../../behavior/explorer/trace-table/conversation-groups.ts";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
+import { mapSessionGroupToConversationGroup } from "../../../../../behavior/explorer/utils/map-session-groups-payload.ts";
 import { getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { type LensConfig } from "../../../../../behavior/view.slice.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
-import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
-import type { ConversationGroup } from "../conversation-groups.ts";
 import { ConversationLensBody } from "../conversation-lens-body.tsx";
 
 const { openDrawerMock } = vi.hoisted(() => ({ openDrawerMock: vi.fn() }));
@@ -32,7 +32,7 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
 
 // The expanded row's turns come from their own conversation-scoped query;
 // nothing here needs them to land, only whether the row asked to expand.
-vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: undefined }),
 }));
 

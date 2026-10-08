@@ -17,12 +17,12 @@ import { EmptyFilterState } from "../empty-filter-state.tsx";
 
 const QUERY = 'status:error AND eval:"is the user annoyed"';
 
-vi.mock("../../../../../features/explorer/ui/sections/hooks/use-explorer-counts.ts", () => ({
+vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () => ({
   useExplorerCounts: () => ({ instantEval: null }),
 }));
 
 let mockChips: { runId: string | null; question: string }[] = [];
-vi.mock("../../../../../features/instant-eval/ui/sections/hooks/use-instant-eval-runs.ts", () => ({
+vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: mockChips }),
 }));
 

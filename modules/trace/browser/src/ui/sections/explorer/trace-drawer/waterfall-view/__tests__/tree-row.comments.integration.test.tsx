@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+import type { AnnotationByTrace } from "../../../../../../behavior/use-annotations-by-trace-ids.ts";
 
 const mocks = vi.hoisted(() => ({
   canManage: true,

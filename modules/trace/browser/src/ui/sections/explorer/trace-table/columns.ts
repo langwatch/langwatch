@@ -1,8 +1,8 @@
 import { type ColumnDef, createColumnHelper } from "@tanstack/react-table";
 
+import type { ConversationGroup } from "../../../../behavior/explorer/trace-table/conversation-groups.ts";
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
 import { timeColumnSizing } from "../../../../features/explorer/behavior/time-format.store.ts";
-import type { TraceListItem } from "../types/trace.ts";
-import type { ConversationGroup } from "./conversation-groups.ts";
 import type { TraceGroup } from "./registry/index.ts";
 import type { ColumnMeta } from "./trace-table-shell.tsx";
 

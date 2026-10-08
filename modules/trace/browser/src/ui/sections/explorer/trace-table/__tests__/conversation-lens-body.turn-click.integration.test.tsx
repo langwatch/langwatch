@@ -12,11 +12,11 @@ import "@testing-library/jest-dom/vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
+import type { TraceListItem } from "../../../../../behavior/explorer/types/trace.ts";
+import { mapSessionGroupToConversationGroup } from "../../../../../behavior/explorer/utils/map-session-groups-payload.ts";
 import type { LensConfig } from "../../../../../behavior/view.slice.ts";
 import { DEFAULT_VIEW_MODE } from "../../../../../model/trace-drawer-params.ts";
 import { ModeSwitch } from "../../trace-drawer/mode-switch.tsx";
-import type { TraceListItem } from "../../types/trace.ts";
-import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
 import { ConversationLensBody } from "../conversation-lens-body.tsx";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";
 
@@ -41,7 +41,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => {
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
-vi.mock("../../../../../features/span/ui/sections/hooks/span-tree-paged-query.ts", () => ({
+vi.mock("../../../../../features/span/behavior/span-tree-paged-query.ts", () => ({
   spanTreeQueryKey: (input: unknown) => ["spanTree", input],
   spanTreeQueryFn: () => () => undefined,
 }));
@@ -57,10 +57,10 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   }),
   useDrawerParams: () => ({}),
 }));
-vi.mock("../../../../../features/conversation/ui/sections/hooks/use-conversation-turns.ts", () => ({
+vi.mock("../../../../../features/conversation/behavior/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({ data: harness.turns }),
 }));
-vi.mock("../../utils/map-trace-list-payload.ts", () => ({
+vi.mock("../../../../../behavior/explorer/utils/map-trace-list-payload.ts", () => ({
   mapTraceListPayload: (data: unknown[] | undefined) => data ?? [],
 }));
 vi.mock("../../trace-id-peek.tsx", () => ({ TraceIdPeek: () => null }));

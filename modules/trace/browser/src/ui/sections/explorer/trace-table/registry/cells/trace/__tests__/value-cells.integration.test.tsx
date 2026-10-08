@@ -12,10 +12,10 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../../../../behavior/explorer.store.ts";
+import type { TraceListItem } from "../../../../../../../../behavior/explorer/types/trace.ts";
 import { useTimeFormatStore } from "../../../../../../../../features/explorer/behavior/time-format.store.ts";
 import { formatISOTimestamp } from "../../../../../../../../model/display-formatters.ts";
 import { useDensityTokens } from "../../../../../hooks/use-density-tokens.ts";
-import type { TraceListItem } from "../../../../../types/trace.ts";
 import { buildTracePlaceholderRows } from "../../../../skeleton-placeholders.ts";
 import { TraceStatisticsProvider } from "../../../../trace-statistics-context.tsx";
 import type { CellDef } from "../../../types.ts";

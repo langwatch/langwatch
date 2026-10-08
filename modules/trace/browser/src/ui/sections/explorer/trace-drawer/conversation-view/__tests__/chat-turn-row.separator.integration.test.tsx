@@ -29,17 +29,14 @@ vi.mock("@langwatch/design-system/conversation-expand-context", async () => {
   };
 });
 
-vi.mock(
-  "../../../../../../features/trace-drawer/ui/sections/hooks/use-text-translation.ts",
-  () => ({
-    useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
-      displayTexts: texts,
-      isActive: false,
-      isLoading: false,
-      toggle: () => undefined,
-    }),
+vi.mock("../../../../../../features/trace-drawer/behavior/use-text-translation.ts", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
   }),
-);
+}));
 
 /**
  * The badge stands in as an empty marker: the tests read the ledger's text, so
@@ -64,9 +61,9 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
 
 import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
+import type { TraceListItem } from "../../../../../../behavior/explorer/types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../../../../behavior/explorer/types/trace.ts";
 import type * as scenarioRolesModule from "../../../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
-import type { TraceListItem } from "../../../types/trace.ts";
-import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;

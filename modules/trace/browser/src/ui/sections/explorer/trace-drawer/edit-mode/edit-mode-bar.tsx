@@ -3,6 +3,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 
+import { exitTraceEditMode } from "../../../../../behavior/explorer/utils/trace-edit-mode.ts";
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
@@ -18,7 +19,6 @@ import {
 } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
 import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
-import { exitTraceEditMode } from "../../utils/trace-edit-mode.ts";
 
 /** "3 fields changed, 1 span deleted", with only the non-zero parts. */
 function describeEdit({
