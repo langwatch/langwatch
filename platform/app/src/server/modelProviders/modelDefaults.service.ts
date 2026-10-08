@@ -144,10 +144,13 @@ function dropInvalidEntries(
  * may predate a tightened restriction. Rejecting it would lock the whole
  * config; resolution already skips such a stored value at runtime.
  */
-function assertWritable(
-  clean: Record<string, string>,
-  stored: Record<string, unknown> = {},
-): void {
+function assertWritable({
+  clean,
+  stored,
+}: {
+  clean: Record<string, string>;
+  stored: Record<string, unknown>;
+}): void {
   const roleKeys = new Set<string>(MODEL_ROLES);
   for (const [key, value] of Object.entries(clean)) {
     if (stored[key] === value) continue;
@@ -160,12 +163,6 @@ function assertWritable(
       );
     }
   }
-}
-
-function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
-  const clean = dropInvalidEntries(raw);
-  assertWritable(clean);
-  return clean;
 }
 
 function dedupeScopes(scopes: ScopeAttachment[]): ScopeAttachment[] {
@@ -278,7 +275,8 @@ export async function createConfig(
     authorId?: string | null;
   },
 ): Promise<{ id: string }> {
-  const config = sanitizeConfig(params.config);
+  const config = dropInvalidEntries(params.config);
+  assertWritable({ clean: config, stored: {} });
   if (Object.keys(config).length === 0) {
     throw new ValidationError(
       "Pick at least one model. A default-models config with every key on inherit has no effect.",
@@ -323,10 +321,15 @@ export async function updateConfig(
     {};
   let deletesTheConfig = false;
   // Restriction check needs the stored config, so it runs inside the lock.
+  // It also runs on the delete branch, so a delete payload carrying a new
+  // restricted value is refused, not deleted.
   const assertConfigWritable = async (repo: ModelDefaultsRepository) => {
     if (data.config === undefined) return;
     const stored = await repo.findConfigById(params.id);
-    assertWritable(data.config, (stored ?? {}) as Record<string, unknown>);
+    assertWritable({
+      clean: data.config,
+      stored: (stored ?? {}) as Record<string, unknown>,
+    });
   };
   if (params.config !== undefined) {
     const clean = dropInvalidEntries(params.config);

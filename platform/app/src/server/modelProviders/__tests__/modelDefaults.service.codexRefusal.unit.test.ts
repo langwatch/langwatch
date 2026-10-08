@@ -44,6 +44,19 @@ vi.mock("../modelDefaults.repository", () => ({
     async findConfigById() {
       return store.config;
     }
+    async findAttachmentsForScopes() {
+      return [];
+    }
+    async findScopesForConfig() {
+      return [{ id: "scope-1", scopeType: "PROJECT", scopeId: "proj-1" }];
+    }
+    async updateConfigScopes(params: {
+      configPayload?: { config?: Record<string, unknown> };
+    }) {
+      if (params.configPayload?.config) {
+        store.written.push(params.configPayload.config);
+      }
+    }
     async updateConfigPayload(params: {
       data: { config?: Record<string, unknown> };
     }) {
@@ -136,6 +149,27 @@ describe("modelDefaults.service — codex refusal for the run-time agent-under-t
               [TOPIC_KEY]: CODEX_DEFAULT_MODEL,
               FAST: "openai/gpt-5-mini",
             },
+          },
+        );
+
+        expect(store.written).toEqual([
+          { [TOPIC_KEY]: CODEX_DEFAULT_MODEL, FAST: "openai/gpt-5-mini" },
+        ]);
+      });
+    });
+
+    describe("when the drawer saves with scopes and the stored codex value unchanged", () => {
+      /** @scenario "A saved Codex clustering override does not block other default-model changes" */
+      it("saves and keeps the stored codex value untouched", async () => {
+        await updateConfig(
+          { prisma: fakePrisma },
+          {
+            id: "cfg-1",
+            config: {
+              [TOPIC_KEY]: CODEX_DEFAULT_MODEL,
+              FAST: "openai/gpt-5-mini",
+            },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
           },
         );
 
