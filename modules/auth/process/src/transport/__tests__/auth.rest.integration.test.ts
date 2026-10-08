@@ -5,6 +5,7 @@
  */
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { AggregateProjectHasNoCredentialError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthSessionPoll } from "../../rules/auth-session-poll.rules.ts";
@@ -142,6 +143,24 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toMatchObject({ code: "invalid_credentials" });
+    });
+
+    it("tells an SDK holding an aggregate project's key that it is refused, not good", async () => {
+      const world = authWorld({
+        validateProjectAuthToken: async () => {
+          throw new AggregateProjectHasNoCredentialError({ meta: { projectId: "aggregate-1" } });
+        },
+      });
+
+      const response = await world.app.request(`${BASE_URL}/api/auth/validate`, {
+        method: "POST",
+        headers: { "x-auth-token": "sk-lw-aggregate" },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "aggregate_project_has_no_credential",
+      });
     });
   });
 

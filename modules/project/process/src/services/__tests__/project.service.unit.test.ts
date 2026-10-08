@@ -27,6 +27,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import type { AggregateAccessService } from "../aggregate-access.service.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -403,6 +404,7 @@ const createService = (
   }),
 ): ProjectService =>
   ProjectService.create({
+    aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
     created,
     repository,
     credentials: new FixedCredentials(),

@@ -24,12 +24,16 @@ export type McpApprovalOutcome =
   | Readonly<{ kind: "challenge-missing" }>
   | Readonly<{ kind: "challenge-method-unsupported" }>
   | Readonly<{ kind: "denied" }>
+  /** A project holding no credential (ADR-175 decision 7), named by its registered refusal. */
+  | Readonly<{ kind: "no-credential"; refusal: Readonly<{ code: string; message: string }> }>
   | Readonly<{ kind: "unavailable" }>;
 
 /** The body every refusal carries, in the OAuth shape the consent page reads. */
 type RefusalBody = Readonly<{
   error: string;
   error_description?: string;
+  /** The registered handled-error code, where the refusal has one beyond the OAuth error. */
+  code?: string;
   redirect?: string;
 }>;
 
@@ -47,6 +51,7 @@ type ApprovalRefusal = Readonly<{
   error: string;
   /** Null for a refusal raised before the redirect URI was verified. */
   description: string | null;
+  code?: string;
 }>;
 
 /**
@@ -84,7 +89,23 @@ const APPROVAL_REFUSALS = {
     error: "server_error",
     description: "Authorization is temporarily unavailable",
   },
-} as const satisfies Record<Exclude<McpApprovalOutcome["kind"], "approved">, ApprovalRefusal>;
+} as const satisfies Record<
+  Exclude<McpApprovalOutcome["kind"], "approved" | "no-credential">,
+  ApprovalRefusal
+>;
+
+/** The refusal one outcome is published as; a project holding no credential keeps its code. */
+function refusalFor(
+  outcome: Exclude<McpApprovalOutcome, Readonly<{ kind: "approved" }>>,
+): ApprovalRefusal {
+  if (outcome.kind !== "no-credential") return APPROVAL_REFUSALS[outcome.kind];
+  return {
+    status: 403,
+    error: "access_denied",
+    description: outcome.refusal.message,
+    code: outcome.refusal.code,
+  };
+}
 
 /** The posted document's known fields, or nothing where the body was not a JSON object. */
 export function parsePostedApproval(raw: string): PostedApprovalFields | undefined {
@@ -132,7 +153,7 @@ export function buildAuthorizeAnswer({
     };
   }
 
-  const refusal: ApprovalRefusal = APPROVAL_REFUSALS[outcome.kind];
+  const refusal = refusalFor(outcome);
   if (refusal.description === null) {
     return { status: refusal.status, body: { error: refusal.error } };
   }
@@ -141,6 +162,7 @@ export function buildAuthorizeAnswer({
     body: {
       error: refusal.error,
       error_description: refusal.description,
+      ...(refusal.code === void 0 ? {} : { code: refusal.code }),
       redirect: redirectWith(redirectUri, {
         error: refusal.error,
         error_description: refusal.description,

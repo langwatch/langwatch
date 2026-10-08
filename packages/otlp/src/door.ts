@@ -43,6 +43,8 @@ const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([
   "missing_credentials",
   "invalid_credentials",
   "api_key_permission_denied",
+  // A key presented for an aggregate project, which accepts none (ADR-175 decision 7).
+  "aggregate_project_has_no_credential",
 ]);
 
 /** A refusal the credential chain raised that an ingestion door renders itself. */

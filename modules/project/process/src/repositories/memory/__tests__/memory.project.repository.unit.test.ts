@@ -427,7 +427,10 @@ describe("MemoryProjectRepository", () => {
         }),
       ).resolves.toBe(false);
       expect(
-        await repository.findProjectsWithDepartments({ organizationId: ORGANIZATION_ID }),
+        await repository.findProjectsWithDepartments({
+          organizationId: ORGANIZATION_ID,
+          includeAggregates: true,
+        }),
       ).toEqual([{ id: "project_1", name: "Checkout assistant", departmentId: "dept_eng" }]);
     });
   });

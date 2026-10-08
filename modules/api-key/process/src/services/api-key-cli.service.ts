@@ -443,6 +443,8 @@ export class ApiKeyCliService {
         page: 1,
         limit: 1000,
         includeGovernance: true,
+        // A summary of what the bindings reach, read for no person (ADR-175 decision 5).
+        aggregatesVisibleTo: "system",
       })
     ).data.filter((project) => projectIds.includes(project.id) || teamIds.includes(project.teamId));
 

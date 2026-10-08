@@ -624,8 +624,10 @@ departmentList(input: { organizationId: string }): Promise<Department[]>;
 
 #### `departmentAssignments`
 
+Aggregates are listed only when the caller is an organisation admin (ADR-175 decision 5).
+
 ```typescript
-departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments>;
+departmentAssignments(input: { organizationId: string; callerUserId: string; }): Promise<DepartmentAssignments>;
 ```
 
 #### `departmentCreate`

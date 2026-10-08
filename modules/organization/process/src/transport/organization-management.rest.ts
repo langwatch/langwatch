@@ -38,7 +38,9 @@ import { getDefaultTeamRoleForOrganizationRole } from "../rules/member-role-cons
 /** A wire date field the way every app answer carries it: an `Instant`, converted here once. */
 
 /** The member the organizationKey door hands over as `actor`; null for a service key. */
-const deriveCaller = (actor: { type: string; id?: string } | null): OrganizationCaller | null =>
+export const deriveCaller = (
+  actor: { type: string; id?: string } | null,
+): OrganizationCaller | null =>
   actor && actor.type === "user" && actor.id ? { id: actor.id } : null;
 
 /** The organization key a request arrived on, bound from its credential at boot. */

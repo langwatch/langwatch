@@ -47,6 +47,7 @@ import {
   type ProjectLifecycleSenders,
 } from "../services/project-created-notice.service.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
+import { ProjectManagementService } from "../services/project-management.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectRequestService } from "../services/project-request.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
@@ -83,6 +84,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   findProjectsWithDepartments(input: {
     organizationId: string;
+    aggregatesVisibleTo: projectContractModule.AggregateAudience;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
     return this.#projectService.findProjectsWithDepartments(input);
   }
@@ -111,6 +113,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #personalProjects: PersonalProjectService;
   readonly #aggregateRules: AggregateRuleService;
   readonly #aggregateAccess: AggregateAccessService;
+  readonly #management: ProjectManagementService;
   readonly #requests = ProjectRequestService.create({
     projects: this,
     probePermission: (input) => this.probePermission(input),
@@ -124,6 +127,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     personalProjects,
     aggregateRules,
     aggregateAccess,
+    management,
   }: {
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
@@ -133,6 +137,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     personalProjects: PersonalProjectService;
     aggregateRules: AggregateRuleService;
     aggregateAccess: AggregateAccessService;
+    management: ProjectManagementService;
   }) {
     this.#projectService = projectService;
     this.#operations = operations;
@@ -142,6 +147,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#personalProjects = personalProjects;
     this.#aggregateRules = aggregateRules;
     this.#aggregateAccess = aggregateAccess;
+    this.#management = management;
   }
 
   static create({
@@ -157,12 +163,17 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       repository: repositories.aggregateRules,
       organizations: dependencies.organizations,
     });
+    const aggregateAccess = AggregateAccessService.create({
+      organizations: dependencies.organizations,
+      authorization: dependencies.authorization,
+    });
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
       credentials: ProjectCredentialsService.create(),
       organizations: dependencies.organizations,
       created: lifecycle,
       aggregateRules,
+      aggregateAccess,
     });
     const operations = ProjectOperationsService.create({
       projects,
@@ -179,7 +190,8 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       dataPrivacy: dependencies.dataPrivacy,
       personalProjects: PersonalProjectService.create({ projects: repositories.projects }),
       aggregateRules,
-      aggregateAccess: AggregateAccessService.create({ organizations: dependencies.organizations }),
+      aggregateAccess,
+      management: ProjectManagementService.create({ projects, aggregateAccess }),
     });
   }
 
@@ -322,22 +334,35 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     });
   }
 
+  getInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string; userId: string | null }>,
+  ): Promise<ProjectWithTeam> {
+    return this.#management.getInOrganization(input);
+  }
+
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      userId: string | null;
+      data: UpdateProjectInput;
+    }>,
   ): Promise<Project> {
-    return this.#projectService.update({
+    return this.#management.updateInOrganization({
       id: input.projectId,
       organizationId: input.organizationId,
+      userId: input.userId,
       data: input.data,
     });
   }
 
   archiveInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string }>,
+    input: Readonly<{ projectId: string; organizationId: string; userId: string | null }>,
   ): Promise<ArchivedProject> {
-    return this.#projectService.archive({
+    return this.#management.archiveInOrganization({
       id: input.projectId,
       organizationId: input.organizationId,
+      userId: input.userId,
     });
   }
 
@@ -394,7 +419,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
-    aggregatesVisibleTo?: { userId: string | null };
+    aggregatesVisibleTo: projectContractModule.AggregateAudience;
   }): Promise<PaginatedProjects> {
     return this.#projectService.listByOrganization(input);
   }

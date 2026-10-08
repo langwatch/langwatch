@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
+import type { AggregateAccessService } from "../aggregate-access.service.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentialsService } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -63,6 +64,7 @@ async function seeded() {
   );
 
   return ProjectService.create({
+    aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
     created: ProjectCreatedNoticeService.create({
       logger: { error: () => void 0 },
       projects: {

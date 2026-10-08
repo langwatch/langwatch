@@ -410,7 +410,11 @@ export interface GovernanceRestApi {
     actor: string;
   }): Promise<GovernanceActorWorkspace | null>;
   departmentList(input: { organizationId: string }): Promise<Department[]>;
-  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments>;
+  /** Aggregates are listed only when the caller is an organisation admin (ADR-175 decision 5). */
+  departmentAssignments(input: {
+    organizationId: string;
+    callerUserId: string;
+  }): Promise<DepartmentAssignments>;
   departmentCreate(input: { organizationId: string; name: string }): Promise<Department>;
   departmentRename(input: {
     id: string;

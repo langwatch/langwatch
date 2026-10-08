@@ -2,6 +2,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
   activeProjectsByScopesInputSchema,
+  aggregateAudienceSchema,
   internalProjectKindSchema,
   internalProjectQuerySchema,
   projectPaginationSchema,
@@ -11,6 +12,7 @@ import {
   projectPresenceInputSchema,
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
+  type AggregateAudience,
   type AggregateRule,
   type CreatableProjectKind,
   type InternalProject,
@@ -45,7 +47,7 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
-import { AggregateAccessService } from "./aggregate-access.service.ts";
+import type { AggregateAccessService } from "./aggregate-access.service.ts";
 import type { AggregateRuleService } from "./aggregate-rule.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
@@ -70,10 +72,18 @@ export class ProjectService {
     return this.repository.findPaths(input);
   }
 
-  findProjectsWithDepartments(input: {
+  async findProjectsWithDepartments({
+    organizationId,
+    aggregatesVisibleTo,
+  }: {
     organizationId: string;
+    aggregatesVisibleTo: AggregateAudience;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
-    return this.repository.findProjectsWithDepartments(input);
+    const includeAggregates = await this.aggregateAccess.listsAggregatesTo({
+      organizationId,
+      audience: aggregateAudienceSchema.parse(aggregatesVisibleTo),
+    });
+    return this.repository.findProjectsWithDepartments({ organizationId, includeAggregates });
   }
 
   /** A saved assignment is recorded as project's fact, best effort, for data privacy to fold. */
@@ -93,7 +103,7 @@ export class ProjectService {
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
   private readonly created: ProjectCreatedNoticeService;
-  private readonly aggregateAccess: AggregateAccessService;
+  private readonly aggregateAccess: Pick<AggregateAccessService, "listsAggregatesTo">;
 
   private constructor({
     metadata,
@@ -102,6 +112,7 @@ export class ProjectService {
     credentials,
     organizations,
     created,
+    aggregateAccess,
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
@@ -109,6 +120,7 @@ export class ProjectService {
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
     created: ProjectCreatedNoticeService;
+    aggregateAccess: Pick<AggregateAccessService, "listsAggregatesTo">;
   }) {
     this.metadata = metadata;
     this.writes = writes;
@@ -116,7 +128,7 @@ export class ProjectService {
     this.credentials = credentials;
     this.organizations = organizations;
     this.created = created;
-    this.aggregateAccess = AggregateAccessService.create({ organizations });
+    this.aggregateAccess = aggregateAccess;
   }
 
   static create(options: {
@@ -124,6 +136,8 @@ export class ProjectService {
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
     created: ProjectCreatedNoticeService;
+    /** ADR-175 decision 5: the module's one admin check, deciding who sees aggregates listed. */
+    aggregateAccess: Pick<AggregateAccessService, "listsAggregatesTo">;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
     /** ADR-175: validates an aggregate's rule; absent, creating an aggregate is refused. */
@@ -139,6 +153,7 @@ export class ProjectService {
       credentials: options.credentials,
       organizations: options.organizations,
       created: options.created,
+      aggregateAccess: options.aggregateAccess,
     });
   }
 
@@ -301,15 +316,13 @@ export class ProjectService {
     limit: number;
     projectIds?: string[];
     includeGovernance?: boolean;
-    aggregatesVisibleTo?: { userId: string | null };
+    aggregatesVisibleTo: AggregateAudience;
   }): Promise<PaginatedProjects> {
     const { aggregatesVisibleTo, ...page } = projectPaginationSchema.parse(input);
-    const includeAggregates =
-      aggregatesVisibleTo === undefined ||
-      (await this.aggregateAccess.mayOpen({
-        organizationId: page.organizationId,
-        userId: aggregatesVisibleTo.userId,
-      }));
+    const includeAggregates = await this.aggregateAccess.listsAggregatesTo({
+      organizationId: page.organizationId,
+      audience: aggregatesVisibleTo,
+    });
 
     return this.repository.listAllByOrganization({ ...page, includeAggregates });
   }

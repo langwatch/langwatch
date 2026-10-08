@@ -11,8 +11,8 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | project                                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:238` (43 operations) |
-| Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:75`                                     |
+| Api token      | `ProjectApi` = `moduleApi<ProjectApi>()("project")`, `contract/src/project.api.ts:246` (43 operations) |
+| Other token    | `ProjectManagementApi`, `process/src/transport/project.rest.ts:85`                                     |
 | Other token    | `ProjectBrowserApi`, `process/src/transport/project.trpc.ts:69`                                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
@@ -22,7 +22,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | --------------- | ------------------ | ---------------------------------------------------------------------------------- |
 | Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.aggregate-rule.repository.ts:16`           |
 | Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project-storage-settings.repository.ts:14` |
-| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:42`                  |
+| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:43`                  |
 | Stores required | prisma, encryption | `process/src/repositories/prisma/prisma.project.repositories.ts:14`                |
 
 Anything else project needs belongs to another module and is reached through its `*Api`.

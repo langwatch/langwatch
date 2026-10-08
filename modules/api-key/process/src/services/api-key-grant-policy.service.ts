@@ -11,6 +11,10 @@ import {
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
+import {
+  AggregateProjectHasNoCredentialError,
+  isAggregateProjectKind,
+} from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyDependencies } from "./api-key.service.ts";
@@ -197,6 +201,10 @@ export class ApiKeyGrantPolicyService {
     const project = await this.options.projects.getWithTeam(binding.scopeId);
     if (project.archivedAt || project.team.organizationId !== organizationId) {
       throw new ApiKeyScopeViolationError(`Project ${binding.scopeId} not found or archived`);
+    }
+    // ADR-175 decision 7: an aggregate owns no credential, so no surface may bind a key to it.
+    if (isAggregateProjectKind(project.kind)) {
+      throw new AggregateProjectHasNoCredentialError();
     }
 
     return {

@@ -75,6 +75,7 @@ export class ModelProviderScopeService {
       page: 1,
       limit: 1,
       includeGovernance: true,
+      aggregatesVisibleTo: "system",
     });
     const reference =
       firstPage.pagination.total > 1
@@ -83,6 +84,7 @@ export class ModelProviderScopeService {
             page: firstPage.pagination.total,
             limit: 1,
             includeGovernance: true,
+            aggregatesVisibleTo: "system",
           })
         : firstPage;
     const createdAt = reference.data[0]?.createdAt;

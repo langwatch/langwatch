@@ -170,6 +170,8 @@ interface MemoryProjectRow {
   apiKey: string;
   /** The stored LangWatchQL key; absent reads as none. */
   lwqlKey?: string;
+  /** The project's kind; absent reads as an ordinary application. */
+  kind?: string;
   teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;

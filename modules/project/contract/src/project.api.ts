@@ -3,6 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { AggregateRule } from "./aggregate-rule.ts";
 import type {
+  AggregateAudience,
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
   CreatableProjectKind,
@@ -76,9 +77,13 @@ export const PROJECT_ID_PAGE_LIMIT = 500;
 
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
-  /** Every non-governance project with its department (main `department.service.ts:126-133`). */
+  /**
+   * Every non-governance project with its department (main `department.service.ts:126-133`),
+   * aggregates only when the audience may open them (ADR-175 decision 5).
+   */
   findProjectsWithDepartments(input: {
     organizationId: string;
+    aggregatesVisibleTo: AggregateAudience;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
   /**
    * Points one project at a department, or clears it; false when no such project (main
@@ -108,8 +113,8 @@ export interface ProjectApi {
     projectIds?: string[];
     /** The organization's hidden governance project is left out unless this is true. */
     includeGovernance?: boolean;
-    /** Aggregates are left out unless this person is an organisation admin (ADR-175). */
-    aggregatesVisibleTo?: { userId: string | null };
+    /** Whom the listing answers, which decides whether aggregates are in it (ADR-175). */
+    aggregatesVisibleTo: AggregateAudience;
   }): Promise<PaginatedProjects>;
   listByTeam(input: {
     organizationId: string;
@@ -215,7 +220,10 @@ export interface ProjectApi {
   }): Promise<ProjectUsageCount>;
   /** Live application projects that have received a trace; internal projects excluded. */
   countWithTraces(input: { organizationId: string }): Promise<number>;
-  /** Live shared-team projects, oldest first; with a member, only theirs (main `resolveHome`). */
+  /**
+   * Live shared-team projects, oldest first; with a member, only theirs (main `resolveHome`).
+   * Never an aggregate or the governance project: nobody lands on those unasked.
+   */
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;

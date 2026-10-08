@@ -43,8 +43,10 @@ export interface ProjectWithOrgAdmin {
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  /** Never the governance project; an aggregate only when `includeAggregates` (ADR-175). */
   findProjectsWithDepartments(input: {
     organizationId: string;
+    includeAggregates: boolean;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
   assignProjectDepartment(input: {
     organizationId: string;
@@ -145,6 +147,7 @@ export interface ProjectRepository {
     since?: number;
   }): Promise<ProjectUsageCount>;
   countWithTraces(input: { organizationId: string }): Promise<number>;
+  /** Never a kind nobody lands on unasked: the aggregate or the governance project. */
   findSharedProjectSlugs(input: {
     organizationId: string;
     memberUserId?: string;

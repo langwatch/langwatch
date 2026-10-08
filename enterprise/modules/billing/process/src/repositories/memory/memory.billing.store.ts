@@ -48,7 +48,7 @@ type MemoryBillingProject = {
   name: string;
   organizationId: string;
   archived: boolean;
-  governance: boolean;
+  kind: string;
 };
 
 /** One request's row in gateway's shared spend ledger, at its latest status. */

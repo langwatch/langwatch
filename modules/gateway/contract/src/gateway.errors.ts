@@ -183,6 +183,23 @@ export class GatewayScopeOrgMismatchError extends HandledError {
   }
 }
 
+/**
+ * A key named an aggregate project as its trace destination (ADR-175). It
+ * reads its members through grants and owns no traces; name a member instead.
+ */
+export class GatewayTraceProjectNotADestinationError extends HandledError {
+  declare readonly code: "gateway_trace_project_not_a_destination";
+
+  constructor() {
+    super(
+      "gateway_trace_project_not_a_destination",
+      "That project reads traces from other projects and does not receive traces of its own",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectNotADestinationError";
+  }
+}
+
 /** A guardrail being attached belongs to a different project than the key. */
 export class GatewayGuardrailProjectMismatchError extends HandledError {
   declare readonly code: "gateway_guardrail_project_mismatch";

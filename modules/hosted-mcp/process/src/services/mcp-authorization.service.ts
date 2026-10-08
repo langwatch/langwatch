@@ -5,6 +5,11 @@
  */
 import { randomBytes } from "node:crypto";
 
+import {
+  AggregateProjectHasNoCredentialError,
+  isAggregateProjectKind,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "@langwatch/project-contract";
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
 import type { McpOAuthClientRepository } from "../repositories/mcp-oauth-client.repository.ts";
@@ -37,6 +42,8 @@ type McpAuthorizeProject = Readonly<{
   organizationId: string;
   /** When the project was archived, in whatever shape the host holds one. */
   archivedAt: TimeInput | null;
+  /** The project's kind: one that holds no credential is never bound (ADR-175). */
+  kind: string;
 }>;
 
 /** One approval, as the consent page posted it. */
@@ -156,6 +163,13 @@ export class McpAuthorizationService {
     const project = await this.#reachableProject(request);
 
     if (!project) return { kind: "denied" };
+
+    // A code opens a session bound to the project, so one holding no credential gets none
+    // (ADR-175 decision 7): the aggregate says why; the governance project stays unreachable.
+    if (isAggregateProjectKind(project.kind)) {
+      return { kind: "no-credential", refusal: new AggregateProjectHasNoCredentialError() };
+    }
+    if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) return { kind: "denied" };
 
     if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };
 

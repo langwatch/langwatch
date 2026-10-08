@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "@langwatch/project-contract";
 import type { MeProject } from "@langwatch/user-contract";
 
 import type { UserOrganizationDirectoryRepository } from "../user-organization-directory.repository.ts";
@@ -41,6 +42,8 @@ export class PrismaUserOrganizationDirectoryRepository implements UserOrganizati
       where: {
         team: { organizationId: input.organizationId, members: { some: { userId: input.userId } } },
         archivedAt: null,
+        // Never an aggregate, opened on purpose, nor the governance project (ADR-175).
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
       },
       orderBy: { createdAt: "asc" },
       select: { slug: true },

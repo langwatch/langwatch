@@ -3,6 +3,7 @@ import type { PersonalFeatures } from "@langwatch/organization-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { Prisma, type Project as PrismaProject } from "@langwatch/prisma-client/generated";
 import {
+  NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
   ProjectNotFoundError,
@@ -44,11 +45,16 @@ export class PrismaProjectRepository
 {
   async findProjectsWithDepartments({
     organizationId,
+    includeAggregates,
   }: {
     organizationId: string;
+    includeAggregates: boolean;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    const hiddenKinds = includeAggregates
+      ? [PROJECT_KIND.INTERNAL_GOVERNANCE]
+      : [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE];
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } },
+      where: { team: { organizationId }, kind: { notIn: hiddenKinds } },
       select: { id: true, name: true, departmentId: true },
       orderBy: { name: "asc" },
     });
@@ -182,6 +188,7 @@ export class PrismaProjectRepository
           ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
         },
         archivedAt: null,
+        kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
       },
       orderBy: { createdAt: "asc" },
       take: limit,

@@ -1,6 +1,6 @@
 /**
- * A complete `AuthzApi` boundary for the teams family's suite: the four
- * operations it reaches are backed by an in-memory binding table; everything
+ * A complete `AuthzApi` boundary for the teams family's suite: the operations
+ * it reaches are backed by an in-memory binding table; everything
  * else refuses by name, so unexpected authorization access fails loudly here.
  */
 import {
@@ -8,6 +8,8 @@ import {
   type AuthzApi,
   type AuthzAttachBindingsInput,
   type AuthzAttachOutcome,
+  type AuthzBindingForSynthesis,
+  type AuthzListBindingsForSynthesisInput,
   type AuthzListScopeBindingsInput,
   type AuthzListTeamMemberBindingsInput,
   type AuthzRevokeBindingsInput,
@@ -57,6 +59,41 @@ export class TestAuthzApi implements AuthzApi {
   /** Seeds a binding the way a team membership write would have left one. */
   seedTeamBinding(seed: TestTeamBindingSeed): void {
     this.bindings.push(this.#row(seed));
+  }
+
+  /** Seeds an organisation-scoped binding, as an administrator grant would have left one. */
+  seedOrganizationBinding(seed: Omit<TestTeamBindingSeed, "teamId">): void {
+    this.bindings.push({
+      ...this.#row({ ...seed, teamId: seed.organizationId }),
+      scopeType: "ORGANIZATION",
+    });
+  }
+
+  /** Lets one person pass `hasPermission` for one permission; nobody passes otherwise. */
+  grantPermission({ userId, permission }: { userId: string; permission: string }): void {
+    this.#permitted.add(`${userId}:${permission}`);
+  }
+
+  readonly #permitted = new Set<string>();
+
+  hasPermission: AuthzApi["hasPermission"] = async (check) =>
+    this.#permitted.has(`${check.userId}:${check.permission}`);
+
+  async listBindingsForSynthesis(
+    args: AuthzListBindingsForSynthesisInput,
+  ): Promise<AuthzBindingForSynthesis[]> {
+    return this.bindings
+      .filter(
+        (binding) => binding.userId === args.userId && args.orgIds.includes(binding.organizationId),
+      )
+      .map(({ organizationId, scopeType, scopeId, role, customRoleId }) => ({
+        organizationId,
+        scopeType,
+        scopeId,
+        role,
+        customRoleId,
+        customRole: null,
+      }));
   }
 
   /** The user ids holding a binding on one team, in attachment order. */
@@ -199,7 +236,6 @@ export class TestAuthzApi implements AuthzApi {
   explainDecision = unsupported<AuthzApi["explainDecision"]>("explainDecision");
   getDecision = unsupported<AuthzApi["getDecision"]>("getDecision");
   getProjectAnyDecision = unsupported<AuthzApi["getProjectAnyDecision"]>("getProjectAnyDecision");
-  hasPermission = unsupported<AuthzApi["hasPermission"]>("hasPermission");
   authorizePermission = unsupported<AuthzApi["authorizePermission"]>("authorizePermission");
   authorizeProjectPermission = unsupported<AuthzApi["authorizeProjectPermission"]>(
     "authorizeProjectPermission",
@@ -217,9 +253,6 @@ export class TestAuthzApi implements AuthzApi {
   );
   listGroupBindings = unsupported<AuthzApi["listGroupBindings"]>("listGroupBindings");
   listApiKeyBindings = unsupported<AuthzApi["listApiKeyBindings"]>("listApiKeyBindings");
-  listBindingsForSynthesis = unsupported<AuthzApi["listBindingsForSynthesis"]>(
-    "listBindingsForSynthesis",
-  );
   listUserCreatedRoles = unsupported<AuthzApi["listUserCreatedRoles"]>("listUserCreatedRoles");
   findRolePermissions = unsupported<AuthzApi["findRolePermissions"]>("findRolePermissions");
   wouldFirstBindingDisableLegacyAccess = unsupported<

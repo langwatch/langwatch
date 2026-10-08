@@ -863,7 +863,7 @@ listTeamsWithProjects(input: Readonly<{ organizationId: string }>, by: Organizat
 #### `listTeamAccessMatrix`
 
 ```typescript
-listTeamAccessMatrix(input: Readonly<{ organizationId: string }>): Promise<OrganizationTeamAccess[]>;
+listTeamAccessMatrix(input: Readonly<{ organizationId: string }>, by: OrganizationCaller): Promise<OrganizationTeamAccess[]>;
 ```
 
 #### `getTeamWithProjects`
@@ -1203,7 +1203,7 @@ type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/sr
 
 |             |                                                     |
 | ----------- | --------------------------------------------------- |
-| Declared at | `src/transport/organization-management.rest.ts:164` |
+| Declared at | `src/transport/organization-management.rest.ts:166` |
 | Base URL    | `/api/organization`, twin `/api/v1/organization`    |
 | Addressing  | dated                                               |
 | Credential  | organization                                        |
@@ -1213,7 +1213,7 @@ type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/sr
 
 Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned.
 
-Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:169`.
+Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:171`.
 
 Answers at `/api/organization`, `/api/v1/organization`; also, undocumented, `/api/organization/2026-08-07`, `/api/v1/organization/2026-08-07`, `/api/organization/latest`, `/api/v1/organization/latest`.
 
@@ -1225,7 +1225,7 @@ type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../
 
 Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:180`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:182`.
 
 Answers at `/api/organization`, `/api/v1/organization`; also, undocumented, `/api/organization/2026-08-07`, `/api/v1/organization/2026-08-07`, `/api/organization/latest`, `/api/v1/organization/latest`.
 
@@ -1249,7 +1249,7 @@ type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../
 
 List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true.
 
-Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:196`.
+Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:198`.
 
 Answers at `/api/organization/members`, `/api/v1/organization/members`; also, undocumented, `/api/organization/2026-08-07/members`, `/api/v1/organization/2026-08-07/members`, `/api/organization/latest/members`, `/api/v1/organization/latest/members`.
 
@@ -1267,7 +1267,7 @@ type Response = z.infer<typeof organizationManagementRestMemberListSchema>; // .
 
 Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages.
 
-Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:217`.
+Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:219`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1283,7 +1283,7 @@ type Response = z.infer<typeof organizationManagementRestMemberWithTeamsSchema>;
 
 The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:239`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:241`.
 
 Answers at `/api/organization/members/:userId/access`, `/api/v1/organization/members/:userId/access`; also, undocumented, `/api/organization/2026-08-07/members/:userId/access`, `/api/v1/organization/2026-08-07/members/:userId/access`, `/api/organization/latest/members/:userId/access`, `/api/v1/organization/latest/members/:userId/access`.
 
@@ -1296,7 +1296,7 @@ type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>;
 
 Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:263`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:265`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1314,7 +1314,7 @@ type Response = z.infer<typeof organizationManagementRestUpdatedMemberSchema>; /
 
 Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:289`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:291`.
 
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
@@ -1330,7 +1330,7 @@ interface Response {
 
 List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:305`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:307`.
 
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
@@ -1342,7 +1342,7 @@ type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // .
 
 Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:320`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:322`.
 
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
@@ -1366,7 +1366,7 @@ type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; 
 
 Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:364`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_API`). Declared at `src/transport/organization-management.rest.ts:366`.
 
 Answers at `/api/organization/invites/:inviteId`, `/api/v1/organization/invites/:inviteId`; also, undocumented, `/api/organization/2026-08-07/invites/:inviteId`, `/api/v1/organization/2026-08-07/invites/:inviteId`, `/api/organization/latest/invites/:inviteId`, `/api/v1/organization/latest/invites/:inviteId`.
 
@@ -1436,7 +1436,7 @@ interface Response {
 
 |             |                                    |
 | ----------- | ---------------------------------- |
-| Declared at | `src/transport/team.rest.ts:102`   |
+| Declared at | `src/transport/team.rest.ts:106`   |
 | Base URL    | `/api/teams`, twin `/api/v1/teams` |
 | Addressing  | dated                              |
 | Credential  | organization                       |
@@ -1446,7 +1446,7 @@ interface Response {
 
 List all non-archived teams for the organization (paginated)
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:107`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:111`.
 
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
@@ -1463,7 +1463,7 @@ type Response = z.infer<typeof organizationTeamRestPageSchema>; // ../contract/s
 
 Create a new team that can group projects and members
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:129`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:133`.
 
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
@@ -1487,7 +1487,7 @@ interface Response {
 
 Get a team by its id
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:148`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:152`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1503,7 +1503,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Update a team by its id
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:166`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:170`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1520,7 +1520,7 @@ type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/f
 
 Archive a team (soft-delete)
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:186`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:190`.
 
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
@@ -1538,7 +1538,7 @@ interface Response {
 
 List members of a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:208`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:212`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1559,7 +1559,7 @@ interface Response {
 
 Add a member to a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:235`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:239`.
 
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
@@ -1580,7 +1580,7 @@ interface Response {
 
 Remove a member from a team
 
-Permission `team:manage`. Declared at `src/transport/team.rest.ts:266`.
+Permission `team:manage`. Declared at `src/transport/team.rest.ts:270`.
 
 Answers at `/api/teams/:teamId/members/:userId`, `/api/v1/teams/:teamId/members/:userId`; also, undocumented, `/api/teams/2026-08-07/:teamId/members/:userId`, `/api/v1/teams/2026-08-07/:teamId/members/:userId`, `/api/teams/latest/:teamId/members/:userId`, `/api/v1/teams/latest/:teamId/members/:userId`.
 
@@ -1597,7 +1597,7 @@ type Response = z.infer<typeof organizationTeamRestSuccessSchema>; // ../contrac
 
 List projects in a team
 
-Permission `team:view`. Declared at `src/transport/team.rest.ts:289`.
+Permission `team:view`. Declared at `src/transport/team.rest.ts:293`.
 
 Answers at `/api/teams/:teamId/projects`, `/api/v1/teams/:teamId/projects`; also, undocumented, `/api/teams/2026-08-07/:teamId/projects`, `/api/v1/teams/2026-08-07/:teamId/projects`, `/api/teams/latest/:teamId/projects`, `/api/v1/teams/latest/:teamId/projects`.
 
@@ -2254,7 +2254,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:297`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:299`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

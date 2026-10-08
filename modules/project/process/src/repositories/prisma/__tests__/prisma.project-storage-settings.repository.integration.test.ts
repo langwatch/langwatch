@@ -18,6 +18,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { AggregateAccessService } from "../../../services/aggregate-access.service.ts";
 import { ProjectCreatedNoticeService } from "../../../services/project-created-notice.service.ts";
 import type { ProjectCredentials } from "../../../services/project-credentials.service.ts";
 import { ProjectOperationsService } from "../../../services/project-operations.service.ts";
@@ -43,6 +44,7 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
 
   const operations = ProjectOperationsService.create({
     projects: ProjectService.create({
+      aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
       created: ProjectCreatedNoticeService.create({
         logger: { error: () => undefined },
         projects: {

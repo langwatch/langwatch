@@ -6,7 +6,7 @@
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import {
   MemberNotFoundError,
@@ -18,6 +18,7 @@ import {
   AGGREGATE_DEFAULT_RULE,
   PROJECT_KIND,
   projectSchema,
+  type AggregateAudience,
   type Project,
   type Team,
 } from "@langwatch/project-contract";
@@ -40,6 +41,8 @@ const ORG = "org_a";
 const ADMIN = "u_admin";
 const MEMBER = "u_member";
 const OUTSIDER = "u_outsider";
+/** A MEMBER by membership row whose organisation-scoped binding makes them an admin. */
+const BOUND_ADMIN = "u_bound_admin";
 const NOW = new Date("2026-10-06T00:00:00.000Z");
 
 function team(id: string, overrides: Partial<Team> = {}): Team {
@@ -92,7 +95,21 @@ function project(id: string, overrides: Partial<Project> = {}): Project {
   });
 }
 
-const ROLES: Record<string, string> = { [ADMIN]: "ADMIN", [MEMBER]: "MEMBER" };
+const ROLES: Record<string, string> = {
+  [ADMIN]: "ADMIN",
+  [MEMBER]: "MEMBER",
+  [BOUND_ADMIN]: "MEMBER",
+};
+
+/** An organisation ADMIN binding outranks the membership row (organisation-visibility's rule). */
+const ADMIN_BINDING: AuthzBindingForSynthesis = {
+  organizationId: ORG,
+  scopeType: "ORGANIZATION",
+  scopeId: ORG,
+  role: "ADMIN",
+  customRoleId: null,
+  customRole: null,
+};
 
 function mount(actorId: string) {
   const database = MemoryProjectDatabase.create();
@@ -131,6 +148,8 @@ function mount(actorId: string) {
   // An outsider holds no organisation permission; everyone else holds every one.
   const authorization = createApiFixture<AuthzApi>({
     hasPermission: async ({ userId }) => userId !== OUTSIDER,
+    listBindingsForSynthesis: async ({ orgIds, userId }) =>
+      userId === BOUND_ADMIN && orgIds.includes(ORG) ? [ADMIN_BINDING] : [],
   });
 
   const app = ProjectModule.create({
@@ -353,10 +372,111 @@ describe("Feature: aggregates are listed only to organisation admins", () => {
     }
   });
 
-  it("keeps an internal listing that names no caller as it was", async () => {
+  it("lists every project for work done for no person, and none to a destination picker", async () => {
     const { app, database } = mount(ADMIN);
     database.putProject(project("p_agg", { kind: PROJECT_KIND.AGGREGATE }));
 
-    expect(listedIds(await app.listByOrganization(page))).toEqual(["p_agg", "p_eng", "p_shared"]);
+    const system = await app.listByOrganization({ ...page, aggregatesVisibleTo: "system" });
+    const nobody = await app.listByOrganization({ ...page, aggregatesVisibleTo: "nobody" });
+
+    expect(listedIds(system)).toEqual(["p_agg", "p_eng", "p_shared"]);
+    expect(listedIds(nobody)).toEqual(["p_eng", "p_shared"]);
+  });
+});
+
+describe("Feature: the department screen lists aggregates only to organisation admins", () => {
+  async function departmentIds(audience: AggregateAudience): Promise<string[]> {
+    const { app, database } = mount(ADMIN);
+    database.putProject(project("p_agg", { kind: PROJECT_KIND.AGGREGATE }));
+    const rows = await app.findProjectsWithDepartments({
+      organizationId: ORG,
+      aggregatesVisibleTo: audience,
+    });
+    return rows.map((row) => row.id).toSorted();
+  }
+
+  it("lists the aggregate to an admin, never the governance project", async () => {
+    expect(await departmentIds({ userId: ADMIN })).toEqual(["p_agg", "p_eng", "p_shared"]);
+  });
+
+  it("leaves it out for a member, a caller acting for nobody and a members-only read", async () => {
+    for (const audience of [{ userId: MEMBER }, { userId: null }, "nobody"] as const) {
+      expect(await departmentIds(audience)).toEqual(["p_eng", "p_shared"]);
+    }
+  });
+});
+
+describe("Feature: an admin only by binding is an admin for aggregates", () => {
+  const page = { organizationId: ORG, page: 1, limit: 50 } as const;
+
+  function withAggregate(actorId: string) {
+    const mounted = mount(actorId);
+    mounted.database.putProject(project("p_agg", { kind: PROJECT_KIND.AGGREGATE }));
+    return mounted;
+  }
+
+  it("creates an aggregate though their membership row says MEMBER", async () => {
+    const { caller, database } = mount(BOUND_ADMIN);
+
+    const { projectSlug } = await caller.create(aggregateInput);
+
+    expect(database.projects().find((row) => row.slug === projectSlug)).toMatchObject({
+      kind: PROJECT_KIND.AGGREGATE,
+    });
+  });
+
+  it("opens an aggregate and the projects it may read", async () => {
+    const { app, caller } = withAggregate(BOUND_ADMIN);
+
+    const opened = await app.getInOrganization({
+      organizationId: ORG,
+      projectId: "p_agg",
+      userId: BOUND_ADMIN,
+    });
+    const candidates = await caller.aggregateMemberCandidates({ organizationId: ORG });
+
+    expect(opened.id).toBe("p_agg");
+    expect(candidates.map((row) => row.id)).toEqual(["p_eng", "p_shared"]);
+  });
+
+  it("sees the aggregate listed on the projects page and the department screen", async () => {
+    const { app } = withAggregate(BOUND_ADMIN);
+    const audience = { userId: BOUND_ADMIN };
+
+    const listed = await app.listByOrganization({ ...page, aggregatesVisibleTo: audience });
+    const departments = await app.findProjectsWithDepartments({
+      organizationId: ORG,
+      aggregatesVisibleTo: audience,
+    });
+
+    expect(listed.data.map((row) => row.id)).toContain("p_agg");
+    expect(departments.map((row) => row.id)).toContain("p_agg");
+  });
+
+  it("still refuses a MEMBER who holds no admin binding, by code", async () => {
+    const { app, caller } = withAggregate(MEMBER);
+
+    await expect(
+      app.getInOrganization({ organizationId: ORG, projectId: "p_agg", userId: MEMBER }),
+    ).rejects.toMatchObject({ code: "project_not_found" });
+    await expect(caller.create(aggregateInput)).rejects.toMatchObject({
+      cause: { code: "aggregate_project_admin_only" },
+    });
+    await expect(caller.aggregateMemberCandidates({ organizationId: ORG })).rejects.toMatchObject({
+      cause: { code: "aggregate_project_admin_only" },
+    });
+  });
+});
+
+describe("Feature: nobody lands on an aggregate by default", () => {
+  it("never answers an aggregate as the shared project a member lands on", async () => {
+    const { app, database } = mount(ADMIN);
+    database.putProject(
+      project("p_agg", { kind: PROJECT_KIND.AGGREGATE, createdAt: new Date("2026-01-01") }),
+    );
+
+    const slugs = await app.findSharedProjectSlugs({ organizationId: ORG, limit: 5 });
+
+    expect(slugs).toEqual(["p_shared"]);
   });
 });

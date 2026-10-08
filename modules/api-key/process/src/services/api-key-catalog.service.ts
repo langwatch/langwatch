@@ -100,6 +100,8 @@ export class ApiKeyCatalogService {
       organizationId,
       page: 1,
       limit: 1000,
+      // An aggregate accepts no credential (ADR-175 decision 7), so no key may name it.
+      aggregatesVisibleTo: "nobody",
     });
 
     return page.data.map((project) => ({

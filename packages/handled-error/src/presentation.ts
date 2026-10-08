@@ -1594,6 +1594,13 @@ const presentations = {
     describe: () =>
       "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
   },
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK, the CLI or a key form naming an aggregate. The key
+    // may be real; it is the project that takes none, so say where to send.
+    title: "This project doesn't accept API keys",
+    describe: () =>
+      "It reads traces from other projects and receives none of its own. Send traces with the key of one of its member projects instead.",
+  },
   aggregate_project_is_read_only: {
     // Reached from any save aimed at an aggregate, often a form opened before
     // the project was switched, so the copy says where the change belongs.
@@ -5466,6 +5473,12 @@ const presentations = {
         ? `Pick a ${scopeType} that belongs to this organization.`
         : "Pick a scope that belongs to this organization.";
     },
+  },
+  gateway_trace_project_not_a_destination: {
+    // A key's trace destination named an aggregate, which owns no traces.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects. Pick one of its member projects as where this key's traces land.",
   },
   gateway_guardrail_project_mismatch: {
     title: "That guardrail is in a different project",

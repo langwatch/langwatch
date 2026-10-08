@@ -10,6 +10,7 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaProjectRepository } from "../../repositories/prisma/prisma.project.repository.ts";
+import type { AggregateAccessService } from "../aggregate-access.service.ts";
 import type { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import type { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectMetadataService } from "../project-metadata.service.ts";
@@ -90,6 +91,7 @@ describe("the project metadata seam", () => {
       const repository = PrismaProjectRepository.create({ prisma: database });
       const seam = ProjectMetadataService.create({ repository });
       const service = ProjectService.create({
+        aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
         repository,
         credentials: createApiFixture<ProjectCredentials>({}),
         organizations: createApiFixture<OrganizationApi>({}),

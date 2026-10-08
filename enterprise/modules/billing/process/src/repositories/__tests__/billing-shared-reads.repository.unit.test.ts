@@ -1,7 +1,7 @@
 /**
  * @see enterprise/modules/billing/specs/billing.feature
  */
-import { PROJECT_KIND } from "@langwatch/project-contract";
+import { NON_DESTINATION_PROJECT_KINDS, PROJECT_KIND } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -50,20 +50,22 @@ describe("billing's shared reads", () => {
 
   describe("when billing lists an organization's projects", () => {
     /** @scenario "Billing lists an organization's projects from project's shared table" */
-    it("spends over live projects and names every non-governance project, archived too", async () => {
+    it("spends over live projects and names every project that holds usage, archived too", async () => {
       const store = MemoryBillingStore.create();
-      const project = (id: string, extra: { archived?: boolean; governance?: boolean } = {}) => ({
+      const project = (id: string, extra: { archived?: boolean; kind?: string } = {}) => ({
         id,
         name: id.toUpperCase(),
         organizationId: "org-1",
         archived: false,
-        governance: false,
+        kind: PROJECT_KIND.APPLICATION,
         ...extra,
       });
       store.projects.push(
         project("zeta"),
         project("alpha", { archived: true }),
-        project("gov", { governance: true }),
+        project("gov", { kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
+        // An aggregate holds no usage of its own (ADR-175), so it has no line.
+        project("view", { kind: PROJECT_KIND.AGGREGATE }),
         { ...project("elsewhere"), organizationId: "org-2" },
       );
       const repository = MemoryBillingProjectDirectoryRepository.create(store);
@@ -71,6 +73,7 @@ describe("billing's shared reads", () => {
       await expect(repository.findProjectIds({ organizationId: "org-1" })).resolves.toEqual([
         "zeta",
         "gov",
+        "view",
       ]);
       await expect(repository.findProjectsWithName({ organizationId: "org-1" })).resolves.toEqual([
         { id: "alpha", name: "ALPHA" },
@@ -100,7 +103,7 @@ describe("billing's shared reads", () => {
         {
           where: {
             team: { organizationId: "org-1" },
-            kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+            kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
           },
           select: { id: true, name: true },
           orderBy: { name: "asc" },

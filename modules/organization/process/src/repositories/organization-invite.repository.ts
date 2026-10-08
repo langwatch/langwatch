@@ -108,9 +108,12 @@ export abstract class OrganizationInviteRepository {
     inviteCode: string;
   }): Promise<InviteWithOrganization>;
   abstract findAdminEmails(input: { organizationId: string }): Promise<string[]>;
-  /** The live projects' slugs in these teams. */
+  /**
+   * The live projects' slugs in these teams that an invitee may land on: never
+   * an aggregate nor the governance project (ADR-175).
+   */
   abstract findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]>;
-  /** The live projects' slugs in the organization's live teams. */
+  /** The same, across the organization's live teams. */
   abstract findProjectSlugsInOrganization(input: { organizationId: string }): Promise<string[]>;
   /** A pending, unexpired invite for the address; throws `InviteNotFoundError`. */
   abstract getPendingInviteForEmail(input: {

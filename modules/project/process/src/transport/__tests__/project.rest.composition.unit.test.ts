@@ -5,12 +5,16 @@
  * Spec: specs/projects/projects-management-door.feature
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
+import {
+  MemberNotFoundError,
+  OrganizationApi,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/process";
 import {
   GovernanceProjectProtectedError,
@@ -19,6 +23,7 @@ import {
 } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectModule } from "../../app/project.app.ts";
@@ -31,24 +36,44 @@ import { mountProjectRestApplication, ORGANIZATION_ID, USER_ID } from "./project
 
 const OTHER_ORGANIZATION_ID = "organization-other";
 const GOVERNANCE_PROJECT_ID = "project_governance";
+const AGGREGATE_PROJECT_ID = "project_aggregate";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
 
 /**
- * The four peer applications this family never reaches — declared, never
- * bound, so a call refuses by name instead of answering quietly. AuthZ is
- * among them: this door authenticates its own credential; the browser door probes permissions.
+ * The peer applications this family never reaches: declared, never bound, so
+ * a call refuses by name instead of answering quietly.
  */
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   apis.declare(OrganizationApi);
-  apis.declare(AuthzApi);
   apis.declare(AuditLogApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
-    authorization: apis.reference(AuthzApi),
     auditLog: apis.reference(AuditLogApi),
   };
+}
+
+/**
+ * AuthZ answers only the bindings the aggregate admin check reads: this door
+ * authenticates its own credential, and the browser door probes permissions.
+ */
+function bindingsOf({ adminByBinding }: { adminByBinding: boolean }) {
+  return createApiFixture<AuthzApi>({
+    listBindingsForSynthesis: async ({ orgIds, userId }) =>
+      adminByBinding && userId === USER_ID && orgIds.includes(ORGANIZATION_ID)
+        ? [
+            {
+              organizationId: ORGANIZATION_ID,
+              scopeType: "ORGANIZATION",
+              scopeId: ORGANIZATION_ID,
+              role: "ADMIN",
+              customRoleId: null,
+              customRole: null,
+            },
+          ]
+        : [],
+  });
 }
 
 function team(overrides: Partial<ProjectWithTeam["team"]> = {}): ProjectWithTeam["team"] {
@@ -106,7 +131,10 @@ function project(overrides: Partial<Project> = {}): Project {
  * in-memory backing of its own repository interface, seeded with one project
  * in this organization and one in another.
  */
-function application(): {
+function application({
+  callerRole = "MEMBER",
+  adminByBinding = false,
+}: { callerRole?: string; adminByBinding?: boolean } = {}): {
   app: ProjectModule;
   database: MemoryProjectDatabase;
 } {
@@ -114,6 +142,14 @@ function application(): {
   database.putTeam(team());
   database.putTeam(team({ id: "team-other", organizationId: OTHER_ORGANIZATION_ID }));
   database.putProject(project());
+  database.putProject(
+    project({
+      id: AGGREGATE_PROJECT_ID,
+      name: "Company view",
+      slug: "company-view",
+      kind: "aggregate",
+    }),
+  );
   database.putProject(
     project({
       id: GOVERNANCE_PROJECT_ID,
@@ -138,6 +174,22 @@ function application(): {
       if (!found) throw new TeamNotFoundError(teamId);
       return found;
     },
+    // The credential's owner, with the role a test gives them; nobody else is a member.
+    getMember: async ({ organizationId, userId }) => {
+      if (organizationId !== ORGANIZATION_ID || userId !== USER_ID) {
+        throw new MemberNotFoundError(userId);
+      }
+      return {
+        userId,
+        organizationId,
+        role: callerRole,
+        disabledAt: null,
+        createdAt: fromDate(NOW),
+        updatedAt: fromDate(NOW),
+        user: { id: userId, name: userId, email: null },
+        teams: [],
+      };
+    },
   });
 
   let piiRedactionLevel: DataPrivacyPiiRedactionLevel = "ESSENTIAL";
@@ -149,7 +201,12 @@ function application(): {
   });
 
   const app = ProjectModule.create({
-    dependencies: { ...unreachablePeers(), organizations, dataPrivacy },
+    dependencies: {
+      ...unreachablePeers(),
+      authorization: bindingsOf({ adminByBinding }),
+      organizations,
+      dataPrivacy,
+    },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
       storageSettings: MemoryProjectStorageSettingsRepository.create({ memory: database }),
@@ -172,6 +229,7 @@ describe("the projects REST family over the application the composition builds",
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 50,
+        aggregatesVisibleTo: { userId: USER_ID },
       });
 
       expect(page.data.map((row) => row.id)).toEqual(["project_1"]);
@@ -185,6 +243,7 @@ describe("the projects REST family over the application the composition builds",
         organizationId: ORGANIZATION_ID,
         page: 1,
         limit: 50,
+        aggregatesVisibleTo: { userId: USER_ID },
       });
 
       const text = JSON.stringify(page);
@@ -378,7 +437,12 @@ describe("the projects REST family over the application the composition builds",
         }),
       ).rejects.toMatchObject({ code: "team_not_in_organization" });
       for (const organizationId of [ORGANIZATION_ID, OTHER_ORGANIZATION_ID]) {
-        const page = await app.listByOrganization({ organizationId, page: 1, limit: 50 });
+        const page = await app.listByOrganization({
+          organizationId,
+          page: 1,
+          limit: 50,
+          aggregatesVisibleTo: "nobody",
+        });
         expect([organizationId, page.pagination.total]).toEqual([organizationId, 1]);
       }
     });
@@ -449,6 +513,53 @@ describe("the projects REST family over the application the composition builds",
       const archived = await send("/api/projects/project_1", { method: "DELETE" });
 
       expect([renamed.status, read.status, archived.status]).toEqual([200, 200, 200]);
+    });
+  });
+
+  /** ADR-175 decision 5: the door's actor is the credential's owner, judged by their role. */
+  describe("given an aggregate project", () => {
+    const path = `/api/projects/${AGGREGATE_PROJECT_ID}`;
+
+    it("reads as not found when the credential's owner is not an organisation admin", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      expect((await send(path)).status).toBe(404);
+    });
+
+    it("refuses a rename and an archive as not found, and writes nothing", async () => {
+      const { app, database } = application();
+      const { send } = mountProjectRestApplication(app);
+
+      const renamed = await send(path, { method: "PATCH", body: { name: "Renamed" } });
+      const archived = await send(path, { method: "DELETE" });
+
+      expect([renamed.status, archived.status]).toEqual([404, 404]);
+      expect(database.findProject(AGGREGATE_PROJECT_ID)).toMatchObject({
+        name: "Company view",
+        archivedAt: null,
+      });
+    });
+
+    it("reads, renames and archives it for an organisation admin's credential", async () => {
+      const { send } = mountProjectRestApplication(application({ callerRole: "ADMIN" }).app);
+
+      const read = await send(path);
+      const renamed = await send(path, { method: "PATCH", body: { name: "Renamed" } });
+      const archived = await send(path, { method: "DELETE" });
+
+      expect([read.status, renamed.status, archived.status]).toEqual([200, 200, 200]);
+    });
+
+    it("reads, renames and archives it when the owner is a MEMBER made admin by binding", async () => {
+      const { send } = mountProjectRestApplication(
+        application({ callerRole: "MEMBER", adminByBinding: true }).app,
+      );
+
+      const read = await send(path);
+      const renamed = await send(path, { method: "PATCH", body: { name: "Renamed" } });
+      const archived = await send(path, { method: "DELETE" });
+
+      expect([read.status, renamed.status, archived.status]).toEqual([200, 200, 200]);
     });
   });
 });

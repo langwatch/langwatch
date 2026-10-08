@@ -384,7 +384,7 @@ type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // .
 
 |             |                                             |
 | ----------- | ------------------------------------------- |
-| Declared at | `src/transport/api-key-projects.rest.ts:79` |
+| Declared at | `src/transport/api-key-projects.rest.ts:85` |
 | Base URL    | none: each route's path is its address      |
 | Addressing  | literal                                     |
 | Credential  | organization                                |
@@ -393,7 +393,7 @@ type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // .
 
 List projects
 
-Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:85`.
+Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:91`.
 
 Answers at `/api/projects`.
 
@@ -410,7 +410,7 @@ type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-ke
 
 Create a project
 
-Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:111`.
+Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:118`.
 
 Answers at `/api/projects`.
 

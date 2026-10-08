@@ -106,6 +106,8 @@ export class LangWatchQLQueryScopeService {
       organizationId: reach.organizationId,
       page: 1,
       limit: LWQL_TENANT_CAPABILITY_MAX_PROJECTS,
+      // Each project is judged below; an aggregate holds no traces of its own (ADR-175).
+      aggregatesVisibleTo: "system",
     });
     if (listed.pagination.total > listed.data.length) {
       throw new Error(

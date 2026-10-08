@@ -127,6 +127,7 @@ export class SlackConnectionMigrationService {
         page,
         limit: PROJECT_PAGE_SIZE,
         includeGovernance: true,
+        aggregatesVisibleTo: "system",
       });
       projects.push(...data);
       pageCount = data.length === 0 ? 0 : Math.ceil(pagination.total / pagination.limit);

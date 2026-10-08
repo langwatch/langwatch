@@ -251,6 +251,24 @@ export class AggregateProjectAdminOnlyError extends HandledError {
 }
 
 /**
+ * A credential was presented for, or bound to, an aggregate project (ADR-175
+ * decision 7). It owns no traces and accepts no key, its own stored one
+ * included. 403 rather than 401: the key may be real, the project takes none.
+ */
+export class AggregateProjectHasNoCredentialError extends HandledError {
+  declare readonly code: "aggregate_project_has_no_credential";
+
+  constructor(options: { meta?: Record<string, unknown> } = {}) {
+    super(
+      "aggregate_project_has_no_credential",
+      "This project reads traces from other projects and accepts no API key. Send traces to one of its member projects instead.",
+      { httpStatus: 403, fault: "customer", meta: options.meta },
+    );
+    this.name = "AggregateProjectHasNoCredentialError";
+  }
+}
+
+/**
  * A rule named a project or department this organisation does not own, or one
  * an aggregate cannot read. One code for every case, so a guessed id is never
  * confirmed to exist elsewhere; raised before anything is written.

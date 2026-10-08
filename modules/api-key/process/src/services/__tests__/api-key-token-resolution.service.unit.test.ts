@@ -390,6 +390,62 @@ describe("ApiKeyTokenResolutionService", () => {
       });
     });
 
+    describe("given a credential that resolves to an aggregate project", () => {
+      const aggregate = project({ id: "aggregate-1", kind: "aggregate" });
+      const refusal = { code: "aggregate_project_has_no_credential", httpStatus: 403 };
+
+      it("refuses the aggregate's own legacy key", async () => {
+        const { service } = serviceWith({ legacyProjectId: "aggregate-1", identity: aggregate });
+
+        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).rejects.toMatchObject(
+          refusal,
+        );
+      });
+
+      it("refuses a key bound to the aggregate alone", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ grants: [{ scopeType: "PROJECT", scopeId: "aggregate-1" }] }),
+          identity: aggregate,
+        });
+
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).rejects.toMatchObject(
+          refusal,
+        );
+      });
+
+      it("refuses an organization key that names the aggregate", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }] }),
+          identity: aggregate,
+        });
+
+        await expect(
+          service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "aggregate-1" }),
+        ).rejects.toMatchObject(refusal);
+      });
+
+      it("still resolves an ordinary project that names its kind", async () => {
+        const { service } = serviceWith({ identity: project({ kind: "application" }) });
+
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+          project: { id: "project-1" },
+        });
+      });
+
+      it("leaves the organization check to say the legacy key is the wrong class", async () => {
+        const { service } = serviceWith({
+          verify: "no_match",
+          legacyProjectId: "aggregate-1",
+          identity: aggregate,
+        });
+
+        await expect(service.resolveOrganizationToken({ token: CURRENT_TOKEN })).resolves.toEqual({
+          ok: false,
+          reason: "wrong_credential_class",
+        });
+      });
+    });
+
     describe("given a current-shaped token that verifies as nothing", () => {
       it("falls back to reading it as a legacy project key", async () => {
         const { service } = serviceWith({ verify: "no_match", legacyProjectId: "project-1" });

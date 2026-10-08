@@ -16,7 +16,6 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import { moduleApi } from "@langwatch/module";
 import {
-  isGovernanceProject,
   PersonalProjectProtectedError,
   projectApiKeyRotationSchema,
   ProjectNotFoundError,
@@ -27,7 +26,6 @@ import {
   projectRestUpdateSchema,
   type ArchivedProject,
   type Project,
-  type ProjectApi,
   type ProjectWithTeam,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
@@ -48,19 +46,31 @@ const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
 /**
  * What the management door reaches: flat operations `ProjectModule` serves via
  * `implements ProjectManagementApi`, so an unsupplied member fails the build.
- * Reads mirror {@link ProjectApi} and {@link DataPrivacyApi}; two are its own.
+ * `userId` is the credential's owner, null for a key acting for nobody.
  */
-export interface ProjectManagementApi
-  extends
-    Pick<ProjectApi, "findWithTeam">,
-    Pick<DataPrivacyApi, "getPiiRedactionLevel" | "setPiiRedactionLevel"> {
+export interface ProjectManagementApi extends Pick<
+  DataPrivacyApi,
+  "getPiiRedactionLevel" | "setPiiRedactionLevel"
+> {
+  /**
+   * One of this organization's projects; the governance project, and an
+   * aggregate the owner may not open (ADR-175), throw `ProjectNotFoundError`.
+   */
+  getInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string; userId: string | null }>,
+  ): Promise<ProjectWithTeam>;
   /**
    * Writes exactly the fields the request carried, scoped to the organization
    * the credential resolved — never to the project's own organization, which
    * would let a token issued for one organization write to another's project.
    */
   updateInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+    input: Readonly<{
+      projectId: string;
+      organizationId: string;
+      userId: string | null;
+      data: UpdateProjectInput;
+    }>,
   ): Promise<Project>;
   /**
    * Archives one of this organization's projects, answering with the row it
@@ -68,7 +78,7 @@ export interface ProjectManagementApi
    * "already archived" verdict would not serve it.
    */
   archiveInOrganization(
-    input: Readonly<{ projectId: string; organizationId: string }>,
+    input: Readonly<{ projectId: string; organizationId: string; userId: string | null }>,
   ): Promise<ArchivedProject>;
 }
 
@@ -104,8 +114,13 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     description: "Get a project by ID. Requires project:view permission.",
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) => {
-    const project = await projectInOrganization({ app, id: input.id, organizationId: scope.id });
+  .handle(async ({ app, input, scope, actor }) => {
+    const project = await projectInOrganization({
+      app,
+      id: input.id,
+      organizationId: scope.id,
+      ...keyOwner(actor),
+    });
 
     return {
       ...projectResponse(project),
@@ -128,7 +143,9 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(({ app, input, scope }) => updateProject({ app, input, organizationId: scope.id }))
+  .handle(({ app, input, scope, actor }) =>
+    updateProject({ app, input, organizationId: scope.id, ...keyOwner(actor) }),
+  )
 
   .delete("/:id", "archiveProject")
   .withParams(projectRestParamsSchema)
@@ -144,8 +161,13 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(async ({ app, input, scope }) => {
-    const project = await archiveProject({ app, id: input.id, organizationId: scope.id });
+  .handle(async ({ app, input, scope, actor }) => {
+    const project = await archiveProject({
+      app,
+      id: input.id,
+      organizationId: scope.id,
+      ...keyOwner(actor),
+    });
 
     return { id: project.id, name: project.name, archivedAt: project.archivedAt };
   })
@@ -192,6 +214,11 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .handle(async () => refuseBaseKeyToApiToken())
   .build();
 
+/** The organization door's actor is the key's owner; a service key acts for nobody. */
+function keyOwner(actor: { type: string; id?: string } | null): { userId: string | null } {
+  return { userId: actor?.type === "user" && actor.id ? actor.id : null };
+}
+
 /** One project, as every route in this family reports it. */
 function projectResponse(
   project: Pick<
@@ -216,29 +243,26 @@ function projectResponse(
 
 /**
  * The project this route addresses, refusing anything outside the organization.
- * The hidden governance project reads as absent: it is left out of every list,
- * so answering a read would be the one thing left that confirms it exists.
+ * What no list shows this caller (the governance project, an aggregate to a
+ * non-admin) reads as absent, since answering would confirm it exists.
  */
 async function projectInOrganization({
   app,
   id,
   organizationId,
+  userId,
 }: {
   app: ProjectManagementApi;
   id: string;
   organizationId: string;
+  userId: string | null;
 }): Promise<ProjectWithTeam> {
-  const project = await app.findWithTeam(id);
-
-  if (
-    !project ||
-    project.team.organizationId !== organizationId ||
-    isGovernanceProject(project.kind)
-  ) {
-    throw new NotFoundError("Project not found");
+  try {
+    return await app.getInOrganization({ projectId: id, organizationId, userId });
+  } catch (error) {
+    if (error instanceof ProjectNotFoundError) throw new NotFoundError("Project not found");
+    throw error;
   }
-
-  return project;
 }
 
 /** The update, then the PII level if one was sent, answering the level read back. */
@@ -246,6 +270,7 @@ async function updateProject({
   app,
   input,
   organizationId,
+  userId,
 }: {
   app: ProjectManagementApi;
   input: Readonly<{
@@ -257,10 +282,12 @@ async function updateProject({
     piiRedactionLevel?: DataPrivacyPiiRedactionLevel | undefined;
   }>;
   organizationId: string;
+  userId: string | null;
 }) {
   const project = await app.updateInOrganization({
     projectId: input.id,
     organizationId,
+    userId,
     data: {
       ...(input.name !== undefined && { name: input.name }),
       ...(input.language !== undefined && { language: input.language }),
@@ -283,13 +310,15 @@ async function archiveProject({
   app,
   id,
   organizationId,
+  userId,
 }: {
   app: ProjectManagementApi;
   id: string;
   organizationId: string;
+  userId: string | null;
 }): Promise<ArchivedProject> {
   try {
-    return await app.archiveInOrganization({ projectId: id, organizationId });
+    return await app.archiveInOrganization({ projectId: id, organizationId, userId });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) throw new NotFoundError("Project not found");
     if (error instanceof PersonalProjectProtectedError) throw new ForbiddenError(error.message);

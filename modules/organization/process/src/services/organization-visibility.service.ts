@@ -4,7 +4,11 @@
  * travel; the member picker shows names to everybody, addresses only to an administrator.
  */
 
-import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import {
+  holdsOrganizationAdminBinding,
+  type AuthzApi,
+  type AuthzBindingForSynthesis,
+} from "@langwatch/authz-contract";
 import {
   OrganizationNotFoundError,
   MemberNotFoundError,
@@ -12,6 +16,7 @@ import {
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
+import { hasTracesToShow, projectKindsHiddenFrom } from "@langwatch/project-contract";
 
 import { userCanOpenTeam } from "../rules/team-visibility.rules.ts";
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
@@ -41,19 +46,6 @@ interface OrganizationVisibilityDependencies {
   readonly reader: OrganizationVisibilityReader;
   readonly permissions: AuthzApi;
   readonly demoProject: OrganizationDemoProject;
-}
-
-/** Whether an organization-scoped ADMIN binding makes this viewer an administrator. */
-function isAdminByBinding(input: {
-  bindings: readonly AuthzBindingForSynthesis[];
-  organizationId: string;
-}): boolean {
-  return input.bindings.some(
-    (binding) =>
-      binding.organizationId === input.organizationId &&
-      binding.scopeType === "ORGANIZATION" &&
-      binding.role === "ADMIN",
-  );
 }
 
 export class OrganizationVisibilityService {
@@ -102,6 +94,7 @@ export class OrganizationVisibilityService {
         isDemo: input.isDemo,
         bindings,
       });
+      this.#markAggregatesAsHavingTraces(organization);
     }
 
     return organizations;
@@ -189,6 +182,16 @@ export class OrganizationVisibilityService {
   }
 
   /**
+   * An aggregate is never sent traces, so its own flag stays false while its
+   * members hold traces (ADR-175); every client gate on the flag reads this.
+   */
+  #markAggregatesAsHavingTraces(organization: FullyLoadedOrganization): void {
+    for (const project of organization.teams.flatMap((team) => team.projects)) {
+      project.firstMessage = hasTracesToShow(project);
+    }
+  }
+
+  /**
    * The organization as this one viewer sees it: their own membership row,
    * their own team memberships, and the teams a binding reaches even where no
    * `TeamUser` row exists.
@@ -215,7 +218,10 @@ export class OrganizationVisibilityService {
     // A person can be an administrator through the legacy membership row OR
     // through an organization-scoped ADMIN binding. The binding is
     // authoritative where present, so a stale MEMBER row cannot shadow it.
-    const adminByBinding = isAdminByBinding({ bindings, organizationId: organization.id });
+    const adminByBinding = holdsOrganizationAdminBinding({
+      bindings,
+      organizationId: organization.id,
+    });
     if (adminByBinding) {
       const own = organization.members[0];
       organization.members = own
@@ -230,6 +236,13 @@ export class OrganizationVisibilityService {
     }
 
     const organizationRole = organization.members.find((member) => member.userId === userId)?.role;
+
+    // ADR-175 decision 5: an aggregate reads other people's personal projects,
+    // so only an administrator of this organisation receives one.
+    const hiddenKinds = projectKindsHiddenFrom(organizationRole);
+    for (const team of organization.teams) {
+      team.projects = team.projects.filter((project) => !hiddenKinds.includes(project.kind));
+    }
 
     organization.teams = organization.teams.filter((team) => {
       team.members = team.members.filter(

@@ -36,6 +36,14 @@ export type OrganizationTeamProject = Pick<
   "id" | "name" | "slug" | "teamId" | "createdAt" | "updatedAt"
 >;
 
+/** Which projects a team read lists; the caller's organization role decides aggregates. */
+export type OrganizationProjectsQuery = {
+  organizationId: string;
+  teamId?: string;
+  limit?: number;
+  callerOrganizationRole: string;
+};
+
 export type PersonalWorkspaceFeatureProject = {
   id: string;
   isPersonal: boolean;
@@ -219,12 +227,12 @@ export abstract class OrganizationRepository {
   abstract findProjectIds(organizationId: string): Promise<string[]>;
   /** The id and name of each named project that exists; an unknown id is left out. */
   abstract findProjectNames(projectIds: readonly string[]): Promise<Pick<Project, "id" | "name">[]>;
-  /** The organization's live projects, governance excluded, newest first; one team's when named. */
-  abstract findProjects(input: {
-    organizationId: string;
-    teamId?: string;
-    limit?: number;
-  }): Promise<OrganizationTeamProject[]>;
+  /**
+   * The organization's live projects, newest first; one team's when named. The
+   * governance project is never listed, an aggregate only to an organisation
+   * admin (ADR-175 decision 5).
+   */
+  abstract findProjects(input: OrganizationProjectsQuery): Promise<OrganizationTeamProject[]>;
   /** Audits the owner's feature switch; project stores the switches on organization's fact. */
   abstract appendPersonalWorkspaceFeaturesAudit(input: {
     projectId: string;

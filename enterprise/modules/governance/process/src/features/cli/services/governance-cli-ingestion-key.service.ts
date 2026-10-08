@@ -13,12 +13,16 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { HandledError } from "@langwatch/handled-error";
+import { AggregateProjectHasNoCredentialError } from "@langwatch/project-contract";
 
 import type { PersonalIngestionKeyService } from "../../personal/services/personal-ingestion-key.service.ts";
 import { created, ok, posted, refuse } from "../rules/governance-cli-answer.rules.ts";
 import type { GovernanceCliCredentialApi } from "./governance-cli-credentials.service.ts";
 import { type GovernanceCliGateService } from "./governance-cli-gate.service.ts";
 import type { GovernanceCliIngestionKeyOutcome } from "./governance-cli-ingestion-key-mint.service.ts";
+
+/** An aggregate project holds no credential (ADR-175 decision 7). */
+const NO_CREDENTIAL = new AggregateProjectHasNoCredentialError();
 
 type GovernanceCliIngestionKeyMembers = Readonly<{
   gate: GovernanceCliGateService;
@@ -131,6 +135,9 @@ function renderIngestionKey(
         `No project "${outcome.projectRef}" in your organization`,
         404,
       );
+    case "project-holds-no-credential":
+      // Main's CLI envelope, under the registered code, so every surface names it alike.
+      return refuse(NO_CREDENTIAL.code, NO_CREDENTIAL.message, 403);
     case "personal-project-not-allowed":
       return refuse(
         "personal_project_not_allowed",

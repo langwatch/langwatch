@@ -71,6 +71,14 @@ const PROJECT: Project = {
   lastCodingAgentPullRequestAt: null,
 };
 
+/** Receives no traces, so the canaries must never run as it. */
+const OLDER_AGGREGATE: Project = {
+  ...PROJECT,
+  id: "project-aggregate",
+  kind: "aggregate",
+  createdAt: new Date("2025-01-01T00:00:00Z"),
+};
+
 let datastores: {
   postgres: MemoryPostgresHealthRepository;
   clickhouse: MemoryClickHouseHealthRepository;
@@ -117,11 +125,12 @@ function service() {
         }),
       }),
       providerTests: createApiFixture<ModelProviderApi>(),
+      // An older aggregate, which only a listing for "nobody" leaves out (ADR-175).
       projectDirectory: {
-        listByOrganization: async ({ page, limit }) => ({
-          data: [PROJECT],
-          pagination: { page, limit, total: 1 },
-        }),
+        listByOrganization: async ({ page, limit, aggregatesVisibleTo }) => {
+          const data = aggregatesVisibleTo === "nobody" ? [PROJECT] : [OLDER_AGGREGATE, PROJECT];
+          return { data, pagination: { page, limit, total: data.length } };
+        },
       },
       mail: {
         getMailDelivery: async () => ({

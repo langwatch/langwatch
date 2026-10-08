@@ -9,11 +9,13 @@ export const signedOut = z.object({ error: z.string() });
 
 /**
  * The OAuth error shape RFC 6749 §4.1.2.1 defines — error, error_description and the
- * redirect that sends the client back to its own URI with them.
+ * redirect that sends the client back to its own URI with them. `code` names a registered
+ * refusal the OAuth error cannot, such as an aggregate project's (ADR-175).
  */
 export const refused = z.object({
   error: z.string(),
   error_description: z.string().optional(),
+  code: z.string().optional(),
   redirect: z.string().optional(),
 });
 

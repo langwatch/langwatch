@@ -57,6 +57,7 @@ import {
 } from "../features/personal-workspace/services/personal-workspace.service.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type {
+  OrganizationProjectsQuery,
   OrganizationRepository,
   OrganizationTeamProject,
 } from "../repositories/organization.repository.ts";
@@ -163,11 +164,7 @@ export class OrganizationService {
     return this.repository.findProjectNames(projectIds);
   }
 
-  listProjects(input: {
-    organizationId: string;
-    teamId?: string;
-    limit?: number;
-  }): Promise<OrganizationTeamProject[]> {
+  listProjects(input: OrganizationProjectsQuery): Promise<OrganizationTeamProject[]> {
     return this.repository.findProjects(input);
   }
 

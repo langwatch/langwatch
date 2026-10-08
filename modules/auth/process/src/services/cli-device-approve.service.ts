@@ -11,6 +11,10 @@ import {
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { FeatureFlagKey, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  AggregateProjectHasNoCredentialError,
+  isAggregateProjectKind,
+} from "@langwatch/project-contract";
 
 import {
   expired,
@@ -216,6 +220,13 @@ async function approveProject({
       }
       throw error;
     });
+
+  // ADR-175 decision 7: an aggregate receives no traces, so no session may point at it. Asked
+  // before any permission, because no grant changes the answer.
+  if (isAggregateProjectKind(project.kind)) {
+    const refusal = new AggregateProjectHasNoCredentialError();
+    throw refused(refusal.code, refusal.message, 403);
+  }
 
   if (project.isPersonal && project.ownerUserId !== person.id) {
     throw refused(

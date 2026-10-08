@@ -88,6 +88,7 @@ describe.skipIf(!DB_URL)("PrismaProjectRepository project lists over Postgres", 
     it("names the projects of the department pickers and usage mails without the hidden one", async () => {
       const departments = await repository.findProjectsWithDepartments({
         organizationId: ids.organization,
+        includeAggregates: true,
       });
       const live = await repository.findLiveNonGovernanceIds({
         organizationId: ids.organization,

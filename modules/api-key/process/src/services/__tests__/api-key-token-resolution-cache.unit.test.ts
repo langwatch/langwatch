@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -24,6 +26,9 @@ import type { ApiKeyDependencies, ApiKeyGrantId } from "../api-key.service.ts";
 
 const START = Temporal.Instant.from("2026-10-01T09:00:00.000Z");
 
+/** The one organization whose project is an aggregate, which accepts no credential. */
+const AGGREGATE_ORGANIZATION = "aggregating";
+
 const identity = (organizationId: string): ProjectIdentity => ({
   id: `project-${organizationId}`,
   name: "Project",
@@ -32,6 +37,7 @@ const identity = (organizationId: string): ProjectIdentity => ({
   organizationId,
   isPersonal: false,
   ownerUserId: null,
+  kind: organizationId === AGGREGATE_ORGANIZATION ? "aggregate" : "application",
 });
 
 function harness() {
@@ -63,7 +69,8 @@ function harness() {
   });
   const projects = createApiFixture<ProjectApi>({
     findIdentity: async (projectId: string) => identity(projectId.replace("project-", "")),
-    findIdByLegacyApiKey: async ({ token }) => (token === "legacy-acme" ? "project-acme" : null),
+    findIdByLegacyApiKey: async ({ token }) =>
+      token.startsWith("legacy-") ? token.replace("legacy-", "project-") : null,
   });
   const dependencies: ApiKeyDependencies & { repository: ApiKeyRepository } = {
     authz,
@@ -540,6 +547,40 @@ describe("checking an API key through the shared answers", () => {
       secondsPass(5);
       await podB.findResolvedToken({ token: "legacy-acme" });
       expect(reads.legacy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when a key for an aggregate project is answered from Redis", () => {
+    it("is refused on the second pod too, from the kind the held answer carries", async () => {
+      const { podA, podB, reads, mint } = harness();
+      const { token } = await mint({ organizationId: AGGREGATE_ORGANIZATION });
+      const refusal = { code: "aggregate_project_has_no_credential" };
+
+      await expect(podA.findResolvedToken({ token })).rejects.toMatchObject(refusal);
+      await expect(podB.findResolvedToken({ token })).rejects.toMatchObject(refusal);
+      expect(reads.row).toHaveBeenCalledTimes(1);
+      expect(reads.identity).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a legacy key's answer was held before identities carried a kind", () => {
+    it("serves the kindless answer until it lapses, then refuses the aggregate", async () => {
+      const { podA, answers, secondsPass } = harness();
+      const token = `legacy-${AGGREGATE_ORGANIZATION}`;
+      const { kind: _kind, ...kindless } = identity(AGGREGATE_ORGANIZATION);
+      await answers.set({
+        key: `legacy:${createHash("sha256").update(token).digest("hex")}`,
+        value: JSON.stringify({ project: kindless }),
+        ttlMs: 5_000,
+      });
+
+      await expect(podA.findResolvedToken({ token })).resolves.toMatchObject({
+        type: "legacyProjectKey",
+      });
+      secondsPass(5);
+      await expect(podA.findResolvedToken({ token })).rejects.toMatchObject({
+        code: "aggregate_project_has_no_credential",
+      });
     });
   });
 

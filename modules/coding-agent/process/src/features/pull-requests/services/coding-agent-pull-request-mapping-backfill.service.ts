@@ -5,6 +5,7 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
+import type { AggregateAudience } from "@langwatch/project-contract";
 
 import type { CodingAgentClock } from "../../../services/coding-agent-clock.service.ts";
 import type { CodingAgentSessionReadService } from "../../../services/coding-agent-session-read.service.ts";
@@ -34,6 +35,7 @@ type CodingAgentBackfillProjects = {
     page: number;
     limit: number;
     includeGovernance?: boolean;
+    aggregatesVisibleTo: AggregateAudience;
   }): Promise<{ data: readonly { id: string }[] }>;
 };
 
@@ -71,6 +73,7 @@ export class CodingAgentPullRequestMappingBackfillService {
         page: 1,
         limit: PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP,
         includeGovernance: true,
+        aggregatesVisibleTo: "system",
       })
     ).data.map((project) => project.id);
     const targets = new Map<string, PullRequestMappingTarget>();

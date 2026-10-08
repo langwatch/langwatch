@@ -25,6 +25,7 @@ import {
   organizationTeamRestSuccessSchema,
   organizationTeamRestUpdateSchema,
   type OrganizationApi,
+  type OrganizationCaller,
   type OrganizationTeam,
   type OrganizationTeamRest,
   type UpdateOrganizationTeamInput,
@@ -32,7 +33,7 @@ import {
 import type { Project } from "@langwatch/project-contract";
 import type { z } from "zod";
 
-import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
+import { deriveCaller, keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
 
 /**
  * What the `/api/teams` family reaches, as flat operations the organization's
@@ -52,11 +53,14 @@ export interface TeamManagementApi
    * which is what `updateTeamWithMembers` is for and why it is not this.
    */
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
-  /** The live projects in one of this organization's teams, newest first. */
-  listProjectsByTeam(input: {
-    organizationId: string;
-    teamId: string;
-  }): Promise<Pick<Project, "id" | "name" | "slug" | "createdAt" | "updatedAt">[]>;
+  /**
+   * The live projects in one of this organization's teams, newest first, as
+   * the key's owner may see them; a service key (`null`) acts for nobody.
+   */
+  listProjectsByTeam(
+    input: { organizationId: string; teamId: string },
+    by: OrganizationCaller | null,
+  ): Promise<Pick<Project, "id" | "name" | "slug" | "createdAt" | "updatedAt">[]>;
 }
 
 export const TeamManagementApi = moduleApi<TeamManagementApi>()("organization");
@@ -295,16 +299,16 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "List projects in a team",
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     await app.getTeam({
       teamId: input.teamId,
       organizationId: scope.id,
     });
 
-    const projects = await app.listProjectsByTeam({
-      organizationId: scope.id,
-      teamId: input.teamId,
-    });
+    const projects = await app.listProjectsByTeam(
+      { organizationId: scope.id, teamId: input.teamId },
+      deriveCaller(actor),
+    );
 
     return {
       data: projects.map(({ id, name, slug, createdAt, updatedAt }) => ({

@@ -989,6 +989,27 @@ describe("given a CLI starting a device login", () => {
       expect(body).not.toContain("sk-lw-mine");
     });
 
+    describe("when the picked project is an aggregate (ADR-175 decision 7)", () => {
+      it("refuses it before any permission is asked, and opens no session", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject({ id: "project-aggregate", kind: "aggregate" });
+        world.administersProject = false;
+        const api = mount(world);
+        const grant = await pendingProjectKeyCode(api);
+
+        const approved = await approveProject(api, grant, "project-aggregate");
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(approved.status).toBe(403);
+        await expect(approved.json()).resolves.toMatchObject({
+          error: "aggregate_project_has_no_credential",
+        });
+        expect(await exchanged.json()).not.toMatchObject({ kind: "project_session" });
+      });
+    });
+
     /** @scenario project-login approval denies a member whose seat has been disabled */
     it("refuses a member whose seat an admin disabled and discloses no key", async () => {
       const world = deviceFlowWorld();
@@ -1397,6 +1418,7 @@ type LiveProject = {
   apiKey: string;
   isPersonal: boolean;
   ownerUserId: string | null;
+  kind: string;
 };
 
 function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
@@ -1408,6 +1430,7 @@ function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     apiKey: "sk-lw-shared",
     isPersonal: false,
     ownerUserId: null,
+    kind: "application",
     ...overrides,
   };
 }

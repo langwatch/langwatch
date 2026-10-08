@@ -30,6 +30,8 @@ type Grant = { permission: AuthzPermission; at: "org" | "team" | "project"; id: 
 
 const ALL_TEAMS: Record<string, true> = { platform: true, "data-sci": true };
 const TEAM_OF_PROJECT: Record<string, string> = { demo: "platform", "ml-prod": "data-sci" };
+/** An aggregate on the platform team (ADR-175): it reads its members and owns no traces. */
+const AGGREGATE_PROJECT_ID = "company-view";
 
 /** A grant reaches its own scope and everything beneath it, and nothing beside it. */
 function grantReaches(grant: Grant, scope: GatewayPermissionScope): boolean {
@@ -92,7 +94,7 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
   projects(): Pick<ProjectApi, "findIdentity" | "listIdsByOrganization"> {
     return createApiFixture<ProjectApi>({
       findIdentity: async (id) => {
-        const teamId = TEAM_OF_PROJECT[id];
+        const teamId = id === AGGREGATE_PROJECT_ID ? "platform" : TEAM_OF_PROJECT[id];
         return teamId
           ? {
               id,
@@ -102,11 +104,12 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
               organizationId: "acme",
               isPersonal: false,
               ownerUserId: null,
+              kind: id === AGGREGATE_PROJECT_ID ? "aggregate" : "application",
             }
           : null;
       },
       listIdsByOrganization: async ({ organizationId }) =>
-        organizationId === "acme" ? Object.keys(TEAM_OF_PROJECT) : [],
+        organizationId === "acme" ? [...Object.keys(TEAM_OF_PROJECT), AGGREGATE_PROJECT_ID] : [],
     });
   }
   async findProjectIdsForTeams({ teamIds }: { teamIds: string[] }) {
@@ -356,6 +359,35 @@ describe("a key never reaches into another organization", () => {
         scopes: [ORG, PLATFORM, DEMO],
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("a key's traces never land in a project that receives none", () => {
+  it("refuses an aggregate named as the trace destination", async () => {
+    await expect(
+      service().assertTraceProjectBelongsToOrg({
+        organizationId: "acme",
+        traceProjectId: AGGREGATE_PROJECT_ID,
+      }),
+    ).rejects.toMatchObject({ code: "gateway_trace_project_not_a_destination", httpStatus: 400 });
+  });
+
+  it("accepts an ordinary project of the key's own organization", async () => {
+    await expect(
+      service().assertTraceProjectBelongsToOrg({ organizationId: "acme", traceProjectId: "demo" }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("still refuses a project of another organization as a mismatch, before its kind", async () => {
+    await expect(
+      service().assertTraceProjectBelongsToOrg({
+        organizationId: "evilcorp",
+        traceProjectId: AGGREGATE_PROJECT_ID,
+      }),
+    ).rejects.toMatchObject({
+      code: "gateway_scope_org_mismatch",
+      meta: { scope_type: "project" },
+    });
   });
 });
 

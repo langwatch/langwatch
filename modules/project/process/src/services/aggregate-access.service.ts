@@ -1,28 +1,40 @@
+import { holdsOrganizationAdminBinding, type AuthzApi } from "@langwatch/authz-contract";
 import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import {
   AggregateProjectAdminOnlyError,
   PROJECT_KIND,
   mayOpenProjectKind,
+  type AggregateAudience,
 } from "@langwatch/project-contract";
 
+/** The organisation role an ADMIN binding confers, whatever the membership row says. */
+const ORGANIZATION_ADMIN_ROLE = "ADMIN";
+
 /**
- * ADR-175 decision 5: an aggregate reads other people's personal projects, so
- * only an organisation admin opens or creates one, whatever a custom role
- * grants. The role is organisation's, read through its API.
+ * ADR-175 decision 5: only an organisation admin opens or creates an aggregate,
+ * whatever a custom role grants. As in organisation's listings, an organisation
+ * ADMIN binding outranks the membership row, which decides otherwise.
  */
 export class AggregateAccessService {
   readonly #organizations: Pick<OrganizationApi, "getMember">;
+  readonly #authorization: Pick<AuthzApi, "listBindingsForSynthesis">;
 
-  private constructor(organizations: Pick<OrganizationApi, "getMember">) {
-    this.#organizations = organizations;
-  }
-
-  static create({
+  private constructor({
     organizations,
+    authorization,
   }: {
     organizations: Pick<OrganizationApi, "getMember">;
+    authorization: Pick<AuthzApi, "listBindingsForSynthesis">;
+  }) {
+    this.#organizations = organizations;
+    this.#authorization = authorization;
+  }
+
+  static create(dependencies: {
+    organizations: Pick<OrganizationApi, "getMember">;
+    authorization: Pick<AuthzApi, "listBindingsForSynthesis">;
   }): AggregateAccessService {
-    return new AggregateAccessService(organizations);
+    return new AggregateAccessService(dependencies);
   }
 
   /** Whether this person may open an aggregate; a key that acts for nobody never may. */
@@ -38,6 +50,20 @@ export class AggregateAccessService {
     return mayOpenProjectKind({ kind: PROJECT_KIND.AGGREGATE, organizationRole: role });
   }
 
+  /** Whether a listing answering this audience carries aggregates. */
+  async listsAggregatesTo({
+    organizationId,
+    audience,
+  }: {
+    organizationId: string;
+    audience: AggregateAudience;
+  }): Promise<boolean> {
+    if (audience === "system") return true;
+    if (audience === "nobody") return false;
+
+    return this.mayOpen({ organizationId, userId: audience.userId });
+  }
+
   /** Refuses anyone who is not an admin of the organisation, members and outsiders alike. */
   async assertMayOpen({
     organizationId,
@@ -50,9 +76,9 @@ export class AggregateAccessService {
   }
 
   /**
-   * Refuses a member who is not an admin. Someone outside the organisation
-   * has no role to judge, so they are left to the permission check the
-   * create asks next, which refuses them the shared way.
+   * Refuses a member who is not an admin. Someone with neither a membership
+   * nor an admin binding has no role to judge, so they are left to the
+   * permission check the create asks next, which refuses them the shared way.
    */
   async assertMayCreate({
     organizationId,
@@ -78,6 +104,12 @@ export class AggregateAccessService {
     organizationId: string;
     userId: string;
   }): Promise<string | undefined> {
+    const bindings = await this.#authorization.listBindingsForSynthesis({
+      orgIds: [organizationId],
+      userId,
+    });
+    if (holdsOrganizationAdminBinding({ bindings, organizationId })) return ORGANIZATION_ADMIN_ROLE;
+
     try {
       return (await this.#organizations.getMember({ organizationId, userId })).role;
     } catch (error) {

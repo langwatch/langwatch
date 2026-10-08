@@ -20,7 +20,11 @@ type Fakes = {
   customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
   seat?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER" | "absent";
-  project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
+  project?: {
+    archivedAt?: Date | null;
+    kind?: string;
+    team: { id: string; organizationId: string };
+  };
   personalOwner?: string | null;
   attached?: { attached: string[]; duplicates: string[] };
   calls?: Record<string, unknown>[];
@@ -323,6 +327,39 @@ describe("ApiKeyGrantPolicyService", () => {
       it("refuses it", async () => {
         const { service } = policyWith({
           project: { archivedAt: new Date(), team: { id: "team-1", organizationId: ORG } },
+        });
+
+        await expect(service.validateScope(scope(), ORG)).rejects.toBeInstanceOf(
+          ApiKeyScopeViolationError,
+        );
+      });
+    });
+
+    describe("given an aggregate project in this organization", () => {
+      it("refuses it, since an aggregate accepts no credential", async () => {
+        const { service } = policyWith({
+          project: {
+            archivedAt: null,
+            kind: "aggregate",
+            team: { id: "team-1", organizationId: ORG },
+          },
+        });
+
+        await expect(service.validateScope(scope(), ORG)).rejects.toMatchObject({
+          code: "aggregate_project_has_no_credential",
+          httpStatus: 403,
+        });
+      });
+    });
+
+    describe("given an aggregate project owned by another organization", () => {
+      it("refuses it as out of scope, saying nothing of its kind", async () => {
+        const { service } = policyWith({
+          project: {
+            archivedAt: null,
+            kind: "aggregate",
+            team: { id: "team-1", organizationId: "other-org" },
+          },
         });
 
         await expect(service.validateScope(scope(), ORG)).rejects.toBeInstanceOf(

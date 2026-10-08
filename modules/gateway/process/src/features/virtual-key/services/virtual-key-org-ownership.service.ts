@@ -2,8 +2,9 @@
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
+  GatewayTraceProjectNotADestinationError,
 } from "@langwatch/gateway-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { receivesTraces, type ProjectApi } from "@langwatch/project-contract";
 
 import type { VirtualKeyAuthorizationRepository } from "../../../repositories/virtual-key-authorization.repository.ts";
 
@@ -38,14 +39,14 @@ async function assertAllResolve(
 export class VirtualKeyOrgOwnershipService {
   static create(input: {
     directory: VirtualKeyAuthorizationRepository;
-    projects: Pick<ProjectApi, "listIdsByOrganization">;
+    projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">;
   }): VirtualKeyOrgOwnershipService {
     return new VirtualKeyOrgOwnershipService(input.directory, input.projects);
   }
 
   private constructor(
     private readonly directory: VirtualKeyAuthorizationRepository,
-    private readonly projects: Pick<ProjectApi, "listIdsByOrganization">,
+    private readonly projects: Pick<ProjectApi, "findIdentity" | "listIdsByOrganization">,
   ) {}
 
   /** Of the named projects, those inside this organization. */
@@ -127,9 +128,9 @@ export class VirtualKeyOrgOwnershipService {
   }
 
   /**
-   * The explicit trace destination must be a project of the key's own
-   * organization: it decides where traces (and therefore budget debits)
-   * land, and a stray id would route another tenant's costs.
+   * The explicit trace destination must be a project of the key's own organization: it decides
+   * where traces (and budget debits) land, and a stray id would route another tenant's costs.
+   * An aggregate owns no traces (ADR-175 decision 7), so it is never a destination.
    */
   async assertTraceProjectBelongsToOrg({
     organizationId,
@@ -142,12 +143,13 @@ export class VirtualKeyOrgOwnershipService {
       return;
     }
 
-    const found = await this.projectIdsInOrganization({
-      organizationId,
-      projectIds: [traceProjectId],
-    });
-    if (found.length === 0) {
+    const project = await this.projects.findIdentity(traceProjectId);
+    if (!project || project.organizationId !== organizationId) {
       throw new GatewayScopeOrgMismatchError("project");
+    }
+
+    if (!receivesTraces(project.kind)) {
+      throw new GatewayTraceProjectNotADestinationError();
     }
   }
 }

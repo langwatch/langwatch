@@ -154,6 +154,18 @@ export const createProjectInputSchema = z
   .strict();
 export type CreateProjectInput = z.infer<typeof createProjectInputSchema>;
 
+/**
+ * ADR-175 decision 5: whom a listing answers, deciding whether aggregates are in it. A person
+ * sees them only as an organisation admin (a key acting for nobody never does); `"system"`
+ * lists them, for work done for no person; `"nobody"` never does, as for destination pickers.
+ */
+export const aggregateAudienceSchema = z.union([
+  z.object({ userId: z.string().min(1).nullable() }).strict(),
+  z.literal("system"),
+  z.literal("nobody"),
+]);
+export type AggregateAudience = z.infer<typeof aggregateAudienceSchema>;
+
 export const projectPaginationSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -161,14 +173,8 @@ export const projectPaginationSchema = z
     limit: z.number().int().positive(),
     projectIds: z.array(z.string().min(1)).optional(),
     includeGovernance: z.boolean().optional(),
-    /**
-     * ADR-175 decision 5: the person a listing answers, whose organisation
-     * role decides whether aggregates are listed. Absent, they are.
-     */
-    aggregatesVisibleTo: z
-      .object({ userId: z.string().min(1).nullable() })
-      .strict()
-      .optional(),
+    /** Required, so every caller decides who it lists for (ADR-175 decision 5). */
+    aggregatesVisibleTo: aggregateAudienceSchema,
   })
   .strict();
 export type ProjectPaginationInput = z.infer<typeof projectPaginationSchema>;
@@ -216,6 +222,11 @@ export const projectIdentitySchema = z
     isPersonal: z.boolean(),
     /** That person, when the workspace is personal. */
     ownerUserId: z.string().min(1).nullable(),
+    /**
+     * Set on every identity this module reads, so a credential door can refuse
+     * an aggregate (ADR-175 decision 7). Optional only for peers' fixtures.
+     */
+    kind: z.string().min(1).optional(),
   })
   .strict();
 export type ProjectIdentity = z.infer<typeof projectIdentitySchema>;

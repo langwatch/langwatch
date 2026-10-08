@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:77`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:78`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -22,10 +22,10 @@ listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
 
 #### `findProjectsWithDepartments`
 
-Every non-governance project with its department (main `department.service.ts:126-133`).
+Every non-governance project with its department (main `department.service.ts:126-133`), aggregates only when the audience may open them (ADR-175 decision 5).
 
 ```typescript
-findProjectsWithDepartments(input: { organizationId: string; }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+findProjectsWithDepartments(input: { organizationId: string; aggregatesVisibleTo: AggregateAudience; }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
 ```
 
 #### `assignProjectDepartment`
@@ -87,7 +87,7 @@ findWithTeam(id: string): Promise<ProjectWithTeam | null>;
 #### `listByOrganization`
 
 ```typescript
-listByOrganization(input: { organizationId: string; page: number; limit: number; projectIds?: string[]; /** The organization's hidden governance project is left out unless this is true. */ includeGovernance?: boolean; /** Aggregates are left out unless this person is an organisation admin (ADR-175). */ aggregatesVisibleTo?: { userId: string | null }; }): Promise<PaginatedProjects>;
+listByOrganization(input: { organizationId: string; page: number; limit: number; projectIds?: string[]; /** The organization's hidden governance project is left out unless this is true. */ includeGovernance?: boolean; /** Whom the listing answers, which decides whether aggregates are in it (ADR-175). */ aggregatesVisibleTo: AggregateAudience; }): Promise<PaginatedProjects>;
 ```
 
 #### `listByTeam`
@@ -296,7 +296,7 @@ countWithTraces(input: { organizationId: string }): Promise<number>;
 
 #### `findSharedProjectSlugs`
 
-Live shared-team projects, oldest first; with a member, only theirs (main `resolveHome`).
+Live shared-team projects, oldest first; with a member, only theirs (main `resolveHome`). Never an aggregate or the governance project: nobody lands on those unasked.
 
 ```typescript
 findSharedProjectSlugs(input: { organizationId: string; memberUserId?: string; limit: number; }): Promise<string[]>;
@@ -330,24 +330,24 @@ listLwqlKeys(input?: ProjectIdPageInput): Promise<ProjectLwqlKeyPage>;
 
 ### `projectRest`
 
-|             |                                    |
-| ----------- | ---------------------------------- |
-| Declared at | `src/transport/project.rest.ts:91` |
-| Base URL    | `/api/projects`                    |
-| Addressing  | dated                              |
-| Credential  | organization                       |
-| Versions    | `2026-08-07`                       |
+|             |                                     |
+| ----------- | ----------------------------------- |
+| Declared at | `src/transport/project.rest.ts:101` |
+| Base URL    | `/api/projects`                     |
+| Addressing  | dated                               |
+| Credential  | organization                        |
+| Versions    | `2026-08-07`                        |
 
 #### `GET /:id` · `getProject`
 
 Get a project
 
-Permission `project:view`. Declared at `src/transport/project.rest.ts:98`.
+Permission `project:view`. Declared at `src/transport/project.rest.ts:108`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project.ts:304
+// Params: projectRestParamsSchema, ../contract/src/project.ts:315
 interface Params {
   id: string;
 }
@@ -369,13 +369,13 @@ interface Response {
 
 Update a project
 
-Permission `project:update`. Declared at `src/transport/project.rest.ts:116`.
+Permission `project:update`. Declared at `src/transport/project.rest.ts:131`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:304
-// Body: projectRestUpdateSchema, ../contract/src/project.ts:294
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:315
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:305
 interface Body {
   name?: string;
   language?: string;
@@ -390,12 +390,12 @@ type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/proj
 
 Archive a project
 
-Permission `project:delete`. Declared at `src/transport/project.rest.ts:133`.
+Permission `project:delete`. Declared at `src/transport/project.rest.ts:150`.
 
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:304
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:315
 // Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:74
 interface Response {
   id: string;
@@ -408,12 +408,12 @@ interface Response {
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:155`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:177`.
 
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:304
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:315
 // Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:32
 interface Response {
   apiKey: string;
@@ -424,13 +424,13 @@ interface Response {
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:174`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:196`.
 
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:304
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:307
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:315
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:318
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:32
 ```

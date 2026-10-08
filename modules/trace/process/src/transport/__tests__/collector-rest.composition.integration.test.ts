@@ -11,7 +11,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
-import { ProjectApi } from "@langwatch/project-contract";
+import { AggregateProjectHasNoCredentialError, ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -78,6 +78,8 @@ type CollectorAccess = {
   permitted?: boolean;
   /** The credential class the token resolves to. */
   type?: ResolvedApiKeyCredential["type"];
+  /** Whether the token names an aggregate project, which the directory refuses outright. */
+  aggregate?: boolean;
 };
 
 /** The two API-key directory operations an ingestion door calls, and no more. */
@@ -87,6 +89,9 @@ function apiKeyDirectory(
 ): Pick<ApiKeyApi, "findResolvedToken" | "markUsed"> {
   return {
     findResolvedToken: async () => {
+      if (access.aggregate) {
+        throw new AggregateProjectHasNoCredentialError({ meta: { projectId: PROJECT.id } });
+      }
       if (access.resolves === false) return null;
       if (access.type === "legacyProjectKey") {
         return { type: "legacyProjectKey", project: PROJECT };
@@ -316,6 +321,20 @@ describe("given the trace module as a process composes it", () => {
         retryable: false,
       });
       expect(body).not.toHaveProperty("code");
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when the presented key belongs to an aggregate project (ADR-175 decision 7)", () => {
+    it("is refused with a 403 that names why, and records nothing", async () => {
+      const { post, recordedSpans } = deployment({ aggregate: true });
+
+      const response = await post("/api/collector", sdkBody());
+
+      expect(response.status).toBe(403);
+      expect(JSON.stringify(await response.json())).toContain(
+        "aggregate_project_has_no_credential",
+      );
       expect(recordedSpans).toHaveLength(0);
     });
   });

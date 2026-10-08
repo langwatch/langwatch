@@ -1963,8 +1963,14 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.departments.getAll(input);
   }
 
-  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
-    return this.departments.getAssignments(input);
+  departmentAssignments(input: {
+    organizationId: string;
+    callerUserId: string;
+  }): Promise<DepartmentAssignments> {
+    return this.departments.getAssignments({
+      organizationId: input.organizationId,
+      aggregatesVisibleTo: { userId: input.callerUserId },
+    });
   }
 
   departmentCreate(input: { organizationId: string; name: string }): Promise<Department> {

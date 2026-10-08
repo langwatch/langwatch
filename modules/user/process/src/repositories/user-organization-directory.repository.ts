@@ -7,7 +7,7 @@ import type { MeProject } from "@langwatch/user-contract";
  */
 export interface UserOrganizationDirectoryRepository {
   findName(organizationId: string): Promise<string | null>;
-  /** The caller's first non-archived project in the organization, by age. */
+  /** The caller's oldest live project the app may land on: no aggregate, no governance project. */
   findFirstProjectSlug(input: { organizationId: string; userId: string }): Promise<string | null>;
   /** The organization's first administrator, by seat age. */
   findFirstAdminEmail(organizationId: string): Promise<string | null>;

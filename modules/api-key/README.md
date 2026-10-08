@@ -13,7 +13,7 @@ API keys: creating and updating them, resolving a presented token to its caller,
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)          |
 | Api token      | `ApiKeyApi` = `moduleApi<ApiKeyApi>()("api-key")`, `contract/src/api-key.api.ts:280` (50 operations) |
 | Other token    | `ApiKeyOrganizationsDoorApi`, `process/src/transport/api-key-organizations.rest.ts:24`               |
-| Other token    | `ApiKeyProjectsDoorApi`, `process/src/transport/api-key-projects.rest.ts:58`                         |
+| Other token    | `ApiKeyProjectsDoorApi`, `process/src/transport/api-key-projects.rest.ts:64`                         |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                           |
 
 ## What api-key owns

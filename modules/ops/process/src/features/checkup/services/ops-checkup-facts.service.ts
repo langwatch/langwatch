@@ -213,7 +213,10 @@ function destinationWords(destination: StoredObjectStorageDestination): string {
   }
 }
 
-/** The organization's oldest project, which the canaries run as; empty where it has none. */
+/**
+ * The organization's oldest project, which the canaries run as; empty where it has none.
+ * Never an aggregate: it receives no traces, so a canary run as one is refused (ADR-175).
+ */
 async function findOldestProjects({
   projects,
   organizationId,
@@ -226,6 +229,7 @@ async function findOldestProjects({
     page: 1,
     limit: 100,
     includeGovernance: true,
+    aggregatesVisibleTo: "nobody",
   });
   return page.data
     .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())

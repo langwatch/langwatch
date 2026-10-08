@@ -12,6 +12,14 @@ import { Temporal, toDate } from "@langwatch/time";
 
 import type { OrganizationSpendRepository } from "../organization-spend.repository.ts";
 
+/**
+ * Project's `projectKindsHiddenFrom`, spelled out because entitlement holds no
+ * edge to project's contract: the governance project is never a row of its own,
+ * and an aggregate is listed to organisation admins only (ADR-175 decision 5).
+ */
+const HIDDEN_FROM_ADMINISTRATORS = ["internal_governance"];
+const HIDDEN_FROM_MEMBERS = ["internal_governance", "aggregate"];
+
 export class PrismaOrganizationSpendRepository implements OrganizationSpendRepository {
   static create(prisma: PrismaClient): PrismaOrganizationSpendRepository {
     return new PrismaOrganizationSpendRepository(prisma);
@@ -22,15 +30,16 @@ export class PrismaOrganizationSpendRepository implements OrganizationSpendRepos
   async findSpendRollups(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]> {
     const projects = await this.prisma.project.findMany({
       where: {
-        kind: { not: "internal_governance" },
         OR: [
           {
+            kind: { notIn: HIDDEN_FROM_MEMBERS },
             team: {
               organizationId: input.organizationId,
               members: { some: { userId: input.userId } },
             },
           },
           {
+            kind: { notIn: HIDDEN_FROM_ADMINISTRATORS },
             team: {
               organizationId: input.organizationId,
               organization: { members: { some: { userId: input.userId, role: "ADMIN" } } },

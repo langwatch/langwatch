@@ -11,7 +11,7 @@ The hosted MCP server, and the MCP OAuth flow that admits its clients.
 | Classification | core (`modules/catalogue.json`)                                                                                              |
 | Subjects       | hosted-mcp, mcp-oauth                                                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                          |
-| Api token      | `HostedMcpApi` = `moduleApi<HostedMcpApiContract>()("hosted-mcp")`, `contract/src/mcp-authorize.schemas.ts:72` (1 operation) |
+| Api token      | `HostedMcpApi` = `moduleApi<HostedMcpApiContract>()("hosted-mcp")`, `contract/src/mcp-authorize.schemas.ts:74` (1 operation) |
 | Other token    | `McpAuthorizeApi`, `process/src/transport/mcp-authorize.rest.ts:23`                                                          |
 | Installed by   | api, worker, tasks (process)                                                                                                 |
 

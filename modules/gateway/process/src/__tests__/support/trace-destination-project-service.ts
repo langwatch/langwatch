@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
+  NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
   type ProjectApi,
   traceDestinationDecisionSchema,
@@ -26,7 +27,13 @@ export function createTraceDestinationProjects(prisma: PrismaClient): ProjectApi
     projectId: string,
   ): Promise<TraceDestinationProject | null> => {
     const row = await prisma.project.findFirst({
-      where: { id: projectId, team: { organizationId }, archivedAt: null },
+      // An aggregate owns no traces (ADR-175 decision 7), so it is never a destination.
+      where: {
+        id: projectId,
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: PROJECT_KIND.AGGREGATE },
+      },
       select: DESTINATION_SELECT,
     });
     return row ? traceDestinationProjectSchema.parse(row) : null;
@@ -71,7 +78,7 @@ export function createTraceDestinationProjects(prisma: PrismaClient): ProjectApi
         const alternatives = await prisma.project.count({
           where: {
             team: { organizationId: parsed.organizationId },
-            kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+            kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
             archivedAt: null,
           },
         });
@@ -110,6 +117,25 @@ export function createTraceDestinationProjects(prisma: PrismaClient): ProjectApi
           const project = byId.get(projectId);
           return project ? [project] : [];
         });
+      },
+
+      async findIdentity(id) {
+        const row = await prisma.project.findUnique({
+          where: { id },
+          include: { team: { select: { organizationId: true } } },
+        });
+        return row
+          ? {
+              id: row.id,
+              name: row.name,
+              slug: row.slug,
+              teamId: row.teamId,
+              organizationId: row.team.organizationId,
+              isPersonal: row.isPersonal,
+              ownerUserId: row.ownerUserId,
+              kind: row.kind,
+            }
+          : null;
       },
 
       async listIdsByOrganization(input) {

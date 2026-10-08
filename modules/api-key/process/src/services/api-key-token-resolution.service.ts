@@ -16,7 +16,12 @@ import {
 } from "@langwatch/api-key-contract";
 import type * as apiKeyContractModule from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
-import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
+import {
+  AggregateProjectHasNoCredentialError,
+  isAggregateProjectKind,
+  projectIdentitySchema,
+  type ProjectIdentity,
+} from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -220,34 +225,27 @@ export class ApiKeyTokenResolutionService {
     return { ...key, tokenType: "apiKey" };
   }
 
+  /**
+   * The one choke point every key-bearing door resolves through, so an aggregate project (which
+   * accepts no credential, its own legacy key included: ADR-175 decision 7) is refused here.
+   * An answer held before identities carried a kind reads as no aggregate until it lapses.
+   */
   async findResolvedToken(input: {
     token: string;
     projectId?: string | null;
   }): Promise<ResolvedApiKeyCredential | null> {
     const parsed = apiKeyTokenResolutionInputSchema.parse(input);
-    const tokenType = getTokenType(parsed.token);
+    const isCurrentKey = getTokenType(parsed.token) === "apiKey";
+    const current = isCurrentKey
+      ? await this.findCurrentApiKeyResolution(parsed.token, parsed.projectId ?? null)
+      : null;
+    // A current-shaped token that verifies as nothing may still be a legacy project key.
+    const readsAsLegacy = !isCurrentKey || parsed.token.startsWith(API_KEY_PREFIX);
+    const resolved =
+      current ?? (readsAsLegacy ? await this.findLegacyProjectKeyResolution(parsed.token) : null);
+    refuseAggregateProject(resolved);
 
-    if (tokenType === "legacyProjectKey") {
-      return this.findLegacyProjectKeyResolution(parsed.token);
-    }
-
-    if (tokenType === "apiKey") {
-      const resolved = await this.findCurrentApiKeyResolution(
-        parsed.token,
-        parsed.projectId ?? null,
-      );
-      if (resolved) {
-        return resolved;
-      }
-
-      if (parsed.token.startsWith(API_KEY_PREFIX)) {
-        return this.findLegacyProjectKeyResolution(parsed.token);
-      }
-
-      return null;
-    }
-
-    return this.findLegacyProjectKeyResolution(parsed.token);
+    return resolved;
   }
 
   async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
@@ -444,6 +442,15 @@ function shared<T>({
   pending.set(key, started);
 
   return started;
+}
+
+/** Throws when the credential resolved to an aggregate project, which accepts none. */
+function refuseAggregateProject(resolved: ResolvedApiKeyCredential | null): void {
+  if (!resolved || !isAggregateProjectKind(resolved.project.kind)) return;
+
+  const projectId = resolved.project.id;
+  logger.warn({ projectId }, "API key presented for an aggregate project, which accepts none");
+  throw new AggregateProjectHasNoCredentialError({ meta: { projectId } });
 }
 
 function tokenHash(token: string): string {

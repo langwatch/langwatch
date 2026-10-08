@@ -776,6 +776,7 @@ export interface OrganizationApi {
   ): Promise<TeamWithProjects[]>;
   listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]>;
   getTeamWithProjects(
     input: Readonly<{ organizationId: string; slug: string }>,

@@ -50,6 +50,7 @@ function serviceWith(options: {
   createdKey?: { id: string; createdAt: Date };
   revoke?: ApiKeyLifecycleService["revoke"];
   extendLoginKeyExpiry?: (input: unknown) => Promise<void>;
+  listByOrganization?: (input: { aggregatesVisibleTo?: unknown }) => Promise<unknown>;
 }) {
   const revoke = vi.fn(options.revoke ?? ((input) => Promise.resolve(revokedKey(input.id))));
   const create = vi.fn();
@@ -76,7 +77,9 @@ function serviceWith(options: {
     {
       repository,
       authz: { listUserBindings: () => Promise.resolve([]) },
-      projects: { listByOrganization: () => Promise.resolve({ data: [] }) },
+      projects: {
+        listByOrganization: options.listByOrganization ?? (() => Promise.resolve({ data: [] })),
+      },
     } as never,
     policy,
     lifecycle,
@@ -105,6 +108,34 @@ describe("given a CLI login key mint", () => {
         kind: "organization",
         projectIds: [],
         permissions: ["project:manage", "traces:view"],
+      });
+    });
+  });
+
+  describe("when the selection names a team that holds an aggregate project", () => {
+    it("summarises every project the binding reaches, listed for no person", async () => {
+      const teamProjects = [
+        { id: "shared-1", teamId: "team-1", kind: "application" },
+        { id: "aggregate-1", teamId: "team-1", kind: "aggregate" },
+      ];
+      const { service } = serviceWith({
+        listByOrganization: async ({ aggregatesVisibleTo }) => ({
+          data: teamProjects.filter(
+            (project) => project.kind !== "aggregate" || aggregatesVisibleTo === "system",
+          ),
+        }),
+      });
+
+      const minted = await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "TEAM", scopeId: "team-1" }], permissions: [] },
+      });
+
+      expect(minted.scope).toMatchObject({
+        kind: "projects",
+        projectIds: ["aggregate-1", "shared-1"],
       });
     });
   });

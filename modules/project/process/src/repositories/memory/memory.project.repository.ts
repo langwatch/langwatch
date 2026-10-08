@@ -1,5 +1,6 @@
 import type { PersonalFeatures } from "@langwatch/organization-contract";
 import {
+  NEVER_LANDED_ON_PROJECT_KINDS,
   NON_DESTINATION_PROJECT_KINDS,
   PROJECT_KIND,
   ProjectNotFoundError,
@@ -75,14 +76,17 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findProjectsWithDepartments({
     organizationId,
+    includeAggregates,
   }: {
     organizationId: string;
+    includeAggregates: boolean;
   }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
     return this.#database
       .projects()
       .filter(
         (row) =>
           row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          (includeAggregates || row.kind !== PROJECT_KIND.AGGREGATE) &&
           this.#database.isInOrganization(row, organizationId),
       )
       .map((row) => ({ id: row.id, name: row.name, departmentId: row.departmentId }))
@@ -410,6 +414,7 @@ export class MemoryProjectRepository implements ProjectRepository {
           team?.organizationId === organizationId &&
           !team.isPersonal &&
           project.archivedAt === null &&
+          !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
           (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
         );
       })
@@ -682,6 +687,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       organizationId: team.organizationId,
       isPersonal: project.isPersonal,
       ownerUserId: project.ownerUserId,
+      kind: project.kind,
     };
   }
 

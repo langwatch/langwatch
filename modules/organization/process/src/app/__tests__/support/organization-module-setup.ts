@@ -56,6 +56,7 @@ export function seedMemoryProject({
   slug = id,
   teamId,
   organizationId,
+  kind,
   at = nowInstant(),
 }: {
   memory: MemoryOrganizationDatabase;
@@ -64,6 +65,8 @@ export function seedMemoryProject({
   slug?: string;
   teamId: string;
   organizationId: string;
+  /** The project's kind; absent seeds an ordinary application. */
+  kind?: string;
   at?: Instant;
 }): void {
   memory.projects.set(id, {
@@ -71,6 +74,7 @@ export function seedMemoryProject({
     name,
     slug,
     apiKey: `sk-lw-${id}`,
+    ...(kind === void 0 ? {} : { kind }),
     teamId,
     isPersonal: false,
     ownerUserId: null,

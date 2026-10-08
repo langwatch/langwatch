@@ -8,8 +8,8 @@ import type { ProjectManagementApi } from "../../project.rest.ts";
 export class TestProjectManagementApi implements ProjectManagementApi {
   constructor(private readonly overrides: Partial<ProjectManagementApi> = {}) {}
 
-  findWithTeam: ProjectManagementApi["findWithTeam"] = (id) =>
-    this.overrides.findWithTeam?.(id) ?? this.unimplemented("findWithTeam");
+  getInOrganization: ProjectManagementApi["getInOrganization"] = (input) =>
+    this.overrides.getInOrganization?.(input) ?? this.unimplemented("getInOrganization");
 
   updateInOrganization: ProjectManagementApi["updateInOrganization"] = (input) =>
     this.overrides.updateInOrganization?.(input) ?? this.unimplemented("updateInOrganization");

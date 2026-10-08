@@ -43,7 +43,11 @@ function fakeRedis() {
 }
 
 /** The family, its approval service, and the two things a test reads back. */
-function harnessFor(options: { held: readonly string[]; approver?: McpApprover | null }) {
+function harnessFor(options: {
+  held: readonly string[];
+  approver?: McpApprover | null;
+  kind?: string;
+}) {
   const { redis, stored } = fakeRedis();
   const probed: string[] = [];
   const approver = options.approver === undefined ? APPROVER : options.approver;
@@ -51,7 +55,12 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   const authorization = McpAuthorizationService.create({
     collaborators: {
       findProject: () =>
-        Promise.resolve({ id: PROJECT_ID, organizationId: "org-1", archivedAt: null }),
+        Promise.resolve({
+          id: PROJECT_ID,
+          organizationId: "org-1",
+          archivedAt: null,
+          kind: options.kind ?? "application",
+        }),
       mayApprove: (input) => {
         probed.push(input.permission);
 
@@ -352,6 +361,43 @@ describe("given a verified client whose approval then fails", () => {
       const body = (await response.json()) as { error: string; redirect: string };
       expect(body.error).toBe("access_denied");
       expect(new URL(body.redirect).searchParams.get("error")).toBe("access_denied");
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+});
+
+/**
+ * ADR-175 decision 7: an aggregate accepts no credential, and an authorization code opens a
+ * session bound to the project. So even an organisation admin, who may open it, gets no code.
+ */
+describe("given a project that holds no credential", () => {
+  describe("when an organisation admin authorizes an aggregate project", () => {
+    it("is refused with the aggregate's code and never mints an authorization code", async () => {
+      const harness = harnessFor({ held: ["project:update"], kind: "aggregate" });
+
+      const response = await approve(harness.app);
+      const body = (await response.json()) as { error?: string; code?: string; redirect?: string };
+
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("access_denied");
+      expect(body.code).toBe("aggregate_project_has_no_credential");
+      const redirect = new URL(body.redirect ?? "");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the approval names the organisation's governance project", () => {
+    it("reads as a project the caller cannot reach and never mints a code", async () => {
+      const harness = harnessFor({ held: ["project:update"], kind: "internal_governance" });
+
+      const response = await approve(harness.app);
+      const body = (await response.json()) as { error?: string; code?: string };
+
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("access_denied");
+      expect(body.code).toBeUndefined();
       expect(mintedCodes(harness.stored)).toEqual([]);
     });
   });

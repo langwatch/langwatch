@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryAggregateRuleRepository } from "../../repositories/memory/memory.aggregate-rule.repository.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
+import type { AggregateAccessService } from "../aggregate-access.service.ts";
 import { AggregateRuleService } from "../aggregate-rule.service.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -165,6 +166,7 @@ describe("given a rule that names a project in another organisation", () => {
       const before = database.projects().length;
       const teamsCreated: string[] = [];
       const projects = ProjectService.create({
+        aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
         repository: MemoryProjectRepository.create({ memory: database }),
         credentials: { generateProjectId: () => "p_new", generateApiKey: () => "sk-lw-new" },
         organizations: createApiFixture<OrganizationApi>({
@@ -209,6 +211,7 @@ describe("given a valid rule", () => {
     it("stores the all-personal rule and attaches the project to the chosen team", async () => {
       const database = seeded();
       const projects = ProjectService.create({
+        aggregateAccess: createApiFixture<Pick<AggregateAccessService, "listsAggregatesTo">>({}),
         repository: MemoryProjectRepository.create({ memory: database }),
         credentials: { generateProjectId: () => "p_view", generateApiKey: () => "sk-lw-view" },
         organizations: createApiFixture<OrganizationApi>({

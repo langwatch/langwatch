@@ -19,6 +19,7 @@ import {
   type User,
   type OrganizationAdmission,
 } from "@langwatch/organization-contract";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type { DeveloperAdmissionVia } from "../../rules/admission-audit.rules.ts";
@@ -897,7 +898,10 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .filter((team) => team.archivedAt === null)
       .map((team) => {
         const projects = [...this.memory.projects.values()].filter(
-          (project) => project.teamId === team.id && project.archivedAt === null,
+          (project) =>
+            project.teamId === team.id &&
+            project.archivedAt === null &&
+            project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE,
         );
         const teamMembers = this.memory.teamUsers
           .filter((teamUser) => teamUser.teamId === team.id)
@@ -952,6 +956,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     slug: string;
     apiKey: string;
     lwqlKey?: string;
+    kind?: string;
     teamId: string;
     isPersonal: boolean;
     ownerUserId: string | null;
@@ -968,7 +973,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       teamId: project.teamId,
       language: "",
       framework: "",
-      kind: "product",
+      kind: project.kind ?? "product",
       firstMessage: false,
       integrated: false,
       createdAt: project.createdAt,

@@ -2,6 +2,7 @@
  * @langwatch/authz-contract — the browser-safe AuthZ contract and pure domain.
  * This is the package's only public entry point.
  */
+export * from "./admin-binding.ts";
 export * from "./authz.ts";
 export * from "./authz.admission.ts";
 export * from "./authz.grant-management.ts";

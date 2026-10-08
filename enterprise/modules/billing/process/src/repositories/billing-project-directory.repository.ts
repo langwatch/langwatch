@@ -5,9 +5,12 @@
  * Spec: enterprise/modules/billing/specs/billing.feature
  */
 export abstract class BillingProjectDirectoryRepository {
-  /** Every live project, governance included: the tenants an organization's spend sums over. */
+  /**
+   * Every live project, governance included: the tenants an organization's spend
+   * sums over. An aggregate is in it too and adds nothing, since it holds no rows.
+   */
   abstract findProjectIds(input: { organizationId: string }): Promise<string[]>;
-  /** Main's `findProjectsWithName`: every non-governance project, archived too, by name. */
+  /** Every project that holds usage of its own, archived too, by name: no governance, no aggregate. */
   abstract findProjectsWithName(input: {
     organizationId: string;
   }): Promise<{ id: string; name: string }[]>;

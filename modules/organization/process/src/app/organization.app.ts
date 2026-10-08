@@ -26,6 +26,7 @@ import {
   AuditTrailDeniedError,
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
+  MemberNotFoundError,
   OrganizationApi,
   type OrganizationIdPage,
   type OrganizationIdPageInput,
@@ -163,6 +164,7 @@ import type { OrganizationTeamProject } from "../repositories/organization.repos
 import { grantCallerOf } from "../rules/grant-caller.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
+import { NO_ORGANIZATION_ROLE, organizationRoleOf } from "../rules/organization-admin.rules.ts";
 import { LicenseLimitService } from "../services/license-limit.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationDirectoryService } from "../services/organization-directory.service.ts";
@@ -1676,12 +1678,16 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     input: Readonly<{ organizationId: string }>,
     by: OrganizationCaller,
   ): Promise<TeamWithProjects[]> {
-    const callerCanManage = await this.#canManage({ organizationId: input.organizationId, by });
+    const [callerCanManage, callerOrganizationRole] = await Promise.all([
+      this.#canManage({ organizationId: input.organizationId, by }),
+      this.#organizationRoleOf({ organizationId: input.organizationId, by }),
+    ]);
     const [teams, projects] = await Promise.all([
       this.listTeamsWithMembers({ organizationId: input.organizationId, callerCanManage }, by),
       this.#dependencies.organizations.listProjects({
         organizationId: input.organizationId,
         limit: TEAM_PROJECT_LIMIT,
+        callerOrganizationRole,
       }),
     ]);
 
@@ -1691,13 +1697,22 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     }));
   }
 
-  /** The access matrix an administrator edits: who holds what, and through what. */
+  /**
+   * The access matrix an administrator edits: who holds what, and through what.
+   * A custom role grants `organization:manage` to a non-admin too, so the
+   * caller's own role still decides whether aggregates are in it.
+   */
   async listTeamAccessMatrix(
     input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
   ): Promise<OrganizationTeamAccess[]> {
     const projects = await this.#dependencies.organizations.listProjects({
       organizationId: input.organizationId,
       limit: TEAM_PROJECT_LIMIT,
+      callerOrganizationRole: await this.#organizationRoleOf({
+        organizationId: input.organizationId,
+        by,
+      }),
     });
 
     return this.listTeamAccess({
@@ -1712,10 +1727,10 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   ): Promise<TeamWithProjects> {
     const callerCanManage = await this.#canManage({ organizationId: input.organizationId, by });
     const team = await this.getTeamWithMembers({ ...input, callerCanManage }, by);
-    const projects = await this.listProjectsByTeam({
-      organizationId: input.organizationId,
-      teamId: team.id,
-    });
+    const projects = await this.listProjectsByTeam(
+      { organizationId: input.organizationId, teamId: team.id },
+      by,
+    );
 
     return { ...team, projects: projects.map(teamProjectOf) };
   }
@@ -1905,12 +1920,44 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
   }
 
-  /** The projects that live in one team. */
-  listProjectsByTeam(input: {
+  /** The projects that live in one team, as the caller may see them; null is a service key. */
+  async listProjectsByTeam(
+    input: { organizationId: string; teamId: string },
+    by: OrganizationCaller | null,
+  ): Promise<OrganizationTeamProject[]> {
+    return this.#dependencies.organizations.listProjects({
+      ...input,
+      callerOrganizationRole: await this.#organizationRoleOf({
+        organizationId: input.organizationId,
+        by,
+      }),
+    });
+  }
+
+  /**
+   * The caller's organisation role, decided as `organization.getAll` decides it
+   * (an ADMIN binding outranks the row). Nobody, a service key, holds none.
+   */
+  async #organizationRoleOf({
+    organizationId,
+    by,
+  }: {
     organizationId: string;
-    teamId: string;
-  }): Promise<OrganizationTeamProject[]> {
-    return this.#dependencies.organizations.listProjects(input);
+    by: OrganizationCaller | null;
+  }): Promise<string> {
+    if (!by) return NO_ORGANIZATION_ROLE;
+    const [bindings, membership] = await Promise.all([
+      this.#dependencies.permissions.listBindingsForSynthesis({
+        orgIds: [organizationId],
+        userId: by.id,
+      }),
+      this.#dependencies.membership.getMember({ organizationId, userId: by.id }).catch((error) => {
+        if (MemberNotFoundError.is(error)) return void 0;
+        throw error;
+      }),
+    ]);
+
+    return organizationRoleOf({ bindings, organizationId, membership });
   }
 }
 

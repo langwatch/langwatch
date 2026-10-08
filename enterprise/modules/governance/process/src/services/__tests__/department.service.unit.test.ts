@@ -13,6 +13,8 @@ import { MemoryDepartmentRepository } from "../../repositories/memory/memory.dep
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 
 const ORG = "organization-1";
+const ADMIN = "admin-1";
+const GOVERNANCE_VIEWER = "viewer-1";
 
 async function harness(options: { targetExists?: boolean } = {}) {
   const repository = MemoryDepartmentRepository.create(MemoryGovernanceStore.create());
@@ -38,10 +40,14 @@ async function harness(options: { targetExists?: boolean } = {}) {
     departmentId: department.id,
     at: Temporal.Instant.from("2026-01-01T00:00:00Z"),
   });
+  // The project module's answer: an aggregate only for an organisation admin (ADR-175).
   const projects = createApiFixture<ProjectApi>({
     assignProjectDepartment: async ({ projectId }) => (writes.push(`project:${projectId}`), exists),
-    findProjectsWithDepartments: async () => [
+    findProjectsWithDepartments: async ({ aggregatesVisibleTo }) => [
       { id: "project-1", name: "Chat", departmentId: department.id },
+      ...(typeof aggregatesVisibleTo === "object" && aggregatesVisibleTo.userId === ADMIN
+        ? [{ id: "aggregate-1", name: "Company view", departmentId: null }]
+        : []),
     ],
   });
   const service = DepartmentService.create({ repository, organizations, projects });
@@ -134,13 +140,50 @@ describe("DepartmentService", () => {
   it("lists members with their email, named by display name or else email, beside teams and projects", async () => {
     const { service, department } = await harness();
 
-    expect(await service.getAssignments({ organizationId: ORG })).toEqual({
+    expect(
+      await service.getAssignments({
+        organizationId: ORG,
+        aggregatesVisibleTo: { userId: GOVERNANCE_VIEWER },
+      }),
+    ).toEqual({
       users: [
         { id: "user-1", name: "Ada", email: "ada@acme.com", departmentId: department.id },
         { id: "user-2", name: "zed@acme.com", email: "zed@acme.com", departmentId: null },
       ],
       teams: [{ id: "team-1", name: "Web", departmentId: null }],
       projects: [{ id: "project-1", name: "Chat", departmentId: department.id }],
+    });
+  });
+
+  describe("given an aggregate project in the organisation", () => {
+    describe("when a member holding governance view through a custom role reads the assignments", () => {
+      it("lists the ordinary project and leaves the aggregate out", async () => {
+        const { service } = await harness();
+
+        const assignments = await service.getAssignments({
+          organizationId: ORG,
+          aggregatesVisibleTo: { userId: GOVERNANCE_VIEWER },
+        });
+
+        const projectIds = assignments.projects.map((project) => project.id);
+        expect(projectIds).toContain("project-1");
+        expect(projectIds).not.toContain("aggregate-1");
+      });
+    });
+
+    describe("when an organisation admin reads the assignments", () => {
+      it("lists the aggregate beside the ordinary project", async () => {
+        const { service } = await harness();
+
+        const assignments = await service.getAssignments({
+          organizationId: ORG,
+          aggregatesVisibleTo: { userId: ADMIN },
+        });
+
+        expect(assignments.projects.map((project) => project.id)).toEqual(
+          expect.arrayContaining(["project-1", "aggregate-1"]),
+        );
+      });
     });
   });
 

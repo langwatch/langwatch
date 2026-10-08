@@ -40,7 +40,7 @@ export class UsageLimitOrganizationService implements BillingUsageLimitOrganizat
     return this.peers.stamps.planLimitAlertSent({ organizationId, sentAt: timestamp });
   }
 
-  /** Main's `findProjectsWithName`: every non-governance project, by name. */
+  /** Every project that holds usage of its own, by name: no governance project, no aggregate. */
   findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]> {
     return this.peers.projects.findProjectsWithName({ organizationId });
   }

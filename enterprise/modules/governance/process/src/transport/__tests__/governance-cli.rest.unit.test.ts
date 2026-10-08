@@ -517,6 +517,29 @@ describe("the CLI governance plane", () => {
       expect(issueForProject).not.toHaveBeenCalled();
     });
 
+    // ADR-175 decision 7: an aggregate receives no traces, so no key may point at it.
+    it("refuses an aggregate project with its own code and mints nothing", async () => {
+      const issueForProject = vi.fn();
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        projects: {
+          findLiveByRef: vi.fn().mockResolvedValue([{ ...PROJECT, kind: "aggregate" }]),
+        },
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.id),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "aggregate_project_has_no_credential",
+      });
+      expect(issueForProject).not.toHaveBeenCalled();
+      expect(api.permittedOnProject).not.toHaveBeenCalled();
+    });
+
     /** @scenario A project in another organization is not found */
     it("answers 404 project_not_found for a project its organization does not hold", async () => {
       const issueForProject = vi.fn();

@@ -59,6 +59,10 @@ function mount() {
     departmentArchive: async (input) => {
       calls.push(input);
     },
+    departmentAssignments: async (input) => {
+      calls.push(input);
+      return { users: [], teams: [], projects: [] };
+    },
   });
   const trpc = initTRPC.context<TestContext>().create();
   const router = createTrpcRuntime<TestContext>({
@@ -101,6 +105,16 @@ describe("the departments tRPC namespace", () => {
       await expect(caller.list({ organizationId: "org_1" })).resolves.toEqual([department]);
       expect(asked).toEqual(["governance:view"]);
       expect(calls).toEqual([{ organizationId: "org_1" }]);
+    });
+
+    // governance:view reaches a plain member through a custom role, and an
+    // aggregate is listed to organisation admins only (ADR-175 decision 5).
+    it("reads the assignments for the calling person, who decides whether aggregates are listed", async () => {
+      const { caller, calls } = mount();
+
+      await caller.assignments({ organizationId: "org_1" });
+
+      expect(calls).toEqual([{ organizationId: "org_1", callerUserId: "user_1" }]);
     });
 
     it("refuses archiving, which takes governance:manage", async () => {

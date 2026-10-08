@@ -18,7 +18,7 @@ Authorization: who may do what, answered from grants and effective permissions. 
 
 | Kind                           | Name                                                                                                                                                          | Declared at                                                                |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Postgres, accessed not claimed | `CustomRole`, `Grant`, `Role`, `RoleBinding`, `ShareLink`                                                                                                     | `process/src/repositories/prisma/prisma.authz-projection.repository.ts:74` |
+| Postgres, accessed not claimed | `CustomRole`, `Grant`, `Role`, `RoleBinding`, `ShareLink`                                                                                                     | `process/src/repositories/prisma/prisma.authz-projection.repository.ts:75` |
 | Stores required                | prisma, redis                                                                                                                                                 | `process/src/repositories/live/live.authz.repositories.ts:19`              |
 | Config                         | `epochCacheEnabled` (AUTHZ_EPOCH_CACHE), `demoProjectId` (DEMO_PROJECT_ID), `demoProjectUserId` (DEMO_PROJECT_USER_ID), `demoProjectSlug` (DEMO_PROJECT_SLUG) | `contract/src/authz.config.ts:18`                                          |
 

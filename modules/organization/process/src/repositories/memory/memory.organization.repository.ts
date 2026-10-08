@@ -20,10 +20,12 @@ import {
   type SignInSecurityPolicy,
   type OrganizationCurrency,
 } from "@langwatch/organization-contract";
+import { PROJECT_KIND, projectKindsHiddenFrom } from "@langwatch/project-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
+  type OrganizationProjectsQuery,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type EnsuredPersonalTeam,
@@ -526,17 +528,15 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  // shortcut: memory rows carry no project kind, so no governance project is excluded here.
-  async findProjects(input: {
-    organizationId: string;
-    teamId?: string;
-    limit?: number;
-  }): Promise<OrganizationTeamProject[]> {
+  async findProjects(input: OrganizationProjectsQuery): Promise<OrganizationTeamProject[]> {
+    const hiddenKinds = projectKindsHiddenFrom(input.callerOrganizationRole);
+
     return [...this.memory.projects.values()]
       .filter(
         (project) =>
           project.organizationId === input.organizationId &&
           project.archivedAt === null &&
+          !hiddenKinds.includes(project.kind ?? PROJECT_KIND.APPLICATION) &&
           (input.teamId === undefined || project.teamId === input.teamId),
       )
       .toSorted((a, b) => Temporal.Instant.compare(b.createdAt, a.createdAt))

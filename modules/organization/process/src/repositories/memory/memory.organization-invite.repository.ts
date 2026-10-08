@@ -9,6 +9,7 @@ import {
   type OrganizationJsonValue,
   type OrganizationUser,
 } from "@langwatch/organization-contract";
+import { landableProjects } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
@@ -209,13 +210,13 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
   }
 
   async findProjectSlugsForTeams(input: { teamIds: string[] }): Promise<string[]> {
-    return [...this.memory.projects.values()]
+    return landableProjects([...this.memory.projects.values()])
       .filter((project) => input.teamIds.includes(project.teamId) && project.archivedAt === null)
       .map((project) => project.slug);
   }
 
   async findProjectSlugsInOrganization(input: { organizationId: string }): Promise<string[]> {
-    return [...this.memory.projects.values()]
+    return landableProjects([...this.memory.projects.values()])
       .filter((project) => {
         const team = this.memory.teams.get(project.teamId);
         return (

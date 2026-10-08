@@ -144,8 +144,12 @@ const surfaces: ListingSurface[] = [
     name: "the plan-limit alert's per-project lines",
     module: PROJECT_REPOSITORY,
     ids: async () =>
+      // The widest audience, so the governance project is proven absent from every listing.
       (
-        await api.application.service(ProjectApi).findProjectsWithDepartments({ organizationId })
+        await api.application.service(ProjectApi).findProjectsWithDepartments({
+          organizationId,
+          aggregatesVisibleTo: "system",
+        })
       ).map((project) => project.id),
   },
   {

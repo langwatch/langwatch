@@ -5,7 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { AggregateAudience, ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { DepartmentRepository } from "../../../repositories/department.repository.ts";
@@ -47,12 +47,22 @@ export class DepartmentService {
     return this.repository.findById(input);
   }
 
-  /** Main `department.service.ts:106-145`: a member with no display name shows their email. */
-  async getAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
+  /**
+   * Main `department.service.ts:106-145`: a member with no display name shows their email.
+   * `governance:view` reaches non-admins through a custom role, so the project list answers
+   * `aggregatesVisibleTo`: an aggregate only for an organisation admin (ADR-175 decision 5).
+   */
+  async getAssignments({
+    organizationId,
+    aggregatesVisibleTo,
+  }: {
+    organizationId: string;
+    aggregatesVisibleTo: AggregateAudience;
+  }): Promise<DepartmentAssignments> {
     const [members, teams, projects] = await Promise.all([
-      this.organizations.findMembersWithDepartments(input),
-      this.organizations.findTeamsWithDepartments(input),
-      this.projects.findProjectsWithDepartments(input),
+      this.organizations.findMembersWithDepartments({ organizationId }),
+      this.organizations.findTeamsWithDepartments({ organizationId }),
+      this.projects.findProjectsWithDepartments({ organizationId, aggregatesVisibleTo }),
     ]);
     return {
       users: members

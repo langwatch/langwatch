@@ -84,6 +84,8 @@ export class CodingAgentScopeDirectoryService implements CodingAgentCallerScopeD
       organizationId,
       page,
       limit: ORGANIZATION_PROJECT_PAGE_SIZE,
+      // The scope rule judges each project for the caller afterwards, as main did.
+      aggregatesVisibleTo: "system",
     });
   }
 

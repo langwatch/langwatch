@@ -94,6 +94,7 @@ export class HostedMcpModule implements HostedMcpApiContract, McpAuthorizeApi {
               id: project.id,
               organizationId: await projects.getOrganizationId(projectId),
               archivedAt: project.archivedAt,
+              kind: project.kind,
             }
           );
         },

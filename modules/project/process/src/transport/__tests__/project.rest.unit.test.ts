@@ -16,7 +16,7 @@ import {
 } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { mountProjectRest, ORGANIZATION_ID } from "./project.rest.harness.ts";
+import { mountProjectRest, ORGANIZATION_ID, USER_ID } from "./project.rest.harness.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -76,13 +76,13 @@ function projectWithTeam(overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 describe("the projects REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
-      const findWithTeam = vi.fn(async () => projectWithTeam());
-      const { hono } = mountProjectRest({ app: { findWithTeam } });
+      const getInOrganization = vi.fn(async () => projectWithTeam());
+      const { hono } = mountProjectRest({ app: { getInOrganization } });
 
       const response = await hono.request("/api/projects/project_1");
 
       expect(response.status).toBe(401);
-      expect(findWithTeam).not.toHaveBeenCalled();
+      expect(getInOrganization).not.toHaveBeenCalled();
     });
 
     it("refuses a credential it does not recognise", async () => {
@@ -99,13 +99,17 @@ describe("the projects REST family", () => {
   describe("when one project is read", () => {
     /** @scenario Reading a project never discloses its base key */
     it("answers without the base key or the service key", async () => {
-      const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()) },
-      });
+      const getInOrganization = vi.fn(async () => projectWithTeam());
+      const { send } = mountProjectRest({ app: { getInOrganization } });
 
       const response = await send("/api/projects/project_1");
 
       expect(response.status).toBe(200);
+      expect(getInOrganization).toHaveBeenCalledWith({
+        projectId: "project_1",
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+      });
       const body = (await response.json()) as Record<string, unknown>;
       expect(body.id).toBe("project_1");
       expect(body).not.toHaveProperty("apiKey");
@@ -119,7 +123,7 @@ describe("the projects REST family", () => {
         async (): Promise<DataPrivacyPiiRedactionLevel> => "DISABLED",
       );
       const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()), getPiiRedactionLevel },
+        app: { getInOrganization: vi.fn(async () => projectWithTeam()), getPiiRedactionLevel },
       });
 
       const response = await send("/api/projects/project_1");
@@ -130,7 +134,11 @@ describe("the projects REST family", () => {
 
     it("reports an unknown id as not found", async () => {
       const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => null) },
+        app: {
+          getInOrganization: vi.fn(async (): Promise<ProjectWithTeam> => {
+            throw new ProjectNotFoundError();
+          }),
+        },
       });
 
       expect((await send("/api/projects/project_doesnotexist")).status).toBe(404);
@@ -138,17 +146,18 @@ describe("the projects REST family", () => {
 
     /** @scenario A project in another organization is not disclosed */
     it("reports a project in another organization as not found, disclosing nothing", async () => {
-      const foreign = projectWithTeam({
-        team: { ...projectWithTeam().team, organizationId: "organization-other" },
-      });
       const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => foreign) },
+        app: {
+          getInOrganization: vi.fn(async (): Promise<ProjectWithTeam> => {
+            throw new ProjectNotFoundError();
+          }),
+        },
       });
 
       const response = await send("/api/projects/project_1");
 
       expect(response.status).toBe(404);
-      expect(await response.text()).not.toContain(foreign.apiKey);
+      expect(await response.text()).not.toContain(project().apiKey);
     });
   });
 
@@ -174,6 +183,7 @@ describe("the projects REST family", () => {
       expect(updateInOrganization).toHaveBeenCalledWith({
         projectId: "project_1",
         organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
         data: { name: "Updated Project Name", language: "typescript" },
       });
     });
@@ -422,6 +432,7 @@ describe("the projects REST family", () => {
       expect(archiveInOrganization).toHaveBeenCalledWith({
         projectId: "project_1",
         organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
       });
     });
 
@@ -461,9 +472,9 @@ describe("the projects REST family", () => {
      * @scenario "The REST project-key routes stay refused"
      */
     it("refuses the base key however much the token holds on that project", async () => {
-      const findWithTeam = vi.fn(async () => projectWithTeam());
+      const getInOrganization = vi.fn(async () => projectWithTeam());
       const { send } = mountProjectRest({
-        app: { findWithTeam },
+        app: { getInOrganization },
         grantedOnProject: { project_1: ["project:view", "project:update", "project:manage"] },
       });
 
@@ -475,9 +486,11 @@ describe("the projects REST family", () => {
 
     /** @scenario "API key refusal happens before the project is read" */
     it("refuses an unknown project id the same way, without looking it up", async () => {
-      const findWithTeam = vi.fn(async () => null);
+      const getInOrganization = vi.fn(async (): Promise<ProjectWithTeam> => {
+        throw new ProjectNotFoundError();
+      });
       const { send } = mountProjectRest({
-        app: { findWithTeam },
+        app: { getInOrganization },
         grantedOnProject: { project_doesnotexist: ["project:manage"] },
       });
 
@@ -486,12 +499,12 @@ describe("the projects REST family", () => {
       // 403 and not 404: a 404 here would answer "does this project exist?"
       // for any token that can reach the door.
       expect(response.status).toBe(403);
-      expect(findWithTeam).not.toHaveBeenCalled();
+      expect(getInOrganization).not.toHaveBeenCalled();
     });
 
     it("names the one way the key can still be read", async () => {
       const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()) },
+        app: { getInOrganization: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:manage"] },
       });
 
@@ -505,7 +518,7 @@ describe("the projects REST family", () => {
     /** @scenario "The REST project-key routes stay refused" */
     it("refuses, and hands back nothing that could authenticate", async () => {
       const { send } = mountProjectRest({
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()) },
+        app: { getInOrganization: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:manage"] },
       });
 
@@ -536,11 +549,11 @@ describe("the projects REST family", () => {
 
     /** @scenario A project route resolves its permission at the project it names */
     it("refuses to read a sibling project, and never reaches the application", async () => {
-      const findWithTeam = vi.fn(async () => projectWithTeam());
-      const { send } = mountProjectRest({ ...SCOPED, app: { findWithTeam } });
+      const getInOrganization = vi.fn(async () => projectWithTeam());
+      const { send } = mountProjectRest({ ...SCOPED, app: { getInOrganization } });
 
       expect((await send("/api/projects/project_2")).status).toBe(403);
-      expect(findWithTeam).not.toHaveBeenCalled();
+      expect(getInOrganization).not.toHaveBeenCalled();
     });
 
     it("refuses to update or archive a sibling project", async () => {
@@ -570,7 +583,7 @@ describe("the projects REST family", () => {
     it("refuses to rotate a sibling project's ingestion key, and rotates nothing", async () => {
       const { send } = mountProjectRest({
         ...SCOPED,
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()) },
+        app: { getInOrganization: vi.fn(async () => projectWithTeam()) },
       });
 
       const response = await send("/api/projects/project_2/regenerate-api-key", {
@@ -584,7 +597,7 @@ describe("the projects REST family", () => {
     it("still serves the project the grant does name", async () => {
       const { send } = mountProjectRest({
         ...SCOPED,
-        app: { findWithTeam: vi.fn(async () => projectWithTeam()) },
+        app: { getInOrganization: vi.fn(async () => projectWithTeam()) },
       });
 
       expect((await send("/api/projects/project_1")).status).toBe(200);

@@ -42,6 +42,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
+import { PROJECT_KIND } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 
 import {
@@ -1326,8 +1327,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
                 // Hide the internal-governance Project from every UI consumer.
                 // It exists only as a routing/tenancy artifact for IngestionSource
                 // data; never user-visible. See specs/ai-gateway/governance/
-                // architecture-invariants.feature + ui-contract.feature.
-                kind: { not: "internal_governance" },
+                // architecture-invariants.feature + ui-contract.feature. An aggregate
+                // is narrowed per organisation role by the visibility service.
+                kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
               },
             },
           },

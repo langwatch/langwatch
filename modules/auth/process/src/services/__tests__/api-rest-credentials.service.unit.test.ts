@@ -10,6 +10,7 @@ import type {
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { AggregateProjectHasNoCredentialError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -578,4 +579,34 @@ describe("given a pre-2025 legacy API key, an opaque `eyJ` value never verified 
       });
     });
   }
+});
+
+describe("given a key the directory refuses because its project is an aggregate", () => {
+  /** A key store whose resolution refuses one token, as the API-key module does an aggregate's. */
+  class AggregateRefusingStore extends KeyStore {
+    override findResolvedToken(
+      input: ApiKeyTokenResolutionInput,
+    ): Promise<ResolvedApiKeyCredential | null> {
+      if (input.token === "sk-lw-aggregate") {
+        return Promise.reject(new AggregateProjectHasNoCredentialError());
+      }
+      return super.findResolvedToken(input);
+    }
+  }
+  const aggregateDoor = doorOver(
+    new AggregateRefusingStore(new Map(), new Map([["sk-lw-aggregate", ORG_KEY]])),
+  );
+  const presented = () => request({ authorization: "Bearer sk-lw-aggregate" });
+
+  it("refuses it at the project door with the aggregate's own code", async () => {
+    expect(await refusalCode(aggregateDoor.identify({ request: presented() }))).toBe(
+      "aggregate_project_has_no_credential",
+    );
+  });
+
+  it("refuses it at the key door, rather than falling back to its organization", async () => {
+    expect(await refusalCode(aggregateDoor.identifyKey({ request: presented() }))).toBe(
+      "aggregate_project_has_no_credential",
+    );
+  });
 });
