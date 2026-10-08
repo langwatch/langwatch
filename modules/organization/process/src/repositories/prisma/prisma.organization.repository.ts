@@ -21,6 +21,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -444,10 +445,33 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     organizationId: string;
     sentAt: Instant;
   }): Promise<void> {
-    await this.database.organization.update({
+    const { count } = await this.database.organization.updateMany({
       where: { id: input.organizationId },
       data: { sentPlanLimitAlert: toDate(input.sentAt) },
     });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: OrganizationCurrency;
+  }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: { currency: input.currency },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
+  }
+
+  async updatePricingModel(input: {
+    organizationId: string;
+    pricingModel: PricingModel;
+  }): Promise<void> {
+    const { count } = await this.database.organization.updateMany({
+      where: { id: input.organizationId },
+      data: { pricingModel: input.pricingModel },
+    });
+    if (count === 0) throw new OrganizationNotFoundError();
   }
 
   async setLicense(input: {

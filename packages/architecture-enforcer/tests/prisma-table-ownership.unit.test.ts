@@ -394,7 +394,7 @@ describe("Prisma table ownership lint", () => {
         ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
       ],
       ["OrganizationUser", "organization", ["authz", "data-privacy"]],
-      ["Organization", "organization", ["scim", "entitlement"]],
+      ["Organization", "organization", ["scim", "entitlement", "billing"]],
       ["Topic", "topic", ["trace"]],
       ["Annotation", "annotation", ["trace"]],
       ["AnnotationScore", "annotation", ["trace"]],
@@ -402,6 +402,7 @@ describe("Prisma table ownership lint", () => {
     expect(writes.map((item) => [item.reader, item.file.split("/").at(-1)])).toEqual([
       ["authz", "prisma.authz-admission.repository.ts"],
       ["authz", "prisma.authz-ledger-read.repository.ts"],
+      ["billing", "prisma.billing-account-facts.repository.ts"],
     ]);
   });
 });

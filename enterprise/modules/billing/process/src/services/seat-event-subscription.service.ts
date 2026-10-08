@@ -25,12 +25,13 @@ import {
   resolveProrationDate,
   seatChange,
 } from "../rules/seat-event-quote.rules.ts";
+import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
 
 /** Organization's side of a seat checkout: the invitations it holds until payment. */
 export type SeatCheckoutInvites = Pick<
   OrganizationApi,
-  "checkInvitesWithinCaller" | "createPaymentPendingInvites" | "cancelPaymentPendingInvites"
+  "checkInvitesWithinCaller" | "createPaymentPendingInvites"
 >;
 
 /** A checkout's invitations and who sent them: organization bounds them by the sender. */
@@ -45,6 +46,7 @@ export class SeatEventSubscriptionService {
   private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly subscriptions: SeatEventSubscriptionRepository;
   private readonly invites: SeatCheckoutInvites;
+  private readonly abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
   private readonly prices: StripePriceMap;
   private readonly customerCurrency: StripeCustomerCurrencyService;
 
@@ -52,18 +54,21 @@ export class SeatEventSubscriptionService {
     stripeSubscriptions,
     subscriptions,
     invites,
+    abandoned,
     prices,
     customerCurrency,
   }: {
     stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
     invites: SeatCheckoutInvites;
+    abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }) {
     this.stripeSubscriptions = stripeSubscriptions;
     this.subscriptions = subscriptions;
     this.invites = invites;
+    this.abandoned = abandoned;
     this.prices = prices;
     this.customerCurrency = customerCurrency;
   }
@@ -72,6 +77,7 @@ export class SeatEventSubscriptionService {
     stripeSubscriptions: StripeSubscriptionsChannel;
     subscriptions: SeatEventSubscriptionRepository;
     invites: SeatCheckoutInvites;
+    abandoned: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
     prices: StripePriceMap;
     customerCurrency: StripeCustomerCurrencyService;
   }): SeatEventSubscriptionService {
@@ -304,10 +310,7 @@ export class SeatEventSubscriptionService {
   private async cancelAbandonedCheckouts(organizationId: string): Promise<void> {
     const staleSubIds = await this.subscriptions.cancelPendingSeatCheckouts({ organizationId });
     if (staleSubIds.length === 0) return;
-    await this.invites.cancelPaymentPendingInvites({
-      organizationId,
-      subscriptionIds: staleSubIds,
-    });
+    await this.abandoned.seatCheckoutsAbandoned({ organizationId, subscriptionIds: staleSubIds });
   }
 
   /** The pending subscription and the payment-pending invites it pays for, written together. */

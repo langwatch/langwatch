@@ -4,6 +4,11 @@ import {
   BILLING_LIFECYCLE_AGGREGATE_TYPE,
   BILLING_LIFECYCLE_EVENT_VERSION,
   CHECKOUT_COMPLETED_EVENT_TYPE,
+  PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
+  CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE,
+  PRICING_MODEL_CHANGED_EVENT_TYPE,
+  SEAT_CHECKOUT_PAID_EVENT_TYPE,
+  SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   USAGE_BILLING_CHANGED_EVENT_TYPE,
@@ -32,6 +37,26 @@ import {
   recordSubscriptionChangedCommandDataSchema,
   recordSubscriptionStartedCommandDataSchema,
   recordUsageBillingChangedCommandDataSchema,
+  RECORD_PLAN_LIMIT_ALERT_SENT_COMMAND_TYPE,
+  type PlanLimitAlertSentEvent,
+  type RecordPlanLimitAlertSentCommandData,
+  recordPlanLimitAlertSentCommandDataSchema,
+  RECORD_CHECKOUT_CURRENCY_SELECTED_COMMAND_TYPE,
+  type CheckoutCurrencySelectedEvent,
+  type RecordCheckoutCurrencySelectedCommandData,
+  recordCheckoutCurrencySelectedCommandDataSchema,
+  RECORD_PRICING_MODEL_CHANGED_COMMAND_TYPE,
+  type PricingModelChangedEvent,
+  type RecordPricingModelChangedCommandData,
+  recordPricingModelChangedCommandDataSchema,
+  RECORD_SEAT_CHECKOUT_PAID_COMMAND_TYPE,
+  type SeatCheckoutPaidEvent,
+  type RecordSeatCheckoutPaidCommandData,
+  recordSeatCheckoutPaidCommandDataSchema,
+  RECORD_SEAT_CHECKOUTS_ABANDONED_COMMAND_TYPE,
+  type SeatCheckoutsAbandonedEvent,
+  type RecordSeatCheckoutsAbandonedCommandData,
+  recordSeatCheckoutsAbandonedCommandDataSchema,
 } from "./billing-lifecycle.events.ts";
 
 /** Records that an organization's subscription state changed. */
@@ -210,5 +235,172 @@ export class RecordBillingAuditCommand implements CommandHandler<
 
   static getAggregateId(payload: RecordBillingAuditCommandData): string {
     return payload.tenantId;
+  }
+}
+
+/** Records that the plan-limit alert went; keyed by the instant it went. */
+export class RecordPlanLimitAlertSentCommand implements CommandHandler<
+  Command<RecordPlanLimitAlertSentCommandData>,
+  PlanLimitAlertSentEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PLAN_LIMIT_ALERT_SENT_COMMAND_TYPE,
+    recordPlanLimitAlertSentCommandDataSchema,
+    "Record that billing sent an organization's plan-limit alert",
+  );
+
+  handle(command: Command<RecordPlanLimitAlertSentCommandData>): PlanLimitAlertSentEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PlanLimitAlertSentEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:plan_limit_alert_sent:${data.sentAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPlanLimitAlertSentCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records the currency a completed checkout chose for the organization. */
+export class RecordCheckoutCurrencySelectedCommand implements CommandHandler<
+  Command<RecordCheckoutCurrencySelectedCommandData>,
+  CheckoutCurrencySelectedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_CHECKOUT_CURRENCY_SELECTED_COMMAND_TYPE,
+    recordCheckoutCurrencySelectedCommandDataSchema,
+    "Record the currency a completed checkout chose",
+  );
+
+  handle(
+    command: Command<RecordCheckoutCurrencySelectedCommandData>,
+  ): CheckoutCurrencySelectedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<CheckoutCurrencySelectedEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:checkout_currency_selected:${data.currency}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordCheckoutCurrencySelectedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records the pricing model the organization is now billed on. */
+export class RecordPricingModelChangedCommand implements CommandHandler<
+  Command<RecordPricingModelChangedCommandData>,
+  PricingModelChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PRICING_MODEL_CHANGED_COMMAND_TYPE,
+    recordPricingModelChangedCommandDataSchema,
+    "Record the pricing model an organization is billed on",
+  );
+
+  handle(command: Command<RecordPricingModelChangedCommandData>): PricingModelChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<PricingModelChangedEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: PRICING_MODEL_CHANGED_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:pricing_model_changed:${data.pricingModel}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordPricingModelChangedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that a seat checkout was paid; one event per subscription row, however often it is sent. */
+export class RecordSeatCheckoutPaidCommand implements CommandHandler<
+  Command<RecordSeatCheckoutPaidCommandData>,
+  SeatCheckoutPaidEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_SEAT_CHECKOUT_PAID_COMMAND_TYPE,
+    recordSeatCheckoutPaidCommandDataSchema,
+    "Record that a seat checkout was paid",
+  );
+
+  handle(command: Command<RecordSeatCheckoutPaidCommandData>): SeatCheckoutPaidEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<SeatCheckoutPaidEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: SEAT_CHECKOUT_PAID_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:seat_checkout_paid:${data.subscriptionId}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordSeatCheckoutPaidCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that seat checkouts were abandoned; keyed by the subscription rows they left. */
+export class RecordSeatCheckoutsAbandonedCommand implements CommandHandler<
+  Command<RecordSeatCheckoutsAbandonedCommandData>,
+  SeatCheckoutsAbandonedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_SEAT_CHECKOUTS_ABANDONED_COMMAND_TYPE,
+    recordSeatCheckoutsAbandonedCommandDataSchema,
+    "Record that seat checkouts were abandoned",
+  );
+
+  handle(command: Command<RecordSeatCheckoutsAbandonedCommandData>): SeatCheckoutsAbandonedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<SeatCheckoutsAbandonedEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:seat_checkouts_abandoned:${data.subscriptionIds.join(",")}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordSeatCheckoutsAbandonedCommandData): string {
+    return payload.organizationId;
   }
 }

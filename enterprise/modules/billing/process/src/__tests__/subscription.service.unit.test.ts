@@ -103,6 +103,8 @@ const createMockOrganizationRepository = (): {
   findStripeCustomerId: vi.fn(),
   findName: vi.fn(),
   findFirstTeamId: vi.fn(),
+  findBillingProfile: vi.fn(),
+  claimStripeCustomerId: vi.fn(),
 });
 
 const createMockNotifier = (): BillingSubscriptionNotifier => ({
@@ -115,6 +117,7 @@ const createMockSeatEventService = () =>
       stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
       subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
       invites: createApiFixture<SeatCheckoutInvites>({}),
+      abandoned: { seatCheckoutsAbandoned: vi.fn() },
       prices: TEST_PRICES,
       customerCurrency: StripeCustomerCurrencyService.create({
         customers: MemoryStripeCustomersChannel.create(),

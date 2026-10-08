@@ -3,10 +3,12 @@
 export type NurturingOrganizationState = Readonly<{
   organizationId: string;
   adminUserId: string | null;
-  /** Learned from project's backfill: its first_* milestones already happened. */
+  /** As stored: learned from project's backfill. The rules widen it at read. */
   seeded: boolean;
   evaluationCount: number;
   simulationRunCount: number;
+  /** Epoch ms of the organization's earliest project, as project's table holds it. */
+  firstProjectCreatedAt: number | null;
 }>;
 
 /**

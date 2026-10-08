@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:22`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable capability exposed by the composed Agent application.
 
-Peers call these through the token, declared at `../contract/src/agent.api.ts:40`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/agent.api.ts:39`; nothing else in this package is public.
 
 #### `listWorkflowConfigs`
 
@@ -106,14 +106,6 @@ hasVoiceAgentForExternalId(input: { projectId: string; transport: VoiceTransport
 
 ```typescript
 touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
-```
-
-#### `findIdsCreatedInWindow`
-
-The ids of the agents created in a window, oldest first, archived ones included: main's candidate query for the agent audit-log id backfill (scripts/backfill-agent-audit-log-ids.ts).
-
-```typescript
-findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
 ```
 
 #### `listWithPresence`

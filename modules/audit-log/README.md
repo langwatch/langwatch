@@ -17,25 +17,16 @@ The audit log: every module records who did what through it, and an entity's his
 
 ## What audit-log owns
 
-| Kind           | Name       | Declared at                                                                         |
-| -------------- | ---------- | ----------------------------------------------------------------------------------- |
-| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.agent-audit-log-migration.repository.ts:11` |
-| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.audit-log.repository.ts:52`                 |
-| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.recent-touch.repository.ts:12`              |
+| Kind           | Name       | Declared at                                                            |
+| -------------- | ---------- | ---------------------------------------------------------------------- |
+| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.audit-log.repository.ts:52`    |
+| Postgres table | `AuditLog` | `process/src/repositories/prisma/prisma.recent-touch.repository.ts:12` |
 
 Anything else audit-log needs belongs to another module and is reached through its `*Api`.
 
 ## Peers (static dependencies)
 
-| Name          | Token           | Module                                |
-| ------------- | --------------- | ------------------------------------- |
-| `agents`      | `AgentApi`      | [agent](../agent/README.md)           |
-| `annotations` | `AnnotationApi` | [annotation](../annotation/README.md) |
-| `datasets`    | `DatasetApi`    | [dataset](../dataset/README.md)       |
-| `monitors`    | `MonitorApi`    | [monitor](../monitor/README.md)       |
-| `projects`    | `ProjectApi`    | [project](../project/README.md)       |
-| `prompts`     | `PromptApi`     | [prompt](../prompt/README.md)         |
-| `workflows`   | `WorkflowApi`   | [workflow](../workflow/README.md)     |
+None: audit-log declares no peers.
 
 ## Who depends on audit-log
 

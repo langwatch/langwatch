@@ -8,15 +8,17 @@ import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
+import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
-/** `placed` stands in for project's and organization's tables (R40). */
+/** `placed` and `created` stand in for project's and organization's tables (R40). */
 function serviceOver({
   placed = new Map([["project-1", "org-1"]]),
-}: { placed?: ReadonlyMap<string, string> } = {}) {
+  created,
+}: { placed?: ReadonlyMap<string, string>; created?: ReadonlyMap<string, number> } = {}) {
   const claimed = new Set<string>();
   return NurturingMilestonesService.create({
-    milestones: MemoryNurturingMilestonesRepository.create({ placed }),
+    milestones: MemoryNurturingMilestonesRepository.create({ placed, created }),
     claims: {
       claim: async (key) => {
         if (claimed.has(key)) return false;
@@ -27,7 +29,9 @@ function serviceOver({
   });
 }
 
-function created(overrides: Partial<ProjectCreatedEventData> = {}): ProjectCreatedEventData {
+function projectCreatedFact(
+  overrides: Partial<ProjectCreatedEventData> = {},
+): ProjectCreatedEventData {
   return {
     tenantId: "project-1",
     projectId: "project-1",
@@ -52,7 +56,7 @@ describe("NurturingMilestonesService", () => {
   /** @scenario "The evaluation milestone names the admin from project's created event" */
   it("names the admin project's created event carried and fires the first once", async () => {
     const service = serviceOver();
-    await service.projectCreated(created());
+    await service.projectCreated(projectCreatedFact());
 
     const first = await service.evaluationCompleted(settled("eval-1"));
     const second = await service.evaluationCompleted(settled("eval-2"));
@@ -66,7 +70,7 @@ describe("NurturingMilestonesService", () => {
   /** @scenario "A seeded organization's first counted evaluation is not its first milestone" */
   it("never fires the first for an organization learned from the backfill", async () => {
     const service = serviceOver();
-    await service.projectCreated(created({ backfilled: true }));
+    await service.projectCreated(projectCreatedFact({ backfilled: true }));
 
     expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
       { first: false, organizationEvaluationCount: 1 },
@@ -76,9 +80,9 @@ describe("NurturingMilestonesService", () => {
   /** @scenario "Project's backfill is idempotent for nurturing" */
   it("keeps a live organization unseeded when the backfill records its project again", async () => {
     const service = serviceOver();
-    await service.projectCreated(created());
-    await service.projectCreated(created({ backfilled: true }));
-    await service.projectCreated(created({ backfilled: true }));
+    await service.projectCreated(projectCreatedFact());
+    await service.projectCreated(projectCreatedFact({ backfilled: true }));
+    await service.projectCreated(projectCreatedFact({ backfilled: true }));
 
     expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
       { first: true, organizationEvaluationCount: 1 },
@@ -87,7 +91,7 @@ describe("NurturingMilestonesService", () => {
 
   it("counts a redelivered completion once", async () => {
     const service = serviceOver();
-    await service.projectCreated(created());
+    await service.projectCreated(projectCreatedFact());
     await service.evaluationCompleted(settled("eval-1"));
 
     expect(await service.evaluationCompleted(settled("eval-1"))).toEqual([]);
@@ -98,7 +102,7 @@ describe("NurturingMilestonesService", () => {
 
   it("raises nothing for a project its owners do not hold", async () => {
     const service = serviceOver({ placed: new Map() });
-    await service.projectCreated(created());
+    await service.projectCreated(projectCreatedFact());
 
     expect(await service.evaluationCompleted(settled("eval-1"))).toEqual([]);
   });
@@ -116,7 +120,7 @@ describe("NurturingMilestonesService", () => {
         ["project-old", "org-1"],
       ]),
     });
-    await service.projectCreated(created());
+    await service.projectCreated(projectCreatedFact());
 
     const counted = await service.evaluationCompleted({
       aggregateId: "project-old:eval-1",
@@ -129,6 +133,49 @@ describe("NurturingMilestonesService", () => {
     });
 
     expect(counted).toMatchObject([{ userId: "admin-1", organizationEvaluationCount: 1 }]);
+  });
+});
+
+describe("given an organization that held a project before nurturing's cutover", () => {
+  const placed = new Map([
+    ["project-1", "org-1"],
+    ["project-old", "org-1"],
+  ]);
+  const created = new Map([
+    ["project-1", NURTURING_CUTOVER_AT + 1],
+    ["project-old", NURTURING_CUTOVER_AT - 1],
+  ]);
+
+  /** @scenario "An organization that held a project before the cutover never gets a first milestone" */
+  it("sends no first evaluation or first run for its new project, though stored unseeded", async () => {
+    const service = serviceOver({ placed, created });
+    await service.projectCreated(projectCreatedFact({ backfilled: false }));
+
+    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
+      { first: false, organizationEvaluationCount: 1 },
+    ]);
+    expect(
+      await service.simulationRunFinished({
+        aggregateId: "run-1",
+        tenantId: "project-1",
+        data: { scenarioRunId: "run-1", occurredAt: 3 },
+      }),
+    ).toMatchObject([{ first: false, organizationRunCount: 1 }]);
+  });
+
+  /** @scenario "An organization whose projects all came after the cutover still gets its first milestone" */
+  it("still sends the first once where every project came after the cutover", async () => {
+    const service = serviceOver({
+      placed,
+      created: new Map([
+        ["project-1", NURTURING_CUTOVER_AT + 1],
+        ["project-old", NURTURING_CUTOVER_AT],
+      ]),
+    });
+    await service.projectCreated(projectCreatedFact());
+
+    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([{ first: true }]);
+    expect(await service.evaluationCompleted(settled("eval-2"))).toMatchObject([{ first: false }]);
   });
 });
 
@@ -145,7 +192,7 @@ describe("NurturingMilestonesService.simulationRunFinished", () => {
   /** @scenario "A finished run tells nurturing the organization's run count so far" */
   it("tells the run against the admin with the organization's count, the first once", async () => {
     const service = serviceOver();
-    await service.projectCreated(created());
+    await service.projectCreated(projectCreatedFact());
 
     expect(await service.simulationRunFinished(finished("run-1"))).toEqual([
       {
@@ -167,14 +214,14 @@ describe("NurturingMilestonesService.simulationRunFinished", () => {
   /** @scenario "A finished run in a project with no organization admin tells nurturing nothing" */
   it("tells nothing when the organization has no admin", async () => {
     const service = serviceOver();
-    await service.projectCreated(created({ adminUserId: null }));
+    await service.projectCreated(projectCreatedFact({ adminUserId: null }));
 
     expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);
   });
 
   it("counts a redelivered run once and never fires the first for a backfilled organization", async () => {
     const service = serviceOver();
-    await service.projectCreated(created({ backfilled: true }));
+    await service.projectCreated(projectCreatedFact({ backfilled: true }));
     await service.simulationRunFinished(finished("run-1"));
 
     expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);

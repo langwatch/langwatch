@@ -63,3 +63,31 @@ export const explorerInstantEvalProgressSchema = z.object({
 });
 
 export type ExplorerInstantEvalProgress = z.infer<typeof explorerInstantEvalProgressSchema>;
+
+/**
+ * A search-bar sentence, with the context the routing classifier reads it in.
+ * Plain fields of this module's own, so no trace type crosses (T2 D3, 2026-10-08).
+ */
+export const explorerSearchClassificationInputSchema = z.object({
+  projectId: z.string(),
+  /** The whole submitted text: bare words plus any explicit terms. */
+  text: z.string().min(1).max(2_000),
+  timeRange: z.object({ from: EPOCH_MS, to: EPOCH_MS }),
+  /** The query applied before this submit, for context only. */
+  activeQuery: z.string().max(2_000).optional(),
+  lensId: z.string().max(200).optional(),
+  /** Whether the assistant route is open to this user. Absent means it is. */
+  isLangyAvailable: z.boolean().optional(),
+});
+
+export type ExplorerSearchClassificationInput = z.infer<
+  typeof explorerSearchClassificationInputSchema
+>;
+
+/** The route label the classifier answered, if any, and whether a judgement may be offered. */
+export const explorerSearchClassificationSchema = z.object({
+  classified: z.string().nullable(),
+  isInstantEvalAvailable: z.boolean(),
+});
+
+export type ExplorerSearchClassification = z.infer<typeof explorerSearchClassificationSchema>;

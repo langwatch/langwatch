@@ -15,7 +15,6 @@ import type {
   AgentPage,
   AgentOverview,
   AgentOverviewPage,
-  AgentCreationWindowInput,
 } from "./agent.queries.ts";
 import type * as agentQueriesModule from "./agent.queries.ts";
 import type { Agent, AgentWithFields } from "./agent.ts";
@@ -84,11 +83,6 @@ export interface AgentApi {
     agentExternalId: string;
   }): Promise<boolean>;
   touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
-  /**
-   * The ids of the agents created in a window, oldest first, archived ones included: main's
-   * candidate query for the agent audit-log id backfill (scripts/backfill-agent-audit-log-ids.ts).
-   */
-  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]>;
   listWithPresence(input: {
     projectId: string;
     page: number;

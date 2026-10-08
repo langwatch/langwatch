@@ -29,4 +29,23 @@ export class MemoryBillingOrganizationRepository extends BillingAccountFactsRepo
   async findFirstTeamId(organizationId: string): Promise<string | null> {
     return this.store.organizations.get(organizationId)?.teamIds[0] ?? null;
   }
+
+  async findBillingProfile(
+    organizationId: string,
+  ): Promise<{ name: string; stripeCustomerId: string | null } | null> {
+    const organization = this.store.organizations.get(organizationId);
+    return organization
+      ? { name: organization.name, stripeCustomerId: organization.stripeCustomerId ?? null }
+      : null;
+  }
+
+  async claimStripeCustomerId(input: {
+    organizationId: string;
+    stripeCustomerId: string;
+  }): Promise<boolean> {
+    const organization = this.store.organizations.get(input.organizationId);
+    if (!organization || organization.stripeCustomerId) return false;
+    organization.stripeCustomerId = input.stripeCustomerId;
+    return true;
+  }
 }

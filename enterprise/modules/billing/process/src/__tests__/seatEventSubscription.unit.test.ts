@@ -14,6 +14,7 @@ import type {
   BillingInvoicePreview,
   BillingSubscription,
 } from "../rules/billing-stripe-shapes.rules.ts";
+import type { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
 import {
   type SeatCheckoutInvites,
   SeatEventSubscriptionService,
@@ -63,7 +64,6 @@ const createMockInvites = (): {
 } => ({
   checkInvitesWithinCaller: vi.fn(),
   createPaymentPendingInvites: vi.fn(),
-  cancelPaymentPendingInvites: vi.fn(),
 });
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -73,6 +73,10 @@ describe("seatEventSubscription", () => {
   let customers: MemoryStripeCustomersChannel;
   let subscriptions: ReturnType<typeof createMockSubscriptions>;
   let invites: ReturnType<typeof createMockInvites>;
+  /** Billing's fact that organization drops the held invitations from (R42). */
+  let abandoned: {
+    seatCheckoutsAbandoned: Mock<BillingLifecycleAnnouncerService["seatCheckoutsAbandoned"]>;
+  };
   let service: SeatEventSubscriptionService;
 
   beforeEach(() => {
@@ -83,10 +87,12 @@ describe("seatEventSubscription", () => {
     customers.seed({ id: "cus_1", currency: null });
     subscriptions = createMockSubscriptions();
     invites = createMockInvites();
+    abandoned = { seatCheckoutsAbandoned: vi.fn() };
     service = SeatEventSubscriptionService.create({
       stripeSubscriptions,
       subscriptions,
       invites,
+      abandoned,
       prices,
       customerCurrency: StripeCustomerCurrencyService.create({
         customers,
@@ -900,7 +906,7 @@ describe("seatEventSubscription", () => {
         });
       });
 
-      it("deletes orphaned PAYMENT_PENDING invites from stale subs", async () => {
+      it("records the stale subs as abandoned, so organization drops their PAYMENT_PENDING invites", async () => {
         await service.createSeatEventCheckout({
           organizationId: "org_1",
           customerId: "cus_1",
@@ -910,7 +916,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 3,
         });
 
-        expect(invites.cancelPaymentPendingInvites).toHaveBeenCalledWith({
+        expect(abandoned.seatCheckoutsAbandoned).toHaveBeenCalledWith({
           organizationId: "org_1",
           subscriptionIds: ["stale_sub_1", "stale_sub_2"],
         });
@@ -997,7 +1003,7 @@ describe("seatEventSubscription", () => {
           membersToAdd: 2,
         });
 
-        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(abandoned.seatCheckoutsAbandoned).not.toHaveBeenCalled();
       });
     });
 
@@ -1188,7 +1194,7 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
-        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(abandoned.seatCheckoutsAbandoned).not.toHaveBeenCalled();
       });
     });
 
@@ -1259,7 +1265,7 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
-        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(abandoned.seatCheckoutsAbandoned).not.toHaveBeenCalled();
       });
     });
 
@@ -1300,7 +1306,7 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
-        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(abandoned.seatCheckoutsAbandoned).not.toHaveBeenCalled();
       });
     });
 
@@ -1341,7 +1347,7 @@ describe("seatEventSubscription", () => {
         expect(stripeSubscriptions.checkoutSessions).toEqual([]);
         expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
         expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
-        expect(invites.cancelPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(abandoned.seatCheckoutsAbandoned).not.toHaveBeenCalled();
       });
     });
 

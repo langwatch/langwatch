@@ -7,6 +7,16 @@ import {
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   USAGE_BILLING_CHANGED_EVENT_TYPE,
   billingAuditRecordedEventDataSchema,
+  PLAN_LIMIT_ALERT_SENT_EVENT_TYPE,
+  CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE,
+  PRICING_MODEL_CHANGED_EVENT_TYPE,
+  SEAT_CHECKOUT_PAID_EVENT_TYPE,
+  SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+  planLimitAlertSentEventDataSchema,
+  checkoutCurrencySelectedEventDataSchema,
+  pricingModelChangedEventDataSchema,
+  seatCheckoutPaidEventDataSchema,
+  seatCheckoutsAbandonedEventDataSchema,
   checkoutCompletedEventDataSchema,
   subscriptionChangedEventDataSchema,
   subscriptionStartedEventDataSchema,
@@ -86,9 +96,85 @@ export const billingAuditRecordedEventSchema = z.object({
 });
 export type BillingAuditRecordedEvent = z.infer<typeof billingAuditRecordedEventSchema>;
 
+export const RECORD_PLAN_LIMIT_ALERT_SENT_COMMAND_TYPE =
+  "lw.billing.record_plan_limit_alert_sent" as const;
+export const recordPlanLimitAlertSentCommandDataSchema = planLimitAlertSentEventDataSchema;
+export type RecordPlanLimitAlertSentCommandData = z.infer<
+  typeof recordPlanLimitAlertSentCommandDataSchema
+>;
+export const planLimitAlertSentEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PLAN_LIMIT_ALERT_SENT_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: planLimitAlertSentEventDataSchema,
+});
+export type PlanLimitAlertSentEvent = z.infer<typeof planLimitAlertSentEventSchema>;
+
+export const RECORD_CHECKOUT_CURRENCY_SELECTED_COMMAND_TYPE =
+  "lw.billing.record_checkout_currency_selected" as const;
+export const recordCheckoutCurrencySelectedCommandDataSchema =
+  checkoutCurrencySelectedEventDataSchema;
+export type RecordCheckoutCurrencySelectedCommandData = z.infer<
+  typeof recordCheckoutCurrencySelectedCommandDataSchema
+>;
+export const checkoutCurrencySelectedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(CHECKOUT_CURRENCY_SELECTED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: checkoutCurrencySelectedEventDataSchema,
+});
+export type CheckoutCurrencySelectedEvent = z.infer<typeof checkoutCurrencySelectedEventSchema>;
+
+export const RECORD_PRICING_MODEL_CHANGED_COMMAND_TYPE =
+  "lw.billing.record_pricing_model_changed" as const;
+export const recordPricingModelChangedCommandDataSchema = pricingModelChangedEventDataSchema;
+export type RecordPricingModelChangedCommandData = z.infer<
+  typeof recordPricingModelChangedCommandDataSchema
+>;
+export const pricingModelChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PRICING_MODEL_CHANGED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: pricingModelChangedEventDataSchema,
+});
+export type PricingModelChangedEvent = z.infer<typeof pricingModelChangedEventSchema>;
+
+export const RECORD_SEAT_CHECKOUT_PAID_COMMAND_TYPE =
+  "lw.billing.record_seat_checkout_paid" as const;
+export const recordSeatCheckoutPaidCommandDataSchema = seatCheckoutPaidEventDataSchema;
+export type RecordSeatCheckoutPaidCommandData = z.infer<
+  typeof recordSeatCheckoutPaidCommandDataSchema
+>;
+export const seatCheckoutPaidEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SEAT_CHECKOUT_PAID_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: seatCheckoutPaidEventDataSchema,
+});
+export type SeatCheckoutPaidEvent = z.infer<typeof seatCheckoutPaidEventSchema>;
+
+export const RECORD_SEAT_CHECKOUTS_ABANDONED_COMMAND_TYPE =
+  "lw.billing.record_seat_checkouts_abandoned" as const;
+export const recordSeatCheckoutsAbandonedCommandDataSchema = seatCheckoutsAbandonedEventDataSchema;
+export type RecordSeatCheckoutsAbandonedCommandData = z.infer<
+  typeof recordSeatCheckoutsAbandonedCommandDataSchema
+>;
+export const seatCheckoutsAbandonedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: seatCheckoutsAbandonedEventDataSchema,
+});
+export type SeatCheckoutsAbandonedEvent = z.infer<typeof seatCheckoutsAbandonedEventSchema>;
+
 export type BillingLifecycleEvent =
   | SubscriptionChangedEvent
   | SubscriptionStartedEvent
   | CheckoutCompletedEvent
   | UsageBillingChangedEvent
-  | BillingAuditRecordedEvent;
+  | BillingAuditRecordedEvent
+  | PlanLimitAlertSentEvent
+  | CheckoutCurrencySelectedEvent
+  | PricingModelChangedEvent
+  | SeatCheckoutPaidEvent
+  | SeatCheckoutsAbandonedEvent;

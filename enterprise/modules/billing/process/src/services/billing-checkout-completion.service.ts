@@ -27,13 +27,6 @@ const logger = createLogger("langwatch:billing:checkoutCompletion");
 const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
-export type InviteApprover = {
-  approvePaymentPendingInvites(params: {
-    subscriptionId: string;
-    organizationId: string;
-  }): Promise<unknown>;
-};
-
 type BillingCheckoutCompletionOptions = {
   subscriptionRepository: BillingWebhookSubscriptionRepository;
   organizationRepository: BillingWebhookOrganizationRepository;
@@ -44,13 +37,17 @@ type BillingCheckoutCompletionOptions = {
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
   };
-  inviteApprover?: InviteApprover;
   licenses: LicenseClearer;
   host: BillingWebhookHost;
   /** Records the checkout and subscription changes for peers; absent where none is composed. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "checkoutCompleted" | "subscriptionActivated" | "subscriptionCancelled"
+    | "checkoutCompleted"
+    | "subscriptionActivated"
+    | "subscriptionCancelled"
+    | "checkoutCurrencySelected"
+    | "seatCheckoutPaid"
+    | "pricingModelChanged"
   >;
 };
 
@@ -61,7 +58,6 @@ export class BillingCheckoutCompletionService {
 
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
-  private readonly inviteApprover?: InviteApprover;
   private readonly host: BillingWebhookHost;
   private readonly announcer: BillingCheckoutCompletionOptions["announcer"];
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
@@ -70,7 +66,6 @@ export class BillingCheckoutCompletionService {
   private constructor(options: BillingCheckoutCompletionOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
-    this.inviteApprover = options.inviteApprover;
     this.host = options.host;
     this.announcer = options.announcer;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
@@ -177,7 +172,7 @@ export class BillingCheckoutCompletionService {
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
       try {
-        await this.organizationRepository.updateCurrency({
+        await this.announcer?.checkoutCurrencySelected({
           organizationId: subscriptionRecord.organizationId,
           currency: normalizedCurrency,
         });
@@ -190,10 +185,10 @@ export class BillingCheckoutCompletionService {
       }
     }
 
-    // Approve PAYMENT_PENDING invites linked to this subscription
-    if (this.inviteApprover && subscriptionRecord) {
+    // Organization opens the PAYMENT_PENDING invites linked to this subscription from the fact.
+    if (this.announcer && subscriptionRecord) {
       try {
-        await this.inviteApprover.approvePaymentPendingInvites({
+        await this.announcer.seatCheckoutPaid({
           subscriptionId: subscriptionRecord.id,
           organizationId: subscriptionRecord.organizationId,
         });

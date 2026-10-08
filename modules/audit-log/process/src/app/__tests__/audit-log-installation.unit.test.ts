@@ -1,14 +1,6 @@
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { auditLogProcessModule } from "../../audit-log.module.ts";
@@ -17,16 +9,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([auditLogProcessModule])
     .withStores(memoryStores())
-    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } })
-    .provide({
-      project: createApiFixture<ProjectApi>({}),
-      prompt: createApiFixture<PromptApi>({}),
-      workflow: createApiFixture<WorkflowApi>({}),
-      dataset: createApiFixture<DatasetApi>({}),
-      monitor: createApiFixture<MonitorApi>({}),
-      annotation: createApiFixture<AnnotationApi>({}),
-      agent: createApiFixture<AgentApi>({}),
-    });
+    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } });
 }
 
 const command = {

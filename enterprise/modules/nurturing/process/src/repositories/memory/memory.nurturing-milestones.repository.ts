@@ -4,17 +4,26 @@ import type {
   NurturingOrganizationState,
 } from "../nurturing-milestones.repository.ts";
 
-/** The Postgres twin's semantics; `placed` stands in for project's and organization's tables. */
+type StoredOrganization = Omit<NurturingOrganizationState, "firstProjectCreatedAt">;
+
+/** The Postgres twin's semantics; `placed` and `created` stand in for the owners' tables. */
 export class MemoryNurturingMilestonesRepository implements NurturingMilestonesRepository {
-  readonly #organizations = new Map<string, NurturingOrganizationState>();
+  readonly #organizations = new Map<string, StoredOrganization>();
 
-  private constructor(private readonly placed: ReadonlyMap<string, string>) {}
+  private constructor(
+    private readonly placed: ReadonlyMap<string, string>,
+    private readonly created: ReadonlyMap<string, number>,
+  ) {}
 
-  /** `placed` maps each project its owners hold to its organization. */
+  /** `placed` maps each held project to its organization, `created` to its creation (epoch ms). */
   static create({
     placed = new Map<string, string>(),
-  }: { placed?: ReadonlyMap<string, string> } = {}): MemoryNurturingMilestonesRepository {
-    return new MemoryNurturingMilestonesRepository(placed);
+    created = new Map<string, number>(),
+  }: {
+    placed?: ReadonlyMap<string, string>;
+    created?: ReadonlyMap<string, number>;
+  } = {}): MemoryNurturingMilestonesRepository {
+    return new MemoryNurturingMilestonesRepository(placed, created);
   }
 
   async recordOrganization({
@@ -38,7 +47,7 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
     if (!organization) return [];
     const counted = { ...organization, evaluationCount: organization.evaluationCount + 1 };
     this.#organizations.set(organization.organizationId, counted);
-    return [counted];
+    return [this.withFirstProject(counted)];
   }
 
   async countSimulationRun({
@@ -48,6 +57,14 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
     if (!organization) return [];
     const counted = { ...organization, simulationRunCount: organization.simulationRunCount + 1 };
     this.#organizations.set(organization.organizationId, counted);
-    return [counted];
+    return [this.withFirstProject(counted)];
+  }
+
+  private withFirstProject(organization: StoredOrganization): NurturingOrganizationState {
+    const createdAts = [...this.placed]
+      .filter(([, organizationId]) => organizationId === organization.organizationId)
+      .flatMap(([projectId]) => this.created.get(projectId) ?? []);
+    const firstProjectCreatedAt = createdAts.length > 0 ? Math.min(...createdAts) : null;
+    return { ...organization, firstProjectCreatedAt };
   }
 }

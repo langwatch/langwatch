@@ -1,22 +1,21 @@
 import {
   CustomerCreationRaceError,
+  OrganizationNotFoundError,
   UserEmailRequiredError,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
 
 import type { StripeCustomersChannel } from "../channels/stripe-customers.channel.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 
 const logger = createLogger("langwatch:billing:customerService");
 
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
-/**
- * The two organization reads billing does, named.
- */
+/** The checkout's read of organization's shared table, and the one claim billing writes there. */
 type BillingProfileSource = Pick<
-  OrganizationService,
-  "getBillingProfile" | "claimBillingCustomerId"
+  BillingAccountFactsRepository,
+  "findBillingProfile" | "claimStripeCustomerId"
 >;
 
 export class CustomerService {
@@ -37,12 +36,11 @@ export class CustomerService {
     organizationId: string;
   }): Promise<string> {
     const { user, organizationId } = params;
-    const organization = await this.organizations.getBillingProfile({
-      organizationId,
-    });
+    const organization = await this.organizations.findBillingProfile(organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
 
-    if (organization.billingCustomerId) {
-      return organization.billingCustomerId;
+    if (organization.stripeCustomerId) {
+      return organization.stripeCustomerId;
     }
 
     if (!user.email) {
@@ -54,9 +52,9 @@ export class CustomerService {
       name: organization.name,
     });
 
-    const claimed = await this.organizations.claimBillingCustomerId({
+    const claimed = await this.organizations.claimStripeCustomerId({
       organizationId,
-      billingCustomerId: customer.id,
+      stripeCustomerId: customer.id,
     });
 
     if (!claimed) {
@@ -81,14 +79,12 @@ export class CustomerService {
         );
       }
 
-      const refreshed = await this.organizations.getBillingProfile({
-        organizationId,
-      });
-      if (!refreshed.billingCustomerId) {
+      const refreshed = await this.organizations.findBillingProfile(organizationId);
+      if (!refreshed?.stripeCustomerId) {
         throw new CustomerCreationRaceError();
       }
 
-      return refreshed.billingCustomerId;
+      return refreshed.stripeCustomerId;
     }
 
     return customer.id;

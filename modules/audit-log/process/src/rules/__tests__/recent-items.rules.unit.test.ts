@@ -2,7 +2,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { RecentTouch } from "../../repositories/recent-touch.repository.ts";
-import { deriveRecentItemHref, pickRecentEntities } from "../recent-items.rules.ts";
+import { pickRecentEntities } from "../recent-items.rules.ts";
 
 function touch(action: string, args: RecentTouch["args"], second: number): RecentTouch {
   return { action, args, createdAt: Temporal.Instant.fromEpochMilliseconds(second * 1000) };
@@ -82,19 +82,5 @@ describe("pickRecentEntities", () => {
 
       expect(pickRecentEntities({ touches, limit: 2 })).toHaveLength(2);
     });
-  });
-});
-
-describe("deriveRecentItemHref", () => {
-  it("links each entity type where main linked it", () => {
-    const place = { projectSlug: "acme", id: "id-1" };
-
-    expect(deriveRecentItemHref({ ...place, type: "prompt" })).toBe("/acme/prompts?prompt=id-1");
-    expect(deriveRecentItemHref({ ...place, type: "workflow" })).toBe("/acme/studio/id-1");
-    expect(deriveRecentItemHref({ ...place, type: "dataset" })).toBe("/acme/datasets/id-1");
-    expect(deriveRecentItemHref({ ...place, type: "evaluation" })).toBe("/acme/online-evaluations");
-    expect(deriveRecentItemHref({ ...place, type: "annotation", queueSlug: "review" })).toBe(
-      "/acme/annotations/review",
-    );
   });
 });

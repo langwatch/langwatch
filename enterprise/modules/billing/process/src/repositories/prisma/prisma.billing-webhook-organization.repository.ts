@@ -3,7 +3,7 @@
  * Postgres — via `BillingWebhookOrganizationRepository`'s narrow shape, since the
  * organization aggregate belongs to a core feature, not billing's own repository.
  */
-import type { Currency, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { BillingWebhookOrganizationRepository } from "../billing-webhook-organization.repository.ts";
 
@@ -31,13 +31,6 @@ export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOr
     return this.database.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true },
-    });
-  }
-
-  async updateCurrency(input: { organizationId: string; currency: string }): Promise<void> {
-    await this.database.organization.update({
-      where: { id: input.organizationId },
-      data: { currency: input.currency as Currency },
     });
   }
 }

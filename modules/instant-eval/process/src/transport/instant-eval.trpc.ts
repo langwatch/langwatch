@@ -9,6 +9,8 @@ import {
   instantEvalTrpc,
   type ExplorerInstantEvalProgress,
   type ExplorerInstantEvalRunInput,
+  type ExplorerSearchClassification,
+  type ExplorerSearchClassificationInput,
   type InstantEvalApi,
   type InstantEvalEstimateWire,
 } from "@langwatch/instant-eval-contract";
@@ -36,6 +38,8 @@ export interface InstantEvalBrowserApi {
   }): Promise<ExplorerInstantEvalProgress>;
   /** One run's counters, which is all a chip and a progress bar read. */
   getExplorerRun(input: { projectId: string; runId: string }): Promise<ExplorerInstantEvalProgress>;
+  /** A search-bar sentence classified for trace's router; never refuses, answers null instead. */
+  classifySearch(input: ExplorerSearchClassificationInput): Promise<ExplorerSearchClassification>;
 }
 
 export const InstantEvalBrowserApi = moduleApi<InstantEvalBrowserApi>()("instant-eval");
@@ -81,4 +85,8 @@ export const instantEvalTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input, actor }) =>
     app.instantEvals().optIn({ projectId: input.projectId, userId: actor.id }),
   )
+
+  .procedure("classifySearch")
+  .withPermission("analytics:view")
+  .handle(({ app, input }) => app.classifySearch(input))
   .build();

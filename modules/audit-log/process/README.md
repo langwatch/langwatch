@@ -6,7 +6,7 @@ The server half of [audit-log](../README.md). The audit log: every module record
 
 ## Installation
 
-`defineProcessModule("audit-log").withRepositories(auditLogRepositories).withApi(AuditLogModule).withTransports(homeTrpcTransport).withEventing(auditLogEventing).withTasks(…)`, `src/audit-log.module.ts:10`.
+`defineProcessModule("audit-log").withRepositories(auditLogRepositories).withApi(AuditLogModule).withTransports(homeTrpcTransport).withEventing(auditLogEventing)`, `src/audit-log.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -52,7 +52,7 @@ None: this module declares no REST family.
 
 ### `home`
 
-Contract `../contract/src/recent-items.ts:35`, router `src/transport/home.trpc.ts:17`.
+Contract `../contract/src/recent-items.ts:33`, router `src/transport/home.trpc.ts:17`.
 
 | Procedure             | Kind  | Gate                      | Input                    | Output |
 | --------------------- | ----- | ------------------------- | ------------------------ | ------ |
@@ -72,14 +72,6 @@ Declared at `src/eventing/audit-log.pipeline.ts:67`.
 | --------------- | --------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------- |
 | peer subscriber | `auditLogOrganizationAudit` | `lw.organization.audit_recorded` from [organization](../../organization/README.md)        | `src/eventing/audit-log.pipeline.ts:73` |
 | peer subscriber | `auditLogBillingAudit`      | `lw.billing.audit_recorded` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/audit-log.pipeline.ts:80` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                           | Class                  | Declared at                                |
-| ------------------------------ | ---------------------- | ------------------------------------------ |
-| `agent-audit-log-ids-backfill` | `AgentAuditLogIdsTask` | `src/tasks/agent-audit-log-ids.task.ts:16` |
 
 ## Configuration
 

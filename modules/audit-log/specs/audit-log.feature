@@ -11,23 +11,6 @@ Feature: Audit logging
     Then the entity's history names the actor and the action
 
   @unit
-  Scenario: Legacy agent audit identifiers are repaired without guessing
-    Given legacy create and copy audit entries omit generated identifiers
-    When the backfill task runs
-    Then candidates are scoped to the audit project's one-minute creation window
-    And copied agents also match the recorded source agent
-    And only a unique candidate is linked
-    And an ambiguous entry is skipped and counted
-    And a repeated pass does not rewrite repaired entries
-
-  @unit
-  Scenario: The legacy audit repair is explicitly invoked
-    When the task runs with --dry-run
-    Then it reports potential repairs without writing data
-    And without --dry-run it writes, as main's script did
-    And ordinary API and worker startup do not run it
-
-  @unit
   Scenario: Entity history stays inside the requested project and action family
     Given audit entries name an entity in id, agentId or newAgentId arguments
     And other projects and action families have entries naming the same entity
@@ -83,17 +66,17 @@ Feature: Audit logging
     Then they are answered with no items
 
   @unit
-  Scenario: the home strip lists what the caller touched, newest first and each once
+  Scenario: the home strip answers each touched entity once, newest first
     Given somebody touched a workflow twice, a prompt, a monitor, an annotation queue and a dataset
     When they read the home strip
-    Then each entity is listed once, at its newest touch, newest first
-    And each is named and linked through its owner's existing read
+    Then each entity is answered once, by id and type, at its newest touch, newest first
+    And the browser names and links each from its owner's list
 
   @unit
-  Scenario: the home strip hides what is gone and never lists simulations
-    Given somebody touched a deleted prompt, an archived workflow, a missing workflow and a simulation
+  Scenario: the home strip never answers simulations
+    Given somebody touched a workflow and a simulation
     When they read the home strip
-    Then none of them is listed
+    Then only the workflow is answered
 
   @unit
   Scenario: the home strip shows only the caller's own touches

@@ -88,7 +88,6 @@ export type {
   LicensePurchaseHandler,
   WebhookService,
 } from "./services/billing-stripe-webhook.service.ts";
-export type { InviteApprover } from "./services/billing-checkout-completion.service.ts";
 export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
 export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export { BillingWebhookHost } from "./channels/billing-webhook-host.channel.ts";

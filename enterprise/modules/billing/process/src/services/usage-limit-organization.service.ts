@@ -3,10 +3,13 @@ import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/orga
 import type { Instant } from "@langwatch/time";
 
 import type { BillingProjectDirectoryRepository } from "../repositories/billing-project-directory.repository.ts";
+import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 
 type UsageLimitOrganizationPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "getWithAdministrators" | "updateSentPlanLimitAlert">;
+  organizations: Pick<OrganizationApi, "getWithAdministrators">;
   projects: Pick<BillingProjectDirectoryRepository, "findProjectsWithName">;
+  /** The stamp is billing's fact, which organization applies to its row (R42). */
+  stamps: Pick<BillingLifecycleAnnouncerService, "planLimitAlertSent">;
 }>;
 
 /** Main's `OrganizationService` reads for the usage-limit mail; projects through their share. */
@@ -39,7 +42,7 @@ export class UsageLimitOrganizationService implements BillingUsageLimitOrganizat
   }
 
   updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void> {
-    return this.peers.organizations.updateSentPlanLimitAlert({ organizationId, sentAt: timestamp });
+    return this.peers.stamps.planLimitAlertSent({ organizationId, sentAt: timestamp });
   }
 
   /** Main's `findProjectsWithName`: every non-governance project, by name. */

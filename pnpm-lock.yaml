@@ -6072,21 +6072,12 @@ importers:
 
   modules/audit-log/process:
     dependencies:
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../agent/contract
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../dataset/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -6099,12 +6090,6 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../monitor/contract
-      '@langwatch/observability':
-        specifier: workspace:*
-        version: link:../../../packages/observability
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -6114,21 +6099,9 @@ importers:
       '@langwatch/process':
         specifier: workspace:*
         version: link:../../../packages/process
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../project/contract
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../prompt/contract
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../workflow/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -12416,6 +12389,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

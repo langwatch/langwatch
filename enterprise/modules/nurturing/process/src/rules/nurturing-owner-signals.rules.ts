@@ -111,6 +111,21 @@ export function evaluationRanSignal({
   };
 }
 
+/**
+ * Nurturing's cutover (migration plan D.1, DATA-NURTURING-GUARD): an organization holding a
+ * project from before it already had its first_* milestones, so none is ever sent again.
+ */
+export const NURTURING_CUTOVER_AT = Temporal.Instant.from("2026-10-08T00:00:00Z").epochMilliseconds;
+
+/** Seeded at read: stored by project's backfill, or holding a project from before the cutover. */
+export function seededAtRead({
+  seeded,
+  firstProjectCreatedAt,
+}: Readonly<{ seeded: boolean; firstProjectCreatedAt: number | null }>): boolean {
+  if (seeded) return true;
+  return firstProjectCreatedAt !== null && firstProjectCreatedAt < NURTURING_CUTOVER_AT;
+}
+
 /** The organization a settled evaluation was counted against, as nurturing's own store holds it. */
 type CountedOrganization = Readonly<{
   adminUserId: string | null;

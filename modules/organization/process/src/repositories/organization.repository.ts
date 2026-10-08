@@ -13,6 +13,7 @@ import type {
   OrganizationUsageCount,
   PricingModel,
   SignInSecurityPolicy,
+  OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -155,6 +156,16 @@ export abstract class OrganizationRepository {
   abstract updateSentPlanLimitAlert(input: {
     organizationId: string;
     sentAt: Instant;
+  }): Promise<void>;
+  /** Billing's checkout currency, from its fact (R42); throws OrganizationNotFoundError. */
+  abstract updateCurrency(input: {
+    organizationId: string;
+    currency: OrganizationCurrency;
+  }): Promise<void>;
+  /** Billing's pricing model, from its fact (R42); throws OrganizationNotFoundError. */
+  abstract updatePricingModel(input: {
+    organizationId: string;
+    pricingModel: PricingModel;
   }): Promise<void>;
   /** Throws OrganizationNotFoundError. */
   abstract setLicense(input: {

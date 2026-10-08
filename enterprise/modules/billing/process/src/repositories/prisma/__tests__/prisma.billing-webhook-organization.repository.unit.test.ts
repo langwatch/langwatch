@@ -46,17 +46,6 @@ describe("PrismaBillingWebhookOrganizationRepository", () => {
     });
   });
 
-  describe("when the organization's invoicing currency changes", () => {
-    /** @scenario "A checkout in a chosen currency writes that currency onto the organization" */
-    it("writes the currency onto that organization alone", async () => {
-      const { adapter, updates } = organizationDouble([{ id: "organization-1", name: "Acme" }]);
-
-      await adapter.updateCurrency({ organizationId: "organization-1", currency: "USD" });
-
-      expect(updates).toEqual([{ where: { id: "organization-1" }, data: { currency: "USD" } }]);
-    });
-  });
-
   describe("when the webhook needs the organization's display name", () => {
     /** @scenario "The webhook resolves a Stripe customer to one organization, and to none where there is none" */
     it("answers the name, and nothing for an organization that is gone", async () => {

@@ -18,6 +18,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type OrganizationCurrency,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -346,6 +347,24 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     const organization = this.memory.organizations.get(input.organizationId);
     if (!organization) throw new OrganizationNotFoundError();
     organization.sentPlanLimitAlert = input.sentAt;
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: OrganizationCurrency;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.currency = input.currency;
+  }
+
+  async updatePricingModel(input: {
+    organizationId: string;
+    pricingModel: PricingModel;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.pricingModel = input.pricingModel;
   }
 
   async setLicense(input: {

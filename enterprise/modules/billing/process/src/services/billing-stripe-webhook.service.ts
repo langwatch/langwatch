@@ -11,10 +11,7 @@ import type { StripeSubscriptionsChannel } from "../channels/stripe-subscription
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
-import {
-  BillingCheckoutCompletionService,
-  type InviteApprover,
-} from "./billing-checkout-completion.service.ts";
+import { BillingCheckoutCompletionService } from "./billing-checkout-completion.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
 import {
   BillingSubscriptionLifecycleService,
@@ -86,7 +83,6 @@ export class EEWebhookService implements WebhookService {
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly stripeSubscriptions: StripeSubscriptionsChannel;
   private readonly itemCalculator: ItemCalculator;
-  private readonly inviteApprover?: InviteApprover;
   private readonly licensePurchaseHandler?: LicensePurchaseHandler;
   private readonly licensePaymentLinkId?: string;
   private readonly host: BillingWebhookHost;
@@ -100,7 +96,6 @@ export class EEWebhookService implements WebhookService {
     organizationRepository,
     stripeSubscriptions,
     itemCalculator,
-    inviteApprover,
     licenses,
     licensePurchaseHandler,
     licensePaymentLinkId,
@@ -112,7 +107,6 @@ export class EEWebhookService implements WebhookService {
     organizationRepository: BillingWebhookOrganizationRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
-    inviteApprover?: InviteApprover;
     /** Clears a trial's licence once its subscription activates; organization owns the row. */
     licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
@@ -126,7 +120,6 @@ export class EEWebhookService implements WebhookService {
     this.organizationRepository = organizationRepository;
     this.stripeSubscriptions = stripeSubscriptions;
     this.itemCalculator = itemCalculator;
-    this.inviteApprover = inviteApprover;
     this.licensePurchaseHandler = licensePurchaseHandler;
     this.licensePaymentLinkId = licensePaymentLinkId;
     this.host = host;
@@ -136,7 +129,6 @@ export class EEWebhookService implements WebhookService {
       organizationRepository,
       stripeSubscriptions,
       itemCalculator,
-      inviteApprover,
       licenses,
       host,
       ...(announcer ? { announcer } : {}),
@@ -157,7 +149,6 @@ export class EEWebhookService implements WebhookService {
     organizationRepository: BillingWebhookOrganizationRepository;
     stripeSubscriptions: StripeSubscriptionsChannel;
     itemCalculator: ItemCalculator;
-    inviteApprover?: InviteApprover;
     licenses: LicenseClearer;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;

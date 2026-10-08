@@ -22,6 +22,8 @@ const namespace = `test-nurturing-placement-${randomUUID()}`;
 const organizationId = `${namespace}-organization`;
 const teamId = `${namespace}-team`;
 const projectId = `${namespace}-project`;
+const archivedProjectId = `${namespace}-archived`;
+const earliest = new Date("2020-01-01T00:00:00.000Z");
 
 describe.skipIf(!databaseUrl)("given project's and organization's tables", () => {
   let connection: PrismaConnection;
@@ -52,13 +54,26 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
         framework: "test",
       },
     });
+    await prisma.project.create({
+      data: {
+        id: archivedProjectId,
+        teamId,
+        name: archivedProjectId,
+        slug: archivedProjectId,
+        apiKey: archivedProjectId,
+        language: "typescript",
+        framework: "test",
+        createdAt: earliest,
+        archivedAt: new Date(),
+      },
+    });
   });
 
   afterAll(async () => {
     if (!connection) return;
     const prisma = connection.client;
     await prisma.nurturingOrganization.deleteMany({ where: { organizationId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
+    await prisma.project.deleteMany({ where: { id: { in: [projectId, archivedProjectId] } } });
     await prisma.team.deleteMany({ where: { id: teamId } });
     await prisma.organization.deleteMany({ where: { id: organizationId } });
     await connection.closeOnce();
@@ -71,6 +86,17 @@ describe.skipIf(!databaseUrl)("given project's and organization's tables", () =>
 
       await expect(repository.countEvaluation({ projectId })).resolves.toMatchObject([
         { organizationId, evaluationCount: 1 },
+      ]);
+    });
+  });
+
+  describe("when an evaluation is counted in an organization holding an archived older project", () => {
+    /** @scenario "Nurturing reads an organization's earliest project through its teams" */
+    it("carries the earliest project's creation, archived included", async () => {
+      await repository.recordOrganization({ organizationId, adminUserId: null, seeded: false });
+
+      await expect(repository.countEvaluation({ projectId })).resolves.toMatchObject([
+        { organizationId, seeded: false, firstProjectCreatedAt: earliest.getTime() },
       ]);
     });
   });

@@ -14,6 +14,11 @@ import type {
   RecordSubscriptionChangedCommandData,
   RecordSubscriptionStartedCommandData,
   RecordUsageBillingChangedCommandData,
+  RecordPlanLimitAlertSentCommandData,
+  RecordCheckoutCurrencySelectedCommandData,
+  RecordPricingModelChangedCommandData,
+  RecordSeatCheckoutPaidCommandData,
+  RecordSeatCheckoutsAbandonedCommandData,
 } from "../../eventing/billing-lifecycle.events.ts";
 import type { BillingReportOrganizationLookup } from "../../repositories/billing-report-organization.repository.ts";
 import {
@@ -86,6 +91,11 @@ function announcerOver(input: {
       },
     },
     recordAudit: recorder<RecordBillingAuditCommandData>([]),
+    recordPlanLimitAlertSent: recorder<RecordPlanLimitAlertSentCommandData>([]),
+    recordCheckoutCurrencySelected: recorder<RecordCheckoutCurrencySelectedCommandData>([]),
+    recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
+    recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
+    recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
   });
   return { service, changed, started, checkouts, usageBilling, usageSends, pauses, lines };
 }
@@ -181,6 +191,11 @@ describe("BillingLifecycleAnnouncerService", () => {
       recordCheckoutCompleted: recorder<RecordCheckoutCompletedCommandData>([]),
       recordUsageBillingChanged: recorder<RecordUsageBillingChangedCommandData>([]),
       recordAudit: recorder<RecordBillingAuditCommandData>([]),
+      recordPlanLimitAlertSent: recorder<RecordPlanLimitAlertSentCommandData>([]),
+      recordCheckoutCurrencySelected: recorder<RecordCheckoutCurrencySelectedCommandData>([]),
+      recordPricingModelChanged: recorder<RecordPricingModelChangedCommandData>([]),
+      recordSeatCheckoutPaid: recorder<RecordSeatCheckoutPaidCommandData>([]),
+      recordSeatCheckoutsAbandoned: recorder<RecordSeatCheckoutsAbandonedCommandData>([]),
     });
 
     await expect(service.subscriptionActivated(activation)).resolves.toBeUndefined();

@@ -51,7 +51,7 @@ type BillingSubscriptionLifecycleOptions = {
   /** Records subscription changes for peers; absent where nothing composes a lifecycle. */
   announcer?: Pick<
     BillingLifecycleAnnouncerService,
-    "subscriptionActivated" | "subscriptionCancelled"
+    "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
   >;
 };
 
@@ -379,6 +379,11 @@ export class BillingSubscriptionLifecycleService {
 
   /** Retires the plans this seat-event subscription supersedes, once the records agree. */
   private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
+    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
+    await this.announcer?.pricingModelChanged({
+      organizationId: updated.organizationId,
+      pricingModel: "SEAT_EVENT",
+    });
     const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
       organizationId: updated.organizationId,
       excludeSubscriptionId: updated.id,
