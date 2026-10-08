@@ -2126,14 +2126,15 @@ Declared at `src/eventing/coding-assistant-billing.pipeline.ts:52`. Events: `cod
 
 ### Pipeline `governance_activity_monitor` (aggregate `global`)
 
-Declared at `src/eventing/governance-activity-monitor.pipeline.ts:64`.
+Declared at `src/eventing/governance-activity-monitor.pipeline.ts:80`.
 
-| Kind            | Name                             | Handles                                                                                     | Declared at                                               |
-| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| process manager | `spendSpikeEvaluation`           | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:82` |
-| process manager | `governanceTraceFacts`           | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)     | `src/eventing/governance-activity-monitor.pipeline.ts:99` |
-| peer subscriber | `seedDefaultAiToolCatalog`       | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/governance-activity-monitor.pipeline.ts:70` |
-| peer subscriber | `assignScimCostCenterDepartment` | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                             | `src/eventing/governance-activity-monitor.pipeline.ts:77` |
+| Kind            | Name                             | Handles                                                                                                                            | Declared at                                                |
+| --------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| process manager | `spendSpikeEvaluation`           | every 5 min (`SPEND_SPIKE_EVALUATION_INTERVAL_MS = 5 * 60 * 1000`); intents `pass` (outbox)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:98`  |
+| process manager | `anomalyAlertDelivery`           | every 1 d (`ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneDelivered`, `requestDelivery` (outbox) | `src/eventing/governance-activity-monitor.pipeline.ts:115` |
+| process manager | `governanceTraceFacts`           | every 1 min (`GOVERNANCE_TRACE_FACTS_INTERVAL_MS = 60 * 1000`); intents `pass` (outbox)                                            | `src/eventing/governance-activity-monitor.pipeline.ts:132` |
+| peer subscriber | `seedDefaultAiToolCatalog`       | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md)                                        | `src/eventing/governance-activity-monitor.pipeline.ts:86`  |
+| peer subscriber | `assignScimCostCenterDepartment` | `lw.scim.cost_center_changed` from [scim](../../scim/README.md)                                                                    | `src/eventing/governance-activity-monitor.pipeline.ts:93`  |
 
 ### Pipeline `ingestion_pull_reconcile` (aggregate `global`)
 
@@ -2180,7 +2181,7 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:156`. Events: `pulledUsageObs
 
 | Kind   | Leaf                      | Environment variable                  | Declared at                               |
 | ------ | ------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:465`           |
+| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:479`           |
 | config | `gatewayPublicUrl`        | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:33` |
 | config | `gatewayInternalUrl`      | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:34` |
 | config | `gatewayLegacyUrl`        | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:35` |
