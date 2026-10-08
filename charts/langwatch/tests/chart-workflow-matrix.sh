@@ -91,13 +91,10 @@ e2e_docker_build = sum(
 )
 emit("e2e_docker_build_count", e2e_docker_build)
 
-# Every leg must either load the app image (needs_app) or declare it unneeded
-# (skip_app_build). A leg that does neither makes e2e.sh rebuild the app image,
-# the most expensive one, on every run.
-app_unprovisioned = sum(
-    1 for l in legs
-    if not l.get("needs_app") and not l.get("skip_app_build")
-)
+# Every leg must load the app image (needs_app): every chart-managed ClickHouse
+# install runs the LWQL access-render Job on it, and a leg without it makes
+# e2e.sh rebuild the most expensive image on every run.
+app_unprovisioned = sum(1 for l in legs if not l.get("needs_app"))
 emit("app_unprovisioned_legs", app_unprovisioned)
 
 # The suite step (the one that runs matrix.script / e2e.sh, where every suite
@@ -238,9 +235,9 @@ test_images_are_built_once_and_reused() {
     bad "image reuse" "e2e needs are '$needs', expected 'build-images render'"
   fi
   if [ "$unprovisioned" = "0" ]; then
-    ok "image reuse" "every leg loads the app image or sets skip_app_build"
+    ok "image reuse" "every leg loads the app image"
   else
-    bad "image reuse" "$unprovisioned leg(s) neither load the app image nor set skip_app_build"
+    bad "image reuse" "$unprovisioned leg(s) do not load the app image (needs_app)"
   fi
 }
 

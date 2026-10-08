@@ -9,9 +9,6 @@
 #   KEEP_CLUSTER=true  — skip Kind cluster deletion on exit (for debugging)
 #   CLUSTER_NAME       — Kind cluster name (default: lw-test)
 #   TIMEOUT            — helm --wait timeout in seconds (default: 480)
-#   E2E_SKIP_APP_BUILD — if set, skip building/loading the app image (a local run
-#                        of suites that never deploy it; no CI leg sets it, since
-#                        every chart-managed ClickHouse install needs the image)
 #   KEEP_CLUSTER and CLUSTER_NAME are passed through to test-helpers.sh
 #
 # Usage:
@@ -1382,18 +1379,17 @@ main() {
 
   # Build and load the app image into Kind. Under the workflow the build-images
   # job supplies every image and each leg loads it, so the image is already
-  # present and nothing is rebuilt here. A local run builds it on demand;
-  # E2E_SKIP_APP_BUILD skips it for a local run that never deploys the app.
+  # present and nothing is rebuilt here. A local run builds it on demand.
   local app_image
   app_image="$("$(dirname "$0")/app-image.sh" "$CHART_DIR")"
-  if [[ -z "${E2E_SKIP_APP_BUILD:-}" ]] && ! docker image inspect "$app_image" &>/dev/null 2>&1; then
+  if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
     if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
       info "Building app image: $app_image"
       docker build -t "$app_image" -f "$repo_root/infra/docker/Dockerfile" "$repo_root"
     fi
   fi
-  if [[ -z "${E2E_SKIP_APP_BUILD:-}" ]] && docker image inspect "$app_image" &>/dev/null 2>&1; then
+  if docker image inspect "$app_image" &>/dev/null 2>&1; then
     info "Loading app image into Kind: $app_image"
     kind load docker-image "$app_image" --name "$CLUSTER_NAME"
   fi

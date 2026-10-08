@@ -17,11 +17,12 @@
 #      / volume must, likewise, be a lower-weight hook that runs in every phase
 #      the Job does — otherwise the secretKeyRef resolves to nothing and the
 #      pod wedges in CreateContainerConfigError. One narrow exemption: a hook
-#      that runs on NO install phase (pre-/post-install) may read a main-phase
-#      Secret the install render also creates, because on upgrade and rollback
-#      the previous release already holds that Secret. The LWQL access-render
-#      Job relies on exactly that. test_hook_secret_exemption_is_upgrade_only
-#      proves an install-phase hook reading a main-phase Secret still fails.
+#      that runs ONLY on upgrade/rollback phases may read a main-phase Secret
+#      the install render also creates in the main phase. It assumes the
+#      previous chart version rendered that Secret too, so a Secret new in this
+#      version must itself be a pre-upgrade hook. The LWQL access-render Job
+#      relies on the exemption; test_hook_secret_exemption_is_upgrade_only pins
+#      every other case (install, delete, missing, hook-only, weight) to a fail.
 #   3. Every hook resource that runs on `pre-upgrade` must also run on
 #      `pre-rollback`. A rollback moves the release the same way an upgrade
 #      does and Helm fires its own event pair for it; a hook registered for the
@@ -31,10 +32,12 @@
 #      declare. An undeclared path renders empty, so a Job reading
 #      `.Values.global.imagePullSecrets` (never declared) pulls nothing and the
 #      private image fails — and the source reads as if the value were wired.
-#   5. No subchart mount may be delivered through a PARENT `extraVolumes` /
-#      `extraVolumeMounts` list. Those lists belong to the parent's own
-#      workloads; a subchart declares its own mounts from a typed value, and a
-#      volume pushed onto the parent list never reaches the subchart's pod.
+#   5. No file the chart ships (values.yaml, examples, test values) may set a
+#      subchart's `extraVolumes` / `extraVolumeMounts`. Those are operator
+#      pass-through lists, and Helm replaces a list rather than merging it, so
+#      an operator who sets their own drops the chart's mount silently. A mount
+#      the chart needs goes in a typed value the subchart declares (as
+#      `clickhouse.lwqlAccess` does). Operator values files are not scanned.
 #
 # The render covers install (`helm template`) and upgrade (`--is-upgrade`); the
 # rollback assertion reads the hook annotations directly, because Helm has no
@@ -93,12 +96,10 @@ if ! ls charts/*.tgz >/dev/null 2>&1; then
 fi
 
 # PyYAML is the values/render parser. It ships with the GitHub ubuntu-latest
-# Python; install it on demand rather than failing a local run that lacks it.
+# Python, the same assumption chart-workflow-matrix.sh makes.
 if ! python3 -c 'import yaml' >/dev/null 2>&1; then
-  python3 -m pip install --quiet --disable-pip-version-check pyyaml >/dev/null 2>&1 || {
-    echo "SETUP ERROR: python3 with PyYAML is required" >&2
-    exit 2
-  }
+  echo "SETUP ERROR: python3 with PyYAML is required (pip install pyyaml)" >&2
+  exit 2
 fi
 
 # ── Subchart names for the parent-extraVolumes check (invariant 5) ───────────
@@ -243,11 +244,12 @@ def resolve_dep(idx, kind, name, job_phases, job_weight):
     return "ok"
 
 
-INSTALL_PHASES = {"pre-install", "post-install"}
+UPGRADE_PHASES = {"pre-upgrade", "post-upgrade", "pre-rollback", "post-rollback"}
 
 
-def rendered_secrets(path):
-    return {d["metadata"]["name"] for d in load_docs([path]) if d["kind"] == "Secret"}
+def main_phase_secrets(path):
+    return {d["metadata"]["name"] for d in load_docs([path])
+            if d["kind"] == "Secret" and not is_hook(d)}
 
 
 def check_hook_deps(kind_wanted):
@@ -260,7 +262,7 @@ def check_hook_deps(kind_wanted):
     in, since the same Job can pass in one and fail in the other.
     """
     renders = [("install", sys.argv[2]), ("upgrade", sys.argv[3])]
-    install_secrets = rendered_secrets(sys.argv[2])
+    install_secrets = main_phase_secrets(sys.argv[2])
     bad = 0
     checked = 0
     exempt = 0
@@ -280,11 +282,12 @@ def check_hook_deps(kind_wanted):
             for name in needs:
                 checked += 1
                 status = resolve_dep(idx, kind_wanted, name, set(jphases), jweight)
-                # A hook with no install phase only fires once a release exists,
-                # so a main-phase Secret the install render creates is already
-                # there. An install-phase hook gets no such pass.
+                # A hook that runs only on upgrade/rollback fires against an
+                # existing release, which already holds a main-phase Secret the
+                # install render creates, assuming the previous chart version
+                # rendered it too. Install and delete hooks get no such pass.
                 if (kind_wanted == "Secret" and status == "main-phase"
-                        and not (set(jphases) & INSTALL_PHASES) and name in install_secrets):
+                        and set(jphases) <= UPGRADE_PHASES and name in install_secrets):
                     exempt += 1
                     continue
                 phase = ",".join(sorted(jphases))
@@ -292,12 +295,16 @@ def check_hook_deps(kind_wanted):
                     print("FAIL [hook-dep]: render=%s job=%s phase=%s needs=%s/%s found=%s"
                           % (render_name, jname, phase, kind_wanted, name, status))
                     bad += 1
+    if checked == 0:
+        print("FAIL [hook-dep]: no hook-Job %s dependency rendered, so nothing was checked"
+              % kind_wanted)
+        return 1
     if bad:
         return 1
     note = (" (%d upgrade-only reads of an install-rendered Secret exempt)" % exempt
             if kind_wanted == "Secret" else "")
     print("ok   [hook-%s] %d hook-Job %s dependencies (across install and upgrade) are lower-weight hooks covering every phase%s"
-          % (kind_wanted.lower(), checked, kind_wanted, note))
+          % (kind_wanted.lower(), checked - exempt, kind_wanted, note))
     return 0
 
 
@@ -309,6 +316,9 @@ def check_pre_rollback():
         if not ph:
             continue
         seen.setdefault((d["kind"], d["metadata"]["name"]), set()).update(ph)
+    if not seen:
+        print("FAIL [pre-rollback]: no hook resource rendered, so nothing was checked")
+        return 1
     bad = 0
     for (kind, name), ph in sorted(seen.items()):
         if "pre-upgrade" in ph and "pre-rollback" not in ph:
@@ -401,7 +411,7 @@ def check_subchart_mounts():
             for key in ("extraVolumes", "extraVolumeMounts"):
                 val = block.get(key)
                 if val:  # non-empty list/map
-                    print("FAIL [subchart-mount]: %s sets %s.%s (%d entr%s) — a subchart mounts from its own typed value, not a parent list"
+                    print("FAIL [subchart-mount]: %s sets %s.%s (%d entr%s) — operators own this list; a chart-owned mount goes in a typed subchart value"
                           % (f, alias, key, len(val), "y" if len(val) == 1 else "ies"))
                     bad += 1
     if bad:
@@ -441,27 +451,43 @@ test_hook_secret_refs_are_lower_weight_hooks() {
   run_check "hook-secret" hook-secret "$INSTALL_RENDER" "$UPGRADE_RENDER"
 }
 
-# Fixture renders, not the chart: the same Job and main-phase Secret, once as an
-# install-phase hook (must still fail) and once upgrade-only (exempt).
+# Fixture renders, not the chart: one Job reading one Secret, varied so each way
+# the exemption could widen is pinned to a failure.
 fixture_render() {
-  # $1 out, $2 hook phases (empty: the Job renders in the main phase)
-  local hook_annotations=""
+  # $1 out, $2 Job hook phases (empty: main phase), $3 Secret: main | none |
+  # "hook <phases> <weight>"
+  local job_ann="" secret_doc=""
   if [ -n "$2" ]; then
-    hook_annotations="  annotations:
+    job_ann="  annotations:
     helm.sh/hook: $2
     helm.sh/hook-weight: \"5\""
   fi
-  cat >"$1" <<FIXEOF
-apiVersion: v1
+  case "$3" in
+    main) secret_doc="apiVersion: v1
 kind: Secret
 metadata:
   name: fixture-secret
----
+---" ;;
+    none) secret_doc="" ;;
+    hook\ *)
+      local _ secret_phases secret_weight
+      read -r _ secret_phases secret_weight <<<"$3"
+      secret_doc="apiVersion: v1
+kind: Secret
+metadata:
+  name: fixture-secret
+  annotations:
+    helm.sh/hook: ${secret_phases}
+    helm.sh/hook-weight: \"${secret_weight}\"
+---" ;;
+  esac
+  cat >"$1" <<FIXEOF
+${secret_doc}
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: fixture-job
-${hook_annotations}
+${job_ann}
 spec:
   template:
     spec:
@@ -473,20 +499,41 @@ spec:
 FIXEOF
 }
 
+# $1 label, $2 install render, $3 upgrade render, $4 the found= status the
+# FAIL line must carry, so a crash (also a nonzero exit) cannot pass for it.
+expect_hook_secret_fail() {
+  local out
+  if out="$(python3 "$CHECKS" hook-secret "$2" "$3" 2>&1)"; then
+    fail "hook-secret-exemption" "$1 passed"
+  elif grep -q "needs=Secret/fixture-secret found=$4" <<<"$out"; then
+    echo "ok   [hook-secret-exemption] $1 fails (found=$4)"
+  else
+    fail "hook-secret-exemption" "$1 failed without found=$4: $out"
+  fi
+}
+
 # @scenario "Only an upgrade-only hook may read a main-phase Secret the install render creates (tasks#894)"
 test_hook_secret_exemption_is_upgrade_only() {
-  local install_hook="$WORKDIR/fixture-install-hook.yaml"
-  local install_main="$WORKDIR/fixture-install-main.yaml"
-  local upgrade_hook="$WORKDIR/fixture-upgrade-hook.yaml"
-  fixture_render "$install_hook" "pre-install,pre-upgrade,pre-rollback"
-  fixture_render "$install_main" ""
-  fixture_render "$upgrade_hook" "pre-upgrade,pre-rollback"
-  if python3 "$CHECKS" hook-secret "$install_hook" "$install_hook" >/dev/null; then
-    fail "hook-secret-exemption" "an install-phase hook reading a main-phase Secret passed"
-  else
-    echo "ok   [hook-secret-exemption] an install-phase hook reading a main-phase Secret fails"
-  fi
-  if python3 "$CHECKS" hook-secret "$install_main" "$upgrade_hook" >/dev/null; then
+  local f="$WORKDIR/fixture" up="pre-upgrade,pre-rollback"
+  fixture_render "$f-install-hook.yaml" "pre-install,$up" main
+  fixture_render "$f-install-main.yaml" "" main
+  fixture_render "$f-install-nosecret.yaml" "" none
+  fixture_render "$f-install-hooksecret.yaml" "" "hook pre-install 0"
+  fixture_render "$f-upgrade-hook.yaml" "$up" main
+  fixture_render "$f-upgrade-sameweight.yaml" "$up" "hook pre-install,$up 5"
+  fixture_render "$f-upgrade-postdelete.yaml" "post-delete" main
+
+  expect_hook_secret_fail "an install-phase hook reading a main-phase Secret" \
+    "$f-install-hook.yaml" "$f-install-hook.yaml" main-phase
+  expect_hook_secret_fail "an upgrade-only hook reading a Secret the install render lacks" \
+    "$f-install-nosecret.yaml" "$f-upgrade-hook.yaml" main-phase
+  expect_hook_secret_fail "an upgrade-only hook reading a Secret that is only a hook on install" \
+    "$f-install-hooksecret.yaml" "$f-upgrade-hook.yaml" main-phase
+  expect_hook_secret_fail "an upgrade-only hook reading a same-weight hook Secret" \
+    "$f-install-main.yaml" "$f-upgrade-sameweight.yaml" "weight 5"
+  expect_hook_secret_fail "a post-delete hook reading a main-phase Secret" \
+    "$f-install-main.yaml" "$f-upgrade-postdelete.yaml" main-phase
+  if python3 "$CHECKS" hook-secret "$f-install-main.yaml" "$f-upgrade-hook.yaml" >/dev/null 2>&1; then
     echo "ok   [hook-secret-exemption] an upgrade-only hook reading an install-rendered Secret passes"
   else
     fail "hook-secret-exemption" "an upgrade-only hook reading an install-rendered Secret failed"

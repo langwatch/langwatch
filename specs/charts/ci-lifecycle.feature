@@ -24,17 +24,18 @@ Feature: Chart CI lifecycle and e2e matrix
     Given the chart renders a hook Job that reads a Secret
     And the Secret is named by a secretKeyRef, an envFrom.secretRef, or a volume secretName
     When lifecycle.sh resolves each named Secret against the rendered resources
-    Then that Secret must itself be a hook running in every phase the Job runs, at a strictly lower weight
+    Then that Secret must itself be a hook running in every phase the Job runs, at a strictly lower weight, except as the next scenario allows
     And a Secret that renders in the main phase is reported as found=main-phase
     And a Secret that does not render at all is reported as found=missing
 
   @regression
   Scenario: Only an upgrade-only hook may read a main-phase Secret the install render creates (tasks#894)
     Given a hook Job reads a Secret that renders in the main phase
-    When the Job's hook runs on an install phase (pre-install or post-install)
+    When the Job's hook runs on an install or delete phase
     Then lifecycle.sh reports it as found=main-phase
-    When the Job's hook runs only on pre-upgrade and pre-rollback, and the install render creates that Secret
+    When the Job's hook runs only on upgrade and rollback phases, and the install render creates that Secret in the main phase
     Then lifecycle.sh accepts it, because the previous release already holds the Secret
+    But a Secret the install render lacks, or renders only as a hook, is still reported as found=main-phase
 
   @regression
   Scenario: Every pre-upgrade hook resource also runs on pre-rollback (tasks#894)
