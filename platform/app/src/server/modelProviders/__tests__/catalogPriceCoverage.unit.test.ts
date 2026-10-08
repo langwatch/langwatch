@@ -68,7 +68,8 @@ const KNOWN_UNPRICED: Record<string, string> = {
  * A router picks another model per request, so it has no rate of its own.
  * The upstream source marks that with a negative rate (-1), whatever the
  * vendor prefix: OpenRouter's own routers carry it, and so do routers other
- * vendors publish under their own name.
+ * vendors publish under their own name. The cost registry treats a negative
+ * rate as no rate, so a router is never billed a negative amount.
  */
 const isVariablePriceRouter = (entry: LLMModelEntry | undefined) =>
   Object.values(entry?.pricing ?? {}).some(

@@ -81,6 +81,22 @@ export function resolveAudioOutputRate(
   return pricing.audioCostPerToken * OPENAI_AUDIO_OUTPUT_MULTIPLIER;
 }
 
+/**
+ * A router picks another model per request and has no rate of its own. The
+ * upstream catalog marks that with a rate of -1 per token, which read as a
+ * price would bill every routed token at minus one dollar. A negative rate is
+ * therefore dropped here, treated as no rate: a router whose rates are all
+ * negative gets no registry entry, so its span stays unpriced instead of
+ * being billed below zero.
+ */
+function withoutNegativeRates<T extends object>(pricing: T): T {
+  return Object.fromEntries(
+    Object.entries(pricing).filter(
+      ([, rate]) => !(typeof rate === "number" && rate < 0),
+    ),
+  ) as T;
+}
+
 const getImportedModelCosts = () => {
   const models = llmModels.models;
 
@@ -103,7 +119,13 @@ const getImportedModelCosts = () => {
     }
   > = {};
 
-  for (const [modelId, model] of Object.entries(models)) {
+  for (const [modelId, catalogModel] of Object.entries(models)) {
+    const model = catalogModel.pricing
+      ? {
+          ...catalogModel,
+          pricing: withoutNegativeRates(catalogModel.pricing),
+        }
+      : catalogModel;
     // Codex models bill the user's ChatGPT plan, so the catalog prices them
     // at zero. A zero-rate entry can never price a span; all it would do is
     // shadow the identically named `openai/<model>` entry (the generated

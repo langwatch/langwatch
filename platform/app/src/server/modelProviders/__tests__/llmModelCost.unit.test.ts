@@ -459,3 +459,53 @@ describe("the ElevenLabs conversational entry", () => {
     });
   });
 });
+
+/**
+ * A router picks another model per request and has no rate of its own; the
+ * upstream catalog marks it with -1 per token. Read as a price, that bills a
+ * routed call below zero, so a negative rate must never reach the registry.
+ */
+describe("variable-price routers", () => {
+  const costs = getStaticModelCosts();
+  const RATE_FIELDS = [
+    "inputCostPerToken",
+    "outputCostPerToken",
+    "cacheReadCostPerToken",
+    "cacheCreationCostPerToken",
+    "cacheCreation1hCostPerToken",
+    "inputAudioCostPerToken",
+    "outputAudioCostPerToken",
+    "inputImageCostPerToken",
+    "outputImageCostPerToken",
+    "inputCostPerCharacter",
+    "inputCostPerSecond",
+  ] as const;
+
+  describe("when the catalog prices a router at -1 per token", () => {
+    /** @scenario A catalog rate below zero is not used as a price */
+    it("keeps every negative rate out of the cost registry", () => {
+      const negative = costs.flatMap((entry) =>
+        RATE_FIELDS.filter((field) => (entry[field] ?? 0) < 0).map(
+          (field) => `${entry.model}.${field}`,
+        ),
+      );
+      expect(negative).toEqual([]);
+    });
+
+    /** @scenario A catalog rate below zero is not used as a price */
+    it("leaves the router out of the registry", () => {
+      expect(
+        costs.filter((entry) =>
+          ["nvidia/switchyard", "typesafe/jev-router"].includes(entry.model),
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario A span naming a router is left unpriced */
+    it("matches no registry entry for a router span", () => {
+      expect(
+        matchModelCostWithFallbacks("nvidia/switchyard", costs),
+      ).toBeUndefined();
+    });
+  });
+});
