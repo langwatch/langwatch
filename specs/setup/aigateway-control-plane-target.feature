@@ -64,7 +64,19 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
     And the recipe shell is a POSIX /bin/sh that looks such names up on PATH only, as dash does
     When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
     Then the variables that file sets are in the environment the service starts with
-    And it does so when the folder path contains spaces
+
+  @unit
+  Scenario: make service loads DEV_ENV_FILE from a path that contains spaces
+    Given DEV_ENV_FILE points at a file whose path contains spaces
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then the variables that file sets are in the environment the service starts with
+
+  @unit
+  Scenario: make service stops when DEV_ENV_FILE exists but fails to load
+    Given DEV_ENV_FILE names a file that exists and fails while it is loaded
+    When "make service svc=aigateway" or "make service-watch svc=aigateway" loads its environment
+    Then the command fails before the service starts
+    And it does not report the file as missing
 
   # --- The gateway's own awareness of how it was configured ---
 

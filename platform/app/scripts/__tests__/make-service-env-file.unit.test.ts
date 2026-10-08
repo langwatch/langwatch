@@ -83,6 +83,7 @@ describe("load-dev-env.sh", () => {
   });
 
   describe("when DEV_ENV_FILE is an absolute path with a space", () => {
+    /** @scenario "make service loads DEV_ENV_FILE from a path that contains spaces" */
     it("exports the variables of that file", () => {
       expect(loadWithSh(path.join(workDir, ".env")).out).toBe("loaded");
     });
@@ -123,8 +124,18 @@ describe("load-dev-env.sh", () => {
 
   for (const target of ["service", "service-watch"]) {
     describe(`when make ${target} gets an env file that fails to load`, () => {
-      it("stops before starting the service", () => {
-        expect(() => runMake(target, `${repoEnvName}.bad`)).toThrow();
+      /** @scenario "make service stops when DEV_ENV_FILE exists but fails to load" */
+      it("stops before starting the service, without calling the file missing", () => {
+        let output = "";
+        try {
+          runMake(target, `${repoEnvName}.bad`);
+        } catch (e) {
+          const err = e as { stdout?: string; stderr?: string };
+          output = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+        }
+        expect(output).toContain("Error");
+        expect(output).not.toContain("service env:");
+        expect(output).not.toContain("not found");
       });
     });
   }
