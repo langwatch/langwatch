@@ -22,18 +22,29 @@ Feature: Router models are never billed a negative cost
   # from that entry, which is a separate matching problem. Either way, no
   # router is ever costed below zero.
 
-  @unit
+  @regression @unit
   Scenario: A catalog rate below zero is not used as a price
     Given the model catalog prices a router at -1 per token
     When the catalog is turned into the cost registry
     Then no registry entry carries a negative rate
     And the router has no registry entry
 
-  @unit
+  @regression @unit
   Scenario: A router name matches no registry price
     Given the model catalog prices "nvidia/switchyard" at -1 per token
     When the cost for model "nvidia/switchyard" is matched
     Then no registry entry is returned
+
+  # A negative rate is dropped field by field, so an entry that states one
+  # negative rate beside real prices keeps those prices. No catalog entry
+  # does this today; the scenario pins the behaviour before one does.
+  @unit
+  Scenario: A single negative rate beside real prices drops only that rate
+    Given a catalog entry prices input and output tokens normally
+    And it states a negative rate for cached input tokens
+    When its pricing is turned into a registry entry
+    Then the input and output prices are kept
+    And there is no rate for cached input tokens
 
   # Every path in the app that writes a cost reads the same registry: the
   # gateway spend rating, the trace span cost, the evaluation cell cost and
@@ -43,25 +54,27 @@ Feature: Router models are never billed a negative cost
   # output tokens. LangEvals reads the catalog separately, into LiteLLM, and
   # is not covered here.
 
-  @unit
+  @regression @unit
   Scenario: A router call through the gateway never lowers spend
     Given the model catalog prices a router at -1 per token
     When a gateway request to that router is rated
     Then the spend it records is not below zero
 
+  # Not a regression scenario: the span path already dropped a cost that
+  # is not above zero, so this guard passes with or without the fix.
   @unit
   Scenario: A router span on a trace is never costed below zero
     Given the model catalog prices a router at -1 per token
     When the cost of a span naming that router is computed
     Then the cost is not below zero
 
-  @unit
+  @regression @unit
   Scenario: An evaluation cell run on a router is never costed below zero
     Given the model catalog prices a router at -1 per token
     When the cost of an evaluation cell that ran that router is computed
     Then the cost is not below zero
 
-  @unit
+  @regression @unit
   Scenario: A DSPy step call on a router is never costed below zero
     Given the model catalog prices a router at -1 per token
     When the cost of a DSPy step's LLM call to that router is computed

@@ -4,6 +4,7 @@ import {
   getStaticModelCosts,
   resolveAudioOutputRate,
   resolveCacheWrite1hRate,
+  withoutNegativeRates,
 } from "../llmModelCost";
 import { llmModels } from "../loadModelCatalog";
 import { VARIABLE_PRICE_ROUTERS } from "./variablePriceRouters.test-helpers";
@@ -485,19 +486,6 @@ describe("the ElevenLabs conversational entry", () => {
  */
 describe("variable-price routers", () => {
   const costs = getStaticModelCosts();
-  const RATE_FIELDS = [
-    "inputCostPerToken",
-    "outputCostPerToken",
-    "cacheReadCostPerToken",
-    "cacheCreationCostPerToken",
-    "cacheCreation1hCostPerToken",
-    "inputAudioCostPerToken",
-    "outputAudioCostPerToken",
-    "inputImageCostPerToken",
-    "outputImageCostPerToken",
-    "inputCostPerCharacter",
-    "inputCostPerSecond",
-  ] as const;
 
   describe("when the catalog prices a router at -1 per token", () => {
     /** @scenario A catalog rate below zero is not used as a price */
@@ -514,10 +502,12 @@ describe("variable-price routers", () => {
 
     /** @scenario A catalog rate below zero is not used as a price */
     it("keeps every negative rate out of the cost registry", () => {
+      // Every numeric field on a registry entry is a rate, so reading the
+      // entry's own values covers a rate field added later as well.
       const negative = costs.flatMap((entry) =>
-        RATE_FIELDS.filter((field) => (entry[field] ?? 0) < 0).map(
-          (field) => `${entry.model}.${field}`,
-        ),
+        Object.entries(entry)
+          .filter(([, rate]) => typeof rate === "number" && rate < 0)
+          .map(([field]) => `${entry.model}.${field}`),
       );
       expect(negative).toEqual([]);
     });
@@ -534,6 +524,23 @@ describe("variable-price routers", () => {
       expect(
         matchModelCostWithFallbacks("nvidia/switchyard", costs),
       ).toBeUndefined();
+    });
+  });
+
+  describe("when a catalog entry states one negative rate beside real prices", () => {
+    /** @scenario A single negative rate beside real prices drops only that rate */
+    it("keeps the real prices and drops only the negative one", () => {
+      const pricing = withoutNegativeRates({
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+        inputCacheReadPerToken: -1,
+      });
+
+      expect(pricing).toEqual({
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+      });
+      expect(pricing).not.toHaveProperty("inputCacheReadPerToken");
     });
   });
 });

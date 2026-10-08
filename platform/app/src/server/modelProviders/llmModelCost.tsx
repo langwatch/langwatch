@@ -93,7 +93,7 @@ export function resolveAudioOutputRate(
  * Partial because the dropped keys include the two the catalog type marks as
  * required, so every read after this has to allow for a missing rate.
  */
-function withoutNegativeRates(
+export function withoutNegativeRates(
   pricing: LLMModelPricing,
 ): Partial<LLMModelPricing> {
   return Object.fromEntries(
