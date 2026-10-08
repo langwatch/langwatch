@@ -27,26 +27,6 @@ function fixture() {
 }
 
 describe("workflow linkage persistence", () => {
-  /** @scenario "Linked features discover workflow fields without reading workflow tables" */
-  it("loads current graph fields in one project-scoped batch excluding archived graphs", async () => {
-    const { workflow, repository } = fixture();
-    workflow.findMany.mockResolvedValue([
-      { id: "wf-1", currentVersion: { dsl: { nodes: [] } } },
-      { id: "wf-2", currentVersion: null },
-    ]);
-
-    await expect(
-      repository.findFieldSources({ projectId: "project-1", workflowIds: ["wf-1", "wf-2"] }),
-    ).resolves.toEqual([
-      { id: "wf-1", dsl: { nodes: [] } },
-      { id: "wf-2", dsl: void 0 },
-    ]);
-    expect(workflow.findMany).toHaveBeenCalledExactlyOnceWith({
-      where: { id: { in: ["wf-1", "wf-2"] }, projectId: "project-1", archivedAt: null },
-      select: { id: true, currentVersion: { select: { dsl: true } } },
-    });
-  });
-
   it("keeps missing or archived related graphs absent", async () => {
     const { workflow, repository } = fixture();
 

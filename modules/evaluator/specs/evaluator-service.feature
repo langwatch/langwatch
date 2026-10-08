@@ -71,3 +71,10 @@ Feature: Evaluator service boundary
     When a caller switches it off as an evaluator
     Then the workflow's evaluator flag is cleared
     And the evaluator that wrapped it is archived, if one did
+
+  @unit
+  Scenario: A workflow's archive preview names its evaluators at the workflow's grain
+    Given a member who may view workflows but not evaluations
+    When the archive dialog asks which evaluators the workflow backs
+    Then evaluators.listByWorkflow answers under workflows:view
+    And it names each live evaluator by id and name only

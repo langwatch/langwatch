@@ -35,7 +35,6 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
-    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",

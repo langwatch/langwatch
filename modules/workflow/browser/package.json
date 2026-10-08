@@ -39,6 +39,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-client": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",

@@ -32,7 +32,6 @@ function process_(role: "api" | "worker") {
       dataset: createApiFixture({}, "DatasetApi"),
       agent: createApiFixture({}, "AgentApi"),
       "model-provider": createApiFixture({}, "ModelProviderApi"),
-      experiment: createApiFixture({}, "ExperimentApi"),
       monitor: createApiFixture({}, "MonitorApi"),
       secret: createApiFixture({}, "SecretApi"),
       organization: createApiFixture({}, "OrganizationApi"),

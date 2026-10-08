@@ -76,6 +76,9 @@
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
+      "path": "../../scenario/client/tsconfig.build.json"
+    },
+    {
       "path": "../../secret/contract/tsconfig.build.json"
     },
     {

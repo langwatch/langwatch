@@ -22,6 +22,7 @@ import {
 } from "./transport/experiment-v3-legacy.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
+import { experimentWorkflowEvaluationRest } from "./transport/experiment-workflow-evaluation.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 
@@ -44,6 +45,8 @@ export const experimentProcessModule = defineProcessModule("experiment")
     experimentBatchLogRest,
     // `/api/dataset/evaluate`, the SDK's dataset evaluation, in dataset's namespace.
     experimentDatasetEvaluationRest,
+    // `/api/workflows/:id/evaluate`, the workflow evaluate door, in workflow's namespace.
+    experimentWorkflowEvaluationRest,
     experimentTrpcTransport,
     batchRecordTrpcTransport,
   )

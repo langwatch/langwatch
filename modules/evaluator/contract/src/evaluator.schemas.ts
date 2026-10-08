@@ -139,6 +139,9 @@ export const evaluatorRelatedEntitiesSchema = z.object({
   workflow: z.object({ id: z.string(), name: z.string() }).nullable(),
 });
 
+/** One evaluator a workflow backs, as a workflow's archive preview names it. */
+export const evaluatorByWorkflowSchema = z.object({ id: z.string(), name: z.string() });
+
 /** What a cascade archive took with it. */
 export const evaluatorCascadeArchiveSchema = z.object({
   evaluator: evaluatorSchema,

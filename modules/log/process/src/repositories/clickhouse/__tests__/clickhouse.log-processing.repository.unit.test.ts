@@ -102,21 +102,6 @@ describe("ClickHouseLogProcessingAdapter", () => {
     });
   });
 
-  describe("given the port durable processing appends through", () => {
-    /** @scenario "The append surface offers no read" */
-    it("carries no trace-scoped read", () => {
-      const appendOnly = ClickHouseCanonicalLogRecordAppendRepository.create({
-        resolveClient: async () => client(),
-        defaultRetentionDays: 49,
-      });
-
-      // Named against the object rather than the type, because the type is
-      // what a `defaultReadLimit` reintroduced here would satisfy again
-      // without anything failing.
-      expect("getLogsByTraceId" in appendOnly).toBe(false);
-    });
-  });
-
   describe("given the full repository and the append-only one", () => {
     /** @scenario "Both graphs append through one implementation" */
     it("runs the same append path for both", async () => {
@@ -127,7 +112,6 @@ describe("ClickHouseLogProcessingAdapter", () => {
       await ClickHouseCanonicalLogRecordRepository.create({
         resolveClient: async () => client({ insert: wideInsert }),
         defaultRetentionDays: 49,
-        defaultReadLimit: 100,
       }).ensureLogRecord(one);
       await ClickHouseCanonicalLogRecordAppendRepository.create({
         resolveClient: async () => client({ insert: narrowInsert }),

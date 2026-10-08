@@ -9,11 +9,9 @@ describe("CanonicalLogRecordStore", () => {
   it("delegates a projection batch as one repository operation", async () => {
     const ensureLogRecord = vi.fn(async () => undefined);
     const ensureLogRecords = vi.fn(async () => undefined);
-    const getLogsByTraceId = vi.fn(async () => []);
     const repository = {
       ensureLogRecord,
       ensureLogRecords,
-      findLogsByTraceId: getLogsByTraceId,
     } satisfies CanonicalLogRecordRepository;
     const records = [
       { recordId: "a".repeat(64) },

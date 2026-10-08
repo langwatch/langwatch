@@ -8,7 +8,6 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
@@ -29,7 +28,6 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
-      experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
       secrets: createApiFixture<SecretApi>({}, "SecretApi"),

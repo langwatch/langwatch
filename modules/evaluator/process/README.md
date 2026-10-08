@@ -335,7 +335,7 @@ type Response = z.infer<typeof archivedEvaluatorResponseSchema>; // ../contract/
 
 ### `evaluators`
 
-Contract `../contract/src/evaluator.trpc.ts:30`, router `src/transport/evaluator.trpc.ts:28`.
+Contract `../contract/src/evaluator.trpc.ts:31`, router `src/transport/evaluator.trpc.ts:28`.
 
 | Procedure                          | Kind     | Gate                            | Input                                   | Output                            |
 | ---------------------------------- | -------- | ------------------------------- | --------------------------------------- | --------------------------------- |
@@ -345,6 +345,7 @@ Contract `../contract/src/evaluator.trpc.ts:30`, router `src/transport/evaluator
 | `evaluators.create`                | mutation | Permission `evaluations:manage` | `evaluatorApiCreateInputSchema`         | `evaluatorSchema`                 |
 | `evaluators.update`                | mutation | Permission `evaluations:manage` | `evaluatorApiUpdateInputSchema`         | `evaluatorSchema`                 |
 | `evaluators.getRelatedEntities`    | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorRelatedEntitiesSchema`  |
+| `evaluators.listByWorkflow`        | query    | Permission `workflows:view`     | `evaluatorApiWorkflowInputSchema`       | inline                            |
 | `evaluators.cascadeArchive`        | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorCascadeArchiveSchema`   |
 | `evaluators.delete`                | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorSchema`                 |
 | `evaluators.getWorkflowFields`     | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorWorkflowFieldsSchema`   |

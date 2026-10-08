@@ -67,7 +67,14 @@ vi.mock("../../../../behavior/workflow-api.ts", () => {
 vi.mock("@langwatch/evaluator-client", () => ({
   evaluatorClient: {
     evaluators: {
-      getAll: { useQuery: () => ({ data: state.evaluators, isLoading: false }) },
+      listByWorkflow: {
+        useQuery: ({ workflowId }: { workflowId: string }) => ({
+          data: state.evaluators
+            .filter((evaluator) => evaluator.workflowId === workflowId)
+            .map(({ id, name }) => ({ id, name })),
+          isLoading: false,
+        }),
+      },
     },
   },
 }));
@@ -158,6 +165,7 @@ describe("given the workflows library", () => {
   });
 
   describe("when a workflow with evaluators bound to it is deleted", () => {
+    /** @scenario "The archive dialog names the evaluators the workflow backs" */
     it("names what goes with it before the reader confirms, and takes the cascade", async () => {
       const user = userEvent.setup();
       state.workflows = [workflowRow()];

@@ -52,4 +52,3 @@ export const LogApi = moduleApi<LogApi>()("log");
 
 /** Product ceilings, not deployment facts: no environment spells them. */
 export const LOG_DEFAULT_RETENTION_DAYS = 30;
-export const LOG_DEFAULT_READ_LIMIT = 100;

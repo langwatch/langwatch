@@ -8,7 +8,6 @@ function createRepository(resolveClient: () => Promise<LogClickHouseClient>) {
   return ClickHouseCanonicalLogRecordRepository.create({
     resolveClient,
     defaultRetentionDays: 30,
-    defaultReadLimit: 100,
   });
 }
 
@@ -16,13 +15,6 @@ function clientWithInsert(insert: LogClickHouseClient["insert"]): LogClickHouseC
   return {
     insert,
     query: async () => ({ json: async () => [] }),
-  };
-}
-
-function clientWithQuery(query: LogClickHouseClient["query"]): LogClickHouseClient {
-  return {
-    query,
-    insert: async () => undefined,
   };
 }
 
@@ -143,79 +135,5 @@ describe("ClickHouseCanonicalLogRecordRepository", () => {
     expect(insert).toHaveBeenCalledTimes(2);
     expect(insert.mock.calls[0]![0].values).toHaveLength(2);
     expect(insert.mock.calls[1]![0].values).toHaveLength(2);
-  });
-
-  it("bounds a trace's log read by time and limit", async () => {
-    const query = vi.fn<
-      (args: {
-        query: string;
-        query_params: Record<string, unknown>;
-      }) => Promise<{ json: () => Promise<unknown[]> }>
-    >(async () => ({ json: async () => [] }));
-    const repository = createRepository(async () => clientWithQuery(query));
-
-    await repository.findLogsByTraceId({
-      tenantId: "project_test",
-      traceId: "b".repeat(32),
-      occurredAtMs: 1_700_000_000_000,
-      limit: 101,
-    });
-
-    const request = query.mock.calls[0]![0];
-    expect(request.query).toContain("FROM log_records FINAL");
-    expect(request.query).toContain("TimeUnixMs >=");
-    expect(request.query).toContain("TimeUnixMs <=");
-    expect(request.query).toContain("LIMIT {limit:UInt64}");
-    expect(request.query_params).toMatchObject({ limit: 101 });
-  });
-
-  describe("when a stored row carries its event name on the EventName column", () => {
-    function readOneRow(row: Record<string, unknown>) {
-      const query = vi.fn(async () => ({ json: async () => [row] }));
-      const repository = createRepository(async () => clientWithQuery(query));
-      return repository.findLogsByTraceId({
-        tenantId: "project_test",
-        traceId: "b".repeat(32),
-        occurredAtMs: 1_700_000_000_000,
-        limit: 10,
-      });
-    }
-
-    const storedRow = (over: Record<string, unknown>) => ({
-      TraceId: "b".repeat(32),
-      SpanId: "c".repeat(16),
-      TimeUnixMs: 1_700_000_000_000,
-      BodyText: null,
-      AttributesFlatJson: "{}",
-      ResourceAttributesFlatJson: "{}",
-      ScopeName: "codex_exec",
-      ScopeVersion: "0.146.0",
-      EventName: "",
-      ...over,
-    });
-
-    /** @scenario "Codex events are rendered whichever way the agent named them" */
-    it("backfills event.name so attribute-keyed readers can recognise the record", async () => {
-      const [log] = await readOneRow(storedRow({ EventName: "codex.tool_result" }));
-
-      expect(log?.attributes["event.name"]).toBe("codex.tool_result");
-    });
-
-    it("leaves an event.name already in the attributes alone", async () => {
-      const [log] = await readOneRow(
-        storedRow({
-          EventName: "codex.tool_result",
-          AttributesFlatJson: '{"event.name":"api_request"}',
-        }),
-      );
-
-      expect(log?.attributes["event.name"]).toBe("api_request");
-    });
-
-    it("adds no event.name when the column is empty, so a nameless record stays nameless", async () => {
-      const [log] = await readOneRow(storedRow({}));
-
-      expect(log?.attributes["event.name"]).toBeUndefined();
-    });
   });
 });

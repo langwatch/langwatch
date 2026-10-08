@@ -3,7 +3,7 @@
  * contract (§3.4). Segment names are the React Query cache key.
  */
 
-import type { agentTrpc, httpProxyTrpc } from "@langwatch/agent-contract";
+import type { agentTrpc } from "@langwatch/agent-contract";
 import {
   createModuleApi,
   type ContractApiMap,
@@ -22,7 +22,6 @@ import type { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow
 export type WorkflowApiMap = ContractApiMap<typeof workflowTrpc> &
   ContractApiMap<typeof workflowOptimizationTrpc> &
   ContractApiMap<typeof agentTrpc> &
-  ContractApiMap<typeof httpProxyTrpc> &
   ContractApiMap<typeof datasetRecordTrpc> &
   ContractApiMap<typeof evaluatorTrpc> &
   ContractApiMap<typeof experimentsTrpc> &

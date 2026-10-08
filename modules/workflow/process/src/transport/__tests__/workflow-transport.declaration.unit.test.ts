@@ -124,7 +124,6 @@ describe("the workflow module's transport declarations", () => {
         ["GET", "/:id", "getApiWorkflowsById", "workflows:view"],
         ["PATCH", "/:id", "patchApiWorkflowsById", "workflows:update"],
         ["DELETE", "/:id", "deleteApiWorkflowsById", "workflows:manage"],
-        ["POST", "/:id/evaluate", "postApiWorkflowsByIdEvaluate", "workflows:create"],
       ]);
       expect(createWorkflowRest().router().namespace).toBe("workflows");
     });

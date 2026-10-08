@@ -15,7 +15,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
-import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -58,8 +57,6 @@ import {
   type WorkflowPushToCopies,
   type WorkflowDsl,
   type WorkflowEvaluatorFields,
-  type WorkflowEvaluationRequest,
-  type WorkflowEvaluationStarted,
   type WorkflowLineageRow,
   type WorkflowListRow,
   type PublishedWorkflowAnswer,
@@ -242,11 +239,6 @@ interface WorkflowCommitMessageWriter {
   generate(input: { projectId: string; previousDsl: string; nextDsl: string }): Promise<string>;
 }
 
-/** Starting one evaluation run through the deployment's evaluations pipeline. */
-interface WorkflowEvaluationTrigger {
-  trigger(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
-}
-
 /** One Monaco completion for the studio's code editor. */
 interface WorkflowCodeCompletions {
   complete(input: {
@@ -331,7 +323,6 @@ interface WorkflowInfrastructure {
   lineage: WorkflowLineageReads;
   publications: WorkflowPublicationReads;
   commitMessages: WorkflowCommitMessageWriter;
-  evaluations: WorkflowEvaluationTrigger;
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
@@ -599,8 +590,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     authz: AuthzApi,
     /** Mints the key a run calls LangWatch back with. */
     apiKeys: ApiKeyApi,
-    /** Registers and runs a workflow's evaluation over its batch. */
-    experiments: ExperimentApi,
     /** The monitors an archive preview names, the ones its evaluators back. */
     monitors: MonitorApi,
     /** Stores an HTTP node's typed token; reads the listed secrets a Studio run receives. */
@@ -673,9 +662,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
       agents: setup.dependencies.agents,
       workflowRows: setup.repositories.workflowRows,
-      evaluations: {
-        trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
-      },
       lineage: lineageOf({
         rows: setup.repositories.lineage,
         linked: WorkflowLinkedRowsService.create({
@@ -1074,11 +1060,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
       inputs: { ...input.body },
       principal: input.principal,
     });
-  }
-
-  /** Starts one evaluation run of a committed version. */
-  async triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
-    return this.#infrastructure.evaluations.trigger(input);
   }
 
   // -- the Studio's own save and copy ----------------------------------------

@@ -51,6 +51,6 @@ Anything else experiment needs belongs to another module and is reached through 
 
 ## Who depends on experiment
 
-[langy](../langy/README.md), [ops](../ops/README.md), [workflow](../workflow/README.md) (as a peer).
+[langy](../langy/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

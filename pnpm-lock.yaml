@@ -16163,9 +16163,6 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../experiment/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

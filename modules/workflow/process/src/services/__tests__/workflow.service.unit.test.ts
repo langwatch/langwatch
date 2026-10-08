@@ -48,9 +48,6 @@ const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
 });
 
 class FakeWorkflowRepository extends WorkflowRepository {
-  async findFieldSources(): Promise<never> {
-    throw new Error("not used by this test");
-  }
   async findSummaries(): Promise<never> {
     throw new Error("not used by this test");
   }

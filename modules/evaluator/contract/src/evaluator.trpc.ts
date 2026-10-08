@@ -16,6 +16,7 @@ import {
   evaluatorApiUpdateInputSchema,
   evaluatorApiWorkflowInputSchema,
   evaluatorApiWorkflowToggleInputSchema,
+  evaluatorByWorkflowSchema,
   evaluatorCascadeArchiveSchema,
   evaluatorCopySchema,
   evaluatorHistoryEntrySchema,
@@ -54,6 +55,11 @@ export const evaluatorTrpc = defineTrpcContract("evaluators")
   .query("getRelatedEntities")
   .withInput(evaluatorApiEvaluatorIdInputSchema)
   .withOutput(evaluatorRelatedEntitiesSchema)
+
+  /** The live evaluators a workflow backs, named for its archive preview. */
+  .query("listByWorkflow")
+  .withInput(evaluatorApiWorkflowInputSchema)
+  .withOutput(evaluatorByWorkflowSchema.array())
 
   /** Archives the evaluator and its workflow; monitor removes its rows on the fact. */
   .mutation("cascadeArchive")

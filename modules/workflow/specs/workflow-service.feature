@@ -1,14 +1,6 @@
 Feature: Workflow service boundary
 
   @unit
-  Scenario: Linked features discover workflow fields without reading workflow tables
-    Given a project has valid, invalid and archived workflow graphs
-    When a peer lists fields for those workflow identifiers
-    Then one project-scoped batch excludes archived workflows
-    And invalid graphs report unresolved fields
-    And valid graphs preserve all declared input and output identifiers
-
-  @unit
   Scenario: A failed peer copy removes only the newly copied workflow
     Given a copied workflow has current and latest version pointers and version parentage
     When the peer deletes its uncommitted workflow in the target project
@@ -186,13 +178,6 @@ Feature: Workflow service boundary
     When Workflow copies the definition into another project
     Then it calls the canonical Dataset service
     And it does not access the Dataset repository
-
-  @unit
-  Scenario: Evaluation remains application composition
-    Given a caller requests `/workflows/:id/evaluate`
-    When the API handles the request
-    Then it composes Workflow version selection with Evaluation execution
-    And Workflow does not own the evaluation run lifecycle
 
   @unit
   Scenario: Execution dispatch is a Workflow server concern

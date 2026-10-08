@@ -10,6 +10,7 @@ export * from "./experiment-run.ts";
 export * from "./experiment.responses.ts";
 export * from "./experiment.rest.ts";
 export * from "./experiment-workbench-rest.ts";
+export * from "./experiment-workflow-evaluation-rest.ts";
 export * from "./batch-record.trpc.ts";
 export * from "./experiment.trpc.ts";
 export * from "./experiment-run-eventing.commands.ts";

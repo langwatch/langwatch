@@ -83,6 +83,17 @@ export const evaluatorTrpcTransport: TrpcRouterDeclaration<
     app.evaluators().getRelatedEntities({ id: input.id, projectId: input.projectId }),
   )
 
+  // Asked at the workflow's grain: whoever may archive a workflow sees what goes with it.
+  .procedure("listByWorkflow")
+  .withPermission("workflows:view")
+  .handle(async ({ app, input }) =>
+    (
+      await app
+        .evaluators()
+        .listByWorkflow({ workflowId: input.workflowId, projectId: input.projectId })
+    ).map(({ id, name }) => ({ id, name })),
+  )
+
   .procedure("cascadeArchive")
   .withPermission("evaluations:manage")
   .handle(async ({ app, input }) =>

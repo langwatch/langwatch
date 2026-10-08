@@ -6,7 +6,7 @@ The server half of [experiment](../README.md). Experiments: saved definitions, t
 
 ## Installation
 
-`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:28`.
+`defineProcessModule("experiment").withRepositories(experimentRepositories).withApi(ExperimentModule).withTransports(experimentV3Rest, experimentRest, experimentInitRest, experimentDspyStepsRest, experimentWorkbenchRunRest, experimentV3LegacyRest, experimentWorkbenchRunLegacyRest, experimentBatchLogRest, experimentDatasetEvaluationRest, experimentWorkflowEvaluationRest, experimentTrpcTransport, batchRecordTrpcTransport).withTransportFacts(…).withEventing(experimentRunProcessingEventing).withEventing(experimentLifecycleEventing)`, `src/experiment.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -828,6 +828,30 @@ Answers at `/api/experiments/abort`, `/api/v1/experiments/abort`; also, undocume
 ```typescript
 type Body = z.infer<typeof abortExperimentRunRequestSchema>; // ../contract/src/workbench/execution/types.ts:215
 type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract/src/workbench/execution/types.ts:220
+```
+
+### `experimentWorkflowEvaluationRest`
+
+|             |                                                           |
+| ----------- | --------------------------------------------------------- |
+| Declared at | `src/transport/experiment-workflow-evaluation.rest.ts:27` |
+| Base URL    | `/api/workflows`, twin `/api/v1/workflows`                |
+| Addressing  | dated                                                     |
+| Credential  | project                                                   |
+| Versions    | `2026-08-07`                                              |
+
+#### `POST /:id/evaluate` · `postApiWorkflowsByIdEvaluate`
+
+Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.
+
+Permission `workflows:create or evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:32`.
+
+Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
+
+```typescript
+type Params = z.infer<typeof experimentWorkflowEvaluateParamsSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:8
+type Body = z.infer<typeof experimentWorkflowEvaluateSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:19
+type Response = z.infer<typeof experimentWorkflowEvaluationStartedSchema>; // ../contract/src/experiment-workflow-evaluation-rest.ts:11
 ```
 
 ### `experimentRest`

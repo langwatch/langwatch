@@ -1,9 +1,9 @@
-import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
- * `POST /api/workflows/:id/evaluate` over the runtime a process mounts it on:
- * the statuses and bodies the public API has answered since it shipped.
+ * `POST /api/workflows/:id/evaluate`, served by experiment, over the runtime a
+ * process mounts it on: the statuses and bodies the public API has answered since it shipped.
  */
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -11,16 +11,16 @@ import {
   projectRestFacts,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authorization";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   WorkflowVersionRequiredError,
-  type WorkflowApi,
   type WorkflowEvaluationStarted,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { createWorkflowRest } from "../workflow.rest.ts";
+import { experimentWorkflowEvaluationRest } from "../experiment-workflow-evaluation.rest.ts";
 
 const started: WorkflowEvaluationStarted = {
   runId: "run_1",
@@ -30,13 +30,13 @@ const started: WorkflowEvaluationStarted = {
 };
 
 function buildApi(options: {
-  triggerEvaluation: WorkflowApi["triggerEvaluation"];
+  triggerEvaluation: ExperimentApi["triggerWorkflowEvaluation"];
   /** What the key holds; every permission when absent. A missing one refuses as the door does. */
   held?: readonly AuthzPermission[];
 }) {
-  const app = createApiFixture<WorkflowApi>(
-    { triggerEvaluation: options.triggerEvaluation },
-    "WorkflowApi",
+  const app = createApiFixture<ExperimentApi>(
+    { triggerWorkflowEvaluation: options.triggerEvaluation },
+    "ExperimentApi",
   );
 
   const runtime = createRestRuntime({
@@ -52,7 +52,7 @@ function buildApi(options: {
     },
   });
 
-  const hono = runtime.mount(createWorkflowRest().router(), {
+  const hono = runtime.mount(experimentWorkflowEvaluationRest.router(), {
     app: () => app,
     credential: "project",
     onError: canonicalErrorResponse,
@@ -189,7 +189,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
   describe("given a key that cannot read the run it would start", () => {
     /** @scenario A workflows-only key cannot start a run it could not read */
     it("refuses 403 naming evaluations:view before the trigger is reached", async () => {
-      const triggerEvaluation = vi.fn<WorkflowApi["triggerEvaluation"]>(async () => started);
+      const triggerEvaluation = vi.fn<ExperimentApi["triggerWorkflowEvaluation"]>(
+        async () => started,
+      );
 
       const response = await post(
         buildApi({ triggerEvaluation, held: ["workflows:create"] }),

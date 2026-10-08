@@ -4,10 +4,10 @@ import {
   type HttpHeader,
   type HttpMethod,
 } from "@langwatch/agent-contract";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useCallback } from "react";
 
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project.ts";
-import { workflowApi } from "../../workflow-api.ts";
 
 export function useHttpTest({
   url,
@@ -30,7 +30,7 @@ export function useHttpTest({
   agentId?: string;
 }) {
   const { project } = useOrganizationTeamProject();
-  const mutation = workflowApi.httpProxy.execute.useMutation();
+  const mutation = scenarioClient.scenarios.testHttpAgent.useMutation();
 
   const handleTest = useCallback(
     async (templateVariables: Record<string, unknown>) => {
