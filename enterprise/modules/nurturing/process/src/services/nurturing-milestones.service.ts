@@ -8,6 +8,7 @@ import type { NurturingClaimRepository } from "../repositories/nurturing-claim.r
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
 import {
   evaluationCompletedSignal,
+  seededAtRead,
   simulationRunFinishedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
 
@@ -56,7 +57,11 @@ export class NurturingMilestonesService {
       projectId: data.projectId,
     });
     return organizations.flatMap((organization) =>
-      evaluationCompletedSignal({ data, aggregateId, organization }),
+      evaluationCompletedSignal({
+        data,
+        aggregateId,
+        organization: { ...organization, seeded: seededAtRead(organization) },
+      }),
     );
   }
 
@@ -76,7 +81,12 @@ export class NurturingMilestonesService {
       projectId: tenantId,
     });
     return organizations.flatMap((organization) =>
-      simulationRunFinishedSignal({ data, aggregateId, tenantId, organization }),
+      simulationRunFinishedSignal({
+        data,
+        aggregateId,
+        tenantId,
+        organization: { ...organization, seeded: seededAtRead(organization) },
+      }),
     );
   }
 }

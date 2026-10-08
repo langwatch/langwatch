@@ -36,14 +36,14 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "nurturing",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, never a fold (round 46 E1, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40)",
   },
   {
     table: "Team",
     owner: "organization",
     readers: ["data-retention", "data-privacy", "instant-eval-judge", "nurturing"],
     reason:
-      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team (round 46 E1, R40)",
+      "data retention and data privacy read a team's organisation to place a project or a team-level rule, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's organisation through its team and an organisation's teams for its earliest project (round 46 E1, R40)",
   },
   {
     table: "OrganizationUser",

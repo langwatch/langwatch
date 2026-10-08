@@ -66,7 +66,27 @@ export class PrismaNurturingMilestonesRepository
       where: { organizationId },
       select: ORGANIZATION_STATE,
     });
-    return organization ? [organization] : [];
+    if (!organization) return [];
+    const firstProjectCreatedAt = await this.firstProjectCreatedAt({ organizationId });
+    return [{ ...organization, firstProjectCreatedAt }];
+  }
+
+  /** The organization's earliest project, archived ones included, through its teams. */
+  private async firstProjectCreatedAt({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    const teams = await this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    if (teams.length === 0) return null;
+    const { _min } = await this.prisma.project.aggregate({
+      where: { teamId: { in: teams.map(({ id }) => id) } },
+      _min: { createdAt: true },
+    });
+    return _min.createdAt ? _min.createdAt.getTime() : null;
   }
 
   private async organizationOf({ projectId }: { projectId: string }): Promise<string | undefined> {
