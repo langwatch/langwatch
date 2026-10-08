@@ -14,9 +14,13 @@ Feature: Router models are never billed a negative cost
   #
   # A negative rate is treated as no rate when the catalog becomes the cost
   # registry. A router whose rates are all negative then has no registry
-  # entry, so it is costed the way any model the catalog cannot price is: the
-  # gateway rates the request at zero, an evaluation cell gets no cost, and a
-  # trace span records a cost of zero. None of them goes below zero.
+  # entry of its own, so it is costed the way any other model without one is.
+  # When its id matches no other entry, the gateway rates the request at zero,
+  # an evaluation cell gets no cost, and a trace span records a cost of zero.
+  # When the fallback matcher finds another model's entry by prefix (for
+  # example openrouter/pareto-code reaching unbiased/pareto), it is priced
+  # from that entry, which is a separate matching problem. Either way, no
+  # router is ever costed below zero.
 
   @unit
   Scenario: A catalog rate below zero is not used as a price
