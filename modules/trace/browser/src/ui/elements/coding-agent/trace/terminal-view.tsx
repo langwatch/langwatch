@@ -19,7 +19,6 @@ import {
 } from "react";
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
-import { readableDate } from "../../../../model/coding-agent/short-date.ts";
 import {
   CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,
@@ -47,6 +46,7 @@ import {
   findCacheRebuilds,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
+import { readableDate } from "../../../../model/display-formatters.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
 import { TerminalPatch } from "./terminal-patch.tsx";
