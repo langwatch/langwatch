@@ -188,6 +188,7 @@ import type {
   OrganizationSeatLicense,
   OrganizationPlanUser,
 } from "../services/organization-seat-license.service.ts";
+import { OrganizationSignInPolicyService } from "../services/organization-sign-in-policy.service.ts";
 import { OrganizationSignalsService } from "../services/organization-signals.service.ts";
 import type { OrganizationSignals } from "../services/organization-signals.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
@@ -245,6 +246,7 @@ export interface OrganizationCaller {
 /** What the process composes this feature's application from. */
 export interface ServerOrganizationAppDependencies {
   organizations: OrganizationEntityService;
+  signInPolicies: OrganizationSignInPolicyService;
   membership: OrganizationMembershipService;
   groups: OrganizationGroupScopeService;
   /** The one permission service every door on this application asks. */
@@ -378,6 +380,9 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const groups = OrganizationGroupScopeService.create({ organizations });
     const application = new OrganizationModule({
       organizations,
+      signInPolicies: OrganizationSignInPolicyService.create({
+        repository: setup.repositories.organization,
+      }),
       membership,
       groups,
       permissions: setup.dependencies.permissions,
@@ -645,44 +650,44 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
    * beforehand, so the answer is carried through rather than dropped here.
    */
   getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting> {
-    return this.#dependencies.organizations.getJoinSetting(input);
+    return this.#dependencies.signInPolicies.getJoinSetting(input);
   }
 
   saveJoinSetting(input: {
     organizationId: string;
     setting: OrganizationJoinSetting;
   }): Promise<void> {
-    return this.#dependencies.organizations.saveJoinSetting(input);
+    return this.#dependencies.signInPolicies.saveJoinSetting(input);
   }
 
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }> {
-    return this.#dependencies.organizations.getSessionPolicy(input);
+    return this.#dependencies.signInPolicies.getSessionPolicy(input);
   }
 
   getSignInSecurityPolicy(input: { organizationId: string }): Promise<SignInSecurityPolicy> {
-    return this.#dependencies.organizations.getSignInSecurityPolicy(input);
+    return this.#dependencies.signInPolicies.getSignInSecurityPolicy(input);
   }
 
   updateSignInSecurityPolicy(input: {
     organizationId: string;
     policy: SignInSecurityPolicy;
   }): Promise<void> {
-    return this.#dependencies.organizations.updateSignInSecurityPolicy(input);
+    return this.#dependencies.signInPolicies.updateSignInSecurityPolicy(input);
   }
 
   findSignInSecurityPoliciesForUser(input: { userId: string }): Promise<SignInSecurityPolicy[]> {
-    return this.#dependencies.organizations.findSignInSecurityPoliciesForUser(input);
+    return this.#dependencies.signInPolicies.findSignInSecurityPoliciesForUser(input);
   }
 
   findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]> {
-    return this.#dependencies.organizations.findConfiguredSignInSecurityPolicies();
+    return this.#dependencies.signInPolicies.findConfiguredSignInSecurityPolicies();
   }
 
   saveSessionPolicy(input: {
     organizationId: string;
     maxSessionDurationDays: number;
   }): Promise<void> {
-    return this.#dependencies.organizations.saveSessionPolicy(input);
+    return this.#dependencies.signInPolicies.saveSessionPolicy(input);
   }
 
   getPricing(input: {
@@ -951,7 +956,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   findBySsoDomain(
     input: Readonly<{ domain: string }>,
   ): Promise<{ id: string; name: string; ssoProvider: string | null } | null> {
-    return this.#dependencies.organizations.findBySsoDomain(input);
+    return this.#dependencies.signInPolicies.findBySsoDomain(input);
   }
 
   createSsoDomainMembership(

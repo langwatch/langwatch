@@ -1,5 +1,6 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import type { OrganizationApi, OrganizationServerConfig } from "@langwatch/organization-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
@@ -21,7 +22,11 @@ import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-wor
 import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
-export const organizationProcessModule = defineProcessModule("organization")
+export const organizationProcessModule: PublishedProcessModule<
+  "organization",
+  OrganizationApi,
+  OrganizationServerConfig
+> = defineProcessModule("organization")
   .withRepositories(organizationRepositories)
   .withApi(OrganizationModule)
   .withTransports(
