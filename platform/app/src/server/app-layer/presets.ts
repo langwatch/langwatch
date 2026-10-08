@@ -37,7 +37,10 @@ import {
 } from "@ee/sso/sso-connection-reads.prisma.repository";
 import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
 import { SsoConnectionTeardownDispatcher } from "@ee/sso/sso-connection-teardown";
-import { LicenseDomainClaimAuthority } from "@ee/sso/sso-self-serve-adapters";
+import {
+  LicenseDomainClaimAuthority,
+  PrismaOrganizationCount,
+} from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -197,6 +200,7 @@ import {
 } from "./automations/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
+import { createSlackDestinationResolver } from "./automations/slack-integration/slack-integration.wiring";
 import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
@@ -838,8 +842,8 @@ export function initializeDefaultApp(options?: {
     notifier: liveTriggerNotifier,
   };
   const triggerTemplates = {
-    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-      testFireTrigger(triggerTemplateDeps, input),
+    testFire: (input: Parameters<typeof testFireTrigger>[0]["input"]) =>
+      testFireTrigger({ deps: triggerTemplateDeps, input }),
   };
   const tokenizer = new TokenizerService(
     config.disableTokenization
@@ -1059,7 +1063,9 @@ export function initializeDefaultApp(options?: {
       bindings: ssoBreakGlass(),
     }),
     ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
-    ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
+    ssoLicenseAuthority: new LicenseDomainClaimAuthority({
+      organizations: new PrismaOrganizationCount(prisma),
+    }),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would
@@ -1354,6 +1360,8 @@ export function initializeDefaultApp(options?: {
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
             sendSlackBot: postSlackChatMessage,
+            // ADR-093 §5a: a report's connection, else its own legacy secret.
+            resolveSlackDestination: createSlackDestinationResolver({ prisma }),
             filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
               emailSuppressions.filterSuppressed({
                 projectId,
@@ -2440,8 +2448,8 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         },
       };
       return {
-        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
-          testFireTrigger(testDeps, input),
+        testFire: (input: Parameters<typeof testFireTrigger>[0]["input"]) =>
+          testFireTrigger({ deps: testDeps, input }),
       };
     })(),
     suiteRuns: {

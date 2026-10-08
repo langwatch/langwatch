@@ -530,6 +530,10 @@ describe.skipIf(!shouldRun)(
         env: {
           ...process.env,
           NLPGO_CHILD_BYPASS: "true",
+          // This suite posts to /go/studio directly, so a secret inherited
+          // from the developer's .env would make the engine 401 every request
+          // here while CI, which has none, stayed green.
+          LANGWATCH_NLP_INTERNAL_SECRET: "",
           NLPGO_SPAN_SYNC: "1",
           SERVER_ADDR: `:${NLPGO_PORT}`,
           LANGWATCH_ENDPOINT: langwatchUrl,

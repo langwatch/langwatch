@@ -16,7 +16,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -64,10 +70,17 @@ vi.mock("~/features/langy/stores/langyStore", () => {
 // SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
 // (used by the global AI shortcut). These tests don't wrap with withTRPC, so
 // stub them out to keep the smoke render free of provider boilerplate.
+//
+// Mutable so the Instant Evals gate suite can give the SearchBar a project id
+// (typedEvalRunOf needs one) without disturbing every other suite's default
+// of no project.
+const orgProjectMock: { project: { id: string } | undefined } = {
+  project: undefined,
+};
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: undefined,
-    organization: undefined,
+    project: orgProjectMock.project,
+    organization: { id: "org-1" },
     team: undefined,
     isFetching: false,
   }),
@@ -96,19 +109,60 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
 // Enter on a sentence calls `tracesV2.routeSearch`; the hook's own routing
 // is covered by useSubmitSearch.integration, so the mutation is stubbed
 // here rather than mounting a tRPC provider.
+//
+// The estimate mutate and the feature-flag read are mutable so the Instant
+// Evals gate suite can flip the flag result and assert on one shared spy —
+// a fresh `vi.fn()` per render (the old shape) can never be asserted on.
+const estimateMutate = vi.fn();
+const enableMutate = vi.fn();
+const routeSearchMutate = vi.fn();
+const featureFlagMock: {
+  data: { enabled: boolean } | undefined;
+  isLoading: boolean;
+} = { data: { enabled: true }, isLoading: false };
+// The organization's own switch, read beside the flag. Off by default so the
+// flag alone decides in the suites above; the gate suite sets the offer.
+const accessMock: {
+  data: { released: boolean; offer: "enable" | "contact_us" } | undefined;
+  isLoading: boolean;
+} = { data: { released: false, offer: "contact_us" }, isLoading: false };
 vi.mock("~/utils/api", () => ({
   api: {
     tracesV2: {
       routeSearch: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        useMutation: () => ({ mutate: routeSearchMutate, isPending: false }),
       },
       instantEval: {
+        access: {
+          useQuery: () => ({
+            data: accessMock.data,
+            isLoading: accessMock.isLoading,
+          }),
+        },
+        enable: {
+          useMutation: () => ({ mutate: enableMutate, isPending: false }),
+        },
         estimate: {
-          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+          useMutation: () => ({ mutate: estimateMutate, isPending: false }),
         },
         start: {
           useMutation: () => ({ mutate: vi.fn(), isPending: false }),
         },
+      },
+    },
+    useUtils: () => ({
+      tracesV2: {
+        instantEval: { access: { invalidate: vi.fn(), setData: vi.fn() } },
+      },
+    }),
+    // The Instant Evals gate reads this flag; stub it enabled so these
+    // smoke tests exercise the flag-on path unless a test overrides it.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({
+          data: featureFlagMock.data,
+          isLoading: featureFlagMock.isLoading,
+        }),
       },
     },
   },
@@ -123,6 +177,7 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 import { traceViewContextChip } from "~/features/langy/hooks/useLangyTraceViewContext";
 import { useExplorerStore } from "../../../stores/explorerStore";
+import { useSearchSubmitRequestStore } from "../../../stores/searchSubmitRequestStore";
 import { SEARCH_BAR_PLACEHOLDER } from "../PlaceholderEditor";
 import { SearchBar } from "../SearchBar";
 import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
@@ -163,6 +218,15 @@ beforeEach(() => {
   langyMock.open.mockClear();
   langyMock.attach.mockClear();
   langyMock.setDraft.mockClear();
+  orgProjectMock.project = undefined;
+  estimateMutate.mockClear();
+  enableMutate.mockClear();
+  routeSearchMutate.mockClear();
+  featureFlagMock.data = { enabled: true };
+  featureFlagMock.isLoading = false;
+  accessMock.data = { released: false, offer: "contact_us" };
+  accessMock.isLoading = false;
+  useSearchSubmitRequestStore.getState().clear();
 });
 
 function renderSearchBar() {
@@ -364,6 +428,151 @@ describe("<SearchBar /> ask affordance", () => {
           document.querySelector("[data-placeholder]"),
         ).toBeInTheDocument();
       });
+    });
+  });
+});
+
+// `useInstantEvalAccess` (read by SearchBar.tsx) is the gate: the release
+// flag read or the organization's access read, either one released or still
+// loading, which the suite drives through `featureFlagMock` and `accessMock`. It is
+// the gate every eval-chip submit runs through before it
+// is allowed to reach the estimate. These tests drive a real submit through
+// `useSearchSubmitRequestStore` — the same door a page button uses — since
+// jsdom cannot type into TipTap (see the file banner). That store's request
+// reaches `useSubmitSearch` the way Enter would, which reaches the real
+// `useInstantEvalRoute` mounted inside `SearchBar`, so the wiring under test
+// is the production wiring end to end, not a stub of it.
+//
+// Spec: specs/traces-v2/instant-eval-search.feature ("A refusal is a
+// popover, never an error state").
+describe("<SearchBar /> Instant Evals gate", () => {
+  beforeEach(() => {
+    orgProjectMock.project = { id: "project-1" };
+  });
+
+  describe("given Instant Evals are off for an enterprise organization", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+      accessMock.data = { released: false, offer: "contact_us" };
+    });
+
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
+    it("opens the contact-us popover and searches nothing", async () => {
+      const typed = 'eval:"the user is annoyed"';
+      // Seeds the store the way the bar shows a recognized chip while the
+      // reader is still typing it, so the post-submit assertion can tell a
+      // preserved value apart from an incidental empty default.
+      useExplorerStore.getState().applyQueryText(typed);
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore.getState().requestSubmit({ text: typed });
+      });
+
+      expect(
+        await screen.findByTestId("instant-eval-refusal"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Instant Evals aren't enabled for this project yet"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Contact us" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Not now" }),
+      ).toBeInTheDocument();
+      expect(estimateMutate).not.toHaveBeenCalled();
+      expect(routeSearchMutate).not.toHaveBeenCalled();
+      // Nothing was applied over it: the chip stays exactly where the
+      // reader left it, under the popover that explains why it did not run.
+      expect(useExplorerStore.getState().queryText).toBe(typed);
+    });
+  });
+
+  describe("given Instant Evals are off for a self-serve organization", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+      accessMock.data = { released: false, offer: "enable" };
+    });
+
+    /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
+    it("opens the enable popover, and Enable throws the switch for the project", async () => {
+      const typed = 'eval:"the user is annoyed"';
+      useExplorerStore.getState().applyQueryText(typed);
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore.getState().requestSubmit({ text: typed });
+      });
+
+      expect(
+        await screen.findByTestId("instant-eval-refusal"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Turn on Instant Evals for your organization"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        expect.stringContaining("#where-the-judged-text-goes"),
+      );
+      expect(estimateMutate).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: "Enable" }));
+      expect(enableMutate).toHaveBeenCalledTimes(1);
+      expect(enableMutate.mock.calls[0]?.[0]).toEqual({
+        projectId: "project-1",
+      });
+      expect(useExplorerStore.getState().queryText).toBe(typed);
+    });
+  });
+
+  describe("given the organization switched Instant Evals on itself", () => {
+    beforeEach(() => {
+      featureFlagMock.data = { enabled: false };
+      featureFlagMock.isLoading = false;
+      accessMock.data = { released: true, offer: "enable" };
+    });
+
+    /** @scenario "An organization that switched itself on is judged without the flag" */
+    it("lets the submit reach the estimate with the flag off", () => {
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore
+          .getState()
+          .requestSubmit({ text: 'eval:"the user is annoyed"' });
+      });
+
+      expect(estimateMutate).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByTestId("instant-eval-refusal"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the Instant Evals flag read is still in flight", () => {
+    beforeEach(() => {
+      featureFlagMock.data = undefined;
+      featureFlagMock.isLoading = true;
+    });
+
+    /** @scenario "A flag read still in flight lets the submit reach the estimate" */
+    it("lets the submit reach the estimate and opens no popover", () => {
+      renderSearchBar();
+
+      act(() => {
+        useSearchSubmitRequestStore
+          .getState()
+          .requestSubmit({ text: 'eval:"the user is annoyed"' });
+      });
+
+      expect(estimateMutate).toHaveBeenCalledTimes(1);
+      expect(routeSearchMutate).not.toHaveBeenCalled();
+      expect(
+        screen.queryByTestId("instant-eval-refusal"),
+      ).not.toBeInTheDocument();
     });
   });
 });

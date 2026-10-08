@@ -5,6 +5,7 @@ import {
   type IdentityFact,
   IdentityIdentifierAlreadyHeldError,
   IdentityIdentifierNotFoundError,
+  IdentityIdentifierNotVerifiableError,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
 } from "@langwatch/identity";
@@ -122,13 +123,25 @@ export class AccountIdentifiersService {
    */
   async listIdentifiers({
     userId,
+    accountAddress = null,
   }: {
     userId: string;
+    /**
+     * The account's own address, and whether `User.emailVerified` holds it as
+     * confirmed. Sign-in linking and the address nudge read that column, so
+     * the row for the same address says confirmed whenever they do, also
+     * where the identifier itself was never verified (an operator who set the
+     * column by hand on an installation that cannot send email).
+     */
+    accountAddress?: { email: string; confirmed: boolean } | null;
   }): Promise<AccountIdentifier[]> {
     const heads = await this.heads.findHeads({ userId });
     const live = Object.values(heads.identifiers).filter(
       (head) => head.state !== "DETACHED",
     );
+    const confirmedAccountAddress = accountAddress?.confirmed
+      ? normalizeIdentifierValue(accountAddress.email)
+      : null;
 
     return live
       .sort((left, right) => left.attachedAtMs - right.attachedAtMs)
@@ -139,16 +152,22 @@ export class AccountIdentifiersService {
         const strands = isActive
           ? detachStrandsUser({ heads, identifierId: head.identifierId })
           : null;
+        const confirmed =
+          isActive ||
+          (head.provider === "email" &&
+            head.value !== null &&
+            confirmedAccountAddress !== null &&
+            normalizeIdentifierValue(head.value) === confirmedAccountAddress);
         return {
           identifierId: head.identifierId,
           accountId: head.accountId,
           provider: head.provider,
           value: head.value,
           isPrimary: head.state === "PRIMARY",
-          confirmed: isActive,
+          confirmed,
           // Only an email can be confirmed by an emailed link, and only one
           // that has not been.
-          resendable: head.provider === "email" && !isActive,
+          resendable: head.provider === "email" && !confirmed,
           removable: strands === null,
           refusalCode: strands?.code ?? null,
           demotesFirst: head.state === "PRIMARY",
@@ -272,6 +291,50 @@ export class AccountIdentifiersService {
     codeChallenge: string;
   }): Promise<void> {
     await this.sendConfirmationFor({ userId, identifierId, codeChallenge });
+  }
+
+  /**
+   * Send the confirmation link for the account's OWN address, the one the
+   * session is signed in as.
+   *
+   * The identifier is resolved here from the session's address, never taken
+   * from the caller, so the only address this can mail is the caller's own.
+   * It runs the same PKCE ceremony as any added address: the link alone
+   * confirms nothing, which is what keeps a pre-registered account from being
+   * confirmed by whoever holds the mailbox link.
+   */
+  async sendOwnAddressConfirmation({
+    userId,
+    email,
+    codeChallenge,
+  }: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<{ identifierId: string }> {
+    const normalizedValue = normalizeIdentifierValue(email);
+    const heads = await this.heads.findHeads({ userId });
+    const own = Object.values(heads.identifiers).filter(
+      (head) => head.provider === "email" && head.value === normalizedValue,
+    );
+    const attached = own.find((head) => head.state === "ATTACHED");
+    if (!attached) {
+      if (own.some((head) => head.state !== "DETACHED")) {
+        throw new IdentityIdentifierNotVerifiableError(
+          `send_own_address_confirmation: ${normalizedValue} is not awaiting confirmation`,
+        );
+      }
+      throw new IdentityIdentifierNotFoundError(
+        `send_own_address_confirmation: no email identifier carries ${normalizedValue}`,
+      );
+    }
+
+    await this.sendConfirmationFor({
+      userId,
+      identifierId: attached.identifierId,
+      codeChallenge,
+    });
+    return { identifierId: attached.identifierId };
   }
 
   /**

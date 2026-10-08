@@ -34,6 +34,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { tryGetApp } from "~/server/app-layer/app";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
@@ -63,14 +64,23 @@ export interface PersonalWorkspace {
   created: boolean;
 }
 
+/** Writes a new project's LangWatchQL key-map row. `ProjectService` is one. */
+export interface LwqlKeyMapSync {
+  syncLwqlKeyMapRow(project: { id: string; lwqlKey: string }): Promise<void>;
+}
+
 export class PersonalWorkspaceService {
   private readonly writer: GrantsLedgerWriter;
+  private readonly lwqlKeyMap?: LwqlKeyMapSync;
 
   constructor(
     private readonly prisma: PrismaClient,
-    deps: { writer?: GrantsLedgerWriter } = {},
+    deps: { writer?: GrantsLedgerWriter; lwqlKeyMap?: LwqlKeyMapSync } = {},
   ) {
     this.writer = deps.writer ?? grantsLedgerWriter();
+    // Unset means the App's project service, resolved when a workspace is
+    // actually created.
+    this.lwqlKeyMap = deps.lwqlKeyMap;
   }
 
   /**
@@ -146,12 +156,18 @@ export class PersonalWorkspaceService {
     // and keep their transaction; the owner's ADMIN grant on the workspace is
     // a ledger command (ADR-092 §13), so the team it points at is collected
     // here and the grant is emitted once the team exists.
-    const { workspace, grantOnTeamId } = await this.prisma.$transaction(
+    const {
+      workspace,
+      grantOnTeamId,
+      createdProject = null,
+    } = await this.prisma.$transaction(
       async (
         tx,
       ): Promise<{
         workspace: PersonalWorkspace;
         grantOnTeamId: string | null;
+        /** Set only when this call created the personal project. */
+        createdProject?: { id: string; lwqlKey: string } | null;
       }> => {
         const existing = await this.findInTx(tx, { userId, organizationId });
         if (existing) {
@@ -192,9 +208,26 @@ export class PersonalWorkspaceService {
         // ADMIN grant so the user can manage their own personal team. Nobody
         // else is ever granted this scope — personal teams are single-member by
         // definition — and it is emitted after this transaction commits.
-        return { workspace: created, grantOnTeamId: created.team.id };
+        return {
+          workspace: created.workspace,
+          grantOnTeamId: created.workspace.team.id,
+          createdProject: {
+            id: created.workspace.project.id,
+            lwqlKey: created.lwqlKey,
+          },
+        };
       },
     );
+
+    if (createdProject) {
+      // After the commit, so a rolled-back workspace leaves no row behind, and
+      // before the grant, whose failure would otherwise skip it for good.
+      // Never throws. Without an App (a standalone script) the next deploy's
+      // backfill writes the row instead.
+      await (this.lwqlKeyMap ?? tryGetApp()?.projects)?.syncLwqlKeyMapRow(
+        createdProject,
+      );
+    }
 
     if (grantOnTeamId) {
       await this.attachOwnerAdminGrant({
@@ -221,7 +254,7 @@ export class PersonalWorkspaceService {
       displayName?: string | null;
       displayEmail?: string | null;
     },
-  ): Promise<PersonalWorkspace> {
+  ): Promise<{ workspace: PersonalWorkspace; lwqlKey: string }> {
     // Use the user's display name if available, otherwise their local
     // email part (jane@acme.com → "jane"), otherwise a fallback. Slug
     // gets a nanoid suffix to avoid global slug collisions across orgs.
@@ -268,20 +301,23 @@ export class PersonalWorkspaceService {
     });
 
     return {
-      team: {
-        id: team.id,
-        name: team.name,
-        slug: team.slug,
-        createdAt: team.createdAt,
+      workspace: {
+        team: {
+          id: team.id,
+          name: team.name,
+          slug: team.slug,
+          createdAt: team.createdAt,
+        },
+        project: {
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          apiKey: project.apiKey,
+          createdAt: project.createdAt,
+        },
+        created: true,
       },
-      project: {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        apiKey: project.apiKey,
-        createdAt: project.createdAt,
-      },
-      created: true,
+      lwqlKey: project.lwqlKey,
     };
   }
 

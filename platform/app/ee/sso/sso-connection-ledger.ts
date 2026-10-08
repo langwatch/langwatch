@@ -46,6 +46,7 @@ import {
   type SsoConnectionFact,
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   WITHDRAW_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity";
@@ -80,6 +81,7 @@ export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> =
     [BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE]: "beginMigrationFinalization",
     [FINALIZE_MIGRATION_COMMAND_TYPE]: "finalizeMigration",
     [RENAME_CONNECTION_COMMAND_TYPE]: "renameConnection",
+    [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: "updateConnectionIdp",
     [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
     [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
     [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",

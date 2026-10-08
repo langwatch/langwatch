@@ -72,7 +72,7 @@ export function DomainsSection({
       {domains.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
           No domain has been claimed yet. Add the domain your team&apos;s email
-          addresses end in —{" "}
+          addresses end in, for example{" "}
           <Text as="span" fontFamily="mono">
             acme.com
           </Text>{" "}
@@ -154,7 +154,7 @@ export function DomainsSection({
                 )
               }
             >
-              Claim domain
+              {provesWithLicense ? "Add domain" : "Claim domain"}
             </Button>
           </HStack>
           <InlineRefusal error={claim.error} what="Claiming that domain" />
@@ -344,9 +344,9 @@ function WhyADomainIsProved({
   if (provesWithLicense) {
     return (
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        A domain has to be proved before it decides how people sign in. On this
-        installation your enterprise licence is that proof, so there is nothing
-        to publish anywhere.
+        On this installation a domain you add is verified right away, with
+        nothing to publish. Once the connection is live, people who sign in with
+        an address at it go to your identity provider.
       </Text>
     );
   }
@@ -359,13 +359,13 @@ function WhyADomainIsProved({
           done at any time afterwards, and an account manager can do it for
           them. What it costs to skip is named rather than implied. */}
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        Proving a domain is optional, and you can come back to it at any time —
-        your account manager at LangWatch can also do it for you. You publish a
+        Proving a domain is optional, and you can come back to it at any time.
+        Your account manager at LangWatch can also do it for you. You publish a
         short value we give you in the domain&apos;s DNS, and we look for it.
       </Text>
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
         Until a domain is proved, people sign in through the link you give them
-        rather than being recognised by their email address — so there is no
+        rather than being recognised by their email address. So there is no
         automatic domain association, and nobody is sent to your identity
         provider on their own.
       </Text>
@@ -383,7 +383,7 @@ function WhyADomainIsProved({
             owner could put there.
           </Text>
           <Text>
-            DNS is the public address book for a domain — the same place its
+            DNS is the public address book for a domain, the same place its
             website and email records are set. It is not in LangWatch: it lives
             with whoever administers the domain, usually a registrar or DNS host
             such as Cloudflare, Route 53 or GoDaddy, and often another team. The
@@ -425,7 +425,7 @@ function publishedRecordRows({
       : [
           {
             label: "Value",
-            hint: "Shown once — this is the secret",
+            hint: "Shown once. This is the secret.",
             value: shownValue,
           },
         ]),
@@ -454,7 +454,7 @@ function RecordHeading({
       </Heading>
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
         {alreadyProved
-          ? "Leave the record published — we read it again from time to time, and a domain whose record disappears eventually stops being proved. The value below is the one that proved it."
+          ? "Leave the record published. We read it again from time to time, and a domain whose record disappears eventually stops being proved. The value below is the one that proved it."
           : `Add it wherever ${domain}'s DNS is administered, then come back and check.`}
       </Text>
     </VStack>
@@ -523,7 +523,7 @@ function PublishedRecord({
           </Text>
           <Text>
             No DNS access? Serve the value as the entire body of a plain-text
-            file, over https, at this address instead — either one proves the
+            file, over https, at this address instead. Either one proves the
             domain.
           </Text>
           <CopyValueRows
@@ -621,7 +621,7 @@ function PublishedRecord({
           {actions.replacing && (
             <Text fontSize="sm" color="fg.muted" maxWidth="72ch">
               A fresh value replaces the one above, and anything you have
-              already published stops counting — you would need to publish the
+              already published stops counting, so you would need to publish the
               new value in its place. Only do this if the current value has been
               lost or has expired.
             </Text>

@@ -107,7 +107,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/dataset-rest-api.feature | "Get dataset returns 404 for non-existent slug" | KEEP | 404 handler; test "returns 404 Not Found" exists |
 | specs/features/dataset-rest-api.feature | "Get dataset enforces 25MB response size limit" | KEEP | MAX_RESPONSE_SIZE check in app.ts; test "returns 400 Bad Request" exists for size limit |
 | specs/features/dataset-rest-api.feature | "Update a dataset name and column types" | KEEP | PATCH /api/dataset/:slugOrId implemented; test "updates the dataset and changes the slug" exists |
-| specs/features/dataset-rest-api.feature | "Update a dataset name regenerates the slug" | KEEP | Slug regeneration on rename; test "regenerates the slug" exists |
+| specs/features/dataset-rest-api.feature | "Renaming a dataset keeps its slug" | KEEP | Slug is stable on rename; test "keeps the slug" exists |
 | specs/features/dataset-rest-api.feature | "Update a dataset fails when new slug conflicts" | KEEP | Conflict handling; test "returns 409 Conflict" exists for slug conflict |
 | specs/features/dataset-rest-api.feature | "Update a non-existent dataset returns 404" | KEEP | 404 handler; test "returns 404 Not Found" exists for PATCH |
 | specs/features/dataset-rest-api.feature | "Update dataset does not enforce plan limits" | KEEP | No middleware on PATCH; test "updates the dataset successfully (no plan limit on PATCH)" exists |
@@ -322,7 +322,7 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/settings-plans-comparison.feature | "Legacy tier organizations show no current plan in comparison" | KEEP | Legacy-tier no-current-badge branch tested in PlansComparisonPage.integration.test.tsx |
 | specs/features/settings-plans-comparison.feature | "TIERED organizations see a discontinued plan migration notice" | KEEP | Discontinued notice branch tested in PlansComparisonPage.integration.test.tsx |
 | specs/features/settings-plans-comparison.feature | "Free plan column shows default limits" | UPDATE | FREE_PLAN_FEATURES is a string list, not the structured detail/value table from scenario; rewrite |
-| specs/features/settings-plans-comparison.feature | "Growth plan column shows seat and usage pricing" | UPDATE | Growth seat/usage details rendered as feature strings; scenario detail/value table doesn't match |
+| specs/features/settings-plans-comparison.feature | "Growth plan column shows seat and usage pricing in the selected currency" | UPDATE | Growth seat/usage details rendered as feature strings; scenario detail/value table doesn't match |
 | specs/features/settings-plans-comparison.feature | "Enterprise plan column shows custom commercial option" | UPDATE | Action label "Contact Sales" exists; highlights are strings not the structured table the scenario expects |
 | specs/features/settings-plans-comparison.feature | "Plan details are visually comparable by row" | UPDATE | SimpleGrid renders columns but without explicit row-grouped "Usage" section the scenario describes |
 | specs/features/stripe-price-catalog-sync.feature | "Sync task fetches Stripe prices for the detected key mode" | DELETE | No sync task script exists; only stripeCatalog.json + reader; sync code never landed |

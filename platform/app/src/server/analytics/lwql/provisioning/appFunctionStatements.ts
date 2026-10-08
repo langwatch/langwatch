@@ -44,11 +44,10 @@
  *
  * A `CREATE FUNCTION` writes the local disk store, so on a multi-replica
  * server it lands on one replica only. The fix is a server setting rather than
- * anything here: `user_defined_zookeeper_path`, which the chart-managed
- * renderer declares in replicated mode
- * (`infra/clickhouse-serverless/internal/render/lwql.go`). With it, one create
- * reaches every replica and a replica rebuilt later picks the functions up at
- * boot — which `ON CLUSTER` would not do.
+ * anything here: `user_defined_zookeeper_path`, which the chart declares in
+ * replicated mode. With it, one create reaches every replica and a replica
+ * rebuilt later picks the functions up at boot — which `ON CLUSTER` would not
+ * do.
  *
  * @see ../appFunctions/catalog.ts — the declaration these statements render
  * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md

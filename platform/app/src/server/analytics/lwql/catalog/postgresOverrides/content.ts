@@ -18,11 +18,11 @@
  *    agree on what `Title` withholds, rather than one publishing what the
  *    other gates.
  *
- * @see ../derivePostgresCatalog.ts#POSTGRES_LABEL_NAME — the label suffixes the aliases avoid
+ * @see ../defineCatalogModel.ts#POSTGRES_LABEL_NAME — the label suffixes the aliases avoid
  * @see specs/lwql/postgres-catalog.feature
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** JSON bodies aliased away from a name that reads as a label elsewhere. */
 export const CONTENT_POSTGRES_OVERRIDES: Record<

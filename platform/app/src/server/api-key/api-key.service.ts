@@ -19,6 +19,10 @@ import {
   type ApiKeyWithBindings,
 } from "./api-key.repository";
 import {
+  type ApiKeyLastUsedRecorder,
+  processApiKeyLastUsed,
+} from "./api-key-last-used";
+import {
   generateApiKeyToken,
   hashSecret,
   INGEST_KEY_PREFIX,
@@ -116,12 +120,14 @@ export class ApiKeyService {
   private readonly mintLegacyGrant: (args: {
     apiKey: ApiKeyWithBindings;
   }) => void;
+  private readonly lastUsed: ApiKeyLastUsedRecorder;
 
   constructor({
     prisma,
     repo,
     roleRepo,
     mintLegacyGrant = mintLegacyKeyGrant,
+    lastUsed = processApiKeyLastUsed,
   }: {
     prisma: PrismaClient;
     repo: ApiKeyRepository;
@@ -132,11 +138,14 @@ export class ApiKeyService {
      * stack behind it.
      */
     mintLegacyGrant?: (args: { apiKey: ApiKeyWithBindings }) => void;
+    /** Defaults to the process-wide recorder; a test injects its own clock. */
+    lastUsed?: ApiKeyLastUsedRecorder;
   }) {
     this.prisma = prisma;
     this.repo = repo;
     this.roleRepo = roleRepo;
     this.mintLegacyGrant = mintLegacyGrant;
+    this.lastUsed = lastUsed;
   }
 
   static create(prisma: PrismaClient): ApiKeyService {
@@ -980,14 +989,13 @@ export class ApiKeyService {
   }
 
   /**
-   * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
+   * Fire-and-forget lastUsedAt update, at most once a minute per key per
+   * process. Call after full authorization succeeds.
    */
   markUsed({ id }: { id: string }): void {
-    this.repo.updateLastUsedAt({ id }).catch((err: unknown) => {
-      logger.warn(
-        { err, apiKeyId: id },
-        "failed to update API key lastUsedAt (fire-and-forget)",
-      );
+    this.lastUsed.markUsed({
+      id,
+      write: () => this.repo.updateLastUsedAt({ id }),
     });
   }
 

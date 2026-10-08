@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Currency } from "~/generated/prisma/client";
+import { Currency, OrganizationUserRole } from "~/generated/prisma/client";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -135,7 +135,7 @@ export const createSubscriptionRouterFactory = ({
           invites: z.array(
             z.object({
               email: z.string().email(),
-              role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+              role: z.nativeEnum(OrganizationUserRole),
             }),
           ),
         }),

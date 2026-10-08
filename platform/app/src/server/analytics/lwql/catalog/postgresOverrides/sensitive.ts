@@ -2,7 +2,7 @@
  * Columns the safe defaults keep but must not expose: secrets that dodge the
  * name rules and raw external-person identity.
  *
- * The derivation's safe defaults strip a column whose *name* looks like a
+ * The builder's safe defaults strip a column whose *name* looks like a
  * secret or a person email. These `skipColumns` cover the columns whose danger
  * their name does not advertise:
  *  - a secret nested inside a config JSON, which no name rule can see into;
@@ -15,17 +15,17 @@
  * must strip both — the `email`-name rule alone would keep the GitHub login.
  *
  * `ModelProvider.customKeys` is *not* here: it ends in `keys`, so
- * {@link ../derivePostgresCatalog#isStrippedByDefault}'s suffix rule already
+ * {@link ../defineCatalogModel#isStrippedByDefault}'s suffix rule already
  * strips it. `ModelProvider.extraHeaders` (raw provider auth headers, masked
  * only by the service layer's read path, never by name) is here because the
  * name rules cannot see it. This file names only the columns those rules
  * cannot see.
  *
- * @see ../derivePostgresCatalog.ts#isStrippedByDefault — the name rules these back-stop
+ * @see ../defineCatalogModel.ts#isStrippedByDefault — the name rules these back-stop
  * @see specs/lwql/postgres-catalog.feature
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** Per-model strips for sensitive columns the name rules do not catch. */
 export const SENSITIVE_POSTGRES_OVERRIDES: Record<

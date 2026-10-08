@@ -103,11 +103,16 @@ export interface CredentialAccountRecordsPort {
     accountId: string;
   }): Promise<UnlinkAttempt>;
   findSecureAccountFacts(args: { userId: string }): Promise<SecureAccountFacts>;
-  /** The `User` and its `credential` `Account`, written in one transaction. */
+  /**
+   * The `User` and its `credential` `Account`, written in one transaction.
+   * `addressConfirmed` is false only where the installation could not mail a
+   * link (ADR-117, revision 2026-09-25).
+   */
   createCredentialUser(args: {
     name: string;
     email: string;
     passwordHash: string;
+    addressConfirmed: boolean;
   }): Promise<CreatedCredentialUser>;
   /**
    * The account a passkey ceremony earned — created, or the unfinished
@@ -232,11 +237,14 @@ export class CredentialAccountService {
     name,
     email,
     password,
+    addressConfirmed,
   }: {
     /** Null where nobody has been asked for one; onboarding asks later. */
     name: string | null;
     email: string;
     password: string;
+    /** Whether a confirmed address proof was spent for this sign-up. */
+    addressConfirmed: boolean;
   }): Promise<{ id: string }> {
     const held = await this.deps.directory.findUserIdByEmail({
       normalizedValue: email,
@@ -247,6 +255,7 @@ export class CredentialAccountService {
       name,
       email,
       passwordHash: await this.deps.passwords.hash({ password }),
+      addressConfirmed,
     });
   }
 
@@ -266,10 +275,12 @@ export class CredentialAccountService {
     name,
     email,
     passwordHash,
+    addressConfirmed,
   }: {
     name: string | null;
     email: string;
     passwordHash: string;
+    addressConfirmed: boolean;
   }): Promise<{ id: string }> {
     const created = await this.deps.records.createCredentialUser({
       // The address stands in for a name nobody has been asked for yet. A
@@ -279,6 +290,7 @@ export class CredentialAccountService {
       name: name ?? email,
       email,
       passwordHash,
+      addressConfirmed,
     });
 
     await this.deps.identifiers.attachCredentialIdentifier({

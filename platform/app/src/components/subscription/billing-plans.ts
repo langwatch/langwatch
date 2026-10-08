@@ -34,6 +34,11 @@ const growthEventsPricingString = (currency: Currency): string =>
     ? "\u20AC5 per additional 100,000 events"
     : "$6 per additional 100,000 events";
 
+const growthRetentionPricingString = (currency: Currency): string =>
+  currency === Currency.EUR
+    ? "30 days retention (+ custom at \u20AC3/GB)"
+    : "30 days retention (+ custom at $4/GB)";
+
 /**
  * Growth plan features for upgrade block.
  * Accepts a currency so the events pricing line is accurate.
@@ -62,13 +67,13 @@ export const FREE_PLAN_FEATURES = [
 
 /**
  * Plan comparison page feature list for Growth.
- * Accepts a currency so the events pricing line is accurate.
+ * Accepts a currency so the events and retention pricing lines are accurate.
  */
 export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "Everything in Free",
   "200,000 events included",
   growthEventsPricingString(currency),
-  "30 days retention (+ custom at $3/GB)",
+  growthRetentionPricingString(currency),
   "Up to 20 core users (volume discount available)",
   "Unlimited lite users",
   "Unlimited evals, simulations and prompts",

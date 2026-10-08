@@ -24,6 +24,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   getConfig,
+  hasConfig,
   initConfig,
   runWithConfig,
 } from "@langwatch/mcp-server/config";
@@ -227,9 +228,7 @@ export function createMcpHandler(): McpHandler {
   const redis = tryGetApp()?.redis ?? null;
 
   // Ensure the MCP config is initialized with the app's endpoint
-  try {
-    getConfig();
-  } catch {
+  if (!hasConfig()) {
     initConfig({
       endpoint: process.env.BASE_HOST ?? "https://app.langwatch.ai",
     });

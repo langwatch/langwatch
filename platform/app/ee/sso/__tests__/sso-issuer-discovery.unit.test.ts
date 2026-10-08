@@ -54,8 +54,37 @@ describe("given an issuer that answers a discovery document", () => {
 
       expect(
         await discovery.discover({ issuer: "https://login.acme.okta.com" }),
-      ).toEqual({ reachable: true });
+      ).toEqual({
+        reachable: true,
+        endpoints: [
+          "https://login.acme.okta.com/authorize",
+          "https://login.acme.okta.com/token",
+        ],
+      });
       expect(asked).toEqual([DISCOVERY_URL]);
+    });
+  });
+
+  describe("when the document names its issuer", () => {
+    it("reports the issuer it names", async () => {
+      const { discovery } = discoveryAnswering({
+        respond: async () =>
+          new Response(
+            JSON.stringify({
+              issuer: "https://login.acme.okta.com",
+              authorization_endpoint: "https://login.acme.okta.com/authorize",
+              token_endpoint: "https://login.acme.okta.com/token",
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      });
+
+      expect(
+        await discovery.discover({ issuer: "https://login.acme.okta.com/" }),
+      ).toMatchObject({
+        reachable: true,
+        issuer: "https://login.acme.okta.com",
+      });
     });
   });
 

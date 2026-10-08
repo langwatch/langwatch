@@ -357,10 +357,12 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
   }): Promise<RoleBindingForSynthesis[]> {
     if (orgIds.length === 0) return [];
 
-    const { groupIdsByOrg, allGroupIds } = await this.groupMembershipsFor({
-      userId,
-      orgIds,
-    });
+    const [{ groupIdsByOrg, allGroupIds }, developerOrgIds] = await Promise.all(
+      [
+        this.groupMembershipsFor({ userId, orgIds }),
+        this.developerSeatOrgIds({ userId, orgIds }),
+      ],
+    );
 
     const rows = await liveGrants(this.prisma).findMany({
       where: {
@@ -382,12 +384,23 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
       select: GRANT_ROW_SELECT,
       orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
     });
-    const grants = listableGrants(rows).filter(
-      ({ row }) =>
-        row.principalType !== "GROUP" ||
-        (row.principalId != null &&
-          groupIdsByOrg.get(row.organizationId)?.has(row.principalId) === true),
-    );
+    const grants = listableGrants(rows)
+      .filter(
+        ({ row }) =>
+          row.principalType !== "GROUP" ||
+          (row.principalId != null &&
+            groupIdsByOrg.get(row.organizationId)?.has(row.principalId) ===
+              true),
+      )
+      // ADR-143: the engine grants a Developer nothing through an
+      // ORGANIZATION-scoped binding or a group (packages/authz matchers), so
+      // the workspace listing must not synthesize a shared team, or an admin
+      // organization role, out of one either.
+      .filter(
+        ({ row, scopeType }) =>
+          !developerOrgIds.has(row.organizationId) ||
+          (row.principalType !== "GROUP" && scopeType !== "ORGANIZATION"),
+      );
 
     const rolesByOrg = await this.rolesByOrganizationFor(grants);
 
@@ -414,6 +427,25 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
           : null,
       };
     });
+  }
+
+  /** The organizations among `orgIds` where this user holds a Developer seat. */
+  private async developerSeatOrgIds({
+    userId,
+    orgIds,
+  }: {
+    userId: string;
+    orgIds: readonly string[];
+  }): Promise<Set<string>> {
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: {
+        userId,
+        organizationId: { in: [...orgIds] },
+        role: "DEVELOPER",
+      },
+      select: { organizationId: true },
+    });
+    return new Set(memberships.map((m) => m.organizationId));
   }
 
   /** The user's group memberships, resolved per organization so a grant

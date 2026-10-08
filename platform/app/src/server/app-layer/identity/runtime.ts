@@ -10,6 +10,7 @@
  * is a closure passed from here — the packages read no env of their own.
  */
 
+import { adminEmailList } from "@ee/admin/isAdmin";
 import { fireActivityTrackingNurturing } from "@ee/billing/nurturing/hooks/activityTracking";
 import { fireSsoAutoAddNurturingCalls } from "@ee/billing/nurturing/hooks/ssoAutoAdd";
 import { ensureUserSyncedToCio } from "@ee/billing/nurturing/hooks/userSync";
@@ -36,6 +37,7 @@ import {
 import { IdentitySsoConnectionGrandfatherMigration } from "@ee/sso/connection-grandfather.migration";
 import { LegacySsoDomainRoutingRepository } from "@ee/sso/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
+import { microsoftProfileRekey } from "@ee/sso/microsoft-account-rekey";
 import { AdminEmailPlatformOperators } from "@ee/sso/platform-operators";
 import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { PrismaSsoAccountFactsRepository } from "@ee/sso/sso-account-facts.prisma.repository";
@@ -70,6 +72,7 @@ import { SsoDomainReproofService } from "@ee/sso/sso-domain-reproof.service";
 import { engineProviderFor } from "@ee/sso/sso-engine-provider";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { HttpSsoIssuerDiscovery } from "@ee/sso/sso-issuer-discovery";
+import { SsoIssuerEndpointOrigins } from "@ee/sso/sso-issuer-endpoint-origins";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import { PrismaSsoMembershipRepository } from "@ee/sso/sso-membership.prisma.repository";
 import { ssoMethodDialWith } from "@ee/sso/sso-method-configured";
@@ -84,6 +87,7 @@ import {
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   LoggingBreakGlassWarningNotifier,
+  PrismaOrganizationCount,
   PrismaSsoDomainReproofTargets,
   PrismaSsoOrganizationMemberLookup,
   SsoSelfServeContextResolver,
@@ -199,6 +203,7 @@ import {
   PrismaSessionFactors,
 } from "./organization-mfa-adapters";
 import { PriorSessionService } from "./prior-session.service";
+import { ProvenAddressesService } from "./proven-addresses.service";
 import { pinnedFetch, systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
@@ -225,6 +230,7 @@ import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.p
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
 import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
+import { PrismaSignUpPolicyRepository } from "./repositories/sign-up-policy.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
@@ -257,6 +263,7 @@ import {
 } from "./sign-in-security-adapters";
 import { SignUpHealthService } from "./sign-up-health.service";
 import { SignUpIdentifierService } from "./sign-up-identifier";
+import { parseAllowedDomains, SignUpPolicy } from "./sign-up-policy";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
 import { SignInLinkEvidence } from "./signin-link-evidence";
 import {
@@ -293,7 +300,10 @@ export {
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
-const ssoAccountFacts = new PrismaSsoAccountFactsRepository(prisma);
+const ssoAccountFacts = new PrismaSsoAccountFactsRepository(
+  prisma,
+  identityStorageTransactions,
+);
 const organizationJoinProcessStore = new PrismaProcessStore(prisma);
 let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
 let organizationJoinMembership: PrismaJoinMembership | null = null;
@@ -333,6 +343,21 @@ const identityEmailService = new IdentityEmailService(identityHeads, isLatched);
 
 export function identityEmail(): IdentityEmailService {
   return identityEmailService;
+}
+
+/**
+ * The addresses a person has proven, identifiers first and the verified
+ * legacy column behind them: one rule for the join door and the invitation
+ * lookup, composed once over the same two reads.
+ */
+const provenAddressesService = new ProvenAddressesService({
+  verifiedEmailsOf: (args) => identityEmailService.verifiedEmailsOf(args),
+  findVerifiedLegacyEmail: (args) =>
+    identityUsers.findVerifiedLegacyEmail(args),
+});
+
+export function provenAddresses(): ProvenAddressesService {
+  return provenAddressesService;
 }
 
 /**
@@ -602,6 +627,15 @@ export async function addressRoutesToConnection({
  * its refusal carries the place to go instead — so the two ask once, here,
  * and cannot come to different conclusions about whose address this is.
  *
+ * The answer carries the METHOD beside the connection, because the two are
+ * not always the same string. A self-serve connection is dialled by its own
+ * id. A grandfathered connection is routed through the broker: the router
+ * names the connection but the method it dials is `auth0`, because the
+ * deployment holds no credentials of its own for it and the engine registers
+ * nothing under its id (`@ee/sso/legacy-sso-dial`). A caller that wants to
+ * SEND somebody to the connection needs to know which of the two it is; a
+ * caller that only wants to know whose address this is does not.
+ *
  * Left to throw for the reason stated above: on a deployment that mandates
  * single sign-on for this address, failing open would hand out the very door
  * the connection exists to close.
@@ -610,13 +644,13 @@ export async function connectionGoverningAddress({
   email,
 }: {
   email: string;
-}): Promise<{ connectionId: string } | null> {
+}): Promise<{ connectionId: string; methodId: string } | null> {
   const decision = await signInRouter().route({ identifier: email });
   if (decision.outcome !== "redirect_to_connection") return null;
-  const connectionId =
-    decision.methodSet.find((method) => method.connectionId !== null)
-      ?.connectionId ?? null;
-  return connectionId === null ? null : { connectionId };
+  const method =
+    decision.methodSet.find((method) => method.connectionId !== null) ?? null;
+  if (method === null || method.connectionId === null) return null;
+  return { connectionId: method.connectionId, methodId: method.id };
 }
 
 let credentialSessionGuard: CredentialSessionGuard | undefined;
@@ -733,6 +767,22 @@ export async function decideLocalSignUp(
   return { outcome: "enroll", methodSet, reasonCode: decision.reasonCode };
 }
 
+/**
+ * Who may create an account and who may found an organization here
+ * (`SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS`, `ADMIN_EMAILS`). Config is read
+ * per call so a test that rewrites the environment sees its own values.
+ */
+export function signUpPolicy(): SignUpPolicy {
+  return new SignUpPolicy({
+    config: () => ({
+      mode: env.SIGN_UP_MODE,
+      allowedDomains: parseAllowedDomains(env.SIGN_UP_ALLOWED_DOMAINS),
+      adminEmails: adminEmailList(),
+    }),
+    repository: new PrismaSignUpPolicyRepository(prisma),
+  });
+}
+
 export async function localSignUpDecision(
   email: string,
 ): Promise<LocalSignUpDecision> {
@@ -760,6 +810,16 @@ export async function localSignUpDecision(
  * migration and D05's self-service all call these verbs; nothing writes an
  * `SsoConnection` row, because the row is a projection of this log.
  */
+/**
+ * What the installation's licence may decide, and who counts as a platform
+ * operator. Shared by the guards and the setup surface's context, so the
+ * screen and the rule read the same answer.
+ */
+const ssoLicenseAuthority = new LicenseDomainClaimAuthority({
+  organizations: new PrismaOrganizationCount(prisma),
+});
+const ssoPlatformOperators = new AdminEmailPlatformOperators(identityUsers);
+
 export function ssoConnections(): SsoConnectionService {
   return new SsoConnectionService(
     new SsoConnectionGuards({
@@ -767,8 +827,8 @@ export function ssoConnections(): SsoConnectionService {
       registrationSlots: new PrismaSsoConnectionRegistrationRepository(prisma),
       breakGlass: activationBreakGlassPort(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
-      platformOperators: new AdminEmailPlatformOperators(identityUsers),
-      licenseAuthority: new LicenseDomainClaimAuthority(),
+      platformOperators: ssoPlatformOperators,
+      licenseAuthority: ssoLicenseAuthority,
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(
@@ -880,7 +940,10 @@ export function ssoSelfServe(): SsoSelfServeService {
     context: new SsoSelfServeContextResolver({
       featureFlags: featureFlagService,
       licenseProof,
+      licenseAuthority: ssoLicenseAuthority,
+      platformOperators: ssoPlatformOperators,
     }),
+    licenseProof,
     proofs: new DnsDomainProofLookup(),
     files: new HttpsDomainProofFileLookup(),
     credentials: ssoCredentials,
@@ -888,20 +951,9 @@ export function ssoSelfServe(): SsoSelfServeService {
     // form. The two addresses somebody named in advance — an operator's own
     // provider, and the simulator — are the two it must not refuse, and they
     // are the same two the engine already dials at sign-in.
-    discovery: new HttpSsoIssuerDiscovery(
-      // The PAIRED fetch, not the global one. The dispatcher the guard pins
-      // each hop with comes from the workspace's undici and Node's built-in
-      // fetch rejects it outright, so handing the global in here reported
-      // every issuer unreachable however well it answered.
-      pinnedFetch,
-      systemHostResolver,
-      resolveDialableInternalOrigins({
-        trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
-        idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
-        isProduction: env.NODE_ENV === "production",
-      }),
-    ),
+    discovery: ssoIssuerDiscovery(),
     baseUrl: env.NEXTAUTH_URL ?? "",
+    deploymentProvider: resolveAuthProvider,
     // The evidence a test sign-in happened is the account the engine wrote,
     // read here rather than recorded anywhere: activation carries the id of
     // an account that exists, or it is refused.
@@ -1357,7 +1409,8 @@ export function signUpVerification(): SignUpVerificationService {
       sendVerificationLink: ({ email, verificationUrl }) =>
         sendSignUpVerificationEmail({ email, verificationUrl }),
     },
-    buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      buildSignUpVerificationUrl({ token, callbackUrl }),
   });
 }
 
@@ -1437,6 +1490,38 @@ export function sessionMinter(): BetterAuthSessionMinter {
 }
 
 /** Request-scoped SSO origin resolution reads the selected connection fresh. */
+function dialableInternalOrigins(): string[] {
+  return resolveDialableInternalOrigins({
+    trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+    idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+    isProduction: env.NODE_ENV === "production",
+  });
+}
+
+function ssoIssuerDiscovery(): HttpSsoIssuerDiscovery {
+  return new HttpSsoIssuerDiscovery(
+    // The PAIRED fetch, not the global one. The dispatcher the guard pins
+    // each hop with comes from the workspace's undici and Node's built-in
+    // fetch rejects it outright, so handing the global in here reported
+    // every issuer unreachable however well it answered.
+    pinnedFetch,
+    systemHostResolver,
+    dialableInternalOrigins(),
+  );
+}
+
+let issuerEndpointOriginsInstance: SsoIssuerEndpointOrigins | null = null;
+
+/** The endpoint origins a registered issuer's discovery document names,
+ *  trusted for sign-in requests naming that issuer. */
+export function ssoIssuerEndpointOrigins(): SsoIssuerEndpointOrigins {
+  issuerEndpointOriginsInstance ??= new SsoIssuerEndpointOrigins({
+    discovery: ssoIssuerDiscovery(),
+    dialableInternalOrigins: dialableInternalOrigins(),
+  });
+  return issuerEndpointOriginsInstance;
+}
+
 let registeredIssuersInstance: RegisteredIssuers | null = null;
 
 export function ssoRegisteredIssuers(): RegisteredIssuers {
@@ -1496,6 +1581,8 @@ export function passkeySignUp(): PasskeySignUpRegistration {
           decision.methodSet.some((candidate) => candidate.kind === method)
         );
       },
+      policyAdmits: async (email) =>
+        (await signUpPolicy().checkSignUp({ email })).allowed,
     },
     directory: identityUsers,
     accounts: {
@@ -1715,6 +1802,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
     ),
     federationAllowed: () => platformSSOAllowed(),
     signInEvidence: signInLinkEvidence(),
+    signUpPolicy: signUpPolicy(),
     analytics: {
       // The same distinct id posthog-js identifies with client-side, so this
       // server event joins the browser person.
@@ -1883,4 +1971,15 @@ export function secondaryStorage(): SecondaryStorageDeps {
     }),
     connection: () => tryGetApp()?.redis ?? null,
   };
+}
+
+/**
+ * The Microsoft sign-in step that moves a pre-3.17 Azure AD account onto the
+ * key better-auth 1.7 looks it up by (see `@ee/sso/microsoft-account-rekey`).
+ * Supplied from here so better-auth never holds the database client itself.
+ */
+export function microsoftAccountRekey(): (
+  profile: Record<string, unknown>,
+) => Promise<void> {
+  return microsoftProfileRekey({ prisma });
 }

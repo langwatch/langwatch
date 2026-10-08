@@ -13,6 +13,7 @@ import {
 } from "../errors";
 import {
   __resetLangyTurnOverrideCacheForTests,
+  composeLangyTurnPrompt,
   LangyTurnService,
   type LangyTurnServiceDeps,
   langyTurnIdentity,
@@ -379,6 +380,30 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ intent: "continue" }),
     );
+  });
+
+  /** @scenario The warm and the turn's probe carry the same disabled skills */
+  it("probes for a worker with the same disabled skills the dispatch sends", async () => {
+    // Flag off => `dashboard-widgets` is gated off for every turn.
+    const flags = vi
+      .spyOn(featureFlagService, "isEnabled")
+      .mockResolvedValue(false);
+    try {
+      await LangyTurnService.create(deps).startConversationTurn(input());
+
+      const probeArgs = mocks.probe.mock.calls[0]![0] as {
+        disabledSkillIds?: string[];
+      };
+      const dispatched = (mocks.dispatch.mock.calls[0] as unknown[])[0] as {
+        credentials: { disabledSkillIds?: string[] };
+      };
+      expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+      expect(probeArgs.disabledSkillIds).toEqual(
+        dispatched.credentials.disabledSkillIds,
+      );
+    } finally {
+      flags.mockRestore();
+    }
   });
 
   it("finalizes the GitHub permit before probing the worker signature", async () => {
@@ -1410,5 +1435,33 @@ describe("when the first message adopts a warmed conversation id", () => {
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-warmed" }),
     );
+  });
+});
+
+describe("composeLangyTurnPrompt", () => {
+  describe("when the viewer has an email", () => {
+    it('names the viewer so "email me" needs no question', () => {
+      const { prompt } = composeLangyTurnPrompt({
+        viewer: { id: "u1", name: "Ada", email: "ada@example.com" },
+        contextBlock: null,
+        capNote: "",
+        userText: "email me on thumbs-down",
+      });
+      expect(prompt).toContain("You are talking to Ada <ada@example.com>.");
+      expect(prompt.endsWith("email me on thumbs-down")).toBe(true);
+    });
+  });
+
+  describe("when the viewer has no email", () => {
+    it("leaves the prompt as the bare user text", () => {
+      expect(
+        composeLangyTurnPrompt({
+          viewer: { id: "u1" },
+          contextBlock: null,
+          capNote: "",
+          userText: "hi",
+        }),
+      ).toEqual({ prompt: "hi", labelled: false });
+    });
   });
 });

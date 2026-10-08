@@ -120,17 +120,20 @@ def sync_detailed(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
-    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret
+    and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to
+    the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent
+    printing a snippet) never holds it. `scopes` defaults to the caller's project, where
+    `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a
+    scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also
+    needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs
+    `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it
+    from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed
+    to the organization's hidden governance project and counted by no budget on the project you had in
+    mind. An organization whose only project is the governance one is exempt, since there is nothing
+    else to name; one with no governance project either refuses with `trace_project_required`. Send
+    `Idempotency-Key` to make a retry safe: a replay returns the original response including its
+    `secret`, which is the only way to recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
@@ -173,17 +176,20 @@ def sync(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
-    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret
+    and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to
+    the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent
+    printing a snippet) never holds it. `scopes` defaults to the caller's project, where
+    `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a
+    scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also
+    needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs
+    `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it
+    from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed
+    to the organization's hidden governance project and counted by no budget on the project you had in
+    mind. An organization whose only project is the governance one is exempt, since there is nothing
+    else to name; one with no governance project either refuses with `trace_project_required`. Send
+    `Idempotency-Key` to make a retry safe: a replay returns the original response including its
+    `secret`, which is the only way to recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
@@ -220,17 +226,20 @@ async def asyncio_detailed(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
-    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret
+    and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to
+    the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent
+    printing a snippet) never holds it. `scopes` defaults to the caller's project, where
+    `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a
+    scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also
+    needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs
+    `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it
+    from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed
+    to the organization's hidden governance project and counted by no budget on the project you had in
+    mind. An organization whose only project is the governance one is exempt, since there is nothing
+    else to name; one with no governance project either refuses with `trace_project_required`. Send
+    `Idempotency-Key` to make a retry safe: a replay returns the original response including its
+    `secret`, which is the only way to recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):
@@ -271,17 +280,20 @@ async def asyncio(
     """Create virtual key
 
      Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret`
-    value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and
-    team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An
-    org- or team-scoped key also needs a place for its traces and spend to land, and must say where:
-    pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without
-    exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`,
-    because the spend would be attributed to the organization's hidden governance project and counted by
-    no budget on the project you had in mind. An organization whose only project is the governance one
-    is exempt, since there is nothing else to name; one with no governance project either refuses with
-    `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original
-    response including its `secret`, which is the only way to recover a secret whose response was lost
-    in transit.
+    value, because LangWatch stores only a hash. With `reveal_once` the response withholds the secret
+    and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to
+    the person the key is for, through the LangWatch app, so a caller that only relays the key (an agent
+    printing a snippet) never holds it. `scopes` defaults to the caller's project, where
+    `virtualKeys:create` is enough; org- and team-scoped keys, or a key for another project, require a
+    scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also
+    needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs
+    `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it
+    from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed
+    to the organization's hidden governance project and counted by no budget on the project you had in
+    mind. An organization whose only project is the governance one is exempt, since there is nothing
+    else to name; one with no governance project either refuses with `trace_project_required`. Send
+    `Idempotency-Key` to make a retry safe: a replay returns the original response including its
+    `secret`, which is the only way to recover a secret whose response was lost in transit.
 
     Args:
         idempotency_key (str | Unset):

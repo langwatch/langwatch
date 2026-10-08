@@ -16,6 +16,7 @@ import {
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
+import { nlpgoInternalHeaders } from "~/server/nlpgo/internalSecret";
 import { nlpgoProxyBaseURL } from "~/server/nlpgo/nlpgoFetch";
 
 const errorCache: Record<string, any> = {};
@@ -101,12 +102,15 @@ secured
       modelProvider,
       projectId,
     });
-    const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [
-        `x-litellm-${key}`,
-        value,
-      ]),
-    );
+    const headers = {
+      ...Object.fromEntries(
+        Object.entries(litellmParams).map(([key, value]) => [
+          `x-litellm-${key}`,
+          value,
+        ]),
+      ),
+      ...nlpgoInternalHeaders(),
+    };
 
     // Go playground proxy: nlpgo's /go/proxy/v1/* (in-process AI Gateway,
     // no LiteLLM). Wire shape is x-litellm-* headers + OpenAI body, read by

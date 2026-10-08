@@ -9,13 +9,16 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
+import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { app } from "../[[...route]]/app";
 
-wireDefaultTestApp();
+wireDefaultTestApp(() => ({
+  projects: new ProjectService(new PrismaProjectRepository(prisma)),
+}));
 
 describe("Feature: Projects REST API", () => {
   const ns = `projects-api-${nanoid(8)}`;

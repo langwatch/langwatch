@@ -355,6 +355,10 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if ifNoneMatch != "" && resp.StatusCode == http.StatusNotModified {
 		return domain.ConfigFetchResult{ETag: ifNoneMatch, NotModified: true}, nil
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		// The key no longer exists: a definitive answer, not an outage.
+		return domain.ConfigFetchResult{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
 	}

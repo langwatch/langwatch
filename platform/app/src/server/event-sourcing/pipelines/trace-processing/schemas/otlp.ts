@@ -126,7 +126,7 @@ export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> =
   z.object({
-    values: z.array(anyValueSchema),
+    values: z.array(anyValueSchema).optional().default([]),
   });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,11 +135,11 @@ export const keyValueListSchema: z.ZodType<
   z.ZodTypeDef,
   any
 > = z.object({
-  values: z.array(keyValueSchema),
+  values: z.array(keyValueSchema).optional().default([]),
 });
 
 export const resourceSchema = z.object({
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
   schemaUrl: z.string().optional().nullable(),
 });
@@ -157,26 +157,18 @@ const STATUS_CODE_SET = {
   2: true,
 } as const satisfies Record<EStatusCode, true>;
 
-// OTLP span kind can be either numeric (from binary format) or string (from JSON format).
-// Per OTLP semantics, an omitted `kind` field decodes to SPAN_KIND_UNSPECIFIED (0)
-// on the wire — both protobuf (default for unset enum field) and JSON (default
-// per the OTLP HTTP spec). Without this default, a span that legitimately omits
-// `kind` fails schema validation and is dropped silently, even though the
-// caller sent a structurally valid span (see #5898 — "edge-omitted-kind"
-// reproducer returned HTTP 200 with the span missing).
-export const eSpanKindSchema = z
-  .union([
-    z.nativeEnum(ESpanKind),
-    z.enum([
-      "SPAN_KIND_UNSPECIFIED",
-      "SPAN_KIND_INTERNAL",
-      "SPAN_KIND_SERVER",
-      "SPAN_KIND_CLIENT",
-      "SPAN_KIND_PRODUCER",
-      "SPAN_KIND_CONSUMER",
-    ]),
-  ])
-  .default(ESpanKind.SPAN_KIND_UNSPECIFIED);
+// OTLP span kind can be either numeric (from binary format) or string (from JSON format)
+export const eSpanKindSchema = z.union([
+  z.nativeEnum(ESpanKind),
+  z.enum([
+    "SPAN_KIND_UNSPECIFIED",
+    "SPAN_KIND_INTERNAL",
+    "SPAN_KIND_SERVER",
+    "SPAN_KIND_CLIENT",
+    "SPAN_KIND_PRODUCER",
+    "SPAN_KIND_CONSUMER",
+  ]),
+]);
 
 export const eStatusCodeSchema = z
   .number()
@@ -193,10 +185,12 @@ export const statusSchema = z.object({
   code: eStatusCodeSchema.optional().nullable(),
 });
 
+// ProtoJSON omits default-valued fields (zero counts, empty lists), so every
+// such field must accept absence or spec-compliant OTLP/JSON spans are dropped.
 export const eventSchema = z.object({
   timeUnixNano: fixed64Schema,
   name: z.string(),
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   droppedAttributesCount: z.number().optional().nullable(),
 });
 
@@ -204,8 +198,8 @@ export const linkSchema = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().optional().nullable(),
-  attributes: z.array(keyValueSchema),
-  droppedAttributesCount: z.number().nullable(),
+  attributes: z.array(keyValueSchema).optional().default([]),
+  droppedAttributesCount: z.number().optional().nullable().default(0),
   flags: z.number().optional().nullable(),
 });
 
@@ -215,10 +209,13 @@ export const spanSchema = z.object({
   traceState: z.string().nullable().optional(),
   parentSpanId: idSchema.nullable().optional(),
   name: z.string(),
-  kind: eSpanKindSchema,
+  // Absent in ProtoJSON and null from the protobuf decoder when unset (0).
+  kind: eSpanKindSchema
+    .nullish()
+    .transform((kind) => kind ?? ESpanKind.SPAN_KIND_UNSPECIFIED),
   startTimeUnixNano: fixed64Schema,
   endTimeUnixNano: fixed64Schema,
-  attributes: z.array(keyValueSchema),
+  attributes: z.array(keyValueSchema).optional().default([]),
   events: z.array(eventSchema).optional().default([]),
   links: z.array(linkSchema).optional().default([]),
   status: statusSchema
@@ -243,7 +240,7 @@ export const scopeSpansSchema = z.object({
 
 export const resourceSpansSchema = z.object({
   resource: resourceSchema.optional(),
-  scopeSpans: z.array(scopeSpansSchema),
+  scopeSpans: z.array(scopeSpansSchema).optional().default([]),
   schemaUrl: z.string().optional(),
 });
 

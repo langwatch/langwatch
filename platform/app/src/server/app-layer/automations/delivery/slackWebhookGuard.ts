@@ -41,13 +41,6 @@ const isGenuineSlackWebhookUrl = (url: string): boolean => {
 };
 
 /**
- * Boolean predicate for the test-fire path: returns false (instead of throwing)
- * when the URL is not a genuine Slack incoming-webhook endpoint.
- */
-export const isSlackWebhookUrl = (url: string): boolean =>
-  isGenuineSlackWebhookUrl(url);
-
-/**
  * Throws a non-retryable `DispatchError` when `url` is not a genuine Slack
  * incoming-webhook endpoint. A bad URL can never become valid on retry, so the
  * failure is classified non-retryable for the drainer.
@@ -60,6 +53,8 @@ export const assertSlackWebhookUrl = (
     throw new DispatchError({
       message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a genuine https://hooks.slack.com/ incoming-webhook endpoint`,
       retryable: false,
+      customerMessage:
+        "That is not a Slack incoming webhook URL. It must start with https://hooks.slack.com/.",
     });
   }
 };

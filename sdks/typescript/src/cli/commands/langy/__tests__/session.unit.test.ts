@@ -815,10 +815,77 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(result!.ok).toBe(false);
       const error = result!.error as { code: string; message: string };
       expect(error.code).toBe("key_refused");
-      expect(error.message).toContain("project:update");
+      expect(error.message).toContain("project:manage");
       expect(error.message).toContain("Acme Shop");
       expect(error.message).toContain(".env");
       expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+    });
+
+    describe("when the key cannot be fetched", () => {
+      /** @scenario "A failed credentials write offers another try, never a manual paste" */
+      it.each([
+        ["an expired login", { status: 401 }],
+        ["a missing permission", { status: 403 }],
+        ["an app that did not answer", { status: 502 }],
+      ])("says what failed and offers another try for %s", async (_name, failure) => {
+        start({
+          readProjectApiKey: async () => {
+            throw Object.assign(new Error("failed"), failure);
+          },
+        });
+        await settle();
+        register();
+        socket.deliver({ type: "policy", skipPermissions: true });
+
+        socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+        await waitUntil(() => socket.sentOf("result").length === 1, {
+          what: "the failure to be reported",
+        });
+
+        const [result] = socket.sentOf("result");
+        const error = result!.error as { code: string; message: string };
+        expect(error.message).toMatch(/\.env was not changed/);
+        expect(error.message).toMatch(/offer to (write the credentials again|try again)/);
+        expect(error.message).not.toMatch(/by hand|settings page/);
+      });
+
+      it.each([
+        [
+          "the project lookup refused",
+          { stage: "lookup", status: 403 },
+          /cannot see Acme Shop \(it needs project:view\)/,
+        ],
+        [
+          "no project found for the login",
+          { stage: "key", status: 404, code: "project_not_found" },
+          /found no project Acme Shop/,
+        ],
+        [
+          "a server older than the command line",
+          { stage: "key", status: 404, code: "endpoint_missing" },
+          /updating LangWatch fixes it/,
+        ],
+      ])("gives guidance that fits when %s", async (_name, failure, guidance) => {
+        start({
+          readProjectApiKey: async () => {
+            throw Object.assign(new Error("failed"), failure);
+          },
+        });
+        await settle();
+        register();
+        socket.deliver({ type: "policy", skipPermissions: true });
+
+        socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+        await waitUntil(() => socket.sentOf("result").length === 1, {
+          what: "the failure to be reported",
+        });
+
+        const [result] = socket.sentOf("result");
+        const error = result!.error as { code: string; message: string };
+        expect(error.code).toBe("key_refused");
+        expect(error.message).toMatch(guidance);
+        expect(error.message).not.toMatch(/project:manage|did not answer|by hand/);
+      });
     });
 
     /** @scenario "The credentials are not written when the terminal has no endpoint" */

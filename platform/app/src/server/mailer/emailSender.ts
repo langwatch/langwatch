@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { env } from "../../env.mjs";
+import { EmailProviderNotConfiguredError } from "./errors";
 import { resolveEmailProvider } from "./providers";
 import type { EmailContent } from "./providers/types";
 
@@ -32,9 +33,7 @@ export const sendEmail = async (content: EmailContent) => {
 
   if (!provider) {
     logger.error("No email sending method available. Skipping email sending.");
-    throw new Error(
-      "No email sending method available. Skipping email sending.",
-    );
+    throw new EmailProviderNotConfiguredError();
   }
 
   return await provider.send({ content, defaultFrom: computeDefaultFrom() });

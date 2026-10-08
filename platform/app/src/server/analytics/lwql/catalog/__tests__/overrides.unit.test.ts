@@ -158,14 +158,11 @@ describe("Dataset overrides", () => {
   });
 
   describe("dedup configuration", () => {
-    // metric_time_rollups, simulation_run_metrics_rollup and
-    // gateway_budget_scope_totals are AggregatingMergeTree sources whose
-    // AggregateFunction-state columns the derived builder cannot merge
-    // correctly — they are skipped (see ../skippedTables.ts), not overridden.
     it("marks each AggregatingMergeTree rollup dataset aggregating", () => {
-      // These were skipped as a follow-up; they are now catalogued, and the
-      // builder finalises their AggregateFunction states with merge combinators
-      // under a GROUP BY — which only fires when the override declares it.
+      // gateway_budget_scope_totals and simulation_run_metrics_rollup are
+      // AggregatingMergeTree sources: the builder finalises their
+      // AggregateFunction states with merge combinators under a GROUP BY —
+      // which only fires when the override declares it.
       expect(GATEWAY_OVERRIDES.gateway_budget_scope_totals?.dedup).toEqual({
         aggregating: true,
       });

@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-01
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-142](./142-the-app-owns-the-lwql-access-model.md)
+
+> **Superseded (2026-09-22).** ADR-142: the app owns the LangWatchQL access model on every distribution; no rendered copy exists. The two-owner table below is historical.
 
 ## Context
 

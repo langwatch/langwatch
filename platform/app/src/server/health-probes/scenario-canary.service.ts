@@ -53,6 +53,7 @@ import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import type { SimulationTarget } from "~/server/scenarios/simulation-target";
 import { SuiteRepository } from "~/server/suites/suite.repository";
 import { parseSuiteTargets } from "~/server/suites/types";
+import { probeCauseOf } from "./probe-cause";
 
 const logger = createLogger("langwatch:scenario-canary");
 
@@ -71,7 +72,7 @@ export type CanaryReason = "timeout" | "run_failed" | "judge_failed";
 /** The pure verdict of one run, before the run's own handle is attached. */
 export type CanaryVerdict =
   | { healthy: true }
-  | { healthy: false; reason: CanaryReason };
+  | { healthy: false; reason: CanaryReason; cause?: string };
 
 /** A settled canary outcome: the verdict plus the run it came from. */
 export type CanaryOutcome = CanaryVerdict & {
@@ -162,16 +163,18 @@ export function classifyCanaryOutcome({
   status,
   results,
 }: ScenarioRunSnapshot): CanaryVerdict {
+  const cause = probeCauseOf(results?.error);
+  const withCause = cause ? { cause } : {};
   if (isTerminalStatus(status) && status !== ScenarioRunStatus.SUCCESS) {
-    return { healthy: false, reason: "run_failed" };
+    return { healthy: false, reason: "run_failed", ...withCause };
   }
   if (!results || results.error || !results.verdict) {
-    return { healthy: false, reason: "judge_failed" };
+    return { healthy: false, reason: "judge_failed", ...withCause };
   }
   if (results.verdict === Verdict.SUCCESS) {
     return { healthy: true };
   }
-  return { healthy: false, reason: "run_failed" };
+  return { healthy: false, reason: "run_failed", ...withCause };
 }
 
 /**
@@ -232,7 +235,15 @@ async function runCanaryAttempt({
       { error, scenarioRunId },
       "Scenario canary attempt failed to launch or read the run",
     );
-    return { scenarioRunId, verdict: { healthy: false, reason: "run_failed" } };
+    const cause = probeCauseOf(error);
+    return {
+      scenarioRunId,
+      verdict: {
+        healthy: false,
+        reason: "run_failed",
+        ...(cause && { cause }),
+      },
+    };
   }
 }
 

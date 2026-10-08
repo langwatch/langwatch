@@ -192,65 +192,62 @@ describe("provider slice round trips", () => {
   });
 
   describe("given a slack slice", () => {
+    const client = CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
     const baseSlackSlice: SlackSlice = {
+      slackIntegrationId: "",
       deliveryMethod: "webhook",
-      webhook: "",
-      botToken: "",
       channelId: "",
-      botTokenAlreadySet: false,
-      isLegacyWebhook: true,
+      legacyParams: null,
       templateType: "block_kit",
       template: { value: "", usingDefault: true },
     };
+    const roundTrip = (slice: SlackSlice) =>
+      client.fromTriggerRow(
+        rowFrom(TriggerAction.SEND_SLACK_MESSAGE, client.toActionParams(slice)),
+      ) as SlackSlice;
 
-    describe("when a webhook slice is serialised to a row and read back", () => {
-      it("preserves the webhook through actionParams", () => {
-        const client =
-          CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
-        const slice: SlackSlice = {
+    describe("when a webhook connection is serialised and read back", () => {
+      it("preserves the connection and the delivery method", () => {
+        const back = roundTrip({
           ...baseSlackSlice,
-          webhook: "https://hooks.slack.com/services/T000/B000/xyz",
-        };
-        const back = client.fromTriggerRow(
-          rowFrom(
-            TriggerAction.SEND_SLACK_MESSAGE,
-            client.toActionParams(slice),
-          ),
-        ) as SlackSlice;
+          slackIntegrationId: "conn-hook",
+        });
+
+        expect(back.slackIntegrationId).toBe("conn-hook");
         expect(back.deliveryMethod).toBe("webhook");
-        expect(back.webhook).toBe(slice.webhook);
+        expect(back.legacyParams).toBeNull();
       });
     });
 
-    describe("when a bot slice is serialised, redacted, and read back", () => {
-      it("carries the channel and reports the token as already set", () => {
-        const client =
-          CLIENT_PROVIDERS[TriggerAction.SEND_SLACK_MESSAGE].client;
-        const slice: SlackSlice = {
+    describe("when a bot connection is serialised and read back", () => {
+      it("preserves the connection and the channel", () => {
+        const back = roundTrip({
           ...baseSlackSlice,
+          slackIntegrationId: "conn-bot",
           deliveryMethod: "bot",
           channelId: "C0123",
-          botToken: "xoxb-fresh-token",
-        };
-        // The server strips the token and echoes a "set" flag before the row
-        // ever reaches the browser (see `redactSlackActionParams`); emulate
-        // that so the read path sees what the client actually receives.
-        const persisted = client.toActionParams(slice) as Record<
-          string,
-          unknown
-        >;
-        const redacted = {
-          slackDelivery: persisted.slackDelivery,
-          slackChannelId: persisted.slackChannelId,
-          slackBotTokenSet: true,
-        };
-        const back = client.fromTriggerRow(
-          rowFrom(TriggerAction.SEND_SLACK_MESSAGE, redacted),
-        ) as SlackSlice;
+        });
+
+        expect(back.slackIntegrationId).toBe("conn-bot");
         expect(back.deliveryMethod).toBe("bot");
         expect(back.channelId).toBe("C0123");
-        expect(back.botToken).toBe("");
-        expect(back.botTokenAlreadySet).toBe(true);
+      });
+    });
+
+    describe("when a legacy bot row is read and written back", () => {
+      it("writes back its method and channel, and the server moves the token it stores", () => {
+        // The read returns no token (see `readableSlackActionParams`).
+        const slice = client.fromTriggerRow(
+          rowFrom(TriggerAction.SEND_SLACK_MESSAGE, {
+            slackDelivery: "bot",
+            slackChannelId: "C0123",
+          }),
+        ) as SlackSlice;
+
+        expect(client.toActionParams(slice)).toEqual({
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        });
       });
     });
   });

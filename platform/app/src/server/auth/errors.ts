@@ -64,6 +64,24 @@ export class NoAddressToConfirmError extends HandledError {
 }
 
 /**
+ * The installation has no email provider configured, so no confirmation link
+ * can be sent. An operator can configure one; until then the address stays
+ * unconfirmed (ADR-117, revision 2026-09-25).
+ */
+export class EmailSendingUnavailableError extends HandledError {
+  declare readonly code: "auth_email_sending_unavailable";
+
+  constructor() {
+    super(
+      "auth_email_sending_unavailable",
+      "This installation cannot send email, so the address cannot be confirmed.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "EmailSendingUnavailableError";
+  }
+}
+
+/**
  * An impersonating operator asked to set or change the subject's password.
  *
  * Refused outright: how an account signs in belongs to its owner, and
@@ -103,5 +121,48 @@ export class DirectRegistrationUnavailableError extends HandledError {
       { httpStatus: 400, fault: "customer" },
     );
     this.name = "DirectRegistrationUnavailableError";
+  }
+}
+
+/**
+ * The installation restricts who may create an account (`SIGN_UP_MODE`,
+ * `SIGN_UP_ALLOWED_DOMAINS`), and this address is not one of them.
+ *
+ * One code for both restrictions: what the person can do is the same either
+ * way, which is to ask an administrator for an invitation. Which rule refused
+ * goes to the log line, through the reason.
+ */
+export class SignUpRestrictedError extends HandledError {
+  declare readonly code: "auth_sign_up_restricted";
+
+  constructor(detail: string) {
+    super(
+      "auth_sign_up_restricted",
+      "Accounts on this installation are created by invitation.",
+      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SignUpRestrictedError";
+  }
+}
+
+/**
+ * A signed-out sign-up request arrived from a web address other than the one
+ * the installation is configured for (`NEXTAUTH_URL`).
+ *
+ * The same refusal the `/api/auth/*` origin gate answers with, for the tRPC
+ * procedures that start or complete a sign-up. The usual cause is somebody
+ * reaching the installation on a second address (a port-forward, an internal
+ * hostname), and the way on is to use the configured one.
+ */
+export class InvalidAuthOriginError extends HandledError {
+  declare readonly code: "auth_invalid_origin";
+
+  constructor() {
+    super(
+      "auth_invalid_origin",
+      "This request came from a different web address than the one this installation is set up for.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "InvalidAuthOriginError";
   }
 }

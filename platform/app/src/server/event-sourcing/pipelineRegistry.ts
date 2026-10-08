@@ -100,6 +100,7 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import { isEvaluatorSettingsRecoveryDisabled } from "../app-layer/evaluations/settings-recovery-flag";
 import { ssoBreakGlass, ssoDomainReproof } from "../app-layer/identity/runtime";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
 import {
@@ -1426,17 +1427,7 @@ export class PipelineRegistry {
       // switch as available while flipping it changed nothing. The command
       // catches a rejection here and stays on the shipped default (recovery
       // ACTIVE) — an unreadable kill switch must not fail evaluations.
-      isSettingsRecoveryDisabled: () =>
-        featureFlagService.isEnabled(
-          "ops_evaluator_settings_recovery_disabled",
-          {
-            distinctId: "evaluator-settings-recovery",
-            defaultValue: false,
-            // A pipeline-wide switch, flipped for the fleet and not per tenant.
-            projectId: NOT_TARGETED,
-            organizationId: NOT_TARGETED,
-          },
-        ),
+      isSettingsRecoveryDisabled: isEvaluatorSettingsRecoveryDisabled,
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag

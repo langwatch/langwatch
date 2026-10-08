@@ -6,10 +6,13 @@
  * The page asks for this once and reads it; the typing and the commands live
  * together because activating clears both inputs whichever one was used.
  */
+import { detectLicenseInputForm } from "@ee/licensing/licenseInputForm";
 import { useState } from "react";
 import { api } from "~/utils/api";
-import { normalizeKeyForActivation } from "./licenseStatusUtils";
 import { useLicenseActions } from "./useLicenseActions";
+
+/** A signed license key is a base64 blob of a few hundred characters. */
+const MIN_LICENSE_KEY_LENGTH = 64;
 
 export function useLicenseScreen(organizationId: string) {
   const [licenseKey, setLicenseKey] = useState("");
@@ -49,9 +52,13 @@ export function useLicenseScreen(organizationId: string) {
     },
   });
 
-  const activateTypedKey = (text: string) => {
-    const normalizedKey = normalizeKeyForActivation(text);
-    if (normalizedKey) upload(normalizedKey);
+  // Every field accepts both forms, the same as LANGWATCH_LICENSE_KEY: the
+  // value's shape decides whether it is redeemed as a code or stored as a key,
+  // whichever field or file it came through.
+  const submitLicense = (text: string) => {
+    const input = detectLicenseInputForm(text);
+    if (input.form === "activation_code") activate(input.code);
+    else if (input.form === "license_key") upload(input.licenseKey);
   };
 
   return {
@@ -64,11 +71,21 @@ export function useLicenseScreen(organizationId: string) {
     activationCode,
     setActivationCode,
     activateCode: () => {
-      const code = activationCode.trim();
-      if (code) activate(code);
+      // A short value that is not a code is a mistyped code, not a license
+      // key: redeeming it gets the connect host's "malformed code" answer
+      // instead of a license format error.
+      const typed = activationCode.trim();
+      if (
+        detectLicenseInputForm(typed).form === "license_key" &&
+        typed.length < MIN_LICENSE_KEY_LENGTH
+      ) {
+        activate(typed);
+        return;
+      }
+      submitLicense(activationCode);
     },
-    activateKey: () => activateTypedKey(licenseKey),
-    activateFile: activateTypedKey,
+    activateKey: () => submitLicense(licenseKey),
+    activateFile: submitLicense,
     remove,
     refresh,
     isUploading,
