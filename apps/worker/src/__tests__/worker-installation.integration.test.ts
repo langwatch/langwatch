@@ -387,7 +387,7 @@ describe("the worker process installation", () => {
         .at(-1)!;
       const declared = eventing.definitions.map((definition) => ({
         pipeline: definition.metadata.name,
-        aliases: definition.laneAliases ?? [],
+        aliases: definition.open((opened) => opened.laneAliases ?? []),
       }));
       expect(laneAliasesPastWindow({ declared, newestRelease })).toEqual([]);
     } finally {
