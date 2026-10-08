@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
-import type { ObjectStore } from "../tieredBlobStore.ts";
+import type { ObjectStore } from "../storage.ts";
 import {
   FlakyObjectStore,
   InMemoryObjectStore,

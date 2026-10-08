@@ -9,7 +9,6 @@ import type { JobBlobStore } from "./jobEnvelope.ts";
 import { gqBlobDecodeCapExceededTotal } from "./metrics.ts";
 import type { MintStorageUri, ObjectStore, TenantId } from "./storage.ts";
 
-export type { ObjectStore } from "./storage.ts";
 
 /**
  * Above this size a blob lives in the durable object store; at or below, in

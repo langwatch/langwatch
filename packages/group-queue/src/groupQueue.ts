@@ -94,7 +94,12 @@ import {
   recordDroppedJob,
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
-import { type MintStorageUri, redactStorageUrisInText, tenantIdFromGroupId } from "./storage.ts";
+import {
+  type MintStorageUri,
+  type ObjectStore,
+  redactStorageUrisInText,
+  tenantIdFromGroupId,
+} from "./storage.ts";
 
 function createBlockingConnection({
   consumerEnabled,
@@ -125,7 +130,7 @@ import {
   type PreflightTargetsState,
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
-import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
+import { TransientBlobStoreError } from "./tieredBlobStore.ts";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {

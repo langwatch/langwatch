@@ -17,11 +17,12 @@ import { RedisJobBlobStore } from "./redisJobBlobStore.ts";
 import {
   createTenantId,
   type MintStorageUri,
+  type ObjectStore,
   redactStorageUrisInText,
   type TenantId,
   tenantIdFromGroupId,
 } from "./storage.ts";
-import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore.ts";
+import { TieredBlobStore } from "./tieredBlobStore.ts";
 
 const logger = createLogger("langwatch:group-queue:envelope-blob-lifecycle");
 

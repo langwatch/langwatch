@@ -23,7 +23,7 @@ export {
 } from "./blobKeys.ts";
 export { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua.ts";
 export type { BlobSweepReport, BlobSweepTally } from "./blobSweeper.ts";
-export { BlobSweeper, BlobSweeper as GroupQueueBlobSweeper } from "./blobSweeper.ts";
+export { BlobSweeper } from "./blobSweeper.ts";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript.ts";
 export {
   DISCARD_FROM_DLQ_LUA,
