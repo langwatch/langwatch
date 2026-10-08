@@ -48,6 +48,7 @@
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",
     "ai": "catalog:",
     "hono": "catalog:",

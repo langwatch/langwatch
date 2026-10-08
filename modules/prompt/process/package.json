@@ -27,6 +27,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/organization-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

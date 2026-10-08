@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",

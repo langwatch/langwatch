@@ -57,6 +57,9 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

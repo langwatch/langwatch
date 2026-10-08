@@ -79,6 +79,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/upgrade/tsconfig.build.json"
     }
   ]
 }

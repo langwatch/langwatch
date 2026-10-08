@@ -121,9 +121,6 @@
       "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
-      "path": "../../platform-health/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {

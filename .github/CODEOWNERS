@@ -6,14 +6,7 @@
 # The pipeline every REST route and tRPC procedure goes through.
 /packages/api/src/                                   @0xdeafcafe
 
-# Who gets which port, which process migrates, what installs AuthZ.
-/apps/api/src/app/*.composition.ts                   @0xdeafcafe
-/apps/worker/src/app/*.composition.ts                @0xdeafcafe
-/apps/tasks/src/platform/*.composition.ts            @0xdeafcafe
-/enterprise/packages/composition/                    @0xdeafcafe
-
 # Authorisation and the request security chain.
-/apps/api/src/api-rest.security.ts                   @0xdeafcafe
 /modules/authz/process/                     @0xdeafcafe
 /modules/identity/process/                  @0xdeafcafe
 

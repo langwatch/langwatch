@@ -1,6 +1,5 @@
 {
   "name": "@langwatch/system-migrations",
-  "langwatch": { "group": "framework" },
   "version": "0.1.0",
   "private": true,
   "description": "In-place, one-time data migrations the system runs on itself: a per-tenant state machine driven by a leased runner at worker boot. Storage-engine-free - the app implements the repository interfaces with Prisma and Redis. First rider: the ADR-092 stage-B authorization backfill.",
@@ -22,12 +21,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/observability": "workspace:*"
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "langwatch": {
+    "group": "framework"
   }
 }

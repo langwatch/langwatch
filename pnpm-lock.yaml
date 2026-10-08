@@ -799,24 +799,9 @@ importers:
 
   apps/api:
     dependencies:
-      '@aws-sdk/client-cloudwatch-logs':
-        specifier: 'catalog:'
-        version: 3.1121.0
-      '@aws-sdk/client-lambda':
-        specifier: 'catalog:'
-        version: 3.1121.0
-      '@aws-sdk/client-s3':
-        specifier: 'catalog:'
-        version: 3.1108.0
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 2.0.10(hono@4.13.1)
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/agent/contract
       '@langwatch/agent-process':
         specifier: workspace:*
         version: link:../../modules/agent/process
@@ -826,9 +811,6 @@ importers:
       '@langwatch/analytics-process':
         specifier: workspace:*
         version: link:../../modules/analytics/process
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../modules/annotation/contract
       '@langwatch/annotation-process':
         specifier: workspace:*
         version: link:../../modules/annotation/process
@@ -868,51 +850,27 @@ importers:
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:../../modules/automation/process
-      '@langwatch/aws-client':
-        specifier: workspace:*
-        version: link:../../packages/aws-client
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../packages/clickhouse-client
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/coding-agent/contract
       '@langwatch/coding-agent-process':
         specifier: workspace:*
         version: link:../../modules/coding-agent/process
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../modules/dashboard/contract
       '@langwatch/dashboard-process':
         specifier: workspace:*
         version: link:../../modules/dashboard/process
-      '@langwatch/data-privacy-contract':
-        specifier: workspace:*
-        version: link:../../modules/data-privacy/contract
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
-      '@langwatch/data-retention-contract':
-        specifier: workspace:*
-        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../modules/dataset/contract
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:../../modules/dataset/process
-      '@langwatch/egress':
-        specifier: workspace:*
-        version: link:../../packages/egress
-      '@langwatch/enterprise-billing-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/billing/contract
       '@langwatch/enterprise-billing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/billing/process
@@ -934,9 +892,6 @@ importers:
       '@langwatch/enterprise-licensing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/process
-      '@langwatch/enterprise-managed-provider-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/managed-provider/contract
       '@langwatch/enterprise-managed-provider-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/managed-provider/process
@@ -946,24 +901,15 @@ importers:
       '@langwatch/enterprise-ops-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/enterprise-ops/process
-      '@langwatch/enterprise-saas-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/saas/contract
       '@langwatch/enterprise-saas-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/saas/process
-      '@langwatch/enterprise-scim-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/scim/contract
       '@langwatch/enterprise-scim-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/process
       '@langwatch/enterprise-sso-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/sso/process
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../modules/entitlement/contract
       '@langwatch/entitlement-process':
         specifier: workspace:*
         version: link:../../modules/entitlement/process
@@ -973,24 +919,15 @@ importers:
       '@langwatch/evaluation-process':
         specifier: workspace:*
         version: link:../../modules/evaluation/process
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluator/contract
       '@langwatch/evaluator-process':
         specifier: workspace:*
         version: link:../../modules/evaluator/process
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
-      '@langwatch/experiment-contract':
-        specifier: workspace:*
-        version: link:../../modules/experiment/contract
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:../../modules/experiment/process
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../modules/feature-flag/contract
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../modules/feature-flag/process
@@ -1000,18 +937,9 @@ importers:
       '@langwatch/gateway-process':
         specifier: workspace:*
         version: link:../../modules/gateway/process
-      '@langwatch/github-contract':
-        specifier: workspace:*
-        version: link:../../modules/github/contract
       '@langwatch/github-process':
         specifier: workspace:*
         version: link:../../modules/github/process
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../packages/group-queue
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../packages/handled-error
       '@langwatch/hosted-mcp-process':
         specifier: workspace:*
         version: link:../../modules/hosted-mcp/process
@@ -1030,9 +958,6 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
-      '@langwatch/langy-contract':
-        specifier: workspace:*
-        version: link:../../modules/langy/contract
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:../../modules/langy/process
@@ -1054,15 +979,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../modules/monitor/contract
       '@langwatch/monitor-process':
         specifier: workspace:*
         version: link:../../modules/monitor/process
-      '@langwatch/notification-contract':
-        specifier: workspace:*
-        version: link:../../modules/notification/contract
       '@langwatch/notification-process':
         specifier: workspace:*
         version: link:../../modules/notification/process
@@ -1072,9 +991,6 @@ importers:
       '@langwatch/onboarding-process':
         specifier: workspace:*
         version: link:../../modules/onboarding/process
-      '@langwatch/ops-contract':
-        specifier: workspace:*
-        version: link:../../modules/ops/contract
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:../../modules/ops/process
@@ -1084,15 +1000,6 @@ importers:
       '@langwatch/organization-process':
         specifier: workspace:*
         version: link:../../modules/organization/process
-      '@langwatch/otlp':
-        specifier: workspace:*
-        version: link:../../packages/otlp
-      '@langwatch/plans':
-        specifier: workspace:*
-        version: link:../../packages/plans
-      '@langwatch/platform-health-contract':
-        specifier: workspace:*
-        version: link:../../modules/platform-health/contract
       '@langwatch/platform-health-process':
         specifier: workspace:*
         version: link:../../modules/platform-health/process
@@ -1123,15 +1030,9 @@ importers:
       '@langwatch/prompt-process':
         specifier: workspace:*
         version: link:../../modules/prompt/process
-      '@langwatch/react-rum':
-        specifier: workspace:*
-        version: link:../../packages/react-rum
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
-      '@langwatch/role-contract':
-        specifier: workspace:*
-        version: link:../../modules/role/contract
       '@langwatch/role-process':
         specifier: workspace:*
         version: link:../../modules/role/process
@@ -1141,15 +1042,9 @@ importers:
       '@langwatch/sample-agents-process':
         specifier: workspace:*
         version: link:../../modules/sample-agents/process
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../modules/scenario/contract
       '@langwatch/scenario-process':
         specifier: workspace:*
         version: link:../../modules/scenario/process
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:../../modules/secret/contract
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:../../modules/secret/process
@@ -1165,93 +1060,45 @@ importers:
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
-      '@langwatch/stored-object-contract':
-        specifier: workspace:*
-        version: link:../../modules/stored-object/contract
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process
-      '@langwatch/suite-contract':
-        specifier: workspace:*
-        version: link:../../modules/suite/contract
       '@langwatch/suite-process':
         specifier: workspace:*
         version: link:../../modules/suite/process
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@langwatch/topic-contract':
-        specifier: workspace:*
-        version: link:../../modules/topic/contract
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:../../modules/topic/process
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../modules/trace/contract
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:../../modules/trace/process
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../packages/upgrade
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../modules/user/contract
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:../../modules/user/process
-      '@langwatch/webhook-contract':
-        specifier: workspace:*
-        version: link:../../modules/webhook/contract
       '@langwatch/webhook-process':
         specifier: workspace:*
         version: link:../../modules/webhook/process
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../modules/workflow/contract
       '@langwatch/workflow-process':
         specifier: workspace:*
         version: link:../../modules/workflow/process
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
-      '@trpc/server':
-        specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2)
-      bcrypt:
-        specifier: 'catalog:'
-        version: 6.0.0
-      better-auth:
-        specifier: 'catalog:'
-        version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
-      hono-openapi:
-        specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
-      openapi-types:
-        specifier: 'catalog:'
-        version: 12.1.3
       prisma:
         specifier: 'catalog:'
         version: 7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
-      zod-validation-error:
-        specifier: 'catalog:'
-        version: 5.0.0(zod@4.6.5)
     devDependencies:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
@@ -1262,24 +1109,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
-      '@opentelemetry/otlp-transformer':
-        specifier: 'catalog:'
-        version: 0.55.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-web':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@types/bcrypt':
-        specifier: 'catalog:'
-        version: 6.0.0
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
-      simple-statistics:
-        specifier: ^7.9.2
-        version: 7.9.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1749,9 +1581,6 @@ importers:
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:../../modules/automation/process
-      '@langwatch/clickhouse-client':
-        specifier: workspace:*
-        version: link:../../packages/clickhouse-client
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../packages/clickhouse-migrations
@@ -1839,15 +1668,9 @@ importers:
       '@langwatch/github-process':
         specifier: workspace:*
         version: link:../../modules/github/process
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../packages/group-queue
       '@langwatch/hosted-mcp-process':
         specifier: workspace:*
         version: link:../../modules/hosted-mcp/process
-      '@langwatch/identity-contract':
-        specifier: workspace:*
-        version: link:../../modules/identity/contract
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
@@ -1950,9 +1773,6 @@ importers:
       '@langwatch/suite-process':
         specifier: workspace:*
         version: link:../../modules/suite/process
-      '@langwatch/system-migrations':
-        specifier: workspace:*
-        version: link:../../packages/system-migrations
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../packages/task
@@ -2418,51 +2238,24 @@ importers:
 
   apps/worker:
     dependencies:
-      '@aws-sdk/client-s3':
-        specifier: 'catalog:'
-        version: 3.1108.0
-      '@clickhouse/client':
-        specifier: 'catalog:'
-        version: 1.23.0
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/agent/contract
       '@langwatch/agent-process':
         specifier: workspace:*
         version: link:../../modules/agent/process
-      '@langwatch/analytics-contract':
-        specifier: workspace:*
-        version: link:../../modules/analytics/contract
       '@langwatch/analytics-process':
         specifier: workspace:*
         version: link:../../modules/analytics/process
-      '@langwatch/annotation-contract':
-        specifier: workspace:*
-        version: link:../../modules/annotation/contract
       '@langwatch/annotation-process':
         specifier: workspace:*
         version: link:../../modules/annotation/process
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../modules/api-key/contract
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:../../modules/api-key/process
-      '@langwatch/audit-log-contract':
-        specifier: workspace:*
-        version: link:../../modules/audit-log/contract
       '@langwatch/audit-log-process':
         specifier: workspace:*
         version: link:../../modules/audit-log/process
-      '@langwatch/auth-contract':
-        specifier: workspace:*
-        version: link:../../modules/auth/contract
       '@langwatch/auth-process':
         specifier: workspace:*
         version: link:../../modules/auth/process
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../modules/authz/contract
       '@langwatch/authz-process':
         specifier: workspace:*
         version: link:../../modules/authz/process
@@ -2472,15 +2265,9 @@ importers:
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:../../modules/automation/process
-      '@langwatch/aws-client':
-        specifier: workspace:*
-        version: link:../../packages/aws-client
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../packages/clickhouse-client
-      '@langwatch/coding-agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/coding-agent/contract
       '@langwatch/coding-agent-process':
         specifier: workspace:*
         version: link:../../modules/coding-agent/process
@@ -2496,24 +2283,12 @@ importers:
       '@langwatch/data-privacy-process':
         specifier: workspace:*
         version: link:../../modules/data-privacy/process
-      '@langwatch/data-retention-contract':
-        specifier: workspace:*
-        version: link:../../modules/data-retention/contract
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../modules/dataset/contract
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:../../modules/dataset/process
-      '@langwatch/egress':
-        specifier: workspace:*
-        version: link:../../packages/egress
-      '@langwatch/enterprise-billing-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/billing/contract
       '@langwatch/enterprise-billing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/billing/process
@@ -2523,21 +2298,12 @@ importers:
       '@langwatch/enterprise-gateway-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/enterprise-gateway/process
-      '@langwatch/enterprise-governance-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/governance/contract
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/governance/process
-      '@langwatch/enterprise-licensing-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/licensing/contract
       '@langwatch/enterprise-licensing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/process
-      '@langwatch/enterprise-managed-provider-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/managed-provider/contract
       '@langwatch/enterprise-managed-provider-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/managed-provider/process
@@ -2547,24 +2313,15 @@ importers:
       '@langwatch/enterprise-ops-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/enterprise-ops/process
-      '@langwatch/enterprise-saas-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/saas/contract
       '@langwatch/enterprise-saas-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/saas/process
-      '@langwatch/enterprise-scim-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/scim/contract
       '@langwatch/enterprise-scim-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/process
       '@langwatch/enterprise-sso-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/sso/process
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../modules/entitlement/contract
       '@langwatch/entitlement-process':
         specifier: workspace:*
         version: link:../../modules/entitlement/process
@@ -2574,9 +2331,6 @@ importers:
       '@langwatch/evaluation-process':
         specifier: workspace:*
         version: link:../../modules/evaluation/process
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluator/contract
       '@langwatch/evaluator-process':
         specifier: workspace:*
         version: link:../../modules/evaluator/process
@@ -2586,30 +2340,15 @@ importers:
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:../../modules/experiment/process
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../modules/feature-flag/contract
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../modules/feature-flag/process
-      '@langwatch/gateway-contract':
-        specifier: workspace:*
-        version: link:../../modules/gateway/contract
       '@langwatch/gateway-process':
         specifier: workspace:*
         version: link:../../modules/gateway/process
-      '@langwatch/github-contract':
-        specifier: workspace:*
-        version: link:../../modules/github/contract
       '@langwatch/github-process':
         specifier: workspace:*
         version: link:../../modules/github/process
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../packages/group-queue
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../packages/handled-error
       '@langwatch/hosted-mcp-process':
         specifier: workspace:*
         version: link:../../modules/hosted-mcp/process
@@ -2631,39 +2370,24 @@ importers:
       '@langwatch/langy-process':
         specifier: workspace:*
         version: link:../../modules/langy/process
-      '@langwatch/log-contract':
-        specifier: workspace:*
-        version: link:../../modules/log/contract
       '@langwatch/log-process':
         specifier: workspace:*
         version: link:../../modules/log/process
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../packages/mail
-      '@langwatch/metric-contract':
-        specifier: workspace:*
-        version: link:../../modules/metric/contract
       '@langwatch/metric-process':
         specifier: workspace:*
         version: link:../../modules/metric/process
-      '@langwatch/model-provider-contract':
-        specifier: workspace:*
-        version: link:../../modules/model-provider/contract
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:../../modules/model-provider/process
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../packages/module
-      '@langwatch/monitor-contract':
-        specifier: workspace:*
-        version: link:../../modules/monitor/contract
       '@langwatch/monitor-process':
         specifier: workspace:*
         version: link:../../modules/monitor/process
-      '@langwatch/notification-contract':
-        specifier: workspace:*
-        version: link:../../modules/notification/contract
       '@langwatch/notification-process':
         specifier: workspace:*
         version: link:../../modules/notification/process
@@ -2673,9 +2397,6 @@ importers:
       '@langwatch/onboarding-process':
         specifier: workspace:*
         version: link:../../modules/onboarding/process
-      '@langwatch/ops-contract':
-        specifier: workspace:*
-        version: link:../../modules/ops/contract
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:../../modules/ops/process
@@ -2685,9 +2406,6 @@ importers:
       '@langwatch/organization-process':
         specifier: workspace:*
         version: link:../../modules/organization/process
-      '@langwatch/plans':
-        specifier: workspace:*
-        version: link:../../packages/plans
       '@langwatch/platform-health-process':
         specifier: workspace:*
         version: link:../../modules/platform-health/process
@@ -2709,21 +2427,9 @@ importers:
       '@langwatch/project-process':
         specifier: workspace:*
         version: link:../../modules/project/process
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../modules/prompt/contract
       '@langwatch/prompt-process':
         specifier: workspace:*
         version: link:../../modules/prompt/process
-      '@langwatch/redaction':
-        specifier: workspace:*
-        version: link:../../packages/redaction
-      '@langwatch/redis-client':
-        specifier: workspace:*
-        version: link:../../packages/redis-client
-      '@langwatch/role-contract':
-        specifier: workspace:*
-        version: link:../../modules/role/contract
       '@langwatch/role-process':
         specifier: workspace:*
         version: link:../../modules/role/process
@@ -2733,48 +2439,30 @@ importers:
       '@langwatch/sample-agents-process':
         specifier: workspace:*
         version: link:../../modules/sample-agents/process
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../modules/scenario/contract
       '@langwatch/scenario-process':
         specifier: workspace:*
         version: link:../../modules/scenario/process
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:../../modules/secret/contract
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:../../modules/secret/process
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
-      '@langwatch/share-contract':
-        specifier: workspace:*
-        version: link:../../modules/share/contract
       '@langwatch/share-process':
         specifier: workspace:*
         version: link:../../modules/share/process
       '@langwatch/slack-process':
         specifier: workspace:*
         version: link:../../modules/slack/process
-      '@langwatch/stored-object-contract':
-        specifier: workspace:*
-        version: link:../../modules/stored-object/contract
       '@langwatch/stored-object-process':
         specifier: workspace:*
         version: link:../../modules/stored-object/process
-      '@langwatch/suite-contract':
-        specifier: workspace:*
-        version: link:../../modules/suite/contract
       '@langwatch/suite-process':
         specifier: workspace:*
         version: link:../../modules/suite/process
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@langwatch/topic-contract':
-        specifier: workspace:*
-        version: link:../../modules/topic/contract
       '@langwatch/topic-process':
         specifier: workspace:*
         version: link:../../modules/topic/process
@@ -2787,112 +2475,28 @@ importers:
       '@langwatch/upgrade':
         specifier: workspace:*
         version: link:../../packages/upgrade
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../modules/user/contract
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:../../modules/user/process
-      '@langwatch/webhook-contract':
-        specifier: workspace:*
-        version: link:../../modules/webhook/contract
       '@langwatch/webhook-process':
         specifier: workspace:*
         version: link:../../modules/webhook/process
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../modules/workflow/contract
       '@langwatch/workflow-process':
         specifier: workspace:*
         version: link:../../modules/workflow/process
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
-      '@opentelemetry/api-logs':
-        specifier: 'catalog:'
-        version: 0.221.0
-      '@opentelemetry/context-async-hooks':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/core':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-logs-otlp-http':
-        specifier: 'catalog:'
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-http':
-        specifier: 'catalog:'
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation':
-        specifier: 'catalog:'
-        version: 0.221.0(@opentelemetry/api@1.9.1)(supports-color@10.2.2)
-      '@opentelemetry/resources':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-logs':
-        specifier: 'catalog:'
-        version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-metrics':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-node':
-        specifier: 'catalog:'
-        version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/semantic-conventions':
-        specifier: 'catalog:'
-        version: 1.43.0
-      '@prisma/client':
-        specifier: 'catalog:'
-        version: 7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
-      nanoid:
-        specifier: ^6.0.0
-        version: 6.0.0
-      node-fetch-cache:
-        specifier: ^5.1.0
-        version: 5.1.0
-      pino:
-        specifier: ^10.3.1
-        version: 10.3.1
-      pino-opentelemetry-transport:
-        specifier: 'catalog:'
-        version: 4.0.2(pino@10.3.1)
-      pino-pretty:
-        specifier: ^13.1.3
-        version: 13.1.3
-      posthog-node:
-        specifier: 'catalog:'
-        version: 5.48.1(rxjs@7.8.2)
-      tiktoken:
-        specifier: ^1.0.22
-        version: 1.0.22
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
     devDependencies:
-      '@ai-sdk/openai':
-        specifier: 'catalog:'
-        version: 3.0.79(zod@4.6.5)
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../packages/clickhouse-migrations
-      '@langwatch/scenario':
-        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(supports-color@10.2.2)(vitest@5.0.1)
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
-      esbuild:
-        specifier: 'catalog:'
-        version: 0.28.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -4293,9 +3897,6 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../contract
-      posthog-js:
-        specifier: 'catalog:'
-        version: 1.415.6
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -4860,9 +4461,6 @@ importers:
       '@anthropic-ai/claude-code':
         specifier: 2.1.228
         version: 2.1.228
-      '@eslint/js':
-        specifier: ^10.0.1
-        version: 10.0.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../packages/egress
@@ -4902,9 +4500,6 @@ importers:
       esbuild:
         specifier: 'catalog:'
         version: 0.28.2
-      eslint:
-        specifier: ^10.2.1
-        version: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
       express:
         specifier: ^5.2.1
         version: 5.2.1(supports-color@10.2.2)
@@ -4917,9 +4512,6 @@ importers:
       typescript:
         specifier: catalog:sdk-toolchain
         version: 6.0.3
-      typescript-eslint:
-        specifier: 'catalog:'
-        version: 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@6.0.3))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -7882,6 +7474,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
@@ -11855,6 +11450,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../contract
@@ -12097,9 +11695,6 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
-      '@langwatch/platform-health-contract':
-        specifier: workspace:*
-        version: link:../../platform-health/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -13308,6 +12903,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -15641,6 +15239,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -17513,6 +17114,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../ksuid
       '@langwatch/module':
         specifier: workspace:*
         version: link:../module
@@ -17797,6 +17401,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -19543,38 +19150,17 @@ packages:
     resolution: {integrity: sha512-nJl2KGTlrf9GjLimgIru+V/mzgSK0ABCDQRvxw5BjURL7WfH5uoWmizbH7QB6MmnMBd8cIC9uceWnezL1VZWWw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@eslint/config-array@0.23.5':
-    resolution: {integrity: sha512-Y3kKLvC1dvTOT+oGlqNQ1XLqK6D1HU2YXPc52NmAlJZbMMWDzGYXMiPRJ8TYD39muD/OTjlZmNJ4ib7dvSrMBA==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
   '@eslint/config-helpers@0.4.2':
     resolution: {integrity: sha512-gBrxN88gOIf3R7ja5K9slwNayVcZgK6SOUORm2uBzTeIEfeVaIhOpCtTox3P6R7o2jLFwLFTLnC7kU/RGcYEgw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-
-  '@eslint/config-helpers@0.5.5':
-    resolution: {integrity: sha512-eIJYKTCECbP/nsKaaruF6LW967mtbQbsw4JTtSVkUQc9MneSkbrgPJAbKl9nWr0ZeowV8BfsarBmPpBzGelA2w==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
   '@eslint/core@0.17.0':
     resolution: {integrity: sha512-yL/sLrpmtDaFEiUj1osRP4TI2MDz1AddJL+jZ7KSqvBuliN4xqYY54IfdN8qD8Toa6g1iloph1fxQNkjOxrrpQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@eslint/core@1.2.1':
-    resolution: {integrity: sha512-MwcE1P+AZ4C6DWlpin/OmOA54mmIZ/+xZuJiQd4SyB29oAJjN30UW9wkKNptW2ctp4cEsvhlLY/CsQ1uoHDloQ==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
   '@eslint/eslintrc@3.3.6':
     resolution: {integrity: sha512-l2Ul9PrHsPCKcEY/ac7VgFj9D80C7S68sOKc618SyHDPK36s1XcFebXY0iTzUVn4Yq+YbwvSnDmCz9yxjX+QrA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-
-  '@eslint/js@10.0.1':
-    resolution: {integrity: sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-    peerDependencies:
-      eslint: ^10.0.0
-    peerDependenciesMeta:
-      eslint:
-        optional: true
 
   '@eslint/js@9.39.5':
     resolution: {integrity: sha512-QywQuszQh77pIXCsq998c8hbhSTI/azTty1Z6N53dmAudKHhy573j3yvRLsX2BSp8YpLtoCEG8E9DJe+8zUh4A==}
@@ -19584,17 +19170,9 @@ packages:
     resolution: {integrity: sha512-VtAOaymWVfZcmZbp6E2mympDIHvyjXs/12LqWYjVw6qjrfF+VK+fyG33kChz3nnK+SU5/NeHOqrTEHS8sXO3OA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@eslint/object-schema@3.0.5':
-    resolution: {integrity: sha512-vqTaUEgxzm+YDSdElad6PiRoX4t8VGDjCtt05zn4nU810UIx/uNEV7/lZJ6KwFThKZOzOxzXy48da+No7HZaMw==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-
-  '@eslint/plugin-kit@0.7.1':
-    resolution: {integrity: sha512-rZAP3aVgB9ds9KOeUSL+zZ21hPmo8dh6fnIFwRQj5EAZl9gzR7wxYbYXYysAM8CTqGmUGyp2S4kUdV17MnGuWQ==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
   '@exodus/bytes@1.15.1':
     resolution: {integrity: sha512-S6mL0yNB/Abt9Ei4tq8gDhcczc4S3+vQ4ra7vxnAf+YHC02srtqxKKZghx2Dq6p0e66THKwR6r8N6P95wEty7Q==}
@@ -20037,10 +19615,6 @@ packages:
 
   '@nodable/entities@3.0.0':
     resolution: {integrity: sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw==}
-
-  '@npmcli/fs@5.0.0':
-    resolution: {integrity: sha512-7OsC1gNORBEawOa5+j2pXN9vsicaIOH5cPXxoR6fJOmH6/EXpJB2CajXOu1fPRFun2m1lktEFX11+P89hqO/og==}
-    engines: {node: ^20.17.0 || >=22.9.0}
 
   '@nx/nx-darwin-arm64@23.2.1':
     resolution: {integrity: sha512-majzvZlhlWL8MSDEKbQoGv3qM1u7v8Pk7X86srWsySbGDnCJ5BpMFyqMeroQ3AY4lxRjLYWACX5YXVPy2ttRtQ==}
@@ -22666,9 +22240,6 @@ packages:
   '@types/dom-mediacapture-record@1.0.22':
     resolution: {integrity: sha512-mUMZLK3NvwRLcAAT9qmcK+9p7tpU2FHdDsntR3YI4+GY88XrgG4XiE7u1Q2LAN2/FZOz/tdMDC3GQCR4T8nFuw==}
 
-  '@types/esrecurse@4.3.1':
-    resolution: {integrity: sha512-xJBAbDifo5hpffDBuHl0Y8ywswbiAp/Wi7Y/GtAgSlZyIABppyurxVueOPE8LUQOxdlgi6Zqce7uoEpqNTeiUw==}
-
   '@types/estree-jsx@1.0.5':
     resolution: {integrity: sha512-52CcUVNFyfb1A2ALocQw/Dd1BQFNmSdkuC3BkZ6iqhdMfQz7JWOFRuJFloOzjk+6WijU56m9oKXFAXc7o3Towg==}
 
@@ -23895,10 +23466,6 @@ packages:
     resolution: {integrity: sha512-b6Ilus+c3RrdDk+JhLKUAQfzzgLEPy6wcXqS7f/xe1EETvsDP6GORG7SFuOs6cID5YkqchW/LXZbX5bc8j7ZcQ==}
     engines: {node: '>=8'}
 
-  cacache@20.0.4:
-    resolution: {integrity: sha512-M3Lab8NPYlZU2exsL3bMVvMrMqgwCnMWfdZbK28bn3pK6APT/Te/I8hjRPNu1uwORY9a1eEQoifXbKPQMfMTOA==}
-    engines: {node: ^20.17.0 || >=22.9.0}
-
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
     engines: {node: '>= 0.4'}
@@ -24718,10 +24285,6 @@ packages:
     resolution: {integrity: sha512-sNXOfKCn74rt8RICKMvJS7XKV/Xk9kA7DyJr8mJik3S7Cwgy3qlkkmyS2uQB3jiJg6VNdZd/pDBJu0nvG2NlTg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  eslint-scope@9.1.2:
-    resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
   eslint-visitor-keys@3.4.3:
     resolution: {integrity: sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
@@ -24733,16 +24296,6 @@ packages:
   eslint-visitor-keys@5.0.1:
     resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
-  eslint@10.2.1:
-    resolution: {integrity: sha512-wiyGaKsDgqXvF40P8mDwiUp/KQjE1FdrIEJsM8PZ3XCiniTMXS3OHWWUe5FI5agoCnr8x4xPrTDZuxsBlNHl+Q==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-    hasBin: true
-    peerDependencies:
-      jiti: '*'
-    peerDependenciesMeta:
-      jiti:
-        optional: true
 
   eslint@9.39.5:
     resolution: {integrity: sha512-DgZS62aPLXKlnxILS/AYCoRvHaZeXceIzlXPkkGGzJWSow1aEk0lbTlxUSlyjC8jcaKxAdOnTDz+o1JFSBsyjw==}
@@ -24758,10 +24311,6 @@ packages:
   espree@10.4.0:
     resolution: {integrity: sha512-j6PAQ2uUr79PZhBjP5C5fhl8e39FmRnOjsD5lGnWrFU8i2G776tBK7+nP8KuQUTTyAZUwfQqXAgrVH5MbH9CYQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
-
-  espree@11.2.0:
-    resolution: {integrity: sha512-7p3DrVEIopW1B1avAGLuCSh1jubc01H2JHc8B4qqGblmg5gI9yumBgACjWo4JlIc04ufug4xJ3SQI8HkS/Rgzw==}
-    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
   esprima@4.0.1:
     resolution: {integrity: sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==}
@@ -25021,10 +24570,6 @@ packages:
     engines: {node: '>=18.3.0'}
     hasBin: true
 
-  formdata-node@6.0.3:
-    resolution: {integrity: sha512-8e1++BCiTzUno9v5IZ2J6bv4RU+3UKDmqWUQD0MIMVCd9AdhWkO1gw57oo1mNEX1dMq2EGI+FbWz4B92pscSQg==}
-    engines: {node: '>= 18'}
-
   formdata-polyfill@4.0.10:
     resolution: {integrity: sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==}
     engines: {node: '>=12.20.0'}
@@ -25053,10 +24598,6 @@ packages:
 
   fs-constants@1.0.0:
     resolution: {integrity: sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==}
-
-  fs-minipass@3.0.3:
-    resolution: {integrity: sha512-XUBA9XClHbnJWSfBzjkm6RvPsyg3sryZt06BEQoXcF7EK/xpGaQYJgQKDJSUH5SGZ76Y7pFx1QBnXz09rU5Fbw==}
-    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -25863,9 +25404,6 @@ packages:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
 
-  locko@1.1.0:
-    resolution: {integrity: sha512-pYB2dzRY93fJkg2RIl41AMNgTQftEjyTK9vlPrGOJvuGQsOjb267VJBw15BjiN3RBd1oBoKkOu9E2dRdFKIfAA==}
-
   lodash-es@4.18.1:
     resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
@@ -26221,22 +25759,6 @@ packages:
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
 
-  minipass-collect@2.0.1:
-    resolution: {integrity: sha512-D7V8PO9oaz7PWGLbCACuI1qEOsq7UKfLotx/C0Aet43fCUB/wfQ7DYeq2oR/svFJGYDHPr38SHATeaj/ZoKHKw==}
-    engines: {node: '>=16 || 14 >=14.17'}
-
-  minipass-flush@1.0.7:
-    resolution: {integrity: sha512-TbqTz9cUwWyHS2Dy89P3ocAGUGxKjjLuR9z8w4WUTGAVgEj17/4nhgo2Du56i0Fm3Pm30g4iA8Lcqctc76jCzA==}
-    engines: {node: '>= 8'}
-
-  minipass-pipeline@1.2.4:
-    resolution: {integrity: sha512-xuIq7cIOt09RPRJ19gdi4b+RiNvDFYe5JH+ggNvBqGqpQXcru3PcRmOZuHBKWK1Txf9+cQ+HMVN4d6z46LZP7A==}
-    engines: {node: '>=8'}
-
-  minipass@3.3.6:
-    resolution: {integrity: sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==}
-    engines: {node: '>=8'}
-
   minipass@4.2.8:
     resolution: {integrity: sha512-fNzuVyifolSLFL4NzpF+wEF4qrgqaaKX0haXPQEdQ7NKAN+WecoKMHV09YcuL/DHxrUsYQOK3MiuDf7Ip2OXfQ==}
     engines: {node: '>=8'}
@@ -26396,10 +25918,6 @@ packages:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
     deprecated: Use your platform's native DOMException instead
-
-  node-fetch-cache@5.1.0:
-    resolution: {integrity: sha512-4j3rRHNGIKGX7VzXSrBT0bh7+wFuyJv1DxCfCLDHsnDahJWoD9lXe3BzL3BJg/GEIJiM7KIvqVs3byW1GFtRsQ==}
-    engines: {node: '>=18.19.0'}
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
@@ -26687,10 +26205,6 @@ packages:
   p-locate@5.0.0:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
-
-  p-map@7.0.5:
-    resolution: {integrity: sha512-e8vJF4XdVkzqqSHguEMz41mQO1wKwxKm5ENrUJQUu9kLDCtn83cxbyHZcszr4QC5zEA7WffRRC4gsTecC7J9oA==}
-    engines: {node: '>=18'}
 
   p-queue@6.6.2:
     resolution: {integrity: sha512-RwFpb72c/BhQLEXIZ5K2e+AhgNVmIejGlTgiB9MzZ0e93GRvqZ7uSi0dvRF7/XIXDeNkra2fNHBxTyPDGySpjQ==}
@@ -27690,9 +27204,6 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  simple-statistics@7.9.2:
-    resolution: {integrity: sha512-UpGdisgfSP4/I1epPL93cOlEodV6Nz6T4D3uEVuwAoIdzBv0LxaCuOU1nDTe08jM4v+aPkO7ZyAHDPVSiC72IQ==}
-
   simple-swizzle@0.2.4:
     resolution: {integrity: sha512-nAu1WFPQSMNr2Zn9PGSZK9AGn4t/y97lEm+MXTtUDwfP0ksAIX4nO+6ruD9Jwut4C49SB1Ws+fbXsm/yScWOHw==}
 
@@ -27765,10 +27276,6 @@ packages:
   ssh2@1.17.0:
     resolution: {integrity: sha512-wPldCk3asibAjQ/kziWQQt1Wh3PgDFpC0XpwclzKcdT1vql6KeYxf5LIt4nlFkUeR8WuphYMKqUA56X4rjbfgQ==}
     engines: {node: '>=10.16.0'}
-
-  ssri@13.0.1:
-    resolution: {integrity: sha512-QUiRf1+u9wPTL/76GTYlKttDEBWV1ga9ZXW8BG6kfdeyyM8LGPix9gROyg9V2+P0xNyF3X2Go526xKFdMZrHSQ==}
-    engines: {node: ^20.17.0 || >=22.9.0}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -28732,9 +28239,6 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
-
-  yallist@4.0.0:
-    resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
 
   yallist@5.0.0:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
@@ -30381,11 +29885,6 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@eslint-community/eslint-utils@4.9.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))':
-    dependencies:
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
-      eslint-visitor-keys: 3.4.3
-
   '@eslint-community/eslint-utils@4.9.1(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))':
     dependencies:
       eslint: 9.39.5(jiti@2.7.0)(supports-color@10.2.2)
@@ -30401,27 +29900,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@eslint/config-array@0.23.5(supports-color@10.2.2)':
-    dependencies:
-      '@eslint/object-schema': 3.0.5
-      debug: 4.4.3(supports-color@10.2.2)
-      minimatch: 10.2.5
-    transitivePeerDependencies:
-      - supports-color
-
   '@eslint/config-helpers@0.4.2':
     dependencies:
       '@eslint/core': 0.17.0
 
-  '@eslint/config-helpers@0.5.5':
-    dependencies:
-      '@eslint/core': 1.2.1
-
   '@eslint/core@0.17.0':
-    dependencies:
-      '@types/json-schema': 7.0.15
-
-  '@eslint/core@1.2.1':
     dependencies:
       '@types/json-schema': 7.0.15
 
@@ -30439,24 +29922,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@eslint/js@10.0.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))':
-    optionalDependencies:
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
-
   '@eslint/js@9.39.5': {}
 
   '@eslint/object-schema@2.1.7': {}
 
-  '@eslint/object-schema@3.0.5': {}
-
   '@eslint/plugin-kit@0.4.1':
     dependencies:
       '@eslint/core': 0.17.0
-      levn: 0.4.1
-
-  '@eslint/plugin-kit@0.7.1':
-    dependencies:
-      '@eslint/core': 1.2.1
       levn: 0.4.1
 
   '@exodus/bytes@1.15.1(@noble/hashes@2.2.0)':
@@ -30939,10 +30411,6 @@ snapshots:
   '@noble/hashes@2.4.0': {}
 
   '@nodable/entities@3.0.0': {}
-
-  '@npmcli/fs@5.0.0':
-    dependencies:
-      semver: 7.8.5
 
   '@nx/nx-darwin-arm64@23.2.1':
     optional: true
@@ -33285,8 +32753,6 @@ snapshots:
 
   '@types/dom-mediacapture-record@1.0.22': {}
 
-  '@types/esrecurse@4.3.1': {}
-
   '@types/estree-jsx@1.0.5':
     dependencies:
       '@types/estree': 1.0.9
@@ -33456,22 +32922,6 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
-    dependencies:
-      '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/scope-manager': 8.58.1
-      '@typescript-eslint/type-utils': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/visitor-keys': 8.58.1
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
-      ignore: 7.0.5
-      natural-compare: 1.4.0
-      ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
-
   '@typescript-eslint/eslint-plugin@8.58.1(@typescript-eslint/parser@8.58.1(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
@@ -33484,18 +32934,6 @@ snapshots:
       ignore: 7.0.5
       natural-compare: 1.4.0
       ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
-
-  '@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
-    dependencies:
-      '@typescript-eslint/scope-manager': 8.58.1
-      '@typescript-eslint/types': 8.58.1
-      '@typescript-eslint/typescript-estree': 8.58.1(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/visitor-keys': 8.58.1
-      debug: 4.4.3(supports-color@10.2.2)
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -33530,18 +32968,6 @@ snapshots:
     dependencies:
       typescript: 6.0.3
 
-  '@typescript-eslint/type-utils@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
-    dependencies:
-      '@typescript-eslint/types': 8.58.1
-      '@typescript-eslint/typescript-estree': 8.58.1(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      debug: 4.4.3(supports-color@10.2.2)
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
-      ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
-
   '@typescript-eslint/type-utils@8.58.1(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.58.1
@@ -33567,17 +32993,6 @@ snapshots:
       semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
-
-  '@typescript-eslint/utils@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)':
-    dependencies:
-      '@eslint-community/eslint-utils': 4.9.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))
-      '@typescript-eslint/scope-manager': 8.58.1
-      '@typescript-eslint/types': 8.58.1
-      '@typescript-eslint/typescript-estree': 8.58.1(supports-color@10.2.2)(typescript@6.0.3)
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -34984,19 +34399,6 @@ snapshots:
 
   cac@6.7.14: {}
 
-  cacache@20.0.4:
-    dependencies:
-      '@npmcli/fs': 5.0.0
-      fs-minipass: 3.0.3
-      glob: 11.1.0
-      lru-cache: 11.5.2
-      minipass: 7.1.3
-      minipass-collect: 2.0.1
-      minipass-flush: 1.0.7
-      minipass-pipeline: 1.2.4
-      p-map: 7.0.5
-      ssri: 13.0.1
-
   call-bind-apply-helpers@1.0.2:
     dependencies:
       es-errors: 1.3.0
@@ -35827,55 +35229,11 @@ snapshots:
       esrecurse: 4.3.0
       estraverse: 5.3.0
 
-  eslint-scope@9.1.2:
-    dependencies:
-      '@types/esrecurse': 4.3.1
-      '@types/estree': 1.0.9
-      esrecurse: 4.3.0
-      estraverse: 5.3.0
-
   eslint-visitor-keys@3.4.3: {}
 
   eslint-visitor-keys@4.2.1: {}
 
   eslint-visitor-keys@5.0.1: {}
-
-  eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2):
-    dependencies:
-      '@eslint-community/eslint-utils': 4.9.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))
-      '@eslint-community/regexpp': 4.12.2
-      '@eslint/config-array': 0.23.5(supports-color@10.2.2)
-      '@eslint/config-helpers': 0.5.5
-      '@eslint/core': 1.2.1
-      '@eslint/plugin-kit': 0.7.1
-      '@humanfs/node': 0.16.8
-      '@humanwhocodes/module-importer': 1.0.1
-      '@humanwhocodes/retry': 0.4.3
-      '@types/estree': 1.0.9
-      ajv: 6.14.0
-      cross-spawn: 7.0.6
-      debug: 4.4.3(supports-color@10.2.2)
-      escape-string-regexp: 4.0.0
-      eslint-scope: 9.1.2
-      eslint-visitor-keys: 5.0.1
-      espree: 11.2.0
-      esquery: 1.7.0
-      esutils: 2.0.3
-      fast-deep-equal: 3.1.3
-      file-entry-cache: 8.0.0
-      find-up: 5.0.0
-      glob-parent: 6.0.2
-      ignore: 5.2.4
-      imurmurhash: 0.1.4
-      is-glob: 4.0.3
-      json-stable-stringify-without-jsonify: 1.0.1
-      minimatch: 10.2.5
-      natural-compare: 1.4.0
-      optionator: 0.9.4
-    optionalDependencies:
-      jiti: 2.7.0
-    transitivePeerDependencies:
-      - supports-color
 
   eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2):
     dependencies:
@@ -35923,12 +35281,6 @@ snapshots:
       acorn: 8.18.0
       acorn-jsx: 5.3.2(acorn@8.18.0)
       eslint-visitor-keys: 4.2.1
-
-  espree@11.2.0:
-    dependencies:
-      acorn: 8.18.0
-      acorn-jsx: 5.3.2(acorn@8.18.0)
-      eslint-visitor-keys: 5.0.1
 
   esprima@4.0.1: {}
 
@@ -36234,8 +35586,6 @@ snapshots:
       fd-package-json: 2.0.0
       package-manager-detector: 1.8.0
 
-  formdata-node@6.0.3: {}
-
   formdata-polyfill@4.0.10:
     dependencies:
       fetch-blob: 3.2.0
@@ -36255,10 +35605,6 @@ snapshots:
   fresh@2.0.0: {}
 
   fs-constants@1.0.0: {}
-
-  fs-minipass@3.0.3:
-    dependencies:
-      minipass: 7.1.3
 
   fsevents@2.3.3:
     optional: true
@@ -37096,8 +36442,6 @@ snapshots:
     dependencies:
       p-locate: 5.0.0
 
-  locko@1.1.0: {}
-
   lodash-es@4.18.1: {}
 
   lodash.camelcase@4.3.0: {}
@@ -37711,22 +37055,6 @@ snapshots:
 
   minimist@1.2.8: {}
 
-  minipass-collect@2.0.1:
-    dependencies:
-      minipass: 7.1.3
-
-  minipass-flush@1.0.7:
-    dependencies:
-      minipass: 3.3.6
-
-  minipass-pipeline@1.2.4:
-    dependencies:
-      minipass: 3.3.6
-
-  minipass@3.3.6:
-    dependencies:
-      yallist: 4.0.0
-
   minipass@4.2.8: {}
 
   minipass@7.1.3: {}
@@ -37912,13 +37240,6 @@ snapshots:
   node-addon-api@8.9.0: {}
 
   node-domexception@1.0.0: {}
-
-  node-fetch-cache@5.1.0:
-    dependencies:
-      cacache: 20.0.4
-      formdata-node: 6.0.3
-      locko: 1.1.0
-      node-fetch: 3.3.2
 
   node-fetch@2.7.0(encoding@0.1.13):
     dependencies:
@@ -38417,8 +37738,6 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
-
-  p-map@7.0.5: {}
 
   p-queue@6.6.2:
     dependencies:
@@ -39597,8 +38916,6 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  simple-statistics@7.9.2: {}
-
   simple-swizzle@0.2.4:
     dependencies:
       is-arrayish: 0.3.4
@@ -39665,10 +38982,6 @@ snapshots:
     optionalDependencies:
       cpu-features: 0.0.10
       nan: 2.28.0
-
-  ssri@13.0.1:
-    dependencies:
-      minipass: 7.1.3
 
   stackback@0.0.2: {}
 
@@ -40114,17 +39427,6 @@ snapshots:
       rxjs: 7.8.2
 
   typedarray@0.0.6: {}
-
-  typescript-eslint@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3):
-    dependencies:
-      '@typescript-eslint/eslint-plugin': 8.58.1(@typescript-eslint/parser@8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/parser': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/typescript-estree': 8.58.1(supports-color@10.2.2)(typescript@6.0.3)
-      '@typescript-eslint/utils': 8.58.1(eslint@10.2.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
-      eslint: 10.2.1(jiti@2.7.0)(supports-color@10.2.2)
-      typescript: 6.0.3
-    transitivePeerDependencies:
-      - supports-color
 
   typescript-eslint@8.58.1(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3):
     dependencies:
@@ -40844,8 +40146,6 @@ snapshots:
   y18n@5.0.8: {}
 
   yallist@3.1.1: {}
-
-  yallist@4.0.0: {}
 
   yallist@5.0.0: {}
 

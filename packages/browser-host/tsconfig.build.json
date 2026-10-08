@@ -10,7 +10,6 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/compat/next-dynamic.ts",
     "./src/capabilities.ts",
     "./src/use-router.ts",
     "./src/toaster.ts",
@@ -19,7 +18,6 @@
     "./src/query/query-retry.ts",
     "./src/testing.ts",
     "./src/link.tsx",
-    "./src/use-drawer.ts",
     "./src/global-store.ts",
     "./src/use-organization-team-project.ts",
     "./src/format-time-ago.ts",

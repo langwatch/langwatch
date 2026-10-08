@@ -18,10 +18,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./compat/next-dynamic": {
-      "types": "./dist/compat/next-dynamic.d.ts",
-      "default": "./src/compat/next-dynamic.ts"
-    },
     "./declarations": {
       "types": "./dist/declarations.d.ts",
       "default": "./src/declarations.ts"
@@ -109,10 +105,6 @@
     "./link": {
       "types": "./dist/link.d.ts",
       "default": "./src/link.tsx"
-    },
-    "./use-drawer": {
-      "types": "./dist/use-drawer.d.ts",
-      "default": "./src/use-drawer.ts"
     },
     "./global-store": {
       "types": "./dist/global-store.d.ts",

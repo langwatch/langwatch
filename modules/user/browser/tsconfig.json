@@ -19,6 +19,7 @@
         "../../../enterprise/modules/governance/contract/src/index.ts"
       ],
       "@langwatch/gateway-contract": ["../../gateway/contract/src/index.ts"],
+      "@langwatch/langy-contract": ["../../langy/contract/src/index.ts"],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
       "@langwatch/user-contract": ["../contract/src/index.ts"]
     }
@@ -75,6 +76,9 @@
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
