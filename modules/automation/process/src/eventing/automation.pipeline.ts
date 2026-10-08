@@ -19,6 +19,7 @@ import {
   defineCommand,
   type Event,
   EventSchema,
+  type LaneAlias,
 } from "@langwatch/eventing";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
@@ -445,6 +446,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           { tenantId: context.tenantId },
         ),
     })
+    .withLaneAliases(MAIN_TRIGGER_LANE_ALIASES)
     .build();
 };
 
@@ -472,3 +474,50 @@ class AutomationsPipelineAdapter {
 export const createAutomationsPipeline = AutomationsPipelineAdapter.createPipeline.bind(
   AutomationsPipelineAdapter,
 );
+
+/** Main's four trigger lanes (trace, evaluation) are peer subscribers now, one per event type. */
+function triggerLaneAliases({
+  from,
+  successors,
+}: {
+  from: string;
+  successors: readonly { eventType: string; lane: string }[];
+}): readonly LaneAlias[] {
+  return successors.map(({ eventType, lane }) => ({
+    from,
+    to: { jobType: "subscriber", lane },
+    eventTypes: [eventType],
+    removeAfter: "3.21.0",
+  }));
+}
+
+const MAIN_TRIGGER_LANE_ALIASES: readonly LaneAlias[] = [
+  ...triggerLaneAliases({
+    from: "trace_processing:reactor:triggerMatch",
+    successors: [
+      { eventType: SPAN_RECEIVED_EVENT_TYPE, lane: "traceSpanTriggerMatch" },
+      { eventType: ORIGIN_RESOLVED_EVENT_TYPE, lane: "traceOriginTriggerMatch" },
+    ],
+  }),
+  ...triggerLaneAliases({
+    from: "trace_processing:subscriber:graphTriggerActivity",
+    successors: [
+      { eventType: SPAN_RECEIVED_EVENT_TYPE, lane: "traceSpanGraphActivity" },
+      { eventType: ORIGIN_RESOLVED_EVENT_TYPE, lane: "traceOriginGraphActivity" },
+    ],
+  }),
+  ...triggerLaneAliases({
+    from: "evaluation_processing:reactor:triggerMatch",
+    successors: [
+      { eventType: EVALUATION_COMPLETED_EVENT_TYPE, lane: "evaluationCompletedTriggerMatch" },
+      { eventType: EVALUATION_REPORTED_EVENT_TYPE, lane: "evaluationReportedTriggerMatch" },
+    ],
+  }),
+  ...triggerLaneAliases({
+    from: "evaluation_processing:subscriber:graphTriggerActivity",
+    successors: [
+      { eventType: EVALUATION_COMPLETED_EVENT_TYPE, lane: "evaluationCompletedGraphActivity" },
+      { eventType: EVALUATION_REPORTED_EVENT_TYPE, lane: "evaluationReportedGraphActivity" },
+    ],
+  }),
+];

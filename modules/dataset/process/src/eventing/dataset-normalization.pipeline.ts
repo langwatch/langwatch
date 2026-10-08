@@ -24,18 +24,28 @@ export type DatasetNormalizationDefinition = StaticPipelineDefinition<
 export function buildDatasetNormalizationPipeline(deps: {
   normalize: DatasetNormalize;
 }): DatasetNormalizationDefinition {
-  return definePipeline({
-    name: DATASET_NORMALIZATION_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "dataset" }),
-  })
-    .withEvents([])
-    .withCommandInstance({
-      name: "datasetNormalize",
-      handlerClass: DatasetNormalizeCommandHandler,
-      instance: DatasetNormalizeCommandHandler.create(deps),
-      options: {},
+  return (
+    definePipeline({
+      name: DATASET_NORMALIZATION_PIPELINE_NAME,
+      aggregate: defineAggregate({ type: "dataset" }),
     })
-    .build();
+      .withEvents([])
+      .withCommandInstance({
+        name: "datasetNormalize",
+        handlerClass: DatasetNormalizeCommandHandler,
+        instance: DatasetNormalizeCommandHandler.create(deps),
+        options: {},
+      })
+      // Main queued it on the trace pipeline; its payload is the command's, staging-key form too.
+      .withLaneAliases([
+        {
+          from: "trace_processing:job:datasetNormalize",
+          to: { jobType: "command", lane: "datasetNormalize" },
+          removeAfter: "3.21.0",
+        },
+      ])
+      .build()
+  );
 }
 
 export const datasetNormalizationEventing = defineEventingModule({

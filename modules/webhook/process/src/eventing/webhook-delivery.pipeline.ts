@@ -3,11 +3,20 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type LaneAlias,
   type ProcessManagerApplier,
   type Projection,
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import {
+  GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import {
   WEBHOOK_DELIVERY_PIPELINE_NAME,
   WEBHOOK_SPEND_DELIVERY_AGGREGATE_TYPE,
@@ -71,7 +80,46 @@ export function buildWebhookDeliveryPipeline(input: {
     .withPeerSubscriber("gatewaySpendSettledDelivery", gateway.gatewaySpendSettledDelivery)
     .withPeerSubscriber("gatewayBudgetCrossingDelivery", gateway.gatewayBudgetCrossingDelivery)
     .withPeerSubscriber("gatewayVkLifecycleDelivery", gateway.gatewayVkLifecycleDelivery)
+    .withLaneAliases(MAIN_DELIVERY_MANAGER_ALIASES)
     .build();
+}
+
+/**
+ * Main's two delivery managers ran on the spend and governance pipelines and read the gateway
+ * event itself. Here the same event reaches the peer subscriber that queues its delivery.
+ */
+const MAIN_DELIVERY_MANAGER_ALIASES: readonly LaneAlias[] = [
+  ...deliveryAliases({
+    from: "gateway_spend_processing:subscriber:pm:webhookDelivery",
+    successors: {
+      [GATEWAY_SPEND_ADMITTED_EVENT_TYPE]: "gatewaySpendAdmittedDelivery",
+      [GATEWAY_SPEND_CONFIRMED_EVENT_TYPE]: "gatewaySpendConfirmedDelivery",
+      [GATEWAY_SPEND_FAILED_EVENT_TYPE]: "gatewaySpendFailedDelivery",
+      [GATEWAY_SPEND_SETTLED_EVENT_TYPE]: "gatewaySpendSettledDelivery",
+    },
+  }),
+  ...deliveryAliases({
+    from: "governance_events_processing:subscriber:pm:governanceEventsDelivery",
+    successors: {
+      [GATEWAY_BUDGET_CROSSING_EVENT_TYPE]: "gatewayBudgetCrossingDelivery",
+      [GATEWAY_VK_LIFECYCLE_EVENT_TYPE]: "gatewayVkLifecycleDelivery",
+    },
+  }),
+];
+
+function deliveryAliases({
+  from,
+  successors,
+}: {
+  from: string;
+  successors: Readonly<Record<string, string>>;
+}): readonly LaneAlias[] {
+  return Object.entries(successors).map(([eventType, lane]) => ({
+    from,
+    to: { jobType: "subscriber", lane },
+    eventTypes: [eventType],
+    removeAfter: "3.21.0",
+  }));
 }
 
 export const webhookDeliveryEventing = defineEventingModule({

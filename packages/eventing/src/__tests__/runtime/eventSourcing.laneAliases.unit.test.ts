@@ -16,7 +16,12 @@ import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
-import { type LaneAlias, laneAliasesPastWindow } from "../../upcast/laneAlias.ts";
+import {
+  type LaneAlias,
+  laneAliasesPastWindow,
+  laneAliasTargetKeys,
+  type RoutedLaneAlias,
+} from "../../upcast/laneAlias.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 
 const SPAN_RECEIVED = "lw.owner.span_received";
@@ -60,7 +65,10 @@ class NoteCommand implements CommandHandler<
   }
 }
 
-function alias(overrides: Partial<LaneAlias> & Pick<LaneAlias, "from" | "to">): LaneAlias {
+function alias(
+  overrides: Pick<RoutedLaneAlias, "from" | "to"> &
+    Partial<Pick<RoutedLaneAlias, "eventTypes" | "data" | "removeAfter">>,
+): RoutedLaneAlias {
   return { removeAfter: "3.21.0", ...overrides };
 }
 
@@ -267,6 +275,46 @@ describe("a successor lane's aliases", () => {
       expect(spanSync).not.toHaveBeenCalled();
       expect(originSync).not.toHaveBeenCalled();
       await eventSourcing.close();
+    });
+  });
+
+  describe("given a former lane its successor tombstones", () => {
+    /** @scenario "A tombstoned former lane has its jobs acknowledged with the reason logged" */
+    it("acknowledges the job and runs no handler", async () => {
+      notes.length = 0;
+      const { eventSourcing, spanSync } = runtime({
+        aliases: [
+          {
+            from: "owner:job:deferredSync",
+            tombstone: "the successor grades through its process manager",
+            removeAfter: "3.21.0",
+          },
+        ],
+      });
+
+      await expect(
+        sendQueuedByPreviousRelease({
+          eventSourcing,
+          key: "owner:job:deferredSync",
+          body: { projectId: "project-1", traceId: "trace-a" },
+        }),
+      ).resolves.toBeUndefined();
+      expect(spanSync).not.toHaveBeenCalled();
+      expect(notes).toEqual([]);
+      await eventSourcing.close();
+    });
+  });
+
+  describe("given a former lane succeeded by a subscriber of the global projections", () => {
+    /** @scenario "A former lane may be succeeded by a subscriber of the global projections" */
+    it("looks for the global lane after its own and its peer lane", () => {
+      expect(
+        laneAliasTargetKeys({ pipeline: "usage", to: { jobType: "reactor", lane: "meterCount" } }),
+      ).toEqual([
+        "usage:reactor:meterCount",
+        "global:reactor:usage.meterCount",
+        "global:reactor:meterCount",
+      ]);
     });
   });
 

@@ -2,13 +2,16 @@ import {
   defineEventingModule,
   throttledWindow,
   type EventingSetup,
+  type LaneAlias,
   type TriggerContext,
 } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceModule } from "../app/trace.app.ts";
 import {
@@ -52,6 +55,35 @@ interface TraceProcessingReactions {
   ) => Promise<void>;
   broadcastDisabled: boolean;
 }
+
+const deferredOriginJobSchema = z.object({ tenantId: z.string(), traceId: z.string() });
+
+/**
+ * Main's origin gate was a reactor of another name, and its delayed job a job lane. The job only
+ * ever sent `resolveOrigin`, so a job still queued sends it with the fallback main's handler used.
+ */
+const MAIN_ORIGIN_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:reactor:originGate",
+    to: { jobType: "reactor", lane: DEFERRED_ORIGIN_SUBSCRIBER_NAME },
+    removeAfter: "3.21.0",
+  },
+  {
+    from: "trace_processing:job:deferredOriginResolution",
+    to: { jobType: "command", lane: "resolveOrigin" },
+    data: (stored) => {
+      const { tenantId, traceId } = deferredOriginJobSchema.parse(stored);
+      return {
+        tenantId,
+        traceId,
+        origin: "application",
+        reason: "deferred_fallback",
+        occurredAt: nowInstant().epochMilliseconds,
+      };
+    },
+    removeAfter: "3.21.0",
+  },
+];
 
 /** The consuming definition: projections and main's subscribers, deferred origin included. */
 export function buildTraceProcessingConsumer(
@@ -108,6 +140,7 @@ export function buildTraceProcessingConsumer(
       ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
       handler: (event, context) => reactions.spanStorageBroadcast(event, context),
     })
+    .withLaneAliases(MAIN_ORIGIN_LANE_ALIASES)
     .build();
 }
 

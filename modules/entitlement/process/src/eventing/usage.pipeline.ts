@@ -110,22 +110,32 @@ export function buildUsagePipeline({
       map: TraceMeterProjection.create(traceMeter).build(),
     });
   if (!billableEventsMeter) return pipeline.build();
-  return pipeline
-    .withProcessManager(REFUSED_ORGANIZATIONS_PROCESS_NAME, (pm) =>
-      pm
-        .state(limitStateSchema, { month: null, reached: false })
-        .intent("recordLimitDecision", recordLimitDecisionCommandDataSchema, (data) =>
-          send().recordLimitDecision(data),
-        )
-        .intent("countMonth", countMonthCommandDataSchema, (data) => send().countMonth(data))
-        .on(monthCountedEventSchema, monthCounted)
-        .keyBy((event) => event.aggregateId)
-        .onWake(refusedOrganizationWake),
-    )
-    .withGlobalMapProjection(BillableEventsMeterProjection.create(billableEventsMeter).build(), [
-      usageMeterCountSubscriber({ projects, countMonth: (data) => send().countMonth(data) }),
-    ])
-    .build();
+  return (
+    pipeline
+      .withProcessManager(REFUSED_ORGANIZATIONS_PROCESS_NAME, (pm) =>
+        pm
+          .state(limitStateSchema, { month: null, reached: false })
+          .intent("recordLimitDecision", recordLimitDecisionCommandDataSchema, (data) =>
+            send().recordLimitDecision(data),
+          )
+          .intent("countMonth", countMonthCommandDataSchema, (data) => send().countMonth(data))
+          .on(monthCountedEventSchema, monthCounted)
+          .keyBy((event) => event.aggregateId)
+          .onWake(refusedOrganizationWake),
+      )
+      .withGlobalMapProjection(BillableEventsMeterProjection.create(billableEventsMeter).build(), [
+        usageMeterCountSubscriber({ projects, countMonth: (data) => send().countMonth(data) }),
+      ])
+      // Cloud only: main's meter dispatch, renamed. Its body is the reactor's, so no transform.
+      .withLaneAliases([
+        {
+          from: "global:reactor:billingMeterDispatch",
+          to: { jobType: "reactor", lane: "usageMeterCount" },
+          removeAfter: "3.21.0",
+        },
+      ])
+      .build()
+  );
 }
 
 export const usageEventing = defineEventingModule({

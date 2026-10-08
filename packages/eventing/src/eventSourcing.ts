@@ -813,7 +813,7 @@ export class EventSourcing {
     clean: Record<string, unknown>;
   }): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
     for (const { pipeline, alias } of this._laneAliases.get(registryKey) ?? []) {
-      if (!laneAliasTakes({ alias, stored: clean })) continue;
+      if (!("to" in alias) || !laneAliasTakes({ alias, stored: clean })) continue;
       const body = readAliasedBody({ alias, stored: clean });
       for (const key of laneAliasTargetKeys({ pipeline, to: alias.to })) {
         const entry = this._globalJobRegistry.get(key);
@@ -824,15 +824,30 @@ export class EventSourcing {
   }
 
   /**
-   * A job under a key a successor aliases, whose event type none of its aliases takes: the head
-   * deliberately reacts to fewer types, so it is acknowledged with a log line, not blocked.
+   * A job under a key a successor aliases that no routed alias takes by event type, or that a
+   * tombstone retires: the head deliberately does less, so it is acknowledged with a log line,
+   * not blocked. An alias that takes it but whose lane is not installed still retries.
    */
   private acknowledgeUnclaimedAlias(payload: Record<string, unknown>): boolean {
-    const registryKey = `${payload.__pipelineName}:${payload.__jobType}:${payload.__jobName}`;
-    if (!this._laneAliases.has(registryKey)) return false;
+    const registryKey = `${payload.__pipelineName as string}:${payload.__jobType as string}:${payload.__jobName as string}`;
+    const aliases = this._laneAliases.get(registryKey);
+    if (!aliases) return false;
+    const {
+      __pipelineName: _p,
+      __jobType: _t,
+      __jobName: _n,
+      [JOB_ROUTING_FIELD]: _r,
+      ...clean
+    } = payload;
+    const taking = aliases.filter(({ alias }) => laneAliasTakes({ alias, stored: clean }));
+    const tombstone = taking.find(({ alias }) => "tombstone" in alias)?.alias;
+    if (taking.length > 0 && !tombstone) return false;
     logger.info(
-      EventSourcing.jobIdentity(payload),
-      "No successor of this former lane takes the job's event type; acknowledging it",
+      {
+        ...EventSourcing.jobIdentity(payload),
+        tombstone: tombstone && "tombstone" in tombstone ? tombstone.tombstone : undefined,
+      },
+      "No successor of this former lane takes the job; acknowledging it",
     );
     return true;
   }

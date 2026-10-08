@@ -6,13 +6,7 @@
   },
   "names": {
     "join-requests:command:?name": {
-      "names": [
-        "requestJoin",
-        "approveJoin",
-        "rejectJoin",
-        "withdrawJoin",
-        "expireJoin"
-      ],
+      "names": ["requestJoin", "approveJoin", "rejectJoin", "withdrawJoin", "expireJoin"],
       "ref": "JOIN_REQUEST_COMMANDS, platform/app/src/server/event-sourcing/pipelines/join-requests/pipeline.ts:61 on main"
     },
     "scim-sync:command:?name": {
@@ -56,21 +50,15 @@
       "ref": "CONNECTION_COMMANDS, platform/app/ee/event-sourcing/pipelines/sso-connections/pipeline.ts:91 on main"
     },
     "log_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentLogFactsDispatch"
-      ],
+      "names": ["codingAgentLogFactsDispatch"],
       "ref": "pipelineRegistry.ts:798-802 on main"
     },
     "metric_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentMetricFactsDispatch"
-      ],
+      "names": ["codingAgentMetricFactsDispatch"],
       "ref": "pipelineRegistry.ts:791-795 on main"
     },
     "trace_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentSpanFactsDispatch"
-      ],
+      "names": ["codingAgentSpanFactsDispatch"],
       "ref": "pipelineRegistry.ts:820-826, passed at :1673 on main"
     },
     "langy_conversation_processing:subscriber:?subscriber.name": {
@@ -84,57 +72,39 @@
       "ref": "pipelineRegistry.ts:1192-1198 on main; head's list (langy-conversation-runtime.pipeline.ts:217-224) is the same plus langyWebPush, a head-only lane this shared key does not list"
     },
     "global:handler:?orgBillableEventsMeterProjection": {
-      "names": [
-        "orgBillableEventsMeter"
-      ],
+      "names": ["orgBillableEventsMeter"],
       "ref": "orgBillableEventsMeter.mapProjection.ts:32 on main"
     },
     "global:handler:?BillableEventsMeterProjection.create(billableEventsMeter).bu...": {
-      "names": [
-        "orgBillableEventsMeter"
-      ],
+      "names": ["orgBillableEventsMeter"],
       "ref": "BILLABLE_EVENTS_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/billable-events-meter.projection.ts:20"
     },
     "global:handler:entitlement.?": {
-      "names": [
-        "entitlement.usageTraceMeter"
-      ],
+      "names": ["entitlement.usageTraceMeter"],
       "ref": "TRACE_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/trace-meter.projection.ts:11"
     },
     "gateway_spend_processing:subscriber:pm:?this.options.gatewayDebits.name": {
-      "names": [
-        "pm:gatewayDebits"
-      ],
+      "names": ["pm:gatewayDebits"],
       "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
     },
     "process:gateway_spend_processing:?this.options.gatewayDebits.name": {
-      "names": [
-        "gatewayDebits"
-      ],
+      "names": ["gatewayDebits"],
       "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
     },
     "simulation_processing:subscriber:pm:?deps.scenarioRunExecution.name": {
-      "names": [
-        "pm:simulation_run_execution"
-      ],
+      "names": ["pm:simulation_run_execution"],
       "ref": "modules/scenario/process/src/eventing/simulation-processing-runtime.pipeline.ts:172"
     },
     "process:simulation_processing:?deps.scenarioRunExecution.name": {
-      "names": [
-        "simulation_run_execution"
-      ],
+      "names": ["simulation_run_execution"],
       "ref": "simulation-processing-runtime.pipeline.ts:172"
     },
     "simulation_processing:subscriber:pm:?deps.scenarioEvaluations.name": {
-      "names": [
-        "pm:scenario_evaluations"
-      ],
+      "names": ["pm:scenario_evaluations"],
       "ref": "simulation-processing-runtime.pipeline.ts:180"
     },
     "process:simulation_processing:?deps.scenarioEvaluations.name": {
-      "names": [
-        "scenario_evaluations"
-      ],
+      "names": ["scenario_evaluations"],
       "ref": "simulation-processing-runtime.pipeline.ts:180"
     }
   },
@@ -157,39 +127,39 @@
     },
     {
       "match": "trace_processing:reactor:triggerMatch",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "moved to automation's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "automations aliases it by event type to its peer subscribers traceSpanTriggerMatch and traceOriginTriggerMatch until 3.21.0 is cut (automation.pipeline.ts, MAIN_TRIGGER_LANE_ALIASES)"
     },
     {
       "match": "trace_processing:subscriber:graphTriggerActivity",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "moved to automation's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "automations aliases it by event type to traceSpanGraphActivity and traceOriginGraphActivity until 3.21.0 is cut (automation.pipeline.ts, MAIN_TRIGGER_LANE_ALIASES)"
     },
     {
       "match": "trace_processing:reactor:simulationMetricsSync",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "moved to scenario's peer subscriber"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "scenario aliases the span_received jobs to its peer subscriber traceSpanMetricsSync until 3.21.0 is cut; other trace events are acknowledged with a log line, as head reacts to fewer types (simulation-processing.pipeline.ts, mainSimulationLaneAliases)"
     },
     {
       "match": "trace_processing:subscriber:customerIoTraceSync",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "moved to nurturing's peer subscriber"
+      "class": "accepted",
+      "ref": "E4 (round 49): never registered on main",
+      "note": "main implements it but registerAll never passes its deps (the TODO at pipelineRegistry.ts:620), so no job is ever queued under it; nurturing's peer subscribers are the new, first delivery"
     },
     {
       "match": "trace_processing:reactor:originGate",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "renamed deferredOriginResolution; no drain maps the old name"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "trace aliases it to its reactor deferredOriginResolution until 3.21.0 is cut (trace-processing.pipeline.ts, MAIN_ORIGIN_LANE_ALIASES)"
     },
     {
       "match": "trace_processing:job:deferredOriginResolution",
-      "class": "pending",
-      "ref": "E4 (Q02)",
-      "note": "main's delayed job (registerJob, pipelineRegistry.ts:1685); head declares a reactor of that name, so the job type differs"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "trace aliases main's delayed job to its resolveOrigin command with the deferred_fallback body, until 3.21.0 is cut (trace-processing.pipeline.ts, MAIN_ORIGIN_LANE_ALIASES)"
     },
     {
       "match": "trace_processing:subscriber:governanceKpisSync",
@@ -205,69 +175,69 @@
     },
     {
       "match": "evaluation_processing:reactor:triggerMatch",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to automations' peer subscribers evaluationCompletedTriggerMatch and evaluationReportedTriggerMatch"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "automations aliases it by event type to evaluationCompletedTriggerMatch and evaluationReportedTriggerMatch until 3.21.0 is cut (automation.pipeline.ts, MAIN_TRIGGER_LANE_ALIASES)"
     },
     {
       "match": "evaluation_processing:subscriber:graphTriggerActivity",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to automations' peer subscribers evaluationCompletedGraphActivity and evaluationReportedGraphActivity"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "automations aliases it by event type to evaluationCompletedGraphActivity and evaluationReportedGraphActivity until 3.21.0 is cut (automation.pipeline.ts, MAIN_TRIGGER_LANE_ALIASES)"
     },
     {
       "match": "evaluation_processing:subscriber:customerIoEvaluationSync",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to nurturing's peer subscribers (evaluationCompleted, evaluationRan)"
+      "class": "accepted",
+      "ref": "E4 (round 49): never registered on main",
+      "note": "main implements it but registerAll never passes its deps (the TODO at pipelineRegistry.ts:620), so no job is ever queued under it; nurturing's peer subscribers are the new, first delivery"
     },
     {
       "match": "simulation_processing:subscriber:customerIoSimulationSync",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to nurturing's peer subscribers (simulationRunFinished, scenarioRunSucceeded)"
+      "class": "accepted",
+      "ref": "E4 (round 49): never registered on main",
+      "note": "main implements it but registerAll never passes its deps (the TODO at pipelineRegistry.ts:620), so no job is ever queued under it; nurturing's peer subscribers are the new, first delivery"
     },
     {
       "match": "simulation_processing:subscriber:scenarioRunMilestones",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to peer subscribers in suite_run_processing and nurturing; exact successor not pinned"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "nurturing aliases it to its peer subscriber scenarioRunSucceeded, which records the succeeded-run signal and the active day main's subscriber tracked, until 3.21.0 is cut (nurturing.pipeline.ts)"
     },
     {
       "match": "simulation_processing:subscriber:suiteRunSync",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "moved to suite_run_processing's peer subscribers scenarioRunStarted, scenarioRunFinished, scenarioRunEvaluated"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "suite aliases it by event type to scenarioRunStarted, scenarioRunFinished and scenarioRunEvaluated until 3.21.0 is cut (suite-run-processing.pipeline.ts, MAIN_SUITE_RUN_SYNC_ALIASES)"
     },
     {
       "match": "simulation_processing:subscriber:scenarioEvaluations",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "replaced by the scenario_evaluations process manager (scenario-evaluations.process.ts:19)"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "scenario aliases it to the scenario_evaluations process manager's own lane pm:scenario_evaluations until 3.21.0 is cut (simulation-processing.pipeline.ts, mainSimulationLaneAliases)"
     },
     {
       "match": "simulation_processing:job:scenarioEvaluations",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "main's delayed job (pipelineRegistry.ts:1989); replaced by the scenario_evaluations process manager"
+      "class": "tombstone",
+      "ref": "E4 (round 49): lane alias tombstone",
+      "note": "scenario tombstones it until 3.21.0 is cut: grading is an intent of the scenario_evaluations process, which a job cannot open, so a job still queued is acknowledged with a log line and its run is graded only if re-finished (simulation-processing.pipeline.ts, mainSimulationLaneAliases)"
     },
     {
       "match": "simulation_processing:job:deferredComputeRunMetrics",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "main's delayed job (pipelineRegistry.ts:2037); head declares command computeRunMetrics (simulation-processing.pipeline.ts:167)"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "scenario aliases it to its command computeRunMetrics, whose data is main's payload, until 3.21.0 is cut (simulation-processing.pipeline.ts, mainSimulationLaneAliases)"
     },
     {
       "match": "trace_processing:job:datasetNormalize",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "main's job (pipelineRegistry.ts:1728); moved to dataset's own pipeline as dataset_normalization:command:datasetNormalize; a lost job leaves an upload un-normalised"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "dataset aliases it to its command datasetNormalize, whose payload reads main's, until 3.21.0 is cut (dataset-normalization.pipeline.ts)"
     },
     {
       "match": "global:reactor:billingMeterDispatch",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "cloud only (isSaas); renamed usageMeterCount in entitlement; no plan row covers it"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "cloud only: entitlement aliases it to its global reactor usageMeterCount until 3.21.0 is cut (usage.pipeline.ts)"
     },
     {
       "match": "log_processing:subscriber:codingAgentLogFactsDispatch",
@@ -285,19 +255,19 @@
       "match": "trace_processing:subscriber:codingAgentSpanFactsDispatch",
       "class": "drained",
       "ref": "E4 (round 49): lane alias",
-      "note": "coding_agent_processing aliases it until 3.21.0 is cut: a span_facts_lifted job to command contributeSpanFacts (its data is the command's), a whole span_received to the peer subscriber; a span_referenced claim-check has no successor and still blocks (coding-agent-processing.pipeline.ts, MAIN_FACTS_DISPATCH_ALIASES)"
+      "note": "coding_agent_processing aliases it until 3.21.0 is cut: a span_facts_lifted job to command contributeSpanFacts (its data is the command's), a whole span_received to the peer subscriber; a span_referenced claim-check is acknowledged with a log line, since v3.20.1 no longer stages it (coding-agent-processing.pipeline.ts, MAIN_FACTS_DISPATCH_ALIASES)"
     },
     {
       "match": "gateway_spend_processing:subscriber:pm:webhookDelivery",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "event-driven (gateway spend events); moved to webhook_delivery, so pm jobs queued on the old lane at the cut are lost"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "webhook aliases it by event type to its peer subscribers gatewaySpend{Admitted,Confirmed,Failed,Settled}Delivery until 3.21.0 is cut; head's delivery manager reads the commands those queue, not the gateway event (webhook-delivery.pipeline.ts, MAIN_DELIVERY_MANAGER_ALIASES)"
     },
     {
       "match": "governance_events_processing:subscriber:pm:governanceEventsDelivery",
-      "class": "pending",
-      "ref": "E4 (Q02's kind, not in Q02)",
-      "note": "event-driven (governance events); moved to webhook_delivery, so pm jobs queued on the old lane at the cut are lost"
+      "class": "drained",
+      "ref": "E4 (round 49): lane alias",
+      "note": "webhook aliases it by event type to gatewayBudgetCrossingDelivery and gatewayVkLifecycleDelivery until 3.21.0 is cut (webhook-delivery.pipeline.ts, MAIN_DELIVERY_MANAGER_ALIASES)"
     },
     {
       "match": "automations:subscriber:pm:webhookDeliveryPrune",

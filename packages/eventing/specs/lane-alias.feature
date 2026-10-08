@@ -54,6 +54,18 @@ Feature: A successor lane also consumes the key a previous release queued its jo
     And no handler runs and its group is not blocked
 
   @unit
+  Scenario: A former lane may be succeeded by a subscriber of the global projections
+    Given the successor aliases "global:reactor:billingMeter" to its global lane "meterCount"
+    Then the lane the alias looks for is "global:reactor:meterCount", after its own and its peer lane
+
+  @unit
+  Scenario: A tombstoned former lane has its jobs acknowledged with the reason logged
+    Given the successor tombstones "owner:job:deferredSync" with a reason
+    When a worker of the new release dequeues a job queued under that key
+    Then the job is acknowledged and the log line carries the reason
+    And no handler runs and its group is not blocked
+
+  @unit
   Scenario: A job under a key no alias names still retries and blocks
     Given no pipeline aliases "owner:subscriber:gone"
     When a worker of the new release dequeues a job the previous release queued under it
