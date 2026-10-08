@@ -32,7 +32,7 @@ import type { PlanInfo } from "./license-constants.ts";
  */
 type TierEntitlements = Partial<Pick<PlanInfo, "webhookEndpointsEnabled">>;
 
-export const ENTITLEMENTS_BY_PLAN_TYPE: Partial<Record<string, TierEntitlements>> = {
+const ENTITLEMENTS_BY_PLAN_TYPE: Partial<Record<string, TierEntitlements>> = {
   ENTERPRISE: { webhookEndpointsEnabled: true },
 };
 

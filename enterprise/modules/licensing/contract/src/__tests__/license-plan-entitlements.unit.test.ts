@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UNLIMITED_PLAN, applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../index.ts";
+import { UNLIMITED_PLAN, applyPlanTypeEntitlements } from "../index.ts";
 import type { PlanInfo } from "../index.ts";
 
 /**
@@ -84,14 +84,17 @@ describe("applyPlanTypeEntitlements", () => {
   describe("given the tier map itself", () => {
     /** @scenario Impersonation powers are not an entitlement of the enterprise tier */
     it("does not carry authorization fields for any tier", () => {
-      for (const entitlements of Object.values(ENTITLEMENTS_BY_PLAN_TYPE)) {
-        expect("overrideAddingLimitations" in (entitlements ?? {})).toBe(false);
-      }
+      const resolved = applyPlanTypeEntitlements(enterprisePlan());
+
+      expect("overrideAddingLimitations" in resolved).toBe(false);
     });
 
     it("entitles webhook endpoints on enterprise and on nothing else", () => {
-      expect(Object.keys(ENTITLEMENTS_BY_PLAN_TYPE)).toEqual(["ENTERPRISE"]);
-      expect(ENTITLEMENTS_BY_PLAN_TYPE["ENTERPRISE"]?.webhookEndpointsEnabled).toBe(true);
+      const entitled = ["FREE", "PRO", "GROWTH", "ENTERPRISE"].filter(
+        (type) => applyPlanTypeEntitlements(enterprisePlan({ type })).webhookEndpointsEnabled,
+      );
+
+      expect(entitled).toEqual(["ENTERPRISE"]);
     });
   });
 });
