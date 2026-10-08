@@ -27,12 +27,12 @@ export function carriesExperimentRunMarker(
 }
 
 /** Only an experiment trace (a hoisted run id) with real cost has metrics to fold. */
-export function hasExperimentCostMetrics(summary: TraceSummaryData): boolean {
+function hasExperimentCostMetrics(summary: TraceSummaryData): boolean {
   if (!summary.attributes[EXPERIMENT_RUN_MARKER]) return false;
   return summary.totalCost !== null && summary.totalCost !== 0;
 }
 
-export interface ExperimentTraceMetricsSyncDeps {
+interface ExperimentTraceMetricsSyncDeps {
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
   findExperimentId: (input: { tenantId: string; runId: string }) => Promise<string | null>;
   computeRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;

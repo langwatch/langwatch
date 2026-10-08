@@ -23,7 +23,7 @@ export const writePulledUsageSchema = z.object({
   observed_at_ms: z.number().int().positive(),
 });
 
-export type WritePulledUsagePayload = z.infer<typeof writePulledUsageSchema>;
+type WritePulledUsagePayload = z.infer<typeof writePulledUsageSchema>;
 
 /** Where a priced observation goes: governance's own `recordPulledUsagePriced` command. */
 export interface PulledUsagePricingDeps {

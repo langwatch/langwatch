@@ -55,7 +55,7 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type IngestionPullRunProjectionDatabase = Pick<
+type IngestionPullRunProjectionDatabase = Pick<
   PrismaClient,
   "ingestionPullRunProjection" | "ingestionSource" | "$transaction"
 >;

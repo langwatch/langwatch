@@ -27,11 +27,11 @@ export const ANNOTATION_LIFECYCLE_PIPELINE_NAME = "annotation_lifecycle" as cons
 /** One aggregate per annotation, and per score definition, so each one's facts stay ordered. */
 export const ANNOTATION_AGGREGATE_TYPE = "annotation" as const;
 
-export const RECORD_ANNOTATION_CREATED_COMMAND_TYPE = "lw.annotation.record_created" as const;
-export const RECORD_ANNOTATION_UPDATED_COMMAND_TYPE = "lw.annotation.record_updated" as const;
-export const RECORD_ANNOTATION_DELETED_COMMAND_TYPE = "lw.annotation.record_deleted" as const;
-export const RECORD_SCORE_DEFINED_COMMAND_TYPE = "lw.annotation.record_score_defined" as const;
-export const RECORD_SCORE_RENAMED_COMMAND_TYPE = "lw.annotation.record_score_renamed" as const;
+const RECORD_ANNOTATION_CREATED_COMMAND_TYPE = "lw.annotation.record_created" as const;
+const RECORD_ANNOTATION_UPDATED_COMMAND_TYPE = "lw.annotation.record_updated" as const;
+const RECORD_ANNOTATION_DELETED_COMMAND_TYPE = "lw.annotation.record_deleted" as const;
+const RECORD_SCORE_DEFINED_COMMAND_TYPE = "lw.annotation.record_score_defined" as const;
+const RECORD_SCORE_RENAMED_COMMAND_TYPE = "lw.annotation.record_score_renamed" as const;
 
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
@@ -61,11 +61,11 @@ export const annotationScoreRenamedEventSchema = event(
   ANNOTATION_SCORE_RENAMED_EVENT_TYPE,
   annotationScoreRenamedEventDataSchema,
 );
-export type AnnotationCreatedEvent = z.infer<typeof annotationCreatedEventSchema>;
-export type AnnotationUpdatedEvent = z.infer<typeof annotationUpdatedEventSchema>;
-export type AnnotationDeletedEvent = z.infer<typeof annotationDeletedEventSchema>;
-export type AnnotationScoreDefinedEvent = z.infer<typeof annotationScoreDefinedEventSchema>;
-export type AnnotationScoreRenamedEvent = z.infer<typeof annotationScoreRenamedEventSchema>;
+type AnnotationCreatedEvent = z.infer<typeof annotationCreatedEventSchema>;
+type AnnotationUpdatedEvent = z.infer<typeof annotationUpdatedEventSchema>;
+type AnnotationDeletedEvent = z.infer<typeof annotationDeletedEventSchema>;
+type AnnotationScoreDefinedEvent = z.infer<typeof annotationScoreDefinedEventSchema>;
+type AnnotationScoreRenamedEvent = z.infer<typeof annotationScoreRenamedEventSchema>;
 export type AnnotationLifecycleEvent =
   | AnnotationCreatedEvent
   | AnnotationUpdatedEvent

@@ -80,7 +80,7 @@ import {
   type ExperimentWorkbenchUpdates,
 } from "./experiment-workbench.service.ts";
 
-export type ExperimentServiceOptions = {
+type ExperimentServiceOptions = {
   repository: ExperimentRepository;
   runRepository: ExperimentRunRepository;
   dspyRepository: ExperimentDspyRepository;

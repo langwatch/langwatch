@@ -13,7 +13,7 @@ import { SpendSpikeAnomalyRepository } from "../spend-spike-anomaly.repository.t
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type SpendSpikeAnomalyDatabase = Pick<PrismaClient, "anomalyAlert" | "anomalyRule">;
+type SpendSpikeAnomalyDatabase = Pick<PrismaClient, "anomalyAlert" | "anomalyRule">;
 
 export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyRepository {
   private constructor(private readonly prisma: SpendSpikeAnomalyDatabase) {
