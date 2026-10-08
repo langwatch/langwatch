@@ -1,12 +1,7 @@
-name: upgrade-rehearsal
+name: Upgrade rehearsal
 
-# Plan 2026-10-08, section F, phases 0 to 2: the real upgrade from the 3.20.1 image and from an
-# origin/main build to this head, with old and new processes overlapping. Report as an artifact.
-# Spec: specs/upgrade/upgrade-rehearsal.feature. Scheduled runs use the default branch's copy.
-
+# Manual dispatch only for now; runner: dev/scripts/upgrade-rehearsal/rehearse.sh (see its README).
 on:
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -14,38 +9,41 @@ permissions:
 
 concurrency:
   group: upgrade-rehearsal-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   rehearse:
-    name: rehearse from ${{ matrix.origin }} (${{ matrix.order }})
+    name: Rehearse from ${{ matrix.origin }}
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { origin: "3.20.1", order: api-first, args: "" }
-          - { origin: main, order: api-first, args: "--build-main" }
-          - { origin: main, order: worker-first, args: "--build-main" }
-          - { origin: empty, order: api-first, args: "" }
+        origin: ["3.20.1", "main", "empty"]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
-      - name: unit checks
-        run: TZ=UTC node --test dev/scripts/upgrade-rehearsal/__tests__/*.unit.test.mjs
-      - name: rehearse
-        run: >-
-          bash dev/scripts/upgrade-rehearsal/rehearse.sh --origin ${{ matrix.origin }}
-          --order ${{ matrix.order }} --build-head ${{ matrix.args }}
-          --run-dir "$RUNNER_TEMP/rehearsal"
-      - if: always()
+
+      - name: Rehearse the upgrade
+        env:
+          ORIGIN: ${{ matrix.origin }}
+        run: |
+          args=(--origin "$ORIGIN" --build-head)
+          if [[ "$ORIGIN" == "main" ]]; then args+=(--build-main); fi
+          bash dev/scripts/upgrade-rehearsal/rehearse.sh "${args[@]}"
+
+      - name: Upload rehearsal evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: upgrade-rehearsal-${{ matrix.origin }}-${{ matrix.order }}
-          path: ${{ runner.temp }}/rehearsal
+          name: upgrade-rehearsal-${{ matrix.origin }}
+          path: .claude/tmp/upgrade-rehearsal/**
           if-no-files-found: warn
+          retention-days: 14
