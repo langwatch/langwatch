@@ -14,6 +14,11 @@ export class MemoryCanonicalLogRecordRepository extends CanonicalLogRecordReposi
     return new MemoryCanonicalLogRecordRepository();
   }
 
+  /** Every record held, one per tenant and record id. */
+  records(): readonly CanonicalLogRecord[] {
+    return [...this.#records.values()];
+  }
+
   async ensureLogRecord(record: CanonicalLogRecord): Promise<void> {
     const key = `${record.tenantId}:${record.recordId}`;
     const existing = this.#records.get(key);
