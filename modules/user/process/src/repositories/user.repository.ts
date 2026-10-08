@@ -32,9 +32,13 @@ type UserAddressConfirmation = Readonly<{ emailVerified: boolean }>;
 /** A credential user and the row it signs in with: identity states its identifier against it. */
 export type CreatedCredentialUser = CreatedUser & { accountId: string; accountCreatedAtMs: number };
 
+/** A sign-up the person made themselves: its registered fact commits with the account. */
+type UserSelfRegistration = Readonly<{ selfRegistered?: boolean }>;
+
 export type CreateCredentialUserRow = CreateCredentialUserInput &
   UserCredentialIssuer &
-  UserAddressConfirmation;
+  UserAddressConfirmation &
+  UserSelfRegistration;
 export type CreatePasskeyUserRow = CreatePasskeyUserInput &
   UserCredentialIssuer &
   UserAddressConfirmation;
@@ -44,7 +48,13 @@ export type UserDeactivationOutcome =
   | Readonly<{ outcome: "deactivated"; user: UserProfile }>
   | Readonly<{ outcome: "none_active" }>;
 
-/** Persistence owned by User. It never crosses the feature boundary. */
+/** An account as the created-fact seed reads it: its id and when its row was written. */
+export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
+
+/**
+ * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
+ * created fact (and a self-registration its registered fact) to the fact outbox with the row.
+ */
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
@@ -101,4 +111,6 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
+  /** One page of every account, in id order after `afterId`, for user's created-fact seed. */
+  findCreatedPage(input: { afterId: string | null; limit: number }): Promise<UserCreatedRow[]>;
 }

@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/user.module.ts:12`.
+`defineProcessModule("user").withRepositories(userRepositories).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/user.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -508,13 +508,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `user_lifecycle` (aggregate `user_account`)
 
-Declared at `src/eventing/user-lifecycle.pipeline.ts:31`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`.
+Declared at `src/eventing/user-lifecycle.pipeline.ts:62`. Events: `userDeactivatedEventSchema`, `userReactivatedEventSchema`, `userRegisteredEventSchema`, `userCreatedEventSchema`, `userErasedEventSchema`.
 
-| Kind    | Name                    | Handles | Declared at                                  |
-| ------- | ----------------------- | ------- | -------------------------------------------- |
-| command | `recordUserDeactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:36` |
-| command | `recordUserReactivated` | –       | `src/eventing/user-lifecycle.pipeline.ts:37` |
-| command | `recordUserRegistered`  | –       | `src/eventing/user-lifecycle.pipeline.ts:38` |
+| Kind            | Name                    | Handles                                                                                                                                              | Declared at                                  |
+| --------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| command         | `recordUserDeactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:73` |
+| command         | `recordUserReactivated` | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:74` |
+| command         | `recordUserRegistered`  | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:75` |
+| command         | `recordUserCreated`     | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:76` |
+| command         | `recordUserErased`      | –                                                                                                                                                    | `src/eventing/user-lifecycle.pipeline.ts:77` |
+| process manager | `userLifecycleFacts`    | every 1 d (`USER_FACTS_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneFacts`, `recordErased`, `recordRegistered`, `recordCreated` (outbox) | `src/eventing/user-lifecycle.pipeline.ts:78` |
 
 ## Configuration
 

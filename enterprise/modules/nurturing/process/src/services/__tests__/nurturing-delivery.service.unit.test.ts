@@ -430,6 +430,7 @@ describe("NurturingDeliveryService", () => {
           throw new Error("bad PostHog configuration");
         }
         groupIdentify(): void {}
+        identify(): void {}
       }
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
@@ -534,6 +535,7 @@ describe("NurturingDeliveryService", () => {
           throw new Error("bad PostHog configuration");
         }
         groupIdentify(): void {}
+        identify(): void {}
       }
       const delivery = NurturingDeliveryService.create({
         claims: claims(),

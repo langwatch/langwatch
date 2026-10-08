@@ -11,6 +11,8 @@ import {
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
+import { memoryUserRepositoriesOver } from "../../repositories/memory/memory.user.repositories.ts";
 import {
   REFUSED_ADDRESS_PROOF,
   UNCONFIRMED_ADDRESS_PROOF,
@@ -39,20 +41,20 @@ function register(
 describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
     /** @scenario "A self-service registration is recorded as user's fact" */
-    it("records one registered fact for the new account", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
+    it("commits the created fact, then one registered fact, with the new account", async () => {
+      const database = MemoryUserDatabase.create();
+      const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       const created = await register(app);
 
       expect(created).toEqual({ id: expect.any(String) });
-      expect(lifecycle.recorded).toEqual([
+      const fact = { tenantId: created.id, userId: created.id, occurredAt: expect.any(Number) };
+      expect(database.factOutbox()).toEqual([
+        { type: "recordCreated", data: fact },
         {
-          type: "registered",
+          type: "recordRegistered",
           data: {
-            tenantId: created.id,
-            userId: created.id,
-            occurredAt: expect.any(Number),
+            ...fact,
             accountId: expect.any(String),
             createdAtMs: expect.any(Number),
             email: "a@x.com",
@@ -62,19 +64,18 @@ describe("registering a credential account", () => {
     });
   });
 
-  describe("when user's registered fact cannot be sent", () => {
-    /** @scenario "A registration stands even when user's registered fact cannot be sent" */
+  describe("when the event bus is down", () => {
+    /** @scenario "A registration stands even when the event bus is down" */
     it("still creates the account and answers it", async () => {
       const { senders } = createUserTestLifecycle();
-      const failing = {
-        ...senders,
-        recordUserRegistered: {
-          send: async () => {
-            throw new Error("event store unavailable");
-          },
+      const down = {
+        send: async () => {
+          throw new Error("event bus unavailable");
         },
       };
-      const app = createUserTestApp({ lifecycle: failing });
+      const app = createUserTestApp({
+        lifecycle: { ...senders, recordUserCreated: down, recordUserRegistered: down },
+      });
 
       const created = await register(app);
 
@@ -85,14 +86,14 @@ describe("registering a credential account", () => {
   describe("when the email is already registered", () => {
     /** @scenario "A refused registration records no registered fact" */
     it("refuses and records no second registered fact", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
+      const database = MemoryUserDatabase.create();
+      const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       await register(app);
-      lifecycle.recorded.length = 0;
+      const committed = database.factOutbox().length;
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(lifecycle.recorded).toEqual([]);
+      expect(database.factOutbox()).toHaveLength(committed);
     });
   });
 
@@ -207,14 +208,14 @@ describe("registering a credential account", () => {
   describe("when the address proof is refused", () => {
     /** @scenario "No credential is collected until the confirmation link is opened" */
     it("refuses as an expired verification and creates no account", async () => {
-      const lifecycle = createUserTestLifecycle();
-      const app = createUserTestApp({ lifecycle: lifecycle.senders });
+      const database = MemoryUserDatabase.create();
+      const app = createUserTestApp({ repositories: memoryUserRepositoriesOver({ database }) });
 
       await expect(
         register(app, "sam@acme.com", { addressProof: REFUSED_ADDRESS_PROOF }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
       await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
-      expect(lifecycle.recorded).toEqual([]);
+      expect(database.factOutbox()).toEqual([]);
     });
   });
 

@@ -11,6 +11,12 @@ export interface PostHogEventInput {
   readonly uuid?: string;
 }
 
+/** A person's properties, so PostHog learns them before any event names them. */
+export interface PostHogIdentifyInput {
+  readonly userId: string;
+  readonly properties: Record<string, unknown>;
+}
+
 /** A PostHog group's properties, as main's checkout set its organization's. */
 export interface PostHogGroupInput {
   readonly groupType: string;
@@ -23,6 +29,8 @@ export abstract class PostHogChannel {
   abstract track(input: PostHogEventInput): void;
   /** Fire and forget, as `track`. */
   abstract groupIdentify(input: PostHogGroupInput): void;
+  /** Fire and forget, as `track`. */
+  abstract identify(input: PostHogIdentifyInput): void;
 }
 
 /** Where server-side product analytics goes: the PostHog project key, and its host. */

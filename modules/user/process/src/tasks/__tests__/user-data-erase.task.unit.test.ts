@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryUserDatabase } from "../../repositories/memory/memory.user.database.ts";
+import { memoryUserRepositoriesOver } from "../../repositories/memory/memory.user.repositories.ts";
 import type { GdprUserDataEraseRepository } from "../../repositories/user-data-erase.repository.ts";
 import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task.ts";
 
@@ -79,6 +81,38 @@ describe("runGdprUserDataErase", () => {
       expect(mocks.eraseUserAndOwnedResources).toHaveBeenCalledWith(
         expect.objectContaining({ userId: "user_1" }),
       );
+    });
+  });
+
+  describe("given a stored user in user's memory store", () => {
+    async function storedUser() {
+      const database = MemoryUserDatabase.create();
+      const repositories = memoryUserRepositoriesOver({ database });
+      const { id } = await repositories.users.create({ name: "Ada", email: "ada@example.com" });
+      return { database, repository: repositories.dataErase, id };
+    }
+
+    /** @scenario "An erasure records user's erased fact with the erase" */
+    it("commits the erased fact with the erase", async () => {
+      const { database, repository, id } = await storedUser();
+
+      await runGdprUserDataErase({ repository, email: "ada@example.com", execute: true });
+
+      expect(database.factOutbox().filter(({ type }) => type === "recordErased")).toEqual([
+        {
+          type: "recordErased",
+          data: { tenantId: id, userId: id, occurredAt: expect.any(Number) },
+        },
+      ]);
+    });
+
+    /** @scenario "A dry-run erasure records no fact" */
+    it("records no erased fact on a dry run", async () => {
+      const { database, repository } = await storedUser();
+
+      await runGdprUserDataErase({ repository, email: "ada@example.com", execute: false });
+
+      expect(database.factOutbox().filter(({ type }) => type === "recordErased")).toEqual([]);
     });
   });
 

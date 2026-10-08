@@ -219,6 +219,8 @@ describe("the worker process installation", () => {
       expect(schedules).not.toEqual([]);
       expect(schedules).toContain("spendSpikeEvaluation");
       expect(schedules).toContain("governanceTraceFacts");
+      // user's fact outbox: its delivered intents are pruned on the worker's daily wake.
+      expect(schedules).toContain("userLifecycleFacts");
     } finally {
       await runtime.stop();
     }

@@ -93,7 +93,7 @@ export function createUserTestAuthorization(operators: ReadonlySet<string> = new
 /** user_lifecycle's senders, recording each fact rather than appending it. */
 export function createUserTestLifecycle() {
   const recorded: {
-    type: "deactivated" | "reactivated" | "registered";
+    type: "deactivated" | "reactivated" | "registered" | "created" | "erased";
     data: RecordUserLifecycleCommandData;
   }[] = [];
   const senders: UserLifecycleSenders = {
@@ -110,6 +110,16 @@ export function createUserTestLifecycle() {
     recordUserRegistered: {
       send: async (data) => {
         recorded.push({ type: "registered", data });
+      },
+    },
+    recordUserCreated: {
+      send: async (data) => {
+        recorded.push({ type: "created", data });
+      },
+    },
+    recordUserErased: {
+      send: async (data) => {
+        recorded.push({ type: "erased", data });
       },
     },
   };

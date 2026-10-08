@@ -29,6 +29,7 @@ import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
+  USER_CREATED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
   type UserApi,
 } from "@langwatch/user-contract";
@@ -75,9 +76,12 @@ describe("RecordNurturingSignalCommand", () => {
 });
 
 /** Nurturing's pipeline over memory PostHog and a recording Customer.io, as the app composes it. */
-function nurturingOverMemoryPostHog() {
+function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({})) {
   const posthog = MemoryPostHogChannel.create();
-  const customerIoFetch = vi.fn(async () => new Response(null, { status: 200 }));
+  const customerIoFetch = vi.fn(
+    async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response(null, { status: 200 }),
+  );
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
     claims: { claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)) },
@@ -86,7 +90,7 @@ function nurturingOverMemoryPostHog() {
       fetchFn: customerIoFetch,
     }),
     posthog,
-    users: createApiFixture<UserApi>({}),
+    users,
   });
   const pipeline = buildNurturingPipeline({
     deliver: (input) => delivery.deliver(input),
@@ -176,7 +180,81 @@ describe("nurturing's userRegistered peer subscriber", () => {
         subscribers
           .filter(({ eventTypes }) => eventTypes.some((type) => type.startsWith("lw.user.")))
           .map(({ eventTypes }) => eventTypes),
-      ).toEqual([[USER_REGISTERED_EVENT_TYPE]]);
+      ).toEqual([[USER_REGISTERED_EVENT_TYPE], [USER_CREATED_EVENT_TYPE]]);
+    });
+  });
+});
+
+/** User's created fact for user-1; `backfilled` when the seed step recorded it. */
+function createdFact({ backfilled }: { backfilled?: true } = {}): Event {
+  return {
+    ...userFact(USER_CREATED_EVENT_TYPE),
+    data: {
+      tenantId: "user-1",
+      userId: "user-1",
+      occurredAt: 1_000,
+      ...(backfilled ? { backfilled } : {}),
+    },
+    idempotencyKey: "user-1:created",
+  } as Event;
+}
+
+/** The person behind user-1, read fresh at delivery and never stored (§9). */
+function jane(): UserApi {
+  return createApiFixture<UserApi>({
+    findById: async () => ({
+      id: "user-1",
+      name: "Jane Doe",
+      email: "jane@example.com",
+      emailVerified: true,
+      image: null,
+      pendingSsoSetup: false,
+      createdAt: new Date(1_000),
+      updatedAt: new Date(1_000),
+      lastLoginAt: null,
+      deactivatedAt: null,
+    }),
+  });
+}
+
+describe("nurturing's userCreated peer subscriber", () => {
+  describe("when user records a minted account, delivered twice", () => {
+    /** @scenario A minted account is identified to PostHog and Customer.io, with no signed_up */
+    it("identifies the person once to each sink and tracks no signed_up", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog(jane());
+
+      await deliverFact(createdFact());
+      await deliverFact(createdFact());
+      await settle();
+
+      expect(posthog.identified).toEqual([
+        { userId: "user-1", properties: { created_at: new Date(1_000).toISOString() } },
+      ]);
+      expect(posthog.tracked).toEqual([]);
+      expect(customerIoFetch).toHaveBeenCalledTimes(1);
+      const body = customerIoFetch.mock.calls[0]?.[1]?.body;
+      expect(typeof body === "string" ? JSON.parse(body) : body).toEqual({
+        userId: "user-1",
+        traits: {
+          email: "jane@example.com",
+          name: "Jane Doe",
+          createdAt: new Date(1_000).toISOString(),
+        },
+      });
+    });
+  });
+
+  describe("when the seed step recorded the fact for an older account", () => {
+    /** @scenario A backfilled created fact is not sent to PostHog or Customer.io */
+    it("sends nothing to either sink", async () => {
+      const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog(jane());
+
+      await deliverFact(createdFact({ backfilled: true }));
+      await settle();
+
+      expect(posthog.identified).toEqual([]);
+      expect(posthog.tracked).toEqual([]);
+      expect(customerIoFetch).not.toHaveBeenCalled();
     });
   });
 });

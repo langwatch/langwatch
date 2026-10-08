@@ -1,27 +1,28 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { EventingCommandSender } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  RecordUserCreatedCommandData,
   RecordUserLifecycleCommandData,
   RecordUserRegisteredCommandData,
 } from "../eventing/user-lifecycle.events.ts";
+import type { UserFactIntent } from "../rules/user-lifecycle-outbox.rules.ts";
 
 type Change = { userId: string; actor: LedgerActor; at: Instant };
-
-const logger = createLogger("langwatch:user:lifecycle-notice");
 
 export type UserLifecycleSenders = Readonly<{
   recordUserDeactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
   recordUserReactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
   recordUserRegistered: Pick<EventingCommandSender<RecordUserRegisteredCommandData>, "send">;
+  recordUserCreated: Pick<EventingCommandSender<RecordUserCreatedCommandData>, "send">;
+  recordUserErased: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
 }>;
 
 /**
- * Where an account's deactivation and reactivation are recorded as user's facts; authz keeps who
- * may still act from them (§9). Not best effort: a change peers never hear of fails the request,
- * and a retry records the same change again. The senders arrive once the pipeline registers.
+ * Where user's facts are sent on user_lifecycle; peers keep their own view from them (§9). A
+ * deactivation or reactivation fails its request when unsent; a mint's, registration's and
+ * erasure's facts arrive through the fact outbox (round 35). Senders arrive once it registers.
  */
 export class UserLifecycleNoticeService {
   static create(): UserLifecycleNoticeService {
@@ -44,24 +45,38 @@ export class UserLifecycleNoticeService {
     await this.#connected().recordUserReactivated.send(this.#data({ userId, actor, at }));
   }
 
-  /**
-   * A self-service registration, for nurturing's signed_up milestone. Best effort, as main's
-   * analytics call was: the account already exists, so a lost fact never fails the sign-up.
-   */
-  async registered({
+  /** Every account, however minted; `backfilled` when the seed step records an older one. */
+  async created({
     userId,
     at,
-    account,
+    backfilled,
   }: {
     userId: string;
     at: Instant;
-    /** The credential row the registration opened; identity states its identifier against it. */
-    account: { accountId: string; createdAtMs: number; email: string };
+    backfilled?: true;
   }): Promise<void> {
-    const data = { tenantId: userId, userId, occurredAt: at.epochMilliseconds, ...account };
-    await this.#connected()
-      .recordUserRegistered.send(data)
-      .catch((error: unknown) => logger.warn({ error, userId }, "user registered fact not sent"));
+    await this.#connected().recordUserCreated.send({
+      tenantId: userId,
+      userId,
+      occurredAt: at.epochMilliseconds,
+      ...(backfilled ? { backfilled } : {}),
+    });
+  }
+
+  /**
+   * The fact outbox's delivery: a fact its write committed, recorded under the key the write
+   * minted. Unconnected throws, so the outbox retries it.
+   */
+  async record(intent: UserFactIntent): Promise<void> {
+    const senders = this.#connected();
+    switch (intent.type) {
+      case "recordCreated":
+        return senders.recordUserCreated.send(intent.data);
+      case "recordRegistered":
+        return senders.recordUserRegistered.send(intent.data);
+      case "recordErased":
+        return senders.recordUserErased.send(intent.data);
+    }
   }
 
   #connected(): UserLifecycleSenders {

@@ -9,6 +9,7 @@ import {
   PostHogChannel,
   type PostHogEventInput,
   type PostHogGroupInput,
+  type PostHogIdentifyInput,
   type ProductAnalyticsTarget,
 } from "../posthog.channel.ts";
 
@@ -50,6 +51,14 @@ export class HttpPostHogChannel extends PostHogChannel {
         client.groupIdentify({ groupType, groupKey, properties });
     } catch (error) {
       logger.warn({ error, groupType }, "a group's properties did not reach PostHog");
+    }
+  }
+
+  identify({ userId, properties }: PostHogIdentifyInput): void {
+    try {
+      for (const client of this.clients()) client.identify({ distinctId: userId, properties });
+    } catch (error) {
+      logger.warn({ error }, "a person's properties did not reach PostHog");
     }
   }
 

@@ -2,6 +2,7 @@ import {
   PostHogChannel,
   type PostHogEventInput,
   type PostHogGroupInput,
+  type PostHogIdentifyInput,
 } from "../posthog.channel.ts";
 
 /**
@@ -11,6 +12,7 @@ import {
 export class MemoryPostHogChannel extends PostHogChannel {
   readonly tracked: PostHogEventInput[] = [];
   readonly groups: PostHogGroupInput[] = [];
+  readonly identified: PostHogIdentifyInput[] = [];
 
   private constructor() {
     super();
@@ -26,5 +28,9 @@ export class MemoryPostHogChannel extends PostHogChannel {
 
   groupIdentify(input: PostHogGroupInput): void {
     this.groups.push(input);
+  }
+
+  identify(input: PostHogIdentifyInput): void {
+    this.identified.push(input);
   }
 }

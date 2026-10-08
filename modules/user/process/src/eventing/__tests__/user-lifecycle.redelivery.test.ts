@@ -3,7 +3,12 @@
  * @unit
  * @see modules/user/specs/user.feature
  */
-import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type Event,
+  type EventSubscriberDefinition,
+  InMemoryProcessStore,
+} from "@langwatch/eventing";
 import {
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
@@ -62,7 +67,10 @@ function sessionStore() {
 function revocationLane(
   sessions: Pick<UserApi, "revokeAllBrowserSessions">,
 ): EventSubscriberDefinition {
-  const pipeline = buildUserLifecyclePipeline({ sessions });
+  const pipeline = buildUserLifecyclePipeline({
+    sessions,
+    facts: { record: async () => undefined, retention: InMemoryProcessStore.createForTesting() },
+  });
   const lanes = new Map<string, EventSubscriberDefinition>();
   const registry = createApiFixture<
     Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]

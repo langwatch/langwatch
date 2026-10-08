@@ -1,6 +1,8 @@
 import type { Instant } from "@langwatch/time";
 import type { UserNotificationChoice } from "@langwatch/user-contract";
 
+import { type UserFactIntent, userFactKey } from "../../rules/user-lifecycle-outbox.rules.ts";
+
 /**
  * The rows the two user repositories share — one store rather than two,
  * since they share the `Account` table: a credential `createCredentialUser`
@@ -45,6 +47,7 @@ type MemoryUserPasskeyRow = {
 
 export class MemoryUserDatabase {
   #users = new Map<string, MemoryUserRow>();
+  #factOutbox = new Map<string, UserFactIntent>();
   #accounts = new Map<string, MemoryUserAccountRow>();
   #passkeys = new Map<string, MemoryUserPasskeyRow>();
 
@@ -75,6 +78,19 @@ export class MemoryUserDatabase {
 
   writeUser(row: MemoryUserRow): void {
     this.#users.set(row.id, row);
+  }
+
+  /** The fact outbox's twin: one intent per key, as the outbox's unique message key keeps. */
+  appendFacts(intents: readonly UserFactIntent[]): void {
+    for (const intent of intents) {
+      const key = userFactKey(intent);
+      if (!this.#factOutbox.has(key)) this.#factOutbox.set(key, intent);
+    }
+  }
+
+  /** Every fact intent appended, in order, for a test to read what a write committed. */
+  factOutbox(): UserFactIntent[] {
+    return [...this.#factOutbox.values()];
   }
 
   /** Drops the user with every account and passkey it holds, as the erasure does. */

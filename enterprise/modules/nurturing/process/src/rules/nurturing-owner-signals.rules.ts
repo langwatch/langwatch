@@ -228,6 +228,21 @@ export function userRegisteredSignal({
   };
 }
 
+/** A minted account, from user's created fact. Keyed by the person alone: one identify each. */
+export function userCreatedSignal({
+  data,
+}: {
+  data: Pick<UserLifecycleEventData, "tenantId" | "userId" | "occurredAt">;
+}): NurturingSignal {
+  return {
+    kind: "user_created",
+    sourceEventId: data.userId,
+    tenantId: data.tenantId,
+    occurredAt: data.occurredAt,
+    userId: data.userId,
+  };
+}
+
 /** A domain auto-join, once per person and organization. */
 export function ssoAutoAddedSignal({
   data,

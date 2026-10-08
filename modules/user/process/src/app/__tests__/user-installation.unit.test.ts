@@ -1,4 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { EventSourcing } from "@langwatch/eventing";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
@@ -6,6 +8,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
@@ -23,6 +26,14 @@ function process(
   return createApp({ role })
     .withModules([userProcessModule])
     .withStores(memoryStores())
+    .withEventing(
+      new EventSourcing({
+        eventStore: EventStoreMemory.createForTesting(),
+        executionTarget: "api",
+        consumersEnabled: false,
+        processManagerMode: "producer-only",
+      }),
+    )
     .withConfig({ user: { publicBaseUrl: undefined } })
     .provide({
       auth: createUserTestAuth(),
@@ -35,6 +46,19 @@ function process(
 }
 
 describe("user app installation", () => {
+  /** @scenario "The seed step records a created fact for every existing account" */
+  it("declares the created-fact seed as a background step", async () => {
+    const runtime = await process("worker").boot();
+    try {
+      const step = runtime
+        .migrationSteps(isMigrationStep)
+        .find(({ id }) => id === "user:record-created-facts");
+      expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
     const runtime = await process(role).boot();
 

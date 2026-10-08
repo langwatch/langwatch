@@ -186,6 +186,7 @@ export class UserService {
     return (await this.repository.findByEmail(parsed.email)).length > 0;
   }
 
+  /** Every mint commits user's created fact with the row, through the repository's outbox. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.repository.create(createUserInputSchema.parse(input));
   }
@@ -198,13 +199,22 @@ export class UserService {
     });
   }
 
-  /** The account a spent mailbox proof earned: born confirmed, as the proof confirmed
-   *  the address. */
-  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedCredentialUser> {
+  /**
+   * The signup form's mint: its registered fact commits with the account. Born confirmed when a
+   * spent mailbox proof confirmed the address.
+   */
+  registerCredentialUser({
+    account,
+    addressConfirmed,
+  }: {
+    account: CreateCredentialUserInput;
+    addressConfirmed: boolean;
+  }): Promise<CreatedCredentialUser> {
     return this.repository.createCredentialUser({
-      ...createCredentialUserInputSchema.parse(input),
+      ...createCredentialUserInputSchema.parse(account),
       issuer: this.credentialIssuer,
-      emailVerified: true,
+      emailVerified: addressConfirmed,
+      selfRegistered: true,
     });
   }
 

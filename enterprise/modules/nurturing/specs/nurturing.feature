@@ -100,3 +100,17 @@ Feature: Nurturing sends the signals its owners record
     Given nurturing learned an organization from a live project creation
     When project's backfill records that project again, once or many times
     Then the organization stays unseeded and its first evaluation still raises the milestone
+
+  # Round 35 (Alex, 2026-10-08): user's created fact is identify only; sign-ups keep their own facts.
+  @unit
+  Scenario: A minted account is identified to PostHog and Customer.io, with no signed_up
+    Given user records "lw.user.created" for an account minted by any path
+    When the fact is delivered, once or many times
+    Then PostHog and Customer.io each learn the person once, the address and name read fresh from UserApi
+    And no signed_up milestone is tracked
+
+  @unit
+  Scenario: A backfilled created fact is not sent to PostHog or Customer.io
+    Given user's seed step records "lw.user.created" with backfilled set for an older account
+    When the fact is delivered
+    Then nothing is sent to PostHog or Customer.io

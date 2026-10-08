@@ -149,6 +149,7 @@ describe("user.deactivate", () => {
       });
       const operator = await account(app);
       operators.add(operator.id);
+      recorded.length = 0;
 
       await expect(
         app.deactivate({ id: operator.id, actor: { type: "system", id: null } }),
@@ -233,6 +234,8 @@ describe("user.deactivate", () => {
         },
         recordUserReactivated: { send: async () => undefined },
         recordUserRegistered: { send: async () => undefined },
+        recordUserCreated: { send: async () => undefined },
+        recordUserErased: { send: async () => undefined },
       };
       const app = createUserTestApp({
         dependencies: { auth },
@@ -255,6 +258,7 @@ describe("user.deactivate", () => {
       const { senders, recorded } = createUserTestLifecycle();
       const app = createUserTestApp({ lifecycle: senders });
       const created = await account(app);
+      recorded.length = 0;
 
       await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
       await app.reactivate({ id: created.id, actor: { type: "system", id: null } });
@@ -280,6 +284,7 @@ describe("user.deactivate", () => {
         passwordHash: "hashed:first",
       });
       operators.add(op.id);
+      recorded.length = 0;
       const direct = { id: op.id, operatorId: op.id, impersonated: false };
 
       await app.deactivateAccount({ userId: customer.id, caller: direct });

@@ -8,6 +8,10 @@ export const USER_DEACTIVATED_EVENT_TYPE = "lw.user.deactivated" as const;
 export const USER_REACTIVATED_EVENT_TYPE = "lw.user.reactivated" as const;
 /** An account somebody registered for themselves; nurturing derives the signed_up milestone. */
 export const USER_REGISTERED_EVENT_TYPE = "lw.user.registered" as const;
+/** Every account, however it was minted: a sign-up, a directory or SCIM mint, a seed. */
+export const USER_CREATED_EVENT_TYPE = "lw.user.created" as const;
+/** An account erased on request; the row and its sign-in methods are gone. */
+export const USER_ERASED_EVENT_TYPE = "lw.user.erased" as const;
 export const USER_LIFECYCLE_EVENT_VERSION = "2026-10-01" as const;
 
 /**
@@ -33,3 +37,10 @@ export const userRegisteredEventDataSchema = z.object({
   email: z.string().min(1).optional(),
 });
 export type UserRegisteredEventData = z.infer<typeof userRegisteredEventDataSchema>;
+
+/** `backfilled` marks a fact the seed step recorded for an account older than the fact. */
+export const userCreatedEventDataSchema = z.object({
+  ...userLifecycleEventDataSchema.shape,
+  backfilled: z.boolean().optional(),
+});
+export type UserCreatedEventData = z.infer<typeof userCreatedEventDataSchema>;

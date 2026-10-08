@@ -75,7 +75,7 @@ Feature: Canonical user lifecycle
   Scenario: A self-service registration is recorded as user's fact
     Given the auth provider is email
     When a registration succeeds through the register route
-    Then exactly one "lw.user.registered" fact is recorded for the created user id
+    Then exactly one "lw.user.registered" fact is committed with the account, after its created fact
     And the fact names the credential row it opened, its creation time and the address
     And the fact is keyed by the user alone, so a redelivery records nothing new
 
@@ -86,11 +86,51 @@ Feature: Canonical user lifecycle
     When the registration is attempted
     Then no "lw.user.registered" fact is recorded
 
+  # Round 35 (Alex, 2026-10-08): a mint's and a registration's facts commit with the account
+  # through user's fact outbox, so a down event bus never fails the request nor loses the fact.
   @unit
-  Scenario: A registration stands even when user's registered fact cannot be sent
-    Given user's lifecycle fact cannot be sent
+  Scenario: A registration stands even when the event bus is down
+    Given the event bus cannot take user's facts
     When a registration succeeds through the register route
     Then the account is created and the registration answers it
+    And its created and registered facts wait in the fact outbox
+
+  @unit
+  Scenario: Every account mint records user's created fact
+    When an account is minted by the directory (SSO, OAuth, SCIM), a credential, a passkey or a registration
+    Then exactly one "lw.user.created" intent is committed to user's fact outbox with the account row, carrying no address or name
+    And it is keyed by the user alone, so a redelivery or the seed step records nothing new
+
+  @unit
+  Scenario: A mint answers while the event bus is down
+    Given the event bus cannot take user's facts
+    When an account is minted
+    Then the account is created and its created fact waits in the fact outbox
+
+  @unit
+  Scenario: A mint whose fact cannot be committed writes no account
+    Given the fact outbox row cannot be written
+    When an account is minted
+    Then the mint fails and its transaction rolls back, leaving no account
+
+  @unit
+  Scenario: The fact outbox records each committed fact on user's pipeline
+    Given created, registered or erased intents committed to user's fact outbox
+    When the worker's outbox delivers them, however often the write appended them
+    Then each is recorded once on user_lifecycle with the data its write committed
+    And a delivery while the bus is down throws, so the outbox retries it
+
+  @unit
+  Scenario: The seed step records a created fact for every existing account
+    Given accounts stored before user recorded created facts
+    When the background step "user:record-created-facts" runs, or resumes from its checkpoint
+    Then each account after the checkpoint is recorded once as created, marked backfilled, at its row's creation time
+    And the step waits until no older image that mints accounts without the fact still serves
+
+  @unit
+  Scenario: The seed step's dry run records nothing
+    When the step runs as a dry run
+    Then it reports how many accounts it would record, records no fact and saves no checkpoint
 
   @unit
   Scenario: Changing an email refreshes authenticated identity

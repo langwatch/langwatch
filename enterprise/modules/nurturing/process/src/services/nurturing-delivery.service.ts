@@ -187,6 +187,8 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(firePromptCreated(signal));
       case "signed_up":
         return this.sendSignup(signal);
+      case "user_created":
+        return this.identifyCreated(signal);
       case "team_member_invited":
         return this.teamMemberInvited(signal);
       case "invite_accepted":
@@ -290,6 +292,11 @@ export class NurturingDeliveryService {
         return track({ userId: signal.userId, event: "evaluation_ran" });
       case "user_registered":
         return track({ userId: signal.userId, event: "signed_up" });
+      case "user_created":
+        return posthog.identify({
+          userId: signal.userId,
+          properties: { created_at: isoOf(signal.occurredAt) },
+        });
       case "signed_up":
         return posthog.track(fireOrganizationCreated(signal));
       case "team_member_invited":
@@ -340,6 +347,26 @@ export class NurturingDeliveryService {
       .findById({ id: signal.userId })
       .then((user) =>
         this.sendCustomerIoCalls(fireSignup({ ...signal, email: user?.email, name: user?.name })),
+      )
+      .catch(reportFailure);
+  }
+
+  /** A minted account: Customer.io learns the person, its address and name read fresh (§9). */
+  private identifyCreated(signal: NurturingSignalOf<"user_created">): void {
+    void this.deps.users
+      .findById({ id: signal.userId })
+      .then((user) =>
+        this.sendCustomerIoCalls([
+          {
+            type: "identify",
+            userId: signal.userId,
+            traits: {
+              ...(user?.email ? { email: user.email } : {}),
+              ...(user?.name ? { name: user.name } : {}),
+              createdAt: isoOf(signal.occurredAt),
+            },
+          },
+        ]),
       )
       .catch(reportFailure);
   }

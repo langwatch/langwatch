@@ -98,8 +98,14 @@ import type { UserRateLimitRepository } from "../repositories/user-rate-limit.re
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
+import type { UserFactIntent } from "../rules/user-lifecycle-outbox.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserAvatarObjectService } from "../services/user-avatar-object.service.ts";
+import {
+  UserCreatedFactBackfillService,
+  type UserCreatedFactBackfillReport,
+  type UserCreatedFactBackfillRun,
+} from "../services/user-created-fact-backfill.service.ts";
 import {
   UserLifecycleNoticeService,
   type UserLifecycleSenders,
@@ -236,6 +242,10 @@ export class UserModule implements UserApi {
         lifecycle,
       }),
       lifecycle,
+      createdFactBackfill: UserCreatedFactBackfillService.create({
+        users: repositories.users,
+        lifecycle,
+      }),
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords,
@@ -255,6 +265,7 @@ export class UserModule implements UserApi {
 
   readonly #users: UserService;
   readonly #lifecycle: UserLifecycleNoticeService;
+  readonly #createdFactBackfill: UserCreatedFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -269,6 +280,7 @@ export class UserModule implements UserApi {
   private constructor(input: {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
+    createdFactBackfill: UserCreatedFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -281,6 +293,7 @@ export class UserModule implements UserApi {
   }) {
     this.#users = input.users;
     this.#lifecycle = input.lifecycle;
+    this.#createdFactBackfill = input.createdFactBackfill;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create(input.dependencies);
     this.#peers = input.dependencies;
@@ -467,15 +480,8 @@ export class UserModule implements UserApi {
       email,
       passwordHash: await this.#passwords.hash({ password: input.password }),
     };
-    const created = addressConfirmed
-      ? await this.#users.createConfirmedCredentialUser(account)
-      : await this.#users.createCredentialUser(account);
-
-    await this.#lifecycle.registered({
-      userId: created.id,
-      at: this.#now(),
-      account: { accountId: created.accountId, createdAtMs: created.accountCreatedAtMs, email },
-    });
+    // The created and registered facts commit with the account, so a down bus never fails it.
+    const created = await this.#users.registerCredentialUser({ account, addressConfirmed });
 
     return { id: created.id };
   }
@@ -724,6 +730,18 @@ export class UserModule implements UserApi {
   /** user_lifecycle's senders, once the pipeline registers in this process. */
   connectLifecycle(senders: UserLifecycleSenders): void {
     this.#lifecycle.connect(senders);
+  }
+
+  /** The `user:record-created-facts` step's body: every stored account recorded as created. */
+  recordExistingCreatedFacts(
+    input: UserCreatedFactBackfillRun,
+  ): Promise<UserCreatedFactBackfillReport> {
+    return this.#createdFactBackfill.recordExisting(input);
+  }
+
+  /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */
+  recordLifecycleFact(intent: UserFactIntent): Promise<void> {
+    return this.#lifecycle.record(intent);
   }
 
   /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */

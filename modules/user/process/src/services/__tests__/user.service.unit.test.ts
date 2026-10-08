@@ -22,6 +22,8 @@ function lifecyclePeers() {
     recordUserDeactivated: { send: async () => undefined },
     recordUserReactivated: { send: async () => undefined },
     recordUserRegistered: { send: async () => undefined },
+    recordUserCreated: { send: async () => undefined },
+    recordUserErased: { send: async () => undefined },
   });
 
   return {
@@ -60,6 +62,7 @@ class StubRepository implements UserRepository {
   countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
+  findCreatedPage = vi.fn(async () => []);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
@@ -187,14 +190,17 @@ describe("UserService", () => {
   it("creates the account a spent mailbox proof earned already confirmed", async () => {
     const { service, repository } = createService();
 
-    await service.createConfirmedCredentialUser({
-      name: "Grace",
-      email: "grace@example.com",
-      passwordHash: "hash",
+    await service.registerCredentialUser({
+      account: { name: "Grace", email: "grace@example.com", passwordHash: "hash" },
+      addressConfirmed: true,
     });
 
     expect(repository.createCredentialUser).toHaveBeenCalledWith(
-      expect.objectContaining({ email: "grace@example.com", emailVerified: true }),
+      expect.objectContaining({
+        email: "grace@example.com",
+        emailVerified: true,
+        selfRegistered: true,
+      }),
     );
   });
 
@@ -645,6 +651,8 @@ describe("the lifecycle facts' clock", () => {
         },
       },
       recordUserRegistered: { send: async () => undefined },
+      recordUserCreated: { send: async () => undefined },
+      recordUserErased: { send: async () => undefined },
     });
     const service = UserService.create({
       repository,
