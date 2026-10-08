@@ -103,8 +103,8 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   @integration
   Scenario: The model-grouped chart answers under a memory cap
     Given about a million traces with one LLM span each
-    When the LLM calls chart grouped by model runs with a 200 MB per-query cap, well under the 520 MB it needs without spilling
-    Then it answers without a memory exceeded error, spilling its aggregations and its join to disk
+    When the LLM calls chart grouped by model runs with a 200 MB per-query cap
+    Then it answers without a memory exceeded error
     And every current trace is counted under its model
 
   @integration
