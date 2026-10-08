@@ -123,7 +123,7 @@ const TEACHING_DIRECTORIES = [".claude/rules", ".claude/skills", "dev/docs"] as 
 const TEACHING_EXCLUDED = /^dev\/docs\/(?:adr|plans|reports)\//;
 const TEACHING_FILES = ["CLAUDE.md"] as const;
 
-/** CLAUDE.md, .claude/rules, .claude/skills and dev/docs outside adr/, plans/ and dated reports/: Markdown only. */
+/** CLAUDE.md, .claude/rules, .claude/skills and dev/docs outside adr/, plans/, reports/. */
 export function teachingSurfaces(snapshot: WorkspaceSnapshot): string[] {
   const { root } = snapshot;
   const found = TEACHING_FILES.map((file) => join(root, file)).filter((file) => existsSync(file));
@@ -208,18 +208,34 @@ export function lintDeletedSpellingsInCode(snapshot: WorkspaceSnapshot): Archite
   const files = spellings.flatMap((entry) =>
     entry.path === undefined ? [] : [{ entry, path: new RegExp(entry.path) }],
   );
+
+  return CODE_DIRECTORIES.flatMap((directory) =>
+    directoryViolations({ snapshot, directory, matcher, files }),
+  );
+}
+
+function directoryViolations({
+  snapshot,
+  directory,
+  matcher,
+  files,
+}: {
+  snapshot: WorkspaceSnapshot;
+  directory: string;
+  matcher: Matcher;
+  files: { entry: DeletedSpelling; path: RegExp }[];
+}): ArchitectureViolation[] {
+  const { root } = snapshot;
   const violations: ArchitectureViolation[] = [];
 
-  for (const directory of CODE_DIRECTORIES) {
-    for (const file of snapshot.files({ directory: join(root, directory), accept: () => true })) {
-      const path = workspacePath({ root, file });
-      for (const { entry } of files.filter((candidate) => candidate.path.test(path))) {
-        if (!isExempt({ entry, path })) violations.push(codeViolation({ entry, file: path }));
-      }
-      if (!CODE_FILE.test(path) || GENERATED.test(path) || path === DELETED_SPELLINGS_RATCHET)
-        continue;
-      violations.push(...codeMatches({ matcher, file, path }));
+  for (const file of snapshot.files({ directory: join(root, directory), accept: () => true })) {
+    const path = workspacePath({ root, file });
+    for (const { entry } of files.filter((candidate) => candidate.path.test(path))) {
+      if (!isExempt({ entry, path })) violations.push(codeViolation({ entry, file: path }));
     }
+    if (!CODE_FILE.test(path) || GENERATED.test(path) || path === DELETED_SPELLINGS_RATCHET)
+      continue;
+    violations.push(...codeMatches({ matcher, file, path }));
   }
 
   return violations;

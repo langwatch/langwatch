@@ -77,11 +77,8 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     [prefix, setValue],
   );
 
-  // Skip the popover trigger entirely when the project has zero
-  // enabled providers — same honest empty state used by the prompt
-  // playground and workflow LLM-node pickers. While the providers
-  // query is in flight, render a skeleton so the empty state doesn't
-  // flash before the data resolves.
+  // Zero enabled providers shows the empty state shared with the prompt playground and
+  // workflow pickers; a skeleton renders while the providers query is in flight.
   // Instant Evals needs no provider, so a released project keeps the picker.
   const { project, organization } = useOrganizationTeamProject();
   const instantEvals = useInstantEvalJudgeModels({

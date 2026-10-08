@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The judge's model picker offers Instant Evals behind the release flag or the
- * organization's own opt-in; the picker itself is lent by the prompt module, so
- * the stand-in lists exactly the options this field hands it.
+ * The judge's picker offers Instant Evals behind the release flag or the organization's
+ * opt-in; the stand-in for the lent picker lists exactly the options this field hands it.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
