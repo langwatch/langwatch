@@ -142,6 +142,44 @@ Contract `../contract/src/personal-virtual-keys.trpc.ts:14`, router `src/transpo
 | `personalVirtualKeys.issuePersonal`  | mutation | Permission `organization:view`                                                                  | inline | `issuedPersonalVirtualKeyAnswerSchema`     |
 | `personalVirtualKeys.revokePersonal` | mutation | Permission `organization:view`                                                                  | inline | `enterpriseGatewayWriteAcknowledgedSchema` |
 
+```typescript
+// personalVirtualKeys.list
+// Input: inline, ../contract/src/personal-virtual-keys.trpc.ts:16
+interface Input {
+  organizationId: string;
+  targetUserId?: string;
+}
+// Output: personalVirtualKeySchema.array() (inline, ../contract/src/personal-virtual-keys.trpc.ts:17)
+
+// personalVirtualKeys.issuePersonal
+// Input: inline, ../contract/src/personal-virtual-keys.trpc.ts:21
+interface Input {
+  organizationId: string;
+  label: string;
+  routingPolicyId?: string;
+}
+// Output: issuedPersonalVirtualKeyAnswerSchema, ../contract/src/personal-virtual-key.ts:46
+interface Output {
+  id: string;
+  label: string;
+  secret: string;
+  baseUrl: string;
+  displayPrefix: string;
+  routingPolicyId: string | null;
+}
+
+// personalVirtualKeys.revokePersonal
+// Input: inline, ../contract/src/personal-virtual-keys.trpc.ts:36
+interface Input {
+  organizationId: string;
+  id: string;
+}
+// Output: enterpriseGatewayWriteAcknowledgedSchema, ../contract/src/enterprise-gateway.api.ts:78
+interface Output {
+  ok: boolean;
+}
+```
+
 ### `routingPolicy`
 
 Contract `../contract/src/routing-policy.trpc.ts:27`, router `src/transport/routing-policy.trpc.ts:9`.
@@ -156,6 +194,75 @@ Contract `../contract/src/routing-policy.trpc.ts:27`, router `src/transport/rout
 | `routingPolicy.update`          | mutation | Permission `routingPolicies:manage` | inline                           | `routingPolicySchema`                      |
 | `routingPolicy.setDefault`      | mutation | Permission `routingPolicies:manage` | `policyInOrganization`           | `routingPolicySchema`                      |
 | `routingPolicy.delete`          | mutation | Permission `routingPolicies:manage` | `policyInOrganization`           | `enterpriseGatewayWriteAcknowledgedSchema` |
+
+```typescript
+// routingPolicy.list
+// Input: listRoutingPoliciesInputSchema, ../contract/src/routing-policy.ts:42
+interface Input {
+  organizationId: string;
+  selectableForScope?: {
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  };
+}
+// Output: routingPolicySchema.array() (inline, ../contract/src/routing-policy.trpc.ts:30)
+
+// routingPolicy.get
+// Input: policyInOrganization, ../contract/src/routing-policy.trpc.ts:15
+interface Input {
+  organizationId: string;
+  id: string;
+}
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+
+// routingPolicy.tierSuggestions
+// Input: inline, ../contract/src/routing-policy.trpc.ts:38
+interface Input {
+  organizationId: string;
+  tier: "complex" | "reasoning" | "fast";
+  boundProviderTypes?: string[];
+}
+// Output: inline, ../contract/src/routing-policy.trpc.ts:44
+type Output = {
+  modelId: string;
+  name: string;
+  provider: string;
+  recommended?: boolean;
+}[];
+
+// routingPolicy.personalContext
+// Input: inline, ../contract/src/routing-policy.trpc.ts:47
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof personalContextSchema>; // ../contract/src/routing-policy.ts:174
+
+// routingPolicy.create
+// Input: z.object({ organizationId: z.string(), scopes: z .array(routingPolicyScopeEntrySchema) .m… (inline, ../contract/src/routing-policy.trpc.ts:52)
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+
+// routingPolicy.update
+// Input: inline, ../contract/src/routing-policy.trpc.ts:67
+interface Input {
+  organizationId: string;
+  id: string;
+  name?: string;
+  modelProviderIds?: string[];
+  description?: string | null;
+  modelAliases?: Record<string, string>;
+  defaultModel?: string | null;
+  policyRules?: Record<string, unknown>;
+}
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+
+// routingPolicy.setDefault
+type Input = z.infer<typeof policyInOrganization>; // ../contract/src/routing-policy.trpc.ts:15
+type Output = z.infer<typeof routingPolicySchema>; // ../contract/src/routing-policy.ts:22
+
+// routingPolicy.delete
+type Input = z.infer<typeof policyInOrganization>; // ../contract/src/routing-policy.trpc.ts:15
+type Output = z.infer<typeof enterpriseGatewayWriteAcknowledgedSchema>; // ../contract/src/enterprise-gateway.api.ts:78
+```
 
 ## Sockets
 

@@ -72,6 +72,10 @@ func run(ctx context.Context, opts options) error {
 	if err != nil {
 		return err
 	}
+	if errs := manifest.Schemas.Errors; len(errs) > 0 {
+		return fmt.Errorf("the zod schemas could not be read (%d imports failed; first: %s); "+
+			"prepare the workspace with `pnpm start:prepare:files` and `pnpm ensure:built`, then rerun", len(errs), errs[0])
+	}
 	reportUnresolved(manifest, stderr)
 	disagreements := crossCheck(manifest, stderr)
 	target := settleTarget{root: root, check: opts.check, stdout: opts.stdout, stderr: stderr}
@@ -79,7 +83,7 @@ func run(ctx context.Context, opts options) error {
 	if err != nil {
 		return err
 	}
-	problems += disagreements
+	problems += disagreements + reportGroups(ws, packageGroups, stderr)
 	if opts.check && problems > 0 {
 		fmt.Fprintf(stderr, "readmegen: %d pages need attention; run `pnpm generate:readmes` and describe each page above its block\n", problems)
 		return errStale{problems}

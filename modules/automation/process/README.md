@@ -483,7 +483,10 @@ Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:139`.
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
+// Params: automationRestIdParamsSchema, ../contract/src/automation-rest.schemas.ts:261
+interface Params {
+  triggerId: string;
+}
 ```
 
 #### `GET /:triggerId/fires` · `getApiTriggersByIdFires`
@@ -496,7 +499,11 @@ Answers at `/api/triggers/:triggerId/fires`, `/api/v1/triggers/:triggerId/fires`
 
 ```typescript
 type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-type Query = z.infer<typeof automationRestFiresQuerySchema>; // ../contract/src/automation-rest.schemas.ts:392
+// Query: automationRestFiresQuerySchema, ../contract/src/automation-rest.schemas.ts:392
+interface Query {
+  limit?: number;
+  cursor?: string;
+}
 ```
 
 #### `POST /` · `postApiTriggers`
@@ -535,7 +542,8 @@ Answers at `/api/triggers/:triggerId/enable`, `/api/v1/triggers/:triggerId/enabl
 
 ```typescript
 type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/automation-rest.schemas.ts:430
+// Body: automationRestNoBodySchema, ../contract/src/automation-rest.schemas.ts:430
+type Body = Record<string, unknown>;
 ```
 
 #### `POST /:triggerId/disable` · `postApiTriggersByIdDisable`
@@ -594,8 +602,20 @@ Permission `triggers:manage`. Declared at `src/transport/slack-trigger.rest.ts:2
 Answers at `/api/trigger/slack`, `/api/v1/trigger/slack`.
 
 ```typescript
-type Body = z.infer<typeof slackAutomationRestInputSchema>; // ../contract/src/automation-rest.schemas.ts:433
-type Response = z.infer<typeof slackAutomationRestCreatedSchema>; // ../contract/src/automation-rest.schemas.ts:476
+// Body: slackAutomationRestInputSchema, ../contract/src/automation-rest.schemas.ts:433
+interface Body {
+  slack_webhook?: string;
+  slack_connection_id?: string;
+  slack_channel_id?: string;
+  name: string;
+  message?: string;
+  filters?: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
+  alert_type: "CRITICAL" | "WARNING" | "INFO";
+}
+// Response: slackAutomationRestCreatedSchema, ../contract/src/automation-rest.schemas.ts:476
+interface Response {
+  message: string;
+}
 ```
 
 ### `unsubscribeRest`
@@ -616,8 +636,14 @@ Public: RFC 8058 one-click unsubscribe; the HMAC token in ?token= is the authori
 Answers at `/api/unsubscribe`, `/api/v1/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof unsubscribeQuery>; // src/transport/unsubscribe.rest.ts:29
-type Response = z.infer<typeof unsubscribeRestAcknowledgedSchema>; // ../contract/src/automation-rest.schemas.ts:479
+// Query: unsubscribeQuery, src/transport/unsubscribe.rest.ts:29
+interface Query {
+  token?: string;
+}
+// Response: unsubscribeRestAcknowledgedSchema, ../contract/src/automation-rest.schemas.ts:479
+interface Response {
+  ok: boolean;
+}
 ```
 
 ## tRPC transport
@@ -648,6 +674,195 @@ Contract `../contract/src/automation.trpc.ts:41`, router `src/transport/automati
 | `automation.testFireTemplate`     | mutation | Permission `triggers:update` | `automationApiTestFireInputSchema`             | `testFireResultSchema`           |
 | `automation.upsert`               | mutation | Permission `triggers:update` | `automationApiUpsertInputSchema`               | `triggerSchema`                  |
 
+```typescript
+// automation.create
+type Input = z.infer<typeof automationApiCreateInputSchema>; // ../contract/src/automation.trpc-schemas.ts:92
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+
+// automation.deleteById
+// Input: automationApiTriggerScopeSchema, ../contract/src/automation.trpc-schemas.ts:26
+interface Input {
+  projectId: string;
+  triggerId: string;
+}
+// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:35
+interface Output {
+  success: boolean;
+}
+
+// automation.getTriggers
+// Input: automationApiProjectScopeSchema, ../contract/src/automation.trpc-schemas.ts:22
+interface Input {
+  projectId: string;
+}
+// Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:52)
+
+// automation.getDailyCap
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:25
+interface Output {
+  cap: number;
+}
+
+// automation.getDailyCapStatus
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:28
+interface Output {
+  cap: number;
+  counts: Record<string, {
+    count: number;
+    skipped: number;
+  }>;
+}
+
+// automation.getTriggerStats
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+// Output: inline, ../contract/src/automation.trpc.ts:69
+type Output = {
+  triggerId: string;
+  lastFiredAt: unknown | null;
+  recentFireCount: number;
+  currentlyFiring: boolean;
+}[];
+
+// automation.getRecentFires
+// Input: automationApiRecentFiresInputSchema, ../contract/src/automation.trpc-schemas.ts:124
+interface Input {
+  projectId: string;
+  triggerId: string;
+  limit?: number;
+}
+// Output: inline, ../contract/src/automation.trpc.ts:73
+type Output = {
+  id: string;
+  triggerId: string;
+  customGraphId: string | null;
+  createdAt: unknown;
+  resolvedAt: unknown | null;
+}[];
+
+// automation.getWebhookDeliveries
+// Input: automationApiWebhookDeliveriesInputSchema, ../contract/src/automation.trpc-schemas.ts:131
+interface Input {
+  projectId: string;
+  triggerId: string;
+  limit?: number;
+}
+// Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:78)
+
+// automation.getFireHistory
+// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:292
+interface Input {
+  projectId: string;
+  triggerId: string;
+  limit?: number;
+  cursor?: {
+    createdAt: unknown;
+    id: string;
+  } | null;
+}
+type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:276
+
+// automation.getLatestEvaluation
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
+// Output: inline, ../contract/src/automation.trpc.ts:88
+type Output = {
+  triggerId: string;
+  projectId: string;
+  evaluatedAt: unknown;
+  verdict: string;
+  observedValue: number | null;
+  threshold: number | null;
+  operator: string | null;
+  timePeriodMinutes: number | null;
+  skipCode: string | null;
+} | null;
+
+// automation.getNextFiring
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
+type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:318
+
+// automation.getRecentActivity
+// Input: automationApiRecentActivityInputSchema, ../contract/src/automation.trpc-schemas.ts:140
+interface Input {
+  projectId: string;
+  limit?: number;
+}
+// Output: inline, ../contract/src/automation.trpc.ts:97
+type Output = {
+  id: string;
+  triggerId: string;
+  customGraphId: string | null;
+  createdAt: unknown;
+  resolvedAt: unknown | null;
+}[];
+
+// automation.getReportSchedules
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+// Output: inline, ../contract/src/automation.trpc.ts:105
+type Output = {
+  triggerId: string;
+  nextRunAt: unknown | null;
+  lastRunAt: unknown | null;
+  active: boolean;
+}[];
+
+// automation.toggleTrigger
+// Input: automationApiToggleTriggerInputSchema, ../contract/src/automation.trpc-schemas.ts:148
+interface Input {
+  triggerId: string;
+  active: boolean;
+  projectId: string;
+}
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+
+// automation.getTriggerById
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
+// Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:113)
+
+// automation.listSlackChannels
+// Input: automationApiListSlackChannelsInputSchema, ../contract/src/automation.trpc-schemas.ts:156
+interface Input {
+  projectId: string;
+  slackIntegrationId: string;
+}
+// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:52
+interface Output {
+  channels: {
+    id: string;
+    name: string;
+    isPrivate: boolean;
+  }[];
+  error: string | null;
+  gaps: ("page_cap" | "private_channels_hidden")[];
+}
+
+// automation.updateTriggerFilters
+// Input: automationApiUpdateTriggerFiltersInputSchema, ../contract/src/automation.trpc-schemas.ts:164
+interface Input {
+  triggerId: string;
+  projectId: string;
+  filters: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
+}
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+
+// automation.testFireTemplate
+type Input = z.infer<typeof automationApiTestFireInputSchema>; // ../contract/src/automation.trpc-schemas.ts:173
+// Output: testFireResultSchema, ../contract/src/test-fire.ts:62
+interface Output {
+  channel: "email" | "slack" | "webhook";
+  recipientCount: number;
+  usedDefault: boolean;
+  missingVariables: string[];
+  errors: string[];
+  httpStatus?: number;
+}
+
+// automation.upsert
+type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:244
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+```
+
 ### `emailSuppression`
 
 Contract `../contract/src/email-suppression.trpc.ts:30`, router `src/transport/email-suppression.trpc.ts:22`.
@@ -658,6 +873,54 @@ Contract `../contract/src/email-suppression.trpc.ts:30`, router `src/transport/e
 | `emailSuppression.confirmUnsubscribe`      | mutation | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `confirmUnsubscribeInputSchema` | `emailSuppressionAcknowledgedSchema` |
 | `emailSuppression.getAll`                  | query    | Permission `triggers:view`                                                                                                                                                      | `suppressionProjectScopeSchema` | inline                               |
 | `emailSuppression.remove`                  | mutation | Permission `triggers:manage`                                                                                                                                                    | `removeSuppressionInputSchema`  | `emailSuppressionAcknowledgedSchema` |
+
+```typescript
+// emailSuppression.resolveUnsubscribeToken
+// Input: resolveUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:16
+interface Input {
+  token: string;
+}
+// Output: unsubscribeViewSchema, ../contract/src/automation.ts:38
+interface Output {
+  projectName: string;
+  triggerName: string | null;
+  email: string;
+}
+
+// emailSuppression.confirmUnsubscribe
+// Input: confirmUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:19
+interface Input {
+  token: string;
+  scope: "trigger" | "project";
+}
+// Output: emailSuppressionAcknowledgedSchema, ../contract/src/automation.ts:56
+interface Output {
+  ok: boolean;
+}
+
+// emailSuppression.getAll
+// Input: suppressionProjectScopeSchema, ../contract/src/email-suppression.trpc.ts:25
+interface Input {
+  projectId: string;
+}
+// Output: inline, ../contract/src/email-suppression.trpc.ts:41
+type Output = {
+  id: string;
+  email: string;
+  triggerId: string | null;
+  reason: string;
+  createdAt: unknown;
+  triggerName: string | null;
+}[];
+
+// emailSuppression.remove
+// Input: removeSuppressionInputSchema, ../contract/src/email-suppression.trpc.ts:28
+interface Input {
+  projectId: string;
+  id: string;
+}
+type Output = z.infer<typeof emailSuppressionAcknowledgedSchema>; // ../contract/src/automation.ts:56
+```
 
 ## Sockets
 

@@ -189,6 +189,95 @@ Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/ide
 | `identityLookup.resendInvitation`      | mutation | Platform permission `ops:manage` | `invitationInputSchema` | `lookupInvitationExpirySchema` |
 | `identityLookup.extendInvitation`      | mutation | Platform permission `ops:manage` | `invitationInputSchema` | `lookupInvitationExpirySchema` |
 
+```typescript
+// identityLookup.resolve
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:26
+interface Input {
+  address: string;
+}
+type Output = z.infer<typeof identityLookupAnswerSchema>; // ../contract/src/identity-lookup.ts:65
+
+// identityLookup.person
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:30
+interface Input {
+  userId: string;
+  address: string;
+}
+// Output: lookupPersonDetailSchema.nullable() (inline, ../contract/src/identity-lookup.trpc.ts:31)
+
+// identityLookup.recentActivity
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:34
+type Input = Record<string, unknown>;
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:35
+type Output = {
+  auditId: string;
+  operatorUserId: string | null;
+  operatorName: string | null;
+  act: string;
+  address: string | null;
+  atMs: number;
+}[];
+
+// identityLookup.claimQueue
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:38
+type Input = Record<string, unknown>;
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:39
+type Output = {
+  connectionId: string;
+  organizationId: string;
+  organizationName: string | null;
+  domain: string;
+  waitingSinceMs: number;
+}[];
+
+// identityLookup.confirmProposedSignIn
+// Input: proposalInputSchema, ../contract/src/identity-lookup.trpc.ts:14
+interface Input {
+  userId: string;
+  proposalId: string;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:43
+type Output = unknown;
+
+// identityLookup.rejectProposedSignIn
+type Input = z.infer<typeof proposalInputSchema>; // ../contract/src/identity-lookup.trpc.ts:14
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:47
+type Output = unknown;
+
+// identityLookup.detachMethod
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:50
+interface Input {
+  userId: string;
+  identifierId: string;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:51
+type Output = unknown;
+
+// identityLookup.endSessions
+// Input: inline, ../contract/src/identity-lookup.trpc.ts:55
+interface Input {
+  userId: string;
+  identifierId?: string | null;
+}
+// Output: inline, ../contract/src/identity-lookup.trpc.ts:61
+type Output = unknown;
+
+// identityLookup.resendInvitation
+// Input: invitationInputSchema, ../contract/src/identity-lookup.trpc.ts:19
+interface Input {
+  organizationId: string;
+  inviteId: string;
+}
+// Output: lookupInvitationExpirySchema, ../contract/src/identity-lookup.ts:172
+interface Output {
+  expiresAtMs: number | null;
+}
+
+// identityLookup.extendInvitation
+type Input = z.infer<typeof invitationInputSchema>; // ../contract/src/identity-lookup.trpc.ts:19
+type Output = z.infer<typeof lookupInvitationExpirySchema>; // ../contract/src/identity-lookup.ts:172
+```
+
 ### `identity`
 
 Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:25`.
@@ -224,6 +313,102 @@ Contract `../contract/src/join-request.trpc.ts:35`, router `src/transport/join-r
 | `identity.joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
 | `identity.joinRequests.getJoinAdmissions`  | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiAdmissionsInputSchema`   | inline                            |
 
+```typescript
+// identity.completeVerification
+// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:24
+interface Input {
+  identifierId: string;
+  verificationId: string;
+  token: string;
+  codeVerifier: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:35
+interface Output {
+  verified: true;
+}
+
+// identity.myTestArrival
+// Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
+type Input = Record<string, unknown>;
+// Output: ssoTestArrivalStandingSchema, ../contract/src/sso-admission.ts:71
+type Output = {
+  testing: true;
+  connectionId: string;
+  organizationId: string;
+  organizationName: string;
+} | {
+  testing: false;
+};
+
+// identity.myIdentifiers
+type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
+// Output: inline, ../contract/src/identity.trpc.ts:43
+type Output = {
+  identifierId: string;
+  accountId: string | null;
+  provider: "credential" | "email" | "passkey" | "google" | "github" | "gitlab" | "azure-ad" | "oidc" | "saml" | "auth0-legacy" | "okta-legacy";
+  value: string | null;
+  isPrimary: boolean;
+  confirmed: boolean;
+  resendable: boolean;
+  removable: boolean;
+  refusalCode: string | null;
+  demotesFirst: boolean;
+}[];
+
+// identity.myMethodsLastUsed
+type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
+// Output: methodsLastUsedSchema, ../contract/src/account-identifiers.ts:34
+interface Output {
+  byIdentifier: Record<string, string>;
+  secondFactorAt: string | null;
+}
+
+// identity.addEmailIdentifier
+// Input: inline, ../contract/src/identity.trpc.ts:50
+interface Input {
+  email: string;
+  codeChallenge: string;
+}
+// Output: emailIdentifierAddedSchema, ../contract/src/account-identifiers.ts:30
+interface Output {
+  identifierId: string;
+}
+
+// identity.resendIdentifierConfirmation
+// Input: inline, ../contract/src/identity.trpc.ts:55
+interface Input {
+  identifierId: string;
+  codeChallenge: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:57
+interface Output {
+  sent: true;
+}
+
+// identity.removeIdentifier
+// Input: inline, ../contract/src/identity.trpc.ts:60
+interface Input {
+  identifierId: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:61
+interface Output {
+  removed: true;
+}
+
+// identity.getJoinAdmissions
+// Input: inline, ../contract/src/identity.trpc.ts:65
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/identity.trpc.ts:66
+type Output = {
+  userId: string;
+  domain: string;
+  automatic: boolean;
+}[];
+```
+
 ### `twoStepVerification`
 
 Contract `../contract/src/two-step-verification.trpc.ts:16`, router `src/transport/two-step-verification.trpc.ts:30`.
@@ -236,6 +421,70 @@ Contract `../contract/src/two-step-verification.trpc.ts:16`, router `src/transpo
 | `twoStepVerification.requirement`    | query    | Permission `organization:manage`                                                                                                                                                        | `organizationInputSchema` | `organizationMfaRequirementSchema`       |
 | `twoStepVerification.setRequirement` | mutation | Permission `organization:manage`                                                                                                                                                        | inline                    | `organizationMfaRequirementChangeSchema` |
 | `twoStepVerification.memberFactors`  | query    | Permission `organization:manage`                                                                                                                                                        | `organizationInputSchema` | inline                                   |
+
+```typescript
+// twoStepVerification.account
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:18
+type Input = Record<string, unknown>;
+// Output: twoStepAccountStandingSchema, ../contract/src/two-step-verification.ts:17
+interface Output {
+  offered: boolean;
+  enabled: boolean;
+  holdsPasskey: boolean;
+  requiringOrganizations: {
+    organizationId: string;
+    name: string;
+    slug: string;
+  }[];
+}
+
+// twoStepVerification.disable
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:23
+interface Input {
+  password?: string;
+  code: string;
+}
+// Output: twoStepDisabledSchema, ../contract/src/two-step-verification.ts:84
+interface Output {
+  disabled: true;
+}
+
+// twoStepVerification.standing
+// Input: organizationInputSchema, ../contract/src/two-step-verification.trpc.ts:14
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof organizationMfaStandingSchema>; // ../contract/src/two-step-verification.ts:43
+
+// twoStepVerification.requirement
+type Input = z.infer<typeof organizationInputSchema>; // ../contract/src/two-step-verification.trpc.ts:14
+// Output: organizationMfaRequirementSchema, ../contract/src/two-step-verification.ts:62
+interface Output {
+  mfaRequired: boolean;
+  offered: boolean;
+  connection: {
+    connected: boolean;
+    assertedFactors: ("pwd" | "otp" | "pin" | "saml" | "oidc" | "phw" | "hwk" | "swk" | "mfa")[];
+    assertsSecondFactor: boolean;
+  };
+}
+
+// twoStepVerification.setRequirement
+// Input: inline, ../contract/src/two-step-verification.trpc.ts:40
+interface Input {
+  organizationId: string;
+  mfaRequired: boolean;
+}
+// Output: organizationMfaRequirementChangeSchema, ../contract/src/two-step-verification.ts:69
+interface Output {
+  previous: boolean;
+  next: boolean;
+}
+
+// twoStepVerification.memberFactors
+type Input = z.infer<typeof organizationInputSchema>; // ../contract/src/two-step-verification.trpc.ts:14
+// Output: z.array(organizationMemberFactorSchema) (inline, ../contract/src/two-step-verification.trpc.ts:45)
+```
 
 ## Sockets
 

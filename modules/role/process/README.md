@@ -125,8 +125,22 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-type Query = z.infer<typeof roleRestListQuerySchema>; // ../contract/src/role-rest.schemas.ts:55
-type Response = z.infer<typeof roleRestListSchema>; // ../contract/src/role-rest.schemas.ts:62
+// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:55
+interface Query {
+  builtIn?: "true" | "false";
+}
+// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:62
+interface Response {
+  roles: {
+    id: string;
+    name: string;
+    description: string | null;
+    permissions: string[];
+    builtIn: boolean;
+    createdAt: unknown | null;
+    updatedAt: unknown | null;
+  }[];
+}
 ```
 
 #### `POST /` · `createRole`
@@ -138,8 +152,22 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-type Body = z.infer<typeof roleRestCreateSchema>; // ../contract/src/role-rest.schemas.ts:66
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:41
+// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:66
+interface Body {
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:41
+interface Response {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  builtIn: boolean;
+  createdAt: unknown | null;
+  updatedAt: unknown | null;
+}
 ```
 
 #### `GET /permissions` · `listRolePermissions`
@@ -151,7 +179,16 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
 ```typescript
-type Response = z.infer<typeof rolePermissionCatalogSchema>; // ../contract/src/role-rest.schemas.ts:81
+// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:81
+interface Response {
+  resources: {
+    resource: string;
+    organizationExclusive: boolean;
+    actions: string[];
+    permissions: string[];
+  }[];
+  actions: string[];
+}
 ```
 
 #### `GET /:id` · `getRole`
@@ -163,7 +200,10 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:64
+// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:64
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:41
 ```
 
@@ -177,7 +217,12 @@ Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/role
 
 ```typescript
 type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:64
-type Body = z.infer<typeof roleRestUpdateSchema>; // ../contract/src/role-rest.schemas.ts:72
+// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:72
+interface Body {
+  name?: string;
+  description?: string | null;
+  permissions?: string[];
+}
 type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:41
 ```
 
@@ -191,7 +236,10 @@ Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/role
 
 ```typescript
 type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:64
-type Response = z.infer<typeof roleRestDeletedSchema>; // ../contract/src/role-rest.schemas.ts:79
+// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:79
+interface Response {
+  success: true;
+}
 ```
 
 ## tRPC transport
@@ -209,6 +257,82 @@ Contract `../contract/src/role.trpc.ts:17`, router `src/transport/role.trpc.ts:1
 | `role.delete`         | mutation | Service-authorized: organization:manage; the role's organization is loaded by its id, so the check runs there rather than on input | `roleApiRoleInputSchema`               | `roleWriteAcknowledgedSchema` |
 | `role.assignToUser`   | mutation | Permission `organization:manage, via teamId`; Entitlement `enterprise` (feature `RBAC`)                                            | `roleApiUserRoleAssignmentInputSchema` | `roleWriteAcknowledgedSchema` |
 | `role.removeFromUser` | mutation | Permission `organization:manage, via teamId`                                                                                       | `roleApiUserRoleAssignmentInputSchema` | `roleWriteAcknowledgedSchema` |
+
+```typescript
+// role.getAll
+// Input: roleApiOrganizationInputSchema, ../contract/src/role.schemas.ts:10
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/role.trpc.ts:20
+type Output = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  kind: "custom" | "system_api_key" | "built_in";
+  createdAt: unknown | null;
+  updatedAt: unknown | null;
+}[];
+
+// role.getById
+// Input: roleApiRoleInputSchema, ../contract/src/role.schemas.ts:13
+interface Input {
+  roleId: string;
+}
+// Output: roleSchema, ../contract/src/role.ts:17
+interface Output {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  kind: "custom" | "system_api_key" | "built_in";
+  createdAt: unknown | null;
+  updatedAt: unknown | null;
+}
+
+// role.create
+// Input: roleApiCreateInputSchema, ../contract/src/role.schemas.ts:23
+interface Input {
+  organizationId: string;
+  name: string;
+  description?: string;
+  permissions: ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage")[];
+}
+type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:17
+
+// role.update
+// Input: roleApiUpdateInputSchema, ../contract/src/role.schemas.ts:31
+interface Input {
+  roleId: string;
+  name?: string;
+  description?: string;
+  permissions?: ("organization:view" | "organization:manage" | "organization:delete" | "project:view" | "project:create" | "project:update" | "project:delete" | "project:manage" | "team:view" | "team:manage" | "analytics:view" | "analytics:create" | "analytics:update" | "analytics:delete" | "analytics:manage" | "cost:view" | "traces:view" | "traces:create" | "traces:update" | "traces:share" | "scenarios:view" | "scenarios:create" | "scenarios:update" | "scenarios:delete" | "scenarios:manage" | "annotations:view" | "annotations:create" | "annotations:update" | "annotations:delete" | "annotations:manage" | "evaluations:view" | "evaluations:create" | "evaluations:update" | "evaluations:delete" | "evaluations:manage" | "datasets:view" | "datasets:create" | "datasets:update" | "datasets:delete" | "datasets:manage" | "triggers:view" | "triggers:create" | "triggers:update" | "triggers:delete" | "triggers:manage" | "workflows:view" | "workflows:create" | "workflows:update" | "workflows:delete" | "workflows:manage" | "experiments:view" | "experiments:create" | "experiments:update" | "experiments:delete" | "experiments:manage" | "prompts:view" | "prompts:create" | "prompts:update" | "prompts:delete" | "prompts:manage" | "secrets:view" | "secrets:create" | "secrets:update" | "secrets:delete" | "secrets:manage" | "playground:view" | "playground:create" | "playground:update" | "playground:delete" | "playground:manage" | "ops:view" | "ops:manage" | "auditLog:view" | "virtualKeys:view" | "virtualKeys:create" | "virtualKeys:update" | "virtualKeys:delete" | "virtualKeys:rotate" | "virtualKeys:manage" | "virtualKeys:viewOtherPersonal" | "gatewayBudgets:view" | "gatewayBudgets:create" | "gatewayBudgets:update" | "gatewayBudgets:delete" | "gatewayBudgets:manage" | "gatewayProviders:view" | "gatewayProviders:update" | "gatewayProviders:manage" | "routingPolicies:view" | "routingPolicies:manage" | "gatewayGuardrails:view" | "gatewayGuardrails:attach" | "gatewayGuardrails:detach" | "gatewayGuardrails:manage" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "gatewayCacheRules:create" | "gatewayCacheRules:update" | "gatewayCacheRules:delete" | "gatewayCacheRules:manage" | "governance:view" | "governance:manage" | "ingestionSources:view" | "ingestionSources:create" | "ingestionSources:update" | "ingestionSources:delete" | "ingestionSources:manage" | "anomalyRules:view" | "anomalyRules:create" | "anomalyRules:update" | "anomalyRules:delete" | "anomalyRules:manage" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "aiTools:manage" | "webhookEndpoints:view" | "webhookEndpoints:manage" | "gatewaySpend:view" | "gatewaySpend:manage" | "langy:view" | "langy:create" | "langy:update" | "langy:delete" | "langy:manage" | "agentCache:view" | "agentCache:manage" | "featureFlags:manageExperiments" | "governanceCost:view" | "sso:view" | "sso:manage")[];
+}
+type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:17
+
+// role.delete
+type Input = z.infer<typeof roleApiRoleInputSchema>; // ../contract/src/role.schemas.ts:13
+// Output: roleWriteAcknowledgedSchema, ../contract/src/role.ts:37
+interface Output {
+  success: true;
+}
+
+// role.assignToUser
+// Input: roleApiUserRoleAssignmentInputSchema, ../contract/src/role.schemas.ts:16
+interface Input {
+  userId: string;
+  teamId: string;
+  customRoleId: string;
+}
+type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:37
+
+// role.removeFromUser
+type Input = z.infer<typeof roleApiUserRoleAssignmentInputSchema>; // ../contract/src/role.schemas.ts:16
+type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:37
+```
 
 ## Sockets
 

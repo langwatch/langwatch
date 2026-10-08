@@ -58,6 +58,23 @@ Contract `../contract/src/recent-items.ts:33`, router `src/transport/home.trpc.t
 | --------------------- | ----- | ------------------------- | ------------------------ | ------ |
 | `home.getRecentItems` | query | Permission `project:view` | `recentItemsInputSchema` | inline |
 
+```typescript
+// home.getRecentItems
+// Input: recentItemsInputSchema, ../contract/src/recent-items.ts:15
+interface Input {
+  projectId: string;
+  limit?: number;
+}
+// Output: inline, ../contract/src/recent-items.ts:38
+type Output = {
+  id: string;
+  type: "prompt" | "workflow" | "dataset" | "evaluation" | "annotation" | "simulation";
+  name: string;
+  href: string;
+  updatedAt: unknown;
+}[];
+```
+
 ## Sockets
 
 None: this module declares no websocket, rawsocket or rawhttp door.

@@ -46,7 +46,8 @@ Answers at `/api/rum/v1/traces`.
 ```typescript
 // Rawbody: "text" (inline, src/transport/rum.rest.ts:25)
 type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:6
-// Response: "protocol" (inline, src/transport/rum.rest.ts:38)
+// Response: inline, src/transport/rum.rest.ts:38
+type Response = unknown;
 ```
 
 ## tRPC transport

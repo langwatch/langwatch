@@ -107,8 +107,18 @@ Permission `secrets:view`. Declared at `src/transport/secret.rest.ts:68`.
 Answers at `/api/secrets`, `/api/v1/secrets`; also, undocumented, `/api/secrets/2026-08-24`, `/api/v1/secrets/2026-08-24`, `/api/secrets/latest`, `/api/v1/secrets/latest`.
 
 ```typescript
-type Query = z.infer<typeof secretPublicListInputSchema>; // ../contract/src/secret-rest.schemas.ts:29
-// Response: secretPublicSchema.array() (inline, src/transport/secret.rest.ts:71)
+// Query: secretPublicListInputSchema, ../contract/src/secret-rest.schemas.ts:29
+interface Query {
+  projectId?: string;
+}
+// Response: inline, src/transport/secret.rest.ts:71
+type Response = {
+  id: string;
+  projectId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}[];
 ```
 
 #### `GET /:id` · `getApiSecretsById`
@@ -120,9 +130,19 @@ Permission `secrets:view`. Declared at `src/transport/secret.rest.ts:75`.
 Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/secrets/2026-08-24/:id`, `/api/v1/secrets/2026-08-24/:id`, `/api/secrets/latest/:id`, `/api/v1/secrets/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:35
+// Params: secretPublicAliasParamsSchema, ../contract/src/secret-rest.schemas.ts:35
+interface Params {
+  id: string;
+}
 type Query = z.infer<typeof secretPublicListInputSchema>; // ../contract/src/secret-rest.schemas.ts:29
-type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:17
+// Response: secretPublicSchema, ../contract/src/secret-rest.schemas.ts:17
+interface Response {
+  id: string;
+  projectId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
 ```
 
 #### `POST /` · `postApiSecrets`
@@ -134,7 +154,12 @@ Permission `secrets:manage`. Declared at `src/transport/secret.rest.ts:85`.
 Answers at `/api/secrets`, `/api/v1/secrets`; also, undocumented, `/api/secrets/2026-08-24`, `/api/v1/secrets/2026-08-24`, `/api/secrets/latest`, `/api/v1/secrets/latest`.
 
 ```typescript
-type Body = z.infer<typeof secretPublicCreateInputSchema>; // ../contract/src/secret-rest.schemas.ts:44
+// Body: secretPublicCreateInputSchema, ../contract/src/secret-rest.schemas.ts:44
+interface Body {
+  projectId?: string;
+  name: string;
+  value: string;
+}
 type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:17
 ```
 
@@ -148,7 +173,11 @@ Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/
 
 ```typescript
 type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:35
-type Body = z.infer<typeof secretPublicUpdateInputSchema>; // ../contract/src/secret-rest.schemas.ts:53
+// Body: secretPublicUpdateInputSchema, ../contract/src/secret-rest.schemas.ts:53
+interface Body {
+  projectId?: string;
+  value: string;
+}
 type Response = z.infer<typeof secretPublicSchema>; // ../contract/src/secret-rest.schemas.ts:17
 ```
 
@@ -162,8 +191,15 @@ Answers at `/api/secrets/:id`, `/api/v1/secrets/:id`; also, undocumented, `/api/
 
 ```typescript
 type Params = z.infer<typeof secretPublicAliasParamsSchema>; // ../contract/src/secret-rest.schemas.ts:35
-type Body = z.infer<typeof secretPublicDeleteInputSchema>; // ../contract/src/secret-rest.schemas.ts:41
-type Response = z.infer<typeof secretPublicDeleteOutputSchema>; // ../contract/src/secret-rest.schemas.ts:58
+// Body: secretPublicDeleteInputSchema, ../contract/src/secret-rest.schemas.ts:41
+interface Body {
+  projectId?: string;
+}
+// Response: secretPublicDeleteOutputSchema, ../contract/src/secret-rest.schemas.ts:58
+interface Response {
+  id: string;
+  deleted: true;
+}
 ```
 
 ## tRPC transport
@@ -179,6 +215,58 @@ Contract `../contract/src/secret.trpc.ts:41`, router `src/transport/secret.trpc.
 | `secrets.update`     | mutation | Permission `secrets:manage` | `secretTrpcUpdateInputSchema` | `secretWriteAcknowledgedSchema` |
 | `secrets.delete`     | mutation | Permission `secrets:manage` | `secretTrpcDeleteInputSchema` | `secretWriteAcknowledgedSchema` |
 | `secrets.revealOnce` | mutation | Permission `secrets:view`   | `revealOnceInputSchema`       | `revealedSecretSchema`          |
+
+```typescript
+// secrets.list
+// Input: listSecretsInputSchema, ../contract/src/secret.ts:56
+interface Input {
+  projectId: string;
+}
+// Output: secretSchema.array() (inline, ../contract/src/secret.trpc.ts:44)
+
+// secrets.create
+// Input: secretTrpcCreateInputSchema, ../contract/src/secret.trpc.ts:22
+interface Input {
+  projectId: string;
+  name: string;
+  value: string;
+}
+type Output = z.infer<typeof secretSchema>; // ../contract/src/secret.ts:43
+
+// secrets.update
+// Input: secretTrpcUpdateInputSchema, ../contract/src/secret.trpc.ts:27
+interface Input {
+  projectId: string;
+  secretId: string;
+  value: string;
+}
+// Output: secretWriteAcknowledgedSchema, ../contract/src/secret.ts:126
+interface Output {
+  success: boolean;
+}
+
+// secrets.delete
+// Input: secretTrpcDeleteInputSchema, ../contract/src/secret.trpc.ts:36
+interface Input {
+  projectId: string;
+  secretId: string;
+}
+type Output = z.infer<typeof secretWriteAcknowledgedSchema>; // ../contract/src/secret.ts:126
+
+// secrets.revealOnce
+// Input: revealOnceInputSchema, ../contract/src/one-time-reveal.ts:34
+interface Input {
+  organizationId: string;
+  revealId: string;
+}
+// Output: revealedSecretSchema, ../contract/src/one-time-reveal.ts:42
+interface Output {
+  kind: "virtual_key";
+  keyId: string;
+  preview: string;
+  secret: string;
+}
+```
 
 ## Sockets
 

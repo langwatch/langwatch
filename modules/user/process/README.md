@@ -441,7 +441,13 @@ Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 
 ```typescript
-type Response = z.infer<typeof meProjectResponseSchema>; // ../contract/src/user-rest.schemas.ts:11
+// Response: meProjectResponseSchema, ../contract/src/user-rest.schemas.ts:11
+interface Response {
+  id: string;
+  name: string;
+  slug: string;
+  isPersonal: boolean;
+}
 ```
 
 ### `userAvatarRest`
@@ -460,8 +466,13 @@ Deferred scope: a key reads the avatars its own project stores, which the runtim
 Answers at `/api/user-avatar/:projectId/:userAvatarId`.
 
 ```typescript
-type Params = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
-// Response: "bytes" (inline, src/transport/user-avatar.rest.ts:47)
+// Params: userAvatarRestParamsSchema, ../contract/src/user-rest.schemas.ts:21
+interface Params {
+  projectId: string;
+  userAvatarId: string;
+}
+// Response: inline, src/transport/user-avatar.rest.ts:47
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -499,6 +510,239 @@ Contract `../contract/src/user.trpc.ts:47`, router `src/transport/user.trpc.ts:4
 | `user.requestBudgetIncrease`          | mutation | Permission `organization:view`                                                                                                                               | `userApiRequestBudgetIncreaseInputSchema`     | `userApiBudgetIncreaseRequestedSchema` |
 | `user.setLastHomePath`                | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                        | `userApiSetLastHomePathInputSchema`           | `userApiOkSchema`                      |
 | `user.homePagePickerState`            | query    | Permission `organization:view`                                                                                                                               | `userApiOrganizationInputSchema`              | `userApiHomePagePickerStateSchema`     |
+
+```typescript
+// user.register
+// Input: userApiRegisterInputSchema, ../contract/src/user.schemas.ts:29
+interface Input {
+  name?: string;
+  email: string;
+  password: string;
+  addressProof: string;
+}
+// Output: createdUserSchema, ../contract/src/user.ts:82
+interface Output {
+  id: string;
+}
+
+// user.getAvatarUrl
+type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:254
+interface Output {
+  url: string;
+}
+
+// user.getTraceExplorerTourPreference
+// Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:15
+type Input = Record<string, unknown>;
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:179
+interface Output {
+  dismissed: boolean;
+  dismissedAt: unknown | null;
+}
+
+// user.dismissTraceExplorerTour
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:179
+
+// user.getNotificationPreference
+// Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:18
+interface Input {
+  topic: "langy";
+}
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:199
+interface Output {
+  topic: "langy";
+  choice: "enabled" | "declined" | null;
+}
+
+// user.setNotificationPreference
+// Input: userApiSetNotificationPreferenceInputSchema, ../contract/src/user.schemas.ts:21
+interface Input {
+  topic: "langy";
+  choice: "enabled" | "declined";
+}
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:199
+
+// user.isAdmin
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userApiIsAdminSchema, ../contract/src/user.responses.ts:15
+interface Output {
+  isAdmin: boolean;
+}
+
+// user.updateLastLogin
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+
+// user.getSsoStatus
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userSsoStatusSchema, ../contract/src/user.ts:176
+interface Output {
+  pendingSsoSetup: boolean;
+}
+
+// user.getAccountInfo
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userAccountInfoSchema, ../contract/src/user.ts:173
+interface Output {
+  createdAt: unknown;
+}
+
+// user.getLinkedAccounts
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userApiLinkedAccountsSchema, ../contract/src/user.responses.ts:32
+type Output = {
+  id: string;
+  provider: string;
+  providerAccountId: string;
+}[];
+
+// user.unlinkAccount
+// Input: userApiUnlinkAccountInputSchema, ../contract/src/user.schemas.ts:44
+interface Input {
+  accountId: string;
+}
+// Output: userApiSuccessSchema, ../contract/src/user.responses.ts:9
+interface Output {
+  success: true;
+}
+
+// user.secureAccountNudge
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:335
+interface Output {
+  offer: boolean;
+  passkey: boolean;
+  twoStep: boolean;
+  signedInWith: "password" | "passkey" | "federated" | "unknown";
+}
+
+// user.dismissSecureAccountNudge
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.updateName
+// Input: userApiUpdateNameInputSchema, ../contract/src/user.schemas.ts:27
+interface Input {
+  name: string;
+}
+// Output: userApiUpdatedNameSchema, ../contract/src/user.responses.ts:21
+interface Output {
+  name: string;
+}
+
+// user.browserSessions
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: inline, ../contract/src/user.trpc.ts:120
+type Output = {
+  sessionId: string;
+  identifierId: string | null;
+  method: string;
+  secondFactorProven: boolean;
+  ipAddress: string | null;
+  userAgent: string | null;
+  signedInAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+}[];
+
+// user.endBrowserSession
+// Input: userApiEndBrowserSessionInputSchema, ../contract/src/user.schemas.ts:47
+interface Input {
+  sessionId: string;
+}
+// Output: userApiBrowserSessionEndedSchema, ../contract/src/user.responses.ts:77
+interface Output {
+  ended: number;
+}
+
+// user.hasPassword
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+// Output: userApiHasPasswordSchema, ../contract/src/user.responses.ts:18
+interface Output {
+  hasPassword: boolean;
+}
+
+// user.setPassword
+// Input: userApiSetPasswordInputSchema, ../contract/src/user.schemas.ts:51
+interface Input {
+  password: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.changePassword
+// Input: userApiChangePasswordInputSchema, ../contract/src/user.schemas.ts:53
+interface Input {
+  currentPassword: string;
+  newPassword: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.deactivate
+// Input: userApiUserInputSchema, ../contract/src/user.schemas.ts:63
+interface Input {
+  userId: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.reactivate
+type Input = z.infer<typeof userApiUserInputSchema>; // ../contract/src/user.schemas.ts:63
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.setAvatar
+// Input: userApiSetAvatarInputSchema, ../contract/src/user.schemas.ts:65
+interface Input {
+  organizationId: string;
+  imageDataUrl: string;
+}
+// Output: userAvatarResultSchema, ../contract/src/user.ts:250
+interface Output {
+  image: string;
+}
+
+// user.removeAvatar
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+
+// user.requestBudgetIncrease
+// Input: userApiRequestBudgetIncreaseInputSchema, ../contract/src/user.schemas.ts:78
+interface Input {
+  organizationId: string;
+  scope: string;
+  scopeId: string;
+  limitUsd: string;
+  spentUsd: string;
+  period?: string;
+  message?: string;
+}
+// Output: userApiBudgetIncreaseRequestedSchema, ../contract/src/user.responses.ts:35
+interface Output {
+  ok: true;
+  sentTo: string;
+}
+
+// user.setLastHomePath
+// Input: userApiSetLastHomePathInputSchema, ../contract/src/user.schemas.ts:88
+interface Input {
+  path: string | null;
+}
+// Output: userApiOkSchema, ../contract/src/user.responses.ts:12
+interface Output {
+  ok: true;
+}
+
+// user.homePagePickerState
+// Input: userApiOrganizationInputSchema, ../contract/src/user.schemas.ts:75
+interface Input {
+  organizationId: string;
+}
+// Output: userApiHomePagePickerStateSchema, ../contract/src/user.responses.ts:40
+interface Output {
+  lastHomePath: string | null;
+  firstProjectSlug: string | null;
+}
+```
 
 ## Sockets
 

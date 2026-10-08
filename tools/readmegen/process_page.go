@@ -1,6 +1,7 @@
 package readmegen
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"strconv"
@@ -12,11 +13,12 @@ func (g *generator) processPage(entry catalogueEntry, pkg *workspacePackage) pag
 	facts := g.facts[entry.ID]
 	dir := pkg.Dir
 	process := &facts.Process
+	schemas := g.schemas.forPage()
 	sections := []string{
 		g.installation(entry, dir, process),
 		moduleAPI(dir, facts),
-		restSection(dir, process.Rest),
-		trpcSection(dir, process.Trpc),
+		restSection(dir, process.Rest, schemas),
+		trpcSection(dir, process.Trpc, schemas),
 		socketSection(dir, process.Sockets),
 		g.workerSection(entry, dir, process),
 		configSection(dir, facts),
@@ -60,18 +62,18 @@ func moduleAPI(dir string, facts ModuleFacts) string {
 	return out
 }
 
-func restSection(dir string, families []RestFamily) string {
+func restSection(dir string, families []RestFamily, schemas schemaIndex) string {
 	if len(families) == 0 {
 		return "## REST transport\n\nNone: this module declares no REST family.\n"
 	}
 	out := "## REST transport\n"
 	for index := range families {
-		out += "\n" + restFamily(dir, &families[index])
+		out += "\n" + restFamily(dir, &families[index], schemas)
 	}
 	return out
 }
 
-func restFamily(dir string, family *RestFamily) string {
+func restFamily(dir string, family *RestFamily, schemas schemaIndex) string {
 	title := family.Name
 	if title == "" {
 		title = family.Namespace.String()
@@ -89,7 +91,7 @@ func restFamily(dir string, family *RestFamily) string {
 	}
 	out := "### " + code(title) + "\n\n" + table([]string{"", ""}, rows)
 	for index := range family.Routes {
-		out += "\n" + restRoute(dir, family, &family.Routes[index])
+		out += "\n" + schemas.restRoute(dir, family, &family.Routes[index])
 	}
 	return out
 }
@@ -122,7 +124,7 @@ func familyVersions(family *RestFamily) string {
 	return strings.Join(versions, ", ")
 }
 
-func restRoute(dir string, family *RestFamily, route *RestRoute) string {
+func (schemas schemaIndex) restRoute(dir string, family *RestFamily, route *RestRoute) string {
 	out := "#### " + code(strings.Join(routeMethods(route), ",")+" "+route.Path.String()) + " · " + code(route.Operation.String()) + "\n\n"
 	if route.Summary != "" {
 		out += oneLine(route.Summary) + "\n\n"
@@ -148,7 +150,7 @@ func restRoute(dir string, family *RestFamily, route *RestRoute) string {
 	if len(route.Schemas) > 0 {
 		out += "\n```typescript\n"
 		for _, schema := range route.Schemas {
-			out += schemaLine(dir, schema)
+			out += schemas.line(dir, schema, schemas.restSchema(family, route, schema.Role))
 		}
 		out += "```\n"
 	}
@@ -175,9 +177,18 @@ func addressLine(route *RestRoute, family *RestFamily) string {
 	return line + "."
 }
 
-func schemaLine(dir string, schema SchemaRef) string {
+// schemaLine prints a schema as TypeScript when it was converted and is short,
+// else names it and links to where it is declared.
+func schemaLine(dir string, schema SchemaRef, raw json.RawMessage) string {
 	label := strings.ToUpper(schema.Role[:1]) + strings.ReplaceAll(schema.Role[1:], " ", "")
 	where := strings.Trim(at(dir, schema.At), "`")
+	if printed := declaration(label, raw); printed != "" {
+		name := schema.Name
+		if schema.Inline {
+			name = "inline"
+		}
+		return "// " + label + ": " + name + ", " + where + "\n" + printed
+	}
 	if schema.Inline {
 		return "// " + label + ": " + schema.Name + " (inline, " + where + ")\n"
 	}
@@ -211,7 +222,7 @@ func entitlementText(entitlement Entitlement) string {
 	return out + "."
 }
 
-func trpcSection(dir string, routers []TrpcRouter) string {
+func trpcSection(dir string, routers []TrpcRouter, schemas schemaIndex) string {
 	if len(routers) == 0 {
 		return "## tRPC transport\n\nNone: this module declares no tRPC router.\n"
 	}
@@ -236,8 +247,30 @@ func trpcSection(dir string, routers []TrpcRouter) string {
 			})
 		}
 		out += table([]string{"Procedure", "Kind", "Gate", "Input", "Output"}, rows)
+		out += trpcContracts(dir, router, schemas)
 	}
 	return out
+}
+
+// trpcContracts is one block of each procedure's input and output, printed from zod.
+func trpcContracts(dir string, router *TrpcRouter, schemas schemaIndex) string {
+	var blocks []string
+	for inner := range router.Procedures {
+		procedure := &router.Procedures[inner]
+		block := ""
+		for _, ref := range []*SchemaRef{procedure.Input, procedure.Output} {
+			if ref != nil {
+				block += schemas.line(dir, *ref, schemas.trpcSchema(router, procedure, ref.Role))
+			}
+		}
+		if block != "" {
+			blocks = append(blocks, "// "+router.Namespace.Value+"."+procedure.Name+"\n"+block)
+		}
+	}
+	if len(blocks) == 0 {
+		return ""
+	}
+	return "\n```typescript\n" + strings.Join(blocks, "\n") + "```\n"
 }
 
 func schemaCell(schema *SchemaRef) string {

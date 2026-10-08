@@ -508,9 +508,18 @@ Permission `scenarios:create`. Declared at `src/transport/scenario-agent-test.re
 Answers at `/api/v1/agents/:id/test`.
 
 ```typescript
-type Params = z.infer<typeof agentTestRestParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:205
-type Body = z.infer<typeof testAgentBodySchema>; // ../contract/src/scenario-rest.schemas.ts:210
-type Response = z.infer<typeof agentTestRunResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:212
+// Params: agentTestRestParamsSchema, ../contract/src/scenario-rest.schemas.ts:205
+interface Params {
+  id: string;
+}
+// Body: testAgentBodySchema, ../contract/src/scenario-rest.schemas.ts:210
+type Body = Record<string, unknown>;
+// Response: agentTestRunResponseSchema, ../contract/src/scenario-rest.schemas.ts:212
+interface Response {
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+}
 ```
 
 ### `scenarioEventsRest`
@@ -533,7 +542,11 @@ Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented
 
 ```typescript
 type Body = z.infer<typeof scenarioEventSchema>; // ../contract/src/schemas/event-schemas.ts:446
-// Response: responseSchemas.success (inline, src/transport/scenario-event.rest.ts:27)
+// Response: inline, src/transport/scenario-event.rest.ts:27
+interface Response {
+  success: boolean;
+  url?: string | null;
+}
 ```
 
 #### `POST /browser-tab` · `offerScenarioBrowserTab`
@@ -545,8 +558,17 @@ Permission `scenarios:create`. Declared at `src/transport/scenario-event.rest.ts
 Answers at `/api/scenario-events/browser-tab`, `/api/v1/scenario-events/browser-tab`; also, undocumented, `/api/scenario-events/2026-08-07/browser-tab`, `/api/v1/scenario-events/2026-08-07/browser-tab`, `/api/scenario-events/latest/browser-tab`, `/api/v1/scenario-events/latest/browser-tab`.
 
 ```typescript
-type Body = z.infer<typeof scenarioEventBrowserTabBodySchema>; // ../contract/src/scenario-event.schemas.ts:4
-// Response: responseSchemas.browserTabHandoff (inline, src/transport/scenario-event.rest.ts:52)
+// Body: scenarioEventBrowserTabBodySchema, ../contract/src/scenario-event.schemas.ts:4
+interface Body {
+  tabKey: string;
+  batchRunId: string;
+  scenarioSetId?: string;
+}
+// Response: inline, src/transport/scenario-event.rest.ts:52
+interface Response {
+  delivered: boolean;
+  url: string;
+}
 ```
 
 #### `DELETE /` · `archiveScenarioEvents`
@@ -558,8 +580,19 @@ Permission `scenarios:manage`. Declared at `src/transport/scenario-event.rest.ts
 Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented, `/api/scenario-events/2026-08-07`, `/api/v1/scenario-events/2026-08-07`, `/api/scenario-events/latest`, `/api/v1/scenario-events/latest`.
 
 ```typescript
-type Query = z.infer<typeof scenarioEventArchiveQuerySchema>; // ../contract/src/scenario-event.schemas.ts:23
-type Response = z.infer<typeof scenarioEventArchiveOutputSchema>; // ../contract/src/scenario-event.schemas.ts:15
+// Query: scenarioEventArchiveQuerySchema, ../contract/src/scenario-event.schemas.ts:23
+interface Query {
+  scenarioSetId?: string;
+  scenarioRunId?: string;
+}
+// Response: scenarioEventArchiveOutputSchema, ../contract/src/scenario-event.schemas.ts:15
+interface Response {
+  archived: number;
+  failed: number;
+  scenarioSetId?: string;
+  hasMore?: boolean;
+  scenarioRunId?: string;
+}
 ```
 
 ### `scenarioGenerateRest`
@@ -580,8 +613,24 @@ Permission `scenarios:manage`. Declared at `src/transport/scenario-generate.rest
 Answers at `/api/scenario/generate`.
 
 ```typescript
-type Body = z.infer<typeof scenarioGenerateRequestSchema>; // ../contract/src/scenario-generate.schemas.ts:17
-type Response = z.infer<typeof scenarioGenerateResponseSchema>; // ../contract/src/scenario-generate.schemas.ts:30
+// Body: scenarioGenerateRequestSchema, ../contract/src/scenario-generate.schemas.ts:17
+interface Body {
+  prompt: string;
+  currentScenario: {
+    name: string;
+    situation: string;
+    criteria: string[];
+  } | null;
+  projectId: string;
+}
+// Response: scenarioGenerateResponseSchema, ../contract/src/scenario-generate.schemas.ts:30
+interface Response {
+  scenario: {
+    name: string;
+    situation: string;
+    criteria: string[];
+  };
+}
 ```
 
 ### `scenarioRunExportRest`
@@ -602,8 +651,18 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-run-export.rest
 Answers at `/api/export/scenario-runs/download`.
 
 ```typescript
-type Body = z.infer<typeof scenarioRunExportRequestSchema>; // ../contract/src/scenario-run-export.ts:17
-// Response: "bytes" (inline, src/transport/scenario-run-export.rest.ts:17)
+// Body: scenarioRunExportRequestSchema, ../contract/src/scenario-run-export.ts:17
+interface Body {
+  projectId: string;
+  mode: "full" | "criteria";
+  scenarioSetId?: string;
+  scenarioId?: string;
+  passFailStatus?: "pass" | "fail" | "stalled";
+  startDate?: number;
+  endDate?: number;
+}
+// Response: inline, src/transport/scenario-run-export.rest.ts:17
+type Response = unknown;
 ```
 
 ### `scenarioVoiceRest`
@@ -624,8 +683,22 @@ Authenticated: The voice flag and scenarios:create are checked in the app; evalu
 Answers at `/api/voice/session`.
 
 ```typescript
-type Body = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:6
-type Response = z.infer<typeof voiceSessionMintResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:40
+// Body: voiceSessionMintInputSchema, ../contract/src/voice/voice-session.schemas.ts:6
+interface Body {
+  projectId: string;
+  transport: "elevenlabs_convai" | "phone";
+  agentId: string;
+  agentRowId?: string;
+}
+// Response: voiceSessionMintResultSchema, ../contract/src/voice/voice-session.schemas.ts:40
+interface Response {
+  transport: "elevenlabs_convai" | "phone";
+  sessionToken: string;
+  maxDurationSeconds: number;
+  connect: {
+    signedUrl: string;
+  };
+}
 ```
 
 #### `POST /api/voice/session/:sessionId/finish` · `finishVoiceSession`
@@ -637,9 +710,21 @@ Authenticated: The voice flag and scenarios:create are checked in the app; evalu
 Answers at `/api/voice/session/:sessionId/finish`.
 
 ```typescript
-type Params = z.infer<typeof voiceSessionFinishParamsSchema>; // ../contract/src/voice/voice-session.schemas.ts:37
+// Params: voiceSessionFinishParamsSchema, ../contract/src/voice/voice-session.schemas.ts:37
+interface Params {
+  sessionId: string;
+}
 type Body = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:22
-type Response = z.infer<typeof voiceSessionFinishResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:49
+// Response: voiceSessionFinishResultSchema, ../contract/src/voice/voice-session.schemas.ts:49
+interface Response {
+  runId: string;
+  agentId: string;
+  source: "provider" | "browser";
+  hasFetchFailed: boolean;
+  hasAudio: boolean;
+  audioUrl?: string;
+  scenarioSetId?: string;
+}
 ```
 
 #### `GET /api/voice/session/:conversationId/audio` · `streamVoiceSessionAudio`
@@ -651,9 +736,16 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:4
 Answers at `/api/voice/session/:conversationId/audio`.
 
 ```typescript
-type Params = z.infer<typeof voiceSessionAudioParamsSchema>; // ../contract/src/voice/voice-session.schemas.ts:69
-type Query = z.infer<typeof voiceSessionAudioQuerySchema>; // ../contract/src/voice/voice-session.schemas.ts:72
-// Response: "bytes" (inline, src/transport/scenario-voice.rest.ts:44)
+// Params: voiceSessionAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:69
+interface Params {
+  conversationId: string;
+}
+// Query: voiceSessionAudioQuerySchema, ../contract/src/voice/voice-session.schemas.ts:72
+interface Query {
+  projectId: string;
+}
+// Response: inline, src/transport/scenario-voice.rest.ts:44
+type Response = unknown;
 ```
 
 #### `GET /api/voice/run/:scenarioRunId/audio` · `streamVoiceRunAudio`
@@ -665,9 +757,13 @@ Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:5
 Answers at `/api/voice/run/:scenarioRunId/audio`.
 
 ```typescript
-type Params = z.infer<typeof voiceRunAudioParamsSchema>; // ../contract/src/voice/voice-session.schemas.ts:80
+// Params: voiceRunAudioParamsSchema, ../contract/src/voice/voice-session.schemas.ts:80
+interface Params {
+  scenarioRunId: string;
+}
 type Query = z.infer<typeof voiceSessionAudioQuerySchema>; // ../contract/src/voice/voice-session.schemas.ts:72
-// Response: "bytes" (inline, src/transport/scenario-voice.rest.ts:63)
+// Response: inline, src/transport/scenario-voice.rest.ts:63
+type Response = unknown;
 ```
 
 ### `createScenarioRest`
@@ -701,7 +797,10 @@ Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:151`.
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:197
+// Params: scenarioRestIdParamsSchema, ../contract/src/scenario-rest.schemas.ts:197
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:70
 ```
 
@@ -756,7 +855,11 @@ Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/
 
 ```typescript
 type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:197
-type Response = z.infer<typeof scenarioRestArchivedSchema>; // ../contract/src/scenario-rest.schemas.ts:202
+// Response: scenarioRestArchivedSchema, ../contract/src/scenario-rest.schemas.ts:202
+interface Response {
+  id: string;
+  archived: boolean;
+}
 ```
 
 #### `GET /:id/versions` · `getApiScenariosByIdVersions`
@@ -769,8 +872,24 @@ Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also
 
 ```typescript
 type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:197
-type Query = z.infer<typeof scenarioRestListVersionsQuerySchema>; // ../contract/src/scenario-rest.schemas.ts:129
-type Response = z.infer<typeof scenarioRestVersionListResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:97
+// Query: scenarioRestListVersionsQuerySchema, ../contract/src/scenario-rest.schemas.ts:129
+interface Query {
+  limit?: number;
+  cursor?: number;
+}
+// Response: scenarioRestVersionListResponseSchema, ../contract/src/scenario-rest.schemas.ts:97
+interface Response {
+  versions: {
+    version: number;
+    authorLabel: string | null;
+    authorId: string | null;
+    changeDescription: string | null;
+    changedFields: string[];
+    createdAt: string;
+    isSynthesized: boolean;
+  }[];
+  nextCursor: number | null;
+}
 ```
 
 #### `GET /:id/versions/:version` · `getApiScenariosByIdVersionsByVersion`
@@ -782,7 +901,11 @@ Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:338`.
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdVersionParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:198
+// Params: scenarioRestIdVersionParamsSchema, ../contract/src/scenario-rest.schemas.ts:198
+interface Params {
+  id: string;
+  version: number;
+}
 type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:106
 ```
 
@@ -805,7 +928,14 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:5
 Answers at `/api/simulation-runs`, `/api/v1/simulation-runs`; also, undocumented, `/api/simulation-runs/2026-08-07`, `/api/v1/simulation-runs/2026-08-07`, `/api/simulation-runs/latest`, `/api/v1/simulation-runs/latest`.
 
 ```typescript
-type Query = z.infer<typeof simulationRunListQuerySchema>; // ../contract/src/simulation-run.schemas.ts:112
+// Query: simulationRunListQuerySchema, ../contract/src/simulation-run.schemas.ts:112
+interface Query {
+  scenarioSetId?: string;
+  batchRunId?: string;
+  limit?: number;
+  cursor?: string;
+  include?: "messages";
+}
 type Response = z.infer<typeof simulationRunListResponseSchema>; // ../contract/src/simulation-run.schemas.ts:134
 ```
 
@@ -818,7 +948,10 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:7
 Answers at `/api/simulation-runs/:scenarioRunId`, `/api/v1/simulation-runs/:scenarioRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/:scenarioRunId`, `/api/v1/simulation-runs/2026-08-07/:scenarioRunId`, `/api/simulation-runs/latest/:scenarioRunId`, `/api/v1/simulation-runs/latest/:scenarioRunId`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRunIdParamsSchema>; // ../contract/src/simulation-run.schemas.ts:131
+// Params: scenarioRunIdParamsSchema, ../contract/src/simulation-run.schemas.ts:131
+interface Params {
+  scenarioRunId: string;
+}
 type Response = z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>; // ../contract/src/simulation-run.schemas.ts:79
 ```
 
@@ -831,7 +964,12 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:9
 Answers at `/api/simulation-runs/batches/list`, `/api/v1/simulation-runs/batches/list`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/list`, `/api/v1/simulation-runs/2026-08-07/batches/list`, `/api/simulation-runs/latest/batches/list`, `/api/v1/simulation-runs/latest/batches/list`.
 
 ```typescript
-type Query = z.infer<typeof simulationBatchQuerySchema>; // ../contract/src/simulation-run.schemas.ts:125
+// Query: simulationBatchQuerySchema, ../contract/src/simulation-run.schemas.ts:125
+interface Query {
+  scenarioSetId: string;
+  limit?: number;
+  cursor?: string;
+}
 type Response = z.infer<typeof simulationBatchListResponseSchema>; // ../contract/src/simulation-run.schemas.ts:140
 ```
 
@@ -844,7 +982,10 @@ Permission `scenarios:view`. Declared at `src/transport/simulation-run.rest.ts:1
 Answers at `/api/simulation-runs/batches/:batchRunId`, `/api/v1/simulation-runs/batches/:batchRunId`; also, undocumented, `/api/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/v1/simulation-runs/2026-08-07/batches/:batchRunId`, `/api/simulation-runs/latest/batches/:batchRunId`, `/api/v1/simulation-runs/latest/batches/:batchRunId`.
 
 ```typescript
-type Params = z.infer<typeof batchRunIdParamsSchema>; // ../contract/src/simulation-run.schemas.ts:132
+// Params: batchRunIdParamsSchema, ../contract/src/simulation-run.schemas.ts:132
+interface Params {
+  batchRunId: string;
+}
 type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract/src/simulation-run.schemas.ts:84
 ```
 
@@ -894,6 +1035,407 @@ Contract `../contract/src/scenario.trpc.ts:169`, router `src/transport/scenario.
 | `scenarios.testAgentTurn`               | mutation     | Permission `evaluations:manage`                                                                                                                                                                                                     | `agentApiTestTurnInputSchema`       | `agentTestTurnResultSchema`          |
 | `scenarios.testAgentRun`                | mutation     | Permission `scenarios:create`                                                                                                                                                                                                       | `agentApiAgentReferenceInputSchema` | `agentTestRunResultSchema`           |
 | `scenarios.testHttpAgent`               | mutation     | Permission `evaluations:manage`                                                                                                                                                                                                     | `httpAgentTestInputSchema`          | `httpProxyResultSchema`              |
+
+```typescript
+// scenarios.create
+type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:75
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.getAll
+// Input: projectSchema, ../contract/src/scenario.trpc.ts:65
+interface Input {
+  projectId: string;
+}
+// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:175)
+
+// scenarios.getById
+// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:73
+interface Input {
+  projectId: string;
+  id: string;
+}
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.getByIdIncludingArchived
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:73
+// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:183)
+
+// scenarios.update
+type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:100
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.archive
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:73
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.moveToTestSuite
+// Input: inline, ../contract/src/scenario.trpc.ts:196
+interface Input {
+  projectId: string;
+  scenarioId: string;
+  testSuiteId: string | null;
+}
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.duplicate
+// Input: inline, ../contract/src/scenario.trpc.ts:205
+interface Input {
+  projectId: string;
+  scenarioId: string;
+}
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.batchArchive
+// Input: inline, ../contract/src/scenario.trpc.ts:209
+interface Input {
+  projectId: string;
+  ids: string[];
+}
+// Output: scenarioBatchArchiveResultSchema, ../contract/src/scenario.responses.ts:53
+interface Output {
+  archived: string[];
+  failed: {
+    id: string;
+    error: string;
+  }[];
+}
+
+// scenarios.listVersions
+// Input: inline, ../contract/src/scenario.trpc.ts:215
+interface Input {
+  projectId: string;
+  scenarioId: string;
+  limit?: number;
+  cursor?: number;
+}
+type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:18
+
+// scenarios.getVersion
+// Input: inline, ../contract/src/scenario.trpc.ts:226
+interface Input {
+  projectId: string;
+  scenarioId: string;
+  version: number;
+}
+type Output = z.infer<typeof scenarioVersionDetailSchema>; // ../contract/src/scenario.version.ts:132
+
+// scenarios.restoreVersion
+// Input: inline, ../contract/src/scenario.trpc.ts:232
+interface Input {
+  projectId: string;
+  scenarioId: string;
+  version: number;
+}
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:29
+
+// scenarios.run
+// Input: scenarioTrpcRunSchema, ../contract/src/scenario.trpc.ts:126
+interface Input {
+  projectId: string;
+  scenarioId: string;
+  target: {
+    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+    referenceId: string;
+  };
+  setId?: string;
+  batchRunId?: string;
+  parameters?: Record<string, string | number | boolean>;
+  note?: string;
+}
+// Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:42
+interface Output {
+  scheduled: true;
+  setId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+}
+
+// scenarios.cancelJob
+// Input: inline, ../contract/src/scenario.trpc.ts:247
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+}
+// Output: scenarioCancelJobResultSchema, ../contract/src/scenario.responses.ts:29
+interface Output {
+  cancelled: boolean;
+}
+
+// scenarios.cancelBatchRun
+// Input: inline, ../contract/src/scenario.trpc.ts:259
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+}
+// Output: scenarioCancelBatchRunResultSchema, ../contract/src/scenario.responses.ts:33
+interface Output {
+  cancelledCount: number;
+  skippedCount: number;
+}
+
+// scenarios.getScenarioSetsData
+// Input: inline, ../contract/src/scenario.trpc.ts:265
+interface Input {
+  projectId: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: inline, ../contract/src/scenario.trpc.ts:266
+type Output = {
+  scenarioSetId: string;
+  scenarioCount: number;
+  lastRunAt: number;
+}[];
+
+// scenarios.getSuiteRunData
+// Input: inline, ../contract/src/scenario.trpc.ts:271
+interface Input {
+  projectId: string;
+  scenarioSetId?: string;
+  limit?: number;
+  cursor?: string;
+  sinceTimestamp?: number;
+  startDate?: number;
+  endDate?: number;
+}
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/simulation.ts:222
+
+// scenarios.getLastResultSummaries
+// Input: inline, ../contract/src/scenario.trpc.ts:289
+interface Input {
+  projectId: string;
+  scenarioIds?: string[];
+  startDate?: number;
+  endDate?: number;
+}
+// Output: inline, ../contract/src/scenario.trpc.ts:295
+type Output = {
+  scenarioId: string;
+  status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING" | "PENDING_EVALUATION";
+  metCriteriaCount: number;
+  unmetCriteriaCount: number;
+  lastRunAt: number;
+  batchRunId: string;
+  scenarioSetId: string;
+  durationInMs: number | null;
+  totalCost: number | null;
+}[];
+
+// scenarios.getSuiteRunFreshness
+// Input: inline, ../contract/src/scenario.trpc.ts:312
+interface Input {
+  projectId: string;
+  scenarioSetId?: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: simulationRunFreshnessSchema, ../contract/src/simulation.ts:252
+interface Output {
+  lastUpdatedAt: number;
+}
+
+// scenarios.getScenarioSetRunData
+// Input: inline, ../contract/src/scenario.trpc.ts:318
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  limit?: number;
+  cursor?: string;
+  startDate?: number;
+  endDate?: number;
+}
+type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/simulation.ts:245
+
+// scenarios.getAllScenarioSetRunData
+// Input: inline, ../contract/src/scenario.trpc.ts:330
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:331)
+
+// scenarios.getRunState
+// Input: inline, ../contract/src/scenario.trpc.ts:334
+interface Input {
+  projectId: string;
+  scenarioRunId: string;
+}
+type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/simulation.ts:114
+
+// scenarios.getScenarioSetBatchRunCount
+// Input: inline, ../contract/src/scenario.trpc.ts:338
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: simulationBatchRunCountSchema, ../contract/src/simulation.ts:255
+interface Output {
+  count: number;
+}
+
+// scenarios.getScenarioSetBatchHistory
+// Input: inline, ../contract/src/scenario.trpc.ts:343
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  limit?: number;
+  cursor?: string;
+  startDate?: number;
+  endDate?: number;
+}
+type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/simulation.ts:202
+
+// scenarios.getBatchRunData
+// Input: inline, ../contract/src/scenario.trpc.ts:357
+interface Input {
+  projectId: string;
+  scenarioSetId: string;
+  batchRunId: string;
+  sinceTimestamp?: number;
+  runTimestamps?: Record<string, number>;
+}
+type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/simulation.ts:211
+
+// scenarios.getExternalSetSummaries
+// Input: inline, ../contract/src/scenario.trpc.ts:375
+interface Input {
+  projectId: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: inline, ../contract/src/scenario.trpc.ts:376
+type Output = {
+  scenarioSetId: string;
+  passedCount: number;
+  failedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number;
+}[];
+
+// scenarios.getAllSuiteRunData
+// Input: inline, ../contract/src/scenario.trpc.ts:381
+interface Input {
+  projectId: string;
+  limit?: number;
+  cursor?: string;
+  startDate?: number;
+  endDate?: number;
+}
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/simulation.ts:222
+
+// scenarios.onSimulationUpdate
+// Input: inline, ../contract/src/scenario.trpc.ts:397
+interface Input {
+  projectId: string;
+  tabKey?: string;
+  tabId?: string;
+}
+// Output: simulationStreamFrameSchema, ../contract/src/simulation.ts:262
+interface Output {
+  event: unknown;
+  timestamp?: number;
+}
+
+// scenarios.getCodeScenarios
+// Input: windowSchema, ../contract/src/scenario.trpc.ts:161
+interface Input {
+  projectId: string;
+  startDate?: number;
+  endDate?: number;
+}
+// Output: inline, ../contract/src/scenario.trpc.ts:412
+type Output = {
+  key: string;
+  name: string;
+}[];
+
+// scenarios.getRunTargets
+type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:161
+// Output: inline, ../contract/src/scenario.trpc.ts:420
+type Output = {
+  key: string;
+  referenceId: string | null;
+  parameters: Record<string, string | number | boolean> | null;
+  name: string;
+}[];
+
+// scenarios.getResultsOverview
+// Input: inline, ../contract/src/scenario.trpc.ts:431
+interface Input {
+  projectId: string;
+  startDate?: number;
+  endDate?: number;
+  scenarioIds?: string[];
+  labels?: string[];
+  testSuiteIds?: string[];
+  scenarioSetIds?: string[];
+  targetKeys?: string[];
+  outcome?: "passed" | "failed" | "pending";
+  groupBy: "plan" | "scenario" | "target" | "none";
+}
+type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:140
+
+// scenarios.getResultAtoms
+// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:448)
+type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:89
+
+// scenarios.getRunConfigurations
+// Input: inline, ../contract/src/scenario.trpc.ts:462
+interface Input {
+  projectId: string;
+  startDate?: number;
+  endDate?: number;
+  limit?: number;
+}
+// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:469)
+
+// scenarios.mintVoiceSession
+type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:6
+type Output = z.infer<typeof voiceSessionMintResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:40
+
+// scenarios.finishVoiceSession
+type Input = z.infer<typeof voiceSessionFinishInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:22
+type Output = z.infer<typeof voiceSessionFinishResultSchema>; // ../contract/src/voice/voice-session.schemas.ts:49
+
+// scenarios.testAgentTurn
+// Input: agentApiTestTurnInputSchema, ../../agent/contract/src/agent.schemas.ts:25
+interface Input {
+  id: string;
+  projectId: string;
+  message: string;
+  params?: Record<string, string | number | boolean>;
+}
+// Output: agentTestTurnResultSchema, ../../agent/contract/src/agent.queries.ts:177
+interface Output {
+  output: unknown;
+  durationMs: number;
+  instance: {
+    hostname: string;
+    label: string | null;
+  } | null;
+}
+
+// scenarios.testAgentRun
+// Input: agentApiAgentReferenceInputSchema, ../../agent/contract/src/agent.schemas.ts:19
+interface Input {
+  projectId: string;
+  agentId: string;
+}
+// Output: agentTestRunResultSchema, ../../agent/contract/src/agent.queries.ts:184
+interface Output {
+  scenarioRunId: string;
+  batchRunId: string;
+  setId: string;
+}
+```
 
 ## Sockets
 

@@ -558,7 +558,18 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
 ```typescript
-type Query = z.infer<typeof grantListQuerySchema>; // ../contract/src/authz-grants-rest.schemas.ts:85
+// Query: grantListQuerySchema, ../contract/src/authz-grants-rest.schemas.ts:85
+interface Query {
+  principalType?: "user" | "group" | "apiKey";
+  principalId?: string;
+  roleId?: string;
+  scopeType?: "organization" | "team" | "project";
+  scopeId?: string;
+  status?: "active" | "expired";
+  limit?: number;
+  cursor?: string;
+  order?: "newest" | "oldest";
+}
 type Response = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants-rest.schemas.ts:100
 ```
 
@@ -571,7 +582,19 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/grants`, `/api/v1/grants`; also, undocumented, `/api/grants/2026-08-07`, `/api/v1/grants/2026-08-07`, `/api/grants/latest`, `/api/v1/grants/latest`.
 
 ```typescript
-type Body = z.infer<typeof grantCreateSchema>; // ../contract/src/authz-grants-rest.schemas.ts:64
+// Body: grantCreateSchema, ../contract/src/authz-grants-rest.schemas.ts:64
+interface Body {
+  principal: {
+    type: "user" | "group" | "apiKey";
+    id: string;
+  };
+  roleId: string;
+  scope: {
+    type: "organization" | "team" | "project";
+    id: string;
+  };
+  expiresAt?: unknown;
+}
 type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:47
 ```
 
@@ -584,7 +607,10 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented, `/api/grants/2026-08-07/:grantId`, `/api/v1/grants/2026-08-07/:grantId`, `/api/grants/latest/:grantId`, `/api/v1/grants/latest/:grantId`.
 
 ```typescript
-type Params = z.infer<typeof grantParamsSchema>; // ../contract/src/authz-grants-rest.schemas.ts:107
+// Params: grantParamsSchema, ../contract/src/authz-grants-rest.schemas.ts:107
+interface Params {
+  grantId: string;
+}
 type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:47
 ```
 
@@ -598,7 +624,10 @@ Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented
 
 ```typescript
 type Params = z.infer<typeof grantParamsSchema>; // ../contract/src/authz-grants-rest.schemas.ts:107
-type Body = z.infer<typeof grantUpdateSchema>; // ../contract/src/authz-grants-rest.schemas.ts:76
+// Body: grantUpdateSchema, ../contract/src/authz-grants-rest.schemas.ts:76
+interface Body {
+  roleId: string;
+}
 type Response = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:47
 ```
 
@@ -612,7 +641,11 @@ Answers at `/api/grants/:grantId`, `/api/v1/grants/:grantId`; also, undocumented
 
 ```typescript
 type Params = z.infer<typeof grantParamsSchema>; // ../contract/src/authz-grants-rest.schemas.ts:107
-type Response = z.infer<typeof grantRevokedSchema>; // ../contract/src/authz-grants-rest.schemas.ts:110
+// Response: grantRevokedSchema, ../contract/src/authz-grants-rest.schemas.ts:110
+interface Response {
+  id: string;
+  revoked: true;
+}
 ```
 
 ### `authzRoleBindingRest`
@@ -635,7 +668,16 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
 ```typescript
-type Query = z.infer<typeof roleBindingRestListQuerySchema>; // ../contract/src/authz-rest.schemas.ts:32
+// Query: roleBindingRestListQuerySchema, ../contract/src/authz-rest.schemas.ts:32
+interface Query {
+  userId?: string;
+  groupId?: string;
+  apiKeyId?: string;
+  scopeType?: "PROJECT" | "TEAM" | "ORGANIZATION";
+  scopeId?: string;
+  offset?: number;
+  limit?: number;
+}
 type Response = z.infer<typeof roleBindingRestListSchema>; // ../contract/src/authz-rest.schemas.ts:43
 ```
 
@@ -648,7 +690,17 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/role-bindings`, `/api/v1/role-bindings`; also, undocumented, `/api/role-bindings/2026-08-07`, `/api/v1/role-bindings/2026-08-07`, `/api/role-bindings/latest`, `/api/v1/role-bindings/latest`.
 
 ```typescript
-type Body = z.infer<typeof roleBindingRestCreateSchema>; // ../contract/src/authz-rest.schemas.ts:49
+// Body: roleBindingRestCreateSchema, ../contract/src/authz-rest.schemas.ts:49
+interface Body {
+  userId?: string;
+  groupId?: string;
+  apiKeyId?: string;
+  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  customRoleId?: string;
+  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION";
+  scopeId: string;
+  expiresAt?: unknown;
+}
 type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-rest.schemas.ts:17
 ```
 
@@ -661,8 +713,15 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocumented, `/api/role-bindings/2026-08-07/:id`, `/api/v1/role-bindings/2026-08-07/:id`, `/api/role-bindings/latest/:id`, `/api/v1/role-bindings/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleBindingRestParamsSchema>; // ../contract/src/authz-rest.schemas.ts:69
-type Body = z.infer<typeof roleBindingRestUpdateSchema>; // ../contract/src/authz-rest.schemas.ts:63
+// Params: roleBindingRestParamsSchema, ../contract/src/authz-rest.schemas.ts:69
+interface Params {
+  id: string;
+}
+// Body: roleBindingRestUpdateSchema, ../contract/src/authz-rest.schemas.ts:63
+interface Body {
+  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  customRoleId?: string;
+}
 type Response = z.infer<typeof roleBindingRestSchema>; // ../contract/src/authz-rest.schemas.ts:17
 ```
 
@@ -676,7 +735,10 @@ Answers at `/api/role-bindings/:id`, `/api/v1/role-bindings/:id`; also, undocume
 
 ```typescript
 type Params = z.infer<typeof roleBindingRestParamsSchema>; // ../contract/src/authz-rest.schemas.ts:69
-type Response = z.infer<typeof roleBindingRestDeletedSchema>; // ../contract/src/authz-rest.schemas.ts:72
+// Response: roleBindingRestDeletedSchema, ../contract/src/authz-rest.schemas.ts:72
+interface Response {
+  success: true;
+}
 ```
 
 ## tRPC transport
@@ -695,6 +757,92 @@ Contract `src/transport/authz.trpc.ts:30`, router `src/transport/authz.trpc.ts:8
 | `authz.listManagedGrants`    | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForOrganizationInputSchema` | `authzListManagedBindingsForOrganizationOutputSchema` |
 | `authz.listMemberGrants`     | query    | Permission `organization:manage`                                                                                                                                           | `authzListManagedBindingsForUserInputSchema`         | `authzListManagedBindingsForUserOutputSchema`         |
 | `authz.applyMemberGrants`    | mutation | Permission `organization:manage`; Entitlement `enterprise` (feature `RBAC`)                                                                                                | inline                                               | `authzBindingMutationSuccessSchema`                   |
+
+```typescript
+// authz.effectivePermissions
+// Input: authzOwnStandingInputSchema, ../contract/src/authz.queries.ts:430
+interface Input {
+  projectId?: string;
+  organizationId?: string;
+}
+// Output: authzOwnStandingSchema, ../contract/src/authz.queries.ts:417
+interface Output {
+  scope: {
+    type: "project" | "team" | "organization" | "resource";
+    id: string;
+  } | null;
+  permissions: string[];
+}
+
+// authz.listGrants
+type Input = z.infer<typeof authzListGrantsInputSchema>; // ../contract/src/authz-grants-rest.schemas.ts:115
+type Output = z.infer<typeof grantPageSchema>; // ../contract/src/authz-grants-rest.schemas.ts:100
+
+// authz.createGrant
+// Input: authzCreateGrantInputSchema.omit(IMPLIED_BY_SESSION) (inline, src/transport/authz.trpc.ts:40)
+type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:47
+
+// authz.changeGrantRole
+// Input: inline, src/transport/authz.trpc.ts:44
+interface Input {
+  organizationId: string;
+  grantId: string;
+  roleId: string;
+}
+type Output = z.infer<typeof grantSchema>; // ../contract/src/authz-grants-rest.schemas.ts:47
+
+// authz.revokeGrant
+// Input: inline, src/transport/authz.trpc.ts:48
+interface Input {
+  organizationId: string;
+  grantId: string;
+}
+type Output = z.infer<typeof grantRevokedSchema>; // ../contract/src/authz-grants-rest.schemas.ts:110
+
+// authz.listManagedGrants
+// Input: authzListManagedBindingsForOrganizationInputSchema, ../contract/src/authz.grant-management.ts:48
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof authzListManagedBindingsForOrganizationOutputSchema>; // ../contract/src/authz.grant-management.ts:81
+
+// authz.listMemberGrants
+// Input: authzListManagedBindingsForUserInputSchema, ../contract/src/authz.grant-management.ts:21
+interface Input {
+  organizationId: string;
+  userId: string;
+}
+// Output: authzListManagedBindingsForUserOutputSchema, ../contract/src/authz.grant-management.ts:43
+type Output = {
+  id: string;
+  userId: string | null;
+  role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+  customRoleId: string | null;
+  customRoleName: string | null;
+  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION";
+  scopeId: string;
+  scopeName: string | null;
+  createdAt: unknown;
+}[];
+
+// authz.applyMemberGrants
+// Input: inline, src/transport/authz.trpc.ts:60
+interface Input {
+  organizationId: string;
+  userId: string;
+  bindingIdsToDelete: string[];
+  bindingsToCreate: {
+    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+    customRoleId?: string | null;
+    scopeType: "PROJECT" | "TEAM" | "ORGANIZATION";
+    scopeId: string;
+  }[];
+}
+// Output: authzBindingMutationSuccessSchema, ../contract/src/authz.grant-management.ts:190
+interface Output {
+  success: true;
+}
+```
 
 ## Sockets
 

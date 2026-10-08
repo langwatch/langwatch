@@ -190,7 +190,16 @@ Answers at `/api/v1/instant-evals/estimate`.
 
 ```typescript
 type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:152
-type Response = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:364
+// Response: instantEvalEstimateSchema, ../contract/src/instant-eval.schemas.ts:364
+interface Response {
+  rows: number;
+  isRowsCapped: boolean;
+  avgTokens: number;
+  totalTokens: number;
+  requests: number;
+  priceUsd: number;
+  freeBudgetRemainingUsd?: number;
+}
 ```
 
 #### `GET /` · `listInstantEvalRuns`
@@ -202,7 +211,12 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:110
 Answers at `/api/v1/instant-evals`.
 
 ```typescript
-type Query = z.infer<typeof instantEvalListQuerySchema>; // ../contract/src/instant-eval.schemas.ts:218
+// Query: instantEvalListQuerySchema, ../contract/src/instant-eval.schemas.ts:218
+interface Query {
+  limit?: number;
+  before?: string;
+  beforeId?: string;
+}
 type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/instant-eval.schemas.ts:408
 ```
 
@@ -215,7 +229,10 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:127
 Answers at `/api/v1/instant-evals/:id`.
 
 ```typescript
-type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
+// Params: instantEvalIdParamsSchema, ../contract/src/instant-eval.schemas.ts:214
+interface Params {
+  id: string;
+}
 type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:318
 ```
 
@@ -229,7 +246,8 @@ Answers at `/api/v1/instant-evals/:id/cancel`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Body = z.infer<typeof cancelInstantEvalRunBodySchema>; // ../contract/src/instant-eval.schemas.ts:212
+// Body: cancelInstantEvalRunBodySchema, ../contract/src/instant-eval.schemas.ts:212
+type Body = Record<string, unknown>;
 type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:318
 ```
 
@@ -243,7 +261,14 @@ Answers at `/api/v1/instant-evals/:id/results`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Query = z.infer<typeof instantEvalResultsQuerySchema>; // ../contract/src/instant-eval.schemas.ts:257
+// Query: instantEvalResultsQuerySchema, ../contract/src/instant-eval.schemas.ts:257
+interface Query {
+  questionId?: string;
+  matched?: "0" | "1" | "true" | "yes" | "false" | "no";
+  status?: "judged" | "skipped" | "failed";
+  limit?: number;
+  cursor?: string;
+}
 type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/instant-eval.schemas.ts:412
 ```
 
@@ -257,7 +282,10 @@ Answers at `/api/v1/instant-evals/:id/sample`.
 
 ```typescript
 type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:214
-type Query = z.infer<typeof instantEvalSampleQuerySchema>; // ../contract/src/instant-eval.schemas.ts:282
+// Query: instantEvalSampleQuerySchema, ../contract/src/instant-eval.schemas.ts:282
+interface Query {
+  n?: number;
+}
 type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/instant-eval.schemas.ts:420
 ```
 

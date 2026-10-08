@@ -268,7 +268,8 @@ Public: SCIM discovery metadata is served without a credential so identity provi
 Answers at `/api/scim/v2/ServiceProviderConfig`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:438)
+// Response: inline, src/transport/scim-protocol.rest.ts:438
+type Response = unknown;
 ```
 
 #### `GET /ResourceTypes` · `scimListResourceTypes`
@@ -280,7 +281,8 @@ Public: SCIM discovery metadata is served without a credential so identity provi
 Answers at `/api/scim/v2/ResourceTypes`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:455)
+// Response: inline, src/transport/scim-protocol.rest.ts:455
+type Response = unknown;
 ```
 
 #### `GET /Schemas` · `scimListSchemas`
@@ -292,7 +294,8 @@ Public: SCIM discovery metadata is served without a credential so identity provi
 Answers at `/api/scim/v2/Schemas`.
 
 ```typescript
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:472)
+// Response: inline, src/transport/scim-protocol.rest.ts:472
+type Response = unknown;
 ```
 
 #### `GET /Users` · `scimListUsers`
@@ -304,8 +307,14 @@ Authenticated: a SCIM token carries no RBAC permission: the organization it was 
 Answers at `/api/scim/v2/Users`.
 
 ```typescript
-type Query = z.infer<typeof listQuery>; // src/transport/scim-protocol.rest.ts:173
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:493)
+// Query: listQuery, src/transport/scim-protocol.rest.ts:173
+interface Query {
+  filter?: string;
+  startIndex?: number;
+  count?: number;
+}
+// Response: inline, src/transport/scim-protocol.rest.ts:493
+type Response = unknown;
 ```
 
 #### `POST /Users` · `scimCreateUser`
@@ -318,7 +327,8 @@ Answers at `/api/scim/v2/Users`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:522)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:525)
+// Response: inline, src/transport/scim-protocol.rest.ts:525
+type Response = unknown;
 ```
 
 #### `GET /Users/:id` · `scimGetUser`
@@ -330,8 +340,12 @@ Authenticated: a SCIM token carries no RBAC permission: the organization it was 
 Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
-type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:562)
+// Params: idParams, src/transport/scim-protocol.rest.ts:137
+interface Params {
+  id: string;
+}
+// Response: inline, src/transport/scim-protocol.rest.ts:562
+type Response = unknown;
 ```
 
 #### `PUT /Users/:id` · `scimReplaceUser`
@@ -345,7 +359,8 @@ Answers at `/api/scim/v2/Users/:id`.
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:579)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:582)
+// Response: inline, src/transport/scim-protocol.rest.ts:582
+type Response = unknown;
 ```
 
 #### `PATCH /Users/:id` · `scimPatchUser`
@@ -359,7 +374,8 @@ Answers at `/api/scim/v2/Users/:id`.
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:608)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:611)
+// Response: inline, src/transport/scim-protocol.rest.ts:611
+type Response = unknown;
 ```
 
 #### `DELETE /Users/:id` · `scimDeleteUser`
@@ -372,7 +388,8 @@ Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:639)
+// Response: inline, src/transport/scim-protocol.rest.ts:639
+type Response = unknown;
 ```
 
 #### `GET /Groups` · `scimListGroups`
@@ -384,8 +401,15 @@ Authenticated: a SCIM token carries no RBAC permission: the organization it was 
 Answers at `/api/scim/v2/Groups`.
 
 ```typescript
-type Query = z.infer<typeof groupListQuery>; // src/transport/scim-protocol.rest.ts:197
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:662)
+// Query: groupListQuery, src/transport/scim-protocol.rest.ts:197
+interface Query {
+  filter?: string;
+  startIndex?: number;
+  count?: number;
+  excludedAttributes?: string;
+}
+// Response: inline, src/transport/scim-protocol.rest.ts:662
+type Response = unknown;
 ```
 
 #### `POST /Groups` · `scimCreateGroup`
@@ -398,7 +422,8 @@ Answers at `/api/scim/v2/Groups`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:692)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:695)
+// Response: inline, src/transport/scim-protocol.rest.ts:695
+type Response = unknown;
 ```
 
 #### `GET /Groups/:id` · `scimGetGroup`
@@ -411,8 +436,12 @@ Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-type Query = z.infer<typeof excludedAttributesQuery>; // src/transport/scim-protocol.rest.ts:191
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:738)
+// Query: excludedAttributesQuery, src/transport/scim-protocol.rest.ts:191
+interface Query {
+  excludedAttributes?: string;
+}
+// Response: inline, src/transport/scim-protocol.rest.ts:738
+type Response = unknown;
 ```
 
 #### `PUT /Groups/:id` · `scimReplaceGroup`
@@ -426,7 +455,8 @@ Answers at `/api/scim/v2/Groups/:id`.
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:763)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:766)
+// Response: inline, src/transport/scim-protocol.rest.ts:766
+type Response = unknown;
 ```
 
 #### `PATCH /Groups/:id` · `scimPatchGroup`
@@ -440,7 +470,8 @@ Answers at `/api/scim/v2/Groups/:id`.
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
 // Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:792)
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:795)
+// Response: inline, src/transport/scim-protocol.rest.ts:795
+type Response = unknown;
 ```
 
 #### `DELETE /Groups/:id` · `scimDeleteGroup`
@@ -453,7 +484,8 @@ Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:137
-// Response: "protocol" (inline, src/transport/scim-protocol.rest.ts:823)
+// Response: inline, src/transport/scim-protocol.rest.ts:823
+type Response = unknown;
 ```
 
 ### `scimTokenRest`
@@ -475,7 +507,16 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Dec
 Answers at `/api/scim-tokens`, `/api/v1/scim-tokens`; also, undocumented, `/api/scim-tokens/2026-08-07`, `/api/v1/scim-tokens/2026-08-07`, `/api/scim-tokens/latest`, `/api/v1/scim-tokens/latest`.
 
 ```typescript
-// Response: z.object({ tokens: z.array(scimTokenRestSummarySchema) }) (inline, src/transport/scim-token.rest.ts:50)
+// Response: inline, src/transport/scim-token.rest.ts:50
+interface Response {
+  tokens: {
+    id: string;
+    description: string | null;
+    connectionId: string | null;
+    createdAt: unknown;
+    lastUsedAt: unknown | null;
+  }[];
+}
 ```
 
 #### `POST /` · `createScimToken`
@@ -487,8 +528,18 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Dec
 Answers at `/api/scim-tokens`, `/api/v1/scim-tokens`; also, undocumented, `/api/scim-tokens/2026-08-07`, `/api/v1/scim-tokens/2026-08-07`, `/api/scim-tokens/latest`, `/api/v1/scim-tokens/latest`.
 
 ```typescript
-type Body = z.infer<typeof scimTokenCreateRestInputSchema>; // ../contract/src/scim-token.rest.ts:20
-// Response: z.object({ id: z.string(), token: z.string(), // Declared because the handler returns it … (inline, src/transport/scim-token.rest.ts:65)
+// Body: scimTokenCreateRestInputSchema, ../contract/src/scim-token.rest.ts:20
+interface Body {
+  description?: string;
+  connectionId?: string;
+}
+// Response: inline, src/transport/scim-token.rest.ts:65
+interface Response {
+  id: string;
+  token: string;
+  connectionId: string;
+  description: string | null;
+}
 ```
 
 #### `DELETE /:id` · `revokeScimToken`
@@ -500,8 +551,14 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `SCIM`). Dec
 Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented, `/api/scim-tokens/2026-08-07/:id`, `/api/v1/scim-tokens/2026-08-07/:id`, `/api/scim-tokens/latest/:id`, `/api/v1/scim-tokens/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scimTokenIdParamsSchema>; // ../contract/src/scim-token.rest.ts:15
-// Response: z.object({ success: z.literal(true) }) (inline, src/transport/scim-token.rest.ts:116)
+// Params: scimTokenIdParamsSchema, ../contract/src/scim-token.rest.ts:15
+interface Params {
+  id: string;
+}
+// Response: inline, src/transport/scim-token.rest.ts:116
+interface Response {
+  success: true;
+}
 ```
 
 ### `scimWebhookRest`
@@ -523,7 +580,8 @@ Answers at `/api/webhooks/auth0-scim`.
 
 ```typescript
 // Rawbody: "text" (inline, src/transport/scim-webhook.rest.ts:58)
-// Response: "protocol" (inline, src/transport/scim-webhook.rest.ts:69)
+// Response: inline, src/transport/scim-webhook.rest.ts:69
+type Response = unknown;
 ```
 
 ## tRPC transport
@@ -539,6 +597,46 @@ Contract `../contract/src/scim-oversight.trpc.ts:18`, router `src/transport/scim
 | `scimOversight.directoryIdentities` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `oversightConnectionInputSchema` | inline                            |
 | `scimOversight.redriveRetiredApply` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `redriveRetiredApplyInputSchema` | `redriveRetiredApplyResultSchema` |
 
+```typescript
+// scimOversight.getAll
+// Input: listOversightSyncsInputSchema, ../contract/src/scim-oversight.ts:60
+interface Input {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+type Output = z.infer<typeof oversightSyncListSchema>; // ../contract/src/scim-oversight.ts:43
+
+// scimOversight.getById
+// Input: oversightConnectionInputSchema, ../contract/src/scim-oversight.ts:67
+interface Input {
+  connectionId: string;
+}
+// Output: oversightSyncSchema.nullable() (inline, ../contract/src/scim-oversight.trpc.ts:25)
+
+// scimOversight.directoryIdentities
+type Input = z.infer<typeof oversightConnectionInputSchema>; // ../contract/src/scim-oversight.ts:67
+// Output: inline, ../contract/src/scim-oversight.trpc.ts:29
+type Output = {
+  connectionId: string;
+  externalId: string;
+  userId: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+}[];
+
+// scimOversight.redriveRetiredApply
+// Input: redriveRetiredApplyInputSchema, ../contract/src/scim-oversight.ts:70
+interface Input {
+  connectionId: string;
+  retiredAtMs: number;
+}
+// Output: redriveRetiredApplyResultSchema, ../contract/src/scim-oversight.ts:77
+interface Output {
+  applied: boolean;
+}
+```
+
 ### `scimReconciliation`
 
 Contract `../contract/src/scim-reconciliation.trpc.ts:20`, router `src/transport/scim-reconciliation.trpc.ts:20`.
@@ -550,6 +648,46 @@ Contract `../contract/src/scim-reconciliation.trpc.ts:20`, router `src/transport
 | `scimReconciliation.getRequests` | query | Permission `sso:view`                                            | `scimConnectionRequestsInputSchema` | inline                             |
 | `scimReconciliation.getById`     | query | Permission `sso:view`; Entitlement `enterprise` (feature `SCIM`) | `scimConnectionRequestsInputSchema` | inline                             |
 
+```typescript
+// scimReconciliation.getAll
+// Input: scimReconciliationScopeSchema, ../contract/src/scim-reconciliation.ts:99
+interface Input {
+  organizationId: string;
+}
+type Output = z.infer<typeof organizationReconciliationSchema>; // ../contract/src/scim-reconciliation.ts:69
+
+// scimReconciliation.getActivity
+// Input: scimConnectionRequestsInputSchema, ../contract/src/scim-request-log.ts:73
+interface Input {
+  organizationId: string;
+  connectionId: string;
+}
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:35
+type Output = {
+  eventId: string;
+  summary: string;
+  occurredAtMs: number;
+  outcome: "ok" | "refused";
+}[];
+
+// scimReconciliation.getRequests
+type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
+// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:45
+type Output = {
+  method: string;
+  resource: string;
+  status: number;
+  reason: "plan_not_entitled" | "forbidden" | "unauthorized" | "malformed_body" | "invalid_resource" | "not_found" | "conflict" | "rate_limited" | "unsupported" | "internal_error" | null;
+  detail: string | null;
+  id: string;
+  occurredAt: unknown;
+}[];
+
+// scimReconciliation.getById
+type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
+// Output: connectionReconciliationSchema.nullable() (inline, ../contract/src/scim-reconciliation.trpc.ts:49)
+```
+
 ### `scimToken`
 
 Contract `../contract/src/scim-token.trpc.ts:19`, router `src/transport/scim-token.trpc.ts:21`.
@@ -560,6 +698,58 @@ Contract `../contract/src/scim-token.trpc.ts:19`, router `src/transport/scim-tok
 | `scimToken.connections` | query    | Permission `sso:view`                                              | `scimTokenScopeSchema`    | inline                   |
 | `scimToken.generate`    | mutation | Permission `sso:manage`; Entitlement `enterprise` (feature `SCIM`) | `generateScimTokenSchema` | `issuedScimTokenSchema`  |
 | `scimToken.revoke`      | mutation | Permission `sso:manage`; Entitlement `enterprise` (feature `SCIM`) | `revokeScimTokenSchema`   | `scimTokenRevokedSchema` |
+
+```typescript
+// scimToken.list
+// Input: scimTokenScopeSchema, ../contract/src/scim-token.ts:39
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/scim-token.trpc.ts:23
+type Output = {
+  id: string;
+  connectionId: string | null;
+  description: string | null;
+  createdAt: unknown;
+  lastUsedAt: unknown | null;
+}[];
+
+// scimToken.connections
+type Input = z.infer<typeof scimTokenScopeSchema>; // ../contract/src/scim-token.ts:39
+// Output: inline, ../contract/src/scim-token.trpc.ts:28
+type Output = {
+  connectionId: string;
+  displayName: string;
+  type: string;
+  state: string;
+}[];
+
+// scimToken.generate
+// Input: generateScimTokenSchema, ../contract/src/scim-token.ts:64
+interface Input {
+  organizationId: string;
+  description?: string;
+  connectionId?: string;
+  secret?: string;
+}
+// Output: issuedScimTokenSchema, ../contract/src/scim-token.ts:29
+interface Output {
+  token: string;
+  tokenId: string;
+  connectionId: string;
+}
+
+// scimToken.revoke
+// Input: revokeScimTokenSchema, ../contract/src/scim-token.ts:73
+interface Input {
+  organizationId: string;
+  tokenId: string;
+}
+// Output: scimTokenRevokedSchema, ../contract/src/scim-token.ts:36
+interface Output {
+  success: true;
+}
+```
 
 ## Sockets
 
