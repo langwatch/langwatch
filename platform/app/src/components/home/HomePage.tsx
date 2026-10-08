@@ -21,7 +21,6 @@ import {
 } from "~/features/briefing";
 import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { DashboardLayout } from "../DashboardLayout";
 import { DocsGuides } from "./DocsGuides";
@@ -63,7 +62,7 @@ import { WelcomeHeader } from "./WelcomeHeader";
  * (HomeBriefingSection / QuietHeadline), and the classic traces overview
  */
 export function HomePage() {
-  const view = useHomeView();
+  const view = useHomeComposition();
 
   return (
     <DashboardLayout>
@@ -127,25 +126,9 @@ export function HomePage() {
   );
 }
 
-/**
- * Which home this project shows. An aggregate (ADR-144) is never set up and
- * never sent data, so its home is the traces overview alone: no onboarding,
- * no setup steps, no quick starts, whatever composition the rollout picked.
- * The overview itself points at the Trace Explorer.
- */
-type HomeView = HomeComposition | "aggregate";
-
-function useHomeView(): HomeView {
-  const composition = useHomeComposition();
-  const { project } = useOrganizationTeamProject();
-  return isAggregateProjectKind(project?.kind) ? "aggregate" : composition;
-}
-
 /** The body of the home, one composition per view. */
-function HomeBody({ view }: { view: HomeView }) {
+function HomeBody({ view }: { view: HomeComposition }) {
   switch (view) {
-    case "aggregate":
-      return <TracesOverview />;
     case "undecided":
       return <HomeCompositionSkeleton />;
     case "signal-focused":

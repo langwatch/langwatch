@@ -11,9 +11,7 @@ import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
-import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { LANGY_TRACE_ORIGIN } from "~/server/app-layer/traces/derive-trace-origin";
-import { AggregateAnalyticsMessage } from "../analytics/AggregateAnalyticsGate";
 import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { usePeriodSelector } from "../PeriodSelector";
 import { Link } from "../ui/link";
@@ -92,23 +90,6 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
         ))}
       </Grid>
     </VStack>
-  );
-}
-
-/**
- * The overview on an aggregate project (ADR-144). Analytics across member
- * projects is not delivered yet, so the figures would read zero beside a
- * trace list full of rows; the card says so and points at the traces, and
- * offers no quick start, since nothing is ever added to an aggregate.
- */
-function AggregateTracesOverview({ projectSlug }: { projectSlug: string }) {
-  return (
-    <HomeCard width="full" padding={HOME_SECTION_PADDING}>
-      <HomeSectionHeader title="Traces overview" />
-      <Text fontSize="sm" color="fg.muted" paddingY={3}>
-        <AggregateAnalyticsMessage projectSlug={projectSlug} />
-      </Text>
-    </HomeCard>
   );
 }
 
@@ -245,10 +226,6 @@ export function TracesOverview({
 
   if (!project) {
     return null;
-  }
-
-  if (isAggregateProjectKind(project.kind)) {
-    return <AggregateTracesOverview projectSlug={project.slug} />;
   }
 
   return (

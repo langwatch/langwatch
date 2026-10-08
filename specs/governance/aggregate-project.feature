@@ -236,6 +236,12 @@ Feature: An aggregate project reads its member projects
     Then the request names no project kind and no rule, as before
 
   @integration
+  Scenario: A new aggregate opens on its Trace Explorer
+    When ana creates an aggregate from "Create New Project"
+    Then the app opens the new aggregate's Trace Explorer, not its home
+    And an ordinary project still opens on its home
+
+  @integration
   Scenario: A project list that fails to load never shows the server's own words
     Given listing the projects ana may pick fails for a reason we cannot name
     When ana checks "Governance" and picks "Specific projects"
@@ -638,9 +644,9 @@ Feature: An aggregate project reads its member projects
     Then an error toast shows the server's reason
     And the editor stays open
 
-  @unit
-  Scenario: The aggregate's home points at its traces instead of saying no data
+  @integration
+  Scenario: Opening an aggregate's home lands on the Trace Explorer
     When ana opens the aggregate project's home
-    Then its traces overview says "Analytics across member projects is not available yet. Open Trace Explorer to see member traces."
-    And it links to the aggregate's Trace Explorer
-    And the home shows no "Nothing here yet", no quick starts and no setup steps
+    Then she lands on its Trace Explorer and never sees the home
+    And the home is replaced in her history, so Back does not return to it
+    And an ordinary project's home still opens as before

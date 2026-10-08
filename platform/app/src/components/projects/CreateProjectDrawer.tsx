@@ -11,7 +11,9 @@ import {
   useOrganizationTeamProject,
 } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { hardRedirect } from "../../utils/hardRedirect";
 import { trackEvent } from "../../utils/tracking";
+import { projectEntryPath } from "../sidebar/projectKindNavigation";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { aggregateRuleOf } from "./AggregateMemberPicker";
@@ -67,6 +69,17 @@ function aggregateFieldsOf(data: ProjectFormData): {
     kind: AGGREGATE_PROJECT_KIND,
     aggregateRule: aggregateRuleOf(data.aggregateMembers),
   };
+}
+
+/**
+ * Opens a project the drawer just created, with a hard redirect so the next
+ * page reads fresh data. An aggregate has no home, so it opens on its Trace
+ * Explorer; every other project opens on its home.
+ */
+function openCreatedProject(projectSlug: string, data: ProjectFormData): void {
+  hardRedirect(
+    projectEntryPath({ slug: projectSlug, kind: aggregateFieldsOf(data).kind }),
+  );
 }
 
 export function CreateProjectDrawer({
@@ -153,8 +166,7 @@ export function CreateProjectDrawer({
           onCreated?.({ projectSlug: result.projectSlug });
 
           if (navigateOnCreate) {
-            // Use hard redirect to ensure fresh data after project creation
-            window.location.href = `/${result.projectSlug}`;
+            openCreatedProject(result.projectSlug, data);
             return;
           }
 

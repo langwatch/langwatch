@@ -53,3 +53,20 @@ export function projectNavigation(
     build: false,
   };
 }
+
+/**
+ * Where opening a project lands. A kind with a home lands there; a kind
+ * without one (an aggregate) lands on its Trace Explorer, the first and only
+ * entry its menu offers. The project home redirects here, and the create
+ * drawer opens a new project here, so neither shows an aggregate a home it
+ * does not have.
+ */
+export function projectEntryPath({
+  slug,
+  kind,
+}: {
+  slug: string;
+  kind: string | null | undefined;
+}): string {
+  return projectNavigation(kind).home ? `/${slug}` : `/${slug}/traces`;
+}

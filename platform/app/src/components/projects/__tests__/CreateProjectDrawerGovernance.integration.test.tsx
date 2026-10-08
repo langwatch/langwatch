@@ -28,6 +28,7 @@ const ORG_ID = "org-acme";
 
 let organizationRole: "ADMIN" | "MEMBER" = "ADMIN";
 let mutateCalls: Array<Record<string, unknown>> = [];
+let createdSlug: string | null = null;
 let candidatesQuery: { data: unknown; error: unknown } = {
   data: null,
   error: null,
@@ -82,6 +83,9 @@ vi.mock("../../../utils/tracking", () => ({ trackEvent: vi.fn() }));
 
 vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 
+const hardRedirect = vi.hoisted(() => vi.fn());
+vi.mock("../../../utils/hardRedirect", () => ({ hardRedirect }));
+
 vi.mock("../../../utils/api", () => ({
   api: {
     useUtils: vi.fn(() => ({
@@ -96,8 +100,14 @@ vi.mock("../../../utils/api", () => ({
     project: {
       create: {
         useMutation: () => ({
-          mutate: (params: Record<string, unknown>) => {
+          mutate: (
+            params: Record<string, unknown>,
+            options?: {
+              onSuccess?: (result: { projectSlug: string }) => void;
+            },
+          ) => {
             mutateCalls.push(params);
+            if (createdSlug) options?.onSuccess?.({ projectSlug: createdSlug });
           },
           isPending: false,
           error: null,
@@ -152,6 +162,8 @@ describe("<CreateProjectDrawer/> Governance", () => {
   beforeEach(() => {
     organizationRole = "ADMIN";
     mutateCalls = [];
+    createdSlug = null;
+    hardRedirect.mockReset();
     candidatesQuery = { data: CANDIDATES, error: null };
     departmentsQuery = { data: [] };
   });
@@ -402,6 +414,37 @@ describe("<CreateProjectDrawer/> Governance", () => {
         });
         expect(mutateCalls[0]).not.toHaveProperty("kind");
         expect(mutateCalls[0]).not.toHaveProperty("aggregateRule");
+      });
+    });
+  });
+
+  describe("given the drawer opens the project it creates", () => {
+    const createAndOpen = async ({ governance }: { governance: boolean }) => {
+      createdSlug = governance ? "company-traces" : "chatbot";
+      const user = userEvent.setup();
+      render(<CreateProjectDrawer organizationId={ORG_ID} navigateOnCreate />, {
+        wrapper: Wrapper,
+      });
+      await user.type(screen.getByPlaceholderText("AI Project"), "Company");
+      if (governance) await checkGovernance(user);
+      await user.click(createButton());
+      await waitFor(() => expect(mutateCalls).toHaveLength(1));
+    };
+
+    describe("when ana creates an aggregate", () => {
+      /** @scenario "A new aggregate opens on its Trace Explorer" */
+      it("opens the new aggregate's Trace Explorer, not its home", async () => {
+        await createAndOpen({ governance: true });
+
+        expect(hardRedirect).toHaveBeenCalledWith("/company-traces/traces");
+      });
+    });
+
+    describe("when ana creates an ordinary project", () => {
+      it("opens the new project's home", async () => {
+        await createAndOpen({ governance: false });
+
+        expect(hardRedirect).toHaveBeenCalledWith("/chatbot");
       });
     });
   });

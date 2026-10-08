@@ -8,14 +8,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
  * What an aggregate project (ADR-144) says where analytics would be: its
- * analytics do not read across members yet, and its traces do. The home's
- * traces overview and every analytics page share these words.
+ * analytics do not read across members yet, and its traces do. Every
+ * analytics page shares these words; the aggregate's home never shows them,
+ * since it opens on the Trace Explorer.
  */
-export function AggregateAnalyticsMessage({
-  projectSlug,
-}: {
-  projectSlug: string;
-}) {
+function AggregateAnalyticsMessage({ projectSlug }: { projectSlug: string }) {
   return (
     <>
       Analytics across member projects is not available yet.{" "}
