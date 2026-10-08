@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:18`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -191,7 +191,7 @@ Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/ide
 
 ### `identity`
 
-Contract `../contract/src/identity.trpc.ts:32`, router `src/transport/identity.trpc.ts:25`.
+Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:25`.
 
 | Procedure                               | Kind     | Gate                                                                                                                                                              | Input                             | Output                         |
 | --------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ |
@@ -202,7 +202,27 @@ Contract `../contract/src/identity.trpc.ts:32`, router `src/transport/identity.t
 | `identity.addEmailIdentifier`           | mutation | No permission: adds an identifier to the session user's own account; no organization scope applies                                                                | inline                            | `emailIdentifierAddedSchema`   |
 | `identity.resendIdentifierConfirmation` | mutation | No permission: re-sends the session user's own address confirmation; the ceremony proves the identifier is theirs                                                 | inline                            | inline                         |
 | `identity.removeIdentifier`             | mutation | No permission: removes an identifier from the session user's own account; the identity guards decide, and no organization scope applies                           | inline                            | inline                         |
-| `identity.getJoinAdmissions`            | query    | Permission `organization:manage`                                                                                                                                  | inline                            | inline                         |
+
+### `identity.joinRequests`
+
+Contract `../contract/src/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
+
+| Procedure                                  | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
+| `identity.joinRequests.lookup`             | query    | No permission: the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else    | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.offer`              | query    | No permission: the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable                                                           | inline                                  | `joinRequestLookupSchema`         |
+| `identity.joinRequests.dismissOffer`       | mutation | No permission: the caller silencing their own offer, on the domain their own session's verified address holds                                                                                                            | inline                                  | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.admitAutomatically` | mutation | No permission: admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else                                            | `joinRequestApiAdmitInputSchema`        | `joinRequestAdmittedSchema`       |
+| `identity.joinRequests.mine`               | query    | No permission: the caller's own pending requests, keyed by their session id                                                                                                                                              | inline                                  | `joinRequestMineSchema`           |
+| `identity.joinRequests.request`            | mutation | No permission: asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist | `joinRequestApiRequestInputSchema`      | `joinRequestFiledSchema`          |
+| `identity.joinRequests.withdraw`           | mutation | No permission: the requester withdrawing their own request, matched on the session's user id                                                                                                                             | `joinRequestApiWithdrawInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.pending`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestPendingSchema`        |
+| `identity.joinRequests.approve`            | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.reject`             | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
+| `identity.joinRequests.joining`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestJoiningSchema`        |
+| `identity.joinRequests.setJoining`         | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiSetJoiningInputSchema`   | `joinRequestJoiningChangedSchema` |
+| `identity.joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
+| `identity.joinRequests.getJoinAdmissions`  | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiAdmissionsInputSchema`   | inline                            |
 
 ### `twoStepVerification`
 
@@ -312,7 +332,7 @@ Declared at `src/eventing/user-identity.pipeline.ts:90`. Events: `identifierAtta
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:450`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:455`           |
 | config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:20` |
 | config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:22` |
 | config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:24` |

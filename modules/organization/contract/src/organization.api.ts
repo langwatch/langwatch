@@ -27,16 +27,7 @@ import type {
   RenameOrganizationGroupInput,
   RemoveOrganizationGroupGrantInput,
 } from "./group.ts";
-import type {
-  JoinRequestAdmitted,
-  JoinRequestAutomaticJoins,
-  JoinRequestFiled,
-  JoinRequestJoining,
-  JoinRequestJoiningChanged,
-  JoinRequestMine,
-  JoinRequestPending,
-} from "./join-request.responses.ts";
-import type { JoinRequestApiOrigin } from "./join-request.trpc-schemas.ts";
+import type { OrganizationJoinOrigin, OrganizationJoinSetting } from "./join-setting.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type {
   PendingInvitationForCaller,
@@ -285,8 +276,11 @@ export interface OrganizationApi {
    * How colleagues on a matching domain get in, in the columns the
    * organization owns; identity's join ledger reads and writes it here.
    */
-  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
-  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void>;
+  getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting>;
+  saveJoinSetting(input: {
+    organizationId: string;
+    setting: OrganizationJoinSetting;
+  }): Promise<void>;
   /** The CLI/device session ceiling in days; zero or an unknown organization is unbounded. */
   getSessionPolicy(input: { organizationId: string }): Promise<{ maxSessionDurationDays: number }>;
   saveSessionPolicy(input: {
@@ -426,7 +420,7 @@ export interface OrganizationApi {
       /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */
       seat?: "MEMBER" | "DEVELOPER";
       /** Where a join request was made, written on the Developer admission audit row. */
-      origin?: JoinRequestApiOrigin;
+      origin?: OrganizationJoinOrigin;
     }>,
   ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
@@ -835,40 +829,6 @@ export interface OrganizationApi {
   listMemberGroupsWithScopeNames(
     input: ListMemberOrganizationGroupsInput,
   ): Promise<GroupMembershipView[]>;
-
-  lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-  listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
-  fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestFiled>;
-  withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
-  listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
-  approveJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void>;
-  rejectJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void>;
-  readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining>;
-  /** Audited against `actorUserId`, the administrator who saved it. */
-  setJoiningPolicy(
-    input: Readonly<{
-      organizationId: string;
-      domainJoin: JoinRequestJoining["domainJoin"];
-      domains: readonly string[];
-      joinerRole?: JoinRequestJoining["joinerRole"];
-      actorUserId: string;
-    }>,
-  ): Promise<JoinRequestJoiningChanged>;
-  /** The post-login offer: the lookup minus the domains this person dismissed. */
-  offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-  dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
-  admitAutomatically(
-    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestAdmitted>;
-  listAutomaticJoins(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<JoinRequestAutomaticJoins>;
 
   initializeOrganization(
     input: OnboardingInitializeOrganizationInput,

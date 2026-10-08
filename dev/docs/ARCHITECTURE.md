@@ -498,7 +498,8 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
 packages. Code repeated within one module stays in that module; repeated across modules it goes to
 the design system, which takes props or a query RESULT (never a hook, never fetches); pure domain
 logic goes to the owner's contract; framework hooks go to `browser-host`. Modules share data, not code: every
-module with tRPC has a `<name>-client` package (`modules/<name>/client`) holding the hooks
+module whose procedures another browser reads has a `<name>-client` package (`modules/<name>/client`;
+Alex, 2026-10-08, round 31 CT-1: clients on demand) holding the hooks
 `createModuleApi` derives from its own contract, at most a few thin convenience hooks and the
 module's lent tokens (§10.1; Alex, 2026-10-06, round 7b), never a component. A client imports only
 its contract, `@langwatch/api/web`, `@langwatch/browser-host` and React, never another client; a

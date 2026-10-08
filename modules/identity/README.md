@@ -10,10 +10,11 @@ The platform operator's identity lookup: find a person by address, review propos
 | -------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Classification | core (`modules/catalogue.json`)                                                                                           |
 | Subjects       | identity                                                                                                                  |
-| Halves         | [contract](contract) · [process](process/README.md)                                                                       |
+| Halves         | [contract](contract) · [process](process/README.md) · [client](client)                                                    |
 | Api token      | `IdentityLookupApi` = `moduleApi<IdentityLookupApi>()("identity")`, `contract/src/identity-lookup.ts:241` (11 operations) |
-| Other token    | `IdentityApi`, `contract/src/identity.api.ts:820`                                                                         |
+| Other token    | `IdentityApi`, `contract/src/identity.api.ts:823`                                                                         |
 | Other token    | `TwoStepVerificationApi`, `contract/src/two-step-verification.ts:118`                                                     |
+| Other token    | `JoinRequestDoorApi`, `process/src/transport/join-request.trpc.ts:63`                                                     |
 | Installed by   | api, worker, tasks (process)                                                                                              |
 
 ## What identity owns
@@ -22,7 +23,7 @@ The platform operator's identity lookup: find a person by address, review propos
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Postgres, accessed not claimed | `Account`, `AccountCredential`, `AuditLog`, `Identifier`, `IdentifierReservation`, `IdentityProjectionCursor`, `JoinRequest`, `MfaEnrollment`, `Organization`, `OrganizationInvite`, `OrganizationUser`, `Passkey`, `SsoAuthenticationActivity`, `SsoConnection`, `SsoConnectionRegistrationSlot`, `SsoVerifiedDomain`, `Team`, `User` | `process/src/repositories/prisma/prisma.sso-migration-evidence.repository.ts:13` |
 | Stores required                | prisma, encryption, rateLimiter                                                                                                                                                                                                                                                                                                        | `process/src/repositories/prisma/prisma.identity.repositories.ts:48`             |
-| Secrets                        | `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                                                                                                                                                                                                                                                  | `process/src/app/identity.app.ts:450`                                            |
+| Secrets                        | `internalSlackSignupsWebhook` (SLACK_CHANNEL_SIGNUPS)                                                                                                                                                                                                                                                                                  | `process/src/app/identity.app.ts:455`                                            |
 | Config                         | `ssoDomainProofDnsServers` (SSO_DOMAIN_PROOF_DNS_SERVERS), `isSaas` (IS_SAAS), `publicBaseUrl` (BASE_HOST)                                                                                                                                                                                                                             | `contract/src/identity.config.ts:20`                                             |
 
 Anything else identity needs belongs to another module and is reached through its `*Api`.

@@ -1,6 +1,6 @@
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type {
-  JoinRequestJoining,
+  OrganizationJoinSetting,
   OrganizationBillingProfile,
   OrganizationWithAdministrators,
   OrganizationIntent,
@@ -97,10 +97,10 @@ export abstract class OrganizationRepository {
   }): Promise<GuidedOnboardingRecord>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
   /** How colleagues on a matching domain get in; throws for an unknown organization. */
-  abstract getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
+  abstract getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting>;
   abstract saveJoinSetting(input: {
     organizationId: string;
-    setting: JoinRequestJoining;
+    setting: OrganizationJoinSetting;
   }): Promise<void>;
   /** The organization claiming this SSO domain, or null. */
   abstract findBySsoDomain(input: {

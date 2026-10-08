@@ -56,7 +56,6 @@ export { organizationProcessModule } from "./organization.module.ts";
 export type { OrganizationRepositories } from "./repositories/organization.repositories.ts";
 export { organizationManagementRest } from "./transport/organization-management.rest.ts";
 export { groupTrpcTransport } from "./transport/group.trpc.ts";
-export { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 export { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 export {
   organizationSessionPersonFact,
@@ -72,10 +71,7 @@ export type {
   OrganizationInviteWithOrganization,
   OrganizationInvitesCreated,
 } from "./services/organization-invitations.service.ts";
-export type {
-  OrganizationJoinRequests,
-  OrganizationJoinRequestState,
-} from "./services/organization-join-requests.service.ts";
+export type { OrganizationJoinRequests } from "./services/organization-join-requests.service.ts";
 export type { OrganizationSignals } from "./services/organization-signals.service.ts";
 export { groupsRest } from "./transport/group.rest.ts";
 export { teamsRest } from "./transport/team.rest.ts";

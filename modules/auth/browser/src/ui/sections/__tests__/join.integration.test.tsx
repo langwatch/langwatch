@@ -32,13 +32,15 @@ const { lookupRef, mineRef, requestMock, hardRedirectMock, invalidateMock, navig
     };
   });
 
-vi.mock("../../../behavior/auth-api.ts", () => ({
-  authApi: {
-    useUtils: () => ({ joinRequests: { mine: { invalidate: invalidateMock } } }),
-    joinRequests: {
-      lookup: { useQuery: () => lookupRef.current },
-      mine: { useQuery: () => mineRef.current },
-      request: { useMutation: () => ({ mutate: requestMock, error: null }) },
+vi.mock("@langwatch/identity-client", () => ({
+  identityClient: {
+    useUtils: () => ({ identity: { joinRequests: { mine: { invalidate: invalidateMock } } } }),
+    identity: {
+      joinRequests: {
+        lookup: { useQuery: () => lookupRef.current },
+        mine: { useQuery: () => mineRef.current },
+        request: { useMutation: () => ({ mutate: requestMock, error: null }) },
+      },
     },
   },
 }));

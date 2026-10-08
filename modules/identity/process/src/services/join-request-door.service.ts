@@ -1,60 +1,62 @@
 /**
- * `joinRequests.*` as this feature serves it: the caller's own verified
- * address resolved once, folded ledger state turned into the two screen
- * shapes — the requester's address withheld from the organization until membership.
+ * `identity.joinRequests.*` as identity serves it: the caller's own verified
+ * address resolved once, folded ledger state turned into the two screen shapes,
+ * the requester's address withheld from the organization until membership.
  */
 
-import { seatForJoiner } from "@langwatch/identity-contract";
-import type {
-  JoinRequestAdmitted,
-  JoinRequestApiOrigin,
-  JoinRequestAutomaticJoins,
-  JoinRequestFiled,
-  JoinRequestJoining,
-  JoinRequestJoiningChanged,
-  JoinRequestMine,
-  JoinRequestPending,
-} from "@langwatch/organization-contract";
+import {
+  type IdentityDomainAdmission,
+  type JoinAdmissionsApi,
+  type JoinLookupDecision,
+  type JoinRequestAdmitted,
+  type JoinRequestAggregateState,
+  type JoinRequestApiOrigin,
+  type JoinRequestAutomaticJoins,
+  type JoinRequestFiled,
+  type JoinRequestJoining,
+  type JoinRequestJoiningChanged,
+  type JoinRequestMine,
+  type JoinRequestPending,
+  type JoinRequestsApi,
+  type VerifiedEmailsResolution,
+  seatForJoiner,
+} from "@langwatch/identity-contract";
 import { Temporal, toDate } from "@langwatch/time";
-
-import type { OrganizationDirectory } from "./organization-directory.service.ts";
-import type {
-  OrganizationJoinRequestState,
-  OrganizationJoinRequests,
-} from "./organization-join-requests.service.ts";
+import type { UserApi } from "@langwatch/user-contract";
 
 /** Shown where the ledger knows a requester's id but nobody's name. */
 const UNNAMED_COLLEAGUE = "A colleague";
 
-interface OrganizationJoinDoorDependencies {
-  readonly joinRequests: OrganizationJoinRequests;
-  readonly directory: OrganizationDirectory;
+interface JoinRequestDoorDependencies {
+  readonly joinRequests: JoinRequestsApi;
+  readonly admissions: JoinAdmissionsApi;
+  readonly emails: {
+    verifiedEmailsOf(input: { userId: string }): Promise<VerifiedEmailsResolution>;
+  };
+  /** Display names, and the legacy verified address of somebody not on identifiers yet. */
+  readonly users: Pick<UserApi, "getProfiles">;
 }
 
-export class OrganizationJoinDoorService {
-  static create(dependencies: OrganizationJoinDoorDependencies): OrganizationJoinDoorService {
-    return new OrganizationJoinDoorService(dependencies);
+export class JoinRequestDoorService {
+  static create(dependencies: JoinRequestDoorDependencies): JoinRequestDoorService {
+    return new JoinRequestDoorService(dependencies);
   }
 
-  private constructor(private readonly deps: OrganizationJoinDoorDependencies) {}
+  private constructor(private readonly deps: JoinRequestDoorDependencies) {}
 
-  /**
-   * Which organizations are open to this person's own verified addresses.
-   * Every closed door - unverified, consumer domain, joining off, nonexistent
-   * - is the same answer.
-   */
-  async lookup(input: Readonly<{ userId: string }>): Promise<unknown> {
+  /** Every closed door (unverified, consumer domain, joining off, nonexistent) answers alike. */
+  async lookup(input: Readonly<{ userId: string }>): Promise<JoinLookupDecision> {
     return this.deps.joinRequests.lookup({
       userId: input.userId,
-      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      verifiedEmail: await this.findVerifiedEmail(input),
     });
   }
 
   /** The post-login offer: the same answer, minus the domains they dismissed. */
-  async offer(input: Readonly<{ userId: string }>): Promise<unknown> {
+  async offer(input: Readonly<{ userId: string }>): Promise<JoinLookupDecision> {
     return this.deps.joinRequests.offerForSignedInUser({
       userId: input.userId,
-      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      verifiedEmail: await this.findVerifiedEmail(input),
     });
   }
 
@@ -62,7 +64,7 @@ export class OrganizationJoinDoorService {
   async dismissOffer(input: Readonly<{ userId: string }>): Promise<void> {
     await this.deps.joinRequests.dismissOffer({
       userId: input.userId,
-      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      verifiedEmail: await this.findVerifiedEmail(input),
     });
   }
 
@@ -72,7 +74,7 @@ export class OrganizationJoinDoorService {
   ): Promise<JoinRequestAdmitted> {
     return this.deps.joinRequests.joinAutomaticallyIfAdmitted({
       userId: input.userId,
-      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+      verifiedEmail: await this.findVerifiedEmail(input),
       ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
   }
@@ -82,10 +84,7 @@ export class OrganizationJoinDoorService {
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestAutomaticJoins> {
     const joins = await this.deps.joinRequests.automaticJoinsForOrganization(input);
-    const names = await this.deps.directory.listUserNames({
-      userIds: joins.map((join) => join.userId),
-    });
-    const nameById = new Map(names.map((person) => [person.id, person.name] as const));
+    const nameById = await this.namesOf(joins.map((join) => join.userId));
 
     return joins.map((join) => ({
       joinRequestId: join.joinRequestId,
@@ -114,7 +113,7 @@ export class OrganizationJoinDoorService {
   ): Promise<JoinRequestFiled> {
     return this.deps.joinRequests.request({
       userId: input.userId,
-      verifiedEmail: await this.deps.directory.findVerifiedEmail({ userId: input.userId }),
+      verifiedEmail: await this.findVerifiedEmail({ userId: input.userId }),
       organizationId: input.organizationId,
       ...(input.origin === undefined ? {} : { origin: input.origin }),
     });
@@ -132,10 +131,7 @@ export class OrganizationJoinDoorService {
   async listPending(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending> {
     const pending = await this.deps.joinRequests.pendingForOrganization(input);
     const { joinerRole } = await this.deps.joinRequests.readJoining(input);
-    const names = await this.deps.directory.listUserNames({
-      userIds: pending.map((request) => request.userId),
-    });
-    const nameById = new Map(names.map((person) => [person.id, person.name] as const));
+    const nameById = await this.namesOf(pending.map((request) => request.userId));
 
     return pending.map((request) => ({
       ...waitingSince(request),
@@ -183,11 +179,41 @@ export class OrganizationJoinDoorService {
       nextJoinerRole: change.nextJoinerRole,
     };
   }
+
+  /** Which of these members a matching domain admitted; nobody outside the list is answered. */
+  findAdmissions(
+    input: Readonly<{ organizationId: string; userIds: readonly string[] }>,
+  ): Promise<IdentityDomainAdmission[]> {
+    return this.deps.admissions.findForMembers(input);
+  }
+
+  /**
+   * The caller's own first PROVEN address: identifiers first, else the legacy
+   * column only where it was verified.
+   */
+  private async findVerifiedEmail({
+    userId,
+  }: Readonly<{ userId: string }>): Promise<string | null> {
+    const verified = await this.deps.emails.verifiedEmailsOf({ userId });
+    if (verified.kind === "resolved") return verified.emails[0]?.value ?? null;
+    const [profile] = await this.deps.users.getProfiles({ userIds: [userId] });
+    return profile?.emailVerified ? profile.email : null;
+  }
+
+  private async namesOf(userIds: readonly string[]): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map();
+    const profiles = await this.deps.users.getProfiles({ userIds: [...new Set(userIds)] });
+    return new Map(
+      profiles.flatMap((person) =>
+        person.name === null ? [] : [[person.id, person.name] as const],
+      ),
+    );
+  }
 }
 
 /** One waiting request, as both pending lists render it. */
 function waitingSince(
-  request: OrganizationJoinRequestState,
+  request: JoinRequestAggregateState,
 ): Omit<JoinRequestMine[number], "organizationId"> {
   return {
     joinRequestId: request.joinRequestId,

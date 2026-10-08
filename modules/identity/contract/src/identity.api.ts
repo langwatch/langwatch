@@ -48,7 +48,6 @@ import type {
 } from "./facts.ts";
 import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type { identityDomainAdmissionSchema } from "./identity.trpc.ts";
 import type {
   DomainJoinSetting,
   JoinerRole,
@@ -62,6 +61,7 @@ import type {
   RequestJoinCommandData,
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
+import type { identityDomainAdmissionSchema } from "./join-request.responses.ts";
 import type {
   JoinRequestAggregateState,
   JoinRequestFactInput,
@@ -614,7 +614,10 @@ export type IdentityDomainAdmission = z.infer<typeof identityDomainAdmissionSche
 
 /** Who a domain admitted to an organization (D12), for the members list's provenance. */
 export interface JoinAdmissionsApi {
-  findForOrganization(args: { organizationId: string }): Promise<IdentityDomainAdmission[]>;
+  findForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<IdentityDomainAdmission[]>;
 }
 
 /** Both values and both domain lists of a saved joining setting, for its audit row. */
@@ -629,7 +632,7 @@ export interface JoinSettingChange {
 
 /**
  * The join-request ledger (D12, ADR-117): the lookup, the offer, the ask, the
- * admins' answers and the setting behind them. Organization serves the door.
+ * admins' answers and the setting behind them. `identity.joinRequests.*` serves the door.
  */
 export interface JoinRequestsApi {
   lookup(args: { userId: string; verifiedEmail: string | null }): Promise<JoinLookupDecision>;

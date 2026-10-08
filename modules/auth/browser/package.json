@@ -29,6 +29,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-client": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

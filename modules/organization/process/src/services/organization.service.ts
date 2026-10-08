@@ -2,7 +2,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
-  type JoinRequestJoining,
+  type OrganizationJoinSetting,
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,
   OrganizationS3SecretRequiredError,
@@ -233,11 +233,14 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   /** How colleagues on a matching domain get in, where the organization keeps it. */
-  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining> {
+  getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting> {
     return this.repository.getJoinSetting(input);
   }
 
-  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void> {
+  saveJoinSetting(input: {
+    organizationId: string;
+    setting: OrganizationJoinSetting;
+  }): Promise<void> {
     return this.repository.saveJoinSetting(input);
   }
 

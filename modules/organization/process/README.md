@@ -6,13 +6,13 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, joinRequestTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).withTransportFacts(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withTasks(…)`, `src/organization.module.ts:25`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).withTransportFacts(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withTasks(…)`, `src/organization.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:228`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:219`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -83,13 +83,13 @@ readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnbo
 How colleagues on a matching domain get in, in the columns the organization owns; identity's join ledger reads and writes it here.
 
 ```typescript
-getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
+getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting>;
 ```
 
 #### `saveJoinSetting`
 
 ```typescript
-saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void>;
+saveJoinSetting(input: { organizationId: string; setting: OrganizationJoinSetting; }): Promise<void>;
 ```
 
 #### `getSessionPolicy`
@@ -307,7 +307,7 @@ getMemberAccessBreakdown(input: Readonly<{ organizationId: string; userId: strin
 Admits somebody on the joiner seat (ADR-129, ADR-171): a MEMBER's grant lands now with `admittedBy` or an SSO arrival resumes it; a DEVELOPER's row is the whole admission. `seat` is the row's role; `"already-present"` is a concurrent callback or a retry.
 
 ```typescript
-createMembership(input: Readonly<{ organizationId: string; userId: string; admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>; /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */ seat?: "MEMBER" | "DEVELOPER"; /** Where a join request was made, written on the Developer admission audit row. */ origin?: JoinRequestApiOrigin; }>): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
+createMembership(input: Readonly<{ organizationId: string; userId: string; admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>; /** The seat the admitting caller decided (ADR-171 v6); absent is the joiner seat. */ seat?: "MEMBER" | "DEVELOPER"; /** Where a join request was made, written on the Developer admission audit row. */ origin?: OrganizationJoinOrigin; }>): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }>;
 ```
 
 #### `isMember`
@@ -998,88 +998,6 @@ createLicensedGroup(input: Omit<CreateOrganizationGroupInput, "actor" | "caller"
 listMemberGroupsWithScopeNames(input: ListMemberOrganizationGroupsInput): Promise<GroupMembershipView[]>;
 ```
 
-#### `lookupJoinableOrganizations`
-
-```typescript
-lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-```
-
-#### `listOwnJoinRequests`
-
-```typescript
-listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
-```
-
-#### `fileJoinRequest`
-
-```typescript
-fileJoinRequest(input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>): Promise<JoinRequestFiled>;
-```
-
-#### `withdrawJoinRequest`
-
-```typescript
-withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
-```
-
-#### `listPendingJoinRequests`
-
-```typescript
-listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
-```
-
-#### `approveJoinRequest`
-
-```typescript
-approveJoinRequest(input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>): Promise<void>;
-```
-
-#### `rejectJoinRequest`
-
-```typescript
-rejectJoinRequest(input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>): Promise<void>;
-```
-
-#### `readJoiningPolicy`
-
-```typescript
-readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining>;
-```
-
-#### `setJoiningPolicy`
-
-Audited against `actorUserId`, the administrator who saved it.
-
-```typescript
-setJoiningPolicy(input: Readonly<{ organizationId: string; domainJoin: JoinRequestJoining["domainJoin"]; domains: readonly string[]; joinerRole?: JoinRequestJoining["joinerRole"]; actorUserId: string; }>): Promise<JoinRequestJoiningChanged>;
-```
-
-#### `offerJoinableOrganizations`
-
-The post-login offer: the lookup minus the domains this person dismissed.
-
-```typescript
-offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
-```
-
-#### `dismissJoinOffer`
-
-```typescript
-dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
-```
-
-#### `admitAutomatically`
-
-```typescript
-admitAutomatically(input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>): Promise<JoinRequestAdmitted>;
-```
-
-#### `listAutomaticJoins`
-
-```typescript
-listAutomaticJoins(input: Readonly<{ organizationId: string }>): Promise<JoinRequestAutomaticJoins>;
-```
-
 #### `initializeOrganization`
 
 ```typescript
@@ -1634,26 +1552,6 @@ Contract `../contract/src/invite.trpc.ts:21`, router `src/transport/invite.trpc.
 | `invite.myPendingInvitation`           | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | inline                                    | `organizationPendingInvitationForCallerSchema`  |
 | `invite.pendingForMe`                  | query    | No permission: runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite | inline                                    | `organizationPendingInvitationsForCallerSchema` |
 
-### `joinRequests`
-
-Contract `../contract/src/join-request.trpc.ts:48`, router `src/transport/join-request.trpc.ts:49`.
-
-| Procedure                         | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
-| --------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
-| `joinRequests.lookup`             | query    | No permission: the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else    | inline                                  | `joinRequestLookupSchema`         |
-| `joinRequests.offer`              | query    | No permission: the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable                                                           | inline                                  | `joinRequestLookupSchema`         |
-| `joinRequests.dismissOffer`       | mutation | No permission: the caller silencing their own offer, on the domain their own session's verified address holds                                                                                                            | inline                                  | `joinRequestWriteAckSchema`       |
-| `joinRequests.admitAutomatically` | mutation | No permission: admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else                                            | `joinRequestApiAdmitInputSchema`        | `joinRequestAdmittedSchema`       |
-| `joinRequests.mine`               | query    | No permission: the caller's own pending requests, keyed by their session id                                                                                                                                              | inline                                  | `joinRequestMineSchema`           |
-| `joinRequests.request`            | mutation | No permission: asking to join is the one action a non-member takes on an organization; the handler proves the organization was OFFERED to this caller's verified domain and refuses anything else as if it did not exist | `joinRequestApiRequestInputSchema`      | `joinRequestFiledSchema`          |
-| `joinRequests.withdraw`           | mutation | No permission: the requester withdrawing their own request, matched on the session's user id                                                                                                                             | `joinRequestApiWithdrawInputSchema`     | `joinRequestWriteAckSchema`       |
-| `joinRequests.pending`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestPendingSchema`        |
-| `joinRequests.approve`            | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
-| `joinRequests.reject`             | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiDecisionInputSchema`     | `joinRequestWriteAckSchema`       |
-| `joinRequests.joining`            | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestJoiningSchema`        |
-| `joinRequests.setJoining`         | mutation | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiSetJoiningInputSchema`   | `joinRequestJoiningChangedSchema` |
-| `joinRequests.automaticJoins`     | query    | Permission `organization:manage`                                                                                                                                                                                         | `joinRequestApiOrganizationScopeSchema` | `joinRequestAutomaticJoinsSchema` |
-
 ### `licenseEnforcement`
 
 Contract `../contract/src/license-enforcement.trpc.ts:24`, router `src/transport/license-enforcement.trpc.ts:14`.
@@ -1760,7 +1658,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:343`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:336`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

@@ -17,7 +17,7 @@ function accessOf(): Map<string, { kind: string; permission?: string }> {
   const declared = new Map<string, { kind: string; permission?: string }>();
   const runtime: TrpcProcedureFactory<object> = {
     procedure: ({ procedure, access }) => {
-      declared.set(procedure.split(".")[1] ?? procedure, access);
+      declared.set(procedure.split(".").at(-1) ?? procedure, access);
       return {};
     },
     router: (record) => record,

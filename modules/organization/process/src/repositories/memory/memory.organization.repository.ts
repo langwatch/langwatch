@@ -4,7 +4,7 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
-  type JoinRequestJoining,
+  type OrganizationJoinSetting,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -105,7 +105,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<JoinRequestJoining> {
+  }): Promise<OrganizationJoinSetting> {
     const organization = this.requireOrganization(organizationId);
 
     return {
@@ -230,7 +230,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     setting,
   }: {
     organizationId: string;
-    setting: JoinRequestJoining;
+    setting: OrganizationJoinSetting;
   }): Promise<void> {
     const organization = this.requireOrganization(organizationId);
     organization.domainJoin = setting.domainJoin;

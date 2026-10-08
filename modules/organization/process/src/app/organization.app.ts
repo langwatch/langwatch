@@ -36,13 +36,7 @@ import {
   type OrganizationListedInvite,
   type OrganizationInviteAccepted,
   type OrganizationPendingInviteApplied,
-  type JoinRequestMine,
-  type JoinRequestApiOrigin,
-  type JoinRequestFiled,
-  type JoinRequestPending,
-  type JoinRequestJoiningChanged,
-  type JoinRequestAdmitted,
-  type JoinRequestAutomaticJoins,
+  type OrganizationJoinOrigin,
   type OrganizationProvisioningSummary,
   type OrganizationRestMemberSummary,
   type OrganizationRestMemberTeamBinding,
@@ -73,7 +67,7 @@ import {
   type OrganizationWithAdministrators,
   type OrganizationGroup,
   type OrganizationGroupGrant,
-  type JoinRequestJoining,
+  type OrganizationJoinSetting,
   type OrganizationGroupDetails,
   type OrganizationGroupPage,
   type OrganizationGroupSummary,
@@ -172,7 +166,6 @@ import { OrganizationInitializationService } from "../services/organization-init
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
 import { OrganizationInvitationsService } from "../services/organization-invitations.service.ts";
 import type { OrganizationInvitations } from "../services/organization-invitations.service.ts";
-import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
 import { OrganizationJoinRequestsService } from "../services/organization-join-requests.service.ts";
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
@@ -430,10 +423,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
-    application.#joinDoor = OrganizationJoinDoorService.create({
-      joinRequests: infrastructure.joinRequests,
-      directory: infrastructure.directory,
-    });
+    application.#joinRequests = infrastructure.joinRequests;
     application.#initialization = OrganizationInitializationService.create({
       ceremony: infrastructure.ceremony,
       signals: infrastructure.signals,
@@ -513,7 +503,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         rateLimit: setup.repositories.inviteRateLimit,
         plans: dependencies.entitlement,
       }),
-      // Identity owns the join-request ledger; this feature serves its door.
+      // Identity owns the join-request ledger and its door; the Directory badge counts it.
       joinRequests: OrganizationJoinRequestsService.create(dependencies.identity),
       signals,
       seatLimits,
@@ -553,7 +543,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #scopeGraph!: OrganizationScopeGraphService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService;
-  #joinDoor!: OrganizationJoinDoorService;
+  #joinRequests!: OrganizationJoinRequests;
   #initialization!: OrganizationInitializationService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
@@ -660,11 +650,14 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
    * existing share link now has to be revoked (ADR-057) — only the write saw the stored value
    * beforehand, so the answer is carried through rather than dropped here.
    */
-  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining> {
+  getJoinSetting(input: { organizationId: string }): Promise<OrganizationJoinSetting> {
     return this.#dependencies.organizations.getJoinSetting(input);
   }
 
-  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void> {
+  saveJoinSetting(input: {
+    organizationId: string;
+    setting: OrganizationJoinSetting;
+  }): Promise<void> {
     return this.#dependencies.organizations.saveJoinSetting(input);
   }
 
@@ -931,7 +924,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       userId: string;
       admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
       seat?: "MEMBER" | "DEVELOPER";
-      origin?: JoinRequestApiOrigin;
+      origin?: OrganizationJoinOrigin;
     }>,
   ): Promise<{ outcome: "created" | "already-present"; seat: "MEMBER" | "DEVELOPER" }> {
     return this.#dependencies.membership.createMembership(input);
@@ -1759,7 +1752,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     const [members, invites, requests, groups, teams] = await Promise.all([
       this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
       this.listPendingInvitations({ organizationId }),
-      this.listPendingJoinRequests({ organizationId }),
+      this.#joinRequests.pendingForOrganization({ organizationId }),
       this.listGroups({ organizationId, page: 1, limit: 1 }),
       this.listTeams({ organizationId, page: 1, limit: 1 }),
     ]);
@@ -1932,84 +1925,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
       })),
     })) as GroupMembershipView[];
-  }
-
-  // -- the join-request doors ------------------------------------------------
-
-  async lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinDoor.lookup(input);
-  }
-
-  async listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine> {
-    return this.#joinDoor.listOwn(input);
-  }
-
-  async fileJoinRequest(
-    input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestFiled> {
-    return this.#joinDoor.file(input);
-  }
-
-  async withdrawJoinRequest(
-    input: Readonly<{ joinRequestId: string; userId: string }>,
-  ): Promise<void> {
-    return this.#joinDoor.withdraw(input);
-  }
-
-  async listPendingJoinRequests(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<JoinRequestPending> {
-    return this.#joinDoor.listPending(input);
-  }
-
-  async approveJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void> {
-    return this.#joinDoor.approve(input);
-  }
-
-  async rejectJoinRequest(
-    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
-  ): Promise<void> {
-    return this.#joinDoor.reject(input);
-  }
-
-  async readJoiningPolicy(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<JoinRequestJoining> {
-    return this.#joinDoor.readJoining(input);
-  }
-
-  async setJoiningPolicy(
-    input: Readonly<{
-      organizationId: string;
-      domainJoin: JoinRequestJoining["domainJoin"];
-      domains: readonly string[];
-      joinerRole?: JoinRequestJoining["joinerRole"];
-      actorUserId: string;
-    }>,
-  ): Promise<JoinRequestJoiningChanged> {
-    return this.#joinDoor.setJoining(input);
-  }
-
-  async offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinDoor.offer(input);
-  }
-
-  async dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void> {
-    return this.#joinDoor.dismissOffer(input);
-  }
-
-  async admitAutomatically(
-    input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
-  ): Promise<JoinRequestAdmitted> {
-    return this.#joinDoor.admitAutomatically(input);
-  }
-
-  async listAutomaticJoins(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<JoinRequestAutomaticJoins> {
-    return this.#joinDoor.listAutomaticJoins(input);
   }
 
   // -- the sign-up ceremony --------------------------------------------------

@@ -121,6 +121,7 @@ import { IdentitySecretCarryService } from "../services/identity-secret-carry.se
 import { IdentityService } from "../services/identity.service.ts";
 import { InProcessBreakGlassLimiterService } from "../services/in-process-break-glass-limiter.service.ts";
 import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
+import { JoinRequestDoorService } from "../services/join-request-door.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
@@ -191,6 +192,7 @@ import { IdentitySecretHealMigrationService } from "../services/system-migration
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
 import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
+import type { JoinRequestDoorApi } from "../transport/join-request.trpc.ts";
 /**
  * The boundary `reservations().reapOrphans()` call takes no args, so it bounds
  * itself per pass the same way `IdentityNewbornReconciliationService`'s own
@@ -231,6 +233,7 @@ type IdentityAppParts = {
   ssoTestArrival: SsoTestArrivalService;
   joinAdmissions: JoinAdmissionsService;
   joinRequests: JoinRequestsService;
+  joinRequestDoor: JoinRequestDoorService;
   ssoActivity: SsoAuthenticationActivityService;
   ssoMigrationCallbacks: SsoMigrationCallbackService;
   ssoBreakGlass: SsoBreakGlassService;
@@ -422,7 +425,9 @@ function joinRateLimit(limiter: IdentityRateLimitRepository): JoinRequestsServic
   };
 }
 
-export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
+export class IdentityModule
+  implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi, JoinRequestDoorApi
+{
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -791,6 +796,8 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       }),
     });
 
+    const joinAdmissions = JoinAdmissionsService.create(setup.repositories.joinRequests);
+
     return new IdentityModule({
       emails,
       ceremonies,
@@ -843,8 +850,14 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
       ssoAssertion,
       ssoArrival,
       ssoTestArrival,
-      joinAdmissions: JoinAdmissionsService.create(setup.repositories.joinRequests),
+      joinAdmissions,
       joinRequests,
+      joinRequestDoor: JoinRequestDoorService.create({
+        joinRequests,
+        admissions: joinAdmissions,
+        emails,
+        users: setup.dependencies.users,
+      }),
       ssoActivity,
       ssoMigrationCallbacks,
       ssoBreakGlass: ssoBreakGlassGrants,
@@ -1198,6 +1211,10 @@ export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVe
 
   joinRequests(): JoinRequestsService {
     return this.#parts.joinRequests;
+  }
+
+  joinRequestDoor(): JoinRequestDoorService {
+    return this.#parts.joinRequestDoor;
   }
 
   ssoActivity(): SsoAuthenticationActivityService {

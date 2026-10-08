@@ -1,14 +1,11 @@
-/** Contract schemas for the join-request feature's tRPC responses. */
+/** Contract schemas for the `identity.joinRequests.*` responses, in identity's own vocabulary. */
 import { z } from "zod";
 
-/**
- * The identity feature's own three settings, inlined since this package does
- * not depend on `@langwatch/identity-contract`. Keep in step with
- * `DOMAIN_JOIN_SETTINGS` in `modules/identity/contract/src/join-matching.ts`.
- */
-const domainJoinSettingSchema = z.enum(["off", "request", "auto"]);
+import { DOMAIN_JOIN_SETTINGS, JOINER_ROLES } from "./join-matching.ts";
+
+const domainJoinSettingSchema = z.enum(DOMAIN_JOIN_SETTINGS);
 /** The seat a joiner without an invitation lands on (ADR-171). */
-export const joinerRoleSchema = z.enum(["MEMBER", "DEVELOPER"]);
+export const joinerRoleSchema = z.enum(JOINER_ROLES);
 
 /** One request this caller, or this organization's admins, are waiting on. */
 const waitingSinceSchema = z
@@ -33,8 +30,7 @@ export type JoinRequestFiled = z.infer<typeof joinRequestFiledSchema>;
 
 /**
  * The organization somebody was just admitted to by its domain setting, or
- * null when nothing admits their address — the ordinary case, not a failure.
- * Identity's `JoinOffer`, restated so this contract carries no value import from it.
+ * null when nothing admits their address: the ordinary case, not a failure.
  */
 export const joinRequestAdmittedSchema = z
   .object({
@@ -101,3 +97,10 @@ export const joinRequestJoiningChangedSchema = z
   })
   .strict();
 export type JoinRequestJoiningChanged = z.infer<typeof joinRequestJoiningChangedSchema>;
+
+/** A member a matching domain admitted, and whether the policy did it with nobody approving. */
+export const identityDomainAdmissionSchema = z.object({
+  userId: z.string(),
+  domain: z.string(),
+  automatic: z.boolean(),
+});

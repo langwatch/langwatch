@@ -21,12 +21,20 @@ export class JoinAdmissionsService implements JoinAdmissionsApi {
     private readonly reads: Pick<JoinRequestListReadRepository, "findApprovedForOrganization">,
   ) {}
 
-  async findForOrganization(args: { organizationId: string }): Promise<IdentityDomainAdmission[]> {
-    const approved = await this.reads.findApprovedForOrganization(args);
-    return approved.map((request) => ({
-      userId: request.userId,
-      domain: request.domain,
-      automatic: request.resolvedById === DOMAIN_AUTO_JOIN_POLICY_ID,
-    }));
+  async findForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<IdentityDomainAdmission[]> {
+    const members = new Set(args.userIds);
+    const approved = await this.reads.findApprovedForOrganization({
+      organizationId: args.organizationId,
+    });
+    return approved
+      .filter((request) => members.has(request.userId))
+      .map((request) => ({
+        userId: request.userId,
+        domain: request.domain,
+        automatic: request.resolvedById === DOMAIN_AUTO_JOIN_POLICY_ID,
+      }));
   }
 }

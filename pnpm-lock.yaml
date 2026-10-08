@@ -4372,6 +4372,9 @@ importers:
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../../packages/error-views
+      '@langwatch/identity-client':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/client
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
@@ -6115,6 +6118,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/identity-client':
+        specifier: workspace:*
+        version: link:../../identity/client
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
@@ -9608,6 +9614,19 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  modules/identity/client:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   modules/identity/contract:
     dependencies:
       '@langwatch/authorization':
@@ -11462,6 +11481,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/identity-client':
+        specifier: workspace:*
+        version: link:../../identity/client
       '@langwatch/langy-client':
         specifier: workspace:*
         version: link:../../langy/client
@@ -12099,6 +12121,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/identity-client':
+        specifier: workspace:*
+        version: link:../../identity/client
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract

@@ -6,7 +6,7 @@
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { authTrpc, signInSecurityTrpc } from "@langwatch/auth-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
-import type { inviteTrpc, joinRequestTrpc } from "@langwatch/organization-contract";
+import type { inviteTrpc } from "@langwatch/organization-contract";
 
 /** What an invitation link may say to whoever opens it. */
 export type AuthInviteLanding = {
@@ -27,7 +27,6 @@ type BorrowedProcedures = {
 
 export type AuthApiMap = ContractApiMap<typeof authTrpc> &
   ContractApiMap<typeof signInSecurityTrpc> &
-  ContractApiMap<typeof joinRequestTrpc> &
   ContractApiMap<typeof inviteTrpc> &
   ContractApiMap<typeof identityTrpc> &
   BorrowedProcedures;

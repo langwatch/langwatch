@@ -49,6 +49,9 @@
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
+      "path": "../../identity/client/tsconfig.build.json"
+    },
+    {
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {

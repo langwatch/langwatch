@@ -1,14 +1,15 @@
 /**
- * Every `joinRequests.*` procedure, declared once; asking to join runs partly
- * outside membership since the caller isn't a member yet. `lookup` answers
- * the identity feature's own join-matching decision, unread here.
+ * Every `identity.joinRequests.*` procedure, declared once; asking to join runs
+ * partly outside membership since the caller isn't a member yet. `lookup`
+ * answers identity's join-matching decision.
  */
 
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
+import type { JoinLookupDecision } from "./join-matching.ts";
 import {
-  joinerRoleSchema,
+  identityDomainAdmissionSchema,
   joinRequestAdmittedSchema,
   joinRequestAutomaticJoinsSchema,
   joinRequestFiledSchema,
@@ -19,33 +20,19 @@ import {
   joinRequestWriteAckSchema,
 } from "./join-request.responses.ts";
 import {
+  joinRequestApiAdmissionsInputSchema,
   joinRequestApiAdmitInputSchema,
   joinRequestApiDecisionInputSchema,
   joinRequestApiOrganizationScopeSchema,
   joinRequestApiRequestInputSchema,
+  joinRequestApiSetJoiningInputSchema,
   joinRequestApiWithdrawInputSchema,
 } from "./join-request.trpc-schemas.ts";
 
-/**
- * How colleagues on a matching domain get in. The three settings are the
- * identity feature's vocabulary, restated here so the contract carries no
- * value import from it.
- */
-export const joinRequestApiDomainJoinSchema = z.enum(["off", "request", "auto"]);
-export type JoinRequestApiDomainJoin = z.infer<typeof joinRequestApiDomainJoinSchema>;
+/** The join-matching decision, forwarded untouched: typed for the browser, never re-validated. */
+export const joinRequestLookupSchema = z.custom<JoinLookupDecision>();
 
-export const joinRequestApiSetJoiningInputSchema = z.object({
-  organizationId: z.string().min(1),
-  domainJoin: joinRequestApiDomainJoinSchema,
-  domains: z.array(z.string().min(1)).default([]),
-  joinerRole: joinerRoleSchema.optional(),
-});
-export type JoinRequestApiSetJoiningInput = z.infer<typeof joinRequestApiSetJoiningInputSchema>;
-
-/** The identity feature's join-matching decision, forwarded untouched. */
-export const joinRequestLookupSchema = z.unknown();
-
-export const joinRequestTrpc = defineTrpcContract("joinRequests")
+export const joinRequestTrpc = defineTrpcContract("identity.joinRequests")
   /**
    * Which organizations are open to the caller's own verified addresses. Every
    * closed door - unverified, consumer domain, joining off, nonexistent - is
@@ -55,10 +42,7 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
   .withInput(z.void())
   .withOutput(joinRequestLookupSchema)
 
-  /**
-   * The same answer for somebody already signed in with an organization — the
-   * post-login offer — minus the domains they have dismissed.
-   */
+  /** The same answer for somebody already signed in, minus the domains they dismissed. */
   .query("offer")
   .withInput(z.void())
   .withOutput(joinRequestLookupSchema)
@@ -111,4 +95,9 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
   .query("automaticJoins")
   .withInput(joinRequestApiOrganizationScopeSchema)
   .withOutput(joinRequestAutomaticJoinsSchema)
+
+  /** Which of these members a matching domain admitted, for member provenance. */
+  .query("getJoinAdmissions")
+  .withInput(joinRequestApiAdmissionsInputSchema)
+  .withOutput(z.array(identityDomainAdmissionSchema))
   .build();

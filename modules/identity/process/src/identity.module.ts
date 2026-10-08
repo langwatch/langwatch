@@ -10,6 +10,7 @@ import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";
+import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import {
   twoStepRequestHeadersFact,
   twoStepVerificationTrpcTransport,
@@ -21,6 +22,7 @@ export const identityProcessModule = defineProcessModule("identity")
   .withTransports(
     identityLookupTrpcTransport,
     identityTrpcTransport,
+    joinRequestTrpcTransport,
     twoStepVerificationTrpcTransport,
   )
   .withTransportFacts(() => [

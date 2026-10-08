@@ -19,7 +19,7 @@ const { state, calls } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../../../../../behavior/organization-api.ts", () => {
+vi.mock("@langwatch/identity-client", () => {
   const recording = (into: unknown[]) => ({
     useMutation: () => ({
       mutate: (input: unknown) => into.push(input),
@@ -30,19 +30,36 @@ vi.mock("../../../../../behavior/organization-api.ts", () => {
   const idle = { useMutation: () => ({ mutate: () => {}, isPending: false, isError: false }) };
   const invalidating = { invalidate: () => {} };
   return {
+    identityClient: {
+      useUtils: () => ({ identity: { joinRequests: { mine: invalidating, offer: invalidating } } }),
+      identity: {
+        joinRequests: {
+          offer: { useQuery: () => ({ data: state.offer, isPending: false }) },
+          mine: { useQuery: () => ({ data: state.mine, isPending: false }) },
+          dismissOffer: idle,
+          request: recording(calls.request),
+          admitAutomatically: recording(calls.admit),
+        },
+      },
+    },
+  };
+});
+
+vi.mock("../../../../../behavior/organization-api.ts", () => {
+  const recording = (into: unknown[]) => ({
+    useMutation: () => ({
+      mutate: (input: unknown) => into.push(input),
+      isPending: false,
+      isError: false,
+    }),
+  });
+  const invalidating = { invalidate: () => {} };
+  return {
     api: {
       useUtils: () => ({
-        joinRequests: { mine: invalidating, offer: invalidating },
         invite: { pendingForMe: invalidating },
         organization: { getAll: invalidating },
       }),
-      joinRequests: {
-        offer: { useQuery: () => ({ data: state.offer, isPending: false }) },
-        mine: { useQuery: () => ({ data: state.mine, isPending: false }) },
-        dismissOffer: idle,
-        request: recording(calls.request),
-        admitAutomatically: recording(calls.admit),
-      },
       invite: {
         pendingForMe: { useQuery: () => state.invitations },
         acceptInvite: recording(calls.accept),

@@ -10,7 +10,6 @@ import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-pr
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
-import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 import {
   organizationKeyFacts,
@@ -30,7 +29,6 @@ export const organizationProcessModule = defineProcessModule("organization")
     inviteTrpcTransport,
     teamTrpcTransport,
     groupTrpcTransport,
-    joinRequestTrpcTransport,
     licenseEnforcementTrpcTransport,
     personalWorkspaceFeaturesTrpcTransport,
     organizationManagementRest,

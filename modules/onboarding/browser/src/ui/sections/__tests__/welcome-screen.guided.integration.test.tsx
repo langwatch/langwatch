@@ -72,6 +72,9 @@ const initializeOrganization =
 const invalidateOrganizations = vi.fn();
 /** What the join lookup answers for the reader's own verified address. */
 let joinLookup: unknown;
+vi.mock("../../../behavior/use-join-lookup.ts", () => ({
+  useJoinLookup: () => ({ data: joinLookup }),
+}));
 vi.mock("../../../behavior/onboarding-api.ts", () => {
   const api = {
     onboarding: {
@@ -79,19 +82,11 @@ vi.mock("../../../behavior/onboarding-api.ts", () => {
         useMutation: () => ({ mutate: initializeOrganization, isPending: false, isSuccess: false }),
       },
     },
-    joinRequests: {
-      lookup: { useQuery: () => ({ data: joinLookup }) },
-      offer: { useQuery: () => ({ data: undefined }) },
-      mine: { useQuery: () => ({ data: undefined }) },
-      request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      dismissOffer: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-    },
     useUtils: () => ({
       organization: {
         getAll: { invalidate: invalidateOrganizations },
         getScopeGraph: { invalidate: vi.fn() },
       },
-      joinRequests: { mine: { invalidate: vi.fn() }, offer: { invalidate: vi.fn() } },
     }),
   };
   return { api, onboardingApi: api };

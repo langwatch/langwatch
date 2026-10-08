@@ -1,6 +1,6 @@
 import type {
   InviteStatus,
-  JoinRequestJoining,
+  OrganizationJoinSetting,
   Organization,
   OrganizationJsonValue,
   OrganizationCurrency,
@@ -41,7 +41,7 @@ export interface MemoryOrganizationRow {
    *  them. Shapeless here for the reason it is shapeless in Postgres. */
   signupData?: Record<string, unknown> | null;
   /** How colleagues on a matching domain get in; absent reads as asking. */
-  domainJoin?: JoinRequestJoining["domainJoin"];
+  domainJoin?: OrganizationJoinSetting["domainJoin"];
   joinDomains?: string[];
   /** The seat a joiner without an invitation lands on (ADR-171); absent reads as MEMBER. */
   joinerRole?: "MEMBER" | "DEVELOPER";
