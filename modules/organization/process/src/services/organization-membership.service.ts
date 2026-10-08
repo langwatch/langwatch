@@ -49,7 +49,7 @@ import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "./organization-member-role.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 import type { OrganizationPromptSeed } from "./organization-prompt-seed.service.ts";
@@ -155,7 +155,7 @@ export class OrganizationMembershipService {
     repository: OrganizationMembershipRepository;
     prompts: OrganizationPromptSeed;
     seats: OrganizationSeatLicense;
-    sessions: OrganizationSessionRevocation;
+    seatNotices: OrganizationSeatRevocationNotice;
     grantCache: OrganizationGrantCache;
     testArrivals: OrganizationTestArrivals;
     admissions: OrganizationAdmissions;
@@ -170,7 +170,7 @@ export class OrganizationMembershipService {
       repository: OrganizationMembershipRepository;
       prompts: OrganizationPromptSeed;
       seats: OrganizationSeatLicense;
-      sessions: OrganizationSessionRevocation;
+      seatNotices: OrganizationSeatRevocationNotice;
       grantCache: OrganizationGrantCache;
       testArrivals: OrganizationTestArrivals;
       admissions: OrganizationAdmissions;

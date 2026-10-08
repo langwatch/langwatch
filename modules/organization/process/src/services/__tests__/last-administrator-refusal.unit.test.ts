@@ -11,7 +11,7 @@ import { MemoryOrganizationMembershipRepository } from "../../repositories/memor
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
@@ -40,7 +40,7 @@ beforeEach(() => {
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
     prompts: createApiFixture<OrganizationPromptSeed>(),
     seats: createApiFixture<OrganizationSeatLicense>(),
-    sessions: createApiFixture<OrganizationSessionRevocation>(),
+    seatNotices: createApiFixture<OrganizationSeatRevocationNotice>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
     ceiling: { assertWithinCaller: async () => {} },

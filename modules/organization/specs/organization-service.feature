@@ -255,3 +255,34 @@ Feature: Shared organization service
     When its first administrator's email is read
     Then the earlier-seated of the two enabled administrators answers
     And an organization with no enabled administrator answers none
+
+  # Organization decides who holds a seat; user owns what a browser session is. Taking a seat is
+  # immediate for authorization, while the live sessions end from organization's fact a few
+  # seconds later (dev/docs/plans/peer-cycle-cuts-2026-10-06.md §7, ruling R7).
+  Rule: Taking a seat refuses the next request at once and records the revocation for user
+
+    @unit
+    Scenario: Disabling a member takes their access away before the call returns
+      Given an active member of an organization
+      When an administrator disables that member
+      Then the membership is written and the organization's cached authorization answers retired before the call returns
+      And no browser session is ended inline
+
+    @unit
+    Scenario: Disabling a member records that their seat was taken away
+      Given an active member of an organization
+      When an administrator disables that member
+      Then the membership is written first
+      And organization records that member as disabled, naming who disabled them
+
+    @unit
+    Scenario: Re-enabling a member records no seat revocation
+      Given a disabled member of an organization
+      When an administrator re-enables that member
+      Then no seat revocation is recorded
+
+    @unit
+    Scenario: A process that cannot record the seat revocation refuses the disable
+      Given a process in which organization's lifecycle pipeline is not registered
+      When an administrator disables a member
+      Then the disable is refused rather than left without its session revocation

@@ -1,6 +1,6 @@
 export type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "./services/organization-member-role.service.ts";
 export type { OrganizationPromptSeed } from "./services/organization-prompt-seed.service.ts";
 export type {

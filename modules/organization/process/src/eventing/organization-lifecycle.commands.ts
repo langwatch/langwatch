@@ -7,6 +7,8 @@ import {
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
@@ -18,11 +20,13 @@ import {
   type MembersInvitedEvent,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
+  type OrganizationMemberDisabledEvent,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type OrganizationTraceSharingDisabledEvent,
   type PersonalWorkspaceProvisionedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
+  RECORD_MEMBER_DISABLED_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
@@ -32,6 +36,8 @@ import {
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
   type RecordInviteAcceptedCommandData,
+  type RecordMemberDisabledCommandData,
+  recordMemberDisabledCommandDataSchema,
   recordInviteAcceptedCommandDataSchema,
   type RecordMembersInvitedCommandData,
   recordMembersInvitedCommandDataSchema,
@@ -278,6 +284,38 @@ export class RecordTraceSharingDisabledCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordTraceSharingDisabledCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a seat taken away, keyed on the member and its moment; user revokes from its side. */
+export class RecordMemberDisabledCommand implements CommandHandler<
+  Command<RecordMemberDisabledCommandData>,
+  OrganizationMemberDisabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_DISABLED_COMMAND_TYPE,
+    recordMemberDisabledCommandDataSchema,
+    "Record that an organization took a member's seat away",
+  );
+
+  handle(command: Command<RecordMemberDisabledCommandData>): OrganizationMemberDisabledEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberDisabledEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:member_disabled:${data.userId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberDisabledCommandData): string {
     return payload.organizationId;
   }
 }

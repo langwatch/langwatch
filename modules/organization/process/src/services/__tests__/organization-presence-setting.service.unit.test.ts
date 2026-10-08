@@ -130,6 +130,7 @@ describe("given two organizations whose presence settings were stored before the
         recordIntegrationMethodChosen: idle,
         recordPersonalWorkspaceProvisioned: idle,
         recordTraceSharingDisabled: idle,
+        recordMemberDisabled: idle,
         recordPresenceSettingChanged: {
           send: async (data) => {
             sent.push(data);

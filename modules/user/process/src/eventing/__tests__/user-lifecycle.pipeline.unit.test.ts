@@ -6,12 +6,14 @@
  * @see modules/user/specs/user.feature
  */
 import { createTenantId } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   USER_DEACTIVATED_EVENT_TYPE,
   USER_LIFECYCLE_PIPELINE_NAME,
   USER_REACTIVATED_EVENT_TYPE,
   USER_REGISTERED_EVENT_TYPE,
 } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -75,7 +77,9 @@ describe("user's lifecycle pipeline", () => {
   });
 
   it("hosts no reaction on its own events", () => {
-    const definition = buildUserLifecyclePipeline();
+    const definition = buildUserLifecyclePipeline({
+      sessions: createApiFixture<UserApi>({}, "UserApi"),
+    });
 
     expect(definition.metadata.name).toBe(USER_LIFECYCLE_PIPELINE_NAME);
     expect(definition.eventSubscribers.size).toBe(0);

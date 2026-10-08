@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Who may create an account here, and who may found an organization, from
  * `SIGN_UP_MODE`, `SIGN_UP_ALLOWED_DOMAINS` and `ADMIN_EMAILS`.
@@ -25,8 +26,10 @@ export interface SignUpPolicySettings {
 interface SignUpPolicyDependencies {
   settings: SignUpPolicySettings;
   repository: SignUpPolicyRepository;
-  /** Whether any account exists, and whether one holds the platform-operator grant. */
-  users: Pick<UserApi, "hasAnyAccount" | "isOperator">;
+  /** Whether any account exists. */
+  users: Pick<UserApi, "hasAnyAccount">;
+  /** Whether an account holds the platform-operator grant: `ops:manage` on the platform. */
+  authorization: Pick<AuthzApi, "can">;
   /** The addresses the caller has proven, read only on an invite-only installation. */
   findProvenAddresses(input: { userId: string }): Promise<readonly string[]>;
 }
@@ -96,7 +99,12 @@ export class SignUpPolicyService {
     if (address && this.adminEmails.includes(address)) {
       return { allowed: true, via: "instance_admin" };
     }
-    if (await this.dependencies.users.isOperator({ userId })) {
+    const operator = await this.dependencies.authorization.can({
+      principal: { type: "user", id: userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
+    if (operator) {
       return { allowed: true, via: "instance_admin" };
     }
     if (!(await this.dependencies.repository.hasAnyOrganization())) {

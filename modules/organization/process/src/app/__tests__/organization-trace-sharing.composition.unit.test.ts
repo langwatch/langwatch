@@ -34,6 +34,7 @@ function lifecycleSenders({
     recordIntegrationMethodChosen: accepts,
     recordPersonalWorkspaceProvisioned: accepts,
     recordPresenceSettingChanged: accepts,
+    recordMemberDisabled: accepts,
     recordTraceSharingDisabled: {
       send: async (data) => {
         if (failing) throw new Error("the event store refused");

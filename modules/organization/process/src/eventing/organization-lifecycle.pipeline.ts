@@ -11,6 +11,7 @@ import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
   RecordMembersInvitedCommand,
+  RecordMemberDisabledCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
@@ -22,6 +23,7 @@ import {
   membersInvitedEventSchema,
   ORGANIZATION_AGGREGATE_TYPE,
   ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
+  organizationMemberDisabledEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
@@ -41,6 +43,7 @@ function lifecycleCommands() {
       personalWorkspaceProvisionedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
+      organizationMemberDisabledEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
@@ -48,7 +51,8 @@ function lifecycleCommands() {
     .withCommand("recordIntegrationMethodChosen", RecordIntegrationMethodChosenCommand)
     .withCommand("recordPersonalWorkspaceProvisioned", RecordPersonalWorkspaceProvisionedCommand)
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
-    .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand);
+    .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
+    .withCommand("recordMemberDisabled", RecordMemberDisabledCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<

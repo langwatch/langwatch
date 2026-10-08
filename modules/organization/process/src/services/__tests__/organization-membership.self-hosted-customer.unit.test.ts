@@ -7,7 +7,7 @@ import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.org
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type { OrganizationPromptSeed } from "../organization-prompt-seed.service.ts";
@@ -28,15 +28,15 @@ function installed() {
     checkLimit: refuse("a seat limit"),
     assertRoleChangeAllowed: refuse("a role change"),
   };
-  const sessions: OrganizationSessionRevocation = {
-    revokeAllBrowserSessions: refuse("a session revocation"),
+  const seatNotices: OrganizationSeatRevocationNotice = {
+    memberDisabled: refuse("a seat revocation record"),
   };
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({
     repository: MemoryOrganizationMembershipRepository.create({ memory }),
     prompts,
     seats,
-    sessions,
+    seatNotices,
     grantCache,
     testArrivals: { standingFor: async () => ({ testing: false }) },
     ceiling: { assertWithinCaller: async () => {} },

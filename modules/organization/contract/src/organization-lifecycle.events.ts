@@ -82,3 +82,16 @@ export const integrationMethodChosenEventDataSchema = z.object({
 export type IntegrationMethodChosenEventData = z.infer<
   typeof integrationMethodChosenEventDataSchema
 >;
+
+export const ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE = "lw.organization.member_disabled" as const;
+export const ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION = "2026-10-08" as const;
+
+/** A seat was taken away; user ends the person's browser sessions on its side (§9, R7). */
+export const organizationMemberDisabledEventDataSchema = z.object({
+  ...envelope,
+  /** Who disabled the seat; absent for an organization key with no member. */
+  disabledByUserId: z.string().min(1).nullish(),
+});
+export type OrganizationMemberDisabledEventData = z.infer<
+  typeof organizationMemberDisabledEventDataSchema
+>;

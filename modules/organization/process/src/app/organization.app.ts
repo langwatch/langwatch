@@ -177,10 +177,7 @@ import { OrganizationJoinRequestsService } from "../services/organization-join-r
 import type { OrganizationJoinRequests } from "../services/organization-join-requests.service.ts";
 import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
 import type { OrganizationLifecycleSenders } from "../services/organization-lifecycle-notice.service.ts";
-import type {
-  OrganizationGrantCache,
-  OrganizationSessionRevocation,
-} from "../services/organization-member-role.service.ts";
+import type { OrganizationGrantCache } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationPromptSeedService } from "../services/organization-prompt-seed.service.ts";
 import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
@@ -378,7 +375,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       repository: membershipRepository,
       prompts: infrastructure.prompts,
       seats: infrastructure.seats,
-      sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
+      seatNotices: infrastructure.lifecycle,
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
       admissions: setup.dependencies.permissions,
       ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
@@ -452,6 +449,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       settings: setup.config.signUp,
       repository: setup.repositories.signUpPolicy,
       users: setup.dependencies.users,
+      authorization: setup.dependencies.permissions,
       // The addresses accepting an invitation takes; an account identity has not resolved yet
       // answers with none, and the caller's session address stands in.
       findProvenAddresses: async ({ userId }) => {
@@ -2100,18 +2098,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   /** The projects that live in one team. */
   listProjectsByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     return this.#dependencies.projects.listByTeam(input);
-  }
-}
-
-class UserApiOrganizationSessionRevocation implements OrganizationSessionRevocation {
-  static create(users: UserApi): UserApiOrganizationSessionRevocation {
-    return new UserApiOrganizationSessionRevocation(users);
-  }
-
-  private constructor(private readonly users: UserApi) {}
-
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    return this.users.revokeAllBrowserSessions(input);
   }
 }
 

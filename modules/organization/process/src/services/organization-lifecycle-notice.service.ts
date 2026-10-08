@@ -8,6 +8,7 @@ import { nowInstant } from "@langwatch/time";
 import type {
   RecordIntegrationMethodChosenCommandData,
   RecordInviteAcceptedCommandData,
+  RecordMemberDisabledCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
   RecordPresenceSettingChangedCommandData,
@@ -26,6 +27,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
   recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
   recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
+  recordMemberDisabled: Sender<RecordMemberDisabledCommandData>;
 }>;
 
 /**
@@ -129,6 +131,15 @@ export class OrganizationLifecycleNoticeService {
     }>,
   ): Promise<void> {
     const sender = this.#senders?.recordTraceSharingDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A seat taken away; awaited and loud, since user ends the sessions only on this record. */
+  async memberDisabled(
+    input: Readonly<{ organizationId: string; userId: string; disabledByUserId: string | null }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordMemberDisabled;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
   }

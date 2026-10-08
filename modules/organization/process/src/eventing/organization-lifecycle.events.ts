@@ -11,6 +11,9 @@ import {
   organizationPresenceSettingChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION,
+  organizationMemberDisabledEventDataSchema,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   organizationTraceSharingDisabledEventDataSchema,
@@ -37,6 +40,8 @@ export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
   "lw.organization.record_presence_setting_changed" as const;
 export const RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE =
   "lw.organization.record_trace_sharing_disabled" as const;
+export const RECORD_MEMBER_DISABLED_COMMAND_TYPE =
+  "lw.organization.record_member_disabled" as const;
 
 /** Somebody finished onboarding by creating this organization. */
 export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
@@ -132,3 +137,15 @@ export const organizationTraceSharingDisabledEventSchema = z.object({
 export type OrganizationTraceSharingDisabledEvent = z.infer<
   typeof organizationTraceSharingDisabledEventSchema
 >;
+
+/** A seat taken away; versioned on its own, like the trace sharing switch. */
+export const recordMemberDisabledCommandDataSchema = organizationMemberDisabledEventDataSchema;
+export type RecordMemberDisabledCommandData = z.infer<typeof recordMemberDisabledCommandDataSchema>;
+
+export const organizationMemberDisabledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_DISABLED_EVENT_VERSION),
+  data: organizationMemberDisabledEventDataSchema,
+});
+export type OrganizationMemberDisabledEvent = z.infer<typeof organizationMemberDisabledEventSchema>;

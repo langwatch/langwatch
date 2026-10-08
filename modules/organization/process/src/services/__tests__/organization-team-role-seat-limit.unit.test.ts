@@ -30,7 +30,7 @@ function serviceWhere(options: {
     }),
     prompts: { seedTagsForOrganization: vi.fn(), reportCompensationFailure: vi.fn() },
     seats: { checkLimit: vi.fn(), assertRoleChangeAllowed },
-    sessions: { revokeAllBrowserSessions: vi.fn() },
+    seatNotices: { memberDisabled: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },
     ceiling: { assertWithinCaller: async () => {} },

@@ -20,7 +20,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import type {
   OrganizationGrantCache,
-  OrganizationSessionRevocation,
+  OrganizationSeatRevocationNotice,
 } from "../services/organization-member-role.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import type { OrganizationPromptSeed } from "../services/organization-prompt-seed.service.ts";
@@ -39,8 +39,8 @@ const seats: OrganizationSeatLicense = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
 };
-const sessions: OrganizationSessionRevocation = {
-  revokeAllBrowserSessions: vi.fn(),
+const seatNotices: OrganizationSeatRevocationNotice = {
+  memberDisabled: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),
@@ -105,7 +105,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         repository: repo,
         prompts: buildFailingPrompts(attempted),
         seats,
-        sessions,
+        seatNotices,
         grantCache,
         testArrivals: { standingFor: async () => ({ testing: false }) as const },
         ceiling: { assertWithinCaller: async () => {} },
@@ -130,7 +130,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         repository: repo,
         prompts: buildWorkingPrompts(),
         seats,
-        sessions,
+        seatNotices,
         grantCache,
         testArrivals: { standingFor: async () => ({ testing: false }) as const },
         ceiling: { assertWithinCaller: async () => {} },

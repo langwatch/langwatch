@@ -24,6 +24,7 @@ function notices(
     recordPersonalWorkspaceProvisioned,
     recordPresenceSettingChanged: idle,
     recordTraceSharingDisabled: idle,
+    recordMemberDisabled: idle,
   });
   return { service, reportError };
 }
@@ -126,6 +127,18 @@ describe("organization's lifecycle notices", () => {
         organizationId: "org_acme",
         projectIds: ["project-1"],
         changedByUserId: "user_admin",
+      }),
+    ).rejects.toThrow("organization_lifecycle is not registered in this process");
+  });
+
+  it("throws, rather than reports, when a member disabled cannot be recorded", async () => {
+    const service = OrganizationLifecycleNoticeService.create({ reportError: vi.fn() });
+
+    await expect(
+      service.memberDisabled({
+        organizationId: "org_acme",
+        userId: "user_member",
+        disabledByUserId: "user_admin",
       }),
     ).rejects.toThrow("organization_lifecycle is not registered in this process");
   });

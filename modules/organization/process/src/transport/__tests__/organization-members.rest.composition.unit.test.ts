@@ -14,11 +14,11 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { organizationModuleSetup } from "../../app/__tests__/support/organization-module-setup.ts";
 import { OrganizationModule } from "../../app/organization.app.ts";
+import type { RecordMemberDisabledCommandData } from "../../eventing/organization-lifecycle.events.ts";
 import {
   organizationKeyFacts,
   organizationManagementRest,
@@ -67,17 +67,9 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
   permissions.invalidateOrganization = async () => {};
   permissions.findRolePermissions = async ({ roleIds }) =>
     roleIds.map((id) => ({ id, name: id, permissions: ["traces:view"] }));
-  const revokedSessions: string[] = [];
+  const disabledMembers: RecordMemberDisabledCommandData[] = [];
   const setup = organizationModuleSetup({
     permissions,
-    users: createApiFixture<UserApi>(
-      {
-        revokeAllBrowserSessions: async ({ userId }) => {
-          revokedSessions.push(userId);
-        },
-      },
-      "UserApi",
-    ),
     entitlement: createApiFixture<EntitlementApi>(
       { getActivePlan: async () => ({ ...roomyPlan, ...plan }), requestBound: async () => 1_000 },
       "EntitlementApi",
@@ -123,6 +115,17 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     },
   });
   const app = await OrganizationModule.create(setup);
+  const accepts = { send: async () => undefined };
+  app.connectLifecycle({
+    recordSignedUp: accepts,
+    recordMembersInvited: accepts,
+    recordInviteAccepted: accepts,
+    recordIntegrationMethodChosen: accepts,
+    recordPersonalWorkspaceProvisioned: accepts,
+    recordPresenceSettingChanged: accepts,
+    recordTraceSharingDisabled: accepts,
+    recordMemberDisabled: { send: async (data) => void disabledMembers.push(data) },
+  });
 
   const runtime = createRestRuntime({
     identity: {
@@ -162,7 +165,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
       }),
     );
 
-  return { app, send, revokedSessions };
+  return { app, send, disabledMembers };
 }
 
 type Refusal = { code: string; status: number };
@@ -202,7 +205,7 @@ describe("given an organization with an administrator and a member", () => {
   describe("when the member is disabled", () => {
     /** @scenario "Disabling a member blocks their access" */
     it("answers 200, reports them disabled and no longer lists the organization to them", async () => {
-      const { app, send, revokedSessions } = await application();
+      const { app, send, disabledMembers } = await application();
       expect(
         (await app.organizationIdsForMember({ userId: MEMBER_ID })).includes(ORGANIZATION_ID),
       ).toBe(true);
@@ -218,7 +221,10 @@ describe("given an organization with an administrator and a member", () => {
       );
 
       expect(disabled.status).toBe(200);
-      expect(revokedSessions).toEqual([MEMBER_ID]);
+      // Access is gone on return; user ends the browser sessions from this record (R7).
+      expect(
+        disabledMembers.map(({ userId, disabledByUserId }) => ({ userId, disabledByUserId })),
+      ).toEqual([{ userId: MEMBER_ID, disabledByUserId: ADMIN_ID }]);
       expect(await disabled.json()).toMatchObject({ userId: MEMBER_ID, disabled: true });
       expect(await fetched.json()).toMatchObject({ userId: MEMBER_ID, disabled: true });
       expect(reachable.map((organization) => organization.id)).not.toContain(ORGANIZATION_ID);

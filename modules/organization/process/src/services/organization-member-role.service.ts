@@ -34,11 +34,15 @@ import type {
 } from "./organization-seat-license.service.ts";
 
 /**
- * The live browser sessions a revoked seat has to lose — not optional decoration, since a
- * seat revoked without the session revoked leaves the person working until the token expires.
+ * Records a seat taken away. User ends the person's browser sessions from that fact (§9, R7);
+ * a disable this cannot record is refused, not half-performed.
  */
-export interface OrganizationSessionRevocation {
-  revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
+export interface OrganizationSeatRevocationNotice {
+  memberDisabled(input: {
+    organizationId: string;
+    userId: string;
+    disabledByUserId: string | null;
+  }): Promise<void>;
 }
 
 /**
@@ -92,7 +96,7 @@ type OrganizationMemberRoleDependencies = {
   repository: OrganizationMembershipRepository;
   prompts: OrganizationPromptSeed;
   seats: OrganizationSeatLicense;
-  sessions: OrganizationSessionRevocation;
+  seatNotices: OrganizationSeatRevocationNotice;
   grantCache: OrganizationGrantCache;
   ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
 };
@@ -139,11 +143,13 @@ export class OrganizationMemberRoleService {
     await this.repo.setMemberDisabled({ organizationId, userId, disabled });
 
     if (disabled) {
-      // Revoking the seat has to revoke the live session too, or the person
-      // keeps working until their token happens to expire. Through the
-      // canonical Auth service: it clears the Better Auth session cache as
-      // well as the rows, which is the half a plain delete misses.
-      await this.dependencies.sessions.revokeAllBrowserSessions({ userId });
+      // The seat is gone and the authz snapshot retired below, so the next request is refused
+      // now; user ends the live browser sessions from this fact (§9, R7).
+      await this.dependencies.seatNotices.memberDisabled({
+        organizationId,
+        userId,
+        disabledByUserId: actingUser?.id ?? null,
+      });
     }
 
     // Disabling is a plain column write, not a grant write, so nothing else
