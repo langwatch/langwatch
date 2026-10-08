@@ -396,7 +396,6 @@ export {
   type OrganizationSsoConnection,
   type SsoConnectionHistoryEntryView,
 } from "./features/sso-connection/sso-connection-history.ts";
-export { type IdentityEmailResolution, IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -731,7 +730,7 @@ export {
  * pipeline name and aggregate type every event stamps. Wire schemas that
  * extend these with the eventing envelope stay in `@langwatch/identity-process`.
  */
-export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events.ts";
+export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./facts.ts";
 export {
   JOIN_REQUEST_AGGREGATE_TYPE,
   JOIN_REQUEST_PIPELINE_NAME,

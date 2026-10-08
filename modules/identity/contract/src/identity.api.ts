@@ -107,11 +107,18 @@ import type {
   SelfServeIssuedDnsRecord,
   SsoDomainReproofOutcome,
 } from "./features/sso-domain/sso-domain-proof.ts";
-import type { IdentityEmailResolution } from "./identity-email.service.ts";
 import type { VerifiedUserDomain } from "./identity-lookup.ts";
 import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
 import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { OrganizationMfaStanding } from "./two-step-verification.ts";
+
+/** The identifier-backed address, or the instruction to keep the legacy `User.email` (ADR-146). */
+export type IdentityEmailResolution = { kind: "resolved"; email: string } | { kind: "keep_legacy" };
+
+/** Portable read capability for the identifier-backed email fork. */
+export abstract class IdentityEmailService {
+  abstract resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution>;
+}
 
 /** One address-lock reaper pass (ADR-116 §6). */
 export interface IdentityNewbornSweepSummary {

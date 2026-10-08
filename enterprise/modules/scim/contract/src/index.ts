@@ -9,10 +9,6 @@ export {
   type ScimTokenAuditEntry,
   type ScimTokenCaller,
 } from "./scim.api.ts";
-export {
-  ProvisioningSetupDrawerToken,
-  type UiProvisioningSetupDrawerProps,
-} from "./scim-drawers.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export * from "./scim-token.rest.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";

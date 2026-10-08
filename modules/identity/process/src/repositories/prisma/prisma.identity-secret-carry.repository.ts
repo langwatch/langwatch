@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
 
 import type { IdentityAccountSecrets } from "../../rules/identity-storage.rules.ts";
 import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
 } from "../../services/identity-secret-carry.service.ts";
-import { toCredentialColumns, toInstant } from "./prisma.account-credential.mapper.ts";
 
 interface LegacyAccountRow {
   id: string;
@@ -32,6 +32,29 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
   }
 
   constructor(private readonly prisma: PrismaClient) {}
+
+  /** A secret as its column stores it: an expiry instant is a `DateTime` column. */
+  static toColumnValue(value: string | Instant | null | undefined): string | Date | null {
+    if (value === null || value === undefined || typeof value === "string") return value ?? null;
+    return toDate(value);
+  }
+
+  /** A stored expiry as the identity branch holds it. */
+  static toInstant(value: Date | null | undefined): Instant | null {
+    return value ? fromDate(value) : null;
+  }
+
+  /** A secret patch as Prisma writes it, naming only the fields the patch names. */
+  static toCredentialColumns(
+    secrets: IdentityAccountSecrets,
+  ): Record<string, string | Date | null> {
+    return Object.fromEntries(
+      Object.entries(secrets).map(([field, value]) => [
+        field,
+        PrismaIdentitySecretCarryRepository.toColumnValue(value),
+      ]),
+    );
+  }
 
   async findAccountSecretPairs({ userId }: { userId: string }): Promise<AccountSecretPair[]> {
     const accounts = (await this.prisma.account.findMany({
@@ -119,7 +142,7 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
           id: accountId,
           userId,
           provider: providerId,
-          ...toCredentialColumns(secrets),
+          ...PrismaIdentitySecretCarryRepository.toCredentialColumns(secrets),
           createdAt: new Date(createdAtMs),
           updatedAt: new Date(updatedAtMs),
         },
@@ -142,7 +165,10 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
       where: { id: accountId },
       // The `Account` row's own `updatedAt` rides along, so the comparison
       // settles at equal and the next pass writes nothing.
-      data: { ...toCredentialColumns(secrets), updatedAt: new Date(updatedAtMs) },
+      data: {
+        ...PrismaIdentitySecretCarryRepository.toCredentialColumns(secrets),
+        updatedAt: new Date(updatedAtMs),
+      },
     });
   }
 
@@ -166,7 +192,7 @@ function secretsOf(account: LegacyAccountRow): IdentityAccountSecrets {
     accessToken: account.access_token,
     refreshToken: account.refresh_token,
     idToken: account.id_token,
-    accessTokenExpiresAt: toInstant(account.expires_at),
+    accessTokenExpiresAt: PrismaIdentitySecretCarryRepository.toInstant(account.expires_at),
     scope: account.scope,
   };
 }
