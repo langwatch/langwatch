@@ -279,7 +279,9 @@ describe("compiler checked process supply", () => {
   });
 
   it("names declared custom members and external supplies", () => {
-    expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingRequirement<"connections">');
+    expect(diagnostics.get("customMissing")?.join("\n")).toContain(
+      'MissingRequirement<"connections">',
+    );
     expect(diagnostics.get("unservedPeerMissing")?.join("\n")).toContain(
       'MissingRequirement<"peer.licensing">',
     );
@@ -292,7 +294,9 @@ describe("compiler checked process supply", () => {
   it("keeps config slices, members and peer gaps at 49 modules", () => {
     expect(diagnostics.get("scale")?.join("\n")).toContain('MissingRequirement<"clock">');
     expect(diagnostics.get("scaleConfig")?.join("\n")).toContain("m48");
-    expect(diagnostics.get("scalePeer")?.join("\n")).toContain('MissingRequirement<"peer.project">');
+    expect(diagnostics.get("scalePeer")?.join("\n")).toContain(
+      'MissingRequirement<"peer.project">',
+    );
   });
 
   it("records the default diagnostic truncation boundary", () => {

@@ -340,8 +340,8 @@ None: this module declares no REST family.
 
 Contract `../contract/src/sso-connection.trpc.ts:31`, router `src/transport/sso-connection.trpc.ts:48`.
 
-| Procedure                             | Kind     | Gate                                                                                                                                                        | Input                                     | Output                              |
-| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------- |
+| Procedure                             | Kind     | Gate                                                                                                                                                  | Input                                     | Output                              |
+| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------- |
 | `ssoConnections.getAll`               | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listSsoConnectionsInputSchema`           | `backofficeSsoConnectionPageSchema` |
 | `ssoConnections.getById`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                              |
 | `ssoConnections.getHistory`           | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                              |

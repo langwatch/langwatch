@@ -6,13 +6,7 @@
   },
   "names": {
     "join-requests:command:?name": {
-      "names": [
-        "requestJoin",
-        "approveJoin",
-        "rejectJoin",
-        "withdrawJoin",
-        "expireJoin"
-      ],
+      "names": ["requestJoin", "approveJoin", "rejectJoin", "withdrawJoin", "expireJoin"],
       "ref": "JOIN_REQUEST_COMMANDS, platform/app/src/server/event-sourcing/pipelines/join-requests/pipeline.ts:61 on main"
     },
     "scim-sync:command:?name": {
@@ -56,21 +50,15 @@
       "ref": "CONNECTION_COMMANDS, platform/app/ee/event-sourcing/pipelines/sso-connections/pipeline.ts:91 on main"
     },
     "log_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentLogFactsDispatch"
-      ],
+      "names": ["codingAgentLogFactsDispatch"],
       "ref": "pipelineRegistry.ts:798-802 on main"
     },
     "metric_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentMetricFactsDispatch"
-      ],
+      "names": ["codingAgentMetricFactsDispatch"],
       "ref": "pipelineRegistry.ts:791-795 on main"
     },
     "trace_processing:subscriber:?subscriber.name": {
-      "names": [
-        "codingAgentSpanFactsDispatch"
-      ],
+      "names": ["codingAgentSpanFactsDispatch"],
       "ref": "pipelineRegistry.ts:820-826, passed at :1673 on main"
     },
     "langy_conversation_processing:subscriber:?subscriber.name": {
@@ -84,57 +72,39 @@
       "ref": "pipelineRegistry.ts:1192-1198 on main; head's list (langy-conversation-runtime.pipeline.ts:217-224) is the same plus langyWebPush, a head-only lane this shared key does not list"
     },
     "global:handler:?orgBillableEventsMeterProjection": {
-      "names": [
-        "orgBillableEventsMeter"
-      ],
+      "names": ["orgBillableEventsMeter"],
       "ref": "orgBillableEventsMeter.mapProjection.ts:32 on main"
     },
     "global:handler:?BillableEventsMeterProjection.create(billableEventsMeter).bu...": {
-      "names": [
-        "orgBillableEventsMeter"
-      ],
+      "names": ["orgBillableEventsMeter"],
       "ref": "BILLABLE_EVENTS_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/billable-events-meter.projection.ts:20"
     },
     "global:handler:entitlement.?": {
-      "names": [
-        "entitlement.usageTraceMeter"
-      ],
+      "names": ["entitlement.usageTraceMeter"],
       "ref": "TRACE_METER_PROJECTION_NAME, modules/entitlement/process/src/eventing/trace-meter.projection.ts:11"
     },
     "gateway_spend_processing:subscriber:pm:?this.options.gatewayDebits.name": {
-      "names": [
-        "pm:gatewayDebits"
-      ],
+      "names": ["pm:gatewayDebits"],
       "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
     },
     "process:gateway_spend_processing:?this.options.gatewayDebits.name": {
-      "names": [
-        "gatewayDebits"
-      ],
+      "names": ["gatewayDebits"],
       "ref": "modules/gateway/process/src/app/gateway.app.ts:1422"
     },
     "simulation_processing:subscriber:pm:?deps.scenarioRunExecution.name": {
-      "names": [
-        "pm:simulation_run_execution"
-      ],
+      "names": ["pm:simulation_run_execution"],
       "ref": "modules/scenario/process/src/eventing/simulation-processing-runtime.pipeline.ts:172"
     },
     "process:simulation_processing:?deps.scenarioRunExecution.name": {
-      "names": [
-        "simulation_run_execution"
-      ],
+      "names": ["simulation_run_execution"],
       "ref": "simulation-processing-runtime.pipeline.ts:172"
     },
     "simulation_processing:subscriber:pm:?deps.scenarioEvaluations.name": {
-      "names": [
-        "pm:scenario_evaluations"
-      ],
+      "names": ["pm:scenario_evaluations"],
       "ref": "simulation-processing-runtime.pipeline.ts:180"
     },
     "process:simulation_processing:?deps.scenarioEvaluations.name": {
-      "names": [
-        "scenario_evaluations"
-      ],
+      "names": ["scenario_evaluations"],
       "ref": "simulation-processing-runtime.pipeline.ts:180"
     }
   },
