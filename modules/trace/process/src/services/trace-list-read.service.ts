@@ -1,4 +1,4 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluationApi, EvaluationSummary } from "@langwatch/evaluation-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -173,6 +173,28 @@ export class TraceListService {
     );
   }
 
+  /** Teases evaluation error text on the traces the window teases, as their own error is. */
+  static #gateEvaluations(
+    evaluations: Record<string, EvaluationSummary[]>,
+    items: TraceListItem[],
+    visibilityCutoffMs: number | null | undefined,
+  ): Record<string, EvaluationSummary[]> {
+    if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
+      return evaluations;
+    }
+
+    const gated = { ...evaluations };
+    for (const item of items) {
+      const summaries = gated[item.traceId];
+      if (item.timestamp >= visibilityCutoffMs || !summaries) continue;
+      gated[item.traceId] = summaries.map((summary) => ({
+        ...summary,
+        error: summary.error ? teaserOf(summary.error) : summary.error,
+      }));
+    }
+    return gated;
+  }
+
   static #teaseItem(item: TraceListItem): TraceListItem {
     return {
       ...item,
@@ -222,7 +244,7 @@ export class TraceListService {
     return {
       items: gatedItems,
       totalHits: result.totalHits,
-      evaluations,
+      evaluations: TraceListService.#gateEvaluations(evaluations, items, params.visibilityCutoffMs),
       nextCursor:
         hasMore && visibleRows.length > 0
           ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)

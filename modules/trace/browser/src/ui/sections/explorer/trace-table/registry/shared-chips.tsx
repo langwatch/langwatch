@@ -226,6 +226,17 @@ export const EvalChip: React.FC<{
                   {display.statusLabel}
                 </Text>
               </HStack>
+              {eval_.status === "error" && eval_.error && (
+                <Text
+                  data-testid="eval-chip-error-text"
+                  textStyle="2xs"
+                  color="fg.muted"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
+                  {eval_.error}
+                </Text>
+              )}
               {onViewDefinition && (
                 <chakra.button
                   type="button"

@@ -12,6 +12,7 @@ import {
 } from "@langwatch/evaluation-contract";
 
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
+import { summaryErrorTextOf } from "../../rules/evaluation-summary-error.rules.ts";
 import {
   EvaluationRunRepository,
   type EvaluationRunFloorLookup,
@@ -84,6 +85,7 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
           score: run.score,
           passed: run.passed,
           label: run.label,
+          error: summaryErrorTextOf({ status: run.status, error: run.error }),
         }),
       );
     }

@@ -13,6 +13,10 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
+import {
+  SUMMARY_ERROR_TEXT_READ_CHARS,
+  summaryErrorTextOf,
+} from "../../rules/evaluation-summary-error.rules.ts";
 import type {
   EvaluationRunFloorLookup,
   EvaluationRetentionLookup,
@@ -231,7 +235,8 @@ export class EvaluationRunClickHouseReadRepository {
       const result = await client.query({
         query: `
           SELECT EvaluationId, EvaluatorId, EvaluatorType, EvaluatorName,
-            TraceId, IsGuardrail, Status, Score, Passed, Label
+            TraceId, IsGuardrail, Status, Score, Passed, Label,
+            substringUTF8(Error, 1, {errorReadChars:UInt32}) AS SummaryError
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND ScheduledAt >= fromUnixTimestamp64Milli({since:Int64})
@@ -250,11 +255,15 @@ export class EvaluationRunClickHouseReadRepository {
           tenantId: input.tenantId,
           traceIds: input.traceIds,
           since: input.since,
+          errorReadChars: SUMMARY_ERROR_TEXT_READ_CHARS,
         },
         format: "JSONEachRow",
       });
       const output: Record<string, EvaluationSummary[]> = {};
-      for (const row of await result.json<ClickHouseEvaluationRunRecord>()) {
+      const rows = await result.json<
+        ClickHouseEvaluationRunRecord & { SummaryError: string | null }
+      >();
+      for (const row of rows) {
         if (!row.TraceId) continue;
         const summary = evaluationSummarySchema.parse({
           evaluationId: row.EvaluationId,
@@ -267,6 +276,7 @@ export class EvaluationRunClickHouseReadRepository {
           score: row.Score,
           passed: row.Passed === null ? null : Boolean(row.Passed),
           label: row.Label,
+          error: summaryErrorTextOf({ status: row.Status, error: row.SummaryError }),
         });
         (output[row.TraceId] ??= []).push(summary);
       }

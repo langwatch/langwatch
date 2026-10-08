@@ -24,6 +24,7 @@ export function mapTraceListPayload(data: TraceListPayload | undefined): TraceLi
       score: e.score,
       passed: e.passed,
       label: e.label,
+      error: e.error,
     })),
     events: item.events ?? NO_TRACE_EVENTS,
   }));

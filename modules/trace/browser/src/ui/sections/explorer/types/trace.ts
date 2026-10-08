@@ -33,6 +33,8 @@ export interface TraceEvalResult {
   score: number | null;
   passed: boolean | null;
   label: string | null;
+  /** The errored run's error text, trimmed and cut short; absent on preview rows. */
+  error?: string | null;
 }
 
 /**

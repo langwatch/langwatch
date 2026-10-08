@@ -38,4 +38,5 @@ export const evaluationSummarySchema = evaluationRunDataSchema.pick({
   score: true,
   passed: true,
   label: true,
+  error: true,
 });
