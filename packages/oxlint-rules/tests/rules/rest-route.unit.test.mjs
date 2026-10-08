@@ -226,7 +226,7 @@ describe("given a route answering through withRawResponse", () => {
 });
 
 describe("given a declared route whose handler builds its own answer", () => {
-  const declared = (handler) =>
+  const declaredRoute = (handler) =>
     route(
       '.get("/agents", "listAgents")',
       '.withPermission("agents:view")',
@@ -244,7 +244,7 @@ describe("given a declared route whose handler builds its own answer", () => {
     [".handle(() => { throw new HTTPException(400); });", "new", "new HTTPException(...)"],
     [".handle(() => { return { status: 404, body: {} }; });", "{ status", "{ status: 404 }"],
   ])("reports manualAnswer for %s", (handler, builder, symbol) => {
-    const found = report(declared(handler));
+    const found = report(declaredRoute(handler));
 
     const column = "  ".length + handler.indexOf(builder);
     expect(where(found)).toEqual([{ messageId: "manualAnswer", line: 6, column }]);
@@ -255,7 +255,7 @@ describe("given a declared route whose handler builds its own answer", () => {
   it("reports a refusal status held in a const", () => {
     const found = report(
       "const NOT_FOUND = 404;\n" +
-        declared('.handle(() => ({ status: NOT_FOUND, body: { message: "gone" } }));'),
+        declaredRoute('.handle(() => ({ status: NOT_FOUND, body: { message: "gone" } }));'),
     );
 
     expect(where(found)).toEqual([{ messageId: "manualAnswer", line: 7, column: 17 }]);

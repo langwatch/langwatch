@@ -98,10 +98,10 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/upgrade/tsconfig.build.json"
+      "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/trace/contract/tsconfig.build.json"
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/instant-eval-judge/process/tsconfig.build.json"

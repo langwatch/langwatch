@@ -108,7 +108,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
 | Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals     | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
 | `migration-order` CI check, `migration-owners` policy                      | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
-| `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration-steps.ts`)                     |
+| `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration/migration-steps.ts`)           |
 | The upgrade task running declared blocking steps                           | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
 | The worker running background steps after the serving roster allows it     | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
 | `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/ledger.ts`, `packages/eventing/specs/event-upcast.feature`)                       |

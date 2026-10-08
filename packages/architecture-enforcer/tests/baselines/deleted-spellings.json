@@ -3,7 +3,6 @@
   "findings": {
     "`*-composition.build.ts` files": 1,
     "absence classes (`Logged*Absence`, `Absent*`)": 1,
-    "declared(\"<name>\")": 1,
     "per-module `use-feature-flag.ts` copies": 1
   }
 }
