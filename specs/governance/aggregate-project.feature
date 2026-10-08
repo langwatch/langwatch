@@ -404,6 +404,15 @@ Feature: An aggregate project reads its member projects
     And on an ordinary project the same request still creates the lens and saves it
 
   @integration
+  Scenario: An AI search asking for a lens on the aggregate is told it is read only
+    Given an aggregate project
+    When ana asks the AI search for something it answers with a new lens
+    Then the search still applies its query to the trace list
+    And no lens is created and the search stays open
+    And it shows the read-only refusal, titled "Data can't be added to this project"
+    And on an ordinary project the same answer creates the lens and closes the search
+
+  @integration
   Scenario: A lens the server refuses to save says so and leaves no phantom
     Given any project whose server refuses to save, rename or delete a lens
     When ana makes that change in the trace list
