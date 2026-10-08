@@ -1859,6 +1859,12 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
 lint names any drain older than one release; a fresh install plans upcast steps by their mode (Alex,
 2026-10-06, rounds 15 and 16).
+A living pipeline that hands a lane to another module declares `.withRetiredLanes([{ jobName,
+drainsInto: { pipeline, lane } }])`: jobs a previous release queued under the retired key drain
+into the lane that took it over (its own or a peer lane) for one release, and a name it still
+declares is refused at build (round 16, `packages/eventing/specs/lane-handover.feature`).
+`defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
+fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline, arming

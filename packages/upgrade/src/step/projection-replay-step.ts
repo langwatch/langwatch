@@ -29,20 +29,23 @@ export interface LaneReplayer {
 
 /**
  * A background data step that fills a projection lane (local or peer) from its owner's log at
- * deploy. Level-triggered by event cursor: a run resumes from the last cursor it completed, so a
- * second run with nothing new changes nothing. Spec: specs/upgrade/projection-replay-step.feature.
+ * deploy from `since` (default: the start), resuming from the last cursor it completed. Specs:
+ * specs/upgrade/projection-replay-step.feature and packages/upgrade/specs (its `since` scenarios).
  */
 export function defineProjectionReplayStep({
   id,
   description,
   lane,
   replayer,
+  since = PROJECTION_REPLAY_FROM_START,
   needsOldWritersGone,
 }: {
   id: string;
   description: string;
   lane: string;
   replayer: LaneReplayer;
+  /** The instant a first run replays from: aggregates with an event since then refold whole. */
+  since?: string;
   needsOldWritersGone?: boolean;
 }): MigrationStep {
   return defineMigrationStep({
@@ -52,8 +55,8 @@ export function defineProjectionReplayStep({
     description,
     ...(needsOldWritersGone === undefined ? {} : { needsOldWritersGone }),
     run: async ({ checkpoint, dryRun, signal }) => {
-      const since = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane });
-      if (signal.aborted) return { lane, replayedThrough: since };
+      const cursor = resumeCursor({ resumeFrom: checkpoint.resumeFrom, lane, since });
+      if (signal.aborted) return { lane, replayedThrough: cursor };
       let saving: Promise<void> = Promise.resolve();
       const onBatchComplete = ({
         batchNum,
@@ -64,11 +67,11 @@ export function defineProjectionReplayStep({
       }) => {
         // Saving renews the lease; the cursor stays the last completed one until the run ends.
         if (dryRun) return;
-        const report = { lane, replayedThrough: since, batchesDone: batchNum, totalBatches };
+        const report = { lane, replayedThrough: cursor, batchesDone: batchNum, totalBatches };
         saving = saving.then(() => checkpoint.save({ report }));
       };
       try {
-        const result = await replayer.replayLane({ lane, since, dryRun, onBatchComplete });
+        const result = await replayer.replayLane({ lane, since: cursor, dryRun, onBatchComplete });
         await saving;
         return { ...result };
       } catch (error) {
@@ -79,15 +82,17 @@ export function defineProjectionReplayStep({
   });
 }
 
-/** The cursor this lane last completed through, or the start of the log. */
+/** The cursor this lane last completed through, or the step's first-run instant. */
 function resumeCursor({
   resumeFrom,
   lane,
+  since,
 }: {
   resumeFrom: MigrationStepReport | null;
   lane: string;
+  since: string;
 }): string {
   const cursor = resumeFrom?.replayedThrough;
-  if (resumeFrom?.lane !== lane || typeof cursor !== "string") return PROJECTION_REPLAY_FROM_START;
+  if (resumeFrom?.lane !== lane || typeof cursor !== "string") return since;
   return cursor;
 }

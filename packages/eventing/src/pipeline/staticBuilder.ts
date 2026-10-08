@@ -61,6 +61,7 @@ import {
   EventUpcaster,
   type UpcastDeclaration,
 } from "../upcast/eventUpcast.ts";
+import { assertRetiredLanesDeclarable, type RetiredLane } from "../upcast/retiredLane.ts";
 import { buildProcessManager, type ProcessManagerApplier } from "./processBuilder.ts";
 import type {
   ProcessManagerDefinition,
@@ -122,6 +123,7 @@ export class PipelineBuilder<
   private prepareEventForProjection?: (event: EventType) => EventType;
   private retentionPolicyResolver?: RetentionPolicyResolver;
   private upcastDeclaration?: UpcastDeclaration;
+  private retiredLanes: readonly RetiredLane[] = [];
   private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
@@ -164,6 +166,16 @@ export class PipelineBuilder<
       events: declaration.events,
     });
     this.upcastDeclaration = declaration;
+    return this;
+  }
+
+  /**
+   * Lanes this living pipeline retired at a handover, each draining the jobs a previous release
+   * queued under it into the lane that took it over in another pipeline (round 16). For one
+   * release. Spec: specs/lane-handover.feature.
+   */
+  withRetiredLanes(retiredLanes: readonly RetiredLane[]): this {
+    this.retiredLanes = retiredLanes;
     return this;
   }
 
@@ -670,6 +682,16 @@ export class PipelineBuilder<
       })),
     };
 
+    assertRetiredLanesDeclarable({
+      pipeline: this.name,
+      laneNames: new Set([
+        ...this.foldProjections.keys(),
+        ...this.mapProjections.keys(),
+        ...this.stateProjections.keys(),
+        ...this.eventSubscribers.keys(),
+      ]),
+      retiredLanes: this.retiredLanes,
+    });
     const upcasts = this.upcastDeclaration && {
       pipeline: this.name,
       aggregateType: aggregate.type,
@@ -684,6 +706,7 @@ export class PipelineBuilder<
         ? (value: unknown) => parseEvent(upcaster.applyToPayload(value))
         : parseEvent,
       ...(upcasts === undefined ? {} : { upcasts }),
+      ...(this.retiredLanes.length === 0 ? {} : { retiredLanes: this.retiredLanes }),
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       ...(this.retentionPolicyResolver === undefined
