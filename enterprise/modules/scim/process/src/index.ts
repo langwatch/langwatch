@@ -10,10 +10,3 @@ export { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.t
 export { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 export { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
 export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
-
-export type {
-  ScimSyncLifecycle,
-  ScimRemovalOperation,
-  ScimUserPushOperation,
-} from "./services/scim-sync-lifecycle.service.ts";
-export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";

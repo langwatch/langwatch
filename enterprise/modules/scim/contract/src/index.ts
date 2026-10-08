@@ -1,9 +1,7 @@
 export * from "./scim.contract.ts";
+export { scimConfig, scimSecrets, type ScimServerConfig } from "./scim.config.ts";
 export {
   ScimApi,
-  scimConfig,
-  scimSecrets,
-  type ScimServerConfig,
   type ScimDeliveryReceipt,
   type ScimDirectoryScope,
   type ScimTokenAuditEntry,
