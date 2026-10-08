@@ -106,3 +106,18 @@ Feature: Release manifests order every migration step release by release
     And an image built from a commit, not a release, declaring steps no manifest names
     When the image plans its upgrade
     Then the plan holds exactly one virtual release carrying those steps
+
+  # Preview to a target (upgrade-ui plan 6.1.2, U6; Q-U3 ruled: the preview runs from the target
+  # image's CLI, so this image never fetches another release's manifests).
+  @unit
+  Scenario: A preview to a target release stops at that release
+    Given an installation recorded at 3.20.1 and an image of 3.23.0
+    When the upgrade is previewed to 3.22.0
+    Then the plan holds 3.21.0 and 3.22.0 in that order and nothing later
+
+  @unit
+  Scenario: A preview to a release this image does not ship prints the command that previews from the target image
+    Given an image of 3.23.0
+    When the upgrade is previewed to 3.24.0
+    Then the preview is refused with the code "target_not_in_image"
+    And the refusal names "pnpm task upgrade plan --to 3.24.0" run from the 3.24.0 image

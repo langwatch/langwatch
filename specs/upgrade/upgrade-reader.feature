@@ -247,3 +247,16 @@ Feature: The upgrade reader answers the installation state and the ledger's rows
     Given a status whose counts include "quarantined"
     When it is formatted
     Then the text contains "quarantined"
+
+  # Preflight (upgrade-ui plan 6.1.3, U6): rows in the checkup's verdict shape, read from the status.
+  @unit
+  Scenario: The preflight refuses an installation below the floor, a failed step and a live lease, naming each fix
+    Given a status below the floor, with a failed step and a lease held
+    When the preflight is read
+    Then the floor, failed-step and lease rows are refused, each with a fix
+
+  @unit
+  Scenario: The preflight of a current installation is verified except the backup, which is always unchecked
+    Given the status of an up-to-date installation
+    When the preflight is read
+    Then every row is verified but the backup row, which is unchecked and names the upgrade docs

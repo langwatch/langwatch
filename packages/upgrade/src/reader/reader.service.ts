@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { UpgradePostgres } from "../ports.ts";
 import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
+import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
 import {
   type LedgerLeaseRow,
   type LedgerRunRow,
@@ -311,7 +312,12 @@ export function createUpgradeReader({
     };
   }
 
-  return { status, listReleases, listSteps, getStep, listRuns, getRun };
+  /** The preflight an upgrade's preview shows, in the checkup's verdict shape (plan 6.1.3). */
+  async function preflight(): Promise<UpgradePreflightRow[]> {
+    return preflightFrom({ status: await status() });
+  }
+
+  return { status, listReleases, listSteps, getStep, listRuns, getRun, preflight };
 }
 
 export type UpgradeReader = ReturnType<typeof createUpgradeReader>;

@@ -89,6 +89,24 @@ describe("the upgrade subcommands", () => {
     expect(printed).toMatchObject({ installed: null, plan: { outcome: "planned", fresh: true } });
   });
 
+  /** @scenario "upgrade plan --to names the release to preview, and nothing else takes it" */
+  it("parses plan --to <release> and refuses --to without a release or on status", () => {
+    expect(parseUpgradeArgs({ args: ["plan", "--to", "3.22.0", "--json"] })).toEqual({
+      command: "plan",
+      json: true,
+      to: "3.22.0",
+    });
+    expect(() => parseUpgradeArgs({ args: ["plan", "--to"] })).toThrow(
+      expect.objectContaining({ code: "unknown_upgrade_argument", argument: "--to" }),
+    );
+    expect(() => parseUpgradeArgs({ args: ["plan", "--to", "latest"] })).toThrow(
+      expect.objectContaining({ code: "unknown_upgrade_argument", argument: "--to latest" }),
+    );
+    expect(() => parseUpgradeArgs({ args: ["status", "--to", "3.22.0"] })).toThrow(
+      expect.objectContaining({ code: "unknown_upgrade_argument", argument: "--to" }),
+    );
+  });
+
   /** @scenario "The upgrade task runs the code steps every installed module declares" */
   it("plans the installed modules' declared steps and closes the process that built them", async () => {
     const step = defineMigrationStep({

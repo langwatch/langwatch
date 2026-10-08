@@ -21,8 +21,9 @@ import {
   loadReleases,
   type ManifestStep,
   type ReleaseManifest,
+  releaseVersionSchema,
 } from "@langwatch/upgrade/manifest";
-import { formatStatus } from "@langwatch/upgrade/reader";
+import { formatStatus, preflightFrom, previewUpgradeTo } from "@langwatch/upgrade/reader";
 import {
   createUpgradeRunner,
   formatPlan,
@@ -54,7 +55,8 @@ const isPreRosterCommand = (argument: string): argument is PreRosterCommand =>
 
 export type UpgradeCommand =
   | { command: "run" }
-  | { command: "status" | "plan"; json: boolean }
+  | { command: "status"; json: boolean }
+  | { command: "plan"; json: boolean; to?: string }
   | { command: PreRosterCommand };
 
 /** An argument `upgrade` does not take; `code` is what a caller branches on. */
@@ -62,7 +64,7 @@ export class UpgradeArgumentError extends Error {
   readonly code = "unknown_upgrade_argument";
   constructor(readonly argument: string) {
     super(
-      `upgrade takes no "${argument}". Use: upgrade | upgrade status [--json] | upgrade plan [--json]` +
+      `upgrade takes no "${argument}". Use: upgrade | upgrade status [--json] | upgrade plan [--to <release>] [--json]` +
         " | upgrade steps [--json] [--out <file>] | upgrade old-writers-gone | upgrade pre-roster-rollback",
     );
     this.name = "UpgradeArgumentError";
@@ -77,9 +79,16 @@ export function parseUpgradeArgs({ args }: { args: readonly string[] }): Upgrade
     return { command: first };
   }
   if (first !== "status" && first !== "plan") throw new UpgradeArgumentError(first);
-  const unknown = rest.find((argument) => argument !== "--json");
+  const toAt = first === "plan" ? rest.indexOf("--to") : -1;
+  const to = toAt === -1 ? undefined : rest[toAt + 1];
+  if (toAt !== -1 && !releaseVersionSchema.validate(to))
+    throw new UpgradeArgumentError(`--to ${to ?? ""}`.trim());
+  const flags = toAt === -1 ? rest : rest.toSpliced(toAt, 2);
+  const unknown = flags.find((argument) => argument !== "--json");
   if (unknown !== undefined) throw new UpgradeArgumentError(unknown);
-  return { command: first, json: rest.includes("--json") };
+  const json = flags.includes("--json");
+  if (first === "status") return { command: first, json };
+  return to === undefined ? { command: first, json } : { command: first, json, to };
 }
 
 /** The migration session's URL with `lock_timeout` added to any session options already there. */
@@ -582,9 +591,9 @@ export function codeStepOf(step: MigrationStep): ManifestStep {
 }
 
 /**
- * `pnpm task upgrade [status | plan] [--json]` (specs/upgrade/upgrade-command.feature). Exit codes:
- * 0 done, 1 failed, 2 refused below the floor, 3 lease not acquired. The installed modules'
- * code steps are booted first and handed to the runner.
+ * `pnpm task upgrade [status | plan [--to <release>]] [--json]`
+ * (specs/upgrade/upgrade-command.feature). Exit codes: 0 done, 1 failed, 2 refused below the
+ * floor, 3 lease not acquired. The installed modules' code steps are booted first.
  */
 export async function runUpgradeCommand({
   args,
@@ -690,8 +699,7 @@ async function runWithCodeSteps({
       return 0;
     }
     if (command.command === "plan") {
-      const planned = await runner.plan();
-      write(`${command.json ? JSON.stringify(planned, null, 2) : formatPlan(planned)}\n`);
+      await printPlan({ command, runner, image: { release: newest }, write });
       return 0;
     }
     const outcome = await runner.run({ signal: input.signal });
@@ -701,6 +709,53 @@ async function runWithCodeSteps({
   } finally {
     await shared?.close();
   }
+}
+
+/** `upgrade plan` prints the plan; with `--to`, the plan narrowed to it and the preflight. */
+async function printPlan({
+  command,
+  runner,
+  image,
+  write,
+}: {
+  command: Extract<UpgradeCommand, { command: "plan" }>;
+  runner: Pick<ReturnType<typeof createUpgradeRunner>, "plan" | "status">;
+  image: { release: string | null };
+  write: (text: string) => void;
+}): Promise<void> {
+  const planned = await runner.plan();
+  if (command.to === undefined) {
+    write(`${command.json ? JSON.stringify(planned, null, 2) : formatPlan(planned)}\n`);
+    return;
+  }
+  const preview = {
+    installed: planned.installed,
+    plan: previewUpgradeTo({ plan: planned.plan, image, to: command.to }),
+    preflight: preflightFrom({ status: await runner.status() }),
+  };
+  write(`${command.json ? JSON.stringify(preview, null, 2) : formatPreview(preview)}\n`);
+}
+
+/** `upgrade plan --to` as text: the narrowed plan, then one line per preflight row. */
+export function formatPreview({
+  installed,
+  plan,
+  preflight,
+}: {
+  installed: string | null;
+  plan: ReturnType<typeof previewUpgradeTo>;
+  preflight: ReturnType<typeof preflightFrom>;
+}): string {
+  const head =
+    plan.outcome === "refused"
+      ? `Refused (${plan.code}): ${plan.message}`
+      : formatPlan({ installed, plan });
+  const rows = preflight.map((row) =>
+    [`  ${row.outcome}: ${row.name}`, row.detail, row.fix && `fix: ${row.fix}`]
+      .filter(Boolean)
+      .join("; "),
+  );
+  return [head, "Preflight:", ...rows].join("\n");
 }
 
 /** The registry's `upgrade` task: runs the upgrade and leaves its exit code for the process. */

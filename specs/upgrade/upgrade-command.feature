@@ -192,6 +192,12 @@ Feature: The upgrade command
     And the plan subcommand prints the plan as JSON when asked
     And an unknown subcommand is refused by name
 
+  @unit
+  Scenario: upgrade plan --to names the release to preview, and nothing else takes it
+    When "upgrade plan --to 3.22.0" is parsed
+    Then the plan subcommand previews to 3.22.0
+    And "--to" without a release, and "upgrade status --to 3.22.0", are refused by name
+
   # Writers before the roster (Round 47 E2; ADR-173, amendment 2026-10-08): the deploy, or the
   # chart's opt-in post-upgrade hook once the rollout finished, asserts them gone; a rollback to an
   # image before the roster is recorded by hand, from the new image, before rolling forward again.
