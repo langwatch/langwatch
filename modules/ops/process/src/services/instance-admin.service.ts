@@ -1,3 +1,4 @@
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
@@ -18,9 +19,13 @@ const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "d
 /** User writes that would skip the user module's facts and last-operator rule. */
 const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
+/** Auth's account doors: each writes through user, then ends the credentials it outdates. */
+export type InstanceAdminAccounts = Pick<AuthApi, "deactivateUser" | "changeUserEmail">;
+
 interface InstanceAdminServiceOptions {
   repository: InstanceAdminRepository;
   users: UserApi;
+  accounts: InstanceAdminAccounts;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -48,17 +53,20 @@ type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
 export class InstanceAdminService {
   private readonly repository: InstanceAdminRepository;
   private readonly users: UserApi;
+  private readonly accounts: InstanceAdminAccounts;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
 
   private constructor(deps: {
     repository: InstanceAdminRepository;
     users: UserApi;
+    accounts: InstanceAdminAccounts;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
   }) {
     this.repository = deps.repository;
     this.users = deps.users;
+    this.accounts = deps.accounts;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
   }
@@ -67,6 +75,7 @@ export class InstanceAdminService {
     return new InstanceAdminService({
       repository: options.repository,
       users: options.users,
+      accounts: options.accounts,
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
     });
@@ -139,9 +148,9 @@ export class InstanceAdminService {
     if (savesFields) await this.auditMutation(saved);
 
     if (lifecycle === "reactivate") await this.users.reactivate({ id: userId, actor });
-    if (lifecycle === "deactivate") await this.users.deactivate({ id: userId, actor });
-    // user signs the account out of every browser on a real change.
-    if (email !== null) await this.users.updateProfile({ id: userId, email });
+    if (lifecycle === "deactivate") await this.accounts.deactivateUser({ id: userId, actor });
+    // auth signs the account out of every browser on a real change.
+    if (email !== null) await this.accounts.changeUserEmail({ id: userId, email });
 
     return savesFields ? this.repository.execute(saved) : this.repository.findUserById(userId);
   }

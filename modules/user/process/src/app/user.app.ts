@@ -64,6 +64,7 @@ import type {
   UserNotificationPreference,
   UserNotificationTopicInput,
   SetUserNotificationPreferenceInput,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
   UserUsageCount,
   UserAvatarRestParams,
@@ -240,11 +241,7 @@ export class UserModule implements UserApi {
       users: UserService.create({
         repository: repositories.users,
         organizations: dependencies.organizations,
-        auth: {
-          revokeAllBrowserSessions: (input) => dependencies.auth.revokeAllBrowserSessions(input),
-          revokeCliTokens: (input) => dependencies.auth.revokeCliTokens(input),
-          getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input),
-        },
+        auth: { getSsoSetupStatus: (input) => channels.authReads.getSsoSetupStatus(input) },
         avatarStorage: avatarObjects,
         credentialIssuer: CREDENTIAL_ISSUER,
         now,
@@ -336,6 +333,10 @@ export class UserModule implements UserApi {
 
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     return this.#users.updateProfile(input);
+  }
+
+  updateEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
+    return this.#users.updateEmail(input);
   }
 
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
@@ -757,34 +758,18 @@ export class UserModule implements UserApi {
     return this.#lifecycle.record(intent);
   }
 
-  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
+  /** Retires an account in one write that refuses the last active operator; records no fact. */
   deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.deactivate(input);
+  }
+
+  recordDeactivated(input: UserLifecycleChangeInput): Promise<void> {
+    return this.#users.recordDeactivated(input);
   }
 
   /** Restores a retired account. */
   reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.reactivate(input);
-  }
-
-  /** Self-service or an operator's call; `deactivate` ends every credential family. */
-  async deactivateAccount({
-    userId,
-    caller,
-  }: {
-    userId: string;
-    caller: UserCaller;
-  }): Promise<void> {
-    // Retiring someone else may revoke an operator, so it is never done while impersonating.
-    const isOthers = userId !== caller.id;
-    if (
-      isOthers &&
-      (caller.impersonated || !(await this.isOperator({ userId: caller.operatorId })))
-    ) {
-      throw new UserAccountAccessDeniedError();
-    }
-
-    await this.#users.deactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
   /** An operator's call alone, never while impersonating: it can restore an operator's grant. */

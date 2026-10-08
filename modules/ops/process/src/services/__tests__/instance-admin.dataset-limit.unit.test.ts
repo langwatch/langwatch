@@ -44,7 +44,15 @@ function organizationEdit(data: Record<string, unknown>): AdminOperationInput {
 async function instanceAdmin() {
   const repository = MemoryInstanceAdminRepository.create({ store: MemoryOpsStore.create() });
   const audit = new RecordingAudit();
-  const service = InstanceAdminService.create({ repository, users: new TestUserApi(), audit });
+  const service = InstanceAdminService.create({
+    repository,
+    users: new TestUserApi(),
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail: () => Promise.reject(new Error("unreached")),
+    },
+    audit,
+  });
   await repository.execute({
     resource: "organization",
     method: "create",

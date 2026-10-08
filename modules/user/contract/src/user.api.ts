@@ -39,6 +39,7 @@ import type {
   SetFirstUserPasswordResult,
   SetUserAvatarInput,
   SetUserHomePathInput,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserAvatarResult,
@@ -69,7 +70,10 @@ export interface UserUsageCount {
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {
   findById(input: { id: string }): Promise<UserProfile | null>;
+  /** Changes the name only; an address change is `updateEmail`, behind auth's door. */
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  /** Writes a normalized address and nothing else; auth's door ends the sessions after it. */
+  updateEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
   personalCallerFor(input: {
     project: { isPersonal: boolean; ownerUserId: string | null };
     callerUserId: string | undefined;
@@ -144,11 +148,11 @@ export interface UserApi {
   }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
-  /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
+  /** Retires an account, never the last active operator, in one write; records no fact. */
   deactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
+  /** Records a written retirement as user's fact, at the instant the database stamped. */
+  recordDeactivated(input: UserLifecycleChangeInput): Promise<void>;
   reactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
-  /** Retires an account and ends every credential family that outlives it. */
-  deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   /** Restores a retired account. Operators only. */
   reactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult>;

@@ -1,18 +1,12 @@
 Feature: Canonical user lifecycle
 
+  # Deactivation's door, its revokes and their order are auth's (D-A1U-5 revised):
+  # modules/auth/specs/account-lifecycle.feature. User writes the row and records the fact.
   @unit
-  Scenario: Deactivating a user invalidates every session family
-    When the User service deactivates an active user, by self-service or through the user operation an operator calls
-    Then the user is marked deactivated
-    And browser sessions are revoked
-    And CLI tokens are revoked
-
-  @unit
-  Scenario: Deactivation ends access even when user's fact cannot be sent
-    Given user's lifecycle fact cannot be sent
+  Scenario: Deactivation writes the account and records no fact
     When the User service deactivates an active user
-    Then the request fails
-    And browser sessions and CLI tokens were already revoked
+    Then the user is marked deactivated
+    And no deactivation fact is recorded until the deactivation is recorded on its own
 
   @unit
   Scenario: A user's lifecycle fact carries the time the database recorded
@@ -51,21 +45,21 @@ Feature: Canonical user lifecycle
     And an operator is deactivated while another active operator remains
 
   @unit
-  Scenario: An impersonated session cannot deactivate another account or reactivate any
+  Scenario: An impersonated session cannot reactivate any account
     Given a platform operator impersonating a customer
-    When they deactivate another account, or reactivate a deactivated one
+    When they reactivate a deactivated account
     Then it is refused with code forbidden and the account is unchanged
 
   @unit
   Scenario: Deactivation and reactivation are recorded as user's facts
-    When the User service deactivates and then reactivates an account
+    When the User service deactivates an account, records the deactivation, and then reactivates it
     Then each change is recorded on user's pipeline as "lw.user.deactivated" and "lw.user.reactivated"
     And each fact is keyed by the user and its instant, so a redelivery records nothing new
 
   @unit
   Scenario: A user's lifecycle fact records who made the change
     Given a platform operator
-    When they deactivate or reactivate an account, directly or while impersonating its owner
+    When an account's deactivation is recorded with them as the actor, and they reactivate it
     Then each fact carries the operator as its actor, in the grants ledger's shape
     And a fact recorded before actors existed still reads, with no actor
 
@@ -133,10 +127,11 @@ Feature: Canonical user lifecycle
     Then it reports how many accounts it would record, records no fact and saves no checkpoint
 
   @unit
-  Scenario: Changing an email refreshes authenticated identity
-    When an authorized transport changes a user's normalized email through the User service
-    Then the profile is updated
-    And browser sessions are revoked
+  Scenario: Changing an email stores the normalized address
+    When auth's door changes a user's email through the User service
+    Then the profile holds the trimmed, lower-cased address
+    And an unknown account is refused with code user_not_found
+    And the sessions the old address outlives are auth's to end (modules/auth/specs/account-lifecycle.feature)
 
   @unit
   Scenario: Uploading an avatar uses the personal workspace

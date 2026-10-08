@@ -4,6 +4,12 @@ import type {
   SignedInWith,
 } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/module";
+import type {
+  UpdateUserEmailInput,
+  UserCaller,
+  UserLifecycleChangeInput,
+  UserProfile,
+} from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type {
@@ -199,6 +205,16 @@ export interface AuthApi {
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
+
+  /**
+   * Retires an account: user's write refuses the last active operator, then every browser
+   * session and CLI token ends, then user records the fact. A refused write ends nothing.
+   */
+  deactivateUser(input: UserLifecycleChangeInput): Promise<UserProfile>;
+  /** The same retirement, for oneself or by a platform operator who is not impersonating. */
+  deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
+  /** Writes the address through user, then ends every session that cached the old one. */
+  changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
 
   /** Whether this attempt is inside the budget the door asked for, and how
    *  long to wait when it is not — the refusal's words name the seconds. */

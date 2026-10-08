@@ -15,7 +15,6 @@ import {
   userNotificationChoiceSchema,
   type AdoptUnconfirmedAccountOutcome,
   type CreateUserInput,
-  type UpdateUserProfileInput,
   type UserAccountInfo,
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
@@ -37,6 +36,7 @@ import type {
   UserCreatedRow,
   UserDeactivationOutcome,
   UserRepository,
+  StoredProfileChange,
 } from "../user.repository.ts";
 import { PrismaUserLifecycleOutboxStore } from "./prisma.user-lifecycle-outbox.store.ts";
 
@@ -399,7 +399,7 @@ export class PrismaUserRepository
     });
   }
 
-  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+  async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
     const data: { name?: string; email?: string } = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;

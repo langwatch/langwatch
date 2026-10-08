@@ -15,6 +15,10 @@ import {
 function buildInstanceAdmin(connectionDecides: boolean) {
   const repository = new RepositoryStub();
   const service = InstanceAdminService.create({
+    accounts: {
+      deactivateUser: () => Promise.reject(new Error("unreached")),
+      changeUserEmail: () => Promise.reject(new Error("unreached")),
+    },
     repository,
     users: new TestUserApi(),
     audit: new AuditStub(),

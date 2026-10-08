@@ -7,6 +7,7 @@ import type {
   CreatedUser,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
+  UpdateUserEmailInput,
   UpdateUserProfileInput,
   UserAccountInfo,
   UserFullProfile,
@@ -55,6 +56,10 @@ export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
  * created fact (and a self-registration its registered fact) to the fact outbox with the row.
  */
+/** A name change, an address change, or both, as the two `UserApi` writes ask for them. */
+export type StoredProfileChange = UpdateUserProfileInput &
+  Partial<Pick<UpdateUserEmailInput, "email">>;
+
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
@@ -74,7 +79,7 @@ export interface UserRepository {
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
   findJoinOfferDismissedDomains(id: string): Promise<string[]>;
   addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void>;
-  updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
+  updateProfile(input: StoredProfileChange): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference>;

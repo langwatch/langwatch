@@ -165,10 +165,14 @@ export const updateUserProfileInputSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().optional(),
-    email: userEmailSchema.optional(),
   })
   .strict();
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileInputSchema>;
+
+export const updateUserEmailInputSchema = z
+  .object({ id: z.string().min(1), email: userEmailSchema })
+  .strict();
+export type UpdateUserEmailInput = z.infer<typeof updateUserEmailInputSchema>;
 
 export const userAccountInfoSchema = z.object({ createdAt: z.date() }).strict();
 export type UserAccountInfo = z.infer<typeof userAccountInfoSchema>;

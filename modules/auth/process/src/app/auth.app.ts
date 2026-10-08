@@ -71,7 +71,13 @@ import {
   signInProviderSecrets,
 } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
+import {
+  UserApi,
+  type UpdateUserEmailInput,
+  type UserCaller,
+  type UserLifecycleChangeInput,
+  type UserProfile,
+} from "@langwatch/user-contract";
 
 import type { AuthChannels } from "../channels/auth.channels.ts";
 import { auth0PasswordChannels } from "../channels/auth0-password-channels.registry.ts";
@@ -93,6 +99,7 @@ import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { buildSignUpVerificationUrl } from "../rules/signup-verification-link.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
+import { AccountLifecycleService } from "../services/account-lifecycle.service.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
@@ -160,6 +167,11 @@ type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
+  /** The account writes auth's lifecycle doors run before ending credentials. */
+  users: Pick<
+    UserApi,
+    "findById" | "updateEmail" | "deactivate" | "recordDeactivated" | "isOperator"
+  >;
 }>;
 
 type AuthSetup = FeatureSetup<
@@ -241,6 +253,8 @@ export class AuthModule implements AuthApiContract {
   readonly #twoStep: TwoStepVerificationService;
   /** Where a session and a domain auto-join are recorded as auth's events. */
   readonly #lifecycle: AuthLifecycleNoticeService;
+  /** The account writes that end credentials: deactivation and an address change. */
+  readonly #accounts: AccountLifecycleService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
   /** The Auth0 tenant's password change; set once the provider secrets resolve. */
@@ -367,6 +381,13 @@ export class AuthModule implements AuthApiContract {
       reportError: (error) =>
         logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
     });
+    this.#accounts = AccountLifecycleService.create({
+      users: dependencies.users,
+      credentials: {
+        revokeAllBrowserSessions: (input) => this.revokeAllBrowserSessions(input),
+        revokeCliTokens: (input) => this.revokeCliTokens(input),
+      },
+    });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
@@ -465,6 +486,7 @@ export class AuthModule implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
+        users: dependencies.users,
       },
       legacySsoAccess: LegacySsoAccessService.create({
         accounts: accountRows,
@@ -928,6 +950,18 @@ export class AuthModule implements AuthApiContract {
 
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
     return this.#sessions.revokeOtherBrowserSessions(input);
+  }
+
+  deactivateUser(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    return this.#accounts.deactivate(input);
+  }
+
+  deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void> {
+    return this.#accounts.deactivateAsCaller(input);
+  }
+
+  changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile> {
+    return this.#accounts.changeEmail(input);
   }
 
   /** Meters through the counter every process supplies, the same one the token

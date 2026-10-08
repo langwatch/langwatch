@@ -25,6 +25,7 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

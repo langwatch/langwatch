@@ -12,7 +12,7 @@ exports[`InstanceAdminService user update > changes the email through user 1`] =
       },
     ],
     [
-      "users.updateProfile",
+      "accounts.changeUserEmail",
       "user-1",
       "new@example.com",
     ],
@@ -67,7 +67,7 @@ exports[`InstanceAdminService user update > combines every side effect 1`] = `
       },
     ],
     [
-      "users.updateProfile",
+      "accounts.changeUserEmail",
       "user-1",
       "a@b.c",
     ],
@@ -101,7 +101,7 @@ exports[`InstanceAdminService user update > deactivates on an unreadable picked 
       },
     ],
     [
-      "users.deactivate",
+      "accounts.deactivateUser",
       "user-1",
       {
         "id": "olive",
@@ -133,7 +133,7 @@ exports[`InstanceAdminService user update > deactivates through user, as the ope
       },
     ],
     [
-      "users.deactivate",
+      "accounts.deactivateUser",
       "user-1",
       {
         "id": "olive",
@@ -165,7 +165,7 @@ exports[`InstanceAdminService user update > normalises the email before handing 
       },
     ],
     [
-      "users.updateProfile",
+      "accounts.changeUserEmail",
       "user-1",
       "same@example.com",
     ],

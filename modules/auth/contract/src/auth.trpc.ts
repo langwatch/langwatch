@@ -5,6 +5,7 @@ import { routingDecisionSchema } from "@langwatch/identity-contract";
  * screens have always called.
  */
 import { defineTrpcContract } from "@langwatch/module";
+import { userApiSuccessSchema, userApiUserInputSchema } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import {
@@ -63,4 +64,9 @@ export const authTrpc = defineTrpcContract("auth")
   .query("priorSession")
   .withInput(z.void())
   .withOutput(priorSessionSchema)
+
+  /** Retires the named account: oneself, or anybody for a platform operator not impersonating. */
+  .mutation("deactivate")
+  .withInput(userApiUserInputSchema)
+  .withOutput(userApiSuccessSchema)
   .build();

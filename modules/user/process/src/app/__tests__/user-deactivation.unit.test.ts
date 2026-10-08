@@ -1,8 +1,8 @@
 /**
  * @vitest-environment node
- * Deactivation is three writes, not one: stopping at the durable flag would
- * leave a live session and a live command-line token belonging to somebody the
- * product says is gone. What this pins is that all three happen, in order, on every door.
+ * User's half of deactivation: one write that refuses the last active operator, and the fact
+ * recorded on its own. Auth runs the door and the revokes between the two
+ * (modules/auth/specs/account-lifecycle.feature).
  */
 import {
   UserAccountAccessDeniedError,
@@ -11,15 +11,14 @@ import {
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import {
   createUserTestApp,
-  createUserTestAuth,
   createUserTestAuthorization,
   createUserTestLifecycle,
 } from "./user.fixture.ts";
 
 const SELF = { id: "user_1", email: "person@example.test" };
+const SYSTEM = { type: "system", id: null } as const;
 
 async function account(app: ReturnType<typeof createUserTestApp>) {
   return app.createCredentialUser({
@@ -30,77 +29,32 @@ async function account(app: ReturnType<typeof createUserTestApp>) {
 }
 
 describe("user.deactivate", () => {
-  describe("given an active user deactivating themselves", () => {
-    /** @scenario "Deactivating a user invalidates every session family" */
-    it("marks them deactivated, then revokes browser sessions, then revokes CLI tokens", async () => {
-      const reached: string[] = [];
-      const auth = createUserTestAuth();
-      auth.revokeAllBrowserSessions.mockImplementation(async () => {
-        reached.push("revokeAllBrowserSessions");
-      });
-      auth.revokeCliTokens.mockImplementation(async () => {
-        reached.push("revokeCliTokensForUser");
-        return { revokedCount: 0 };
-      });
-      const app = createUserTestApp({ dependencies: { auth } });
+  describe("given an active user", () => {
+    /** @scenario "Deactivation writes the account and records no fact" */
+    it("marks them deactivated and records the fact only when asked, at the stored instant", async () => {
+      const { senders, recorded } = createUserTestLifecycle();
+      const app = createUserTestApp({ lifecycle: senders });
       const created = await account(app);
+      recorded.length = 0;
 
-      await app.deactivateAccount({
+      const written = await app.deactivate({ id: created.id, actor: SYSTEM });
+
+      expect(written.deactivatedAt).toEqual(expect.any(Date));
+      expect(recorded).toEqual([]);
+
+      await app.recordDeactivated({ id: created.id, actor: SYSTEM });
+
+      expect(recorded.map(({ type }) => type)).toEqual(["deactivated"]);
+      expect(recorded[0]?.data).toMatchObject({
         userId: created.id,
-        caller: { id: created.id, operatorId: created.id, impersonated: false },
-      });
-
-      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
-        deactivatedAt: expect.any(Date),
-      });
-      expect(reached).toEqual(["revokeAllBrowserSessions", "revokeCliTokensForUser"]);
-    });
-  });
-
-  describe("given somebody else's account and a caller who is no operator", () => {
-    it("refuses, and writes nothing", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-      const created = await account(app);
-
-      await expect(
-        app.deactivateAccount({
-          userId: created.id,
-          caller: { id: "someone-else", operatorId: "someone-else", impersonated: false },
-        }),
-      ).rejects.toBeInstanceOf(UserAccountAccessDeniedError);
-      expect(auth.revokeAllBrowserSessions).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("given somebody else's account and an operator", () => {
-    it("deactivates it, because the platform-operator grant is the standing", async () => {
-      const operators = new Set<string>();
-      const app = createUserTestApp({
-        dependencies: { authz: createUserTestAuthorization(operators) },
-      });
-      const created = await account(app);
-      const operator = await app.createCredentialUser({
-        name: "Op",
-        email: "op@example.test",
-        passwordHash: "hashed:first",
-      });
-      operators.add(operator.id);
-
-      await app.deactivateAccount({
-        userId: created.id,
-        caller: { id: operator.id, operatorId: operator.id, impersonated: false },
-      });
-
-      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
-        deactivatedAt: expect.any(Date),
+        occurredAt: written.deactivatedAt?.getTime(),
       });
     });
   });
 
   describe("given a platform operator impersonating a customer", () => {
-    /** @scenario "An impersonated session cannot deactivate another account or reactivate any" */
-    it("refuses deactivating another account and reactivating one, and changes neither", async () => {
+    /** @scenario "An impersonated session cannot reactivate any account" */
+    it("refuses reactivating an account, and leaves it deactivated", async () => {
       const operators = new Set<string>();
       const app = createUserTestApp({
         dependencies: { authz: createUserTestAuthorization(operators) },
@@ -111,27 +65,18 @@ describe("user.deactivate", () => {
         email: "op@example.test",
         passwordHash: "hashed:first",
       });
-      const other = await app.createCredentialUser({
-        name: "B",
-        email: "b@example.test",
-        passwordHash: "hashed:first",
-      });
       const gone = await app.createCredentialUser({
         name: "C",
         email: "c@example.test",
         passwordHash: "hashed:first",
       });
       operators.add(op.id);
-      await app.deactivate({ id: gone.id, actor: { type: "system", id: null } });
+      await app.deactivate({ id: gone.id, actor: SYSTEM });
       const caller = { id: customer.id, operatorId: op.id, impersonated: true };
 
-      await expect(app.deactivateAccount({ userId: other.id, caller })).rejects.toBeInstanceOf(
-        UserAccountAccessDeniedError,
-      );
       await expect(app.reactivateAccount({ userId: gone.id, caller })).rejects.toBeInstanceOf(
         UserAccountAccessDeniedError,
       );
-      await expect(app.findById({ id: other.id })).resolves.toMatchObject({ deactivatedAt: null });
       await expect(app.findById({ id: gone.id })).resolves.toMatchObject({
         deactivatedAt: expect.any(Date),
       });
@@ -210,48 +155,6 @@ describe("user.deactivate", () => {
     });
   });
 
-  describe("given an operator deactivates someone through the user operation", () => {
-    /** @scenario "Deactivating a user invalidates every session family" */
-    it("ends their browser sessions and CLI tokens on that door too", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-      const created = await account(app);
-
-      await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
-
-      expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
-      expect(auth.revokeCliTokens).toHaveBeenCalledWith({ userId: created.id });
-    });
-
-    /** @scenario "Deactivation ends access even when user's fact cannot be sent" */
-    it("has ended their sessions and CLI tokens before the fact fails", async () => {
-      const auth = createUserTestAuth();
-      const failing: UserLifecycleSenders = {
-        recordUserDeactivated: {
-          send: async () => {
-            throw new Error("event store unavailable");
-          },
-        },
-        recordUserReactivated: { send: async () => undefined },
-        recordUserRegistered: { send: async () => undefined },
-        recordUserCreated: { send: async () => undefined },
-        recordUserErased: { send: async () => undefined },
-      };
-      const app = createUserTestApp({
-        dependencies: { auth },
-        lifecycle: failing,
-      });
-      const created = await account(app);
-
-      await expect(
-        app.deactivate({ id: created.id, actor: { type: "system", id: null } }),
-      ).rejects.toThrow("event store unavailable");
-
-      expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
-      expect(auth.revokeCliTokens).toHaveBeenCalledWith({ userId: created.id });
-    });
-  });
-
   describe("given an account is deactivated and then reactivated", () => {
     /** @scenario "Deactivation and reactivation are recorded as user's facts" */
     it("records each change as user's fact, keyed to the account", async () => {
@@ -260,15 +163,16 @@ describe("user.deactivate", () => {
       const created = await account(app);
       recorded.length = 0;
 
-      await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
-      await app.reactivate({ id: created.id, actor: { type: "system", id: null } });
+      await app.deactivate({ id: created.id, actor: SYSTEM });
+      await app.recordDeactivated({ id: created.id, actor: SYSTEM });
+      await app.reactivate({ id: created.id, actor: SYSTEM });
 
       expect(recorded.map(({ type }) => type)).toEqual(["deactivated", "reactivated"]);
       expect(recorded[0]?.data).toMatchObject({ tenantId: created.id, userId: created.id });
     });
   });
 
-  describe("given an operator changes accounts, directly or while impersonating", () => {
+  describe("given an operator changes accounts", () => {
     /** @scenario "A user's lifecycle fact records who made the change" */
     it("records the operator as the actor, and an older fact without one still reads", async () => {
       const operators = new Set<string>();
@@ -285,20 +189,16 @@ describe("user.deactivate", () => {
       });
       operators.add(op.id);
       recorded.length = 0;
-      const direct = { id: op.id, operatorId: op.id, impersonated: false };
+      const byOperator = { type: "user", id: op.id } as const;
 
-      await app.deactivateAccount({ userId: customer.id, caller: direct });
-      await app.reactivateAccount({ userId: customer.id, caller: direct });
-      await app.deactivateAccount({
+      await app.deactivate({ id: customer.id, actor: byOperator });
+      await app.recordDeactivated({ id: customer.id, actor: byOperator });
+      await app.reactivateAccount({
         userId: customer.id,
-        caller: { id: customer.id, operatorId: op.id, impersonated: true },
+        caller: { id: op.id, operatorId: op.id, impersonated: false },
       });
 
-      expect(recorded.map(({ data }) => data.actor)).toEqual([
-        { type: "user", id: op.id },
-        { type: "user", id: op.id },
-        { type: "user", id: op.id },
-      ]);
+      expect(recorded.map(({ data }) => data.actor)).toEqual([byOperator, byOperator]);
       expect(
         userLifecycleEventDataSchema.parse({ tenantId: "u", userId: "u", occurredAt: 1 }),
       ).not.toHaveProperty("actor");

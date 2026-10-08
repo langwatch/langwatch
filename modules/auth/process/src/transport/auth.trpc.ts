@@ -8,9 +8,11 @@ import {
   callerAddressFact,
   defineTrpcFact,
   defineTrpcRouter,
+  type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { AuthApi, authTrpc, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
+import type { UserCaller } from "@langwatch/user-contract";
 import { z } from "zod";
 
 /**
@@ -74,6 +76,9 @@ const OWN_SESSION_COOKIE = publicRoute({
 
 const OWN_ADDRESS_STATE =
   "reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable";
+
+const SELF_OR_OPERATOR =
+  "self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant";
 
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
@@ -208,7 +213,26 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
   .withFacts(authRequestHeadersFact)
   .withAccess(OWN_SESSION_COOKIE)
   .handle(({ app }, headers) => app.getPriorSession({ headers }))
+
+  /** Moved from `user.deactivate` with its wire (D-A1U-5): the application decides standing. */
+  .procedure("deactivate")
+  .noPermission({ reason: SELF_OR_OPERATOR })
+  .handle(async ({ app, actor, input }) => {
+    await app.deactivateAccount({ userId: input.userId, caller: callerOf(actor) });
+
+    return { success: true as const };
+  })
   .build();
+
+/**
+ * Who is asking: the outer id is the subject, `operatorId` whose standing applies. They differ
+ * only while a platform operator browses as somebody.
+ */
+function callerOf(actor: TrpcHandlerActor): UserCaller {
+  const operatorId = (actor.type === "user" ? actor.impersonatorId : undefined) ?? actor.id;
+
+  return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
+}
 
 /**
  * One attempt against the counter keyed on the caller's address. `"unknown"`
