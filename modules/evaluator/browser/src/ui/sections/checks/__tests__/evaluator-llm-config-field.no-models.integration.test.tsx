@@ -8,12 +8,14 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
-import { cleanup, screen } from "@testing-library/react";
+import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
+import { cleanup, screen, within } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   flagReleased: false,
+  flagLoading: false,
   optedIn: false,
   providers: [] as unknown[],
 }));
@@ -29,7 +31,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: (name: string) => ({
     enabled: name === INSTANT_EVALS_FLAG && state.flagReleased,
-    isLoading: false,
+    isLoading: state.flagLoading,
   }),
 }));
 
@@ -54,7 +56,7 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
 }));
 
 vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
-  LLMModelDisplay: () => <span>model display</span>,
+  LLMModelDisplay: ({ model }: { model: string }) => <span>model display {model}</span>,
 }));
 
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
@@ -73,14 +75,15 @@ const CONFIGURED_PROVIDER = { provider: "openai", enabled: true, customModels: n
 
 beforeEach(() => {
   state.flagReleased = false;
+  state.flagLoading = false;
   state.optedIn = false;
   state.providers = [];
 });
 afterEach(() => cleanup());
 
-function renderField() {
+function renderField({ model }: { model?: string } = {}) {
   const Harness = () => {
-    const methods = useForm({ defaultValues: { settings: {} } });
+    const methods = useForm({ defaultValues: { settings: model ? { model } : {} } });
     return (
       <FormProvider {...methods}>
         <EvaluatorLLMConfigField prefix="settings" />
@@ -91,7 +94,8 @@ function renderField() {
 }
 
 function offersInstantEvals(): boolean {
-  return screen.queryByText("Instant Evals") !== null;
+  const options = screen.queryByLabelText("model options");
+  return options !== null && within(options).queryByText("Instant Evals") !== null;
 }
 
 describe("EvaluatorLLMConfigField", () => {
@@ -133,6 +137,39 @@ describe("EvaluatorLLMConfigField", () => {
         expect(offersInstantEvals()).toBe(false);
       });
     });
+
+    describe("when a judge saved on Instant Evals opens and Instant Evals is not released", () => {
+      /** @scenario "A judge saved on Instant Evals reads by its name when not released" */
+      it("reads Instant Evals, not enabled, and the picker does not offer it", () => {
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        expect(screen.queryByText("Instant Evals")).not.toBeNull();
+        expect(screen.queryByText(/not enabled for this project/i)).not.toBeNull();
+        expect(screen.queryByText(INSTANT_EVAL_JUDGE_MODEL_ID, { exact: false })).toBeNull();
+        expect(screen.queryByText(/update needed/i)).toBeNull();
+        expect(offersInstantEvals()).toBe(false);
+      });
+    });
+
+    describe("when a judge saved on Instant Evals opens before release is known", () => {
+      it("waits rather than flash not enabled", () => {
+        state.flagLoading = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        expect(screen.queryByText(/not enabled for this project/i)).toBeNull();
+        expect(screen.queryByText(/model display/)).toBeNull();
+      });
+    });
+
+    describe("when a judge saved on Instant Evals opens and Instant Evals is released", () => {
+      it("hands the model to the lent display", () => {
+        state.flagReleased = true;
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        expect(screen.queryByText(/not enabled for this project/i)).toBeNull();
+        expect(screen.queryByText(`model display ${INSTANT_EVAL_JUDGE_MODEL_ID}`)).not.toBeNull();
+      });
+    });
   });
 
   describe("given a project with no model provider", () => {
@@ -141,7 +178,17 @@ describe("EvaluatorLLMConfigField", () => {
         renderField();
 
         expect(screen.queryByText(/No models configured/i)).not.toBeNull();
-        expect(screen.queryByText("model display")).toBeNull();
+        expect(screen.queryByText(/model display/)).toBeNull();
+      });
+
+      /** @scenario "A judge saved on Instant Evals in a project with no model provider reads by its name when not released" */
+      it("reads Instant Evals, not enabled, and says no models are configured", () => {
+        renderField({ model: INSTANT_EVAL_JUDGE_MODEL_ID });
+
+        expect(screen.queryByText("Instant Evals")).not.toBeNull();
+        expect(screen.queryByText(/not enabled for this project/i)).not.toBeNull();
+        expect(screen.queryByText(/No models configured/i)).not.toBeNull();
+        expect(screen.queryByText(INSTANT_EVAL_JUDGE_MODEL_ID, { exact: false })).toBeNull();
       });
     });
 

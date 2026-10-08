@@ -1,7 +1,8 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
-import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
+import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import { allModelOptions } from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
@@ -10,7 +11,10 @@ import { useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
 import { LLMConfigPopover } from "../../../behavior/lent-peers.tsx";
-import { useInstantEvalJudgeModels } from "../../../behavior/use-instant-eval-judge-models.ts";
+import {
+  INSTANT_EVALS_BUILT_IN_MODEL,
+  useInstantEvalJudgeModels,
+} from "../../../behavior/use-instant-eval-judge-models.ts";
 import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import { toInternalKey } from "../prompt/llm-parameters/parameter-config.ts";
 
@@ -32,6 +36,20 @@ export const LLM_CONFIG_KEYS = [
   "reasoning",
   "verbosity",
 ] as const;
+
+/** A judge saved on Instant Evals where it is not released reads by its name, not as a broken id. */
+function InstantEvalsNotEnabled() {
+  return (
+    <VStack gap={0} align="start">
+      <Text fontSize="14px" fontFamily="mono" color="fg.muted">
+        {INSTANT_EVALS_BUILT_IN_MODEL.label}
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        Not enabled for this project
+      </Text>
+    </VStack>
+  );
+}
 
 /**
  * Bridges react-hook-form's flat structure with LLMConfigPopover's
@@ -95,11 +113,20 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     mode: "chat",
     builtInModels,
   });
-  if (isLoading || (isEmpty && instantEvals.isLoading)) {
+  const isInstantEvalsSaved = llmConfig.model === INSTANT_EVAL_JUDGE_MODEL_ID;
+  if (isLoading || (instantEvals.isLoading && (isEmpty || isInstantEvalsSaved))) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }
+  const isInstantEvalsNotEnabled = isInstantEvalsSaved && !instantEvals.released;
   if (isEmpty) {
-    return <NoModelsConfiguredCallout size="sm" />;
+    return isInstantEvalsNotEnabled ? (
+      <VStack width="full" align="stretch" gap={2}>
+        <InstantEvalsNotEnabled />
+        <NoModelsConfiguredCallout size="sm" />
+      </VStack>
+    ) : (
+      <NoModelsConfiguredCallout size="sm" />
+    );
   }
 
   return (
@@ -117,7 +144,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
+          {isInstantEvalsNotEnabled ? (
+            <InstantEvalsNotEnabled />
+          ) : (
+            <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
+          )}
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>

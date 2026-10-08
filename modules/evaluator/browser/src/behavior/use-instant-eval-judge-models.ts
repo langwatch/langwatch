@@ -25,7 +25,7 @@ export function useInstantEvalJudgeModels({
 }: {
   projectId: string | undefined;
   organizationId: string | undefined;
-}): { builtInModels: readonly BuiltInModel[]; isLoading: boolean } {
+}): { builtInModels: readonly BuiltInModel[]; released: boolean; isLoading: boolean } {
   const flag = useFeatureFlag(INSTANT_EVALS_FLAG, {
     projectId,
     organizationId,
@@ -39,6 +39,7 @@ export function useInstantEvalJudgeModels({
 
   return {
     builtInModels: released ? RELEASED : NONE,
+    released,
     isLoading: !released && (flag.isLoading || access.isLoading),
   };
 }
