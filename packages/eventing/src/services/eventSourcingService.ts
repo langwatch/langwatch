@@ -22,7 +22,7 @@ import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues/
 import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type {
-  EventSourcingOptions,
+  EventOrderingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types.ts";
 import {
@@ -55,7 +55,7 @@ export class EventSourcingService<
   private readonly aggregateType: AggregateType;
   private readonly allowedEventTypes: ReadonlySet<string>;
   private readonly eventStore: EventStore<EventType>;
-  private readonly options: EventSourcingOptions<EventType>;
+  private readonly options: EventOrderingOptions<EventType>;
   private readonly queueManager: QueueManager<EventType>;
   private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly globalRegistry?: ProjectionRegistry<Event>;
