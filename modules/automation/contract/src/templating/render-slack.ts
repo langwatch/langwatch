@@ -1,3 +1,4 @@
+import type { SlackTemplateType } from "../providers/slack.ts";
 import { testFireSlackBlock, testFireSlackText } from "./banner.ts";
 import { filterBlockKit } from "./block-kit-allowlist.ts";
 import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE, DEFAULT_SLACK_TEMPLATE } from "./defaults.ts";
@@ -18,8 +19,6 @@ export interface SlackRenderDefaults {
   slackString: string;
   slackBlockKit: string;
 }
-
-export type SlackTemplateType = "string" | "block_kit";
 
 /** The `templateType` a Slack send renders with: the author's pick when there is one, else
  *  Block Kit over a bot connection and plain text over a webhook (ADR-041). */
