@@ -131,7 +131,7 @@ export class MemoryGatewayBudgetChangeDedupeRepository extends GatewayBudgetChan
 }
 
 /** No cache tier in memory: the durable store is already as fast as a cache. */
-export class MemoryGatewaySpendFoldCacheRepository implements GatewaySpendFoldCacheRepository {
+class MemoryGatewaySpendFoldCacheRepository implements GatewaySpendFoldCacheRepository {
   static create(): MemoryGatewaySpendFoldCacheRepository {
     return new MemoryGatewaySpendFoldCacheRepository();
   }

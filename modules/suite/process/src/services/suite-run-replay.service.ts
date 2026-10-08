@@ -19,7 +19,7 @@ type SuiteRunItemSenders = Pick<
 const NOT_STARTED_STATUSES: readonly string[] = ["QUEUED", "PENDING"];
 
 /** What one pass did across the open suite runs; the ledger keeps it. */
-export type SuiteRunReplayReport = {
+type SuiteRunReplayReport = {
   openRuns: number;
   behindRuns: number;
   startsSent: number;

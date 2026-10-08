@@ -22,7 +22,7 @@ import type {
 } from "../repositories/authz-read.repository.ts";
 import { liveBindings } from "../rules/grant-expiry.rules.ts";
 
-export type AuthzCollectorOptions = {
+type AuthzCollectorOptions = {
   reader: AuthzReadRepository;
   /** Where scope refs read lineage from; omitted = the reader, read afresh every time. */
   lineage?: Pick<ScopeLineageRepository, "findProjectLineage" | "findTeamOrganization">;

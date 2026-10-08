@@ -5,7 +5,7 @@ import type { SlackWebhookClientChannel } from "../slack/slack.webhook-client.ch
 type SlackApiRequest = Parameters<SlackApiTransport["request"]>[0];
 
 /** Records each Web API call and answers with Slack's `ok`. */
-export class MemorySlackApiTransportChannel implements SlackApiTransport {
+class MemorySlackApiTransportChannel implements SlackApiTransport {
   static create(): MemorySlackApiTransportChannel {
     return new MemorySlackApiTransportChannel();
   }
@@ -23,7 +23,7 @@ export class MemorySlackApiTransportChannel implements SlackApiTransport {
 type SlackWebhookSend = Parameters<SlackWebhookClientChannel["send"]>[0];
 
 /** Records each incoming-webhook send instead of reaching Slack. */
-export class MemorySlackWebhookClientChannel implements Pick<SlackWebhookClientChannel, "send"> {
+class MemorySlackWebhookClientChannel implements Pick<SlackWebhookClientChannel, "send"> {
   static create(): MemorySlackWebhookClientChannel {
     return new MemorySlackWebhookClientChannel();
   }

@@ -25,7 +25,7 @@ import {
 } from "../rules/rum-ingest.rules.ts";
 
 /** Whether this deployment names a collector, and the channel to it when it does. */
-export type RumCollector =
+type RumCollector =
   | Readonly<{ configured: true; channel: RumCollectorChannel }>
   | Readonly<{ configured: false }>;
 

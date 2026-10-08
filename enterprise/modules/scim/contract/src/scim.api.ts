@@ -10,7 +10,7 @@ import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/conf
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { moduleApi, uiTokens } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 
 import type {
@@ -287,19 +287,6 @@ export interface ScimApi {
 }
 
 export const ScimApi = moduleApi<ScimApi>()("scim");
-
-/** Scim's drawers, by token: the one way a caller opens them (ARCHITECTURE.md §10.1). */
-
-/** What a caller hands the provisioning-setup drawer. */
-export type UiProvisioningSetupDrawerProps = {
-  open?: boolean;
-};
-
-const drawers = uiTokens("scim");
-
-/** SCIM provisioning for the reader's organization: the address, the tokens, the sync. */
-export const ProvisioningSetupDrawerToken =
-  drawers.drawer<UiProvisioningSetupDrawerProps>("provisioningSetup");
 
 /** `provenOffboarding` selects one process-wide offboarding path at boot. */
 export const scimConfig = Config.define((c) => ({

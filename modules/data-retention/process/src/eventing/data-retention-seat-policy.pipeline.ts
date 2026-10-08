@@ -20,7 +20,7 @@ import type { DataRetentionModule } from "../app/data-retention.app.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import type { SeatRetentionPolicyService } from "../services/seat-retention-policy.service.ts";
 
-export const DATA_RETENTION_SEAT_POLICY_PIPELINE_NAME = "data_retention_seat_policy" as const;
+const DATA_RETENTION_SEAT_POLICY_PIPELINE_NAME = "data_retention_seat_policy" as const;
 
 export type DataRetentionSeatPolicyPipeline = StaticPipelineDefinition<never>;
 

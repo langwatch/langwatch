@@ -96,7 +96,7 @@ export function isUsableBy({
     : connection.scopeId === scope.projectId;
 }
 
-export function scopeNameOf({
+function scopeNameOf({
   row,
   scope,
 }: {

@@ -140,7 +140,7 @@ export function bodyType(body: unknown): CanonicalLogRecord["bodyType"] {
   return parsed.success ? parsed.data : "empty";
 }
 
-export type BodyText = { present: true; text: string } | { present: false };
+type BodyText = { present: true; text: string } | { present: false };
 
 export function bodyText(body: unknown): BodyText {
   if (isRecord(body) && body.type === "string" && typeof body.value === "string") {

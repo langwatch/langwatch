@@ -3,7 +3,7 @@ import type {
   DataRetentionProjectScopeRepository,
 } from "../data-retention-project-scope.repository.ts";
 
-export type MemoryRetentionTeamRow = Readonly<{ teamId: string; organizationId: string }>;
+type MemoryRetentionTeamRow = Readonly<{ teamId: string; organizationId: string }>;
 
 /** Project and team rows a test put there, as project's and organization's tables hold them. */
 export class MemoryDataRetentionProjectScopeRepository implements DataRetentionProjectScopeRepository {

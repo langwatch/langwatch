@@ -31,7 +31,7 @@ export function deriveTouchFetchLimit(limit: number): number {
   return limit * 3;
 }
 
-export type RecentEntity = {
+type RecentEntity = {
   type: RecentItemType;
   id: string;
   touchedAt: Instant;

@@ -30,7 +30,7 @@ export function isCapped(limit: UsageLimit): boolean {
 }
 
 /** The month's count in the limit's own unit, or that its meter was not read. */
-export type UnitCount = Readonly<{ read: true; count: number }> | Readonly<{ read: false }>;
+type UnitCount = Readonly<{ read: true; count: number }> | Readonly<{ read: false }>;
 
 export function countInUnit(counted: MonthCountedEventData): UnitCount {
   const count = counted.limit.unit === "traces" ? counted.traces : counted.billableEvents;

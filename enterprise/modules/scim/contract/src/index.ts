@@ -1,16 +1,18 @@
 export * from "./scim.contract.ts";
 export {
-  ProvisioningSetupDrawerToken,
   ScimApi,
   scimConfig,
   scimSecrets,
   type ScimServerConfig,
-  type UiProvisioningSetupDrawerProps,
   type ScimDeliveryReceipt,
   type ScimDirectoryScope,
   type ScimTokenAuditEntry,
   type ScimTokenCaller,
 } from "./scim.api.ts";
+export {
+  ProvisioningSetupDrawerToken,
+  type UiProvisioningSetupDrawerProps,
+} from "./scim-drawers.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export * from "./scim-token.rest.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";

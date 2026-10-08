@@ -24,7 +24,7 @@ import {
 
 type CanonicalAttributes = { key: string; value: unknown }[];
 
-export type CanonicalPayloadParts = {
+type CanonicalPayloadParts = {
   payloadValue: {
     resource: {
       schemaUrl: string;
