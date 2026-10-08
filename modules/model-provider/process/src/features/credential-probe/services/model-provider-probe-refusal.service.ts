@@ -1,13 +1,18 @@
 import { type HandledError, type SerializedHandledError } from "@langwatch/handled-error";
-import { ProviderKeyInvalidError, ProviderRefusedError } from "@langwatch/model-provider-contract";
+import {
+  ProviderKeyInvalidError,
+  ProviderKeyRestrictedError,
+  ProviderRefusedError,
+  ProviderServiceDisabledError,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  GEMINI_REASON_ERRORS,
   MAX_UPSTREAM_DETAIL_LENGTH,
   type UpstreamRefusal,
   extractUpstreamMessage,
   extractUpstreamReason,
+  geminiRefusalKind,
   redactApiKey,
 } from "../../../rules/model-provider-probe-upstream.rules.ts";
 import type { ProbeContext } from "./model-provider-probe-chain.service.ts";
@@ -74,17 +79,21 @@ function classifyGeminiRefusal({
   }
   if (!reason) return undefined;
 
-  const build = GEMINI_REASON_ERRORS[reason];
-  if (!build) return undefined;
-
-  const error = build({ provider, googleDoor });
-
-  return refusal(
-    error,
-    // Only a reason naming something else is worth outranking the provider's
-    // own verdict that the key itself is wrong.
-    error.code === "provider_key_invalid" ? FAILURE_RANK.definitive : FAILURE_RANK.actionable,
-  );
+  // Only a reason naming something else is worth outranking the provider's
+  // own verdict that the key itself is wrong.
+  switch (geminiRefusalKind({ reason })) {
+    case "key_invalid":
+      return refusal(new ProviderKeyInvalidError({ provider }), FAILURE_RANK.definitive);
+    case "service_disabled":
+      return refusal(new ProviderServiceDisabledError({ provider }), FAILURE_RANK.actionable);
+    case "key_restricted":
+      return refusal(
+        new ProviderKeyRestrictedError({ provider, reason, googleDoor }),
+        FAILURE_RANK.actionable,
+      );
+    case "unmapped":
+      return undefined;
+  }
 }
 
 /** A refusal, ranked by how much it tells the customer. */

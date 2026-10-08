@@ -1,8 +1,5 @@
-import { type HandledError, type SerializedHandledError } from "@langwatch/handled-error";
+import { type SerializedHandledError } from "@langwatch/handled-error";
 import {
-  ProviderKeyInvalidError,
-  ProviderKeyRestrictedError,
-  ProviderServiceDisabledError,
   type ModelProviderCredentialVerdict,
   type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
@@ -29,42 +26,26 @@ export const unchecked = (
 /** Longest upstream explanation we keep for the server-side log line. */
 export const MAX_UPSTREAM_DETAIL_LENGTH = 300;
 
+/** What a Google `ErrorInfo` reason says about the key; the probe service maps it to an error. */
+export type GeminiRefusalKind = "key_invalid" | "service_disabled" | "key_restricted" | "unmapped";
+
+const GEMINI_REASON_KINDS = new Map<string, GeminiRefusalKind>([
+  ["API_KEY_INVALID", "key_invalid"],
+  ["SERVICE_DISABLED", "service_disabled"],
+  ["API_KEY_SERVICE_BLOCKED", "key_restricted"],
+  ["API_KEY_HTTP_REFERRER_BLOCKED", "key_restricted"],
+  ["API_KEY_IP_ADDRESS_BLOCKED", "key_restricted"],
+  ["API_KEY_ANDROID_APP_BLOCKED", "key_restricted"],
+  ["API_KEY_IOS_APP_BLOCKED", "key_restricted"],
+]);
+
 /**
  * Only `API_KEY_INVALID` means the key is wrong; the rest are project/restriction problems.
  * @see https://cloud.google.com/apis/design/errors
  */
-export const GEMINI_REASON_ERRORS: Record<
-  string,
-  (args: { provider: string; googleDoor?: "gemini-api" | "agent-platform" }) => HandledError
-> = {
-  API_KEY_INVALID: ({ provider }) => new ProviderKeyInvalidError({ provider }),
-  SERVICE_DISABLED: ({ provider }) => new ProviderServiceDisabledError({ provider }),
-  API_KEY_SERVICE_BLOCKED: (args) =>
-    new ProviderKeyRestrictedError({
-      ...args,
-      reason: "API_KEY_SERVICE_BLOCKED",
-    }),
-  API_KEY_HTTP_REFERRER_BLOCKED: (args) =>
-    new ProviderKeyRestrictedError({
-      ...args,
-      reason: "API_KEY_HTTP_REFERRER_BLOCKED",
-    }),
-  API_KEY_IP_ADDRESS_BLOCKED: (args) =>
-    new ProviderKeyRestrictedError({
-      ...args,
-      reason: "API_KEY_IP_ADDRESS_BLOCKED",
-    }),
-  API_KEY_ANDROID_APP_BLOCKED: (args) =>
-    new ProviderKeyRestrictedError({
-      ...args,
-      reason: "API_KEY_ANDROID_APP_BLOCKED",
-    }),
-  API_KEY_IOS_APP_BLOCKED: (args) =>
-    new ProviderKeyRestrictedError({
-      ...args,
-      reason: "API_KEY_IOS_APP_BLOCKED",
-    }),
-};
+export function geminiRefusalKind({ reason }: { reason: string }): GeminiRefusalKind {
+  return GEMINI_REASON_KINDS.get(reason) ?? "unmapped";
+}
 
 /** The refusal as the provider described it, once we can read it. */
 export type UpstreamRefusal = { message?: string; reason?: string };
