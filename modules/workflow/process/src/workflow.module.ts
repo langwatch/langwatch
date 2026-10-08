@@ -3,8 +3,9 @@ import {
   principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineProcessModule } from "@langwatch/process";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
+import type { WorkflowApi, WorkflowServerConfig } from "@langwatch/workflow-contract";
 
 import { WorkflowModule } from "#app/workflow.app";
 import { workflowChannels } from "#channels/workflow-channels.registry";
@@ -22,7 +23,11 @@ import { workflowStudioRest } from "#transport/workflow-studio.rest";
 import { createWorkflowRest } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
 
-export const workflowProcessModule = defineProcessModule("workflow")
+export const workflowProcessModule: PublishedProcessModule<
+  "workflow",
+  WorkflowApi,
+  WorkflowServerConfig
+> = defineProcessModule("workflow")
   .withRepositories(workflowRepositories)
   .withChannels(workflowChannels)
   .withApi(WorkflowModule)
