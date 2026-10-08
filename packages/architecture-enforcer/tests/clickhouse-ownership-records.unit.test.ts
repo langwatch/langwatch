@@ -19,6 +19,13 @@ const roots: string[] = [];
 
 const CATALOGUE: FeatureCatalogueEntry[] = [
   { id: "trace", root: "modules/trace", classification: "core", subjects: ["trace"] },
+  { id: "analytics", root: "modules/analytics", classification: "core", subjects: ["analytics"] },
+  {
+    id: "experiment",
+    root: "modules/experiment",
+    classification: "core",
+    subjects: ["experiment"],
+  },
   {
     id: "instant-eval",
     root: "modules/instant-eval",
@@ -47,7 +54,13 @@ const DECLARED: DeclaredOwnership = {
       reason: "one statement",
     },
   ],
+  shared: [
+    { table: "trace_analytics", owner: "trace", readers: ["analytics"], reason: "dashboards" },
+  ],
 };
+
+const ANALYTICS_READER =
+  "modules/analytics/process/src/repositories/clickhouse/clickhouse.slim.mapper.ts";
 
 function create(table: string): string {
   return `-- +goose Up\nCREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table} (TenantId String) ENGINE = MergeTree;\n`;
@@ -89,6 +102,15 @@ function fixture(declared: DeclaredOwnership = DECLARED) {
     writer("instant_eval_judgments"),
   );
   write(SUBQUERY_FILE, reader("instant_eval_judgments"));
+  write(
+    "packages/clickhouse-migrations/migrations/00004_trace_analytics.sql",
+    create("trace_analytics"),
+  );
+  write(
+    "modules/trace/process/src/repositories/clickhouse/clickhouse.trace-analytics.repository.ts",
+    writer("trace_analytics"),
+  );
+  write(ANALYTICS_READER, reader("trace_analytics"));
 
   return {
     write,
@@ -184,10 +206,70 @@ describe("ClickHouse ownership records", () => {
     });
   });
 
+  describe("given trace shares trace_analytics for reading with analytics", () => {
+    /** @scenario "A module reading a table its owner shares with it passes" */
+    it("reports nothing for the named reader", () => {
+      expect(fixture().messages()).toEqual([]);
+    });
+
+    /** @scenario "A module the owner did not name still may not read a shared table" */
+    it("reports a reader the declaration does not name", () => {
+      const world = fixture();
+      world.write(
+        "modules/experiment/process/src/repositories/clickhouse/clickhouse.run.repository.ts",
+        reader("trace_analytics"),
+      );
+
+      expect(world.messages()).toEqual(["experiment reads trace_analytics, owned by trace."]);
+    });
+
+    /** @scenario "A named reader writing a shared table is a second writer" */
+    it("reports the named reader inserting into the table", () => {
+      const world = fixture();
+      world.write(
+        "modules/analytics/process/src/repositories/clickhouse/clickhouse.writer.repository.ts",
+        writer("trace_analytics"),
+      );
+
+      expect(world.messages()).toContain(
+        "Table trace_analytics is written by trace and analytics (modules/analytics/process/src/repositories/clickhouse/clickhouse.writer.repository.ts). Keep a single module owner.",
+      );
+    });
+
+    /** @scenario "A shared table declared by a module that does not own it is reported" */
+    it("reports a declaration naming the wrong owner", () => {
+      const declared: DeclaredOwnership = {
+        ...DECLARED,
+        shared: [{ table: "trace_analytics", owner: "analytics", readers: ["trace"], reason: "x" }],
+      };
+
+      expect(fixture(declared).messages()).toEqual([
+        "analytics reads trace_analytics, owned by trace.",
+        "Table trace_analytics is declared shared by analytics, which does not own it. Fix or delete the declaration.",
+      ]);
+    });
+
+    /** @scenario "A shared reader that no longer reads the table is reported" */
+    it("reports a named reader the tree no longer has", () => {
+      const declared: DeclaredOwnership = {
+        ...DECLARED,
+        shared: [{ ...DECLARED.shared[0]!, readers: ["analytics", "experiment"] }],
+      };
+
+      expect(fixture(declared).messages()).toEqual([
+        "Table trace_analytics is shared with experiment, which no longer reads it. Delete the reader.",
+      ]);
+    });
+  });
+
   describe("given the declared records and exceptions", () => {
     /** @scenario "Every record and named exception carries a reason" */
     it("gives each one a reason", () => {
-      const entries = [...DECLARED_OWNERSHIP.records, ...DECLARED_OWNERSHIP.exceptions];
+      const entries = [
+        ...DECLARED_OWNERSHIP.records,
+        ...DECLARED_OWNERSHIP.exceptions,
+        ...DECLARED_OWNERSHIP.shared,
+      ];
 
       expect(entries.filter((entry) => entry.reason.trim() === "")).toEqual([]);
       expect(DECLARED_OWNERSHIP.records.map((record) => record.table)).toEqual([
@@ -199,6 +281,13 @@ describe("ClickHouse ownership records", () => {
         "langy_messages",
       ]);
       expect(DECLARED_OWNERSHIP.exceptions).toHaveLength(5);
+      expect(DECLARED_OWNERSHIP.shared.map((item) => item.table)).toEqual([
+        "trace_analytics",
+        "trace_analytics_rollup",
+        "trace_summaries",
+        "stored_spans",
+        "evaluation_runs",
+      ]);
     });
   });
 });

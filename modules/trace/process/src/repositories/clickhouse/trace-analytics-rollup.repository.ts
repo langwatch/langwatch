@@ -2,14 +2,9 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
-import type { TraceAnalyticsRollupRow } from "../../eventing/trace-analytics-rollup.projection.ts";
+import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
 import { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
-
-/** The tenant's routed ClickHouse session, as analytics' sessions repository resolves it. */
-type TraceAnalyticsClickHouseResolver = (
-  tenantId: string,
-) => Promise<EvaluationAnalyticsClickHouseClient>;
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
@@ -18,7 +13,7 @@ const logger = createLogger("langwatch:trace:trace-analytics-rollup-repository")
 /**
  * 64-bit int columns serialize as strings to prevent JSON precision loss.
  */
-type ClickHouseRollupWriteRecord = {
+interface ClickHouseRollupWriteRecord {
   TenantId: string;
   BucketStart: Date;
   Model: string;
@@ -39,7 +34,7 @@ type ClickHouseRollupWriteRecord = {
   DurationSum: string;
   // UInt16 — small enough to fit in a JSON number.
   _retention_days: number;
-};
+}
 
 function toClickHouseRecord(
   row: TraceAnalyticsRollupRow,
@@ -68,14 +63,14 @@ function toClickHouseRecord(
 export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRollupRepository {
   private constructor(
     private readonly options: {
-      resolveClient: TraceAnalyticsClickHouseResolver;
+      resolveClient: TraceClickHouseWriteResolver;
     },
   ) {
     super();
   }
 
   static create(options: {
-    resolveClient: TraceAnalyticsClickHouseResolver;
+    resolveClient: TraceClickHouseWriteResolver;
   }): TraceAnalyticsRollupClickHouseRepository {
     return new TraceAnalyticsRollupClickHouseRepository(options);
   }

@@ -183,7 +183,6 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("agent_lifecycle");
       expect(pipelines).toContain("annotation_lifecycle");
       expect(pipelines).toContain("agent_workflow_fields");
-      expect(pipelines).toContain("trace_analytics");
       expect(pipelines).toContain("user_lifecycle");
       expect(pipelines).toContain("workflow_agent_archive_cascade");
       expect(pipelines).toContain("evaluator_workflow_archive_cascade");
@@ -379,7 +378,7 @@ describe("the worker process installation", () => {
       );
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
-      ).toEqual(["orgBillableEventsMeter", "usageTraceMeter"]);
+      ).toEqual(["entitlement.usageTraceMeter", "orgBillableEventsMeter"]);
     } finally {
       await runtime.stop();
     }

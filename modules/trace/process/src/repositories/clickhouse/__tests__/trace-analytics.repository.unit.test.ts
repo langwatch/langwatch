@@ -10,15 +10,15 @@ nodeProcessEnv.TZ = "Asia/Kolkata";
 import { setWindowedReadMetrics } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
-import type { TraceAnalyticsRow } from "#eventing/trace-analytics.projection";
+import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 
-import { TraceAnalyticsClickHouseRepository } from "../clickhouse.trace-analytics-projection.repository.ts";
+import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
   capturingInsertClient,
   clientReturning,
   orderingClient,
   TestWindowedReadMetrics,
-} from "./clickhouse.trace-analytics-test-helpers.ts";
+} from "./clickhouse-test-helpers.ts";
 
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";

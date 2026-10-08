@@ -32,6 +32,8 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
   const projections = EventingTracePipelineAdapter.create({
     spanStore: createApiFixture<Options["spanStore"]>(),
     summaryStore: createApiFixture<Options["summaryStore"]>(),
+    derivedStore: createApiFixture<Options["derivedStore"]>(),
+    rollupStore: createApiFixture<Options["rollupStore"]>(),
     canonicalisation: TraceCanonicalisationService.create(),
     ioExtraction: createApiFixture<Options["ioExtraction"]>(),
     mediaReferences: createApiFixture<Options["mediaReferences"]>(),

@@ -5,11 +5,13 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/trace-analytics-projection.repository.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
-} from "../trace-analytics.projection.ts";
-import { TraceAnalyticsStore } from "../trace-analytics.store.ts";
+} from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
  * The applied-event-id watermark (ADR-066): the executor dedups a
@@ -22,6 +24,8 @@ const TRACE_ID = "trace-1";
 
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime: createTestRuntime(),
 });
 
 const context = (appliedEventIds?: string[]): ProjectionStoreContext =>

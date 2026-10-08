@@ -33,10 +33,12 @@ import type { TraceSpanCostEnrichment, TraceSpanTokenEstimation } from "./record
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
+import { TraceAnalyticsStore } from "./trace-derived.store.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import { buildTraceProcessingConsumer } from "./trace-processing.pipeline.ts";
+import { TraceAnalyticsRollupStore } from "./trace-rollup.store.ts";
 import { TraceSummaryStore } from "./trace-summary.store.ts";
 import { createTraceUpdateBroadcastHandler } from "./trace-update-broadcast.subscriber.ts";
 import {
@@ -65,7 +67,15 @@ export interface TraceProcessingPipelineInput {
   role: string;
   tokenizer: TraceTokenCounter;
   peers: TraceProcessingPeers;
-  repositories: Pick<TraceRepositories, "spanStorage" | "summaryProjection" | "summaryFoldCache">;
+  repositories: Pick<
+    TraceRepositories,
+    | "spanStorage"
+    | "summaryProjection"
+    | "analyticsProjection"
+    | "analyticsRollup"
+    | "summaryFoldCache"
+    | "analyticsFoldCache"
+  >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
@@ -105,6 +115,16 @@ export class TraceProcessingRuntimeAdapter {
       summaryStore: repositories.summaryFoldCache.cached(
         TraceSummaryStore.create({ storage: repositories.summaryProjection, defaultRetentionDays }),
       ),
+      derivedStore: repositories.analyticsFoldCache.cached(
+        TraceAnalyticsStore.create({
+          storage: repositories.analyticsProjection,
+          defaultRetentionDays,
+        }),
+      ),
+      rollupStore: TraceAnalyticsRollupStore.create({
+        storage: repositories.analyticsRollup,
+        defaultRetentionDays,
+      }),
       canonicalisation,
       ioExtraction: TraceIoExtractionAdapterService.create(canonicalisation),
       mediaReferences: TraceMediaReferenceService.create(),

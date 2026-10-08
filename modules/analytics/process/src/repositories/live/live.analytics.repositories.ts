@@ -8,17 +8,13 @@ import { ClickHouseAnalyticsRecencyRepository } from "../clickhouse/clickhouse.a
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse/clickhouse.analytics-sessions.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
-import { TraceAnalyticsClickHouseRepository } from "../clickhouse/clickhouse.trace-analytics-projection.repository.ts";
-import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/clickhouse.trace-analytics-rollup.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
-import { RedisTraceAnalyticsFoldCacheRepository } from "../redis/redis.trace-analytics-fold-cache.repository.ts";
 
-/** Analytics' live stores: rows in ClickHouse, windows and a fold cache in Redis, LWQL targets. */
+/** Analytics' live stores: rows in ClickHouse, windows in Redis, LangWatchQL's server targets. */
 export class LiveAnalyticsRepositories {
   static readonly requires = [
     "clickhouse",
     "rateLimiter",
-    "redis",
     "clickhouseAdmin",
     "databaseTarget",
     "prisma",
@@ -27,14 +23,12 @@ export class LiveAnalyticsRepositories {
   static create({
     clickhouse,
     rateLimiter,
-    redis,
     clickhouseAdmin,
     databaseTarget,
     prisma,
   }: Readonly<{
     clickhouse: ClickHouseQueryClient;
     rateLimiter: RateLimiter;
-    redis: Parameters<typeof RedisTraceAnalyticsFoldCacheRepository.create>[0];
     clickhouseAdmin: LangWatchQlSupply["admin"];
     databaseTarget: LangWatchQlSupply["postgres"];
     prisma: LwqlProvisioningDatabase;
@@ -52,9 +46,6 @@ export class LiveAnalyticsRepositories {
       recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
       rateLimits: RedisAnalyticsRateLimitRepository.create(rateLimiter),
       langWatchQl: { admin: clickhouseAdmin, postgres: databaseTarget, database: () => prisma },
-      traceAnalyticsProjection: TraceAnalyticsClickHouseRepository.create({ resolveClient }),
-      traceAnalyticsRollup: TraceAnalyticsRollupClickHouseRepository.create({ resolveClient }),
-      traceAnalyticsFoldCache: RedisTraceAnalyticsFoldCacheRepository.create(redis),
     };
   }
 }

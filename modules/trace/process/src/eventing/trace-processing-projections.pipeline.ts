@@ -36,29 +36,27 @@ import type { TraceModelCost } from "../services/trace-model-cost.service.ts";
 import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
 import { SpanStorageMapProjection } from "./span-storage.projection.ts";
+import {
+  type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
+} from "./trace-derived.projection.ts";
 import { EventingTraceOriginAdapter } from "./trace-origin.commands.ts";
 import { EventingTraceProcessingAdapter } from "./trace-processing.commands.ts";
+import {
+  type TraceAnalyticsRollupRow,
+  TraceAnalyticsRollupMapProjection,
+} from "./trace-rollup.projection.ts";
 import { TraceSummaryFoldProjection } from "./trace-summary.projection.ts";
 import { EventingTraceTopicAdapter } from "./trace-topic-assignment.commands.ts";
 
 /** Trace pipeline name; shared by both full and producer-only registration shapes. */
 const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";
 
-/** The two lanes analytics' trace_analytics pipeline took over (round 18, lane handover). */
-const TRACE_ANALYTICS_RETIRED_LANES = [
-  {
-    jobName: "traceAnalytics",
-    drainsInto: { pipeline: "trace_analytics", lane: "traceAnalytics" },
-  },
-  {
-    jobName: "traceAnalyticsRollup",
-    drainsInto: { pipeline: "trace_analytics", lane: "traceAnalyticsRollup" },
-  },
-] as const;
-
 export type EventingTracePipelineAdapterOptions = {
   spanStore: AppendStore<NormalizedSpan>;
   summaryStore: FoldProjectionStore<TraceSummaryData>;
+  derivedStore: FoldProjectionStore<TraceAnalyticsData>;
+  rollupStore: AppendStore<TraceAnalyticsRollupRow>;
   canonicalisation: TraceCanonicalisationService;
   ioExtraction: TraceIoExtraction;
   mediaReferences: TraceMediaReferenceResolver;
@@ -103,68 +101,78 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
   // the trace's lane: on separate groups a delete could precede its add.
   const commands = EventingTraceProcessingAdapter.create();
 
-  return (
-    definePipeline({
-      name: TRACE_PROCESSING_PIPELINE_NAME,
-      aggregate: defineAggregate({
-        type: "trace",
+  return definePipeline({
+    name: TRACE_PROCESSING_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: "trace",
+    }),
+  })
+    .withEvents([
+      spanReceivedEventSchema,
+      spanRecordedEventSchema,
+      topicAssignedEventSchema,
+      logRecordReceivedEventSchema,
+      logContributedEventSchema,
+      metricDataPointCorrelatedEventSchema,
+      originResolvedEventSchema,
+      annotationAddedEventSchema,
+      annotationRemovedEventSchema,
+      annotationsBulkSyncedEventSchema,
+      traceNameChangedEventSchema,
+    ])
+    .withProjectionPayloadPreparation(options.prepareEventForProjection)
+    .withClickHouseFoldProjection(
+      TraceSummaryFoldProjection.create({
+        store: options.summaryStore,
+        traceCanonicalisation: options.canonicalisation,
+        runtime,
       }),
+    )
+    .withClickHouseFoldProjection(
+      TraceAnalyticsFoldProjection.create({
+        store: options.derivedStore,
+        traceCanonicalisation: options.canonicalisation,
+        runtime,
+      }),
+    )
+    .withClickHouseMapProjection(
+      SpanStorageMapProjection.create({
+        store: options.spanStore,
+        spanCostService: runtime.spanCost,
+        spanNormalization: runtime.spanNormalization,
+      }),
+    )
+    .withClickHouseMapProjection(
+      TraceAnalyticsRollupMapProjection.create({
+        store: options.rollupStore,
+        spanCostService: runtime.spanCost,
+        spanNormalization: runtime.spanNormalization,
+      }),
+    )
+    .withCommandInstance({
+      name: "recordSpan",
+      handlerClass: EventingRecordSpanAdapter,
+      instance: options.recordSpanCommand,
+      options: recordSpanOptions,
     })
-      .withEvents([
-        spanReceivedEventSchema,
-        spanRecordedEventSchema,
-        topicAssignedEventSchema,
-        logRecordReceivedEventSchema,
-        logContributedEventSchema,
-        metricDataPointCorrelatedEventSchema,
-        originResolvedEventSchema,
-        annotationAddedEventSchema,
-        annotationRemovedEventSchema,
-        annotationsBulkSyncedEventSchema,
-        traceNameChangedEventSchema,
-      ])
-      .withProjectionPayloadPreparation(options.prepareEventForProjection)
-      .withClickHouseFoldProjection(
-        TraceSummaryFoldProjection.create({
-          store: options.summaryStore,
-          traceCanonicalisation: options.canonicalisation,
-          runtime,
-        }),
-      )
-      .withClickHouseMapProjection(
-        SpanStorageMapProjection.create({
-          store: options.spanStore,
-          spanCostService: runtime.spanCost,
-          spanNormalization: runtime.spanNormalization,
-        }),
-      )
-      // Analytics hosts both trace analytics lanes (Q207); an earlier release's jobs drain there.
-      .withRetiredLanes(TRACE_ANALYTICS_RETIRED_LANES)
-      .withCommandInstance({
-        name: "recordSpan",
-        handlerClass: EventingRecordSpanAdapter,
-        instance: options.recordSpanCommand,
-        options: recordSpanOptions,
-      })
-      .withCommand("assignTopic", EventingTraceTopicAdapter)
-      .withCommand("recordLogContribution", commands.recordLogContributionCommand, {
-        coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
-      })
-      .withCommand("recordMetricCorrelation", commands.recordMetricCorrelationCommand, {
-        coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
-      })
-      .withCommand("resolveOrigin", EventingTraceOriginAdapter)
-      .withCommand("addAnnotation", commands.addAnnotationCommand, {
-        serializeByAggregate: true,
-      })
-      .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
-        serializeByAggregate: true,
-      })
-      .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
-        serializeByAggregate: true,
-      })
-      .withCommand("changeTraceName", commands.changeTraceNameCommand)
-  );
+    .withCommand("assignTopic", EventingTraceTopicAdapter)
+    .withCommand("recordLogContribution", commands.recordLogContributionCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
+    .withCommand("recordMetricCorrelation", commands.recordMetricCorrelationCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
+    .withCommand("resolveOrigin", EventingTraceOriginAdapter)
+    .withCommand("addAnnotation", commands.addAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("removeAnnotation", commands.removeAnnotationCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("bulkSyncAnnotations", commands.bulkSyncAnnotationsCommand, {
+      serializeByAggregate: true,
+    })
+    .withCommand("changeTraceName", commands.changeTraceNameCommand);
 }
 
 /** Deliberate process-facing adapter for Trace's deterministic projections. */

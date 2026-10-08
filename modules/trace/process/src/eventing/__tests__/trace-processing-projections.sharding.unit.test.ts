@@ -41,6 +41,8 @@ function pipeline({ spanCommandShardCount }: { spanCommandShardCount: number }) 
   return EventingTracePipelineAdapter.create({
     spanStore: createApiFixture<Options["spanStore"]>(),
     summaryStore: createApiFixture<Options["summaryStore"]>(),
+    derivedStore: createApiFixture<Options["derivedStore"]>(),
+    rollupStore: createApiFixture<Options["rollupStore"]>(),
     canonicalisation,
     ioExtraction: createApiFixture<Options["ioExtraction"]>(),
     mediaReferences: createApiFixture<Options["mediaReferences"]>(),

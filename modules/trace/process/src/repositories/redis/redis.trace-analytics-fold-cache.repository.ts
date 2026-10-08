@@ -1,9 +1,7 @@
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { TraceAnalyticsFoldCacheRepository } from "../trace-analytics-fold-cache.repository.ts";
-
-/** The Redis connection the fold cache runs on, as the eventing cache takes it. */
-type RedisConnection = ConstructorParameters<typeof RedisCachedFoldStore>[1];
 
 /** main's keyspace, so a rolling deploy reads the state the previous release cached. */
 const TRACE_ANALYTICS_FOLD_CACHE_KEY_PREFIX = "trace_analytics";

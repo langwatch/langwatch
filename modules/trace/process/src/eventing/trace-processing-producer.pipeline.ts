@@ -27,7 +27,9 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import type { TraceAnalyticsData } from "./trace-derived.projection.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
+import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 
 /** Why every stand-in below refuses, naming the module and the role. */
 function producerOnly(role: string, capability: string): Error {
@@ -201,6 +203,11 @@ export function createTraceProcessingProducerPipeline(input: {
   return EventingTracePipelineAdapter.create({
     spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(role, "span"),
     summaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(role, "trace summary"),
+    derivedStore: new ProducerOnlyFoldStore<TraceAnalyticsData>(role, "trace analytics"),
+    rollupStore: new ProducerOnlyAppendStore<TraceAnalyticsRollupRow>(
+      role,
+      "trace analytics rollup",
+    ),
     canonicalisation: new ProducerOnlyCanonicalisation(role),
     ioExtraction: new ProducerOnlyIoExtraction(role),
     mediaReferences: new ProducerOnlyMediaReferences(role),

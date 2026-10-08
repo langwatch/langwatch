@@ -60,9 +60,18 @@ export type OwnershipRecord = {
 /** A foreign read inside one statement, which an `*Api` call cannot express (Q207). */
 export type NamedException = { reader: string; table: string; file: string; reason: string };
 
+/** A table its writing module shares for reading with named modules; writes stay its own (EF-5). */
+export type SharedTable = {
+  table: string;
+  owner: string;
+  readers: readonly string[];
+  reason: string;
+};
+
 export type DeclaredOwnership = {
   records: readonly OwnershipRecord[];
   exceptions: readonly NamedException[];
+  shared: readonly SharedTable[];
 };
 
 const LEGACY = "no writer on this release";
@@ -141,6 +150,39 @@ export const DECLARED_OWNERSHIP: DeclaredOwnership = {
       table: "log_records",
       file: "modules/trace/process/src/repositories/clickhouse/session-groups.repository.ts",
       reason: SUBQUERY,
+    },
+  ],
+  shared: [
+    {
+      table: "trace_analytics",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "trace folds it from its facts for analytics' dashboards to read (EF-5, 2026-10-07)",
+    },
+    {
+      table: "trace_analytics_rollup",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "trace appends it per span for analytics' dashboards to read (EF-5, 2026-10-07)",
+    },
+    {
+      table: "trace_summaries",
+      owner: "trace",
+      readers: ["analytics"],
+      reason:
+        "analytics' custom-graph aggregations select over trace's summaries (EF-5, 2026-10-07)",
+    },
+    {
+      table: "stored_spans",
+      owner: "trace",
+      readers: ["analytics"],
+      reason: "analytics' span-level aggregations select over trace's spans (EF-5, 2026-10-07)",
+    },
+    {
+      table: "evaluation_runs",
+      owner: "evaluation",
+      readers: ["analytics"],
+      reason: "analytics' evaluation metrics select over evaluation's runs (EF-5, 2026-10-07)",
     },
   ],
 };
@@ -625,12 +667,73 @@ function staleExceptions({
     }));
 }
 
+/** A read its owner declared shared with the reading module. */
+function isSharedRead({
+  entry,
+  owner,
+  shared,
+}: {
+  entry: Access;
+  owner: string;
+  shared: readonly SharedTable[];
+}): boolean {
+  return (
+    !entry.write &&
+    shared.some(
+      (item) =>
+        item.table === entry.table && item.owner === owner && item.readers.includes(entry.module),
+    )
+  );
+}
+
+/** A shared table its declared owner does not own, or a named reader that no longer reads it. */
+function staleShared({
+  access,
+  tables,
+  writers,
+  feeds,
+  shared,
+  root,
+}: {
+  access: readonly Access[];
+  tables: ReadonlyMap<string, string>;
+  writers: ReadonlyMap<string, Access[]>;
+  feeds: Feeds;
+  shared: readonly SharedTable[];
+  root: string;
+}): Finding[] {
+  return shared.flatMap((item): Finding[] => {
+    const owner = tables.has(item.table) ? ownerOf({ table: item.table, writers, feeds }) : void 0;
+
+    if (owner?.module !== item.owner) {
+      return [
+        {
+          key: `shared|${item.table}`,
+          file: join(root, MIGRATIONS),
+          message: `Table ${item.table} is declared shared by ${item.owner}, which does not own it. Fix or delete the declaration.`,
+        },
+      ];
+    }
+
+    return item.readers
+      .filter(
+        (reader) => !access.some((entry) => entry.module === reader && entry.table === item.table),
+      )
+      .map((reader) => ({
+        key: `shared|${item.table}|${reader}`,
+        file: owner.file,
+        message: `Table ${item.table} is shared with ${reader}, which no longer reads it. Delete the reader.`,
+      }));
+  });
+}
+
 type TableContext = {
   access: readonly Access[];
   writers: ReadonlyMap<string, Access[]>;
   feeds: Feeds;
   root: string;
   exceptions: readonly NamedException[];
+  shared: readonly SharedTable[];
   findings: Map<string, Finding>;
 };
 
@@ -644,7 +747,7 @@ function addTableFindings({
   migration: string;
   context: TableContext;
 }): void {
-  const { access, writers, feeds, root, exceptions, findings } = context;
+  const { access, writers, feeds, root, exceptions, shared, findings } = context;
   const owner = ownerOf({ table, writers, feeds });
 
   if (!owner) {
@@ -672,6 +775,7 @@ function addTableFindings({
     const key = `${entry.module}|${table}`;
     if (entry.module === owner.module || findings.has(key)) continue;
     if (isExcepted({ entry, exceptions, root })) continue;
+    if (isSharedRead({ entry, owner: owner.module, shared })) continue;
 
     findings.set(key, {
       key,
@@ -698,7 +802,8 @@ function collectFindings({
   const writers = owners(access);
   const recorded = new Set(declared.records.map((record) => record.table));
   const findings = new Map<string, Finding>();
-  const context = { access, writers, feeds, root, exceptions: declared.exceptions, findings };
+  const { exceptions, shared } = declared;
+  const context = { access, writers, feeds, root, exceptions, shared, findings };
 
   for (const [table, migration] of [...tables].toSorted(([a], [b]) => a.localeCompare(b))) {
     if (!recorded.has(table)) addTableFindings({ table, migration, context });
@@ -707,7 +812,8 @@ function collectFindings({
   return [
     ...findings.values(),
     ...recordFindings({ tables, writers, records: declared.records, root }),
-    ...staleExceptions({ access, exceptions: declared.exceptions, root }),
+    ...staleExceptions({ access, exceptions, root }),
+    ...staleShared({ access, tables, writers, feeds, shared, root }),
   ];
 }
 
@@ -770,7 +876,7 @@ export function clickhouseTableOwners({
   return result;
 }
 
-const NOTHING_DECLARED: DeclaredOwnership = { records: [], exceptions: [] };
+const NOTHING_DECLARED: DeclaredOwnership = { records: [], exceptions: [], shared: [] };
 
 /** Every finding under a root; fixtures pass declarations, the registry the ruled ones. */
 export function collectClickhouseOwnershipFindings(

@@ -54,7 +54,6 @@ import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import type { EventReadSeat } from "./stores/eventReadSeat.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
 import { EventUpcaster, type PipelineUpcasts } from "./upcast/eventUpcast.ts";
-import { type RetiredLane, retiredLaneTargetKeys } from "./upcast/retiredLane.ts";
 import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
@@ -150,7 +149,6 @@ export class EventSourcing {
     { pipeline: string; jobNames: ReadonlyMap<string, string> }
   >();
   /** Retired lanes by `<living pipeline>:<job name>`, each with the lane it drains into. */
-  private readonly _retiredLanes = new Map<string, RetiredLane["drainsInto"]>();
   private _initialized = false;
   private _consumersHeld = false;
   private _consumersPaused = false;
@@ -581,7 +579,6 @@ export class EventSourcing {
       parseEvent: definition.parseEvent,
     });
     this.registerUpcastDrain(definition.upcasts);
-    this.registerRetiredLanes(definition);
 
     const serviceOptions = buildServiceOptions(definition);
 
@@ -782,42 +779,13 @@ export class EventSourcing {
     });
   }
 
-  /** A living pipeline's retired lanes drain into the lanes that took them over (round 16). */
-  private registerRetiredLanes({
-    metadata,
-    retiredLanes,
-  }: Pick<StaticPipelineDefinition, "metadata" | "retiredLanes">): void {
-    for (const { jobName, drainsInto } of retiredLanes ?? []) {
-      this._retiredLanes.set(`${metadata.name}:${jobName}`, drainsInto);
-    }
-  }
-
-  /** The lane a job queued under a retired or former lane's key drains into, if declared. */
+  /** The lane a job queued under a former pipeline's key drains into, if declared. */
   private drainedEntry(job: {
     pipelineName: string;
     jobType: string;
     jobName: string;
   }): JobRegistryEntry | undefined {
-    return this.upcastDrainedEntry(job) ?? this.retiredLaneEntry(job);
-  }
-
-  /** The lane that took over a living pipeline's retired lane, local or peer. */
-  private retiredLaneEntry({
-    pipelineName,
-    jobType,
-    jobName,
-  }: {
-    pipelineName: string;
-    jobType: string;
-    jobName: string;
-  }): JobRegistryEntry | undefined {
-    const drainsInto = this._retiredLanes.get(`${pipelineName}:${jobName}`);
-    if (!drainsInto) return undefined;
-    for (const key of retiredLaneTargetKeys({ jobType, drainsInto })) {
-      const entry = this._globalJobRegistry.get(key);
-      if (entry) return entry;
-    }
-    return undefined;
+    return this.upcastDrainedEntry(job);
   }
 
   /** The current lane a job queued under a former pipeline's key drains into, if declared. */

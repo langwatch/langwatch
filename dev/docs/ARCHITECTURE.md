@@ -1470,8 +1470,11 @@ window; the producer-only rule stands for everything else (Alex, 2026-10-06, rou
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
 (trace's and gateway's); a read only one statement can answer (a subquery over an owner's table) is a
-named exception in the table-ownership policy, with its reason. Analytics owns the trace analytics
-tables, and trace drops its copy of the has-signal predicate. The policy records `event_log` as
+named exception in the table-ownership policy, with its reason. **A module's analytics tables stay
+its own** (Alex, 2026-10-07, EF-5, overriding Q207's hosting): its own pipeline writes them, and the
+owner declares a table shared for reading by named modules in that policy, which admits those reads
+and no write. Trace writes `trace_analytics` and `trace_analytics_rollup` and shares both with
+analytics; trace drops its copy of the has-signal predicate. The policy records `event_log` as
 framework owned and the six legacy tables with no TypeScript writer as legacy owned; nothing is dropped.
 
 A check that holds a summary against the facts it was folded from keeps its own record of those
@@ -1859,10 +1862,6 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 `event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
 lint names any drain older than one release; a fresh install plans upcast steps by their mode (Alex,
 2026-10-06, rounds 15 and 16).
-A living pipeline that hands a lane to another module declares `.withRetiredLanes([{ jobName,
-drainsInto: { pipeline, lane } }])`: jobs a previous release queued under the retired key drain
-into the lane that took it over (its own or a peer lane) for one release, and a name it still
-declares is refused at build (round 16, `packages/eventing/specs/lane-handover.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
@@ -1983,15 +1982,15 @@ through the framework; no module scans queues or reads the `gq:parked-tenants` k
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
-**A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
-a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
-registration blocks. The group queue owns and writes the dead-letter layout; ops lists, redrives
 A dequeued event whose type no pipeline on that worker declares is retried, not refused (Alex,
 2026-10-08, round 24): mid rolling deploy an older worker can take a newer release's event, and the
 queue's retry budget (25 attempts with backoff) is the drain window in which a worker declaring it
 takes the job. Still undeclared once spent, it exhausts on its lane's outcome with a reason naming
 the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
 
+**A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
+a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
+registration blocks. The group queue owns and writes the dead-letter layout; ops lists, redrives
 and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
 stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
 dead-letters, redrivable once analysis is back.

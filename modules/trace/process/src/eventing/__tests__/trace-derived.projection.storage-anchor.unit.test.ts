@@ -11,14 +11,19 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceAnalyticsProjectionRepository } from "../../repositories/trace-analytics-projection.repository.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-analytics.projection.ts";
-import { TraceAnalyticsStore } from "../trace-analytics.store.ts";
-import { createSpanReceivedEvent, msToUnixNano } from "./trace-analytics-test.fixtures.ts";
+} from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+  msToUnixNano,
+} from "./trace-summary-test.fixtures.ts";
 
 /** The slim fold's STORAGE ANCHOR (ADR-071 step 3). OccurredAt is the partition,
  * sort and TTL key; now separate from span timing baseline (storageAnchorMs).
@@ -28,8 +33,11 @@ const TENANT = "tenant-anchor";
 const TRACE_ID = "aaaa0000000000000000000000000009";
 const BASE_MS = 1_760_000_000_000;
 
+const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime,
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {

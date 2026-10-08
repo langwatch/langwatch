@@ -1,4 +1,4 @@
-import type { TraceAnalyticsRollupRow } from "../../eventing/trace-analytics-rollup.projection.ts";
+import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
 import { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
 
 /**

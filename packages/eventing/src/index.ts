@@ -22,7 +22,6 @@ export {
   type UpcastDrain,
   upcastStepId,
 } from "./upcast/eventUpcast.ts";
-export type { RetiredLane } from "./upcast/retiredLane.ts";
 export {
   type ActiveUpcast,
   activeUpcastSchema,

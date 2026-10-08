@@ -12,13 +12,18 @@ import {
 } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-analytics.projection.ts";
-import { createSpanReceivedEvent, msToUnixNano } from "./trace-analytics-test.fixtures.ts";
+} from "../trace-derived.projection.ts";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+  msToUnixNano,
+} from "./trace-summary-test.fixtures.ts";
 
 /**
  * The read-back boundary is a DESERIALIZE, not a rebuild: a resumed fold
@@ -30,8 +35,11 @@ const TENANT = "tenant-fold-eq";
 const TRACE_ID = "aaaa0000000000000000000000000003";
 const BASE_MS = 1_760_000_000_000;
 
+const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime,
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {

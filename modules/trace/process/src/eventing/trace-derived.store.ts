@@ -10,7 +10,7 @@ import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
-} from "./trace-analytics.projection.ts";
+} from "./trace-derived.projection.ts";
 
 /**
  * The projection stamps `getWithApplied` will decode: the current shape, and the pre-split

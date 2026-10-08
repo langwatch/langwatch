@@ -9,13 +9,18 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-analytics.projection.ts";
-import { createSpanReceivedEvent, msToUnixNano } from "./trace-analytics-test.fixtures.ts";
+} from "../trace-derived.projection.ts";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+  msToUnixNano,
+} from "./trace-summary-test.fixtures.ts";
 
 /** The storage anchor and span timing baseline, resumed across a read-back
  * (ADR-071 step 3). A log-led trace freezes its anchor on the first log
@@ -25,8 +30,11 @@ const TENANT = "tenant-log-led-resume";
 const TRACE_ID = "aaaa0000000000000000000000000002";
 const BASE_MS = 1_760_000_000_000;
 
+const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime,
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {

@@ -3,11 +3,12 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import { MAX_PROCESSED_SPANS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
-} from "../trace-analytics.projection.ts";
-import { createSpanReceivedEvent } from "./trace-analytics-test.fixtures.ts";
+} from "../trace-derived.projection.ts";
+import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /** Regression guard for the 2026-07-09 re-fold storm. The slim trace-analytics
  * fold shipped without refoldOnOutOfOrder: false, causing hot traces to re-fold
@@ -22,6 +23,8 @@ function buildProjection(
 ): TraceAnalyticsFoldProjection {
   return TraceAnalyticsFoldProjection.create({
     store,
+    traceCanonicalisation: TraceCanonicalisationService.create(),
+    runtime: createTestRuntime(),
   });
 }
 

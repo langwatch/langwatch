@@ -1,12 +1,14 @@
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-analytics.projection.ts";
+} from "../trace-derived.projection.ts";
+import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
  * Read-back of a PRE-SPLIT row (migration 00061): before `storageAnchorMs`
@@ -17,8 +19,11 @@ import {
 const TENANT = "tenant-rb";
 const BASE_MS = 1_760_000_000_000;
 
+const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime,
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {

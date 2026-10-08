@@ -13,14 +13,15 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/trace-analytics-projection.repository.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
-} from "../trace-analytics.projection.ts";
-import { TraceAnalyticsStore } from "../trace-analytics.store.ts";
-import { createSpanReceivedEvent } from "./trace-analytics-test.fixtures.ts";
+} from "../trace-derived.projection.ts";
+import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
  * The version gate on the committed row: trusted only when its projection
@@ -32,8 +33,11 @@ const TENANT = "tenant-gate";
 const TRACE_ID = "aaaa0000000000000000000000000004";
 const BASE_MS = 1_760_000_000_000;
 
+const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
   store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
+  traceCanonicalisation: TraceCanonicalisationService.create(),
+  runtime,
 });
 
 function project(state: TraceAnalyticsData): TraceAnalyticsRow {
@@ -187,6 +191,8 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         const { storage, rows } = recordingPort();
         const fold = TraceAnalyticsFoldProjection.create({
           store: TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 }),
+          traceCanonicalisation: TraceCanonicalisationService.create(),
+          runtime: createTestRuntime(),
         });
         // A loader that fails the test if the executor still replays history:
         // the whole point of the always-write row is that it never needs to.

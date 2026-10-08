@@ -1,7 +1,6 @@
 /**
  * Regression: a span start time wrong by orders of magnitude used to block a
- * whole project's span lane. Drives the REAL normalization and projections;
- * the trace analytics cases live with analytics, which hosts those lanes.
+ * whole project's span lane. Drives the REAL normalization and projections.
  * @see specs/traces/span-start-time-must-be-storable.feature
  */
 import type { SpanReceivedEvent } from "@langwatch/trace-contract";
@@ -9,6 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { SpanStorageMapProjection } from "../span-storage.projection.ts";
+import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
+import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
@@ -47,8 +48,20 @@ const spanStorage = () =>
     spanCostService: runtime.spanCost,
     spanNormalization: runtime.spanNormalization,
   });
+const analyticsRollup = () =>
+  TraceAnalyticsRollupMapProjection.create({
+    store: noopAppendStore,
+    spanCostService: runtime.spanCost,
+    spanNormalization: runtime.spanNormalization,
+  });
 const summaryFold = () =>
   TraceSummaryFoldProjection.create({
+    store: noopFoldStore,
+    traceCanonicalisation: TraceCanonicalisationService.create(),
+    runtime,
+  });
+const analyticsFold = () =>
+  TraceAnalyticsFoldProjection.create({
     store: noopFoldStore,
     traceCanonicalisation: TraceCanonicalisationService.create(),
     runtime,
@@ -87,6 +100,15 @@ describe("given a span whose start time cannot be stored", () => {
     });
   });
 
+  describe("when the analytics-rollup projection maps it", () => {
+    /** @scenario "A stored span whose start time cannot be stored is skipped without blocking the rest of the project's spans" */
+    it("skips the span instead of throwing", () => {
+      const projection = analyticsRollup();
+
+      expect(projection.mapTraceSpanReceived(unstorableEvent())).toBeNull();
+    });
+  });
+
   describe("when the trace-summary fold applies it", () => {
     /** @scenario "A stored span whose start time cannot be stored is skipped without blocking the rest of the project's spans" */
     it("leaves the trace's state untouched instead of throwing", () => {
@@ -96,6 +118,18 @@ describe("given a span whose start time cannot be stored", () => {
       const folded = projection.handleTraceSpanReceived(unstorableEvent(), state);
 
       // No span counted, no timing seeded, nothing anchored off the value.
+      expect(folded).toBe(state);
+    });
+  });
+
+  describe("when the trace-analytics fold applies it", () => {
+    /** @scenario "A stored span whose start time cannot be stored is skipped without blocking the rest of the project's spans" */
+    it("leaves the trace's state untouched instead of throwing", () => {
+      const projection = analyticsFold();
+      const state = projection.init();
+
+      const folded = projection.handleTraceSpanReceived(unstorableEvent(), state);
+
       expect(folded).toBe(state);
     });
   });

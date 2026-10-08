@@ -35,11 +35,11 @@ import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
   spanStorabilityOf,
-  stampTraceModelMetadata,
   SYNTHETIC_TRACE_SPAN_NAMES,
   type TopicAssignedEvent,
   topicAssignedEventSchema,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  type TraceCanonicalisationService,
   type TraceNameChangedEvent,
   traceNameChangedEventSchema,
   type TraceSummaryData,
@@ -47,13 +47,9 @@ import {
   UNSTORABLE_SPAN_SKIPPED,
 } from "@langwatch/trace-contract";
 
-import {
-  canonicaliseTraceLogRecord,
-  normaliseTraceSpan,
-  priceAccumulatedTraceSpan,
-} from "../rules/trace-analytics-span.rules.ts";
+import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
-const logger = createLogger("langwatch:analytics:trace-analytics-fold");
+const logger = createLogger("langwatch:trace-processing:trace-analytics-fold");
 
 /**
  * Deterministic fold for the slim `trace_analytics` table: hoisted
@@ -272,8 +268,9 @@ interface LogContribution {
 // ─── Fold projection class ──────────────────────────────────────────
 
 /**
- * Slim fold projection, analytics' peer fold over trace's facts (round 8). Handlers call
- * trace-contract's pure folds and the same canonicalisers trace's summary fold applies.
+ * Slim fold projection. Handlers call the same service CLASSES the
+ * trace-summary fold uses, so both folds pick up service logic changes
+ * automatically. Slim's role is orchestration only.
  */
 export class TraceAnalyticsFoldProjection
   extends AbstractFoldProjection<
@@ -285,6 +282,8 @@ export class TraceAnalyticsFoldProjection
   >
   implements FoldEventHandlers<typeof traceAnalyticsEvents, TraceAnalyticsData>
 {
+  private readonly traceCanonicalisation: TraceCanonicalisationService;
+  private readonly runtime: TraceProjectionRuntimeService;
   readonly name = "traceAnalytics";
   readonly version = TRACE_ANALYTICS_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceAnalyticsData>;
@@ -305,17 +304,25 @@ export class TraceAnalyticsFoldProjection
     onExhausted: "dead-letter",
   };
 
-  private constructor(deps: { store: FoldProjectionStore<TraceAnalyticsData> }) {
+  private constructor(deps: {
+    store: FoldProjectionStore<TraceAnalyticsData>;
+    traceCanonicalisation: TraceCanonicalisationService;
+    runtime: TraceProjectionRuntimeService;
+  }) {
     super({
       createdAtKey: "createdAt",
       updatedAtKey: "updatedAt",
       LastEventOccurredAtKey: "LastEventOccurredAt",
     });
     this.store = deps.store;
+    this.traceCanonicalisation = deps.traceCanonicalisation;
+    this.runtime = deps.runtime;
   }
 
   static create(deps: {
     store: FoldProjectionStore<TraceAnalyticsData>;
+    traceCanonicalisation: TraceCanonicalisationService;
+    runtime: TraceProjectionRuntimeService;
   }): TraceAnalyticsFoldProjection {
     return new TraceAnalyticsFoldProjection(deps);
   }
@@ -386,14 +393,19 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
-    const normalizedSpan = normaliseTraceSpan({
+    const normalizedSpan = this.runtime.spanNormalization.normalizeSpanReceived({
       tenantId: event.tenantId,
       span: event.data.span,
       resource: event.data.resource,
       instrumentationScope: event.data.instrumentationScope,
     });
+    this.runtime.spanNormalization.enrichRagContextIds(normalizedSpan);
 
-    return TraceAnalyticsFoldProjection.applySpanToAnalytics({ state, span: normalizedSpan });
+    return TraceAnalyticsFoldProjection.applySpanToAnalytics({
+      state,
+      span: normalizedSpan,
+      runtime: this.runtime,
+    });
   }
 
   handleTraceTopicAssigned(
@@ -418,7 +430,7 @@ export class TraceAnalyticsFoldProjection
       return state;
     }
 
-    const liftedAttributes = canonicaliseTraceLogRecord({
+    const liftedAttributes = this.traceCanonicalisation.canonicalizeLogRecord({
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
@@ -426,6 +438,7 @@ export class TraceAnalyticsFoldProjection
 
     return TraceAnalyticsFoldProjection.applyLogContribution({
       state,
+      runtime: this.runtime,
       contribution: {
         traceId: event.data.traceId,
         liftedAttributes,
@@ -440,6 +453,7 @@ export class TraceAnalyticsFoldProjection
   ): TraceAnalyticsData {
     return TraceAnalyticsFoldProjection.applyLogContribution({
       state,
+      runtime: this.runtime,
       contribution: {
         traceId: event.data.traceId,
         liftedAttributes: event.data.liftedAttributes,
@@ -634,9 +648,11 @@ export class TraceAnalyticsFoldProjection
   private static applyLogContribution({
     state,
     contribution,
+    runtime,
   }: {
     state: TraceAnalyticsData;
     contribution: LogContribution;
+    runtime: TraceProjectionRuntimeService;
   }): TraceAnalyticsData {
     const mergedAttributes = { ...state.attributes };
     const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
@@ -672,7 +688,7 @@ export class TraceAnalyticsFoldProjection
 
     // Same trace-level model metadata stamp the span path applies, so
     // log-only (Path B) traces also surface `metadata.model`.
-    stampTraceModelMetadata({
+    runtime.traceAttributes.stampModelMetadata({
       attributes: mergedAttributes,
       models,
     });
@@ -874,9 +890,11 @@ export class TraceAnalyticsFoldProjection
   static applySpanToAnalytics({
     state,
     span,
+    runtime,
   }: {
     state: TraceAnalyticsData;
     span: NormalizedSpan;
+    runtime: TraceProjectionRuntimeService;
   }): TraceAnalyticsData {
     // Short-circuit before pricing; the contract fold skips synthetic spans too.
     if (SYNTHETIC_TRACE_SPAN_NAMES.has(span.name)) {
@@ -886,7 +904,7 @@ export class TraceAnalyticsFoldProjection
     const next = foldSpanIntoTraceAnalytics({
       state: TraceAnalyticsFoldProjection.asTraceSummaryStateView(state),
       span,
-      spanCost: priceAccumulatedTraceSpan(span),
+      spanCost: runtime.spanCost.estimateAccumulatedSpanCost(span),
     });
 
     return {

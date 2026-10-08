@@ -17,7 +17,6 @@ import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 import type { PipelineUpcasts } from "../upcast/eventUpcast.ts";
-import type { RetiredLane } from "../upcast/retiredLane.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
 import type { PipelineMetadata } from "./types.ts";
 
@@ -124,9 +123,6 @@ export interface StaticPipelineDefinition<
 
   /** Stored event types read as current ones, declared with `.withUpcasts` (§9). */
   upcasts?: PipelineUpcasts;
-
-  /** Lanes this pipeline retired, draining into another pipeline's lane (`.withRetiredLanes`). */
-  retiredLanes?: readonly RetiredLane[];
 
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<

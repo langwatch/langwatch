@@ -4,17 +4,12 @@ import { createLogger } from "@langwatch/observability";
 import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceAnalyticsRow } from "../../eventing/trace-analytics.projection.ts";
+import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
-
-/** The tenant's routed ClickHouse session, as analytics' sessions repository resolves it. */
-type TraceAnalyticsClickHouseResolver = (
-  tenantId: string,
-) => Promise<EvaluationAnalyticsClickHouseClient>;
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
@@ -38,7 +33,7 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
  * 00039). 64-bit-integer columns are serialised as strings in JSONEachRow
  * (JSON numbers can't round-trip past 2^53); other types stay unstringified.
  */
-type ClickHouseTraceAnalyticsWriteRecord = {
+interface ClickHouseTraceAnalyticsWriteRecord {
   TenantId: string;
   TraceId: string;
   Version: string;
@@ -93,19 +88,19 @@ type ClickHouseTraceAnalyticsWriteRecord = {
   AppliedEventIds: string[];
 
   _retention_days: number;
-};
+}
 
 export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionRepository {
   private constructor(
     private readonly options: {
-      resolveClient: TraceAnalyticsClickHouseResolver;
+      resolveClient: TraceClickHouseWriteResolver;
     },
   ) {
     super();
   }
 
   static create(options: {
-    resolveClient: TraceAnalyticsClickHouseResolver;
+    resolveClient: TraceClickHouseWriteResolver;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
   }

@@ -1477,23 +1477,24 @@ Declared at `src/eventing/trace-log-records.pipeline.ts:33`.
 
 ### Pipeline `trace_processing` (aggregate `trace`)
 
-Declared at `src/eventing/trace-processing-projections.pipeline.ts:107`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`.
+Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events: `spanReceivedEventSchema`, `spanRecordedEventSchema`, `topicAssignedEventSchema`, `logRecordReceivedEventSchema`, `logContributedEventSchema`, `metricDataPointCorrelatedEventSchema`, `originResolvedEventSchema`, `annotationAddedEventSchema`, `annotationRemovedEventSchema`, `annotationsBulkSyncedEventSchema`, `traceNameChangedEventSchema`.
 
 | Kind                           | Name                                                                                           | Handles | Declared at                                                 |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------- |
-| command                        | –                                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:143` |
-| command                        | `assignTopic`                                                                                  | –       | `src/eventing/trace-processing-projections.pipeline.ts:149` |
-| command                        | `recordLogContribution`                                                                        | –       | `src/eventing/trace-processing-projections.pipeline.ts:150` |
-| command                        | `recordMetricCorrelation`                                                                      | –       | `src/eventing/trace-processing-projections.pipeline.ts:153` |
-| command                        | `resolveOrigin`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:156` |
-| command                        | `addAnnotation`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:157` |
-| command                        | `removeAnnotation`                                                                             | –       | `src/eventing/trace-processing-projections.pipeline.ts:160` |
-| command                        | `bulkSyncAnnotations`                                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:163` |
-| command                        | `changeTraceName`                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:166` |
-| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:126` |
-| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:127` |
-| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:134` |
-| retired lanes                  | `≈ TRACE_ANALYTICS_RETIRED_LANES`                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:142` |
+| command                        | –                                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:152` |
+| command                        | `assignTopic`                                                                                  | –       | `src/eventing/trace-processing-projections.pipeline.ts:158` |
+| command                        | `recordLogContribution`                                                                        | –       | `src/eventing/trace-processing-projections.pipeline.ts:159` |
+| command                        | `recordMetricCorrelation`                                                                      | –       | `src/eventing/trace-processing-projections.pipeline.ts:162` |
+| command                        | `resolveOrigin`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:165` |
+| command                        | `addAnnotation`                                                                                | –       | `src/eventing/trace-processing-projections.pipeline.ts:166` |
+| command                        | `removeAnnotation`                                                                             | –       | `src/eventing/trace-processing-projections.pipeline.ts:169` |
+| command                        | `bulkSyncAnnotations`                                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:172` |
+| command                        | `changeTraceName`                                                                              | –       | `src/eventing/trace-processing-projections.pipeline.ts:175` |
+| projection payload preparation | `≈ options.prepareEventForProjection`                                                          | –       | `src/eventing/trace-processing-projections.pipeline.ts:123` |
+| ClickHouse fold projection     | `≈ TraceSummaryFoldProjection.create({ store: options.summaryStore, traceCanonicalisation: o…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:124` |
+| ClickHouse fold projection     | `≈ TraceAnalyticsFoldProjection.create({ store: options.derivedStore, traceCanonicalisation:…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:131` |
+| ClickHouse map projection      | `≈ SpanStorageMapProjection.create({ store: options.spanStore, spanCostService: runtime.span…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:138` |
+| ClickHouse map projection      | `≈ TraceAnalyticsRollupMapProjection.create({ store: options.rollupStore, spanCostService: r…` | –       | `src/eventing/trace-processing-projections.pipeline.ts:145` |
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 

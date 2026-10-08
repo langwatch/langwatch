@@ -6,9 +6,6 @@ import type { AnalyticsSessionsRepository } from "./analytics-sessions.repositor
 import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
-import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
-import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
-import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
 
 /**
  * Whether this deployment offers LangWatchQL (ADR-159): the credential-free ClickHouse target and
@@ -56,10 +53,4 @@ export interface AnalyticsRepositories {
   /** The per-project window every LangWatchQL execution is counted against. */
   readonly rateLimits: AnalyticsRateLimitRepository;
   readonly langWatchQl: LangWatchQlSupply;
-  /** The slim trace_analytics row analytics' peer fold writes (Q207). */
-  readonly traceAnalyticsProjection: TraceAnalyticsProjectionRepository;
-  /** The per-span trace_analytics_rollup rows analytics' peer map appends. */
-  readonly traceAnalyticsRollup: TraceAnalyticsRollupRepository;
-  /** The slim fold's read-through cache in front of its durable row. */
-  readonly traceAnalyticsFoldCache: TraceAnalyticsFoldCacheRepository;
 }

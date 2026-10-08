@@ -4,6 +4,9 @@ import type { TraceClickHouse } from "./clickhouse/clickhouse.trace-member-clien
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
+import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
+import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.repository.ts";
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
@@ -31,8 +34,11 @@ export interface TraceRepositories {
   /** Governance's coding-assistant billing fact as trace folded it; read at OTLP ingest. */
   readonly ingestSourceBilling: TraceIngestSourceBillingRepository;
   readonly summaryProjection: TraceSummaryProjectionRepository;
-  /** The summary fold's warm state; without it a fold reads back a lossy row mid-trace. */
+  readonly analyticsProjection: TraceAnalyticsProjectionRepository;
+  readonly analyticsRollup: TraceAnalyticsRollupRepository;
+  /** The two folds' warm state; without it a fold reads back a lossy row mid-trace. */
   readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
+  readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;
   readonly spanStorage: SpanStorageRepository;
   readonly existence: TraceExistenceRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;
