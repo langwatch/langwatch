@@ -1986,6 +1986,12 @@ the system is under load; otherwise a tenant may burst past the others (Alex, 20
 **A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
 a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
 registration blocks. The group queue owns and writes the dead-letter layout; ops lists, redrives
+A dequeued event whose type no pipeline on that worker declares is retried, not refused (Alex,
+2026-10-08, round 24): mid rolling deploy an older worker can take a newer release's event, and the
+queue's retry budget (25 attempts with backoff) is the drain window in which a worker declaring it
+takes the job. Still undeclared once spent, it exhausts on its lane's outcome with a reason naming
+the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
+
 and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
 stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
 dead-letters, redrivable once analysis is back.

@@ -73,10 +73,10 @@ Feature: Event upcasting
     Then building the pipeline refuses, naming the type
 
   @unit
-  Scenario: A stored type no upcast names is still refused as undeclared
+  Scenario: A stored type no upcast names is retried as undeclared
     Given a queued job carries an event type neither declared nor upcast
     When the worker dispatches it
-    Then the job is refused as an invalid queued payload
+    Then the job fails retryably, naming the type, so a worker that declares it can take it
 
   @unit
   Scenario: Jobs queued under the former pipeline's keys drain into the current lanes

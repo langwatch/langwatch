@@ -46,7 +46,11 @@ import {
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
-import { ConfigurationError, ValidationError } from "../services/errorHandling.ts";
+import {
+  ConfigurationError,
+  UndeclaredQueuedEventTypeError,
+  ValidationError,
+} from "../services/errorHandling.ts";
 import type {
   EventSubscriberDefinition,
   EventSubscriberOptions,
@@ -754,7 +758,14 @@ export class PipelineDeclaration {
   > {
     const eventSchemas = indexEventSchemas<Schemas[number]>({ pipelineName: this.name, schemas });
     const parseEvent = (value: unknown): DeclaredEvents<Schemas> => {
-      const schema = eventSchemas.get(eventTypeOf(value));
+      const type = eventTypeOf(value);
+      const schema = eventSchemas.get(type);
+      if (!schema && type !== "") {
+        throw new UndeclaredQueuedEventTypeError({
+          eventType: type,
+          declaredBy: `pipeline "${this.name}"`,
+        });
+      }
       if (!schema) {
         throw new ValidationError({
           reason: `Pipeline "${this.name}" declares no schema for this queued event's type`,

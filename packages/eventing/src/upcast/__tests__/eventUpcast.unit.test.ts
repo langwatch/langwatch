@@ -241,8 +241,8 @@ describe("an upcast declared on the owning pipeline", () => {
       await eventSourcing.close();
     });
 
-    /** @scenario "A stored type no upcast names is still refused as undeclared" */
-    it("refuses a type neither declared nor upcast", async () => {
+    /** @scenario "A stored type no upcast names is retried as undeclared" */
+    it("retries a type neither declared nor upcast, naming it", async () => {
       const eventSourcing = runtimeWith(vi.fn());
 
       await expect(
@@ -252,8 +252,9 @@ describe("an upcast declared on the owning pipeline", () => {
           pipeline: "entitlement",
         }),
       ).rejects.toMatchObject({
-        name: "QueuedPayloadInvalidError",
-        issues: [expect.objectContaining({ path: "type" })],
+        name: "UndeclaredQueuedEventTypeError",
+        eventType: "lw.usage.limit_reached",
+        message: expect.stringContaining('"lw.usage.limit_reached"'),
       });
       await eventSourcing.close();
     });

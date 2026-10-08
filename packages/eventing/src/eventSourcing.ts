@@ -41,6 +41,7 @@ import {
   ConfigurationError,
   QueueError,
   QueueTenantMismatchError,
+  UndeclaredQueuedEventTypeError,
   ValidationError,
 } from "./services/errorHandling.ts";
 import {
@@ -377,6 +378,12 @@ export class EventSourcing {
         definition.aggregate.events.some((event) => event.type === type) ||
         definition.open((opened) => EventUpcaster.of(opened.upcasts).declaresFrom(type)),
     );
+    if (!owner && typeof type === "string" && type !== "") {
+      throw new UndeclaredQueuedEventTypeError({
+        eventType: type,
+        declaredBy: "any registered pipeline",
+      });
+    }
     if (!owner) {
       throw new ValidationError({
         reason: "No registered pipeline declares this queued event's type",
@@ -910,6 +917,34 @@ export class EventSourcing {
     });
   }
 
+  /** Reads a dequeued job; an event type this worker does not declare is logged, then retried. */
+  private readDequeued<T>({
+    read,
+    payload,
+    delivery,
+  }: {
+    read: () => T;
+    payload: Record<string, unknown>;
+    delivery: JobDelivery | undefined;
+  }): T {
+    try {
+      return read();
+    } catch (error) {
+      if (error instanceof UndeclaredQueuedEventTypeError) {
+        logger.warn(
+          {
+            ...EventSourcing.jobIdentity(payload),
+            eventType: error.eventType,
+            declaredBy: error.declaredBy,
+            attempt: delivery?.attempt ?? null,
+          },
+          "Queued event type is not declared on this worker; retrying so a worker that declares it takes the job",
+        );
+      }
+      throw error;
+    }
+  }
+
   /**
    * Gate every dispatch on tenant consistency: the payload's tenant (via the
    * lane's recorded accessor) must equal the group-key tenant segment, else
@@ -1013,7 +1048,11 @@ export class EventSourcing {
     if (!result) {
       this.rejectUnroutableJob(payload, queueName);
     }
-    const job = result.entry.read(result.clean);
+    const job = this.readDequeued({
+      read: () => result.entry.read(result.clean),
+      payload,
+      delivery,
+    });
     this.assertTenantRoutingConsistency({ tenants: job, payload, queueName });
     // Forward the delivery. Dropping it here silently pinned `deliveryAttempt` at 1 for every
     // registry entry, which disabled the fold store's merge-on-retry handling (#6578).
@@ -1050,7 +1089,11 @@ export class EventSourcing {
     const readBatch = firstEntry?.readBatch;
     if (!readBatch || !routed.every((r) => r.entry === firstEntry)) {
       const jobs = routed.map((r) => {
-        const job = r.entry.read(r.clean);
+        const job = this.readDequeued({
+          read: () => r.entry.read(r.clean),
+          payload: r.payload,
+          delivery,
+        });
         this.assertTenantRoutingConsistency({ tenants: job, payload: r.payload, queueName });
         return job;
       });
@@ -1058,7 +1101,11 @@ export class EventSourcing {
       return;
     }
 
-    const batch = readBatch(routed.map((r) => r.clean));
+    const batch = this.readDequeued({
+      read: () => readBatch(routed.map((r) => r.clean)),
+      payload: routed[0]?.payload ?? {},
+      delivery,
+    });
     batch.jobs.forEach((tenants, index) => {
       this.assertTenantRoutingConsistency({
         tenants,
