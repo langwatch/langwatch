@@ -17,8 +17,6 @@ export interface TopicApi {
   getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
   /** Asks the project's clustering process for a run; ports main's `requestClustering`. */
   requestClustering(input: TopicClusteringRequestInput): Promise<void>;
-  /** Re-asserts the project's clustering schedule, at most once per project per hour. */
-  bootstrapClustering(input: TopicProjectInput): Promise<void>;
 }
 
 export const TopicApi = moduleApi<TopicApi>()("topic");

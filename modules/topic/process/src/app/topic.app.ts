@@ -63,7 +63,6 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
   readonly #topics: TopicService;
   readonly #commands: EventingTopicClusteringCommandsService;
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
-  readonly #bootstrap: TopicClusteringBootstrapService;
   readonly #manualRun: TopicClusteringManualRunService;
   readonly #trigger: TopicClusteringTriggerService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
@@ -72,7 +71,6 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     topics: TopicService;
     commands: EventingTopicClusteringCommandsService;
     outcomes: EventingTopicClusteringOutcomeCommandsService;
-    bootstrap: TopicClusteringBootstrapService;
     manualRun: TopicClusteringManualRunService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
   }) {
@@ -85,7 +83,6 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
     this.#topics = parts.topics;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
-    this.#bootstrap = parts.bootstrap;
     this.#manualRun = parts.manualRun;
     this.#pipeline = parts.pipeline;
   }
@@ -123,10 +120,6 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
       }),
       commands,
       outcomes,
-      bootstrap: TopicClusteringBootstrapService.create({
-        claims: repositories.claims,
-        commands,
-      }),
       manualRun: TopicClusteringManualRunService.create({ runner }),
       pipeline: createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore: repositories.runStatus,
@@ -139,6 +132,10 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
           metrics,
         },
         seeds: migration,
+        bootstrap: TopicClusteringBootstrapService.create({
+          claims: repositories.claims,
+          commands,
+        }),
       }),
     });
   }
@@ -176,10 +173,6 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
   requestClustering(input: TopicClusteringRequestInput): Promise<void> {
     const { projectId, ...request } = input;
     return this.#commands.requestClustering({ tenantId: projectId, ...request });
-  }
-
-  bootstrapClustering(input: TopicProjectInput): Promise<void> {
-    return this.#bootstrap.bootstrap(input);
   }
 
   /** The tasks role's manual walk over every clustering page for one project. */

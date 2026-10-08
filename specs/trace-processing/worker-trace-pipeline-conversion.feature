@@ -61,7 +61,7 @@ Feature: The worker mounts the trace processing pipeline
     Scenario: A project's first trace claims its topic clustering
       Given a project that has not yet received a real trace
       When its first trace reaches the project metadata subscriber
-      Then the project's topic clustering is claimed through the topics feature
+      Then the first trace is recorded as trace's own milestone, which topic reacts to from its side
       And the integration milestone is reported against the organization admin
 
     @unit

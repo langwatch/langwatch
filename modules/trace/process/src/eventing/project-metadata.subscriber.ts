@@ -46,9 +46,6 @@ export interface ProjectMetadataSubscriberDeps {
    * every existing caller passes what it already passed.
    */
   projects: TraceProjectMetadata;
-  // ADR-051: reconciliation path ensures topic clustering runs daily; safe
-  // to call repeatedly as it's rate-limited.
-  bootstrapTopicClustering?: (projectId: string) => Promise<void>;
   /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
   milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
 }
@@ -138,12 +135,6 @@ async function syncProjectMetadata({
     return;
   }
 
-  // Level-triggered, so it runs BEFORE the already-marked early return
-  // below: an established project is exactly the case that used to be
-  // unreachable here, and exactly the case the deploy backfill existed
-  // to repair.
-  await assertClusteringSchedule(deps, tenantId);
-
   // A real trace on a project that already sent its first: main's
   // last_trace_at update (customerIoTraceSync), keyed off the same flag.
   if (project.firstMessage) {
@@ -162,28 +153,6 @@ async function syncProjectMetadata({
     project,
     attrs: foldState.attributes ?? {},
   });
-}
-
-/**
- * Own error handling: a bootstrap failure must not be reported as a metadata
- * failure, and must not stop the metadata write that follows. Failing is
- * survivable — the next trace re-asserts it.
- */
-async function assertClusteringSchedule(
-  deps: ProjectMetadataSubscriberDeps,
-  tenantId: string,
-): Promise<void> {
-  try {
-    await deps.bootstrapTopicClustering?.(tenantId);
-  } catch (error) {
-    logger.error(
-      {
-        tenantId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "Topic clustering bootstrap failed — retried on this project's next trace (non-fatal)",
-    );
-  }
 }
 
 function detectLanguage(attrs: Record<string, string>): string {

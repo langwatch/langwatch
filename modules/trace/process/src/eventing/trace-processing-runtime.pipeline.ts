@@ -8,7 +8,6 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
@@ -60,7 +59,6 @@ interface TraceProcessingPeers {
   modelProviders: Pick<ModelProviderApi, "listCosts">;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
-  topics: Pick<TopicApi, "bootstrapClustering">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -172,7 +170,6 @@ export class TraceProcessingRuntimeAdapter {
       traceUpdateBroadcast: createTraceUpdateBroadcastHandler({ broadcast: this.input.broadcast }),
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
-        bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
         milestones: this.input.milestones,
       }),
       experimentMetricsSync: createExperimentMetricsSyncHandler({
