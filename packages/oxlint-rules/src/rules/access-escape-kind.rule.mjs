@@ -38,7 +38,9 @@ function lacksReason(call) {
   if (declaration === undefined) return true;
   if (declaration.type !== "ObjectExpression") return false;
   if (declaration.properties.some((property) => property.type === "SpreadElement")) return false;
-  const reason = declaration.properties.find((property) => property.key?.name === "reason");
+  const reason = declaration.properties.find(
+    (property) => !property.computed && (property.key?.name ?? property.key?.value) === "reason",
+  );
   return reason === undefined || isBlankText(reason.value);
 }
 

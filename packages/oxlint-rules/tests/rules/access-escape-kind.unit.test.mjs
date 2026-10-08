@@ -46,6 +46,13 @@ describe("given a module transport", () => {
     });
   });
 
+  describe("when an escape kind states its reason under a quoted key", () => {
+    /** @scenario "An escape kind with a quoted reason key is accepted" */
+    it("reports nothing", () => {
+      expect(report('route.withAccess(anyAuthenticated({ "reason": "quoted key" }));')).toEqual([]);
+    });
+  });
+
   describe("when a handler asks admitX beside its operation", () => {
     /** @scenario "A handler pairing admitX with an operation is reported" */
     it("reports admitInHandler", () => {

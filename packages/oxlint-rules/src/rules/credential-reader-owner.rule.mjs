@@ -31,7 +31,17 @@ export const credentialReaderOwnerRule = defineRule({
         data: { name, path: file.workspacePath },
       });
 
+    const namespaces = new Set();
+
     return {
+      ImportNamespaceSpecifier(node) {
+        namespaces.add(node.local.name);
+      },
+      MemberExpression(node) {
+        if (node.computed || !namespaces.has(nameOf(node.object))) return;
+        const name = nameOf(node.property);
+        if (READER.test(name ?? "")) report(node, name);
+      },
       ImportSpecifier(node) {
         const name = nameOf(node.imported) ?? node.imported?.value;
         if (READER.test(name ?? "")) report(node, name);

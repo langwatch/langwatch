@@ -22,3 +22,9 @@ Feature: The credential-reader-owner lint rule
     Given packages/api declaring projectCredentialOfRequest
     When the credential-reader-owner rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A credential reader called through a namespace import is reported
+    Given a module file that calls projectCredentialOfRequest through a namespace import
+    When the credential-reader-owner rule runs over it
+    Then it reports credentialReader naming the reader, and nothing for the same name on another object

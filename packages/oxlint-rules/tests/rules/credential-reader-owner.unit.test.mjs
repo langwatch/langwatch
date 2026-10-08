@@ -28,6 +28,22 @@ describe("given a module outside the credential owners", () => {
     });
   });
 
+  describe("when it calls a credential reader through a namespace import", () => {
+    /** @scenario "A credential reader called through a namespace import is reported" */
+    it("reports the member call naming the reader", () => {
+      const found = report(
+        'import * as rest from "@langwatch/api/rest";\n' +
+          "const credential = rest.projectCredentialOfRequest(request);\n" +
+          "const other = request.projectCredentialOfRequest;",
+        "modules/agent/process/src/agent.module.ts",
+      );
+
+      expect(found.map((finding) => [finding.messageId, finding.data.name])).toEqual([
+        ["credentialReader", "projectCredentialOfRequest"],
+      ]);
+    });
+  });
+
   describe("when it declares its own bearer extractor", () => {
     /** @scenario "A hand-written bearer extractor is reported" */
     it("reports the declaration", () => {

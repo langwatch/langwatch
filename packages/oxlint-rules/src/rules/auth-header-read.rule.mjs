@@ -12,6 +12,26 @@ function isGoverned(file) {
   return GOVERNED_FOLDERS.has(file.sourcePath?.split("/")[0]);
 }
 
+// A header named without a string: a `.withHeaders(...)` key or `headers.authorization`.
+function isNamedHeader(node) {
+  const parent = node.parent;
+  if (parent?.computed) return false;
+  if (parent?.type === "MemberExpression")
+    return parent.property === node && nameOf(parent.object) === "headers";
+  if (parent?.type !== "Property" || parent.key !== node) return false;
+  for (let child = parent, up = parent.parent; up; child = up, up = up.parent)
+    if (up.type === "CallExpression" && nameOf(up.callee) === "withHeaders")
+      return up.arguments.includes(child);
+
+  return false;
+}
+
+function nameOf(node) {
+  if (node?.type === "Identifier") return node.name;
+
+  return node?.type === "MemberExpression" ? node.property?.name : undefined;
+}
+
 export const authHeaderReadRule = defineRule({
   name: "auth-header-read",
   kind: "problem",
@@ -25,16 +45,22 @@ export const authHeaderReadRule = defineRule({
     },
   },
   create(context, file) {
+    const check = (node, name) => {
+      const header = name.toLowerCase();
+      if (!AUTH_HEADERS.has(header)) return;
+      context.report({ node, messageId: "authHeader", data: { header, path: file.workspacePath } });
+    };
+
     return {
       Literal(node) {
         if (typeof node.value !== "string" || node.parent?.type === "TSLiteralType") return;
-        const header = node.value.toLowerCase();
-        if (!AUTH_HEADERS.has(header)) return;
-        context.report({
-          node,
-          messageId: "authHeader",
-          data: { header, path: file.workspacePath },
-        });
+        check(node, node.value);
+      },
+      TemplateLiteral(node) {
+        if (node.expressions.length === 0) check(node, node.quasis[0]?.value.cooked ?? "");
+      },
+      Identifier(node) {
+        if (isNamedHeader(node)) check(node, node.name);
       },
     };
   },

@@ -27,3 +27,9 @@ Feature: The auth-header-read lint rule
     Given a module service that reads the X-Auth-Token header
     When the auth-header-read rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: An auth header named by a key or a member is reported
+    Given a module transport naming authorization as an object key and a member, and x-api-key in a plain template
+    When the auth-header-read rule runs over it
+    Then it reports each, and nothing for a computed member

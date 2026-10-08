@@ -34,3 +34,9 @@ Feature: The access-escape-kind lint rule
     Given a module transport whose handler returns the result of an admitX operation
     When the access-escape-kind rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: An escape kind with a quoted reason key is accepted
+    Given a module transport whose escape kind passes its reason under a quoted "reason" key
+    When the access-escape-kind rule runs over it
+    Then it reports nothing
