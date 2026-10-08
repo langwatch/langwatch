@@ -20,7 +20,7 @@ const { queryImpls, utils, mockOnClose } = vi.hoisted(() => ({
   mockOnClose: vi.fn(),
 }));
 
-vi.mock("../coding-agent-api.ts", () => {
+vi.mock("../behavior/coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -53,12 +53,12 @@ vi.mock("../coding-agent-api.ts", () => {
   return { codingAgentApi: makeNode("") };
 });
 
-import { PullRequestDetailDrawer } from "../pull-request-detail-drawer.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
 } from "../testing.tsx";
+import { PullRequestDetailDrawer } from "../ui/sections/pull-request-detail-drawer.tsx";
 
 function pinDetail(data: unknown) {
   queryImpls["codingAgents.pullRequestDetail"] = () => ({

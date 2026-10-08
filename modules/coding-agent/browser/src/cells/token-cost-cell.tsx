@@ -2,7 +2,7 @@ import { formatCost } from "@langwatch/design-system/display-formatters";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
-import type { SessionListRow } from "../session-list-row.ts";
+import type { SessionListRow } from "../behavior/session-list-row.ts";
 import { MissingValue } from "../ui/elements/cells/missing-value.tsx";
 import { ComparisonBar } from "./context-cell.tsx";
 

@@ -13,11 +13,11 @@ import {
 export const codingAgentWeb = defineBrowserModule("coding-agent")
   .lends(CodingAgentPullRequestsTableToken, {
     load: async () => ({
-      default: (await import("./lent-activity-tables.tsx")).LentPullRequestsTable,
+      default: (await import("./ui/sections/lent-activity-tables.tsx")).LentPullRequestsTable,
     }),
   })
   .lends(CodingAgentSessionsTableToken, {
     load: async () => ({
-      default: (await import("./lent-activity-tables.tsx")).LentSessionsTable,
+      default: (await import("./ui/sections/lent-activity-tables.tsx")).LentSessionsTable,
     }),
   });

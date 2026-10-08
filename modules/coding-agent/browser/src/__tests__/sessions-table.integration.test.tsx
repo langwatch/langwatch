@@ -18,7 +18,7 @@ const { queryImpls, utils } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../coding-agent-api.ts", () => {
+vi.mock("../behavior/coding-agent-api.ts", () => {
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -51,12 +51,12 @@ vi.mock("../coding-agent-api.ts", () => {
   return { codingAgentApi: makeNode("") };
 });
 
-import { SessionsTable } from "../sessions-table.tsx";
 import {
   codingAgentHostWrapper,
   fakeCodingAgentActivityHost,
   type FakeCodingAgentActivityHost,
 } from "../testing.tsx";
+import { SessionsTable } from "../ui/sections/sessions-table.tsx";
 
 /** A fixed moment the fixtures hang off, well outside any relative preset. */
 const LONG_AGO = Date.parse("2026-07-01T09:00:00Z");

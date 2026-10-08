@@ -41,6 +41,7 @@ export const navigationWeb = defineBrowserModule("navigation")
   /** The palette drawn inline in a landing hero, lent to project (§10.1). */
   .lends(InlineCommandPaletteToken, {
     load: async () => ({
-      default: (await import("./ui/sections/inline-command-palette.tsx")).InlineCommandPalette,
+      default: (await import("./features/command-bar/ui/sections/inline-command-palette.tsx"))
+        .InlineCommandPalette,
     }),
   });
