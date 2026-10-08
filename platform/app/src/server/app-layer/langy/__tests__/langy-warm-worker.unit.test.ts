@@ -19,6 +19,18 @@ import {
 import { LangySessionKeyScopeError } from "../langyApiKey";
 import type { LangyWorkerPort } from "../langyWorker";
 
+const logger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  createLogger: () => logger,
+}));
+
 const SESSION = {
   user: { id: "user-1" },
 } as StartConversationTurnInput["session"];
@@ -293,6 +305,23 @@ describe("LangyTurnService.warmConversationWorker", () => {
       expect(result.warmed).toBe(false);
       expect(mocks.ensureConversation).not.toHaveBeenCalled();
       expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("logs the aggregate refusal at debug, not as a warning", async () => {
+      logger.debug.mockClear();
+      logger.warn.mockClear();
+      const { deps } = makeDeps({
+        projectKinds: { kindOf: vi.fn(async () => "aggregate") },
+      });
+      const service = LangyTurnService.create(deps);
+
+      await service.warmConversationWorker(warmInput());
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "aggregate_project_is_read_only" }),
+        expect.any(String),
+      );
     });
 
     it("skips the warm when no model is configured", async () => {

@@ -383,6 +383,7 @@ Feature: An aggregate project reads its member projects
     Given an aggregate project, which has no Langy model and accepts no key
     When ana starts a Langy turn on it, from the panel, the API or a connected folder
     Then it is refused as read only, titled "Data can't be added to this project"
+    And the refusal card offers no "Try again", since the same turn is refused the same way
     And no conversation is written, no model is resolved and no key is minted
     And opening the Langy panel on it starts no worker and writes nothing
 

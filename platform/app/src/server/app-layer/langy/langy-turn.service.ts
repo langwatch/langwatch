@@ -59,6 +59,7 @@ import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyT
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { ProjectKindReader } from "~/server/app-layer/permissions/aggregate-admin-gate";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagKey } from "~/server/featureFlag/registry";
@@ -756,6 +757,13 @@ export class LangyTurnService {
         logger.debug(
           { error, projectId, conversationId },
           "langy warm skipped, session key scope refusal, first message will surface it",
+        );
+      } else if (error instanceof AggregateProjectIsReadOnlyError) {
+        // An aggregate takes no turns at all; the first message carries the
+        // read-only refusal. Expected on every panel open there, so no stack.
+        logger.debug(
+          { projectId, code: error.code },
+          "langy warm skipped, aggregate project refuses turns",
         );
       } else {
         logger.warn(

@@ -57,6 +57,9 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
+      // A turn on an aggregate project, refused before anything is written
+      // with the shared read-only refusal.
+      "aggregate_project_is_read_only",
       // Sending faster than the per-user limit allows: without an entry here it
       // fell into the generic default, which tells a throttled user Langy is
       // broken and offers a retry into the same limit.
@@ -697,6 +700,21 @@ describe("explainLangyError", () => {
 
       expect(presentation.render).toBe("suppress");
       expect(presentation.action?.kind).toBe("connect-github");
+    });
+  });
+
+  describe("given a turn refused because the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("renders the read-only card with no retry", () => {
+      // Refused every time while the project is an aggregate, so a "Try again"
+      // could never work; the copy says where the change belongs instead.
+      const presentation = explainLangyError(
+        domain({ code: "aggregate_project_is_read_only", httpStatus: 403 }),
+      );
+
+      expect(presentation.render).toBe("card");
+      expect(presentation.title).toBe("Data can't be added to this project");
+      expect(presentation.action).toBeUndefined();
     });
   });
 
