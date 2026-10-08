@@ -1,18 +1,26 @@
 import type { ScopeGraphOrganization } from "@langwatch/organization-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { OrganizationScopeGraphReader } from "../../services/organization-scope-graph.service.ts";
+
+type PrismaScopeGraphDatabase = Pick<PrismaClient, "organization" | "organizationUser">;
 
 /**
  * The scope graph in one narrow select: the skeleton and the chrome's scalars, and
  * only the caller's own membership rows. Ordered, so its hash is stable.
  */
-export class PrismaScopeGraphRepository implements OrganizationScopeGraphReader {
-  static create(prisma: PrismaClient): PrismaScopeGraphRepository {
+export class PrismaScopeGraphRepository
+  extends PrismaRepository.for("Organization", "OrganizationUser")
+  implements OrganizationScopeGraphReader
+{
+  static create(prisma: PrismaScopeGraphDatabase): PrismaScopeGraphRepository {
     return new PrismaScopeGraphRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(prisma: PrismaScopeGraphDatabase) {
+    super(prisma);
+  }
 
   async findScopeGraphForUser({ userId }: { userId: string }): Promise<ScopeGraphOrganization[]> {
     const organizations = await this.prisma.organization.findMany({

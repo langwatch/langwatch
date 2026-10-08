@@ -95,6 +95,22 @@ Feature: Private Prisma table ownership
     When entitlement updates Project through a delegate or raw SQL
     Then the policy reports each write as reading-only access misused
 
+  # A ruled write on a share is named by file with its reason (R42: authz's admission and offboarding writes).
+  @unit @architecture
+  Scenario: A named reader's write a share admits by file passes
+    Given project shares Project for reading with entitlement
+    And the share admits entitlement's writes in one named file, with a reason
+    When entitlement updates Project in that file
+    Then no finding names that write
+    And a write by entitlement in any other file is still reported
+
+  @unit @architecture
+  Scenario: A share's write exception that matches no write is reported
+    Given the Project share admits a write in a named file
+    And that file no longer writes Project, or the exception names a module that is not a reader
+    When the policy runs
+    Then the policy asks for the write exception to be deleted
+
   @unit @architecture
   Scenario: A shared Prisma table declared by a module that does not own it is reported
     Given the policy declares Project shared by organization
@@ -113,3 +129,4 @@ Feature: Private Prisma table ownership
   Scenario: Every shared Prisma table carries a reason
     When the declared Prisma shares are read
     Then each one has a non-empty reason
+    And each write exception on a share has a non-empty reason

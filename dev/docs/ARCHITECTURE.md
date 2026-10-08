@@ -1501,9 +1501,11 @@ framework owned and the six legacy tables with no TypeScript writer as legacy ow
 
 **Shared reads over copies, Postgres too** (Alex, 2026-10-07, R40): a module needing another's stored data
 reads the owner's table through a declared share, never a copy, unless a ruling names a reason. The
-`prisma-table-ownership` policy keeps `SHARED_PRISMA_TABLES` (model, owner, readers, reason): a named reader's
-claim and reads pass when the owner claims the model; its writes, a wrong owner or a reader that no longer
-reads are findings.
+`prisma-table-ownership` policy keeps `SHARED_PRISMA_TABLES` (model, owner, readers, reason, optional writes):
+a named reader's claim and reads pass when the owner claims the model; its writes, a wrong owner or a reader
+that no longer reads are findings. A write a ruling admits is a named exception on the share (reader, file,
+reason) and one matching no write is a finding; authz's SSO admission UPDATEs and offboarding delete of
+OrganizationUser are the first (Alex, 2026-10-08, R42).
 
 A check that holds a summary against the facts it was folded from keeps its own record of those
 facts, a projection over the same events on its own pipeline, and never reads `event_log`:

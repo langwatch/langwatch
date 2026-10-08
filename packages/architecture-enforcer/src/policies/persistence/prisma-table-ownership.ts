@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
@@ -10,12 +10,16 @@ import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
+/** A named reader's write a ruling admits on a share, by file, with its reason (R42). */
+export type SharedPrismaWrite = { reader: string; file: string; reason: string };
+
 /** A Prisma model its claiming module shares for reading with named modules (R40). */
 export type SharedPrismaTable = {
   table: string;
   owner: string;
   readers: readonly string[];
   reason: string;
+  writes?: readonly SharedPrismaWrite[];
 };
 
 /** The Postgres twin of clickhouse-table-ownership's `shared`; `table` is the model name. */
@@ -26,6 +30,34 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
     readers: ["entitlement"],
     reason:
       "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40)",
+  },
+  {
+    table: "OrganizationUser",
+    owner: "organization",
+    readers: ["authz"],
+    reason:
+      "authz reads memberships for every decision and answers its active administrators from them (R41, R42)",
+    writes: [
+      {
+        reader: "authz",
+        file: "modules/authz/process/src/repositories/prisma/prisma.authz-admission.repository.ts",
+        reason:
+          "SSO admission completes or clears pendingSsoGrantId atomically with the grant (R42)",
+      },
+      {
+        reader: "authz",
+        file: "modules/authz/process/src/repositories/prisma/prisma.authz-ledger-read.repository.ts",
+        reason:
+          "offboarding deletes the membership first, its lock serialising the grant snapshot (R42)",
+      },
+    ],
+  },
+  {
+    table: "Organization",
+    owner: "organization",
+    readers: ["scim"],
+    reason:
+      "scim resolves an organisation by its SSO domain and reads names for its oversight screen (R37 S1 R2, R40, R42)",
   },
 ];
 
@@ -561,7 +593,7 @@ function readerAccess({
   return [...files].toSorted().flatMap((file) => fileAccess({ file, table, delegate }));
 }
 
-/** A share naming the wrong owner, a write by a named reader, or a reader that no longer reads. */
+/** A wrong owner, an unadmitted write by a reader, a stale write exception or a stale reader. */
 function sharedFindings({
   root,
   catalogue,
@@ -590,11 +622,18 @@ function sharedFindings({
       ];
     }
 
-    return item.readers.flatMap((reader) => {
+    const written: SharedPrismaWrite[] = [];
+    const readers = item.readers.flatMap((reader) => {
       const feature = catalogue.find((entry) => entry.id === reader);
       const access = feature ? readerAccess({ root, feature, table: item.table }) : [];
       const writes = access
         .filter((entry) => entry.write)
+        .filter((entry) => {
+          const excepted = admittedWrite({ item, reader, file: relative(root, entry.file) });
+          if (excepted) written.push(excepted);
+
+          return !excepted;
+        })
         .map((entry) =>
           issue(
             entry.file,
@@ -614,5 +653,39 @@ function sharedFindings({
         ),
       ];
     });
+
+    return [...readers, ...staleWrites({ root, item, written })];
   });
+}
+
+function admittedWrite({
+  item,
+  reader,
+  file,
+}: {
+  item: SharedPrismaTable;
+  reader: string;
+  file: string;
+}): SharedPrismaWrite | undefined {
+  return item.writes?.find((write) => write.reader === reader && write.file === file);
+}
+
+/** A write exception the tree no longer needs is deleted, so the share cannot widen silently. */
+function staleWrites({
+  root,
+  item,
+  written,
+}: {
+  root: string;
+  item: SharedPrismaTable;
+  written: readonly SharedPrismaWrite[];
+}): ArchitectureViolation[] {
+  return (item.writes ?? [])
+    .filter((write) => !written.includes(write))
+    .map((write) =>
+      issue(
+        join(root, write.file),
+        `The write exception for ${write.reader} writing ${item.table} in ${write.file} matches no write. Delete it.`,
+      ),
+    );
 }
