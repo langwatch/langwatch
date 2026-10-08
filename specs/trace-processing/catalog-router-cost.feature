@@ -35,11 +35,13 @@ Feature: Router models are never billed a negative cost
     When the cost for model "nvidia/switchyard" is matched
     Then no registry entry is returned
 
-  # Every path that writes a cost reads the same registry: the gateway spend
-  # rating, the trace span cost and the evaluation cell cost. The span path
-  # already drops a cost that is not above zero; the other two did not, so a
-  # call routed through nvidia/switchyard rated at minus 1,500 dollars for
-  # 1,000 input and 500 output tokens.
+  # Every path in the app that writes a cost reads the same registry: the
+  # gateway spend rating, the trace span cost, the evaluation cell cost and
+  # the DSPy step call cost. The span path already drops a cost that is not
+  # above zero; the other three did not, so a call routed through
+  # nvidia/switchyard rated at minus 1,500 dollars for 1,000 input and 500
+  # output tokens. LangEvals reads the catalog separately, into LiteLLM, and
+  # is not covered here.
 
   @unit
   Scenario: A router call through the gateway never lowers spend
@@ -57,4 +59,10 @@ Feature: Router models are never billed a negative cost
   Scenario: An evaluation cell run on a router is never costed below zero
     Given the model catalog prices a router at -1 per token
     When the cost of an evaluation cell that ran that router is computed
+    Then the cost is not below zero
+
+  @unit
+  Scenario: A DSPy step call on a router is never costed below zero
+    Given the model catalog prices a router at -1 per token
+    When the cost of a DSPy step's LLM call to that router is computed
     Then the cost is not below zero
