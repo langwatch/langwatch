@@ -142,8 +142,8 @@ describe("the Dashboards screens", () => {
     });
 
     describe("when the member has no My dashboard yet", () => {
-      /** @scenario "AC160b A member with no My dashboard gets one made, starred by nobody" */
-      it("makes exactly one, stars nothing, and opens it", async () => {
+      /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+      it("makes exactly one and opens it, leaving the star to the server", async () => {
         const server = boardsServer([listed({ id: "team-1", name: "Weekly review" })]);
         const host = hostOpening({ flags: FLAG_ON });
         renderDashboards({

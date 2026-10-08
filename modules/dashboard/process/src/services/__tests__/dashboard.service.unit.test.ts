@@ -6,6 +6,7 @@ import {
   DashboardNotFoundError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
+  MY_DASHBOARD_NAME,
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
@@ -202,6 +203,54 @@ describe("DashboardService", () => {
         viewer: { userId: "member-1" },
       });
       expect(listed?.isStarred).toBe(false);
+    });
+  });
+
+  describe("given a member's My dashboard is made", () => {
+    const myDashboard = (service: DashboardService) =>
+      service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME, createdById: "member-1" });
+    const starredIds = async (service: DashboardService, userId: string) =>
+      (await service.listStarred({ projectId: PROJECT, userId })).map((entry) =>
+        entry.kind === "board" ? entry.dashboard.id : entry.templateId,
+      );
+
+    /** @scenario "AC160b A member with no My dashboard gets one made, starred for them" */
+    it("stars it for its maker and for nobody else", async () => {
+      const { service } = serviceWith();
+
+      const created = await myDashboard(service);
+
+      await expect(starredIds(service, "member-1")).resolves.toEqual([created.id]);
+      await expect(starredIds(service, "member-2")).resolves.toEqual([]);
+      const [listed] = await service.getAll({
+        projectId: PROJECT,
+        graphCountScope: "builder",
+        viewer: { userId: "member-1" },
+      });
+      expect(listed?.isStarred).toBe(true);
+    });
+
+    /** @scenario "AC160c A member who unstars My dashboard keeps it unstarred" */
+    it("keeps it unstarred once its maker unstars it", async () => {
+      const { service } = serviceWith();
+      const created = await myDashboard(service);
+
+      await service.unstar({
+        projectId: PROJECT,
+        userId: "member-1",
+        star: { kind: "board", dashboardId: created.id },
+      });
+      await service.getOrCreateFirst({ projectId: PROJECT, viewer: { userId: "member-1" } });
+
+      await expect(starredIds(service, "member-1")).resolves.toEqual([]);
+    });
+
+    it("stars nobody when the board has no maker", async () => {
+      const { service } = serviceWith();
+
+      await service.create({ projectId: PROJECT, name: MY_DASHBOARD_NAME });
+
+      await expect(starredIds(service, "member-1")).resolves.toEqual([]);
     });
   });
 
