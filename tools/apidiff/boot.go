@@ -114,6 +114,9 @@ type BootConfig struct {
 	// BranchHead boots the branch from -branch-dir's HEAD in its persistent
 	// worktree under -no-haven too, leaving -branch-dir itself untouched.
 	BranchHead bool
+	// SweepDays drops apidiff_* databases older than this many days at the
+	// start of a run; 0 skips the sweep.
+	SweepDays int
 }
 
 // Instance is one booted API copy.
@@ -701,6 +704,9 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Join(state.workRoot, "logs"), 0o750); err != nil {
+		return err
+	}
+	if err := writeRunPID(state.workRoot); err != nil {
 		return err
 	}
 	state.runID = RunID(state.workRoot)
@@ -1293,6 +1299,12 @@ func (state *bootState) chAdmin(ctx context.Context, query string) error {
 // ClickHouse databases are created by the clickhouse-migrate task's goose
 // bootstrap; here they only need dropping for freshness.
 func (state *bootState) prepareDatabases(ctx context.Context) error {
+	if state.cfg.SweepDays > 0 {
+		maxAge := time.Duration(state.cfg.SweepDays) * 24 * time.Hour
+		if err := state.sweepStaleDatabases(ctx, maxAge, false); err != nil {
+			state.logf("%v", err)
+		}
+	}
 	if state.cfg.Keep {
 		state.logf("databases: -keep set, reusing existing")
 		return nil

@@ -399,3 +399,17 @@ Feature: apidiff boots its instances through haven
       When the spec diff reports the removed root operations and the changed connect security
       Then those changes render under their ruling and are not counted as differences
       And a different change kind on the same operation is still counted
+
+    @unit
+    Scenario: Stale apidiff databases are swept, and nothing else
+      Given the shared Postgres server holds apidiff databases of crashed and kept runs
+      When a run starts, or apidiff -sweep-databases runs, with -sweep-days at 2
+      Then each apidiff_<run>_branch or _main database older than 2 days is dropped
+      And a database without the apidiff_ prefix is never touched
+      And with -dry-run the databases that would be dropped are printed and none is dropped
+
+    @unit
+    Scenario: A database owned by a running apidiff is never swept
+      Given an old apidiff database whose run directory holds the pid of a live process
+      When the sweep selects databases to drop
+      Then that database and the current run's databases are left alone

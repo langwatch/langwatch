@@ -141,6 +141,7 @@ usage:
                 [-scenarios GLOB] [-scenario-id PATTERN]... [-scenario-concurrency N]
                 [-scenario-shards N] [-repeat N] [-run-dir DIR] [-seed-dir DIR] [-final]
                 (without -b: run the scenarios against the one stack; PASS or FAIL)
+  apidiff -sweep-databases [-sweep-days N] [-dry-run] [-pg-url URL] [-branch-dir DIR]
   apidiff done  -run RUN -scenario ID -note TEXT [-force] | -list | -undo ID
 
 Each run instance is a haven stack under its own run-scoped slug wherever
@@ -177,6 +178,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runBootSubcommand(ctx, args[1:], out)
 	case "scenarios":
 		return runScenariosSubcommand(ctx, args[1:], out)
+	case "-sweep-databases", "sweep-databases":
+		return runSweepSubcommand(ctx, args[1:], out)
 	case "done":
 		return doneScenariosSubcommand(args[1:], out)
 	default:
@@ -374,6 +377,7 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
 	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
 	flags.BoolVar(&boot.ComposePostgres, "compose-postgres", os.Getenv("CI") != "", "-no-haven: run Postgres in the compose project too, for full isolation (default on CI, which has no host Postgres); otherwise each side gets its own run-scoped database on haven's host Postgres at 127.0.0.1:5432")
+	flags.IntVar(&boot.SweepDays, "sweep-days", defaultSweepDays, "at the start of a run, drop apidiff_* databases older than this many days that no live run owns (0 = never)")
 	flags.BoolVar(&boot.DryRun, "dry-run", false, "print the plan (refs, worktree paths, slugs, commands) and start nothing")
 	noHaven := false
 	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
