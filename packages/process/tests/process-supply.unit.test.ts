@@ -1,7 +1,10 @@
-import { SupplyToken, supplyToken } from "@langwatch/module";
+import { moduleApi, SupplyToken, supplyToken } from "@langwatch/module";
+import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
-import { defineProcessModule } from "../src/feature-installer.ts";
+import { MissingProviderError } from "../src/boot-errors.ts";
+import { type BoundApis, defineChannels } from "../src/channel-registry.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { createApp as packageCreateApp } from "../src/index.ts";
 import { createApp } from "../src/process-supply.ts";
 import { Server } from "../src/server.ts";
@@ -240,5 +243,91 @@ describe("process supply", () => {
     await runtime.start();
     await runtime.stop();
     expect(events).toEqual(["producer:start", "listener:start", "listener:stop", "producer:stop"]);
+  });
+});
+
+interface VerdictApi {
+  judge(text: string): string;
+}
+const VerdictApi = moduleApi<VerdictApi>()("instant-eval");
+
+interface VerdictChannels {
+  readonly verdicts: Pick<VerdictApi, "judge">;
+}
+
+/** Binds the judge's Api without listing it as a dependency: only a stand-in can fill it. */
+class BoundVerdictChannels {
+  static readonly requires = [] as const;
+  static readonly binds = { verdicts: VerdictApi } as const;
+
+  static create({
+    bound,
+  }: {
+    bound: BoundApis<typeof BoundVerdictChannels.binds>;
+  }): VerdictChannels {
+    return { verdicts: { judge: (text) => bound.verdicts.judge(text) } };
+  }
+}
+
+interface ScoringApi {
+  score(text: string): string;
+}
+const ScoringApi = moduleApi<ScoringApi>()("analytics");
+
+class ScoringApp implements ScoringApi {
+  static readonly contract = ScoringApi;
+  static readonly dependencies = {};
+
+  static create({
+    channels,
+  }: FeatureSetup<Record<never, never>, never, undefined, never, VerdictChannels>): ScoringApp {
+    return new ScoringApp(channels.verdicts);
+  }
+
+  private constructor(private readonly verdicts: VerdictChannels["verdicts"]) {}
+
+  score(text: string): string {
+    return `scored ${this.verdicts.judge(text)}`;
+  }
+}
+
+const scoringModule = defineProcessModule("analytics")
+  .withChannels(defineChannels({ live: BoundVerdictChannels, memory: BoundVerdictChannels }))
+  .withApi(ScoringApp)
+  .build();
+
+describe("given a module whose channel binds an Api whose module is not installed", () => {
+  describe("when the process stands in for that Api", () => {
+    /** @scenario "Standing in for a capability a module's channel binds" */
+    it("boots and a call through the channel reaches the stand-in", async () => {
+      const standIn: VerdictApi = { judge: (text) => `stood in for ${text}` };
+      const runtime = await createApp({ role: "api" })
+        .withModules([scoringModule])
+        .withStores(memoryStores())
+        .provide({ "instant-eval": standIn })
+        .boot();
+
+      try {
+        expect(runtime.service(ScoringApi).score("a reply")).toBe("scored stood in for a reply");
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when the process neither installs nor stands in for it", () => {
+    /** @scenario "Standing in for a capability a module's channel binds" */
+    it("refuses boot, naming the module, the binding and the token", async () => {
+      const boot = createApp({ role: "api" })
+        .withModules([scoringModule])
+        .withStores(memoryStores())
+        .boot();
+
+      await expect(boot).rejects.toBeInstanceOf(MissingProviderError);
+      await expect(boot).rejects.toMatchObject({
+        feature: "analytics",
+        dependencyKey: "channels.verdicts",
+      });
+    });
   });
 });

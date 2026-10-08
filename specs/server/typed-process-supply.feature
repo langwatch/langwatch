@@ -63,6 +63,13 @@ Feature: A process cannot boot without what its modules declared
       Then it boots
       And a capability neither installed nor stood in for is named as missing
 
+    @unit
+    Scenario: Standing in for a capability a module's channel binds
+      Given a module whose channel tier binds a capability whose module is not installed
+      When the process stands in for that capability
+      Then it boots and a call through the channel reaches the stand-in
+      And a bound capability neither installed nor stood in for refuses boot, naming the module, the binding and the token
+
   # ---------------------------------------------------------------------------
   # Stores
   # ---------------------------------------------------------------------------

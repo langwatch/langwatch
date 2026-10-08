@@ -3,6 +3,7 @@ import { ModuleApiToken, type ResolvedTokens, SupplyToken } from "@langwatch/mod
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
 import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
+import { channelsBind } from "./channel-registry.ts";
 import type {
   InstallableServerFeature,
   ModuleSecretsScope,
@@ -481,7 +482,7 @@ export class ProcessSupply<
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
     const supplied = new Set<ModuleApiToken<unknown> | SupplyToken<unknown>>();
     for (const module of state.modules) {
-      for (const token of Object.values(module.dependencies)) {
+      for (const token of [...Object.values(module.dependencies), ...boundTokens(module)]) {
         if (
           (token instanceof ModuleApiToken || token instanceof SupplyToken) &&
           Object.hasOwn(state.peers, token.name) &&
@@ -506,6 +507,15 @@ export class ProcessSupply<
         .boot()
     );
   }
+}
+
+/** A bound channel's `*Api` on either tier, so `provide()` can stand in for it (record §5). */
+function boundTokens(module: SupplyModule): readonly ModuleApiToken<unknown>[] {
+  const channels = module.channelRegistry;
+  if (channels === undefined) return [];
+  return (["live", "memory"] as const).flatMap((tier) =>
+    channelsBind(channels, tier).map(([, token]) => token),
+  );
 }
 
 interface CreateAppOptions {
