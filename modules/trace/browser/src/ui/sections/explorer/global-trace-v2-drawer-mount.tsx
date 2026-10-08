@@ -1,10 +1,16 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type React from "react";
+import { lazy, Suspense } from "react";
 
 import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { isTraceExplorerPath } from "../../../model/trace-explorer-path.ts";
 import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator.ts";
-import { TraceV2DrawerShell } from "./trace-drawer/index.ts";
+
+// The drawer and everything it renders (transcripts, code, markdown) load when a trace opens,
+// not with every page this mount sits above.
+const TraceV2DrawerShell = lazy(() =>
+  import("./trace-drawer/index.ts").then((module) => ({ default: module.TraceV2DrawerShell })),
+);
 
 /**
  * Mounts the v2 trace drawer above whatever page the reader is on, so
@@ -21,5 +27,9 @@ const GlobalTraceV2DrawerMountInner: React.FC = () => {
   useTraceDrawerUrlHydrator();
   const hasTrace = useTraceDrawer((s) => !!s.traceId);
   if (!hasTrace) return null;
-  return <TraceV2DrawerShell />;
+  return (
+    <Suspense fallback={null}>
+      <TraceV2DrawerShell />
+    </Suspense>
+  );
 };

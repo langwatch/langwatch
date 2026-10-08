@@ -51,6 +51,17 @@ describe("given a governed file", () => {
     });
   });
 
+  describe("when the file is the design system's Shiki adapter", () => {
+    /** @scenario "The design system's Shiki adapter is exempt" */
+    it("reports nothing there and still reports its siblings", () => {
+      const code = 'const shiki = await import("shiki");';
+      const source = "packages/design-system/src";
+
+      expect(report(code, `${source}/shiki-adapter.ts`)).toEqual([]);
+      expect(report(code, `${source}/shiki-chunking.ts`)).toHaveLength(1);
+    });
+  });
+
   describe("when the file is a dev runtime entry", () => {
     /** @scenario "The dev runtime's entries are exempt" */
     it("reports nothing there and still reports its siblings", () => {

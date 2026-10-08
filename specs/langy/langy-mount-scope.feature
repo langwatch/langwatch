@@ -24,3 +24,11 @@ Feature: Langy mounts with the product pages, not the special screens
     When a project page below it is opened, such as the experiment workbench
     Then the page renders inside the Langy provider, beside the panel
     And the page may register its handlers with the panel rather than throwing
+
+  @integration
+  Scenario: A page loads the Langy panel only when Langy opens
+    Given the minimised peek is off and Langy is closed
+    When a project page below the Langy layout is opened
+    Then the page shows the Langy launcher, and the panel's code is not loaded
+    When the reader opens Langy
+    Then the panel loads and opens

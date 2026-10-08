@@ -11,7 +11,7 @@ import { LangyProvider, useLangy } from "../../../../ui/sections/langy-page-cont
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
-import { LangySidecar } from "./langy-panel.tsx";
+import { LangyDock } from "./langy-dock.tsx";
 
 /** The routed page, when the router mounts this layout with no children of its own. */
 const ROUTED_PAGE = <UiRouteOutlet />;
@@ -110,6 +110,6 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
 function LangySidecarConnected() {
   const { proposalHandlersRef, actionHandlersRef } = useLangy();
   return (
-    <LangySidecar proposalHandlersRef={proposalHandlersRef} actionHandlersRef={actionHandlersRef} />
+    <LangyDock proposalHandlersRef={proposalHandlersRef} actionHandlersRef={actionHandlersRef} />
   );
 }

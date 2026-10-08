@@ -14,6 +14,9 @@ const MCP_SERVER_STARTUP = /^mcp\/typescript\/src\//;
 // modules/data-privacy/process/src/channels/http/__tests__/http.google-dlp.channel.unit.test.ts.
 const GOOGLE_DLP_CHANNEL =
   /^modules\/data-privacy\/process\/src\/channels\/http\/http\.google-dlp\.channel\.ts$/;
+// The ~600 kB Shiki engine loads on the first highlight, never with a page that could show
+// code; pinned by apps/ui/vite/__tests__/shiki-reach-guard.unit.test.ts (ADR-027).
+const SHIKI_ADAPTER = /^packages\/design-system\/src\/shiki-adapter\.ts$/;
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
@@ -28,6 +31,7 @@ function isExempt(workspacePath) {
     CLI_STARTUP.test(workspacePath) ||
     MCP_SERVER_STARTUP.test(workspacePath) ||
     GOOGLE_DLP_CHANNEL.test(workspacePath) ||
+    SHIKI_ADAPTER.test(workspacePath) ||
     CLI_TSUP_CONFIG.test(workspacePath) ||
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath) ||

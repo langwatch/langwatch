@@ -64,3 +64,16 @@ Rule: Highlighting does no work until code is shown
   Scenario: No grammar loads until the drawer highlights something
     Given the trace explorer has loaded but no code has been highlighted yet
     Then no language grammar has been loaded for a less common language
+
+Rule: The highlighter loads only when code is highlighted
+  @unit
+  Scenario: A page that only could show code does not load the highlighter
+    Given the built application
+    When the entry or a chunk every board page loads is followed through its static imports
+    Then none of them reaches the Shiki engine chunk
+    And the build fails, naming the chain, when one does
+
+  @unit
+  Scenario: Markdown does not load the highlighter
+    Given the small hast helpers Shiki and the markdown renderer share
+    Then they land in a chunk of their own, not in the Shiki engine chunk

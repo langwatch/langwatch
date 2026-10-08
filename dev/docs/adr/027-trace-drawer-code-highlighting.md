@@ -64,6 +64,22 @@ languages that actually dominate trace payloads.
 - Eager-base choices are now a deliberate, documented hot-path list rather
   than an ad-hoc accumulation.
 
+## Amendment (2026-10-08): the engine loads on the first highlight
+
+The adapter imported `shiki` statically, so any chunk that could render code (markdown,
+the trace drawer, Langy's messages) pulled the ~600 kB engine chunk onto pages that never
+showed code, such as dashboards. Now:
+
+- The adapter reads the language registry from `shiki/langs` (its own small chunk of lazy
+  loaders) so `normalizeShikiLang` and `isShikiLangReady` stay synchronous, and imports
+  `shiki` itself with `import()` inside `getSharedHighlighter`. A code block shows plain
+  text until the engine arrives, the same transition a lazy grammar already had.
+- The eager base keeps its meaning: those grammars load with the engine, not with the page.
+- The hast helpers Shiki shares with the markdown renderer get their own chunk; a manual
+  chunk swallows its dependencies, so they had pulled the engine into every markdown view.
+- `apps/ui/vite/shiki-reach-guard.ts` fails the build when the entry or a chunk every board
+  page loads reaches the shiki chunk through static imports.
+
 ## References
 
 - Shiki bundles: https://shiki.style/guide/bundles

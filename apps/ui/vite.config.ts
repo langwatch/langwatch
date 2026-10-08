@@ -21,6 +21,7 @@ import { havenHmrGate } from "./vite/havenHmrGate";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
+import { shikiReachGuard } from "./vite/shiki-reach-guard";
 
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
@@ -37,6 +38,16 @@ function manualChunkFor(id: string): string | undefined {
   // (dependency-free) so its guard test can exercise the real logic.
   return shikiManualChunk(id);
 }
+
+// A named chunk swallows the modules it depends on, first come first served, so a shared
+// helper landed wherever Rolldown looked first. Priorities make it deterministic: the small
+// chunks claim their modules before the shiki chunk can, highest first.
+const NAMED_CHUNKS = ["preload-helper", "hast-helpers", "shiki-langs", "shiki"] as const;
+const CHUNK_GROUPS = NAMED_CHUNKS.map((name, index) => ({
+  name,
+  test: (id: string) => manualChunkFor(id) === name,
+  priority: NAMED_CHUNKS.length - index,
+}));
 
 type PackageExportTarget = string | { default?: string };
 
@@ -266,6 +277,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
+      shikiReachGuard(),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages
@@ -311,7 +323,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           defaultHandler(warning);
         },
         output: {
-          manualChunks: manualChunkFor,
+          codeSplitting: { groups: CHUNK_GROUPS },
         },
       },
     },

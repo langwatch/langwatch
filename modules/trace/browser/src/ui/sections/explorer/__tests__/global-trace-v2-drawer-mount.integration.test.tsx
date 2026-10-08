@@ -19,9 +19,12 @@ vi.mock("../hooks/use-trace-drawer-url-hydrator.ts", () => ({
   useTraceDrawerUrlHydrator: () => undefined,
 }));
 
-vi.mock("../trace-drawer/index.ts", () => ({
-  TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" />,
-}));
+const shellModule = vi.hoisted(() => ({ loads: 0 }));
+
+vi.mock("../trace-drawer/index.ts", () => {
+  shellModule.loads += 1;
+  return { TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" /> };
+});
 
 import { setWindowAddress } from "../../../../__tests__/window-location-router.ts";
 import { GlobalTraceV2DrawerMount } from "../global-trace-v2-drawer-mount.tsx";
@@ -40,15 +43,27 @@ describe("GlobalTraceV2DrawerMount", () => {
     cleanup();
   });
 
+  // Runs first: the module registry is per file, so a later test would have loaded it.
+  describe("when no trace has opened on the page yet", () => {
+    /** @scenario "A page loads the trace drawer only when a trace opens" */
+    it("does not load the drawer's code", () => {
+      mockPathname = "/my-project/dashboards";
+
+      render(<GlobalTraceV2DrawerMount />);
+
+      expect(shellModule.loads).toBe(0);
+    });
+  });
+
   describe("when a trace is open on the optimization studio page", () => {
     /** @scenario "The default applies to every trace entry point, not only the traces table" */
-    it("renders the v2 drawer shell", () => {
+    it("renders the v2 drawer shell", async () => {
       mockPathname = "/[project]/studio/[workflow]";
       openTraceAddress("trace-from-evaluations-panel");
 
       render(<GlobalTraceV2DrawerMount />);
 
-      expect(screen.getByTestId("trace-v2-shell")).toBeInTheDocument();
+      expect(await screen.findByTestId("trace-v2-shell")).toBeInTheDocument();
     });
   });
 
@@ -92,13 +107,13 @@ describe("GlobalTraceV2DrawerMount", () => {
 
   describe("when a trace is open on a resolved path that is not the explorer", () => {
     /** @scenario "The trace drawer opens over a page that is not the Trace Explorer" */
-    it("renders the v2 drawer shell", () => {
+    it("renders the v2 drawer shell", async () => {
       mockPathname = "/my-project/simulations";
       openTraceAddress("trace-from-a-simulation");
 
       render(<GlobalTraceV2DrawerMount />);
 
-      expect(screen.getByTestId("trace-v2-shell")).toBeInTheDocument();
+      expect(await screen.findByTestId("trace-v2-shell")).toBeInTheDocument();
     });
   });
 });

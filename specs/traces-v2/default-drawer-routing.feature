@@ -60,6 +60,14 @@ Feature: Trace Explorer is the default trace experience from every entry point
       Then the Trace Explorer drawer opens over that page
       And I am still on the page I was on
 
+    # The drawer is heavy (transcripts, code, markdown); a page that never opens a trace
+    # should not download it.
+    @integration
+    Scenario: A page loads the trace drawer only when a trace opens
+      Given I am on a page that is not the Trace Explorer
+      And no trace is open
+      Then the trace drawer's code is not loaded
+
     # The Trace Explorer draws its own copy, so a second one over it would put
     # two drawers on one trace.
     @integration

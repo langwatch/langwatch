@@ -33,6 +33,12 @@ Feature: The no-inline-dynamic-import lint rule
     Then it reports nothing, while a sibling channel is still reported
 
   @unit
+  Scenario: The design system's Shiki adapter is exempt
+    Given packages/design-system/src/shiki-adapter.ts with an inline import()
+    When the no-inline-dynamic-import rule runs over it
+    Then it reports nothing, while a sibling design-system file is still reported
+
+  @unit
   Scenario: The dev runtime's entries are exempt
     Given tools/dev-runtime/src/backend.entrypoint.ts or app.entrypoint.ts with an inline import()
     When the no-inline-dynamic-import rule runs over it
