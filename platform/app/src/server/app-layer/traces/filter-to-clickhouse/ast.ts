@@ -74,10 +74,9 @@ export function normalizeQuery(s: string): string {
  */
 export function translateFilterToClickHouse(
   queryText: string,
-  tenantId: string,
   timeRange: { from: number; to: number },
 ): { sql: string; params: Record<string, unknown> } | null {
-  return translateFilterWithEvalRuns({ queryText, tenantId, timeRange });
+  return translateFilterWithEvalRuns({ queryText, timeRange });
 }
 
 /**
@@ -86,25 +85,24 @@ export function translateFilterToClickHouse(
  */
 export function translateFilterWithEvalRuns({
   queryText,
-  tenantId,
   timeRange,
   evalRuns,
 }: {
   queryText: string;
-  tenantId: string;
   timeRange: { from: number; to: number };
   /** The Instant Eval runs registered for the query's `eval` chips. */
   evalRuns?: readonly ResolvedInstantEvalRun[];
 }): { sql: string; params: Record<string, unknown> } | null {
+  // The compiled fragment names no tenant: every subquery carries a tenant
+  // marker the authorized reader expands into the proof's fence (ADR-144
+  // block C), so the statement it lands in decides who is in scope.
   const ctx: TranslationContext = {
     paramCounter: 0,
     nodeCount: 0,
     params: {
-      tenantId,
       timeFrom: timeRange.from,
       timeTo: timeRange.to,
     },
-    tenantId,
     timeRange,
     ...(evalRuns ? { evalRuns } : {}),
   };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
@@ -36,12 +37,10 @@ function saveCallbacks({
       });
       onDone();
     },
-    onError: () => {
-      toaster.create({
-        title: "Could not save annotation",
-        type: "error",
-      });
-    },
+    // A refusal the server can name (the aggregate's read-only answer among
+    // them) reads as its registered copy; anything else keeps this title.
+    onError: (error: unknown) =>
+      showErrorToast({ error, fallbackTitle: "Could not save annotation" }),
   };
 }
 
@@ -147,12 +146,11 @@ export function useAnnotationMutations({
           toaster.create({ title: "Annotation deleted", type: "success" });
           onDone();
         },
-        onError: () => {
-          toaster.create({
-            title: "Could not delete annotation",
-            type: "error",
-          });
-        },
+        onError: (error: unknown) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Could not delete annotation",
+          }),
       },
     );
   };

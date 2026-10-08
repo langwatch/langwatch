@@ -24,7 +24,9 @@ const {
   mockToggleMutate,
   mockInvalidateTriggerById,
   mockToastCreate,
+  mockProjectKindRef,
 } = vi.hoisted(() => ({
+  mockProjectKindRef: { current: "application" },
   mockPathnameRef: { current: "/test-project/automations" },
   mockOpenDrawer: vi.fn(),
   mockDeleteMutate: vi.fn(),
@@ -44,7 +46,12 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test-project", name: "Test Project" },
+    project: {
+      id: "proj-1",
+      slug: "test-project",
+      name: "Test Project",
+      kind: mockProjectKindRef.current,
+    },
     organization: { id: "org-1" },
     team: { slug: "team-1" },
     hasPermission: () => true,
@@ -128,6 +135,7 @@ const renderPage = async () => {
 describe("given the unified automations table", () => {
   beforeEach(() => {
     mockPathnameRef.current = "/test-project/automations/automations";
+    mockProjectKindRef.current = "application";
     mockDeleteMutate.mockReset();
     mockInvalidateTriggerById.mockReset();
     mockToastCreate.mockReset();
@@ -135,6 +143,20 @@ describe("given the unified automations table", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("when the open project is an aggregate reached by its address", () => {
+    /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+    it("says data can't be added and offers no way to create an automation", async () => {
+      mockProjectKindRef.current = "aggregate";
+
+      await renderPage();
+
+      expect(
+        await screen.findByText("Data can't be added to this project"),
+      ).toBeTruthy();
+      expect(screen.queryByText("New automation")).toBeNull();
+    });
   });
 
   describe("when the project has automations watching a filter and a graph", () => {

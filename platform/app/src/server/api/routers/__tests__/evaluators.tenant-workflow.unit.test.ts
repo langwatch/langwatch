@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { projectKindReaderFor } from "~/server/app-layer/permissions/aggregate-admin-gate";
 import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
@@ -71,7 +72,11 @@ const createCaller = () => {
     permissionChecked: true,
   });
   ctx.prisma = prisma;
-  ctx.app = { permissions: permissionsServiceFor(prisma) } as never;
+  ctx.app = {
+    permissions: permissionsServiceFor(prisma),
+    // ADR-144: an admin's write asks the project's kind before the handler.
+    projectKinds: projectKindReaderFor(prisma),
+  } as never;
   return evaluatorsRouter.createCaller(ctx);
 };
 

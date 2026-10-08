@@ -10,11 +10,13 @@ import {
   probeProjectPermission,
   probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
+import { traceDestinationViolation } from "~/server/app-layer/projects/project-kinds";
 import type { Session } from "~/server/auth";
 import { resolveApiKeyPermission } from "../app-layer/authz/credential-permissions";
 import {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
+  GatewayTraceProjectNotADestinationError,
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "./errors";
@@ -442,10 +444,15 @@ export async function assertTraceProjectBelongsToOrg(
   if (!traceProjectId) return;
   const project = await prisma.project.findFirst({
     where: { id: traceProjectId, team: { organizationId } },
-    select: { id: true },
+    select: { id: true, kind: true },
   });
   if (!project) {
     throw new GatewayScopeOrgMismatchError("project");
+  }
+  // ADR-144 decision 7: an aggregate owns no traces, so it is never where a
+  // key's traces (and their budget debits) land.
+  if (traceDestinationViolation(project.kind)) {
+    throw new GatewayTraceProjectNotADestinationError();
   }
 }
 

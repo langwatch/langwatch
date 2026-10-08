@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   getLLMModelCosts,
@@ -78,9 +79,12 @@ export interface CostRuleMatchingSpansPreview {
  */
 export async function previewCostRuleMatchingSpans({
   spans,
+  authorization,
   input,
 }: {
   spans: SpanStorageService;
+  /** The route's proof; the model inventory and samples read through it. */
+  authorization: Authorization;
   input: CostRulePreviewInput;
 }): Promise<CostRuleMatchingSpansPreview> {
   if (!compileSafeRegex(input.regex)) {
@@ -100,7 +104,7 @@ export async function previewCostRuleMatchingSpans({
 
   const fromMs = Date.now() - PREVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   const stats = await spans.getModelUsageStats({
-    tenantId: input.projectId,
+    authorization,
     fromMs,
     limit: MAX_DISTINCT_MODELS,
   });
@@ -118,7 +122,7 @@ export async function previewCostRuleMatchingSpans({
   let sampleSpans: CostRulePreviewSampleSpan[] = [];
   if (matchedModels.length > 0) {
     const rows = await spans.getRecentSpansByModels({
-      tenantId: input.projectId,
+      authorization,
       models: matchedModels.map((m) => m.model),
       fromMs,
       perModelLimit: PER_MODEL_SAMPLE_LIMIT,

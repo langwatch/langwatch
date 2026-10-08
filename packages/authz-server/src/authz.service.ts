@@ -334,6 +334,13 @@ export class AuthzService {
       { teams: Map<string, boolean>; projects: Map<string, boolean> }
     >;
     organizationRole: OrganizationRoleOrNull;
+    /**
+     * For an api-key principal, the owner's organisation role, read from the
+     * snapshot the ceiling already collected; null for a user principal and
+     * for a service key with no owner. A rule that only an organisation admin
+     * may pass asks this, since the key itself holds no role.
+     */
+    ownerOrganizationRole: OrganizationRoleOrNull;
   }> {
     // The api-key owner ceiling, collected with the key's grants as check()
     // collects it — see `canAnyByIds`. Null for a user or service-key
@@ -396,6 +403,7 @@ export class AuthzService {
         ]),
       ),
       organizationRole: grants.organizationRole,
+      ownerOrganizationRole: ownerGrants?.organizationRole ?? null,
     };
   }
 

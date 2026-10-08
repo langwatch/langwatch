@@ -3,6 +3,10 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
+  type FoldReadAuthorizer,
+  foldReadPurpose,
+} from "./foldReadAuthorization";
+import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
@@ -47,7 +51,24 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 export class TraceAnalyticsStore
   implements FoldProjectionStore<TraceAnalyticsData>
 {
-  constructor(private readonly repo: TraceAnalyticsRepository) {}
+  private readonly repo: TraceAnalyticsRepository;
+  private readonly authorize: FoldReadAuthorizer;
+
+  /**
+   * Writes name the tenant from the store context. The read-back is fenced
+   * by a proof (ADR-144 block C): the store asks `authorize` for an own-only
+   * one on the context's tenant, so the fold reads back the row it wrote.
+   */
+  constructor({
+    repository,
+    authorize,
+  }: {
+    repository: TraceAnalyticsRepository;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.repo = repository;
+    this.authorize = authorize;
+  }
 
   async store(
     state: TraceAnalyticsData,
@@ -182,7 +203,13 @@ export class TraceAnalyticsStore
     miss?: "absent" | "undecodable";
   }> {
     const found = await this.repo.findByTraceIdWithApplied({
-      tenantId: String(context.tenantId),
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({
+          context,
+          entry: "TraceAnalyticsStore.getWithApplied",
+        }),
+      }),
       traceId: aggregateId,
       window: context.readWindow,
     });

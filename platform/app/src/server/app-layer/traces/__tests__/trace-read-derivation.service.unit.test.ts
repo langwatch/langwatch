@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   type NormalizedSpanReader,
   TraceReadDerivationService,
@@ -27,7 +28,7 @@ class CountingReader implements NormalizedSpanReader {
 // One coalesced batch: every per-event subscriber observes the same final fold
 // state, so foldVersion (spanCount) is identical across the batch.
 const BATCH_PARAMS = {
-  tenantId: "t1",
+  authorization: ownProof({ projectId: "t1" }),
   traceId: "trace-1",
   occurredAtMs: 1000,
   foldVersion: 5,
@@ -119,7 +120,11 @@ describe("TraceReadDerivationService", () => {
       it("reads every time because a live read is non-deterministic", async () => {
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
-        const live = { tenantId: "t1", traceId: "trace-1", occurredAtMs: 1000 };
+        const live = {
+          authorization: ownProof({ projectId: "t1" }),
+          traceId: "trace-1",
+          occurredAtMs: 1000,
+        };
 
         await service.deriveEvents(live);
         await service.deriveEvents(live);
