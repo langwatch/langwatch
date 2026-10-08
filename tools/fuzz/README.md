@@ -7,7 +7,7 @@ organisation through the public API (diffkit's org-per-tool helper), and never
 restarts the stack or lowers a global limit.
 
 ```
-go run ./cmd/fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only <area>] [-reload-every N] [-url URL]
+go run ./cmd/fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only <area>] [-reload-every N] [-vision] [-url URL]
 ```
 
 - `api` (Go, this package): every operation in the branch OpenAPI document,
@@ -67,6 +67,27 @@ Each finding is shrunk to a minimal reproducing request, written with its curl
 line, and findings are grouped by signature so thousands of hits collapse to a
 short list.
 
+## The vision check (`ui -vision`, AI, opt-in)
+
+`-vision` sets `"vision": true` in `plan.json`. After a visit opens its route and
+the oracles above found nothing, the runner screenshots the settled page and asks
+`claude-haiku-5-5` (effort low, JSON-schema verdict) whether it looks wrong: an
+error toast, an empty panel, a stuck spinner, overlap, broken layout, "undefined".
+
+- The key is `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_BASE_URL`) from the
+  environment haven sets (`eval "$(haven env --reveal)"`); it is never printed.
+  Missing, the run stops at setup.
+- A route is judged once until its screenshot's hash changes.
+- A flagged page is judged once more; only findings both judgements name stand.
+- The signature is `vision :: <route> <kind> <element>`, never the message, so
+  rewordings of one defect group as one.
+- A failed judgement files no finding. `ui/vision.json` records calls, tokens,
+  dollars per page and the failures with the first one's message; the totals are
+  stamped on stderr at the end.
+
+Logic is pinned with a fake judge: `src/__tests__/vision.unit.test.ts`
+(`specs/tooling/fuzz-vision.feature`).
+
 ## UI protocol (Go writes plan.json, TS writes findings.jsonl)
 
 The two halves agree by file, in the run directory `.fuzz/<run>/`:
@@ -83,6 +104,7 @@ The two halves agree by file, in the run directory `.fuzz/<run>/`:
   "actionsPerRoute": 40,
   "reloadEvery": 5,
   "only": "",
+  "vision": false,
   "org": {
     "name": "fuzzer",
     "orgKey": "sk-lw-...",
@@ -101,7 +123,7 @@ The two halves agree by file, in the run directory `.fuzz/<run>/`:
 
 ```json
 {
-  "oracle": "console-error|page-error|network-5xx|network-4xx|blank|error-boundary|nav-404|hang",
+  "oracle": "console-error|page-error|network-5xx|network-4xx|blank|error-boundary|nav-404|hang|vision",
   "finding": true,
   "route": "/[project]/messages",
   "signature": "console-error :: TypeError: x is not a function",

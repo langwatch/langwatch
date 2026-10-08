@@ -12,6 +12,7 @@ const ORACLE_OF: Record<FindingKind, Oracle> = {
   "blank-screen": "blank",
   "not-found": "nav-404",
   hang: "hang",
+  vision: "vision",
 };
 
 export const oracleOf = (kind: FindingKind): Oracle => ORACLE_OF[kind];
