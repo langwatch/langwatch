@@ -548,6 +548,14 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
 ] as const;
 
 /**
+ * What one statement is retried on in place: the transient list minus MEMORY_LIMIT_EXCEEDED.
+ * The group queue still re-stages a job that hit it, minutes later; retrying the statement within
+ * seconds re-adds the same allocation to the pressure that refused it, and fails the same way.
+ */
+export const CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS: readonly string[] =
+  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS.filter((fragment) => fragment !== "MEMORY_LIMIT_EXCEEDED");
+
+/**
  * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.
  * Transient errors (overload, timeouts, connection issues, ZK / cluster
  * recovery) should be retried by the group queue; only data-integrity errors are CRITICAL.

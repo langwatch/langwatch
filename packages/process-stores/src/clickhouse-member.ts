@@ -19,7 +19,7 @@ import {
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
+import { CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { counter, histogram } from "@langwatch/observability/metrics";
 
@@ -123,7 +123,8 @@ export function buildClickHouse(options: {
     driver: routingDriver(connection),
     tenantGuard: new TenantGuard(),
     retries: new RetryPolicy({
-      transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+      // A memory-limit refusal fails the same way within seconds; only the group queue retries it.
+      transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
       onRetry: ({ request, attempt, maxAttempts, delayMs, error, level }) =>
         reporter.retryNotice({
           operation: request?.kind === "write" ? "insert" : "query",
