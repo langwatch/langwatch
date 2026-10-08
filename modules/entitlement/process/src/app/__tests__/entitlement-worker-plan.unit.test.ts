@@ -13,7 +13,6 @@ import { createTestLogger } from "@langwatch/test-harness";
  * @see specs/automations/worker-plan-resolution.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
@@ -65,7 +64,6 @@ function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sour
       user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({ resolve: async () => licence }),
       billing: billing ?? createApiFixture<BillingApi>({}),
-      trace: createApiFixture<TraceApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
       project: createApiFixture<ProjectApi>({}),
     })
@@ -186,7 +184,6 @@ describe("given the entitlement module installed on the worker role", () => {
           .provide({
             user: createEntitlementTestUsers(),
             licensing: createApiFixture<LicensingApi>({ resolve: async () => unlicensed }),
-            trace: createApiFixture<TraceApi>({}),
             organization: createApiFixture<OrganizationApi>({}),
             project: createApiFixture<ProjectApi>({}),
           })
@@ -220,7 +217,6 @@ describe("given the entitlement module installed on the worker role", () => {
             },
           }),
           billing: createApiFixture<BillingApi>({}),
-          trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({}),
           project: createApiFixture<ProjectApi>({}),
         })

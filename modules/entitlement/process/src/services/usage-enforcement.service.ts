@@ -4,9 +4,9 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
+import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
 
@@ -129,9 +129,8 @@ export class InProcessUsageCache implements UsageCache {
   }
 }
 
-/** The peers the live usage count reads through. */
+/** The peers the usage count reads through; traces are counted off entitlement's own meter. */
 export type EntitlementUsagePeers = Readonly<{
-  traces: Pick<TraceApi, "countTracesByProjects">;
   billing: Pick<BillingApi, "getPricingModel" | "sendUsageWarning">;
   organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId" | "findAllIds">;
   projects: Pick<ProjectApi, "listIdsByOrganization">;
@@ -152,6 +151,30 @@ function meterEventCounter({
         endDate: `${month.add({ months: 1 }).toString()}-01 00:00:00.000`,
       };
       const counts = await meter.countByProjects({ organizationId, projectIds, window });
+      const countByProject = new Map(counts.map(({ projectId, count }) => [projectId, count]));
+      return projectIds.map((projectId) => ({
+        projectId,
+        count: countByProject.get(projectId) ?? 0,
+      }));
+    },
+  };
+}
+
+/** This UTC month's traces per named project off the trace meter, 0 for a project with none. */
+function meterTraceCounter({
+  meter,
+}: {
+  meter: Pick<TraceMeterRepository, "countByProjects">;
+}): UsageVolumeCounter {
+  return {
+    async getCountByProjects({ organizationId, projectIds }) {
+      if (projectIds.length === 0) return [];
+      const month = nowInstant().toZonedDateTimeISO("UTC").toPlainDate().toPlainYearMonth();
+      const counts = await meter.countByProjects({
+        organizationId,
+        projectIds,
+        month: month.toString(),
+      });
       const countByProject = new Map(counts.map(({ projectId, count }) => [projectId, count]));
       return projectIds.map((projectId) => ({
         projectId,
@@ -208,21 +231,22 @@ export class UsageService {
     return new UsageService(deps);
   }
 
-  /** Main's `UsageService` over trace's traces, entitlement's events meter, billing's pricing. */
+  /** Main's `UsageService` over entitlement's trace and events meters and billing's pricing. */
   static overPeers(input: {
     isSaas: boolean;
     planResolver: PlanResolver;
     peers: EntitlementUsagePeers;
     meter: Pick<BillableEventsMeterRepository, "countByProjects">;
+    traceMeter: Pick<TraceMeterRepository, "countByProjects">;
   }): UsageService {
-    const { traces, billing, organizations, projects } = input.peers;
+    const { billing, organizations, projects } = input.peers;
     return new UsageService({
       organizations: {
         getOrganizationIdByTeamId: (lookup) => organizations.getOrganizationIdByTeamId(lookup),
         getProjectIds: (organizationId) => projects.listIdsByOrganization({ organizationId }),
         getPricingModel: (organizationId) => billing.getPricingModel({ organizationId }),
       },
-      traceCounter: { getCountByProjects: (counted) => traces.countTracesByProjects(counted) },
+      traceCounter: meterTraceCounter({ meter: input.traceMeter }),
       eventCounter: meterEventCounter({ meter: input.meter }),
       planResolver: input.planResolver,
       deployment: { isSaas: input.isSaas },

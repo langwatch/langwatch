@@ -26,6 +26,7 @@ import {
   InMemoryProcessStore,
   testEventSchema,
 } from "@langwatch/eventing/testing";
+import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -69,16 +70,16 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
         billing: { getPricingModel: async () => ({ pricingModel: PricingModel.TIERED }) },
       }),
     }),
-    meterStores: send && {
-      billableEvents: BillableEventsMeterAppendService.create({
+    traceMeter: TraceMeterAppendService.create({
+      meter: MemoryTraceMeterRepository.create(),
+      projects,
+    }),
+    billableEventsMeter:
+      send &&
+      BillableEventsMeterAppendService.create({
         meter: MemoryBillableEventsMeterRepository.create(),
         projects,
       }),
-      traces: TraceMeterAppendService.create({
-        meter: MemoryTraceMeterRepository.create(),
-        projects,
-      }),
-    },
     projects,
     send:
       send ??
@@ -86,6 +87,13 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
         throw new Error("nothing is sent from a count");
       }),
   });
+}
+
+/** Trace's pipeline as the trace meter's peer lane needs it: the owner of span_received. */
+function traceStandIn() {
+  return definePipeline({ name: "trace_stand_in", aggregate: defineAggregate({ type: "trace" }) })
+    .withEvents([testEventSchema(SPAN_RECEIVED_EVENT_TYPE, z.object({}))])
+    .build();
 }
 
 /** A peer pipeline subscribing to month_counted from its own side, as billing does. */
@@ -111,6 +119,7 @@ function runtime(
     eventStore: EventStoreMemory.createForTesting(),
     processStore: InMemoryProcessStore.createForTesting(),
   });
+  eventing.register(traceStandIn());
   eventing.register(metering({ send }));
   eventing.register(peerStandIn(seen));
   eventing.startConsumers();

@@ -25,7 +25,7 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
-import { TraceMeterProjection } from "./trace-meter.projection.ts";
+import { TRACE_METER_EVENT, TraceMeterProjection } from "./trace-meter.projection.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import { CountMonthCommand, RecordLimitDecisionCommand } from "./usage.commands.ts";
 import {
@@ -52,21 +52,20 @@ export type UsageSenders = Readonly<{
   recordLimitDecision: (data: RecordLimitDecisionCommandData) => Promise<void>;
 }>;
 
-/** The two meters' append sides; both are written on SaaS only. */
-type UsageMeterStores = Readonly<{
-  billableEvents: AppendStore<BillableEventRecord>;
-  traces: AppendStore<TraceMeterRecord>;
-}>;
-
-/** The metering pipeline; the meters, their subscriber and the limit decider are SaaS only. */
+/**
+ * The metering pipeline. The trace meter is appended on every deployment (round 22); the
+ * billable-events meter, its subscriber and the limit decider stay SaaS only.
+ */
 export function buildUsagePipeline({
   countMonth,
-  meterStores,
+  traceMeter,
+  billableEventsMeter,
   projects,
   send,
 }: {
   countMonth: CountMonthCommand;
-  meterStores: UsageMeterStores | undefined;
+  traceMeter: AppendStore<TraceMeterRecord>;
+  billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
   projects: Pick<ProjectApi, "findOrganizationId">;
   send: () => UsageSenders;
 }): UsagePipelineDefinition {
@@ -105,8 +104,12 @@ export function buildUsagePipeline({
         },
       },
     })
-    .withCommand("recordLimitDecision", RecordLimitDecisionCommand);
-  if (!meterStores) return pipeline.build();
+    .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
+    .withPeerMapProjection({
+      events: [TRACE_METER_EVENT] as const,
+      map: TraceMeterProjection.create(traceMeter).build(),
+    });
+  if (!billableEventsMeter) return pipeline.build();
   return pipeline
     .withProcessManager(REFUSED_ORGANIZATIONS_PROCESS_NAME, (pm) =>
       pm
@@ -119,11 +122,9 @@ export function buildUsagePipeline({
         .keyBy((event) => event.aggregateId)
         .onWake(refusedOrganizationWake),
     )
-    .withGlobalMapProjection(
-      BillableEventsMeterProjection.create(meterStores.billableEvents).build(),
-      [usageMeterCountSubscriber({ projects, countMonth: (data) => send().countMonth(data) })],
-    )
-    .withGlobalMapProjection(TraceMeterProjection.create(meterStores.traces).build())
+    .withGlobalMapProjection(BillableEventsMeterProjection.create(billableEventsMeter).build(), [
+      usageMeterCountSubscriber({ projects, countMonth: (data) => send().countMonth(data) }),
+    ])
     .build();
 }
 

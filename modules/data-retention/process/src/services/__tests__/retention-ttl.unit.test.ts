@@ -163,6 +163,23 @@ describe("gateway_spend retention exemption", () => {
   });
 });
 
+describe("usage_trace_meter retention exemption", () => {
+  // Entitlement's trace meter is billing-grade, like gateway_spend: a fixed 13-month TTL in its own
+  // migration, outside tenant retention and the reconciler, so no tenant policy shortens it.
+  /** @scenario "The trace meter keeps a fixed thirteen month window outside tenant retention" */
+  it("is absent from tenant retention, the indefinite list and the TTL reconciler config", () => {
+    expect(RETENTION_TTL_MANAGED_TABLES).not.toContain("usage_trace_meter");
+    expect(INDEFINITE_DEFAULT_RETENTION_TABLES).not.toContain("usage_trace_meter");
+    expect(TABLE_TTL_CONFIG.find((c) => c.table === "usage_trace_meter")).toBeUndefined();
+  });
+
+  it("declares its fixed 13-month delete in a migration", () => {
+    const migration = readFileSync(migrationEndingIn("_usage_trace_meter_retention.sql"), "utf8");
+    expect(migration).toContain("MODIFY TTL toDateTime(Month) + INTERVAL 13 MONTH DELETE");
+    expect(migration).not.toContain("_retention_days");
+  });
+});
+
 describe("governance cost tables keep data indefinitely by default", () => {
   // Zero (`_retention_days`'s default) is the indefinite sentinel — deleted
   // only if a day count is deliberately stamped. These tables stay OUT of

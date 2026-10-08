@@ -16,7 +16,7 @@ export class MemoryEntitlementRepositories {
       membership: MemoryUsageMembershipRepository.create({ memory: database }),
       spend: MemoryOrganizationSpendRepository.create({ memory: database }),
       billableEvents,
-      traces: MemoryTraceMeterRepository.create({ billableEvents: billableEvents.rows }),
+      traces: MemoryTraceMeterRepository.create(),
     };
   }
 }

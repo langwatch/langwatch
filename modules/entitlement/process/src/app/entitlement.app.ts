@@ -37,7 +37,6 @@ import {
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import { buildUsageWarningPipeline } from "../eventing/entitlement-usage-warning.pipeline.ts";
@@ -142,7 +141,6 @@ export class EntitlementModule implements EntitlementApiContract {
     users: UserApi,
     license: LicensingApi,
     billing: BillingApi,
-    traces: TraceApi,
     organizations: OrganizationApi,
     projects: ProjectApi,
   };
@@ -210,6 +208,7 @@ export class EntitlementModule implements EntitlementApiContract {
       planResolver: (organizationId) => plans.getActivePlan({ organizationId }),
       peers: dependencies,
       meter: repositories.billableEvents,
+      traceMeter: repositories.traces,
     });
     const warnings = UsageWarningService.create({
       billing: dependencies.billing,
@@ -226,18 +225,16 @@ export class EntitlementModule implements EntitlementApiContract {
       plans,
       billing: dependencies.billing,
     });
-    // The meters are appended on Cloud only; the pipeline builds without them elsewhere.
-    const meterStores = config.isSaas
-      ? {
-          billableEvents: BillableEventsMeterAppendService.create({
-            meter: repositories.billableEvents,
-            projects: dependencies.projects,
-          }),
-          traces: TraceMeterAppendService.create({
-            meter: repositories.traces,
-            projects: dependencies.projects,
-          }),
-        }
+    // The trace meter is appended everywhere (round 22); the billable-events meter on Cloud only.
+    const traceMeter = TraceMeterAppendService.create({
+      meter: repositories.traces,
+      projects: dependencies.projects,
+    });
+    const billableEventsMeter = config.isSaas
+      ? BillableEventsMeterAppendService.create({
+          meter: repositories.billableEvents,
+          projects: dependencies.projects,
+        })
       : undefined;
 
     return new EntitlementModule({
@@ -248,7 +245,8 @@ export class EntitlementModule implements EntitlementApiContract {
       usagePipeline: (send) =>
         buildUsagePipeline({
           countMonth: CountMonthCommand.create({ counting }),
-          meterStores,
+          traceMeter,
+          billableEventsMeter,
           projects: dependencies.projects,
           send,
         }),

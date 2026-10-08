@@ -45,30 +45,44 @@ Feature: Entitlement's meters, decisions and who learns them
     Then no trace meter row is written
     And a warning is logged naming the project
 
+  # Round 22 (2026-10-07): meter everywhere; the billable-events meter stays SaaS only.
   @unit @usage
-  Scenario: The trace meter registers beside the billable-events meter, on SaaS only
+  Scenario: The trace meter registers on every deployment, the billable-events meter on SaaS only
     When the usage pipeline registers its global projections
-    Then the trace meter is registered as "usageTraceMeter" on a SaaS deployment
-    And a self-hosted deployment registers neither meter
-
-  @integration @usage @unimplemented
-  Scenario: The meter seed is idempotent
-    Given traces recorded this month before the trace meter existed
-    When the meter seed runs twice
-    Then each trace counts once
-
-  # Q14 (Alex, 2026-10-06): the seed folds the month's billable_events once.
-  @unit @usage
-  Scenario: The meter seed counts each trace once, in its first month
-    Given traces recorded this month and last month before the trace meter existed
-    When the meter seed runs twice
-    Then each trace counts once, in the month its first span arrived
+    Then the trace meter is registered as the peer lane "entitlement.usageTraceMeter" on every deployment
+    And only a SaaS deployment registers the billable-events meter
 
   @unit @usage
-  Scenario: A dry run of the meter seed writes nothing
-    Given traces recorded this month before the trace meter existed
-    When the meter seed runs as a dry run
-    Then it reports what it would fold and writes no meter row
+  Scenario: A self-hosted deployment appends the trace meter as each trace arrives
+    Given a self-hosted deployment
+    When a span arrives for a project in an organization
+    Then a trace meter row is written for its trace in the month it arrived
+
+  @unit @usage
+  Scenario: The trace meter parses only trace's narrow metering schema
+    Given a self-hosted deployment
+    When a span arrives whose payload carries only its trace id and start time
+    Then a trace meter row is written for its trace in the month it arrived
+
+  @unit @usage
+  Scenario: The trace meter is seeded at deploy by replaying trace's spans
+    Given traces recorded before the trace meter was appended on this deployment
+    When the deploy's background steps run
+    Then the trace meter lane is replayed from trace's log
+    And each trace counts once, in the month its first span arrived
+
+  @unit @usage
+  Scenario: The trace meter decides a limit as the live trace count did, over the same traces
+    Given an organization metered in traces whose projects' traces this month are on the trace meter
+    When the limit is checked and the month is counted per project
+    Then the decision and the per-project counts equal those over a live count of the same traces
+
+  @unit @usage
+  Scenario: The trace meter keeps a fixed thirteen month window outside tenant retention
+    Given the trace meter is a billing-grade record
+    When the ClickHouse schema is migrated and the TTL reconciler runs
+    Then the trace meter deletes rows thirteen months after their month began
+    And no tenant retention policy or reconciler pass rewrites that window
 
   # --- The billable-events meter ------------------------------------------------
 
@@ -273,7 +287,7 @@ Feature: Entitlement's meters, decisions and who learns them
     Then none names UsageApi
     And entitlement's metering asks only its own billing and project peers
 
-  @unit @usage @unimplemented
+  @unit @usage
   Scenario: Trace is no longer asked to count usage
     Given the installed process modules
     When entitlement's dependencies are read

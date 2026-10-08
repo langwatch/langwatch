@@ -19,7 +19,7 @@ What a plan allows, and what has been used and spent against it, so the allowanc
 | Kind                      | Name                                                           | Declared at                                                                             |
 | ------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | ClickHouse table (writes) | `billable_events`                                              | `process/src/repositories/clickhouse/clickhouse.billable-events-meter.repository.ts:36` |
-| ClickHouse table (writes) | `usage_trace_meter`                                            | `process/src/repositories/clickhouse/clickhouse.trace-meter.repository.ts:36`           |
+| ClickHouse table (writes) | `usage_trace_meter`                                            | `process/src/repositories/clickhouse/clickhouse.trace-meter.repository.ts:37`           |
 | Stores required           | prisma, clickhouse                                             | `process/src/repositories/live/live.entitlement.repositories.ts:10`                     |
 | Stores required           | prisma                                                         | `process/src/repositories/prisma/prisma.entitlement.repositories.ts:13`                 |
 | Config                    | `requestBounds` (LANGWATCH_REQUEST_BOUNDS), `isSaas` (IS_SAAS) | `contract/src/entitlement.config.ts:20`                                                 |
@@ -34,7 +34,6 @@ Anything else entitlement needs belongs to another module and is reached through
 | `license`       | `LicensingApi`    | [licensing](../../enterprise/modules/licensing/README.md) |
 | `organizations` | `OrganizationApi` | [organization](../organization/README.md)                 |
 | `projects`      | `ProjectApi`      | [project](../project/README.md)                           |
-| `traces`        | `TraceApi`        | [trace](../trace/README.md)                               |
 | `users`         | `UserApi`         | [user](../user/README.md)                                 |
 
 ## Who depends on entitlement

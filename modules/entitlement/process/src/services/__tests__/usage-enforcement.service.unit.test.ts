@@ -8,6 +8,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
+import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import { UsageCountingService } from "../usage-counting.service.ts";
 import {
   type EntitlementUsagePeers,
   USAGE_UNKNOWN,
@@ -274,8 +276,8 @@ describe("UsageService.checkLimit against the plan's allowance", () => {
         isSaas: true,
         planResolver,
         meter: { countByProjects },
+        traceMeter: { countByProjects: countTracesByProjects },
         peers: {
-          traces: { countTracesByProjects },
           billing: createApiFixture<EntitlementUsagePeers["billing"]>({}),
           organizations: createApiFixture<EntitlementUsagePeers["organizations"]>({
             getOrganizationIdByTeamId: async ({ teamId }) => {
@@ -296,6 +298,11 @@ describe("UsageService.checkLimit against the plan's allowance", () => {
   });
 });
 
+/** An events-metered organization's trace meter: asking it is a defect. */
+async function refuseTraceCount(): Promise<never> {
+  throw new Error("an events-metered organization's trace meter is never read");
+}
+
 /** An organization off Cloud on a free plan, so it is metered in events, over a given meter. */
 function eventsServiceOver({
   meter,
@@ -308,8 +315,8 @@ function eventsServiceOver({
     isSaas: false,
     planResolver: async () => ({ ...plan(1_000), free: true }),
     meter,
+    traceMeter: { countByProjects: refuseTraceCount },
     peers: {
-      traces: createApiFixture<EntitlementUsagePeers["traces"]>({}),
       billing: createApiFixture<EntitlementUsagePeers["billing"]>({
         getPricingModel: async () => ({ pricingModel: null }),
       }),
@@ -398,4 +405,81 @@ describe("UsageService.overPeers counting events", () => {
       ).rejects.toMatchObject({ code: "meter_unavailable" });
     });
   });
+});
+
+describe("UsageService over the trace meter", () => {
+  const projectIds = ["project-1", "project-2", "project-3"];
+  const liveCounts = [
+    { projectId: "project-1", count: 600 },
+    { projectId: "project-2", count: 500 },
+    { projectId: "project-3", count: 0 },
+  ];
+
+  /** The month's traces on the meter, two span rows each, as the live count would see them. */
+  async function meterHolding(): Promise<MemoryTraceMeterRepository> {
+    const meter = MemoryTraceMeterRepository.create();
+    const month = UsageCountingService.monthOf(Date.now());
+    for (const { projectId, count } of liveCounts) {
+      for (let trace = 0; trace < count * 2; trace++) {
+        const record = {
+          organizationId: "org-1",
+          tenantId: projectId,
+          traceId: `${projectId}-trace-${trace % count}`,
+          month,
+        };
+        await meter.insert({ record, organizationId: "org-1" });
+      }
+    }
+    return meter;
+  }
+
+  function overMeter({
+    meter,
+    allowance,
+  }: {
+    meter: MemoryTraceMeterRepository;
+    allowance: number;
+  }) {
+    return UsageService.overPeers({
+      isSaas: true,
+      planResolver: async () => plan(allowance),
+      meter: { countByProjects: refuseTraceCount },
+      traceMeter: meter,
+      peers: {
+        billing: createApiFixture<EntitlementUsagePeers["billing"]>({
+          getPricingModel: async () => ({ pricingModel: null }),
+        }),
+        organizations: createApiFixture<EntitlementUsagePeers["organizations"]>({
+          getOrganizationIdByTeamId: async () => "org-1",
+        }),
+        projects: { listIdsByOrganization: async () => projectIds },
+      },
+    });
+  }
+
+  function overLiveCount({ allowance }: { allowance: number }) {
+    return UsageService.create({
+      organizations: organizationsOwning(projectIds),
+      traceCounter: new TestCounter(liveCounts),
+      eventCounter: new TestCounter(USAGE_UNKNOWN),
+      planResolver: async () => plan(allowance),
+      deployment: { isSaas: true },
+    });
+  }
+
+  /** @scenario "The trace meter decides a limit as the live trace count did, over the same traces" */
+  it.each([1_000, 1_100, 5_000])(
+    "decides an allowance of %i and counts each project as the live count did",
+    async (allowance) => {
+      const meter = overMeter({ meter: await meterHolding(), allowance });
+      const live = overLiveCount({ allowance });
+
+      const decided = await meter.checkLimit({ teamId: "team-1" });
+      expect(decided).toEqual(await live.checkLimit({ teamId: "team-1" }));
+      expect(decided.exceeded).toBe(allowance <= 1_100);
+      await expect(
+        meter.getCurrentMonthCountByProjects({ organizationId: "org-1", projectIds }),
+      ).resolves.toEqual(liveCounts);
+    },
+  );
 });

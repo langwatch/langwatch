@@ -7,7 +7,6 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementProcessModule } from "../../entitlement.module.ts";
@@ -49,7 +48,6 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
         resolve: async () => ({ granted: true, plan: free }),
       }),
       billing,
-      trace: createApiFixture<TraceApi>({}),
       organization: createApiFixture<OrganizationApi>({}),
       project: createApiFixture<ProjectApi>({}),
     })

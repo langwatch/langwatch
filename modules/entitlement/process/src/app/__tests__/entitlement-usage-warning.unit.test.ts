@@ -29,11 +29,6 @@ function warningsOver(counts: ProjectUsageCounts) {
   });
   const peers = {
     billing,
-    traces: {
-      countTracesByProjects: async () => {
-        throw new Error("a free plan off Cloud is metered in events");
-      },
-    },
     organizations: createApiFixture<OrganizationApi>({}),
     projects: { listIdsByOrganization: async () => ["project-1", "project-2"] },
   };

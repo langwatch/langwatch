@@ -45,6 +45,11 @@ export const spanReceivedEventSchema = z.object({
   metadata: spanReceivedEventMetadataSchema,
 });
 
+/** What a metering consumer reads of span_received: its trace and when the span started. */
+export const spanReceivedMeteringDataSchema = z.object({
+  span: spanSchema.pick({ traceId: true, startTimeUnixNano: true }),
+});
+
 export type SpanReceivedEventMetadata = z.infer<typeof spanReceivedEventMetadataSchema>;
 export type SpanReceivedEventData = z.infer<typeof spanReceivedEventDataSchema>;
 export type SpanReceivedEvent = z.infer<typeof spanReceivedEventSchema>;

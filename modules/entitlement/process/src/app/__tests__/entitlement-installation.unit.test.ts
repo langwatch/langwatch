@@ -13,7 +13,7 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -22,6 +22,7 @@ import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.enti
 import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
 import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
 import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
+import { EntitlementModule } from "../entitlement.app.ts";
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
@@ -76,6 +77,13 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
   }
 }
 
+describe("entitlement's dependencies", () => {
+  /** @scenario "Trace is no longer asked to count usage" */
+  it("names no TraceApi: traces are counted off entitlement's own meter", () => {
+    expect(Object.values(EntitlementModule.dependencies)).not.toContain(TraceApi);
+  });
+});
+
 describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
@@ -108,10 +116,6 @@ describe("entitlement app installation", () => {
               warned.push(input);
               return { sent: true, notificationId: "notification-1" };
             },
-          }),
-          trace: createApiFixture<TraceApi>({
-            countTracesByProjects: async ({ projectIds }) =>
-              projectIds.map((projectId) => ({ projectId, count: 7 })),
           }),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
@@ -181,7 +185,6 @@ describe("entitlement app installation", () => {
         .provide({
           user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
-          trace: createApiFixture<TraceApi>({}),
           organization: createApiFixture<OrganizationApi>({
             countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0, developers: 0 }),
           }),

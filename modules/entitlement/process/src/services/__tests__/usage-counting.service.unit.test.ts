@@ -41,7 +41,7 @@ class ReadCountingTraceMeter extends MemoryTraceMeterRepository {
   reads = 0;
 
   constructor() {
-    super([]);
+    super();
   }
 
   override async findTotal(input: { organizationId: string; month: string }): Promise<number> {

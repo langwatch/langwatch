@@ -12,9 +12,10 @@ export abstract class TraceMeterRepository {
   abstract insert(input: { record: TraceMeterRecord; organizationId: string }): Promise<void>;
   /** Distinct traces of the organization's projects whose first span arrived in the month. */
   abstract findTotal(input: { organizationId: string; month: string }): Promise<number>;
-  /**
-   * Folds the month's span_received billable events into the meter, from trace's idempotency
-   * key `tenant:trace:span`; answers the distinct traces folded, writing nothing on a dry run.
-   */
-  abstract seedMonth(input: { month: string; dryRun: boolean }): Promise<number>;
+  /** {@link findTotal} per named project; a project with no trace is absent from the answer. */
+  abstract countByProjects(input: {
+    organizationId: string;
+    projectIds: readonly string[];
+    month: string;
+  }): Promise<{ projectId: string; count: number }[]>;
 }
