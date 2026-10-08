@@ -70,7 +70,10 @@ export const ingestionKeyRouter = createTRPCRouter({
         sourceType: input.sourceType,
         ingestionTemplateId: input.templateId ?? null,
       });
-      void auditLog({
+      // Awaited, so the row is durable before the caller is told a key
+      // exists; the `.catch` is what keeps the token flowing when the audit
+      // write genuinely fails — this response shows it exactly once.
+      await auditLog({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         action: "ingestionKey.mint",
@@ -108,7 +111,10 @@ export const ingestionKeyRouter = createTRPCRouter({
         sourceType: input.sourceType,
         ingestionTemplateId: input.templateId ?? null,
       });
-      void auditLog({
+      // Same bargain as the mint: awaited so the row is durable before the
+      // caller is told the old tokens are dead, `.catch` so a failed audit
+      // write still hands back the replacement token.
+      await auditLog({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         action: "ingestionKey.rotate",

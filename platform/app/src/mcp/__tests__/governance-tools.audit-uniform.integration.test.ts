@@ -19,7 +19,7 @@
 
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -214,17 +214,15 @@ describe("governance MCP tools — audit-uniform contract", () => {
       expect(minted).not.toMatch(/^FORBIDDEN|^AUTH_REQUIRED/);
       const apiKeyId = (JSON.parse(minted) as { apiKeyId: string }).apiKeyId;
 
-      // The mint does not wait on its audit row: a write that fails must not
-      // swallow a token the response shows exactly once. So the row lands
-      // shortly after the answer, not before it.
-      await vi.waitFor(async () => {
-        const mintAudit = await prisma.auditLog.findFirst({
-          where: { organizationId: ORG_ID, action: "ingestionKey.mint" },
-          orderBy: { createdAt: "desc" },
-        });
-        expect(mintAudit?.metadata).toMatchObject({ surface: "mcp" });
-        expect(mintAudit?.args).toMatchObject({ apiKeyId });
+      // The mint awaits this row, so it is already there when it answers, and
+      // the read needs no wait. Waiting here would pass whether or not the
+      // mint awaits — which is the whole of what this assertion is for.
+      const mintAudit = await prisma.auditLog.findFirst({
+        where: { organizationId: ORG_ID, action: "ingestionKey.mint" },
+        orderBy: { createdAt: "desc" },
       });
+      expect(mintAudit?.metadata).toMatchObject({ surface: "mcp" });
+      expect(mintAudit?.args).toMatchObject({ apiKeyId });
 
       const revoked = await call(mock, "governance_ingestion_keys_revoke", {
         api_key_id: apiKeyId,
