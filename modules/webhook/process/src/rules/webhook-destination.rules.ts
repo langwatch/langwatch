@@ -1,9 +1,14 @@
-import type { SqsCredentialMode, WebhookDestinationKind } from "@langwatch/webhook-contract";
+import {
+  type SqsCredentialMode,
+  type WebhookDestinationKind,
+  type WebhookSignatureScheme,
+  webhookSignatureSchemeSchema,
+} from "@langwatch/webhook-contract";
 
 export type WebhookUrlProblemCode = "invalid_url" | "scheme" | "host" | "port" | "credentials";
 
 export type WebhookDestinationConfig =
-  | { kind: "http"; url: string }
+  | { kind: "http"; url: string; signatureScheme?: WebhookSignatureScheme }
   | {
       kind: "sqs";
       queueUrl: string;
@@ -12,6 +17,31 @@ export type WebhookDestinationConfig =
       accessKeyId: string | null;
       secretAccessKey: string | null;
     };
+
+/** A legacy-scheme endpoint posts one raw alert per request, so its batch size stays 1. */
+export function endpointMaxBatchSize({
+  signatureScheme,
+  maxBatchSize,
+}: {
+  signatureScheme: string | null | undefined;
+  maxBatchSize: number;
+}): number {
+  return signatureScheme == null ? maxBatchSize : 1;
+}
+
+/** An HTTPS destination's config; a stored scheme the contract does not know is ignored. */
+export function httpDestinationConfig({
+  url,
+  signatureScheme,
+}: {
+  url: string;
+  signatureScheme: string | null | undefined;
+}): WebhookDestinationConfig {
+  const scheme = webhookSignatureSchemeSchema.safeParse(signatureScheme);
+  return scheme.success
+    ? { kind: "http", url, signatureScheme: scheme.data }
+    : { kind: "http", url };
+}
 
 export function findUrlProblem(
   url: string,

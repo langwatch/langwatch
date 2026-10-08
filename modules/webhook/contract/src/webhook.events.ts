@@ -76,6 +76,13 @@ export const WEBHOOK_EVENT_TYPES = [
     isEmitting: true,
     description: "A virtual key was revoked (terminal).",
   },
+  {
+    type: "governance.anomaly_alert.triggered",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description: "A governance anomaly rule fired an alert for an endpoint its destination names.",
+  },
 ] as const satisfies readonly WebhookEventType[];
 
 export type WebhookEventTypeName = (typeof WEBHOOK_EVENT_TYPES)[number]["type"];

@@ -355,3 +355,37 @@ Feature: The fence a customer-supplied webhook leaves through
       When a requested delivery is sent
       Then no connection is opened to that address
       And the attempt is recorded as refused and dead-lettered without a retry
+
+  Rule: Endpoints migrated from governance anomaly destinations keep main's alert format
+    Request delivery Q2 and Q3 (rulings 2026-10-05): an endpoint created from an inline anomaly
+    destination carries the legacy signature scheme. It receives one raw alert per POST, signed
+    `sha256=<hex hmac of the body>`, as main's anomaly dispatcher sent it. Every other endpoint,
+    new or old, keeps the batch envelope and the `t=,v1=` signature.
+
+    @unit
+    Scenario: An endpoint on the legacy scheme receives one raw alert per POST signed sha256=
+      Given an HTTPS endpoint created with the legacy signature scheme
+      When a governance anomaly alert is requested for it and its batch is sent
+      Then the POST body is the alert itself, not a batch envelope
+      And the signature header is "sha256=" followed by the HMAC of that body under the endpoint's secret
+      And the endpoint batches at most one message per POST
+
+    @unit
+    Scenario: Raising the batch size of a legacy-scheme endpoint keeps it at one message per POST
+      Given an HTTPS endpoint created with the legacy signature scheme
+      When its maximum batch size is updated to 50
+      Then its maximum batch size stays 1
+      And an endpoint without a scheme takes the new batch size
+
+    @unit
+    Scenario: An endpoint without a scheme keeps the batch envelope and the t=,v1= signature
+      Given an HTTPS endpoint created without a signature scheme
+      When a batch is sent to it
+      Then the POST body is the batch envelope
+      And the signature header carries "t=" and "v1="
+
+    @unit
+    Scenario: Governance anomaly alerts are an event type endpoints can subscribe to
+      Given the webhook event catalog
+      Then "governance.anomaly_alert.triggered" is a known event type
+      And the "governance.*" family selector validates

@@ -471,11 +471,11 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:112
+type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:120
 
 // webhookEndpoints.create
 type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:47
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:92
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
 
 // webhookEndpoints.health
 // Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:23
@@ -483,7 +483,7 @@ interface Input {
   organizationId: string;
   endpointId: string;
 }
-// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:73
+// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:81
 interface Output {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
@@ -499,19 +499,19 @@ interface Output {
 
 // webhookEndpoints.update
 type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:58
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
 
 // webhookEndpoints.rollSecret
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:92
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:100
 
 // webhookEndpoints.enable
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
 
 // webhookEndpoints.disable
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:43
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
 
 // webhookEndpoints.archive
 type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23

@@ -151,7 +151,12 @@ import {
   EntitlementApi,
   type EntitlementOperator,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  IntentContext,
+  ProcessStore,
+} from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -164,6 +169,7 @@ import type { FeatureSetup } from "@langwatch/process";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, UserNotOrganizationMemberError } from "@langwatch/user-contract";
+import { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { GovernanceHttpClient } from "../channels/governance-http.channel.ts";
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
@@ -175,6 +181,11 @@ import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts"
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import {
+  OutboxAnomalyAlertDelivery,
+  requestAnomalyAlertDelivery,
+} from "../eventing/anomaly-alert-delivery.intent.ts";
+import type { AnomalyAlertDeliveryIntent } from "../eventing/anomaly-alert-delivery.process.ts";
 import { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
 import { GovernanceCostChargeMapProjection } from "../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
@@ -295,6 +306,8 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 export interface GovernanceAppDependencies {
+  /** Anomaly alerts to a rule's registered webhook endpoints, from the delivery intent only. */
+  webhooks: Pick<WebhookApi, "requestDelivery">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -460,6 +473,7 @@ export class GovernanceModule implements GovernanceRestApi {
     auditLog: AuditLogApi,
     logs: LogApi,
     metrics: MetricApi,
+    webhooks: WebhookApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -511,6 +525,7 @@ export class GovernanceModule implements GovernanceRestApi {
         auditLog: dependencies.auditLog,
         logs: dependencies.logs,
         metrics: dependencies.metrics,
+        webhooks: dependencies.webhooks,
       },
       repositories,
       erasureSuppression,
@@ -712,6 +727,7 @@ export class GovernanceModule implements GovernanceRestApi {
       spend: repositories.anomalySpend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: HttpAnomalyAlertChannel.create(),
+        outbox: () => this.#anomalyAlertOutbox,
         diagnostics: anomalyDiagnostics,
       }),
       diagnostics: anomalyDiagnostics,
@@ -981,6 +997,25 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
+  }
+
+  #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
+
+  /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
+  connectAnomalyAlertOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#anomalyAlertOutbox = OutboxAnomalyAlertDelivery.create(processStore);
+  }
+
+  /** The delivery intent's handler: one WebhookApi.requestDelivery per recorded intent. */
+  requestAnomalyAlertDelivery(
+    intent: AnomalyAlertDeliveryIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAnomalyAlertDelivery(this.dependencies.webhooks)(intent, context);
   }
 
   /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */

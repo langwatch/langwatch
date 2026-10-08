@@ -27,6 +27,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
@@ -54,6 +55,7 @@ async function buildApp(planType: string) {
     config: void 0,
     repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
+      webhooks: createApiFixture<WebhookApi>(),
       agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
       auth: createApiFixture<AuthApi>(),

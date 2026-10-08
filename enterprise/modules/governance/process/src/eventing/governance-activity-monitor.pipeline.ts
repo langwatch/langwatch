@@ -19,6 +19,19 @@ import { nowInstant } from "@langwatch/time";
 
 import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { pruneAnomalyAlertDeliveries } from "./anomaly-alert-delivery.intent.ts";
+import {
+  ANOMALY_ALERT_DELIVERY_INITIAL_STATE,
+  ANOMALY_ALERT_DELIVERY_MAX_ATTEMPTS,
+  ANOMALY_ALERT_DELIVERY_PROCESS_NAME,
+  ANOMALY_ALERT_DELIVERY_PRUNE_INTENT,
+  ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS,
+  ANOMALY_ALERT_DELIVERY_REQUEST_INTENT,
+  anomalyAlertDeliveryIntentSchema,
+  anomalyAlertDeliveryPruneSchema,
+  anomalyAlertDeliveryPruneWake,
+  anomalyAlertDeliveryStateSchema,
+} from "./anomaly-alert-delivery.process.ts";
 import { runGovernanceTraceFacts } from "./governance-trace-facts.intent.ts";
 import {
   GOVERNANCE_TRACE_FACTS_INITIAL_STATE,
@@ -54,12 +67,15 @@ function buildGovernanceActivityMonitor({
   Pick<
     GovernanceModule,
     | "evaluateSpendSpikes"
+    | "connectAnomalyAlertOutbox"
+    | "requestAnomalyAlertDelivery"
     | "pullGovernanceTraceFacts"
     | "aiToolEnsureDefaultCatalog"
     | "departmentResolveByNameOrCreate"
     | "departmentAssignUser"
   >
 >): StaticPipelineDefinition<never> {
+  app.connectAnomalyAlertOutbox({ processStore });
   return (
     definePipeline({
       name: GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME,
@@ -95,6 +111,23 @@ function buildGovernanceActivityMonitor({
           )
           // One pass at a time; an open alert per rule keeps a repeated pass from firing twice.
           .outbox({ maxAttempts: 1, concurrency: 1, batchSize: 1, leaseDurationMs: 5 * 60 * 1000 }),
+      )
+      .withProcessManager(ANOMALY_ALERT_DELIVERY_PROCESS_NAME, (pm) =>
+        pm
+          .state(anomalyAlertDeliveryStateSchema, ANOMALY_ALERT_DELIVERY_INITIAL_STATE)
+          .intent(
+            ANOMALY_ALERT_DELIVERY_REQUEST_INTENT,
+            anomalyAlertDeliveryIntentSchema,
+            (intent, context) => app.requestAnomalyAlertDelivery(intent, context),
+          )
+          .intent(
+            ANOMALY_ALERT_DELIVERY_PRUNE_INTENT,
+            anomalyAlertDeliveryPruneSchema,
+            pruneAnomalyAlertDeliveries(processStore),
+          )
+          .schedule({ everyMs: ANOMALY_ALERT_DELIVERY_PRUNE_INTERVAL_MS })
+          .onWake(anomalyAlertDeliveryPruneWake)
+          .outbox({ maxAttempts: ANOMALY_ALERT_DELIVERY_MAX_ATTEMPTS }),
       )
       .withProcessManager(GOVERNANCE_TRACE_FACTS_PROCESS_NAME, (pm) =>
         pm

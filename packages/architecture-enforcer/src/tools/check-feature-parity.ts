@@ -350,7 +350,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/anomaly-detection.feature",
-  "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/architecture-invariants.feature",
   "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
   "specs/ai-gateway/governance/c3-alert-dispatch.feature",
@@ -700,6 +699,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/gateway-service.feature",
   "specs/ai-gateway/governance/admin-routing-policies.feature",
   "specs/ai-gateway/governance/admin-trace-access.feature",
+  // Reason: W-11 tagged and bound the webhook_endpoint destination scenarios
+  // and retired its LEGACY_INERT entry. The fifteen untagged scenarios
+  // describe the existing rule surface and were not audited by that lane.
+  "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/budget-exceeded.feature",
   "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/departments.feature",
