@@ -22,22 +22,25 @@ export interface MigratedClickHouse {
   database: string;
 }
 
-let endpoint: MigratedClickHouse | undefined;
+const endpoints = new Map<string, MigratedClickHouse>();
 
 /**
- * Starts (or reuses) the migrated endpoint and returns a client bound to it. `CLICKHOUSE_CLUSTER`
- * is unset for the migration: it switches every engine to `Replicated`, which needs a Keeper no
- * test server has.
+ * Starts (or reuses) a migrated endpoint and returns a client bound to it. A suite that needs
+ * the server's memory to itself names its own endpoint. `CLICKHOUSE_CLUSTER` is unset for the
+ * migration: `Replicated` engines need a Keeper no test server has.
  */
-export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
-  if (endpoint) return endpoint;
+export async function startMigratedClickHouse({
+  name = "schema",
+}: { name?: string } = {}): Promise<MigratedClickHouse> {
+  const existing = endpoints.get(name);
+  if (existing) return existing;
 
   const [provisioned] = await startTestClickHouseEndpoints({
     suite: MIGRATED_ENDPOINT_SUITE,
-    names: ["schema"],
+    names: [name],
     environment: process.env,
   });
-  if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the schema suite");
+  if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the migrated suite");
 
   await migrateTestClickHouseOnce({
     url: provisioned.url,
@@ -59,7 +62,7 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
     },
   });
 
-  endpoint = {
+  const endpoint = {
     client: createClient({
       url: provisioned.url,
       clickhouse_settings: {
@@ -70,6 +73,7 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
     url: provisioned.url,
     database: provisioned.database,
   };
+  endpoints.set(name, endpoint);
   return endpoint;
 }
 

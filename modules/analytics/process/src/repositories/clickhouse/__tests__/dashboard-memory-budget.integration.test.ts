@@ -175,7 +175,9 @@ describe("dashboard panels under a memory cap", () => {
   };
 
   beforeAll(async () => {
-    ch = (await startMigratedClickHouse()).client;
+    // Its own endpoint: in CI that is its own container, so suites sharing the
+    // default one cannot push the 1 GiB server over while the seed runs.
+    ch = (await startMigratedClickHouse({ name: "memory-budget" })).client;
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
