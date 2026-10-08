@@ -27,9 +27,7 @@ import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlDictionaryAuditQuery,
-  lwqlGrantStatement,
   lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
 } from "../provisioning/accessModel";
 import {
   lwqlViewSetupStatements,
@@ -137,12 +135,9 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         );
         tenantsWithoutPolicy = rows.map((row) => row.TenantId);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
-            names: harness.names,
-            lwqlTable: spans,
-          }),
-        ]);
+        // Reconverge the whole model from the definition — restores the spans
+        // policy detached above (idempotent OR REPLACE).
+        await harness.applyAccessModel();
       }
 
       expect(
@@ -1117,8 +1112,11 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
           `CREATE VIEW ${database}.${invokerView} SQL SECURITY INVOKER ` +
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
-          lwqlGrantStatement({ names: harness.names, table: definerView }),
-          lwqlGrantStatement({ names: harness.names, table: invokerView }),
+          // Ad-hoc probe views this test alone creates: a plain whole-object
+          // grant so the restricted identity can read them. Not a reusable
+          // builder — the shipped access model is single-sourced (#8258).
+          `GRANT SELECT ON ${database}.${definerView} TO ${harness.names.restrictedUser}`,
+          `GRANT SELECT ON ${database}.${invokerView} TO ${harness.names.restrictedUser}`,
         ]);
 
         definerTenants = (
@@ -1254,6 +1252,12 @@ describe("given the coding-agent datasets provisioned over the shipped migration
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the coding-agent datasets, from the
+    // single access-model emitter (#8258) — the view statements are structural.
+    await harness.applyAccessModel({
+      views: [sessions, sessionEvents],
+      sourceDatabase: facts,
+    });
 
     await harness.admin.insert({
       table: `${facts}.coding_agent_sessions`,

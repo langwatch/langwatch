@@ -109,10 +109,12 @@ vi.mock(
     deploymentOffersPasskeys: () => true,
     resolveSignInMethodPolicy: async () => ({}),
     priorSession: () => ({}),
+    provenAddresses: () => ({}),
     signInRouter: () => ({}),
     decideLocalSignUp: async () => ({}),
     localSignUpDecision: async () => ({}),
     signUpIdentifier: () => ({}),
+    signUpPolicy: () => ({}),
     signUpVerification: () => ({}),
     scimOversight: () => ({}),
     scimReconciliation: () => ({}),
@@ -126,6 +128,7 @@ vi.mock(
     ssoDomainClaimQueue: () => ({}),
     ssoDomainReproof: () => ({}),
     ssoEngineProviderDerivation: () => undefined,
+    ssoIssuerEndpointOrigins: () => ({}),
     ssoRegisteredIssuers: () => ({}),
     ssoSelfServe: () => ({}),
     // Core identity additions. Stubbed rather than omitted because the annotation
@@ -144,6 +147,7 @@ vi.mock(
     // exhaustive on this Record too. Nothing in this suite reaches either.
     secondaryStorage: () => ({ configured: false, connection: () => null }),
     betterAuthInstance: () => ({ provide: () => undefined }),
+    microsoftAccountRekey: () => async () => undefined,
     // ADR-129 slice 21b: the three satellite roots folded into the runtime.
     identityLookup: () => ({}),
     linkProposals: () => ({}),

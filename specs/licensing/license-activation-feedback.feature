@@ -5,7 +5,7 @@ Feature: A self-hosted deployment is told the truth about its own license
   product gives at that moment has to survive long enough to be read and has to
   be true.
 
-  Three things were not. The confirmation that names the restart SSO needs was
+  Three things were not. The confirmation that says when SSO turns on was
   written into a toast and then destroyed by an immediate page reload, so the
   one instruction that matters was the one nobody saw. An unlicensed deployment
   was shown the Cloud Free tier as its current plan, complete with the seat and
@@ -26,11 +26,11 @@ Feature: A self-hosted deployment is told the truth about its own license
   # ============================================================================
 
   @integration
-  Scenario: The restart instruction outlives the activation it belongs to
+  Scenario: The SSO instruction outlives the activation it belongs to
     Given an organization with no license
     When an admin activates a genuine license
     Then they are told the license is active
-    And they are told to restart the server if the deployment uses single sign-on
+    And they are told single sign-on turns on within a minute, with no restart
     And that message is still on screen after the page has caught up
 
   @integration

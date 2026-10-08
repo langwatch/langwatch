@@ -159,7 +159,7 @@ test_e2e_runs_exactly_the_named_suites() {
   # No arguments lists today's full order.
   out="$(bash "$E2E" --list | tr '\n' ' ')"
   out="${out% }"
-  local full="test_install test_clickhouse test_clickhouse_url_secret test_postgresql test_redis test_resources test_app test_lwql test_workers test_metrics_collection test_upgrade_strategy_boundary test_upgrade test_external_clickhouse test_lwql_external_postgres_secret_guard test_cold_storage_and_backup"
+  local full="test_install test_clickhouse test_clickhouse_url_secret test_postgresql test_redis test_resources test_app test_lwql test_workers test_metrics_collection test_upgrade_strategy_boundary test_upgrade test_external_clickhouse test_cold_storage_and_backup test_lwql_replicas test_lwql_upgrade_from_main"
   if [ "$out" = "$full" ]; then
     ok "argument parsing" "no args lists the full suite set in order"
   else

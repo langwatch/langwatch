@@ -5,6 +5,7 @@ class PostApiPromptsByIdVersionsByVersionIdRestoreResponse200InputsItemType(str,
     BOOL = "bool"
     CHAT_MESSAGES = "chat_messages"
     DICT = "dict"
+    FILE = "file"
     FLOAT = "float"
     IMAGE = "image"
     LIST = "list"

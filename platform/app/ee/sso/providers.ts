@@ -95,7 +95,22 @@ type SocialProviderEnv = Pick<
   | "AZURE_AD_CLIENT_ID"
   | "AZURE_AD_CLIENT_SECRET"
   | "AZURE_AD_TENANT_ID"
+  | "NEXTAUTH_URL"
 >;
+
+/**
+ * What the social providers call out to while a sign-in is in flight.
+ */
+export interface SocialProviderDeps {
+  /**
+   * Called with the Microsoft id token claims before better-auth
+   * looks the account up, so an account stored under its pre-3.17 key can be
+   * moved onto the one the lookup asks for (`microsoft-account-rekey.ts`).
+   * A throw stops the sign-in: the callback fails and the user retries,
+   * rather than better-auth looking up an account still on its old key.
+   */
+  onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
+}
 
 /**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
@@ -126,6 +141,7 @@ type SocialProviderEnv = Pick<
  */
 export const buildSocialProviders = (
   e: SocialProviderEnv,
+  deps: SocialProviderDeps = {},
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
   if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
@@ -177,19 +193,23 @@ export const buildSocialProviders = (
       clientId: e.AZURE_AD_CLIENT_ID,
       clientSecret: e.AZURE_AD_CLIENT_SECRET,
       tenantId: e.AZURE_AD_TENANT_ID,
-      mapProfileToUser: (profile) => ({
-        name: fallbackName(profile as Record<string, any>),
-        email:
-          (
-            profile as {
-              email?: string;
-              mail?: string;
-              userPrincipalName?: string;
-            }
-          ).email ??
-          (profile as { mail?: string }).mail ??
-          (profile as { userPrincipalName?: string }).userPrincipalName,
-      }),
+      ...microsoftRedirect(e.NEXTAUTH_URL),
+      mapProfileToUser: async (profile) => {
+        await deps.onMicrosoftProfile?.(profile as Record<string, unknown>);
+        return {
+          name: fallbackName(profile as Record<string, any>),
+          email:
+            (
+              profile as {
+                email?: string;
+                mail?: string;
+                userPrincipalName?: string;
+              }
+            ).email ??
+            (profile as { mail?: string }).mail ??
+            (profile as { userPrincipalName?: string }).userPrincipalName,
+        };
+      },
     };
   }
 
@@ -284,6 +304,29 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
     );
   }
 };
+
+/** The callback path segment Azure app registrations carry for the
+ *  Microsoft provider, from the NextAuth releases where it was `azure-ad`. */
+export const MICROSOFT_LEGACY_CALLBACK_ID = "azure-ad";
+
+/**
+ * better-auth mounts the Microsoft provider as `microsoft` and would send
+ * `/api/auth/callback/microsoft`. Every Azure app registration made for
+ * LangWatch before 3.17, and every one made from the self-hosting docs since,
+ * lists `/api/auth/callback/azure-ad`, so the redirect is pinned to that path
+ * and `legacy-callback-alias.ts` routes it back to the provider.
+ */
+function microsoftRedirect(baseUrl: string | undefined): {
+  redirectURI?: string;
+} {
+  if (!baseUrl) return {};
+  return {
+    redirectURI: legacyCallbackUrl({
+      baseUrl,
+      providerId: MICROSOFT_LEGACY_CALLBACK_ID,
+    }),
+  };
+}
 
 /**
  * The callback URL an operator registers with their identity provider. One

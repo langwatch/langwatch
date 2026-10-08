@@ -46,6 +46,38 @@ export const URL_PARAM_TO_FIELD = {
   utm_content: "utmContent",
 } as const satisfies Record<string, AttributionField>;
 
+/**
+ * Analytics property name for each attribution field. UTM fields keep their
+ * URL param name, which is also the name PostHog and Customer.io use.
+ */
+export const ATTRIBUTION_FIELD_TO_PROPERTY = {
+  leadSource: "lead_source",
+  utmSource: "utm_source",
+  utmMedium: "utm_medium",
+  utmCampaign: "utm_campaign",
+  utmTerm: "utm_term",
+  utmContent: "utm_content",
+  referrer: "referrer",
+} as const satisfies Record<AttributionField, string>;
+
+export type AttributionProperty =
+  (typeof ATTRIBUTION_FIELD_TO_PROPERTY)[AttributionField];
+
+/**
+ * Converts attribution fields to analytics event properties. Unset and empty
+ * fields are left out, so an event without attribution carries no such keys.
+ */
+export function toAttributionProperties(
+  attribution: Partial<Record<AttributionField, string | null | undefined>>,
+): Partial<Record<AttributionProperty, string>> {
+  const properties: Partial<Record<AttributionProperty, string>> = {};
+  for (const field of ATTRIBUTION_FIELDS) {
+    const value = attribution[field];
+    if (value) properties[ATTRIBUTION_FIELD_TO_PROPERTY[field]] = value;
+  }
+  return properties;
+}
+
 const STORAGE_PREFIX = "lw_attrib.";
 
 function storageKey(field: AttributionField): string {

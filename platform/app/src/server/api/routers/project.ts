@@ -181,6 +181,10 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
+      // Best-effort and never throws: without its key-map row the project
+      // reads zero rows from LangWatchQL until the next deploy's backfill.
+      await getApp().projects.syncLwqlKeyMapRow(project);
+
       // (The eager per-project Langy service key that used to be minted here is
       // gone — Langy now mints a per-turn, per-user session key scoped to exactly
       // what the caller holds; no long-lived project key is provisioned.)

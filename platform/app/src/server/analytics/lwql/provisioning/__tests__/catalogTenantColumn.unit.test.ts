@@ -12,15 +12,17 @@
  * polices nothing, so the assertion is on the exact predicate column.
  *
  * @see ../catalogStatements.ts — lwqlSourceTables, where the column is resolved
- * @see ../accessModel.ts — lwqlRowPolicyStatement, which renders the policy
+ * @see ../accessModelDdl.ts — renderLwqlAccessModelDdl, which renders the policy
  * @see specs/lwql/api.feature
  */
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLViewDefinition } from "../../catalog/types";
 import type { LangWatchQLNames } from "../accessModel";
-import { lwqlRowPolicyStatement } from "../accessModel";
+import { renderLwqlAccessModelDdl } from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
 import { lwqlSourceTables } from "../catalogStatements";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 const NAMES: LangWatchQLNames = {
   database: "langwatch",
@@ -29,6 +31,35 @@ const NAMES: LangWatchQLNames = {
   keyMapTable: "lwql_api_key_tenant_map",
   tenantSetting: "custom_api_key_hash",
 };
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "langwatch",
+  user: "lwql_ro",
+  password: "reader-secret",
+};
+
+/** The source-table tenant row policy the definition renders for one view. */
+function tenantRowPolicy(view: LangWatchQLViewDefinition): string {
+  const ddl = renderLwqlAccessModelDdl(
+    buildLwqlAccessModelDefinition({
+      names: NAMES,
+      passwordSha256Hex: "a".repeat(64),
+      namedCollection: NAMED_COLLECTION,
+      sourceDatabase: NAMES.database,
+      views: [view],
+    }),
+  );
+  return (
+    ddl.find(
+      (statement) =>
+        statement.startsWith("CREATE ROW POLICY") &&
+        statement.includes("_tenant "),
+    ) ?? ""
+  );
+}
 
 /**
  * A dataset whose source names the project column `project_id`, exposed under
@@ -100,16 +131,7 @@ describe("given a dataset whose source names its project column project_id", () 
 
   describe("when the row policy is rendered", () => {
     it("filters project_id, not the literal TenantId", () => {
-      const [lwqlTable] = lwqlSourceTables({
-        names: NAMES,
-        sourceDatabase: NAMES.database,
-        views: [PROJECT_ID_VIEW],
-      });
-      const statement = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: lwqlTable!,
-        sourceDatabase: NAMES.database,
-      });
+      const statement = tenantRowPolicy(PROJECT_ID_VIEW);
       expect(statement).toContain("ON langwatch.scratch_objects");
       // The predicate opens on the source's own column, and the key map's
       // TenantId (the mapped-to value) is untouched.
@@ -120,16 +142,7 @@ describe("given a dataset whose source names its project column project_id", () 
     });
 
     it("filters TenantId for a source on the default column", () => {
-      const [lwqlTable] = lwqlSourceTables({
-        names: NAMES,
-        sourceDatabase: NAMES.database,
-        views: [TENANT_ID_VIEW],
-      });
-      const statement = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: lwqlTable!,
-        sourceDatabase: NAMES.database,
-      });
+      const statement = tenantRowPolicy(TENANT_ID_VIEW);
       expect(statement).toContain("USING TenantId IN (SELECT any(TenantId)");
     });
   });

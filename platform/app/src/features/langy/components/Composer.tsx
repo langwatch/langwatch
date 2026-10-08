@@ -29,6 +29,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
+import { useLangyChatsImproveLangy } from "../langyDataUse";
 import { describeChipContext } from "../logic/langyChipContext";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../logic/langyLocalWaits";
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
@@ -106,10 +107,12 @@ export const AWAITING_ANSWER_PLACEHOLDER =
 export const AWAITING_ANSWER_TERMINAL_PLACEHOLDER =
   LANGY_ANSWER_HERE_OR_TERMINAL;
 
-// Shown under every composer, in every variant and at every viewport height. A
-// notice about what happens to what you type only does its job where you type,
-// so it is not gated on the layout the way the tagline below it is.
-const COMPOSER_DATA_USE_NOTICE =
+// Shown under every composer on LangWatch Cloud, in every variant and at every
+// viewport height. A notice about what happens to what you type only does its
+// job where you type, so it is not gated on the layout the way the tagline
+// below it is. A self-hosted install sends no chats to LangWatch, so it is
+// hidden there (see langyDataUse.ts).
+export const COMPOSER_DATA_USE_NOTICE =
   "Note: these chats are used by LangWatch to improve Langy.";
 
 /**
@@ -187,6 +190,7 @@ function ComposerImpl({
   const floating = variant === "floating";
   const hero = variant === "hero";
   const reduceMotion = useReducedMotion();
+  const chatsImproveLangy = useLangyChatsImproveLangy();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // The draft subscription lives in ComposerInputRow, NOT here. When this
   // component read the draft, every character re-rendered the whole card:
@@ -518,16 +522,18 @@ function ComposerImpl({
           Langy proposes, you review and apply.
         </Text>
       ) : null}
-      <Text
-        marginTop={1.5}
-        textStyle="2xs"
-        color="fg.subtle"
-        textAlign="center"
-        letterSpacing="0.01em"
-        lineHeight="1.2"
-      >
-        {COMPOSER_DATA_USE_NOTICE}
-      </Text>
+      {chatsImproveLangy ? (
+        <Text
+          marginTop={1.5}
+          textStyle="2xs"
+          color="fg.subtle"
+          textAlign="center"
+          letterSpacing="0.01em"
+          lineHeight="1.2"
+        >
+          {COMPOSER_DATA_USE_NOTICE}
+        </Text>
+      ) : null}
     </Box>
   );
 }

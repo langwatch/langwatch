@@ -40,6 +40,7 @@ import { type App, getApp } from "../app";
 import { organizationMfa } from "../identity/runtime";
 import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
 import {
+  DeveloperSeatRestrictedError,
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
@@ -502,6 +503,15 @@ function deniedError({
       code: "UNAUTHORIZED",
       message: "This feature is not available for your account",
       cause: new LiteMemberRestrictedError(
+        permission.split(":")[0] ?? "unknown",
+      ),
+    });
+  }
+  if (organizationRole === "DEVELOPER") {
+    return new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "This is outside your Developer seat",
+      cause: new DeveloperSeatRestrictedError(
         permission.split(":")[0] ?? "unknown",
       ),
     });

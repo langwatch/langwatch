@@ -53,6 +53,7 @@ vi.mock("~/utils/api", () => ({
       effectivePermissions: { useQuery: mockEffectivePermissionsQuery },
     },
     sharedTrace: { get: { useQuery: idleQuery } },
+    identity: { myTestArrival: { useQuery: idleQuery } },
     publicEnv: { useQuery: idleQuery },
     modelProvider: { getAllForProject: { useQuery: idleQuery } },
   },

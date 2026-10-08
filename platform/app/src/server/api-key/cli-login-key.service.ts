@@ -293,6 +293,9 @@ export class CliLoginKeyService {
     userId: string;
     organizationId: string;
   }): Promise<string[]> {
+    // A Developer seat (ADR-143) is capped to its own personal team by the
+    // grants engine at resolution, so a shared team listed here never
+    // becomes one of its key scopes.
     const teams = await this.prisma.team.findMany({
       where: {
         organizationId,

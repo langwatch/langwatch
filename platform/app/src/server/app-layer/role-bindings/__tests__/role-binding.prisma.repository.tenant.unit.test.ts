@@ -18,6 +18,7 @@ vi.spyOn(prisma.group, "findMany").mockResolvedValue([]);
 vi.spyOn(prisma.user, "findMany").mockResolvedValue([]);
 vi.spyOn(prisma.apiKey, "findMany").mockResolvedValue([]);
 vi.spyOn(prisma.role, "findMany").mockResolvedValue([]);
+vi.spyOn(prisma.organizationUser, "findMany").mockResolvedValue([]);
 
 function grant(overrides: Partial<Grant> = {}): Grant {
   const now = new Date("2026-01-01T00:00:00.000Z");

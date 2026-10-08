@@ -63,6 +63,9 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
 
+  workflow_dispatch:
+    # Allow running kind e2e legs on demand against draft branches.
+    # Skipped on draft PRs by the if: conditions at ~line 226 and ~270.
 # The e2e jobs here are the most expensive in the repo — the single `e2e:
 # infra` leg ran to 697s before it was split into the parallel `core` /
 # `external` legs, and `e2e: overlays` runs to 348s — and without a group every
@@ -142,6 +145,9 @@ jobs:
           render hosted-prod -f examples/values-hosted-prod.yaml
           render scalable-prod -f examples/values-scalable-prod.yaml
 
+          # autogen off, every Secret operator-owned: the Argo CD posture
+          render autogen-off -f tests/values-autogen-off.yaml
+
           if [ "${#failed[@]}" -gt 0 ]; then
             echo
             echo "presets that failed to render: ${failed[*]}"
@@ -178,6 +184,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/sso-providers.sh
 
+      # The app, the workers and the NLP service must carry one checked
+      # code-block ceiling, and the chart must refuse ceilings the engine's
+      # stream idle timeout cannot cover. Only the render shows both.
+      - name: "assert every nlpgo caller gets the same code-block ceiling"
+        if: "!cancelled()"
+        run: ./tests/nlpgo-timeout-guard.sh
+
       # Workers drain in-flight queue jobs and their ClickHouse writes on
       # SIGTERM. Too short a grace period turns that drain into a SIGKILL,
       # which severs in-flight statements — invisible in the template source,
@@ -205,25 +218,34 @@ jobs:
         if: "!cancelled()"
         run: ./tests/lifecycle.sh
 
-      # Design C rests on one Secret name resolving identically on both sides:
-      # the app reads the langwatch_lwql password from exactly the Secret the
-      # ClickHouse pod mounts to create that identity. The two names come from
-      # two different helpers, only guaranteed equal by shared values — a
-      # divergence is invisible in the source and breaks every LWQL query. Also
-      # pins the chart's default autogen-off posture, which no preset exercises.
-      - name: "assert LWQL query Secret matches the ClickHouse-mounted Secret"
-        if: "!cancelled()"
-        run: ./tests/lwql-secret-parity.sh
-
-      # The password alone is not a working LangWatchQL connection: with
-      # LWQL_SELF_PROVISION off (chart-managed), the executor needs the full
-      # URL/user/database/tenant set too and refuses every query when one is
-      # missing. Pins that chart-managed emits all five on app AND workers, and
-      # that external ClickHouse self-provisions instead — visible only in the
-      # render (review 5115397477).
-      - name: "assert LWQL connection env is complete on both app and workers"
+      # Issue #8258: the app always owns the LWQL access model, on every
+      # ClickHouse/PostgreSQL posture. The chart's only job is handing the app
+      # and workers the two passwords it converges the model with
+      # (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) — no
+      # rendered connection vars, no DDL switch, nothing else LWQL-shaped.
+      # Visible only in the render.
+      - name: "assert LWQL env is exactly the two query passwords, on every posture"
         if: "!cancelled()"
         run: ./tests/lwql-connection-env.sh
+
+      - name: "assert app and workers get the in-cluster gateway address"
+        if: "!cancelled()"
+        run: ./tests/gateway-internal-url.sh
+
+      # A plain install renders no Ingress for the app or the gateway, an
+      # enabled gateway Ingress uses the class the operator picked, and no
+      # PodDisruptionBudget can block a node drain.
+      - name: "assert ingress is opt-in and disruption budgets allow drains"
+        if: "!cancelled()"
+        run: ./tests/gateway-ingress-and-pdbs.sh
+
+      # Argo CD renders with no cluster access and as revision 1 every time.
+      # With autogen off and operator Secrets the render must be stable, take
+      # remapped key names, never block ClickHouse on LangWatchQL, and keep
+      # every StatefulSet in sync under server-side diff.
+      - name: "assert autogen-off installs converge under Argo CD"
+        if: "!cancelled()"
+        run: ./tests/autogen-off-and-argocd.sh
 
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
@@ -233,6 +255,31 @@ jobs:
       - name: "assert Connect emits nothing by default and reaches both workloads when on"
         if: "!cancelled()"
         run: ./tests/connect-env.sh
+
+      # Same upgrade guarantee for self sign-up: a default render carries no
+      # SIGN_UP_ variable, and the values reach the app when set.
+      - name: "assert sign-up settings render only when set"
+        if: "!cancelled()"
+        run: ./tests/sign-up-env.sh
+
+      # A default install calls LangWatch only for the license sync and the
+      # usage report. The offline defaults that switch off library calls to
+      # third parties (Prisma checkpoint, the voice quick tunnel, RAGAS
+      # analytics) sit in a ConfigMap listed first in envFrom, so the
+      # operator's extraEnvs and extraEnvFrom win; that order is only visible
+      # in the render.
+      - name: "assert third-party calls are off by default and overridable"
+        if: "!cancelled()"
+        run: ./tests/privacy-defaults.sh
+
+      # release-please bumps the gateway and langyagent subchart versions on
+      # every release, and clickhouse-serverless on its own releases. The
+      # umbrella must still build its dependencies right after that bump,
+      # which a committed Chart.lock breaks (the 3.19.1 chart release failed
+      # on exactly this).
+      - name: "assert dependencies build after a subchart version bump"
+        if: "!cancelled()"
+        run: ./tests/dependency-build-after-subchart-bump.sh
 
       # The e2e job below is split into independent matrix legs sharing one
       # image build. That structure is a CI invariant with no cluster to prove
@@ -382,19 +429,22 @@ jobs:
             cluster: lw-core
             needs_app: true
           # Each of these does its own install and shares nothing with the
-          # chain, so they run as their own leg. None enables the app or workers
-          # (app.replicaCount stays 0 in values-e2e and no hook Job uses the app
-          # image), so this leg needs only the gateway and clickhouse images.
+          # chain, so they run as their own leg. Every chart-managed ClickHouse
+          # install runs the lwql-access-render Job on the app image, so this
+          # leg loads it too.
           - name: external
-            script: make test-e2e E2E_SUITES="test_external_clickhouse test_lwql_external_postgres_secret_guard test_cold_storage_and_backup"
+            script: make test-e2e E2E_SUITES="test_external_clickhouse test_cold_storage_and_backup test_lwql_replicas test_lwql_upgrade_from_main"
             cluster: lw-external
-            needs_app: false
-            skip_app_build: "1"
+            needs_app: true
           - name: overlays
             script: make test-e2e-overlays
             cluster: lw-overlay
-            needs_app: false
-            skip_app_build: "1"
+            # The overlays leg installs chart-managed ClickHouse, which depends
+            # on the app image: the lwql-access-render Job runs it to write the
+            # access Secret every ClickHouse pod mounts. Without the image the
+            # Job hits ErrImageNeverPull and ClickHouse never leaves
+            # ContainerCreating.
+            needs_app: true
     defaults:
       run:
         working-directory: charts/langwatch

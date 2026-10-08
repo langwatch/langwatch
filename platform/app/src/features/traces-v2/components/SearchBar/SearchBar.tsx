@@ -25,6 +25,7 @@ import {
 } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { useInstantEvalAccess } from "../../hooks/useInstantEvalAccess";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
@@ -168,7 +169,7 @@ export const SearchBar: React.FC = () => {
   // popover pointing the user at /settings/model-providers. Langy needs
   // none of this — the panel walks the user through model setup itself —
   // so when Langy owns the affordance the primer never blocks the way in.
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
   const askAiNeedsProviderPrimer =
@@ -292,7 +293,21 @@ export const SearchBar: React.FC = () => {
   // attached. A search that ran without the model that shapes it says so in
   // the strip under the bar (`SearchFallbackNotice`), which is where the
   // model settings are offered.
-  const instantEval = useInstantEvalRoute();
+  // While the flag read is in flight the submit is treated as available, so
+  // the estimate goes out; if the server refuses it, the user gets the model
+  // popover and the phrase search fallback, so a slow flag read never hides a
+  // feature the project actually has.
+  // The organization's own switch is read beside the flag: either one makes
+  // the judgement available, and the access read also says what the popover
+  // offers a refused reader (the switch, or a word with us).
+  const instantEvalAccess = useInstantEvalAccess({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
+  const instantEval = useInstantEvalRoute({
+    isInstantEvalAvailable: instantEvalAccess.isAvailable,
+    optInOffer: instantEvalAccess.optInOffer,
+  });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the
   // bar (a Langy action) reaches this same route rather than one of its own.
@@ -302,6 +317,7 @@ export const SearchBar: React.FC = () => {
   );
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
+    isInstantEvalAvailable: instantEvalAccess.isAvailable,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,
@@ -554,6 +570,9 @@ export const SearchBar: React.FC = () => {
           <InstantEvalRefusalPopover
             refusal={instantEval.refusal}
             onClose={instantEval.dismissRefusal}
+            onEnable={instantEval.enableInstantEvals}
+            isEnabling={instantEval.isEnabling}
+            viaConnect={instantEvalAccess.viaConnect}
           >
             <Box
               position="absolute"

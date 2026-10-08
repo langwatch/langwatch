@@ -68,7 +68,6 @@ import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
 } from "../accessModel";
 import {
   lwqlApprovedPostgresViewNames,
@@ -175,6 +174,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole shipped catalog, from the
+    // single access-model emitter (#8258) — the view statements are structural.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: harness.factDatabase,
+    });
   };
 
   beforeAll(async () => {
@@ -496,13 +501,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           )
         ).map((row) => row.TenantId);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
-            names: harness.names,
-            lwqlTable: sourceTable,
-            sourceDatabase: facts,
-          }),
-        ]);
+        // Reconverge the whole catalog from the definition — restores the
+        // simulations source-table policy detached above.
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
 
       expect(

@@ -1,13 +1,24 @@
 /**
- * Settings → Integrations. v0 surfaces the organization's GitHub connection:
- * connect the app, see which GitHub accounts and repositories it reaches, and
- * open GitHub to change or remove the installation. Future integrations slot in
- * here as additional cards.
+ * Settings → Integrations. Two cards today, at two different scopes:
  *
- * The same install endpoint serves the in-chat popup flow; this page uses the
- * redirect-mode variant so a full-page round-trip lands back here.
+ *  - GitHub, owned by the organization: connect the app, see which GitHub
+ *    accounts and repositories it reaches, and open GitHub to change or remove
+ *    the installation. Managing it takes `organization:manage`.
+ *  - Slack (ADR-093 §5a): named connections, each usable by the whole
+ *    organization or one project. Managing one takes `organization:manage`
+ *    or `project:update` at its scope.
  *
- * Spec: specs/integrations/github-connection.feature.
+ * The page itself therefore guards on `organization:view` — the permission
+ * every member of the organization holds — and each card gates its own writes.
+ * Guarding the page on `organization:manage`, as it did while GitHub was the
+ * only card, would have hidden a project-scoped integration from exactly the
+ * people who own it: a project admin who is not an organization admin.
+ *
+ * The same GitHub install endpoint serves the in-chat popup flow; this page
+ * uses the redirect-mode variant so a full-page round-trip lands back here.
+ *
+ * Specs: specs/integrations/github-connection.feature,
+ * specs/automations/slack-connections.feature.
  */
 import {
   Badge,
@@ -22,6 +33,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
+import { SlackConnectionsSection } from "~/features/automations/components/slack-connection/SlackConnectionsSection";
 import { showErrorToast } from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -37,12 +49,17 @@ function IntegrationsSettings() {
   return <IntegrationsContent organizationId={organization.id} />;
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("organization:view", {
   layoutComponent: SettingsLayout,
 })(IntegrationsSettings);
 
 function IntegrationsContent({ organizationId }: { organizationId: string }) {
-  const status = api.github.getConnectionStatus.useQuery({ organizationId });
+  const { hasPermission } = useOrganizationTeamProject();
+  const canManageOrganization = hasPermission("organization:manage");
+  const status = api.github.getConnectionStatus.useQuery(
+    { organizationId },
+    { enabled: canManageOrganization },
+  );
   const router = useRouter();
 
   useEffect(() => {
@@ -81,64 +98,69 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
     <SettingsLayout>
       <VStack align="stretch" gap={6} padding={6} maxWidth="720px">
         <Heading size="md">Integrations</Heading>
-        <Card.Root id="github">
-          <Card.Body>
-            <VStack align="stretch" gap={3}>
-              <HStack gap={2}>
-                <GitHub size={18} />
-                <Heading size="sm">GitHub</Heading>
-                {installations.length > 0 ? (
-                  <Badge colorPalette="green" variant="subtle">
-                    Installed
-                  </Badge>
-                ) : null}
-              </HStack>
-              <Text fontSize="sm" color="fg.muted">
-                Lets LangWatch open pull requests on the repositories you
-                choose, and link coding agent sessions to the pull requests they
-                produced. Pull requests are made by the LangWatch app and credit
-                you as the requester.
-              </Text>
-
-              {!configured ? (
+        <SlackConnectionsSection />
+        {!canManageOrganization ? (
+          <LangyCodeAccessPreference standalone />
+        ) : (
+          <Card.Root id="github">
+            <Card.Body>
+              <VStack align="stretch" gap={3}>
+                <HStack gap={2}>
+                  <GitHub size={18} />
+                  <Heading size="sm">GitHub</Heading>
+                  {installations.length > 0 ? (
+                    <Badge colorPalette="green" variant="subtle">
+                      Installed
+                    </Badge>
+                  ) : null}
+                </HStack>
                 <Text fontSize="sm" color="fg.muted">
-                  The GitHub integration is not available on this instance.
+                  Lets LangWatch open pull requests on the repositories you
+                  choose, and link coding agent sessions to the pull requests
+                  they produced. Pull requests are made by the LangWatch app and
+                  credit you as the requester.
                 </Text>
-              ) : installations.length === 0 ? (
-                <Button
-                  variant="solid"
-                  onClick={onInstall}
-                  disabled={!installUrl}
-                  alignSelf="flex-start"
-                >
-                  Connect GitHub
-                </Button>
-              ) : (
-                <VStack align="stretch" gap={3}>
-                  {installations.map((inst) => (
-                    <InstallationRow
-                      key={inst.installationId}
-                      organizationId={organizationId}
-                      installation={inst}
-                      onChanged={() => void status.refetch()}
-                    />
-                  ))}
+
+                {!configured ? (
+                  <Text fontSize="sm" color="fg.muted">
+                    The GitHub integration is not available on this instance.
+                  </Text>
+                ) : installations.length === 0 ? (
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="solid"
                     onClick={onInstall}
                     disabled={!installUrl}
                     alignSelf="flex-start"
                   >
-                    Add another account
+                    Connect GitHub
                   </Button>
-                </VStack>
-              )}
+                ) : (
+                  <VStack align="stretch" gap={3}>
+                    {installations.map((inst) => (
+                      <InstallationRow
+                        key={inst.installationId}
+                        organizationId={organizationId}
+                        installation={inst}
+                        onChanged={() => void status.refetch()}
+                      />
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onInstall}
+                      disabled={!installUrl}
+                      alignSelf="flex-start"
+                    >
+                      Add another account
+                    </Button>
+                  </VStack>
+                )}
 
-              <LangyCodeAccessPreference />
-            </VStack>
-          </Card.Body>
-        </Card.Root>
+                <LangyCodeAccessPreference />
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        )}
       </VStack>
     </SettingsLayout>
   );
@@ -149,7 +171,13 @@ function IntegrationsContent({ organizationId }: { organizationId: string }) {
  * choice is made in the chat, so this line only appears once one is stored,
  * and its one job is to let the reader take it back.
  */
-function LangyCodeAccessPreference() {
+function LangyCodeAccessPreference({
+  standalone = false,
+}: {
+  /** Outside the manager-only GitHub card: its own card, so every member
+   *  can see and clear their project's choice. */
+  standalone?: boolean;
+}) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const preference = api.langy.getCodeAccessPreference.useQuery(
@@ -164,13 +192,13 @@ function LangyCodeAccessPreference() {
 
   if (preference.data?.preference !== "github" || !projectId) return null;
 
-  return (
+  const line = (
     <HStack
       gap={3}
       justifyContent="space-between"
-      borderTopWidth="1px"
+      borderTopWidth={standalone ? "0" : "1px"}
       borderColor="border.muted"
-      paddingTop={3}
+      paddingTop={standalone ? 0 : 3}
     >
       <Text fontSize="sm" color="fg.muted">
         Langy uses GitHub for code changes
@@ -184,6 +212,20 @@ function LangyCodeAccessPreference() {
         Change
       </Button>
     </HStack>
+  );
+  if (!standalone) return line;
+  return (
+    <Card.Root id="langy-code-access">
+      <Card.Body>
+        <VStack align="stretch" gap={2}>
+          <HStack gap={2}>
+            <GitHub size={18} />
+            <Heading size="sm">Langy code access</Heading>
+          </HStack>
+          {line}
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
 }
 

@@ -12,16 +12,22 @@
 import { describe, expect, it } from "vitest";
 import { lwqlNamesForSuite } from "../../__tests__/lwqlClickHouseHarness";
 import type { LangWatchQLViewDefinition } from "../../catalog/types";
-import { lwqlRowPolicyStatement } from "../accessModel";
-import {
-  LWQL_SOURCE_ALIAS,
-  lwqlSourceTables,
-  lwqlViewSetupStatements,
-  SHIPPED_LWQL_DEDUP,
-} from "../catalogStatements";
+import { renderLwqlAccessModelDdl } from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
+import { LWQL_SOURCE_ALIAS, lwqlSourceTables } from "../catalogStatements";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 const NAMES = lwqlNamesForSuite("jointenant");
 const SOURCE_DATABASE = "langwatch";
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: SOURCE_DATABASE,
+  user: "lwql_ro",
+  password: "reader-secret",
+};
 
 /**
  * A synthetic view joining a default-`TenantId` primary to a `project_id`-keyed
@@ -88,26 +94,25 @@ describe("given a view joining a project_id-keyed fact table", () => {
     });
   });
 
-  describe("when the full setup is generated", () => {
-    const statements = lwqlViewSetupStatements({
-      names: NAMES,
-      sourceDatabase: SOURCE_DATABASE,
-      views: [JOIN_VIEW],
-      dedup: SHIPPED_LWQL_DEDUP,
-    });
+  describe("when the full access model is generated", () => {
+    const statements = renderLwqlAccessModelDdl(
+      buildLwqlAccessModelDefinition({
+        names: NAMES,
+        passwordSha256Hex: "a".repeat(64),
+        namedCollection: NAMED_COLLECTION,
+        sourceDatabase: SOURCE_DATABASE,
+        views: [JOIN_VIEW],
+      }),
+    );
 
     it("emits the joined table's row policy filtering project_id", () => {
-      const expected = lwqlRowPolicyStatement({
-        names: NAMES,
-        lwqlTable: {
-          table: "project_scoped_right",
-          tenantColumn: "project_id",
-          database: SOURCE_DATABASE,
-        },
-        sourceDatabase: SOURCE_DATABASE,
-      });
-      expect(statements).toContain(expected);
-      expect(expected).toContain("project_id IN (SELECT any(TenantId)");
+      const policy = statements.find((statement) =>
+        statement.startsWith(
+          `CREATE ROW POLICY OR REPLACE project_scoped_right_tenant ON ${SOURCE_DATABASE}.project_scoped_right`,
+        ),
+      );
+      expect(policy).toBeDefined();
+      expect(policy).toContain("project_id IN (SELECT any(TenantId)");
     });
   });
 

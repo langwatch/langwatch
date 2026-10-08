@@ -11,7 +11,7 @@
  * identifiers back has to be one rule consulted twice, because a rule that only
  * one engine knows about is a rule the other engine will undo.
  *
- * Two questions are asked, in this order.
+ * Three questions are asked, in this order.
  *
  *   1. Does the attribute NAME reserve it, AND does the value look like the
  *      address that name promises? A short list of trace and span identifier
@@ -19,11 +19,22 @@
  *      are not a protected namespace — the OTLP endpoint takes attributes as the
  *      caller wrote them — so the value still has to be hex or decimal before
  *      the name is allowed to turn the personal-data pass off.
- *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
+ *   2. Is it the SPAN KIND attribute holding one of the known kinds? Each is a
+ *      fixed word (`agent`, `workflow`, `llm`, …) that cannot carry personal
+ *      data, but the name detector reads some of them as first names. The gate
+ *      is the exact list, not a shape, because anyone can write that key: a
+ *      name written under it is still analysed.
+ *   3. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
  *      analysed.
+ *
+ * MODEL AND TOOL NAMES ARE NOT HELD BACK. They get a narrower answer from
+ * {@link reservesModelOrToolName}: spared name and place detection, which reads
+ * `claude-sonnet-4-6` as a person, and scanned for everything else. Holding
+ * them back altogether would leave a phone or national id under one of those
+ * names scanned by nothing wherever the native pass does not cover it.
  *
  * WHY THERE ARE TWO VALUE RULES. The engines pay different prices for a wrong
  * answer, so they get different rules and the difference is the whole point.
@@ -38,11 +49,15 @@
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
  * the reserved list would mean storing that in the clear. They are covered by
- * question 2 like every other attribute: an opaque value is held back, personal
+ * question 3 like every other attribute: an opaque value is held back, personal
  * data is still redacted.
  */
 
-import { METADATA_SUBKEY_PREFIXES } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import {
+  ATTR_KEYS,
+  METADATA_SUBKEY_PREFIXES,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { spanTypesSchema } from "~/server/tracer/types";
 
 const HAS_LETTER = /[A-Za-z]/;
 const HAS_DIGIT = /\d/;
@@ -310,8 +325,121 @@ export function reservesTraceAddress({
 }
 
 /**
+ * Attribute names whose value is a model, provider or tool name: chosen by the
+ * developer or reported by the provider, never typed by the end user.
+ *
+ * These are the values the name/place pass gets most visibly wrong. A bare
+ * Anthropic model id (`claude-sonnet-4-6`) reads to it as a first name, so under
+ * the strict level every call to that provider stored `[PERSON]` in place of
+ * the model, and tool names written as words went the same way. None of them is
+ * opaque — they split into short readable runs — so the value rule above never
+ * holds them back; only the name can mark them, and only for that one pass.
+ *
+ * Compared lower-cased. Like the trace list, the names are not a namespace
+ * anyone owns, so the value is gated too ({@link MODEL_OR_TOOL_NAME_VALUE}).
+ */
+const RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS: ReadonlySet<string> = new Set([
+  "ai.model.id",
+  "ai.model.provider",
+  "ai.response.model",
+  "ai.toolcall.name",
+  "gen_ai.request.model",
+  "gen_ai.response.model",
+  "gen_ai.system",
+  "gen_ai.provider.name",
+  "gen_ai.tool.name",
+  "llm.model_name",
+]);
+
+/**
+ * What a model, provider or tool name is written as: one token of letters,
+ * digits and the separators vendors use (`us.anthropic.claude-opus-4-1`,
+ * `anthropic/claude-sonnet-4`, `gpt-5:latest`, `lookup_profile`).
+ *
+ * No whitespace, so prose written under one of these names is still analysed;
+ * no `@`, so an email address is still analysed; and a URL is sent on too
+ * (see {@link reservesModelOrToolName}), since it can carry a person in its
+ * path. Model ids use `/` themselves (`anthropic/claude-sonnet-4`,
+ * `bedrock/us.anthropic.claude-opus-4-1`), so a URL is told apart by what
+ * comes before the first `/`: a scheme, or a dotted host (`www.acme.example/`).
+ * A vendor namespace before the slash never carries a dot.
+ *
+ * What this knowingly lets through is a lone single-token name written under a
+ * model or tool attribute ("jane.doe", "jane_doe"). It cannot be told apart by
+ * shape: providers write their own ids as dotted words (`anthropic.messages`,
+ * `openai.chat`), which is the exact value this rule exists for. The trace
+ * rule can refuse "jane.doe" because an address is hex or decimal; a model name
+ * is words. That is the residual, and it is accepted: those attributes are set
+ * by code, and only name and place detection is skipped, so card numbers,
+ * phone numbers, national ids and secrets in them are redacted either way.
+ */
+const MODEL_OR_TOOL_NAME_VALUE = /^[A-Za-z0-9._:/+-]+$/;
+
+/**
+ * How long a model, provider or tool name may be. Real ones fit, including a
+ * full Bedrock inference-profile ARN (about 100 characters); this sits below
+ * {@link MAX_IDENTIFIER_LENGTH} because the rule is exempting readable words,
+ * not opaque runs, so the longer the value the less it looks like a name
+ * picked from a list.
+ */
+export const MAX_MODEL_OR_TOOL_NAME_LENGTH = 128;
+
+/** A scheme (`https://`), or a dotted host before the first `/`. */
+const URL_SHAPED = /:\/\/|^[^/]*\.[^/]*\//;
+
+/**
+ * Whether this attribute is a model, provider or tool name carrying a value
+ * shaped like one. Such a value is spared name and place detection only: the
+ * analysis call still scans it for every other entity it was asked for.
+ */
+export function reservesModelOrToolName({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    RESERVED_MODEL_OR_TOOL_ATTRIBUTE_KEYS.has(key.toLowerCase()) &&
+    value.length <= MAX_MODEL_OR_TOOL_NAME_LENGTH &&
+    MODEL_OR_TOOL_NAME_VALUE.test(value) &&
+    !URL_SHAPED.test(value)
+  );
+}
+
+/**
+ * Whether this attribute is the span kind ({@link ATTR_KEYS.SPAN_TYPE})
+ * carrying one of the known kinds (`llm`, `tool`, `agent`, `workflow`, ...).
+ * The name/place pass reads some of those words as a first name, so under the
+ * strict level top-level spans stored `[PERSON]` as their kind and lost it in
+ * the trace view.
+ *
+ * Gated on the exact list ({@link spanTypesSchema}), not on shape: the name is
+ * not a namespace anyone owns, and a known kind is a fixed word that cannot
+ * carry personal data, so it is safe to hold back from every pass. Anything
+ * else written under this name is analysed as usual.
+ */
+export function reservesSpanType({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    key.toLowerCase() === ATTR_KEYS.SPAN_TYPE &&
+    spanTypesSchema.safeParse(value).success
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name, or a value that is exclusively one opaque identifier token.
+ * name as a trace address, a known span kind, or a value that is exclusively
+ * one opaque identifier token.
+ *
+ * A model or tool name is NOT held back here. It is still analysed for
+ * everything except names and places ({@link reservesModelOrToolName}), so a
+ * phone, card or national id written under one is found on every path.
  *
  * Attribute values only. Free text — a log body, a status message, the chat
  * content itself — is content by definition and always analysed.
@@ -323,5 +451,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesSpanType({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }

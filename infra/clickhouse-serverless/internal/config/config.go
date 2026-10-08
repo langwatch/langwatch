@@ -25,29 +25,6 @@ type Input struct {
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
 	ClusterSecretFile string `env:"CLICKHOUSE_CLUSTER_SECRET_FILE"` // path to mounted cluster secret
 
-	// LangWatchQL access model (issue langwatch-saas#1168, Design C). When the
-	// chart mounts CLICKHOUSE_LWQL_PASSWORD_FILE the server owns the LWQL access
-	// model: renderLWQL emits the langwatch_lwql restricted user, its
-	// lwql_restricted profile, grants and row filters as config. Absent on
-	// installs that do not use LangWatchQL (or that point it at an external
-	// ClickHouse) — the renderer self-gates on LWQLPassword and skips otherwise.
-	//
-	// LWQLPassword is read from CLICKHOUSE_LWQL_PASSWORD_FILE in Load() (like
-	// Password), never from a plain env, so it is hashed from the same mounted
-	// Secret the app authenticates with.
-	LWQLPassword string
-	LWQLDatabase string `env:"CLICKHOUSE_LWQL_DATABASE" default:"langwatch"`
-
-	// lwql_postgres named collection — the ClickHouse→PostgreSQL bridge the
-	// LWQL PostgreSQL-resident views read through. Rendered only when both the
-	// host and the (plaintext, unhashable) reader password are provided.
-	// LWQLPgPassword is read from CLICKHOUSE_LWQL_PG_PASSWORD_FILE in Load().
-	LWQLPgHost     string `env:"CLICKHOUSE_LWQL_PG_HOST"`
-	LWQLPgPort     int    `env:"CLICKHOUSE_LWQL_PG_PORT" default:"5432"`
-	LWQLPgDatabase string `env:"CLICKHOUSE_LWQL_PG_DATABASE"`
-	LWQLPgUser     string `env:"CLICKHOUSE_LWQL_PG_USER"`
-	LWQLPgPassword string
-
 	// Backups — independent of cold storage, uses same S3-compatible credentials
 	BackupEnabled bool `env:"BACKUP_ENABLED"`
 
@@ -119,14 +96,6 @@ type Input struct {
 	ClickHouseUser string `env:"CLICKHOUSE_USER" default:"default"`
 }
 
-// lwqlSecretFile binds an env var naming a mounted secret file to the Input
-// field its trimmed contents load into. Used only by Load()'s file-only LWQL
-// password loop.
-type lwqlSecretFile struct {
-	envKey string
-	dest   *string
-}
-
 // Load reads configuration from env vars + cgroup auto-detection.
 func Load() (*Input, error) {
 	i := &Input{}
@@ -173,29 +142,6 @@ func Load() (*Input, error) {
 			return nil, fmt.Errorf("CLICKHOUSE_PASSWORD_FILE: %w", err)
 		}
 		i.Password = strings.TrimSpace(string(data))
-	}
-
-	// LWQL passwords are file-only: never a plain env, and a missing file is not
-	// an error — it simply leaves the LWQL access model unprovisioned (the same
-	// fail-open-to-skip contract as the SaaS render-config.sh). An empty file is
-	// treated as absent so an operator Secret without the key stays inert rather
-	// than provisioning a user with an empty password.
-	for _, lwqlSecret := range []lwqlSecretFile{
-		{"CLICKHOUSE_LWQL_PASSWORD_FILE", &i.LWQLPassword},
-		{"CLICKHOUSE_LWQL_PG_PASSWORD_FILE", &i.LWQLPgPassword},
-	} {
-		path := os.Getenv(lwqlSecret.envKey)
-		if path == "" {
-			continue
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, fmt.Errorf("%s: %w", lwqlSecret.envKey, err)
-		}
-		*lwqlSecret.dest = strings.TrimSpace(string(data))
 	}
 
 	return i, nil

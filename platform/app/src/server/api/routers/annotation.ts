@@ -16,7 +16,6 @@ import {
   resolveAnnotationSuggestionTarget,
   withReadableAnnotationAnchor,
 } from "~/server/annotations/annotationAnchor";
-import { getApp } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
 import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
@@ -542,7 +541,7 @@ export const annotationRouter = createTRPCRouter({
         anchorPath: input.anchorPath,
       });
 
-      const createdAnnotation = await service.create({
+      return service.create({
         id: nanoid(),
         projectId: input.projectId,
         traceId: input.traceId,
@@ -555,30 +554,6 @@ export const annotationRouter = createTRPCRouter({
         anchorId: input.anchorId,
         anchorPath: input.anchorPath,
       });
-
-      // Best-effort ClickHouse sync: Prisma is the source of truth.
-      // Failures are logged but don't fail the mutation — the backfill task
-      // can reconcile any missed syncs.
-      //
-      // Anchored comments sync too. This is what answers "has a human touched
-      // this trace", which the has-annotation filter in search reads, and a
-      // comment on one of its spans means yes.
-      try {
-        const app = getApp();
-        await app.traces.addAnnotation({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          annotationId: createdAnnotation.id,
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          { error, traceId: input.traceId, projectId: input.projectId },
-          "Failed to sync annotation to ClickHouse",
-        );
-      }
-
-      return createdAnnotation;
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -731,32 +706,10 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
-      const deletedAnnotation = await service.delete({
+      return service.delete({
         id: input.annotationId,
         projectId: input.projectId,
       });
-
-      // Best-effort ClickHouse sync (see create mutation comment above).
-      try {
-        const app = getApp();
-        await app.traces.removeAnnotation({
-          tenantId: input.projectId,
-          traceId: deletedAnnotation.traceId,
-          annotationId: deletedAnnotation.id,
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          {
-            error,
-            traceId: deletedAnnotation.traceId,
-            projectId: input.projectId,
-          },
-          "Failed to sync annotation removal to ClickHouse",
-        );
-      }
-
-      return deletedAnnotation;
     }),
   /**
    * The project's annotations list, and the export taken from it. One row per

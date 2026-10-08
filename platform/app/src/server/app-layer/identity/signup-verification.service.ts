@@ -108,7 +108,7 @@ export interface SignUpVerificationDeps {
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
   /** Builds the link the email carries, from a minted token. */
-  buildVerificationUrl(input: { token: string }): string;
+  buildVerificationUrl(input: { token: string; callbackUrl?: string }): string;
   now?: () => Date;
   mintToken?: () => string;
 }
@@ -138,6 +138,13 @@ export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
  * caller must not be able to make about an address they do not hold.
  */
 const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
+
+/**
+ * The namespace for a proof that an address was typed on an installation that
+ * cannot send email, so nothing was proven (ADR-117, revision 2026-09-25). A
+ * separate namespace keeps it from ever passing a confirmed-proof check.
+ */
+const UNCONFIRMED_ADDRESS_NAMESPACE = "identity-signup-unconfirmed:";
 
 /**
  * How long a spent confirmation link keeps telling the truth about itself.
@@ -236,8 +243,16 @@ export class SignUpVerificationService {
    * asking twice sends twice and both links work until one is spent, which is
    * the behavior a person who cannot find the first email expects.
    */
-  async requestVerification({ email }: { email: string }): Promise<void> {
-    await this.issueLink({ email, passwordHash: null });
+  async requestVerification({
+    email,
+    callbackUrl,
+  }: {
+    email: string;
+    /** Where the screen was going once through; rides on the link so a
+     *  fresh tab lands where the first one was headed. */
+    callbackUrl?: string;
+  }): Promise<void> {
+    await this.issueLink({ email, passwordHash: null, callbackUrl });
   }
 
   /**
@@ -356,6 +371,53 @@ export class SignUpVerificationService {
   }
 
   /**
+   * Mints a single-use proof for an address that could not be mailed, bound to
+   * the normalized address. Only a caller that knows the installation has no
+   * email provider asks for it; it never marks the address as confirmed.
+   */
+  async issueUnconfirmedAddressProof({
+    email,
+  }: {
+    email: string;
+  }): Promise<string> {
+    const token = this.mintToken();
+    await this.deps.tokens.issue({
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      token,
+      expires: new Date(this.now().getTime() + CONFIRMED_ADDRESS_TTL_MS),
+    });
+    return token;
+  }
+
+  async claimUnconfirmedAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    return await this.deps.tokens.claimExpected({
+      token,
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
+  async validateUnconfirmedAddressProof({
+    token,
+    email,
+  }: {
+    token: string;
+    email: string;
+  }): Promise<boolean> {
+    return await this.deps.tokens.hasExpected({
+      token,
+      identifier: `${UNCONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
+  /**
    * The same link, opened again while its marker is still live.
    *
    * The answer is the answer the first opening gave, because the question has
@@ -408,9 +470,11 @@ export class SignUpVerificationService {
   private async issueLink({
     email,
     passwordHash,
+    callbackUrl,
   }: {
     email: string;
     passwordHash: string | null;
+    callbackUrl?: string;
   }): Promise<void> {
     const normalized = normalizeIdentifierValue(email);
     const token = this.mintToken();
@@ -423,7 +487,7 @@ export class SignUpVerificationService {
 
     await this.deps.mailer.sendVerificationLink({
       email: normalized,
-      verificationUrl: this.deps.buildVerificationUrl({ token }),
+      verificationUrl: this.deps.buildVerificationUrl({ token, callbackUrl }),
     });
   }
 

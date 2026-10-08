@@ -2,7 +2,7 @@
 #
 # Renders the chart and asserts what Connect emits, on both postures.
 #
-# The upgrade guarantee for ADR-141 is a claim about absence: an install that
+# The upgrade guarantee for ADR-142 is a claim about absence: an install that
 # upgrades and changes no value must carry no LANGWATCH_CONNECT_ variable at
 # all, so what it calls is decided by its license and by nothing in this chart.
 # Absence is exactly what a template's source does not show: an `{{- if }}`

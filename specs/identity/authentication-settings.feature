@@ -103,7 +103,40 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the sign-in addresses are listed
     Then nothing offers to send a confirmation link
 
+  # Two facts can say an address is confirmed: the account's email identifier
+  # (VERIFIED through the emailed ceremony) and `User.emailVerified`. The fold
+  # writes the column from the identifier, never the other way, and sign-in
+  # linking reads the column. An operator who confirms an address by setting
+  # the column directly, on an installation that cannot send email, moves only
+  # the column. The list follows the column for the account's own address, so
+  # the screen never calls an address unconfirmed that sign-in already trusts.
+  @unit
+  Scenario: The account's own address confirmed outside the app shows as confirmed
+    Given "sam"'s own address identifier was never verified
+    And "sam"'s account says the address is confirmed
+    When the sign-in addresses are listed
+    Then the account's own address is shown as confirmed
+    And nothing offers to send it a confirmation link
+    And another address that was never confirmed still shows as not confirmed yet
+
   # ── Adding another address ─────────────────────────────────────────────
+
+  # Adding an address is sending it a link. Where the installation has no email
+  # provider no link can go out, so the offer stands down and says what is
+  # missing, and the route refuses with a named error whatever the screen drew.
+  @integration
+  Scenario: An installation that cannot send email does not offer to add an address
+    Given the installation has no email provider configured
+    When the authentication settings are shown
+    Then adding an email address is not offered
+    And the reason given says an administrator needs to set up an email provider
+
+  @unit
+  Scenario: Adding or resending an address without a way to send email is refused with a named error
+    Given the installation has no email provider configured
+    When "sam" asks to add an address or to send an address its link again
+    Then it is refused with "auth_email_sending_unavailable"
+    And no identifier is attached and nothing is sent
 
   @integration
   Scenario: Adding a second address starts a confirmation rather than a sign-in method
@@ -132,6 +165,50 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When the link is opened in a browser that did not start the ceremony
     Then nothing is confirmed
     And the screen says to return to the window the request came from
+
+  # The account's own address runs the same ceremony. An account that exists
+  # and is unconfirmed (a password sign-up from an older release, or one made
+  # on an installation that could not send email) cannot use a sign-up link:
+  # that link refuses an address that already holds an account, because a
+  # mailed link alone must never confirm an account somebody else may have
+  # created. Confirming it marks the account's address as confirmed, which is
+  # what single sign-on reads before it links a sign-in to the account.
+  @integration
+  Scenario: An existing unconfirmed account confirms its own address from Settings
+    Given "sam" has an account whose own address was never confirmed
+    When "sam" asks from Settings for the link to be sent again
+    And "sam" opens the emailed link in the window that asked
+    Then the address is confirmed
+    And the account's address reads as confirmed everywhere, including to single sign-on
+
+  @integration
+  Scenario: The own address link opened without the window that asked confirms nothing
+    Given "sam" has an account whose own address was never confirmed
+    And a confirmation link for it went out from Settings
+    When the link is used without the proof the asking window kept
+    Then nothing is confirmed
+    And the account's address still reads as not confirmed
+
+  @integration
+  Scenario: An own address that is already confirmed is not confirmed again
+    Given "sam" has confirmed the account's own address
+    When "sam" asks from Settings for another confirmation link
+    Then no link is sent
+    And "sam" is told the address cannot be confirmed again
+
+  @integration
+  Scenario: An own address the account is not known by sends nothing
+    Given the account's own address is not one of the addresses "sam" is known by
+    When "sam" asks from Settings for the confirmation link
+    Then no link is sent
+    And "sam" is told the address was not found
+
+  @unit
+  Scenario: The own address confirmation only ever goes to the session's own address
+    Given "sam" is signed in
+    When "sam" asks for the own address confirmation
+    Then the link goes to the address "sam" is signed in as
+    And no sign-up link is sent
 
   # Attaching is not claiming. An unverified identifier blocks nobody, so
   # refusing here would buy no protection and would answer "does an account
@@ -280,6 +357,20 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" asks to remove the password
     Then the confirmation names the ways in that stay behind
     And nothing is removed until "sam" confirms
+
+  # ── Connecting a provider ──────────────────────────────────────────────
+
+  # The Connect offers come from the deployment's sign-in policy, carried on
+  # the public settings read. An operator who removes a provider restarts the
+  # app, and a tab that was open across that restart still holds the old list.
+  # The read is kept briefly and asked again on mount and on focus, so a plain
+  # reload, or coming back to the tab, shows the deployment's current set.
+  @unit
+  Scenario: A provider the deployment stopped offering leaves the Connect offers on reload
+    Given the deployment offered "Microsoft" when "sam" opened the page
+    And the operator removed it and restarted the app
+    When "sam" reloads or comes back to the page
+    Then the deployment's settings are asked for again rather than read from a long-lived cache
 
   # ── Unlinking single sign-on ───────────────────────────────────────────
 

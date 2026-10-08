@@ -163,7 +163,7 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     category: "operational",
     window: "point_in_time",
     why: "Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at.",
-    source: "AUTH_PROVIDER",
+    source: "AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER",
   },
   {
     key: "sso_provider",

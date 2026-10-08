@@ -24,7 +24,7 @@
  * @see dev/docs/adr/136-lwql-postgres-catalog-derived-opt-out.md
  */
 
-import type { PostgresDatasetOverride } from "../derivePostgresCatalog";
+import type { PostgresDatasetOverride } from "../defineCatalogModel";
 
 /** A conversation's own `isShared` flag — the base case of the filter. */
 const OWN_CONVERSATION_SHARED = `"m"."isShared" = true`;

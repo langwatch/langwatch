@@ -109,6 +109,10 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // an example table name in a comment about column-casing conventions.
   // Audited: no query, delete, update, or truncate on the table.
   /^src\/server\/analytics\/lwql\/catalog\/defineDatasetFromTable\.ts$/,
+  // lwql/catalog/lwqlViews.ts names "stored_objects" as the source table of
+  // the read-only "objects" LWQL view (its explicit catalog entry). Audited: a
+  // read-only SELECT-only view declaration; no delete/update/truncate.
+  /^src\/server\/analytics\/lwql\/catalog\/lwqlViews\.ts$/,
   // lwql/provisioning/catalogStatements.ts references "stored_objects" only
   // in a comment explaining the tenantColumn override below. Audited: it
   // provisions read-only ClickHouse grants/views, no delete/update/truncate.

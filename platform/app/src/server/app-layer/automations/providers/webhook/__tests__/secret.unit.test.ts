@@ -18,10 +18,12 @@ const BASE = {
   url: "https://example.com/hook",
   method: "POST" as const,
   bodyTemplate: null,
+  contentType: "application/json",
 };
 
 describe("persistWebhookActionParams", () => {
   describe("when all header values are freshly typed", () => {
+    /** @scenario "Header values are stored encrypted at rest" */
     it("encrypts the record and drops the plaintext", () => {
       const stored = persistWebhookActionParams({
         incoming: { ...BASE, headers: { Authorization: "Bearer secret" } },
@@ -57,6 +59,7 @@ describe("persistWebhookActionParams", () => {
       });
     });
 
+    /** @scenario "Renaming a saved header requires re-entering its value" */
     it("drops a kept value whose name has no stored counterpart", () => {
       const stored = persistWebhookActionParams({
         incoming: {
@@ -88,6 +91,24 @@ describe("persistWebhookActionParams", () => {
           existing,
         }),
       ).toThrow(/Re-enter webhook header values/);
+    });
+
+    it("refuses to carry a saved signing secret to a changed destination", () => {
+      const existing = persistWebhookActionParams({
+        incoming: { ...BASE, headers: {}, signingSecret: "whsec-original" },
+      });
+
+      expect(() =>
+        persistWebhookActionParams({
+          incoming: {
+            ...BASE,
+            url: "https://attacker.example/collect",
+            headers: {},
+            signingSecret: WEBHOOK_HEADER_VALUE_KEPT,
+          },
+          existing,
+        }),
+      ).toThrow(/Re-enter the signing secret/);
     });
   });
 

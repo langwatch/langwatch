@@ -13,12 +13,22 @@ import type {
   SsoVerificationMethod,
 } from "@langwatch/identity";
 
+/** The sign-in a deployment configures for itself (`NEXTAUTH_PROVIDER`) and
+ *  the address it returns to (`deployment-sign-in.ts`). */
+export interface DeploymentSignIn {
+  name: string;
+  redirectUrl: string;
+}
+
 export interface SsoServiceProviderDetails {
   redirectUrl: string;
   assertionConsumerServiceUrl: string;
   singleLogoutUrl: string;
   entityId: string;
   metadataUrl: string;
+  /** The deployment's own sign-in and its redirect address, when it has
+   *  one besides the connection. */
+  deploymentSignIn?: DeploymentSignIn | null;
 }
 
 export interface SelfServeDomainClaimView {
@@ -186,3 +196,23 @@ export interface SelfServeSetupView {
   migration: SelfServeMigrationView | null;
   attestationOffered: false;
 }
+
+/**
+ * A connection's current identity provider settings, as the edit form is
+ * prefilled with them. Never the OpenID Connect client secret: the form says
+ * whether one is stored, and a blank secret keeps it.
+ */
+export type SelfServeIdentityProviderView =
+  | {
+      protocol: "oidc";
+      issuer: string | null;
+      clientId: string | null;
+      hasClientSecret: boolean;
+    }
+  | {
+      protocol: "saml";
+      entryPoint: string | null;
+      entityId: string | null;
+      metadataXml: string | null;
+      certificate: string | null;
+    };

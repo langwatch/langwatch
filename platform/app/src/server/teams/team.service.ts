@@ -3,6 +3,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
+  OrganizationUserRole,
   Prisma,
   type PrismaClient,
   RoleBindingScopeType,
@@ -471,7 +472,18 @@ export class TeamService {
                 where: {
                   groupId: { in: allGroupIds },
                   group: { organizationId },
-                  user: { orgMemberships: { some: { organizationId } } },
+                  // A Developer seat gets nothing through a group (ADR-143),
+                  // so one sitting in a team-bound group is not a member the
+                  // listing should show, the same rule the admin fan-out
+                  // applies in effective-team-admins.
+                  user: {
+                    orgMemberships: {
+                      some: {
+                        organizationId,
+                        role: { not: OrganizationUserRole.DEVELOPER },
+                      },
+                    },
+                  },
                 },
                 include: { user: { select: ACCESS_LISTING_USER_SELECT } },
               })

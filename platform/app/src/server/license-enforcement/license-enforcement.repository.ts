@@ -8,7 +8,11 @@ import { parseCustomRolePermissions } from "~/server/app-layer/authz/custom-role
 import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { getCurrentMonthStart } from "../utils/dateUtils";
-import { isFullMember, isLiteMember } from "./member-classification";
+import {
+  isDeveloper,
+  isFullMember,
+  isLiteMember,
+} from "./member-classification";
 
 /**
  * Type for team assignment in organization invites.
@@ -45,6 +49,7 @@ interface MemberClassificationContext {
 export interface ILicenseEnforcementRepository {
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;
+  getMembersDeveloperCount(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
@@ -84,6 +89,15 @@ export class LicenseEnforcementRepository
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
     return this.countMembersByType(context, isLiteMember);
+  }
+
+  /**
+   * Counts Developer seats (ADR-143): users and live PENDING invites with the
+   * DEVELOPER role. Shown on the plan page, never compared to a limit.
+   */
+  async getMembersDeveloperCount(organizationId: string): Promise<number> {
+    const context = await this.getMemberClassificationContext(organizationId);
+    return this.countMembersByType(context, isDeveloper);
   }
 
   /**

@@ -93,5 +93,29 @@ describe("IssueActivationCodeDrawer", () => {
         });
       });
     });
+
+    describe("when the operator leaves lite seats empty, or types a number", () => {
+      /** @scenario "The activation code form offers lite seats with the plan default" */
+      it("sends no lite seats when empty, and the typed number otherwise", async () => {
+        mutate.mockClear();
+        renderDrawer();
+        await fillCustomer();
+
+        const lite = screen.getByRole("spinbutton", {
+          name: "Lite member seats",
+        });
+        expect(lite).toHaveValue(null);
+        expect(lite).toHaveAttribute("placeholder", "Plan default");
+
+        fireEvent.click(screen.getByRole("button", { name: "Issue code" }));
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+        expect(mutate.mock.calls[0]?.[0]).not.toHaveProperty("maxMembersLite");
+
+        fireEvent.change(lite, { target: { value: "7" } });
+        fireEvent.click(screen.getByRole("button", { name: "Issue code" }));
+        await waitFor(() => expect(mutate).toHaveBeenCalledTimes(2));
+        expect(mutate.mock.calls[1]?.[0]).toMatchObject({ maxMembersLite: 7 });
+      });
+    });
   });
 });

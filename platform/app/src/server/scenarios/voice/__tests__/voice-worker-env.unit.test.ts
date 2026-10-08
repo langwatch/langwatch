@@ -87,26 +87,48 @@ describe("readVoiceWorkerEnv", () => {
 
   describe("given VOICE_TUNNEL values", () => {
     /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
-    it("is enabled for anything that is not the literal false", () => {
-      expect(
-        readVoiceWorkerEnv({ VOICE_TUNNEL: "TRUE" }).voiceTunnelEnabled,
-      ).toBe(true);
-      expect(readVoiceWorkerEnv({ VOICE_TUNNEL: "" }).voiceTunnelEnabled).toBe(
-        true,
-      );
-      expect(
-        readVoiceWorkerEnv({ VOICE_TUNNEL: "nonsense" }).voiceTunnelEnabled,
-      ).toBe(true);
+    it("is enabled for the literal true, case-insensitively, even on a self-hosted production install", () => {
+      for (const value of ["true", "TRUE"]) {
+        expect(
+          readVoiceWorkerEnv({ NODE_ENV: "production", VOICE_TUNNEL: value })
+            .voiceTunnelEnabled,
+        ).toBe(true);
+      }
     });
 
     /** @scenario "A voice worker opens a quick tunnel when no public base URL is configured" */
-    it("is disabled for the literal false, case-insensitively", () => {
+    it("is disabled for the literal false, case-insensitively, even on SaaS", () => {
+      for (const value of ["false", "FALSE"]) {
+        expect(
+          readVoiceWorkerEnv({ IS_SAAS: "true", VOICE_TUNNEL: value })
+            .voiceTunnelEnabled,
+        ).toBe(false);
+      }
+    });
+  });
+
+  describe("given VOICE_TUNNEL unset or not a boolean", () => {
+    /** @scenario "A self-hosted production worker opens no quick tunnel unless enabled" */
+    it("leaves the tunnel off on a self-hosted production install", () => {
+      for (const value of [undefined, "", "nonsense"]) {
+        expect(
+          readVoiceWorkerEnv({ NODE_ENV: "production", VOICE_TUNNEL: value })
+            .voiceTunnelEnabled,
+        ).toBe(false);
+      }
+    });
+
+    /** @scenario "A self-hosted production worker opens no quick tunnel unless enabled" */
+    it("turns the tunnel on for SaaS and for local development", () => {
+      for (const IS_SAAS of ["true", "1"]) {
+        expect(
+          readVoiceWorkerEnv({ NODE_ENV: "production", IS_SAAS })
+            .voiceTunnelEnabled,
+        ).toBe(true);
+      }
       expect(
-        readVoiceWorkerEnv({ VOICE_TUNNEL: "FALSE" }).voiceTunnelEnabled,
-      ).toBe(false);
-      expect(
-        readVoiceWorkerEnv({ VOICE_TUNNEL: "false" }).voiceTunnelEnabled,
-      ).toBe(false);
+        readVoiceWorkerEnv({ NODE_ENV: "development" }).voiceTunnelEnabled,
+      ).toBe(true);
     });
   });
 });

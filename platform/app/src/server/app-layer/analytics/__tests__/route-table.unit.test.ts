@@ -287,6 +287,35 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
   });
 
+  describe("given a metadata.key filter on a blocklisted key sent with · for .", () => {
+    it("falls back to trace_summaries (the builders read the dotted key)", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        filters: { "metadata.key": ["input·value"] },
+      });
+      expect(table).toBe("trace_summaries");
+    });
+  });
+
+  describe("given an evaluation metric filtered by custom metadata", () => {
+    // The eval slim row carries only the evaluation events' metadata, never
+    // the trace's, so it would count nothing (langwatch/tasks#919).
+    it.each([
+      { "metadata.key": ["outcome"] },
+      { "metadata.value": { outcome: ["ok"] } },
+    ])("routes %j to evaluation_runs", (filters) => {
+      // Grouped by label so the unfiltered series lands on the eval slim.
+      const query = {
+        series: [series("evaluations.evaluation_runs", "cardinality")],
+        groupBy: "evaluations.evaluation_label",
+      };
+      const unfiltered = pickAnalyticsTable(query);
+      const filtered = pickAnalyticsTable({ ...query, filters });
+      expect(unfiltered).toBe("evaluation_analytics");
+      expect(filtered).toBe("evaluation_runs");
+    });
+  });
+
   describe("given a metadata.value filter on a blocklisted prefix key", () => {
     it("falls back to trace_summaries", () => {
       const table = pickAnalyticsTable({

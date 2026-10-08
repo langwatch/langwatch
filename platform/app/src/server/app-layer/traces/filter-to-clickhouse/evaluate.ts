@@ -11,6 +11,11 @@ import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { normalizeQuery, translateFilterToClickHouse } from "./ast";
 import { FIELD_DEF_BY_NAME } from "./build-handlers";
 import {
+  type AndChain,
+  andChainOf,
+  evaluateEvaluationScope,
+} from "./evaluation-scope";
+import {
   type FieldNeeds,
   type InMemoryTrace,
   UNSUPPORTED,
@@ -119,6 +124,10 @@ function evaluateNode(
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
+      // An AND chain is read once from its top, binding an evaluator to its
+      // result conditions exactly as `translateNode` does.
+      const chain = negated ? null : andChainOf(logExpr);
+      if (chain) return evaluateAndChain(chain, trace, state);
       // Negation threads down unchanged and the operator stays as-is — the
       // exact shape `translateNode` compiles, so both sides always agree.
       const left = evaluateNode(logExpr.left, negated, trace, state);
@@ -142,6 +151,31 @@ function evaluateNode(
     default:
       return UNSUPPORTED;
   }
+}
+
+/** Mirrors `translateAndChain`: the bound group, ANDed with the rest. */
+function evaluateAndChain(
+  chain: AndChain,
+  trace: InMemoryTrace,
+  state: WalkState,
+): boolean | Unsupported {
+  state.nodeCount += chain.nodeCount - 1;
+  if (state.nodeCount > MAX_FILTER_NODE_COUNT) return UNSUPPORTED;
+  let matched = true;
+  if (chain.scope) {
+    const bound = evaluateEvaluationScope(chain.scope, trace);
+    if (bound === UNSUPPORTED) {
+      state.unsupportedFields.push("evaluator");
+      return UNSUPPORTED;
+    }
+    matched = bound;
+  }
+  for (const operand of chain.rest) {
+    const result = evaluateNode(operand, false, trace, state);
+    if (result === UNSUPPORTED) return UNSUPPORTED;
+    matched = matched && result;
+  }
+  return matched;
 }
 
 function evaluateTag(

@@ -6,6 +6,7 @@
  * and key mint are fakes.
  */
 import { describe, expect, it, vi } from "vitest";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyConversationIdUnadoptableError,
   LangyModelNotConfiguredError,
@@ -153,6 +154,35 @@ describe("LangyTurnService.warmConversationWorker", () => {
         credentials: { langwatchApiKeyId?: string };
       };
       expect(warmArgs.credentials.langwatchApiKeyId).toBe("key-warm");
+    });
+  });
+
+  describe("given a skill is gated off for the user by a feature flag", () => {
+    /** @scenario The warm and the turn's probe carry the same disabled skills */
+    it("warms and probes a worker with that skill disabled", async () => {
+      // Flag off => `dashboard-widgets` is gated off, as it is for the turn.
+      const flags = vi
+        .spyOn(featureFlagService, "isEnabled")
+        .mockResolvedValue(false);
+      try {
+        const { deps, mocks } = makeDeps();
+        const service = LangyTurnService.create(deps);
+
+        await service.warmConversationWorker(warmInput());
+
+        const probeArgs = mocks.probe.mock.calls[0]![0] as {
+          disabledSkillIds?: string[];
+        };
+        const warmArgs = mocks.warm.mock.calls[0]![0] as {
+          credentials: { disabledSkillIds?: string[] };
+        };
+        expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+        expect(warmArgs.credentials.disabledSkillIds).toEqual(
+          probeArgs.disabledSkillIds,
+        );
+      } finally {
+        flags.mockRestore();
+      }
     });
   });
 

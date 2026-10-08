@@ -48,44 +48,12 @@ export interface PostgresNamedCollection {
 }
 
 /**
- * Creates the named collection holding the PostgreSQL credentials server-side.
- *
- * Credentials live in the collection, never in a table definition and never in
- * a query: the restricted identity is granted neither `NAMED COLLECTION` nor
- * `SHOW NAMED COLLECTIONS`, so `SHOW CREATE TABLE` on a mapped table reveals
- * the collection's *name* and nothing more.
- *
- * Dropped first rather than `IF NOT EXISTS`, so re-provisioning against a host
- * whose address has changed converges instead of silently keeping the old one.
- *
- * Two callers, two ownership models. Self-hosted deployments run this for
- * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
- * so it is a production path. On cloud the same objects are
- * owned by infra (langwatch-saas#1126) and this stays the reference
- * implementation terraform must match — keep it and its tests in sync with
- * both.
+ * The named collection holding the PostgreSQL credentials is rendered from the
+ * shared access-model definition ({@link renderLwqlNamedCollectionDdl} in
+ * `./accessModelDdl.ts`), the single source both delivery paths read (#8258).
+ * {@link PostgresNamedCollection} above is that definition's `namedCollection`
+ * shape.
  */
-export function postgresNamedCollectionStatements({
-  connection,
-}: {
-  connection: PostgresNamedCollection;
-}): string[] {
-  assertIdentifier(connection.collection, "named collection");
-  if (!Number.isInteger(connection.port)) {
-    throw new Error(
-      `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-    );
-  }
-  return [
-    `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-    `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-      `host=${clickHouseLiteral(connection.host)}, ` +
-      `port=${connection.port}, ` +
-      `database=${clickHouseLiteral(connection.database)}, ` +
-      `user=${clickHouseLiteral(connection.user)}, ` +
-      `password=${clickHouseLiteral(connection.password)}`,
-  ];
-}
 
 /** A column of a PostgreSQL-engine table, in ClickHouse types. */
 export interface LangWatchQLColumn {
@@ -489,9 +457,8 @@ export interface PostgresReaderRole {
  * `lwqlPostgresReaderConnectionLimit` from `./catalogStatements.ts`, which does that —
  * this constant is what a caller mapping a single table by hand would want.
  *
- * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
- * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
- * is the reference implementation terraform must match.
+ * Provisioned by the application on every distribution (issue #8258) — it owns
+ * the reader role, so there is no infra-owned copy to keep in parity.
  */
 export const DEFAULT_POSTGRES_READER_LIMITS = {
   connectionLimit: 5,
@@ -515,11 +482,9 @@ export const DEFAULT_POSTGRES_READER_LIMITS = {
  * Idempotent: existence is settled once, then every property is converged with
  * `ALTER`, so re-provisioning an already-configured server is a no-op.
  *
- * Two callers, two ownership models. Self-hosted deployments run this for real
- * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
- * a production path. On cloud the same role is owned by infra
- * (langwatch-saas#1126) and this stays the reference implementation terraform
- * must match — so keep it and its tests in sync with both.
+ * The application provisions this on every distribution (issue #8258): it owns
+ * the reader role, so there is one definition and no rendered copy to keep in
+ * parity.
  */
 export function postgresReaderRoleStatements({
   reader,

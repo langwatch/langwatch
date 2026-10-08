@@ -71,9 +71,6 @@ vi.mock("../../hooks/useSavedViews", () => ({
 
 vi.mock("../../utils/api", () => ({
   api: {
-    checkup: {
-      startupNotice: { useQuery: () => ({ data: undefined }) },
-    },
     limits: {
       getUsage: {
         useQuery: () => ({
@@ -114,6 +111,15 @@ vi.mock("../../utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      admitAutomatically: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ isPending: true, data: undefined }) },
+      acceptInvite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     useUtils: () => ({}),
   },

@@ -162,3 +162,81 @@ describe("googleDLPClearPII with exception patterns", () => {
     expect(wrapper.value).toBe("res [REDACTED] x");
   });
 });
+
+describe("googleDLPClearPII sparing names and places", () => {
+  // "claude-sonnet-4-6+12345678901": "claude" is misread as a first name at
+  // [0,6); the phone number sits at [18,29).
+  const value = "claude-sonnet-4-6+12345678901";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    inspectContentMock.mockResolvedValue([
+      {
+        result: {
+          findings: [
+            {
+              infoType: { name: "FIRST_NAME" },
+              location: { codepointRange: { start: 0, end: 6 } },
+            },
+            {
+              infoType: { name: "PHONE_NUMBER" },
+              location: { codepointRange: { start: 18, end: 29 } },
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("masks only the phone number when the value is flagged", async () => {
+    const wrapper = { value };
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+      spareNamesAndPlaces: true,
+    });
+    expect(wrapper.value).toBe("claude-sonnet-4-6+[REDACTED]");
+  });
+
+  /** @scenario "A spared name an exception keeps still blocks an overlapping finding on the fallback detector" */
+  it("still protects a spared name an exception keeps from an overlapping finding", async () => {
+    // "claude" is kept by an exception; a phone finding that starts inside it
+    // must not mask into it, even though the name finding itself is spared.
+    inspectContentMock.mockResolvedValue([
+      {
+        result: {
+          findings: [
+            {
+              infoType: { name: "FIRST_NAME" },
+              location: { codepointRange: { start: 0, end: 6 } },
+            },
+            {
+              infoType: { name: "PHONE_NUMBER" },
+              location: { codepointRange: { start: 3, end: 29 } },
+            },
+          ],
+        },
+      },
+    ]);
+    const wrapper = { value };
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+      exceptPatterns: ["claude"],
+      spareNamesAndPlaces: true,
+    });
+    expect(wrapper.value).toBe("claude[REDACTED]");
+  });
+
+  it("masks the name too when the value is not flagged", async () => {
+    const wrapper = { value };
+    await googleDLPClearPII({
+      currentObject: wrapper,
+      lastKey: "value",
+      piiRedactionLevel: "STRICT",
+    });
+    expect(wrapper.value).toBe("[REDACTED]-sonnet-4-6+[REDACTED]");
+  });
+});

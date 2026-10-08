@@ -175,3 +175,21 @@ def get_cpu_count():
     except AttributeError:
         # Local fallback
         return os.cpu_count() or 4
+
+
+def gunicorn_options(host: str, port: int, workers: int) -> dict:
+    """Settings for the Linux server.
+
+    The control socket is off: gunicorn creates it under $HOME, which is not
+    writable on a read-only root filesystem, and nothing here uses gunicornc.
+    """
+    return {
+        "bind": f"{host}:{port}",
+        "workers": workers,
+        "worker_class": "uvicorn.workers.UvicornWorker",
+        "preload_app": True,
+        "forwarded_allow_ips": "*",
+        "loglevel": "warning",
+        "timeout": 900,
+        "control_socket_disable": True,
+    }

@@ -215,17 +215,19 @@ export class PrismaCredentialAccountRepository
     name,
     email,
     passwordHash,
+    addressConfirmed,
   }: {
     name: string;
     email: string;
     passwordHash: string;
+    addressConfirmed: boolean;
   }): Promise<CreatedCredentialUser> {
     const created = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name,
           email,
-          emailVerified: true,
+          emailVerified: addressConfirmed,
           signupConfirmationPending: false,
         },
       });

@@ -124,7 +124,9 @@ async function operationalBlock({
     teams,
     projects: projectIds.length,
     users,
-    auth_method: process.env.AUTH_PROVIDER ?? "email",
+    // The resolved provider: AUTH_PROVIDER, else the deprecated
+    // NEXTAUTH_PROVIDER, else email (see resolveConfiguredAuthProvider).
+    auth_method: env.NEXTAUTH_PROVIDER ?? "email",
     // The name of the provider in use, never its configuration. The first one
     // named, because an install with two is still an install using SSO.
     sso_provider:

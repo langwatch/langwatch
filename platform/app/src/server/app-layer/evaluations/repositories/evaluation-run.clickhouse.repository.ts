@@ -457,42 +457,47 @@ export class EvaluationRunClickHouseRepository
       "EvaluationRunClickHouseRepository.findByTraceId",
     );
 
+    // The outer query reads every column through the `t.` alias: the SELECT
+    // projects `toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt`, and a bare
+    // `UpdatedAt` in WHERE resolves to that integer alias, which never equals
+    // the subquery's DateTime64 `max(UpdatedAt)`, so the read returns no rows.
+    // See dev/docs/best_practices/clickhouse-queries.md.
     try {
       const client = await this.resolveClient(tenantId);
       const result = await client.query({
         query: `
           SELECT
-            ProjectionId,
-            TenantId,
-            EvaluationId,
-            Version,
-            EvaluatorId,
-            EvaluatorType,
-            EvaluatorName,
-            TraceId,
-            IsGuardrail,
-            Status,
-            Score,
-            Passed,
-            Label,
-            Details,
-            Inputs,
-            Error,
-            ErrorDetails,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
-            CostId,
-            LastProcessedEventId,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ScheduledAt >= now() - INTERVAL 7 DAY
-            AND TraceId = {traceId:String}
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
+            t.ProjectionId AS ProjectionId,
+            t.TenantId AS TenantId,
+            t.EvaluationId AS EvaluationId,
+            t.Version AS Version,
+            t.EvaluatorId AS EvaluatorId,
+            t.EvaluatorType AS EvaluatorType,
+            t.EvaluatorName AS EvaluatorName,
+            t.TraceId AS TraceId,
+            t.IsGuardrail AS IsGuardrail,
+            t.Status AS Status,
+            t.Score AS Score,
+            t.Passed AS Passed,
+            t.Label AS Label,
+            t.Details AS Details,
+            t.Inputs AS Inputs,
+            t.Error AS Error,
+            t.ErrorDetails AS ErrorDetails,
+            toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(t.ArchivedAt) AS ArchivedAt,
+            toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
+            t.CostId AS CostId,
+            t.LastProcessedEventId AS LastProcessedEventId,
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.ScheduledAt >= now() - INTERVAL 7 DAY
+            AND t.TraceId = {traceId:String}
+            AND (t.TenantId, t.EvaluationId, t.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
@@ -500,7 +505,7 @@ export class EvaluationRunClickHouseRepository
                 AND TraceId = {traceId:String}
               GROUP BY TenantId, EvaluationId
             )
-          ORDER BY UpdatedAt DESC
+          ORDER BY t.UpdatedAt DESC
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
