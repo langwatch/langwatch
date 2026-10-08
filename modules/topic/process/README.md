@@ -81,19 +81,7 @@ type Output = {
 }[];
 
 // topics.getTopicCounts
-// Input: traceFilterInputSchema, ../../trace/contract/src/traces.trpc.ts:86
-interface Input {
-  projectId: string;
-  startDate: number;
-  endDate: number;
-  query?: string;
-  filters?: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
-  traceIds?: string[];
-  negateFilters?: boolean;
-  excludeOrigins?: string[];
-  pageOffset?: number;
-  pageSize?: number;
-}
+type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:86
 type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:87
 
 // topics.getClusteringStatus
@@ -107,12 +95,14 @@ type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.t
 // topics.triggerTopicClustering
 type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:21
 // Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:80
-type Output = {
-  started: true;
-} | {
-  started: false;
-  reason: "already_running";
-};
+type Output =
+  | {
+      started: true;
+    }
+  | {
+      started: false;
+      reason: "already_running";
+    };
 ```
 
 ## Sockets

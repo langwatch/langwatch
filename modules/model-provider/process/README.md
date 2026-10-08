@@ -641,19 +641,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: modelProviderCredentialVerdictSchema, ../contract/src/model-provider.ts:235
-type Output = {
-  outcome: "verified";
-  valid: true;
-} | {
-  outcome: "refused";
-  valid: false;
-  domainError: unknown;
-} | {
-  outcome: "unchecked";
-  valid: true;
-  reason: "provider_not_probeable" | "credential_masked" | "no_credential" | "no_endpoint" | "unknown_provider";
-};
+type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:235
 
 // modelProvider.testConnection
 // Input: modelProviderTestConnectionTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:149
@@ -688,14 +676,16 @@ interface Input {
   setAsCodingDefaults?: boolean;
 }
 // Output: modelProviderCodexSignInPollSchema, ../contract/src/model-provider.trpc-schemas.ts:252
-type Output = {
-  status: "pending";
-} | {
-  status: "complete";
-  providerId?: string;
-  email: string;
-  plan: string;
-};
+type Output =
+  | {
+      status: "pending";
+    }
+  | {
+      status: "complete";
+      providerId?: string;
+      email: string;
+      plan: string;
+    };
 
 // modelProvider.codexApplyCodingDefaults
 // Input: modelProviderCodexApplyCodingDefaultsTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:161
@@ -714,13 +704,15 @@ interface Output {
 // modelProvider.codexStatus
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:56
 // Output: modelProviderCodexStatusSchema, ../contract/src/model-provider.ts:261
-type Output = {
-  connected: false;
-} | {
-  connected: true;
-  providerId: string;
-  plan: string;
-};
+type Output =
+  | {
+      connected: false;
+    }
+  | {
+      connected: true;
+      providerId: string;
+      plan: string;
+    };
 
 // modelProvider.isManagedProvider
 // Input: modelProviderIsManagedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:166
@@ -815,19 +807,7 @@ interface Input {
   }[];
   excludeConfigId?: string;
 }
-// Output: modelDefaultInheritedValuesSchema, ../contract/src/model-provider.ts:465
-interface Output {
-  inherited: Record<string, {
-    model: string;
-    source: "feature_override" | "role_default" | "inferred";
-    scope: "project" | "team" | "organization" | null;
-    inferredFromProvider?: string;
-  } | null>;
-  referenceScope: {
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-    scopeId: string;
-  };
-}
+type Output = z.infer<typeof modelDefaultInheritedValuesSchema>; // ../contract/src/model-provider.ts:465
 ```
 
 ### `translate`

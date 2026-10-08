@@ -653,13 +653,15 @@ interface Output {
 // license.refresh
 type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/license.queries.ts:3
 // Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:201
-type Output = {
-  outcome: "unchanged";
-} | {
-  outcome: "updated";
-  maxMembers: number;
-  expiresAt: string;
-};
+type Output =
+  | {
+      outcome: "unchanged";
+    }
+  | {
+      outcome: "updated";
+      maxMembers: number;
+      expiresAt: string;
+    };
 ```
 
 ## Sockets

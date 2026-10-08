@@ -1212,18 +1212,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:297
-type Output = {
-  scenarioId: string;
-  status: "SUCCESS" | "ERROR" | "CANCELLED" | "IN_PROGRESS" | "PENDING" | "FAILED" | "STALLED" | "QUEUED" | "RUNNING" | "PENDING_EVALUATION";
-  metCriteriaCount: number;
-  unmetCriteriaCount: number;
-  lastRunAt: number;
-  batchRunId: string;
-  scenarioSetId: string;
-  durationInMs: number | null;
-  totalCost: number | null;
-}[];
+// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:297)
 
 // scenarios.getSuiteRunFreshness
 // Input: inline, ../contract/src/scenario.trpc.ts:314

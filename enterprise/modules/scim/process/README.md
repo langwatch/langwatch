@@ -672,16 +672,7 @@ type Output = {
 
 // scimReconciliation.getRequests
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73
-// Output: inline, ../contract/src/scim-reconciliation.trpc.ts:45
-type Output = {
-  method: string;
-  resource: string;
-  status: number;
-  reason: "plan_not_entitled" | "forbidden" | "unauthorized" | "malformed_body" | "invalid_resource" | "not_found" | "conflict" | "rate_limited" | "unsupported" | "internal_error" | null;
-  detail: string | null;
-  id: string;
-  occurredAt: unknown;
-}[];
+// Output: scimRequestEntrySchema.array() (inline, ../contract/src/scim-reconciliation.trpc.ts:45)
 
 // scimReconciliation.getById
 type Input = z.infer<typeof scimConnectionRequestsInputSchema>; // ../contract/src/scim-request-log.ts:73

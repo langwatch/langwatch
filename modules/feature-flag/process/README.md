@@ -158,23 +158,14 @@ Contract `../contract/src/feature-flag.trpc.ts:30`, router `src/transport/featur
 
 ```typescript
 // featureFlag.isEnabled
-// Input: featureFlagReadInputSchema, ../contract/src/feature-flag.schemas.ts:66
-interface Input {
-  flag: "release_ui_ai_gateway_menu_enabled" | "release_ui_beta_annotations_trained_enabled" | "release_voice_agents_enabled" | "release_ui_ai_governance_enabled" | "release_ui_governance_billed_cost_enabled" | "release_langy_enabled" | "release_langy_promo_enabled" | "release_langy_ui_actions" | "release_ui_langy_peek_dock_enabled" | "release_ui_comparison_leaderboard_enabled" | "release_ui_agent_testing_v2_enabled" | "release_custom_chart_playground" | "release_instant_evals" | "experiment_onboarding_langy_guided";
-  projectId?: string | null;
-  organizationId?: string | null;
-}
+type Input = z.infer<typeof featureFlagReadInputSchema>; // ../contract/src/feature-flag.schemas.ts:66
 // Output: enabledOutputSchema, ../contract/src/feature-flag.trpc.ts:20
 interface Output {
   enabled: boolean;
 }
 
 // featureFlag.isEnabledForAnyOrganization
-// Input: organizationFeatureFlagsInputSchema, ../contract/src/feature-flag.schemas.ts:79
-interface Input {
-  flag: "release_ui_ai_gateway_menu_enabled" | "release_ui_beta_annotations_trained_enabled" | "release_voice_agents_enabled" | "release_ui_ai_governance_enabled" | "release_ui_governance_billed_cost_enabled" | "release_langy_enabled" | "release_langy_promo_enabled" | "release_langy_ui_actions" | "release_ui_langy_peek_dock_enabled" | "release_ui_comparison_leaderboard_enabled" | "release_ui_agent_testing_v2_enabled" | "release_custom_chart_playground" | "release_instant_evals" | "experiment_onboarding_langy_guided";
-  organizationIds: string[];
-}
+type Input = z.infer<typeof organizationFeatureFlagsInputSchema>; // ../contract/src/feature-flag.schemas.ts:79
 type Output = z.infer<typeof enabledOutputSchema>; // ../contract/src/feature-flag.trpc.ts:20
 
 // featureFlag.isEnabledForEachOrganization
@@ -185,19 +176,7 @@ interface Output {
 }
 
 // featureFlag.resolve
-// Input: featureFlagTargetRequestSchema, ../contract/src/feature-flag.schemas.ts:86
-interface Input {
-  target: {
-    kind: "project";
-    projectId: string;
-    organizationId: string;
-  } | {
-    kind: "organization";
-    organizationId: string;
-  } | {
-    kind: "user";
-  };
-}
+type Input = z.infer<typeof featureFlagTargetRequestSchema>; // ../contract/src/feature-flag.schemas.ts:86
 // Output: resolvedFlagsOutputSchema, ../contract/src/feature-flag.trpc.ts:24
 interface Output {
   flags: Record<string, boolean>;
@@ -215,18 +194,7 @@ interface Output {
 }
 
 // featureFlag.setExperimentTenantPolicy
-// Input: experimentTenantPolicyInputSchema, ../contract/src/feature-flag.schemas.ts:98
-interface Input {
-  flag: "release_ui_ai_gateway_menu_enabled" | "release_ui_beta_annotations_trained_enabled" | "release_voice_agents_enabled" | "release_ui_ai_governance_enabled" | "release_ui_governance_billed_cost_enabled" | "release_langy_enabled" | "release_langy_promo_enabled" | "release_langy_ui_actions" | "release_ui_langy_peek_dock_enabled" | "release_ui_comparison_leaderboard_enabled" | "release_ui_agent_testing_v2_enabled" | "release_custom_chart_playground" | "release_instant_evals" | "experiment_onboarding_langy_guided";
-  scope: {
-    kind: "project";
-    projectId: string;
-  } | {
-    kind: "organization";
-    organizationId: string;
-  };
-  policy: "inherit" | "enabled" | "disabled";
-}
+type Input = z.infer<typeof experimentTenantPolicyInputSchema>; // ../contract/src/feature-flag.schemas.ts:98
 type Output = z.infer<typeof experimentWriteOutputSchema>; // ../contract/src/feature-flag.trpc.ts:28
 ```
 

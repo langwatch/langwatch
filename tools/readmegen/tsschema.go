@@ -213,8 +213,8 @@ func decodeList(decoder *json.Decoder) (any, error) {
 	return list, err
 }
 
-// declaration prints a schema as a TypeScript declaration named `name`, or
-// "" when it was not converted or is too long to print.
+// declaration prints a schema as a TypeScript declaration named `name`, laid
+// out as oxfmt would, or "" when it was not converted or is too long to print.
 func declaration(name string, raw json.RawMessage) string {
 	if !converted(raw) {
 		return ""
@@ -225,23 +225,54 @@ func declaration(name string, raw json.RawMessage) string {
 	if defs, ok := root.get("$defs").(*jsonObject); ok {
 		p.defs = defs
 	}
-	body := p.typeOf(node, "")
-	out := "type " + name + " = " + body + ";\n"
-	if strings.HasPrefix(body, "{") && root.get("type") == "object" {
-		out = "interface " + name + " " + body + "\n"
+	body := p.typeOf(node)
+	var out strings.Builder
+	if body.object && root.get("type") == "object" {
+		out.WriteString(layout(concat{text("interface " + name + " "), body.doc}) + "\n")
+	} else {
+		out.WriteString(layout(concat{text("type " + name + " ="), body.annotated(), text(";")}) + "\n")
 	}
 	for _, def := range p.defs.keys {
-		out += "type " + p.defName(def) + " = " + p.typeOf(p.defs.get(def), "") + ";\n"
+		alias := concat{text("type " + p.defName(def) + " ="), p.typeOf(p.defs.get(def)).annotated(), text(";")}
+		out.WriteString(layout(alias) + "\n")
 	}
-	if strings.Count(out, "\n") > maxPrintedLines {
+	if strings.Count(out.String(), "\n") > maxPrintedLines {
 		return ""
 	}
-	return out
+	return out.String()
 }
 
 type tsPrinter struct {
 	root string
 	defs *jsonObject
+}
+
+// tsType is one printed type; members is set for a union, which prints
+// differently after a colon than inside type arguments.
+type tsType struct {
+	doc         doc
+	members     []doc
+	object      bool
+	needsParens bool
+	multiline   bool
+}
+
+func plain(body doc) tsType { return tsType{doc: body} }
+
+// annotated is the type after `name:` or `=`: a space then the type, or a break and a leading bar.
+func (t tsType) annotated() doc {
+	if t.members == nil {
+		return concat{text(" "), t.doc}
+	}
+	return &group{body: indent{concat{line{lineSpace}, ifBreak{broken: text("| "), flat: text("")}, joinDocs(t.members, concat{line{lineSpace}, text("| ")})}}}
+}
+
+// inline is the type inside type arguments or a tuple.
+func (t tsType) inline() doc {
+	if t.members == nil {
+		return t.doc
+	}
+	return &group{body: concat{ifBreak{broken: text("| "), flat: text("")}, joinDocs(t.members, concat{line{lineSpace}, text("| ")})}}
 }
 
 // defName names a shared definition after the declaration it serves: `__schema0` of Input is InputSchema0.
@@ -253,112 +284,124 @@ func (p *tsPrinter) defName(def string) string {
 	return p.root + strings.ToUpper(name[:1]) + name[1:]
 }
 
-func (p *tsPrinter) typeOf(node any, indent string) string {
+func (p *tsPrinter) typeOf(node any) tsType {
 	schema, ok := node.(*jsonObject)
 	if !ok {
 		if node == false {
-			return "never"
+			return plain(text("never"))
 		}
-		return "unknown"
+		return plain(text("unknown"))
 	}
 	if ref, ok := schema.get("$ref").(string); ok {
 		if ref == "#" {
-			return p.root
+			return plain(text(p.root))
 		}
-		return p.defName(strings.TrimPrefix(ref, "#/$defs/"))
+		return plain(text(p.defName(strings.TrimPrefix(ref, "#/$defs/"))))
 	}
 	if schema.has("const") {
-		return literal(schema.get("const"))
+		return plain(text(literal(schema.get("const"))))
 	}
 	if values, ok := schema.get("enum").([]any); ok {
-		return p.join(values, " | ", literal)
+		return p.union(values, func(value any) tsType { return plain(text(literal(value))) })
 	}
-	if composite, ok := p.composite(schema, indent); ok {
+	if composite, ok := p.composite(schema); ok {
 		return composite
 	}
-	return p.typed(schema, indent)
+	return p.typed(schema)
 }
 
 // composite is a union or intersection: anyOf, oneOf, allOf or a list of types.
-func (p *tsPrinter) composite(schema *jsonObject, indent string) (string, bool) {
-	each := func(option any) string { return p.typeOf(option, indent) }
+func (p *tsPrinter) composite(schema *jsonObject) (tsType, bool) {
 	for _, key := range []string{"anyOf", "oneOf"} {
 		if options, ok := schema.get(key).([]any); ok {
-			return p.join(options, " | ", each), true
+			return p.union(options, p.typeOf), true
 		}
 	}
 	if parts, ok := schema.get("allOf").([]any); ok {
-		return p.join(parts, " & ", each), true
+		return p.intersection(parts), true
 	}
 	if kinds, ok := schema.get("type").([]any); ok {
-		return p.join(kinds, " | ", func(kind any) string { return p.typeOf(withType(schema, kind), indent) }), true
+		return p.union(kinds, func(kind any) tsType { return p.typeOf(withType(schema, kind)) }), true
 	}
-	return "", false
+	return tsType{}, false
 }
 
-func (p *tsPrinter) typed(schema *jsonObject, indent string) string {
+func (p *tsPrinter) typed(schema *jsonObject) tsType {
 	switch schema.get("type") {
 	case "string":
-		return "string"
+		return plain(text("string"))
 	case "number", "integer":
-		return "number"
+		return plain(text("number"))
 	case "boolean":
-		return "boolean"
+		return plain(text("boolean"))
 	case "null":
-		return "null"
+		return plain(text("null"))
 	case "array":
-		return p.array(schema, indent)
+		return p.array(schema)
 	case "object":
-		return p.object(schema, indent)
+		return p.object(schema)
 	}
 	if schema.has("properties") {
-		return p.object(schema, indent)
+		return p.object(schema)
 	}
-	return "unknown"
+	return plain(text("unknown"))
 }
 
-func (p *tsPrinter) array(schema *jsonObject, indent string) string {
+func (p *tsPrinter) array(schema *jsonObject) tsType {
 	if items, ok := schema.get("prefixItems").([]any); ok {
-		return "[" + p.join(items, ", ", func(item any) string { return p.typeOf(item, indent) }) + "]"
+		return plain(&group{body: concat{text("["), indent{concat{line{lineSoft}, p.list(items)}}, line{lineSoft}, text("]")}})
 	}
-	item := p.typeOf(schema.get("items"), indent)
-	if strings.ContainsAny(item, "|&") && !strings.HasPrefix(item, "{") {
-		item = "(" + item + ")"
+	item := p.typeOf(schema.get("items"))
+	if item.needsParens && item.multiline {
+		return plain(concat{text("("), item.inline(), text(")[]")})
 	}
-	return item + "[]"
+	if item.needsParens {
+		return plain(&group{body: concat{text("("), indent{concat{line{lineSoft}, item.inline()}}, line{lineSoft}, text(")[]")}})
+	}
+	return plain(concat{item.doc, text("[]")})
 }
 
-func (p *tsPrinter) object(schema *jsonObject, indent string) string {
+// list is comma separated members; the union members of each stay inline.
+func (p *tsPrinter) list(items []any) doc {
+	docs := make([]doc, 0, len(items))
+	for _, item := range items {
+		docs = append(docs, p.typeOf(item).inline())
+	}
+	return joinDocs(docs, concat{text(","), line{lineSpace}})
+}
+
+func (p *tsPrinter) object(schema *jsonObject) tsType {
 	properties, _ := schema.get("properties").(*jsonObject)
 	extra, open := schema.get("additionalProperties").(*jsonObject)
 	if properties == nil || len(properties.keys) == 0 {
-		return p.record(schema, indent)
+		return p.record(schema)
 	}
 	required := requiredSet(schema)
-	inner := indent + "  "
-	out := "{\n"
+	members := []doc{}
 	for _, name := range properties.keys {
 		mark := "?"
 		if required[name] {
 			mark = ""
 		}
-		out += inner + propertyName(name) + mark + ": " + p.typeOf(properties.get(name), inner) + ";\n"
+		members = append(members, concat{text(propertyName(name) + mark + ":"), p.typeOf(properties.get(name)).annotated(), text(";")})
 	}
 	if open {
-		out += inner + "[key: string]: " + p.typeOf(extra, inner) + ";\n"
+		members = append(members, concat{text("[key: string]:"), p.typeOf(extra).annotated(), text(";")})
 	}
-	return out + indent + "}"
+	body := concat{text("{"), indent{concat{line{lineHard}, joinDocs(members, line{lineHard})}}, line{lineHard}, text("}")}
+	return tsType{doc: body, object: true}
 }
 
 // record is an object without properties: a map, a closed empty object or any object.
-func (p *tsPrinter) record(schema *jsonObject, indent string) string {
+func (p *tsPrinter) record(schema *jsonObject) tsType {
 	if extra, open := schema.get("additionalProperties").(*jsonObject); open {
-		return "Record<string, " + p.typeOf(extra, indent) + ">"
+		arguments := concat{text("string,"), line{lineSpace}, p.typeOf(extra).inline()}
+		return plain(&group{body: concat{text("Record<"), indent{concat{line{lineSoft}, arguments}}, line{lineSoft}, text(">")}})
 	}
 	if schema.get("additionalProperties") == false {
-		return "{}"
+		return tsType{doc: text("{}"), object: true}
 	}
-	return "Record<string, unknown>"
+	return plain(text("Record<string, unknown>"))
 }
 
 func requiredSet(schema *jsonObject) map[string]bool {
@@ -372,18 +415,107 @@ func requiredSet(schema *jsonObject) map[string]bool {
 	return required
 }
 
-func (p *tsPrinter) join(items []any, separator string, each func(any) string) string {
-	parts := make([]string, 0, len(items))
+// distinct drops options that print the same, keeping the first.
+func (p *tsPrinter) distinct(items []any, each func(any) tsType) []tsType {
+	seen := []string{}
+	parts := make([]tsType, 0, len(items))
 	for _, item := range items {
-		text := each(item)
-		if !contains(parts, text) {
-			parts = append(parts, text)
+		part := each(item)
+		key := render(part.inline(), 1<<30)
+		if !contains(seen, key) {
+			seen = append(seen, key)
+			parts = append(parts, part)
 		}
 	}
-	if len(parts) == 0 {
-		return "never"
+	return parts
+}
+
+// union prints oxfmt's way: members aligned under the bar; one object beside null hugs the brace.
+func (p *tsPrinter) union(items []any, each func(any) tsType) tsType {
+	parts := p.distinct(items, each)
+	if flat, nested := flatten(parts); nested {
+		parts = p.distinct(flat, func(part any) tsType { return part.(tsType) })
 	}
-	return strings.Join(parts, separator)
+	switch len(parts) {
+	case 0:
+		return plain(text("never"))
+	case 1:
+		return parts[0]
+	}
+	members := make([]doc, 0, len(parts))
+	for _, part := range parts {
+		members = append(members, indent{part.inline()})
+	}
+	if hugsObject(parts) {
+		docs := make([]doc, 0, len(parts))
+		for _, part := range parts {
+			docs = append(docs, part.inline())
+		}
+		return tsType{doc: joinDocs(docs, text(" | ")), needsParens: true, multiline: true}
+	}
+	return tsType{members: members, needsParens: true}
+}
+
+// flatten splices the members of a nested union in place, as TypeScript reads `A | (B | C)`.
+func flatten(parts []tsType) ([]any, bool) {
+	out := make([]any, 0, len(parts))
+	nested := false
+	for _, part := range parts {
+		if part.members == nil {
+			out = append(out, part)
+			continue
+		}
+		nested = true
+		for _, member := range part.members {
+			out = append(out, plain(member.(indent).body))
+		}
+	}
+	return out, nested
+}
+
+// hugsObject is one object beside only null, which oxfmt keeps on one line.
+func hugsObject(parts []tsType) bool {
+	objects, nulls := 0, 0
+	for _, part := range parts {
+		if part.object {
+			objects++
+		}
+		if name, ok := part.doc.(text); ok && name == "null" {
+			nulls++
+		}
+	}
+	return objects == 1 && nulls == len(parts)-1
+}
+
+func (p *tsPrinter) intersection(items []any) tsType {
+	parts := p.distinct(items, p.typeOf)
+	switch len(parts) {
+	case 0:
+		return plain(text("never"))
+	case 1:
+		return parts[0]
+	}
+	docs := make([]doc, 0, len(parts))
+	for _, part := range parts {
+		docs = append(docs, part.inline())
+	}
+	for _, part := range parts {
+		if part.object {
+			return tsType{doc: joinDocs(docs, text(" & ")), needsParens: true, multiline: true}
+		}
+	}
+	return tsType{doc: &group{body: joinDocs(docs, concat{text(" &"), line{lineSpace}})}, needsParens: true}
+}
+
+func joinDocs(items []doc, separator doc) doc {
+	out := concat{}
+	for index, item := range items {
+		if index > 0 {
+			out = append(out, separator)
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func withType(schema *jsonObject, kind any) *jsonObject {

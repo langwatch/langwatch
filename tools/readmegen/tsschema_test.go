@@ -68,3 +68,22 @@ func TestPackageGroupsWaitForTheClosedList(t *testing.T) {
 		t.Errorf("the ruled list does not group the index:\n%s", body)
 	}
 }
+
+func TestDeclarationLaysOutLongTypesAsOxfmtDoes(t *testing.T) {
+	cases := map[string]struct{ schema, want string }{
+		"long union breaks after the colon": {
+			`{"type":"object","properties":{"plan":{"enum":["AAAAAAAAAAAAAAAA","BBBBBBBBBBBBBBBB","CCCCCCCCCCCCCCCC","DDDDDDDDDDDDDDDD","EEEEEEEEEEEEEEEE"]}},"required":["plan"]}`,
+			"interface Body {\n  plan:\n    | \"AAAAAAAAAAAAAAAA\"\n    | \"BBBBBBBBBBBBBBBB\"\n    | \"CCCCCCCCCCCCCCCC\"\n    | \"DDDDDDDDDDDDDDDD\"\n    | \"EEEEEEEEEEEEEEEE\";\n}\n"},
+		"object beside null hugs the brace": {
+			`{"type":"object","properties":{"x":{"anyOf":[{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]},{"type":"null"}]}},"required":["x"]}`,
+			"interface Body {\n  x: {\n    a: string;\n  } | null;\n}\n"},
+		"two objects break under bars": {
+			`{"anyOf":[{"type":"object","properties":{"a":{"type":"string"}},"required":["a"]},{"type":"object","properties":{"b":{"type":"string"}},"required":["b"]}]}`,
+			"type Body =\n  | {\n      a: string;\n    }\n  | {\n      b: string;\n    };\n"},
+	}
+	for name, c := range cases {
+		if got := declaration("Body", json.RawMessage(c.schema)); got != c.want {
+			t.Errorf("%s: got %q, want %q", name, got, c.want)
+		}
+	}
+}

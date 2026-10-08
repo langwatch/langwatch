@@ -417,17 +417,7 @@ interface Output {
 }
 
 // analytics.topUsedDocuments
-// Input: sharedFiltersInputSchema, ../contract/src/analytics.input-schemas.ts:56
-interface Input {
-  projectId: string;
-  startDate: number;
-  endDate: number;
-  query?: string;
-  filters?: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
-  traceIds?: string[];
-  negateFilters?: boolean;
-  excludeOrigins?: string[];
-}
+type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:56
 // Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:138
 interface Output {
   topDocuments: {

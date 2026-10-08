@@ -377,12 +377,14 @@ interface Input {
 // ssoConnections.getHistory
 type Input = z.infer<typeof ssoConnectionByIdSchema>; // ../contract/src/sso.contract.ts:68
 // Output: inline, ../contract/src/sso-connection.trpc.ts:43
-type Output = {
-  eventId: string;
-  occurredAtMs: number;
-  summary: string;
-  carriedOver: boolean;
-}[] | null;
+type Output =
+  | {
+      eventId: string;
+      occurredAtMs: number;
+      summary: string;
+      carriedOver: boolean;
+    }[]
+  | null;
 
 // ssoConnections.getMigrationProgress
 // Input: operatorSsoMigrationProgressInputSchema, ../contract/src/sso.contract.ts:72
@@ -624,19 +626,7 @@ type Output = unknown;
 
 // ssoSetup.identityProvider
 type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:13
-// Output: inline, ../contract/src/sso-setup.trpc.ts:148
-type Output = {
-  protocol: "oidc";
-  issuer: string | null;
-  clientId: string | null;
-  hasClientSecret: boolean;
-} | {
-  protocol: "saml";
-  entryPoint: string | null;
-  entityId: string | null;
-  metadataXml: string | null;
-  certificate: string | null;
-} | null;
+// Output: ssoSetupIdentityProviderViewSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:148)
 
 // ssoSetup.updateIdentityProvider
 type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:378

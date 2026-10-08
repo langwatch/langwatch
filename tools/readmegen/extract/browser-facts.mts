@@ -36,10 +36,7 @@ export type UiRoute = { page: string; path: string };
 
 type Scope = { source: ts.SourceFile; reading: Reading };
 
-function properties({
-  expression,
-  ...scope
-}: Scope & { expression: ts.Expression | undefined }): {
+function properties({ expression, ...scope }: Scope & { expression: ts.Expression | undefined }): {
   key: string;
   value: ts.Expression;
   source: ts.SourceFile;

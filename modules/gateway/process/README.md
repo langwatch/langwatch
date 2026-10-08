@@ -1503,18 +1503,7 @@ type Output = {
 
 // gatewayBudgets.personalBudget
 type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/gateway.budget.ts:452
-// Output: gatewayPersonalBudgetSchema, ../contract/src/gateway.responses.ts:326
-type Output = {
-  status: "ok";
-} | {
-  status: "ok" | "warning" | "exceeded";
-  scope: string;
-  spentUsd: string;
-  limitUsd: string;
-  period: string;
-  requestIncreaseUrl?: string;
-  adminEmail: string | null;
-};
+type Output = z.infer<typeof gatewayPersonalBudgetSchema>; // ../contract/src/gateway.responses.ts:326
 
 // gatewayBudgets.create
 type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/gateway.budget.ts:463

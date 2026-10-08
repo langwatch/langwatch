@@ -1507,18 +1507,7 @@ interface Input {
 
 // governanceAgents.syncSources
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:15
-// Output: inline, ../contract/src/governance-agents.ts:67
-type Output = {
-  id: string;
-  name: string;
-  sourceType: string;
-  lastListing: {
-    outcome: "listed";
-  } | {
-    outcome: "refused";
-    cause: "access" | "unreachable" | "incomplete";
-  } | null;
-}[];
+// Output: agentSyncSourceListingSchema.array() (inline, ../contract/src/governance-agents.ts:67)
 
 // governanceAgents.requestListing
 type Input = z.infer<typeof organizationScope>; // ../contract/src/governance-agents.ts:15
@@ -1888,18 +1877,7 @@ interface Input {
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/ingestion-source.ts:39
 
 // ingestionSources.create
-// Input: ingestionSourceCreateInputSchema, ../contract/src/ingestion-sources.trpc.ts:17
-interface Input {
-  organizationId: string;
-  teamId?: string | null;
-  sourceType: "otel_generic" | "claude_code" | "claude_cowork" | "workato" | "copilot_studio" | "copilot_studio_dataverse" | "openai_compliance" | "openai_admin" | "claude_compliance" | "anthropic_admin" | "databricks_genie" | "s3_custom" | "http_custom";
-  name: string;
-  description?: string | null;
-  parserConfig?: Record<string, unknown>;
-  pullConfig?: Record<string, unknown> | null;
-  pullSchedule?: string | null;
-  traceProjectId?: string | null;
-}
+type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/ingestion-sources.trpc.ts:17
 type Output = z.infer<typeof createdIngestionSourceSchema>; // ../contract/src/ingestion-sources.trpc.ts:43
 
 // ingestionSources.update

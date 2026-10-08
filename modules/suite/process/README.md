@@ -602,12 +602,15 @@ interface Input {
   endDate?: number;
 }
 // Output: inline, ../contract/src/suite.trpc.ts:97
-type Output = Record<string, {
-  passedCount: number;
-  failedCount: number;
-  totalCount: number;
-  lastRunTimestamp: number | null;
-}>;
+type Output = Record<
+  string,
+  {
+    passedCount: number;
+    failedCount: number;
+    totalCount: number;
+    lastRunTimestamp: number | null;
+  }
+>;
 ```
 
 ### `suites.testSuites`

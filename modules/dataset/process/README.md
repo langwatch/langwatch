@@ -312,27 +312,8 @@ Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:179`.
 Answers at `/api/dataset`, `/api/v1/dataset`; also, undocumented, `/api/dataset/2026-08-07`, `/api/v1/dataset/2026-08-07`, `/api/dataset/latest`, `/api/v1/dataset/latest`.
 
 ```typescript
-// Body: datasetRestCreateSchema, ../contract/src/dataset-rest.schemas.ts:33
-interface Body {
-  name: string;
-  columnTypes?: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-  }[];
-}
-// Response: datasetRestSummarySchema, ../contract/src/dataset-rest.schemas.ts:135
-interface Response {
-  id: string;
-  name: string;
-  slug: string;
-  columnTypes: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-  }[];
-  createdAt: unknown;
-  updatedAt: unknown;
-  platformUrl: string;
-}
+type Body = z.infer<typeof datasetRestCreateSchema>; // ../contract/src/dataset-rest.schemas.ts:33
+type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:135
 ```
 
 #### `POST /:slugOrId/records` · `postApiDatasetBySlugOrIdRecords`
@@ -398,17 +379,7 @@ Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:247`.
 Answers at `/api/dataset/imports`, `/api/v1/dataset/imports`; also, undocumented, `/api/dataset/2026-08-07/imports`, `/api/v1/dataset/2026-08-07/imports`, `/api/dataset/latest/imports`, `/api/v1/dataset/latest/imports`.
 
 ```typescript
-// Body: datasetRestImportSchema, ../contract/src/dataset-rest.schemas.ts:90
-type Body = BodyDatasetImport;
-type BodyDatasetImport = {
-  name: string;
-  storedObjectId: string;
-  columnTypes?: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-    sourceHeader: string;
-  }[];
-};
+type Body = z.infer<typeof datasetRestImportSchema>; // ../contract/src/dataset-rest.schemas.ts:90
 // Response: datasetImportStartedSchema, ../contract/src/dataset.ts:406
 interface Response {
   datasetId: string;
@@ -449,19 +420,7 @@ Answers at `/api/dataset/upload`, `/api/v1/dataset/upload`; also, undocumented, 
 
 ```typescript
 // Multipart: { fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } } (inline, src/transport/dataset.rest.ts:276)
-// Response: datasetRestUploadCreatedSchema, ../contract/src/dataset-rest.schemas.ts:124
-interface Response {
-  id: string;
-  name: string;
-  slug: string;
-  columnTypes: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-  }[];
-  createdAt: unknown;
-  updatedAt: unknown;
-  recordsCreated: number;
-}
+type Response = z.infer<typeof datasetRestUploadCreatedSchema>; // ../contract/src/dataset-rest.schemas.ts:124
 ```
 
 #### `POST /:slugOrId/upload` · `postApiDatasetBySlugOrIdUpload`
@@ -550,14 +509,7 @@ Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocume
 
 ```typescript
 type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:75
-// Body: datasetRestUpdateSchema, ../contract/src/dataset-rest.schemas.ts:38
-interface Body {
-  name?: string;
-  columnTypes?: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-  }[];
-}
+type Body = z.infer<typeof datasetRestUpdateSchema>; // ../contract/src/dataset-rest.schemas.ts:38
 type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:135
 ```
 
@@ -765,19 +717,7 @@ Contract `../contract/src/dataset.trpc.ts:39`, router `src/transport/dataset.trp
 
 ```typescript
 // dataset.upsert
-// Input: inline, ../contract/src/dataset.trpc.ts:42
-interface Input {
-  projectId: string;
-  datasetRecords?: (Record<string, unknown> & {
-    id?: string;
-  })[];
-  name: string;
-  columnTypes: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-  }[];
-  datasetId?: string;
-}
+// Input: datasetApiUpsertBaseInputSchema.and(datasetApiUpsertTargetInputSchema) (inline, ../contract/src/dataset.trpc.ts:42)
 type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:132
 
 // dataset.validateDatasetName
@@ -855,17 +795,7 @@ interface Input {
 type Output = z.infer<typeof datasetWireSchema>; // ../contract/src/dataset.ts:132
 
 // dataset.createFromStoredObject
-// Input: createDatasetFromStoredObjectInputSchema, ../contract/src/dataset.ts:396
-interface Input {
-  projectId: string;
-  name: string;
-  storedObjectId: string;
-  columnTypes?: {
-    name: string;
-    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
-    sourceHeader: string;
-  }[];
-}
+type Input = z.infer<typeof createDatasetFromStoredObjectInputSchema>; // ../contract/src/dataset.ts:396
 type Output = z.infer<typeof datasetImportStartedSchema>; // ../contract/src/dataset.ts:406
 
 // dataset.appendStoredObject

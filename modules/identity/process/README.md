@@ -310,30 +310,20 @@ interface Output {
 // Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
 type Input = Record<string, unknown>;
 // Output: ssoTestArrivalStandingSchema, ../contract/src/sso-admission.ts:71
-type Output = {
-  testing: true;
-  connectionId: string;
-  organizationId: string;
-  organizationName: string;
-} | {
-  testing: false;
-};
+type Output =
+  | {
+      testing: true;
+      connectionId: string;
+      organizationId: string;
+      organizationName: string;
+    }
+  | {
+      testing: false;
+    };
 
 // identity.myIdentifiers
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
-// Output: inline, ../contract/src/identity.trpc.ts:36
-type Output = {
-  identifierId: string;
-  accountId: string | null;
-  provider: "credential" | "email" | "passkey" | "google" | "github" | "gitlab" | "azure-ad" | "oidc" | "saml" | "auth0-legacy" | "okta-legacy";
-  value: string | null;
-  isPrimary: boolean;
-  confirmed: boolean;
-  resendable: boolean;
-  removable: boolean;
-  refusalCode: string | null;
-  demotesFirst: boolean;
-}[];
+// Output: z.array(accountIdentifierSchema) (inline, ../contract/src/identity.trpc.ts:36)
 
 // identity.myMethodsLastUsed
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14

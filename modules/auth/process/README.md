@@ -623,16 +623,7 @@ interface Input {
   email: string;
   addressProof: string;
 }
-// Output: signUpEnrollmentSchema, ../contract/src/front-door.responses.ts:87
-interface Output {
-  outcome: "enroll" | "redirect" | "existing_account" | "unavailable";
-  methodSet: {
-    id: string;
-    kind: "password" | "passkey" | "federated";
-    connectionId: string | null;
-  }[];
-  reasonCode: "sole_active_connection" | "break_glass" | "domain_routed" | "no_domain_match" | "identifier_unknown" | "account_methods" | "connection_suspended" | "method_not_licensed" | "method_not_configured" | "jit_disabled" | "link_proposed";
-}
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:87
 
 // auth.route
 // Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:14
@@ -640,18 +631,7 @@ interface Input {
   identifier: string | null;
   breakGlass?: boolean;
 }
-// Output: routingDecisionSchema, ../../identity/contract/src/signin-routing.ts:141
-interface Output {
-  outcome: "redirect_to_connection" | "method_picker" | "route_to_signup";
-  connectionId?: string;
-  methodSet: {
-    id: string;
-    kind: "password" | "passkey" | "federated";
-    connectionId: string | null;
-  }[];
-  reasonCode: "sole_active_connection" | "break_glass" | "domain_routed" | "no_domain_match" | "identifier_unknown" | "account_methods" | "connection_suspended" | "method_not_licensed" | "method_not_configured" | "jit_disabled" | "link_proposed";
-  domainManaged?: true;
-}
+type Output = z.infer<typeof routingDecisionSchema>; // ../../identity/contract/src/signin-routing.ts:141
 
 // auth.requestSignUpVerification
 // Input: signUpVerificationInputSchema, ../contract/src/front-door.schemas.ts:26
@@ -660,12 +640,14 @@ interface Input {
   callbackUrl?: string;
 }
 // Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:12
-type Output = {
-  sent: true;
-} | {
-  sent: false;
-  addressProof: string;
-};
+type Output =
+  | {
+      sent: true;
+    }
+  | {
+      sent: false;
+      addressProof: string;
+    };
 
 // auth.inviteLanding
 // Input: frontDoorInviteCodeInputSchema, ../contract/src/front-door.schemas.ts:45
@@ -711,12 +693,14 @@ interface Output {
 // Input: inline, ../contract/src/auth.trpc.ts:64
 type Input = unknown;
 // Output: priorSessionSchema, ../contract/src/front-door.responses.ts:72
-type Output = {
-  kind: "expired";
-  email: string;
-} | {
-  kind: "unknown";
-};
+type Output =
+  | {
+      kind: "expired";
+      email: string;
+    }
+  | {
+      kind: "unknown";
+    };
 ```
 
 ### `signInSecurity`

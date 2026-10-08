@@ -609,7 +609,10 @@ interface Body {
   slack_channel_id?: string;
   name: string;
   message?: string;
-  filters?: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
+  filters?: Record<
+    string,
+    string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+  >;
   alert_type: "CRITICAL" | "WARNING" | "INFO";
 }
 // Response: slackAutomationRestCreatedSchema, ../contract/src/automation-rest.schemas.ts:476
@@ -709,10 +712,13 @@ type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src
 // Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:28
 interface Output {
   cap: number;
-  counts: Record<string, {
-    count: number;
-    skipped: number;
-  }>;
+  counts: Record<
+    string,
+    {
+      count: number;
+      skipped: number;
+    }
+  >;
 }
 
 // automation.getTriggerStats
@@ -842,7 +848,10 @@ interface Output {
 interface Input {
   triggerId: string;
   projectId: string;
-  filters: Record<string, string[] | Record<string, string[]> | Record<string, Record<string, string[]>>>;
+  filters: Record<
+    string,
+    string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+  >;
 }
 type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
 

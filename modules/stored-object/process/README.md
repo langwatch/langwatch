@@ -284,16 +284,7 @@ interface Params {
 interface Body {
   projectId: string;
 }
-// Response: storedObjectsConfirmUploadOutputSchema, ../contract/src/uploads.ts:43
-interface Response {
-  projectId: string;
-  id: string;
-  sha256: string;
-  byteLength: number;
-  filename: unknown;
-  mediaType: string;
-  audience: "organization:view" | "project:view" | "team:view" | "analytics:view" | "cost:view" | "traces:view" | "scenarios:view" | "annotations:view" | "evaluations:view" | "datasets:view" | "triggers:view" | "workflows:view" | "experiments:view" | "prompts:view" | "secrets:view" | "playground:view" | "ops:view" | "auditLog:view" | "virtualKeys:view" | "gatewayBudgets:view" | "gatewayProviders:view" | "routingPolicies:view" | "gatewayGuardrails:view" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "governance:view" | "ingestionSources:view" | "anomalyRules:view" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "webhookEndpoints:view" | "gatewaySpend:view" | "langy:view" | "agentCache:view" | "governanceCost:view" | "sso:view";
-}
+type Response = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:43
 ```
 
 #### `PUT /uploads/:storedObjectId/content` · `putStoredObjectUploadContent`
@@ -344,11 +335,7 @@ Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:store
 interface Params {
   storedObjectId: string;
 }
-// Query: inline, src/transport/stored-object.rest.ts:106
-interface Query {
-  projectId: string;
-  audience: "organization:view" | "project:view" | "team:view" | "analytics:view" | "cost:view" | "traces:view" | "scenarios:view" | "annotations:view" | "evaluations:view" | "datasets:view" | "triggers:view" | "workflows:view" | "experiments:view" | "prompts:view" | "secrets:view" | "playground:view" | "ops:view" | "auditLog:view" | "virtualKeys:view" | "gatewayBudgets:view" | "gatewayProviders:view" | "routingPolicies:view" | "gatewayGuardrails:view" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "governance:view" | "ingestionSources:view" | "anomalyRules:view" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "webhookEndpoints:view" | "gatewaySpend:view" | "langy:view" | "agentCache:view" | "governanceCost:view" | "sso:view";
-}
+// Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:106)
 type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src/stored-object.commands.ts:29
 ```
 
@@ -399,15 +386,18 @@ interface Input {
   id: string;
 }
 // Output: storedObjectHeadSchema, ../contract/src/stored-object.trpc.ts:26
-type Output = {
-  status: "available";
-  mediaType: string;
-} | {
-  status: "missing";
-  mediaType: string;
-} | {
-  status: "not_found";
-};
+type Output =
+  | {
+      status: "available";
+      mediaType: string;
+    }
+  | {
+      status: "missing";
+      mediaType: string;
+    }
+  | {
+      status: "not_found";
+    };
 
 // storedObjects.getReadUrl
 // Input: storedObjectReadUrlInputSchema, ../contract/src/stored-object.trpc.ts:33

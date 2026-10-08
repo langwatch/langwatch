@@ -403,19 +403,7 @@ type Input = z.infer<typeof annotationApiCreateInputSchema>; // ../contract/src/
 type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
 
 // annotation.updateByTraceId
-// Input: annotationApiUpdateInputSchema, ../contract/src/annotation-trpc.schemas.ts:35
-interface Input {
-  id: string;
-  traceId: string;
-  projectId: string;
-  comment?: string | null;
-  isThumbsUp?: boolean | null;
-  expectedOutput?: string | null;
-  scoreOptions: Record<string, {
-    value?: string | string[] | null;
-    reason?: string | null;
-  }>;
-}
+type Input = z.infer<typeof annotationApiUpdateInputSchema>; // ../contract/src/annotation-trpc.schemas.ts:35
 type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
 
 // annotation.getByTraceId
