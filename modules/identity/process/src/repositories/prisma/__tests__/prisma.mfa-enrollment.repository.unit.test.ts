@@ -7,7 +7,7 @@ import { PrismaMfaEnrollmentRepository } from "../prisma.mfa-enrollment.reposito
 /**
  * `findRequiringOrganizationSlugs` spans every org a person belongs to, so
  * `guardOrganizationId` (ADR-021) refuses it as a top-level `findMany` — what
- * broke Backoffice impersonation in production. The stub runs the REAL guard.
+ * broke Admin impersonation in production. The stub runs the REAL guard.
  */
 
 function makeGuardedPrisma(person: unknown) {

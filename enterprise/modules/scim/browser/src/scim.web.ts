@@ -22,7 +22,7 @@ export const scimWeb = defineBrowserModule("scim")
       load: () => import("./ui/sections/connectors.screen.tsx"),
     },
     // Ops' directory sync across every customer: operators only, as main's
-    // back-office shell guarded it; the server refuses everyone else as not found.
+    // admin shell guarded it; the server refuses everyone else as not found.
     "pages/ops/directory-sync": {
       requires: "ops:manage",
       load: () => import("./ui/sections/directory-sync-view.screen.tsx"),

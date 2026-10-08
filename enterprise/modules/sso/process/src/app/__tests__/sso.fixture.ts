@@ -8,7 +8,7 @@ import {
   ssoDomainRecordLocation,
   type IdentityApi,
   type SsoBreakGlassApi,
-  type SsoConnectionBackofficeApi,
+  type SsoConnectionAdminApi,
   type SsoConnectionHistoryApi,
   type SsoDomainCeremonyApi,
   type SsoSetupApi,
@@ -88,12 +88,12 @@ export function createSsoTestAuditLog(): AuditLogApi {
 
 /**
  * Every ledger verb, recorded, so a test reads what was commanded. Typed
- * against identity's own backoffice shape — the strictest of the two
+ * against identity's own admin shape — the strictest of the two
  * equivalent interfaces sso and identity each declare — so the same double
  * satisfies both `SsoConnectionLedger` (structurally, narrow-to-wide) and the
- * `IdentityApi.ssoBackoffice()` peer this fixture stands in for.
+ * `IdentityApi.ssoAdmin()` peer this fixture stands in for.
  */
-type Ledger = SsoConnectionBackofficeApi;
+type Ledger = SsoConnectionAdminApi;
 
 export class RecordingSsoConnectionLedger implements SsoConnectionLedger, Ledger {
   static create(): RecordingSsoConnectionLedger {
@@ -154,7 +154,7 @@ export function createSsoTestIdentity({
   commands,
   breakGlass,
 }: {
-  connections: SsoConnectionBackofficeApi;
+  connections: SsoConnectionAdminApi;
   history?: SsoConnectionHistoryApi;
   ceremony?: SsoDomainCeremonyApi;
   setup?: SsoSetupApi;
@@ -162,7 +162,7 @@ export function createSsoTestIdentity({
   breakGlass?: SsoBreakGlassApi;
 }): IdentityApi {
   return createApiFixture<IdentityApi>({
-    ssoBackoffice: () => connections,
+    ssoAdmin: () => connections,
     ...(history ? { ssoConnectionHistory: () => history } : {}),
     ...(ceremony ? { ssoDomainCeremony: () => ceremony } : {}),
     ...(setup ? { ssoSetup: () => setup } : {}),

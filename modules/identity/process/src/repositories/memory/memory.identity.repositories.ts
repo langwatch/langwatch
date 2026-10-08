@@ -30,7 +30,7 @@ import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.reposito
 import { MemorySsoConnectionRegistrationRepository } from "./memory.sso-connection-registration.repository.ts";
 import { MemorySsoConnectionRoutingRepository } from "./memory.sso-connection-routing.repository.ts";
 import {
-  MemorySsoConnectionBackofficeRepository,
+  MemorySsoConnectionAdminRepository,
   MemorySsoConnectionReadRepository,
   MemorySsoConnectionStrandingRepository,
 } from "./memory.sso-connection.repositories.ts";
@@ -76,7 +76,7 @@ export function identityRepositoriesOverMemory(store: MemoryIdentityStore): Iden
     legacySsoOrganizations: MemoryLegacySsoOrganizationRepository.create(),
     ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
     ssoRegistrationSlots: MemorySsoConnectionRegistrationRepository.create(store),
-    ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),
+    ssoAdmin: MemorySsoConnectionAdminRepository.create(store),
     ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
     ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
     ssoCredentials: MemorySsoCredentialRepository.create(store),

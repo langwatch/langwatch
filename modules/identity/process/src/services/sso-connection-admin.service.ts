@@ -9,7 +9,7 @@ import {
 } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { SsoConnectionBackofficeRepository } from "../repositories/sso-connection-backoffice.repository.ts";
+import type { SsoConnectionAdminRepository } from "../repositories/sso-connection-admin.repository.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionHistoryService } from "./sso-connection-history.service.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
@@ -21,7 +21,7 @@ import type { SsoConnectionService } from "./sso-connection.service.ts";
  */
 
 /** One row of the back office's connection list. */
-export interface BackofficeSsoConnection {
+export interface AdminSsoConnection {
   connectionId: string;
   organizationId: string;
   /** Resolved server-side. Null when the organization no longer exists — the
@@ -34,7 +34,7 @@ export interface BackofficeSsoConnection {
   approvedDomains: string[];
   verifiedDomains: string[];
   /** What proved each domain — not yet its ADR-123 condition, which the
-   *  back-office schema does not carry. */
+   *  admin schema does not carry. */
   domainVerifications: Pick<
     SsoDomainVerification,
     "domain" | "method" | "actorId" | "verifiedAtMs"
@@ -57,8 +57,8 @@ export interface BackofficeSsoConnection {
   updatedAtMs: number;
 }
 
-export interface BackofficeSsoConnectionList {
-  connections: BackofficeSsoConnection[];
+export interface AdminSsoConnectionList {
+  connections: AdminSsoConnection[];
   total: number;
 }
 
@@ -67,20 +67,20 @@ export interface OperatorActor {
   userId: string;
 }
 
-export class SsoConnectionBackofficeService {
+export class SsoConnectionAdminService {
   static create(deps: {
-    reads: SsoConnectionBackofficeRepository;
+    reads: SsoConnectionAdminRepository;
     connections: () => SsoConnectionService;
     /** The same words the organization's own page reads, because the events
      *  are the same events. */
     history: () => SsoConnectionHistoryService;
-  }): SsoConnectionBackofficeService {
-    return new SsoConnectionBackofficeService(deps);
+  }): SsoConnectionAdminService {
+    return new SsoConnectionAdminService(deps);
   }
 
   private constructor(
     private readonly deps: {
-      reads: SsoConnectionBackofficeRepository;
+      reads: SsoConnectionAdminRepository;
       connections: () => SsoConnectionService;
       history: () => SsoConnectionHistoryService;
     },
@@ -94,13 +94,13 @@ export class SsoConnectionBackofficeService {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<BackofficeSsoConnectionList> {
+  }): Promise<AdminSsoConnectionList> {
     const { states, total } = await this.deps.reads.listPage({ page, pageSize, search });
     const names = await this.organizationNames(states.map((state) => state.organizationId));
 
     return {
       connections: states.map((state) =>
-        SsoConnectionBackofficeService.toBackofficeConnection({
+        SsoConnectionAdminService.toAdminConnection({
           state,
           organizationName: names.get(state.organizationId) ?? null,
         }),
@@ -109,11 +109,7 @@ export class SsoConnectionBackofficeService {
     };
   }
 
-  async findById({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<BackofficeSsoConnection | null> {
+  async findById({ connectionId }: { connectionId: string }): Promise<AdminSsoConnection | null> {
     const state = await this.deps.reads.getById({ connectionId }).catch((error: unknown) => {
       if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
         return undefined;
@@ -125,7 +121,7 @@ export class SsoConnectionBackofficeService {
 
     const names = await this.organizationNames([state.organizationId]);
 
-    return SsoConnectionBackofficeService.toBackofficeConnection({
+    return SsoConnectionAdminService.toAdminConnection({
       state,
       organizationName: names.get(state.organizationId) ?? null,
     });
@@ -289,13 +285,13 @@ export class SsoConnectionBackofficeService {
     return this.deps.reads.findOrganizationNames({ organizationIds });
   }
 
-  static toBackofficeConnection({
+  static toAdminConnection({
     state,
     organizationName,
   }: {
     state: SsoConnectionState;
     organizationName: string | null;
-  }): BackofficeSsoConnection {
+  }): AdminSsoConnection {
     return {
       connectionId: state.connectionId,
       organizationId: state.organizationId,

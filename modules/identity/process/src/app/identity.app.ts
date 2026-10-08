@@ -154,7 +154,7 @@ import {
   SsoBreakGlassService,
   type SsoBreakGlassDirectory,
 } from "../services/sso-break-glass.service.ts";
-import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
+import { SsoConnectionAdminService } from "../services/sso-connection-admin.service.ts";
 import { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
 import { SsoConnectionGrandfatherService } from "../services/sso-connection-grandfather.service.ts";
 import type { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
@@ -222,7 +222,7 @@ type IdentityAppParts = {
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
-  ssoBackoffice: SsoConnectionBackofficeService | null;
+  ssoAdmin: SsoConnectionAdminService | null;
   ssoConnectionHistory: SsoConnectionHistoryService;
   ssoConnectionReads: OrganizationSsoConnectionsService;
   ssoIssuers: SsoIssuerDirectoryService;
@@ -582,9 +582,9 @@ export class IdentityModule
         eventStore: eventStores.of({ pipeline: SSO_CONNECTION_PIPELINE_NAME }),
       }),
     });
-    const ssoBackoffice = ssoConnections
-      ? SsoConnectionBackofficeService.create({
-          reads: setup.repositories.ssoBackoffice,
+    const ssoAdmin = ssoConnections
+      ? SsoConnectionAdminService.create({
+          reads: setup.repositories.ssoAdmin,
           connections: () => ssoConnections,
           history: () => ssoConnectionHistory,
         })
@@ -841,7 +841,7 @@ export class IdentityModule
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
-      ssoBackoffice,
+      ssoAdmin,
       ssoConnectionHistory,
       ssoConnectionReads,
       ssoIssuers,
@@ -1150,11 +1150,11 @@ export class IdentityModule
     return this.#parts.ssoConnectionGuards;
   }
 
-  ssoBackoffice(): SsoConnectionBackofficeService {
-    if (!this.#parts.ssoBackoffice || !this.#holdsSsoConnectionLog()) {
-      throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
+  ssoAdmin(): SsoConnectionAdminService {
+    if (!this.#parts.ssoAdmin || !this.#holdsSsoConnectionLog()) {
+      throw new IdentityCapabilityUnavailableError("SSO connection admin");
     }
-    return this.#parts.ssoBackoffice;
+    return this.#parts.ssoAdmin;
   }
 
   ssoConnectionHistory(): SsoConnectionHistoryService {

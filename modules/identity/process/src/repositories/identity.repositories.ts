@@ -26,7 +26,7 @@ import type {
 import type { LegacySsoOrganizationRepository } from "./legacy-sso-organization.repository.ts";
 import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
-import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
+import type { SsoConnectionAdminRepository } from "./sso-connection-admin.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
 import type { SsoConnectionRoutingRepository } from "./sso-connection-routing.repository.ts";
 import type {
@@ -70,7 +70,7 @@ export interface IdentityRepositories {
   readonly ssoStranding: SsoConnectionStrandingRepository;
   /** The per-organization registration slots a new connection claims first. */
   readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;
-  readonly ssoBackoffice: SsoConnectionBackofficeRepository;
+  readonly ssoAdmin: SsoConnectionAdminRepository;
   /** Which proved domains are due a re-read, and the look itself (ADR-123). */
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
   /** Where a connection's identity-provider credentials are kept (D09). */

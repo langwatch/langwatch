@@ -114,8 +114,8 @@ export {
   type JoinRequestStagedSender,
 } from "./eventing/join-request-ledger.store.ts";
 export type { JoinRequestNotificationMail } from "./channels/join-request-notification-mail.channel.ts";
-export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
-export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
+export type { SsoConnectionAdminPage } from "./repositories/sso-connection-admin.repository.ts";
+export type { PrismaSsoConnectionAdminDatabase } from "./repositories/prisma/prisma.sso-connection-admin.repository.ts";
 export type { SsoConnectionRoutingRepository } from "./repositories/sso-connection-routing.repository.ts";
 export type { PrismaSsoConnectionRoutingDatabase } from "./repositories/prisma/prisma.sso-connection-routing.repository.ts";
 export type { SsoMethodConfiguration, SsoMethodDial } from "./rules/sso-method-dial.rules.ts";
@@ -145,10 +145,10 @@ export type { IdentityWriteGateState } from "./services/identity-write-gate.serv
 export type { IdentityStorageAdapterDeps } from "./services/better-auth-identity-storage.service.ts";
 export type { PrismaIdentityUsersDatabase } from "./repositories/prisma/prisma.identity-users.repository.ts";
 export type {
-  BackofficeSsoConnection,
-  BackofficeSsoConnectionList,
+  AdminSsoConnection,
+  AdminSsoConnectionList,
   OperatorActor,
-} from "./services/sso-connection-backoffice.service.ts";
+} from "./services/sso-connection-admin.service.ts";
 export type { PerSubjectCachedFlag } from "./services/per-subject-cached-gate.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
 export {

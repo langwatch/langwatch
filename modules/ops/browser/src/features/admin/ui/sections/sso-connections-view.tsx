@@ -13,10 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import type {
-  BackofficeSsoConnection,
-  SsoSetupMigration,
-} from "@langwatch/enterprise-sso-contract";
+import type { AdminSsoConnection, SsoSetupMigration } from "@langwatch/enterprise-sso-contract";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -104,7 +101,7 @@ const METHOD_LABEL: Record<string, string> = {
   "legacy-configuration": "Earlier configuration",
 };
 
-type ConnectionRow = BackofficeSsoConnection;
+type ConnectionRow = AdminSsoConnection;
 
 /** The three answers in the words the customer's own screen uses. */
 const ARRIVAL_LABELS = {

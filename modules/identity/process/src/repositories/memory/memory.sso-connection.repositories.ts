@@ -11,9 +11,9 @@ import {
 } from "../../rules/sso-connection-stranding.rules.ts";
 import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
 import type {
-  SsoConnectionBackofficePage,
-  SsoConnectionBackofficeRepository,
-} from "../sso-connection-backoffice.repository.ts";
+  SsoConnectionAdminPage,
+  SsoConnectionAdminRepository,
+} from "../sso-connection-admin.repository.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -116,10 +116,10 @@ export class MemorySsoConnectionStrandingRepository implements SsoConnectionStra
   }
 }
 
-/** The backoffice twin: one page over every connection the store holds. */
-export class MemorySsoConnectionBackofficeRepository implements SsoConnectionBackofficeRepository {
-  static create(store: MemoryIdentityStore): MemorySsoConnectionBackofficeRepository {
-    return new MemorySsoConnectionBackofficeRepository(store);
+/** The admin twin: one page over every connection the store holds. */
+export class MemorySsoConnectionAdminRepository implements SsoConnectionAdminRepository {
+  static create(store: MemoryIdentityStore): MemorySsoConnectionAdminRepository {
+    return new MemorySsoConnectionAdminRepository(store);
   }
 
   private constructor(private readonly store: MemoryIdentityStore) {}
@@ -128,7 +128,7 @@ export class MemorySsoConnectionBackofficeRepository implements SsoConnectionBac
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<SsoConnectionBackofficePage> {
+  }): Promise<SsoConnectionAdminPage> {
     const search = args.search?.toLowerCase() ?? "";
     const matched = [...this.store.ssoConnections.values()].filter(
       (connection) => search === "" || connection.connectionId.toLowerCase().includes(search),

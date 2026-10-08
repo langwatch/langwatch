@@ -1,7 +1,7 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
 
 /** One page of the operator list, already folded into aggregate state. */
-export interface SsoConnectionBackofficePage {
+export interface SsoConnectionAdminPage {
   states: SsoConnectionState[];
   total: number;
 }
@@ -11,7 +11,7 @@ export interface SsoConnectionBackofficePage {
  * deliberately: the `SsoConnection` row is a projection of the log, so a write here would be
  * overwritten by the next fold.
  */
-export abstract class SsoConnectionBackofficeRepository {
+export abstract class SsoConnectionAdminRepository {
   /**
    * One page, newest first. `search` matches the identifiers and domains an
    * operator would have to hand: a connection id from a log line, an
@@ -21,7 +21,7 @@ export abstract class SsoConnectionBackofficeRepository {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<SsoConnectionBackofficePage>;
+  }): Promise<SsoConnectionAdminPage>;
   /** One connection's state; `SsoConnectionNotFoundError` when no row carries that id. */
   abstract getById(args: { connectionId: string }): Promise<SsoConnectionState>;
   /** The display names of the organizations a page names, by id. */

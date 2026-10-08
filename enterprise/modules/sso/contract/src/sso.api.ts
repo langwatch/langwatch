@@ -34,8 +34,8 @@ import type {
 } from "./sso-setup.contract.ts";
 import type {
   ActivateSsoConnectionInput,
-  BackofficeSsoConnection,
-  BackofficeSsoConnectionPage,
+  AdminSsoConnection,
+  AdminSsoConnectionPage,
   ListSsoConnectionsInput,
   OperatorSsoMigrationProgressInput,
   RegisterSsoConnectionInput,
@@ -48,7 +48,7 @@ import type {
 } from "./sso.contract.ts";
 
 /**
- * The operator a back-office read or command is attributed to, as the request
+ * The operator an admin read or command is attributed to, as the request
  * boundary knows them. An operator debugging a customer account is still the
  * operator, so the impersonator is who the platform-operator grant is checked against.
  */
@@ -90,15 +90,12 @@ export interface SsoApi {
     onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
   }): Promise<SignInProviderMounts>;
 
-  listConnections(
-    input: ListSsoConnectionsInput,
-    by: SsoOperator,
-  ): Promise<BackofficeSsoConnectionPage>;
+  listConnections(input: ListSsoConnectionsInput, by: SsoOperator): Promise<AdminSsoConnectionPage>;
   /** `undefined` when no connection carries that id. */
   findConnection(
     input: SsoConnectionByIdInput,
     by: SsoOperator,
-  ): Promise<BackofficeSsoConnection | undefined>;
+  ): Promise<AdminSsoConnection | undefined>;
   registerConnection(input: RegisterSsoConnectionInput, by: SsoOperator): Promise<void>;
   claimDomain(input: SsoDomainTarget, by: SsoOperator): Promise<void>;
   approveDomainClaim(input: SsoDomainTarget, by: SsoOperator): Promise<void>;

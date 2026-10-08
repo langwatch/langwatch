@@ -3,7 +3,7 @@ import type { LookupOperatorActivityRow, VerifiedUserDomain } from "@langwatch/i
 /**
  * The cross-organization reads the operator lookup takes (D05 tier 1).
  * Reads only: these rows are projections of the log, so a write here
- * would be overwritten by the next fold (`sso-connection-backoffice`).
+ * would be overwritten by the next fold (`sso-connection-admin`).
  */
 export abstract class IdentityLookupRepository {
   abstract findIdentifiersByValue(input: {

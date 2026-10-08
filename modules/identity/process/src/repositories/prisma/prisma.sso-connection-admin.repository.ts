@@ -2,16 +2,13 @@ import { SsoConnectionNotFoundError, type SsoConnectionState } from "@langwatch/
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
-  SsoConnectionBackofficePage,
-  SsoConnectionBackofficeRepository,
-} from "../sso-connection-backoffice.repository.ts";
+  SsoConnectionAdminPage,
+  SsoConnectionAdminRepository,
+} from "../sso-connection-admin.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
 /** The two models the operator back office reads, and no others. */
-export type PrismaSsoConnectionBackofficeDatabase = Pick<
-  PrismaClient,
-  "ssoConnection" | "organization"
->;
+export type PrismaSsoConnectionAdminDatabase = Pick<PrismaClient, "ssoConnection" | "organization">;
 
 /**
  * Search over the identifiers and domains an operator would have to hand: a
@@ -33,14 +30,12 @@ function searchFilter(search: string): Prisma.SsoConnectionWhereInput {
 }
 
 /** The back office's reads over the `SsoConnection` head and its organizations. */
-export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBackofficeRepository {
-  static create(
-    database: PrismaSsoConnectionBackofficeDatabase,
-  ): PrismaSsoConnectionBackofficeRepository {
-    return new PrismaSsoConnectionBackofficeRepository(database);
+export class PrismaSsoConnectionAdminRepository implements SsoConnectionAdminRepository {
+  static create(database: PrismaSsoConnectionAdminDatabase): PrismaSsoConnectionAdminRepository {
+    return new PrismaSsoConnectionAdminRepository(database);
   }
 
-  private constructor(private readonly prisma: PrismaSsoConnectionBackofficeDatabase) {}
+  private constructor(private readonly prisma: PrismaSsoConnectionAdminDatabase) {}
 
   async listPage({
     page,
@@ -50,7 +45,7 @@ export class PrismaSsoConnectionBackofficeRepository implements SsoConnectionBac
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<SsoConnectionBackofficePage> {
+  }): Promise<SsoConnectionAdminPage> {
     const where = search ? searchFilter(search) : {};
     const [rows, total] = await Promise.all([
       this.prisma.ssoConnection.findMany({

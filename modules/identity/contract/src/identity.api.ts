@@ -114,13 +114,13 @@ export interface IdentityNewbornSweepSummary {
   locksReaped: number;
 }
 
-/** The operator issuing a backoffice SSO command, as the surface knows them. */
+/** The operator issuing a admin SSO command, as the surface knows them. */
 export interface IdentityOperatorActor {
   userId: string;
 }
 
-/** One SSO connection, shaped for the backoffice read surface. */
-export interface IdentityBackofficeSsoConnection {
+/** One SSO connection, shaped for the admin read surface. */
+export interface IdentityAdminSsoConnection {
   connectionId: string;
   organizationId: string;
   organizationName: string | null;
@@ -129,7 +129,7 @@ export interface IdentityBackofficeSsoConnection {
   claimedDomains: string[];
   approvedDomains: string[];
   verifiedDomains: string[];
-  /** What proved each domain. Not its ADR-123 condition: the back-office
+  /** What proved each domain. Not its ADR-123 condition: the admin
    *  surface does not carry one yet. */
   domainVerifications: Pick<
     SsoDomainVerification,
@@ -153,8 +153,8 @@ export interface IdentityBackofficeSsoConnection {
   updatedAtMs: number;
 }
 
-export interface IdentityBackofficeSsoConnectionList {
-  connections: IdentityBackofficeSsoConnection[];
+export interface IdentityAdminSsoConnectionList {
+  connections: IdentityAdminSsoConnection[];
   total: number;
 }
 
@@ -326,14 +326,14 @@ export interface SsoConnectionHistoryApi {
   }): Promise<SsoConnectionHistoryEntryView[]>;
 }
 
-/** The backoffice read/write surface over SSO connections. */
-export interface SsoConnectionBackofficeApi {
+/** The admin read/write surface over SSO connections. */
+export interface SsoConnectionAdminApi {
   list(args: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<IdentityBackofficeSsoConnectionList>;
-  findById(args: { connectionId: string }): Promise<IdentityBackofficeSsoConnection | null>;
+  }): Promise<IdentityAdminSsoConnectionList>;
+  findById(args: { connectionId: string }): Promise<IdentityAdminSsoConnection | null>;
   /** One connection's history, the organization resolved from the connection
    *  rather than taken from the caller. Null for one that does not exist. */
   findHistory(args: {
@@ -719,7 +719,7 @@ export interface IdentityReservationsApi {
 /**
  * The capabilities identity publishes across a package boundary today: email
  * fork read, guard services, address-lock reservations, newborn
- * reconciliation, user-migration registry, SSO backoffice connection writer.
+ * reconciliation, user-migration registry, SSO admin connection writer.
  */
 export interface IdentityApi {
   /** Where one person stands with one organization's second-factor requirement, on this session. */
@@ -802,7 +802,7 @@ export interface IdentityApi {
   joinRequestGuards(): JoinRequestGuardsApi;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
-  ssoBackoffice(): SsoConnectionBackofficeApi;
+  ssoAdmin(): SsoConnectionAdminApi;
   ssoConnectionHistory(): SsoConnectionHistoryApi;
   ssoConnectionReads(): SsoConnectionReadsApi;
   ssoIssuers(): SsoIssuerDirectoryApi;

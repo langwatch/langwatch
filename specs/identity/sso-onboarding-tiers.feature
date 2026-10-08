@@ -138,9 +138,9 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     And the words name the proved domain, the test sign-in, and a way back in without the identity provider
 
   @integration
-  Scenario: The connection list behaves like every other back-office list
+  Scenario: The connection list behaves like every other admin list
     When "olive" opens the single sign-on connections list
-    Then it searches, pages and shows its loading and empty states the way the other back-office lists do
+    Then it searches, pages and shows its loading and empty states the way the other admin lists do
     And each row's actions are in that row's overflow menu, with removal set apart as destructive
 
   @integration

@@ -27,7 +27,7 @@ import { PrismaLegacySsoOrganizationRepository } from "./prisma.legacy-sso-organ
 import { PrismaMfaEnrollmentProjectionRepository } from "./prisma.mfa-enrollment-projection.repository.ts";
 import { PrismaMfaEnrollmentRepository } from "./prisma.mfa-enrollment.repository.ts";
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
-import { PrismaSsoConnectionBackofficeRepository } from "./prisma.sso-connection-backoffice.repository.ts";
+import { PrismaSsoConnectionAdminRepository } from "./prisma.sso-connection-admin.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 import {
   PrismaSsoConnectionReadRepository,
@@ -77,7 +77,7 @@ export class PostgresIdentityRepositories {
       legacySsoOrganizations: PrismaLegacySsoOrganizationRepository.create(database),
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoRegistrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
-      ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
+      ssoAdmin: PrismaSsoConnectionAdminRepository.create(database),
       ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
       ssoCredentials: PrismaSsoCredentialRepository.create(database, members.encryption),
       ssoEngineProviders: PrismaSsoEngineProviderRepository.create(database, members.encryption),

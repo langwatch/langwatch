@@ -11,20 +11,20 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { SsoConnectionBackofficeRepository } from "../../repositories/sso-connection-backoffice.repository.ts";
+import { SsoConnectionAdminRepository } from "../../repositories/sso-connection-admin.repository.ts";
 import { SsoConnectionHistoryRepository } from "../../repositories/sso-connection-history.repository.ts";
-import { SsoConnectionBackofficeService } from "../sso-connection-backoffice.service.ts";
+import { SsoConnectionAdminService } from "../sso-connection-admin.service.ts";
 import { SsoConnectionHistoryService } from "../sso-connection-history.service.ts";
 
 const ACME = "org_acme";
 const CONNECTION = "ssoc_acme";
 
-function backofficeOver(state: SsoConnectionState | null) {
+function adminOver(state: SsoConnectionState | null) {
   const findHistory = vi.fn<SsoConnectionHistoryRepository["findHistory"]>().mockResolvedValue([]);
   class StubHistory extends SsoConnectionHistoryRepository {
     findHistory = findHistory;
   }
-  class StubReads extends SsoConnectionBackofficeRepository {
+  class StubReads extends SsoConnectionAdminRepository {
     listPage = vi.fn().mockResolvedValue({ states: [], total: 0 });
     getById = vi.fn(async () => {
       if (!state) throw new SsoConnectionNotFoundError("no connection");
@@ -33,7 +33,7 @@ function backofficeOver(state: SsoConnectionState | null) {
     findOrganizationNames = vi.fn().mockResolvedValue(new Map<string, string>());
   }
   return {
-    service: SsoConnectionBackofficeService.create({
+    service: SsoConnectionAdminService.create({
       reads: new StubReads(),
       connections: () => {
         throw new Error("the history read commands nothing");
@@ -47,7 +47,7 @@ function backofficeOver(state: SsoConnectionState | null) {
 describe("given an operator reading a connection's history from the back office", () => {
   describe("when the connection exists", () => {
     it("reads the log under the organization the connection itself names", async () => {
-      const { service, findHistory } = backofficeOver({
+      const { service, findHistory } = adminOver({
         ...emptySsoConnection({ connectionId: CONNECTION }),
         organizationId: ACME,
       });
@@ -62,7 +62,7 @@ describe("given an operator reading a connection's history from the back office"
 
   describe("when no connection carries that id", () => {
     it("answers null without reading any organization's log", async () => {
-      const { service, findHistory } = backofficeOver(null);
+      const { service, findHistory } = adminOver(null);
 
       await expect(service.findHistory({ connectionId: CONNECTION })).resolves.toBeNull();
       expect(findHistory).not.toHaveBeenCalled();
