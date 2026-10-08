@@ -10,6 +10,7 @@ import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
   createServingRoster,
   type ServingRoster,
@@ -26,6 +27,9 @@ export const SERVING_ROSTER_TIMING = { staleAfterMs: 60_000, refreshEveryMs: 15_
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
+
+/** Writers before the roster count as present this long after the upgrade run (Round 47 E2). */
+export const SERVING_ROSTER_PRE_ROSTER_GRACE_MS = 30 * 60_000;
 
 /** A process with no database (the memory tier) has no installation to be behind. */
 const NO_LEDGER_GATE: UpgradeGate = {
@@ -85,6 +89,7 @@ export function upgradeGateOver({
 }): UpgradeGate {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
+  const preRoster = PreRosterRepository.create({ postgres });
   const { blockingSteps, declaredSteps } = imageGateSteps({ tree, withClickHouse });
   const roster = createServingRoster({
     ledger: {
@@ -92,9 +97,11 @@ export function upgradeGateOver({
       findLiveRoster: (input) => ledger.findLiveRoster(input),
       removeRosterEntry: (input) => ledger.removeRosterEntry(input),
       pruneRoster: (input) => runner.pruneServingRoster(input),
+      findPreRosterHistory: () => preRoster.findPreRosterHistory(),
     },
     ...SERVING_ROSTER_TIMING,
     pruneDeadAfterMs: SERVING_ROSTER_PRUNE_AFTER_MS,
+    preRosterGraceMs: SERVING_ROSTER_PRE_ROSTER_GRACE_MS,
     onRefreshError: (error) =>
       warn("roster refresh failed", { processId, error: messageOf(error) }),
     onPruneError: (error) => warn("roster prune failed", { processId, error: messageOf(error) }),

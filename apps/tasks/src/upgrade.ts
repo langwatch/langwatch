@@ -14,7 +14,7 @@ import {
 import { READ_HINT_BROADCAST_CHANNEL } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { imageSteps, type UpgradeClickHouse } from "@langwatch/upgrade";
+import { imageSteps, type UpgradeClickHouse, type UpgradePostgres } from "@langwatch/upgrade";
 import { IMAGE_MIGRATION_DIRECTORIES, readImageTree } from "@langwatch/upgrade/gate";
 import {
   compareReleases,
@@ -38,6 +38,7 @@ import {
   type UpgradeSchemaApplier,
   upgradeReadHintMessage,
 } from "@langwatch/upgrade/runner";
+import { assertOldWritersGone, recordPreRosterRollback } from "@langwatch/upgrade/serving-roster";
 import { isMigrationStep, type MigrationStep } from "@langwatch/upgrade/step";
 import { applyRelease, SteppingError } from "@langwatch/upgrade/stepping";
 
@@ -45,14 +46,24 @@ import type { TaskInput } from "./config.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
 import { withTasksApp } from "./module-task.ts";
 
-export type UpgradeCommand = { command: "run" } | { command: "status" | "plan"; json: boolean };
+/** Overrides for writers before the serving roster (Round 47 E2; ADR-173, amendment 2026-10-08). */
+const PRE_ROSTER_COMMANDS = ["old-writers-gone", "pre-roster-rollback"] as const;
+type PreRosterCommand = (typeof PRE_ROSTER_COMMANDS)[number];
+const isPreRosterCommand = (argument: string): argument is PreRosterCommand =>
+  (PRE_ROSTER_COMMANDS as readonly string[]).includes(argument);
+
+export type UpgradeCommand =
+  | { command: "run" }
+  | { command: "status" | "plan"; json: boolean }
+  | { command: PreRosterCommand };
 
 /** An argument `upgrade` does not take; `code` is what a caller branches on. */
 export class UpgradeArgumentError extends Error {
   readonly code = "unknown_upgrade_argument";
   constructor(readonly argument: string) {
     super(
-      `upgrade takes no "${argument}". Use: upgrade | upgrade status [--json] | upgrade plan [--json]`,
+      `upgrade takes no "${argument}". Use: upgrade | upgrade status [--json] | upgrade plan [--json]` +
+        " | upgrade steps [--json] [--out <file>] | upgrade old-writers-gone | upgrade pre-roster-rollback",
     );
     this.name = "UpgradeArgumentError";
   }
@@ -61,6 +72,10 @@ export class UpgradeArgumentError extends Error {
 export function parseUpgradeArgs({ args }: { args: readonly string[] }): UpgradeCommand {
   const [first, ...rest] = args;
   if (first === undefined) return { command: "run" };
+  if (isPreRosterCommand(first)) {
+    if (rest[0] !== undefined) throw new UpgradeArgumentError(rest[0]);
+    return { command: first };
+  }
   if (first !== "status" && first !== "plan") throw new UpgradeArgumentError(first);
   const unknown = rest.find((argument) => argument !== "--json");
   if (unknown !== undefined) throw new UpgradeArgumentError(unknown);
@@ -583,7 +598,42 @@ export async function runUpgradeCommand({
   codeSteps?: DeclaredCodeSteps;
 }): Promise<number> {
   const command = parseUpgradeArgs({ args });
+  if (command.command === "old-writers-gone" || command.command === "pre-roster-rollback") {
+    const database = input.connections.database;
+    if (!database) throw new Error("DATABASE_URL is required to upgrade");
+    return runPreRosterCommand({ command: command.command, postgres: database.sql, write });
+  }
   return codeSteps((steps) => runWithCodeSteps({ command, input, write, steps }));
+}
+
+/** Records one override for writers before the roster; no lease and no module boot. Exit 0. */
+export async function runPreRosterCommand({
+  command,
+  postgres,
+  write,
+  actor = `pnpm task upgrade ${command} on ${hostname()}`,
+}: {
+  command: PreRosterCommand;
+  postgres: UpgradePostgres;
+  write: (text: string) => void;
+  actor?: string;
+}): Promise<number> {
+  if (command === "old-writers-gone") {
+    const { recordedAt } = await assertOldWritersGone({ postgres, actor });
+    write(
+      `old writers before the serving roster asserted gone at ${recordedAt.toISOString()}: ` +
+        "steps that wait for old writers run once every live process declares them\n",
+    );
+    return 0;
+  }
+  const { recordedAt, reopened } = await recordPreRosterRollback({ postgres, actor });
+  write(
+    `rollback to an image before the serving roster recorded at ${recordedAt.toISOString()}; ` +
+      `reopened: ${reopened.length > 0 ? reopened.join(", ") : "none"}. Steps that wait for old ` +
+      "writers hold until `pnpm task upgrade old-writers-gone` runs after the next rollout, or " +
+      "until the grace after the next upgrade run\n",
+  );
+  return 0;
 }
 
 async function runWithCodeSteps({

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import { servingRosterEntrySchema } from "../ledger.ts";
+import type { PreRosterHistory } from "./pre-roster.ts";
 
 /** What a serving process declares about itself; the ledger stamps the times. */
 export const servingRosterDeclarationSchema = z.object({
@@ -24,4 +25,6 @@ export type ServingRosterLedger = Pick<
   removeRosterEntry(input: { processId: string }): Promise<void>;
   /** Deletes entries dead for `deadForMs` (plan 2026-10-08 F-10); absent, nothing is pruned. */
   pruneRoster?(input: { deadForMs: number }): Promise<number>;
+  /** Writers before the roster (Round 47 E2); absent, none are assumed. */
+  findPreRosterHistory?(): Promise<PreRosterHistory>;
 };

@@ -1,4 +1,5 @@
 import type { ServingRosterEntry } from "../../ledger.ts";
+import type { PreRosterHistory } from "../pre-roster.ts";
 import type { ServingRosterDeclaration, ServingRosterLedger } from "../serving-roster-ledger.ts";
 
 /**
@@ -72,5 +73,23 @@ export class MemoryServingRosterLedger implements ServingRosterLedger {
     );
     for (const row of dead) this.rows.delete(row.processId);
     return dead.length;
+  }
+}
+
+/** The roster ledger with the run and override history of writers before the roster (E2). */
+export class MemoryPreRosterLedger extends MemoryServingRosterLedger {
+  seededFromExistingAt: Date | null = null;
+  readonly rollbacksAt: Date[] = [];
+  readonly assertionsAt: Date[] = [];
+  readonly upgradesFinishedAt: Date[] = [];
+
+  async findPreRosterHistory(): Promise<PreRosterHistory> {
+    return {
+      now: new Date(),
+      seededFromExistingAt: this.seededFromExistingAt,
+      rollbacksAt: [...this.rollbacksAt],
+      assertionsAt: [...this.assertionsAt],
+      upgradesFinishedAt: [...this.upgradesFinishedAt],
+    };
   }
 }

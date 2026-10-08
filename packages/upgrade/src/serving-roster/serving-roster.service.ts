@@ -1,4 +1,5 @@
 import type { ServingRosterEntry } from "../ledger.ts";
+import { preRosterWriters } from "./pre-roster.ts";
 import {
   type ServingRosterDeclaration,
   type ServingRosterLedger,
@@ -56,11 +57,20 @@ function assertTimings({
   staleAfterMs,
   refreshEveryMs,
   pruneDeadAfterMs,
+  preRosterGraceMs,
+  readsPreRoster,
 }: {
   staleAfterMs: number;
   refreshEveryMs: number;
   pruneDeadAfterMs: number | undefined;
+  preRosterGraceMs: number | undefined;
+  readsPreRoster: boolean;
 }): void {
+  if (readsPreRoster && !(preRosterGraceMs !== undefined && preRosterGraceMs >= 0)) {
+    throw new RangeError(
+      `a roster that reads writers before the roster needs a grace of 0 ms or more (got ${preRosterGraceMs})`,
+    );
+  }
   if (!(refreshEveryMs > 0 && refreshEveryMs < staleAfterMs)) {
     throw new RangeError(
       `roster refresh interval (${refreshEveryMs} ms) must be positive and below the stale bound (${staleAfterMs} ms)`,
@@ -90,9 +100,9 @@ async function pruneDead({
 }
 
 /**
- * Which builds are serving, and whether every one declares a step (plan 3.1, D2; ADR-173).
- * `record` writes the row, prunes long-dead ones and refreshes it every `refreshEveryMs` until
- * `stop`. Failed refreshes and prunes are reported; `onLapseChange` hears a lapse (round 9).
+ * Which builds are serving, and whether every one declares a step (plan 3.1, D2; ADR-173); an
+ * unseen writer before the roster counts while `preRosterWriters` says so (Round 47 E2). `record`
+ * writes, prunes and refreshes every `refreshEveryMs` until `stop`; failures are reported.
  */
 export function createServingRoster({
   ledger,
@@ -102,6 +112,7 @@ export function createServingRoster({
   onRefreshError,
   onPruneError,
   onLapseChange,
+  preRosterGraceMs,
 }: {
   ledger: ServingRosterLedger;
   staleAfterMs: number;
@@ -111,8 +122,17 @@ export function createServingRoster({
   onRefreshError?: (error: unknown) => void;
   onPruneError?: (error: unknown) => void;
   onLapseChange?: (lapsed: boolean) => void;
+  /** Required when the ledger reads writers before the roster (Round 47 E2). */
+  preRosterGraceMs?: number;
 }): ServingRoster {
-  assertTimings({ staleAfterMs, refreshEveryMs, pruneDeadAfterMs });
+  const readsPreRoster = ledger.findPreRosterHistory !== undefined;
+  assertTimings({
+    staleAfterMs,
+    refreshEveryMs,
+    pruneDeadAfterMs,
+    preRosterGraceMs,
+    readsPreRoster,
+  });
 
   let current: ServingRosterDeclaration | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -159,6 +179,9 @@ export function createServingRoster({
     },
     live,
     async oldWritersGoneFor({ stepId }) {
+      const history = await ledger.findPreRosterHistory?.();
+      const graceMs = preRosterGraceMs ?? 0;
+      if (history && preRosterWriters({ history, graceMs }).present) return false;
       const rows = await live();
       return rows.every((row) => row.steps.includes(stepId));
     },

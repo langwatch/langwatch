@@ -160,3 +160,48 @@ Feature: Cloud upgrades run on deploy while old and new builds serve side by sid
     Then the process is admitted
     And the failure is reported
 
+
+  # Writers before the roster (plan 2026-10-08 F-6; Round 47 E2; ADR-173, amendment 2026-10-08).
+  # origin/main and 3.20.1 write no roster row. Once the ledger was seeded from an installation that
+  # existed, or a rollback to such an image was recorded, an unseen old writer counts as present:
+  # a step needing old writers gone waits for the operator assertion, or for a grace counted from
+  # the first upgrade run that finished after the opening. The database clock judges the grace.
+  @unit
+  Scenario: An installation upgraded from an image before the roster holds the step until old writers are asserted gone
+    Given the ledger was seeded from an existing installation and the upgrade run after it finished
+    And a worker on the new image declaring step "trace:backfill-cost" is the only live process
+    Then old writers are not gone for step "trace:backfill-cost"
+    When old writers before the roster are asserted gone
+    Then old writers are gone for step "trace:backfill-cost"
+
+  @unit
+  Scenario: With no assertion, the grace after the upgrade run releases the step
+    Given the ledger was seeded from an existing installation and the upgrade run after it finished
+    And a worker on the new image declaring step "trace:backfill-cost" is the only live process
+    When the grace of 30 minutes passes after that upgrade run finished
+    Then old writers are gone for step "trace:backfill-cost"
+
+  @unit
+  Scenario: A fresh installation never waits for writers before the roster
+    Given the ledger was seeded from an empty installation
+    And a worker on the new image declaring step "trace:backfill-cost" is the only live process
+    Then old writers are gone for step "trace:backfill-cost"
+
+  @unit
+  Scenario: The assertion does not release a step a live process on the old image still lacks
+    Given the ledger was seeded from an existing installation and old writers before the roster are asserted gone
+    And an api on the old image declaring no steps is live
+    Then old writers are not gone for step "trace:backfill-cost"
+
+  @unit
+  Scenario: A recorded rollback to an image before the roster holds the step again until the next grace
+    Given old writers before the roster were asserted gone
+    When a rollback to an image before the roster is recorded
+    Then old writers are not gone for step "trace:backfill-cost"
+    When the next upgrade run finishes and the grace of 30 minutes passes after it
+    Then old writers are gone for step "trace:backfill-cost"
+
+  @unit
+  Scenario: A roster that reads the history of writers before the roster without a grace is refused
+    When a serving roster is created over a ledger that reports that history and no grace
+    Then creating it is refused with a range error

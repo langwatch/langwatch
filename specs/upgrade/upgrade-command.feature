@@ -191,3 +191,27 @@ Feature: The upgrade command
     Then the status subcommand prints the reader's status
     And the plan subcommand prints the plan as JSON when asked
     And an unknown subcommand is refused by name
+
+  # Writers before the roster (Round 47 E2; ADR-173, amendment 2026-10-08): the deploy, or the
+  # chart's opt-in post-upgrade hook once the rollout finished, asserts them gone; a rollback to an
+  # image before the roster is recorded by hand, from the new image, before rolling forward again.
+  @unit
+  Scenario: upgrade takes old-writers-gone and pre-roster-rollback, and nothing after them
+    When "upgrade old-writers-gone" or "upgrade pre-roster-rollback" is parsed
+    Then each parses as its own subcommand
+    And an argument after either is refused by name
+
+  @integration
+  Scenario: upgrade old-writers-gone records the assertion and releases the held steps
+    Given the ledger was seeded from an existing installation and the upgrade run after it finished
+    When "upgrade old-writers-gone" runs
+    Then it exits with code 0 and says the steps that wait for old writers may run
+    And the ledger reports the assertion after the seed
+
+  @integration
+  Scenario: upgrade pre-roster-rollback reopens done background steps and holds old-writers steps again
+    Given the background step "trace:backfill-cost" is done and old writers before the roster were asserted gone
+    When "upgrade pre-roster-rollback" runs
+    Then it exits with code 0 naming "trace:backfill-cost" as reopened
+    And "trace:backfill-cost" is pending again
+    And the ledger reports the rollback after the assertion

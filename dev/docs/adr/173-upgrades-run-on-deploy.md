@@ -141,6 +141,30 @@ Source: `.claude/coordinator/rulings-2026-10-06-rounds.md`. Each line is Alex's 
   so one fleet page shows both (Q-U6); a failed or held upgrade emails platform operators and shows
   the operator banner, with Slack only where ops' notifier is configured (Q-U7).
 
+### 6. Amendment 2026-10-08: writers before the roster (Round 47 E2)
+
+Images before the roster (`origin/main`, 3.20.1) write no row, so on the first deploy "every live
+row declares S" holds while they still serve, and a rollback to one is invisible (plan 2026-10-08
+F-6). The operator override of §3 is wired into `oldWritersGoneFor` (Alex, 2026-10-08, round 47):
+
+- **When it holds.** After the latest opening, an unseen old writer counts as present. An opening
+  is a seed run that inferred steps from an existing installation, or a recorded rollback to an
+  image before the roster. A fresh installation has none and never waits.
+- **What releases it.** The assertion recorded after that opening, or a grace counted from the
+  first succeeded upgrade run that finished after it (the opening itself when none has), judged
+  by the database clock. Both live in the ledger schema, in the runner-owned
+  `_langwatch_serving_roster_override` table.
+- **Who records it.** `pnpm task upgrade old-writers-gone` asserts and `pnpm task upgrade
+pre-roster-rollback` records a rollback and reopens done background steps. The cloud deploy
+  asserts after its rollout; the chart's post-upgrade hook does so once the rollout has finished,
+  opt-in because it needs RBAC and its own ServiceAccount token; docker compose recreates the app
+  and workers independently and relies on the grace. Ops' `assertSystemMigrationLegacyWritersDrained`
+  is the operator's spelling of the same override; carrying it to this record changes the
+  `OpsApi` contract (it is keyed by tenant migration today) and is held for a ruling.
+
+The pure rule is `preRosterWriters` in `packages/upgrade/src/serving-roster/pre-roster.ts`;
+scenarios in `specs/upgrade/cloud-automatic.feature` and `specs/upgrade/upgrade-command.feature`.
+
 ## Alternatives considered
 
 - **Number cloud builds** (a build counter beside the `git-<sha>`). Ordering builds
@@ -150,6 +174,10 @@ Source: `.claude/coordinator/rulings-2026-10-06-rounds.md`. Each line is Alex's 
   no answer on `docker compose`, and knows images, not the steps each declares.
 - **Keep the operator assertion on cloud.** Nobody is there to type the generation,
   and a typo releases a step while an old writer still serves.
+- **The grace alone for writers before the roster** (E2 (b)). Nothing to wire, but a slow rollout
+  outlasts any fixed bound and releases a step while an old pod still writes.
+- **Accept the gap** (E2 (c)). Rows an old pod writes stay unreconciled until the next upgrade:
+  hours on cloud, months on self-hosted.
 - **Contract early on cloud.** Saves up to one LTS cycle of dead schema but makes a
   cloud rollback able to land below its own schema, and splits the window in two.
 

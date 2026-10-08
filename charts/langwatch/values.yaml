@@ -179,9 +179,15 @@ app:
   ## pre-upgrade Job on the new image, before any Deployment rolls (ADR-155). Fail-closed.
   ## Off means you run `pnpm task upgrade` yourself first; the containers never migrate.
   ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job.
+  ## @param app.migrations.oldWritersGoneHook [default: false] After the app and workers finish rolling out, a post-upgrade Job records that writers from before the serving roster have stopped (pnpm task upgrade old-writers-gone). Needs a Role reading the two Deployments and its own ServiceAccount token, projected into its kubectl container only.
+  ## @param app.migrations.oldWritersGoneHookTimeoutSeconds [default: 1800] How long it waits for the rollouts; past it nothing is asserted and the grace applies.
+  ## @param app.migrations.oldWritersGoneHookImage [string, default: alpine/k8s:1.34.9] Image of its rollout wait. Needs sh and kubectl.
   migrations:
     preRoll: true
     preRollTimeoutSeconds: 2100
+    oldWritersGoneHook: false
+    oldWritersGoneHookTimeoutSeconds: 1800
+    oldWritersGoneHookImage: alpine/k8s:1.34.9
   # Telemetry identity for the app pods. Becomes the OTel resource
   # `service.name` and the `service` field on stdout log lines, which log
   # shipping promotes to the Loki `service_name` label.

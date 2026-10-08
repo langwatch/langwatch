@@ -21,6 +21,7 @@ the chart's pre-roll Job runs `upgrade`, and every admitted api and worker write
 | New pods refusing until current, and the roster | `mig-serving-gate`                                           |
 | The serving roster table                        | `mig-ledger-widen`                                           |
 | The "old writers gone" predicate                | `mig-cloud-presence` (`packages/upgrade/src/serving-roster`) |
+| Writers before the roster (assertion, grace)    | `mig-pre-roster`; the serving gate's wiring is pending       |
 
 ## The contract
 
@@ -66,6 +67,38 @@ Job, which `mig-entry-points` repoints to `upgrade`.
   the gradual release takes.
 - **Tenant steps keep their pacing on enrolment** (rethink 6.8). The deploy never
   paces tenants; a gated step shows `gated` until it is enrolled.
+
+## Writers from before the roster
+
+Images before the serving roster (`origin/main`, 3.20.1) write no roster row, so the roster
+cannot see them (plan 2026-10-08 F-6; Round 47 E2; ADR-173, amendment 2026-10-08). When the
+ledger was seeded from an installation that already existed, a step that needs every old writer
+gone also waits until one of these happens, whichever is first:
+
+- **The assertion.** `pnpm task upgrade old-writers-gone`, run from the new image once the
+  rollout has finished and the old pods have stopped. It records the assertion in the ledger
+  schema and exits 0; it takes no lease and boots no module.
+- **The grace.** A fixed time after the first upgrade run that finished since the seed, judged by
+  the database clock.
+
+Who asserts, by deployment:
+
+- **Cloud's private deploy**: runs the command as the step after its rollout completes (both api
+  and workers), from the image it just rolled.
+- **Helm**: set `app.migrations.oldWritersGoneHook: true`. A post-upgrade Job waits for the app
+  and workers rollouts, then for their termination grace, then runs the command. It needs a Role
+  that reads the two Deployments and its own ServiceAccount token, projected into its kubectl
+  container only, which is why it is off by default (`global.automountServiceAccountToken` stays
+  `false`). A rollout that does not finish within
+  `app.migrations.oldWritersGoneHookTimeoutSeconds` (1800) asserts nothing and leaves the grace;
+  the Job never fails the release. Without the hook, the grace applies.
+- **docker compose**: `docker compose up -d` recreates the app and the workers independently, so
+  nothing knows when both are done. Rely on the grace, or once `docker compose ps` shows every
+  container on the new image, run
+  `docker compose run --rm app sh -c "cd /app/apps/tasks && pnpm -s task upgrade old-writers-gone"`.
+
+The assertion releases only writers before the roster: a live roster row that does not declare
+the step still holds it.
 
 ## What a failed run means
 
@@ -132,3 +165,10 @@ writers gone" turns false again and any step waiting on it waits again. Blocking
 steps the newer build applied stay applied and are harmless to the older one.
 Contract steps wait for the LTS floor on cloud as on self-hosted (ADR-173,
 decision 4), so a rollback within the supported window always finds its schema.
+
+**A rollback to an image before the roster** (`origin/main` or 3.20.1) writes no roster row, so
+nothing sees it, and level-triggered steps would never re-run over what it wrote. Before rolling
+forward again, run `pnpm task upgrade pre-roster-rollback` from the new image. It records the
+rollback, so steps that need old writers gone wait again for the assertion or the grace after the
+next upgrade run, and reopens every done background step so it re-runs over the rollback's writes.
+It answers the ids it reopened; running it twice reopens nothing more.
