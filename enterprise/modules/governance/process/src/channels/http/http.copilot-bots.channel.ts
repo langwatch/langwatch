@@ -25,9 +25,11 @@ import {
   agentsListed,
   agentsRefused,
   type DiscoveredAgentRecord,
+} from "../../features/agents/rules/agent-listing.rules.ts";
+import {
   refusalFromStatus,
   refusalFromThrown,
-} from "../../features/agents/rules/agent-listing.rules.ts";
+} from "../../features/agents/rules/provider-listing.rules.ts";
 import {
   DATAVERSE_API_VERSION,
   dataverseHeaders,

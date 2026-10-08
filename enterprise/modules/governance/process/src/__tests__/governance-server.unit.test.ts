@@ -1,9 +1,15 @@
-import { createTenantId } from "@langwatch/eventing";
+import {
+  INGESTION_PULL_AGGREGATE_TYPE,
+  INGESTION_PULL_EVENT_TYPES,
+  INGESTION_PULL_EVENT_VERSIONS,
+  ingestionPullRunCompletedEventSchema,
+} from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { IngestionPullRunStatusProjection } from "../eventing/ingestion-pull-run-status.projection.ts";
+import { IngestionPullRunStatusEventingProjection } from "../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import type { PulledUsageRateReader } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
 import { PulledUsagePricingService } from "../features/ingestion-pull/services/pulled-usage-pricing.service.ts";
+import { MemoryIngestionPullRunRepository } from "../repositories/memory/memory.ingestion-pull-run.repository.ts";
 
 class FixedRate implements PulledUsageRateReader {
   rate() {
@@ -40,22 +46,24 @@ describe("governance server", () => {
 
   /** @scenario "Pull outcomes cannot regress the projected cursor" */
   it("does not regress a projected cursor for a stale completion", () => {
-    const projection = new IngestionPullRunStatusProjection();
+    const projection = IngestionPullRunStatusEventingProjection.create(
+      MemoryIngestionPullRunRepository.create(),
+    );
     const current = {
-      ...projection.initial(),
-      sourceId: "source",
-      cursor: "new",
-      lastRunScheduledFor: 20,
+      ...projection.init(),
+      SourceId: "source",
+      Cursor: "new",
+      LastRunScheduledFor: 20,
     };
-    const stale = {
+    const stale = ingestionPullRunCompletedEventSchema.parse({
       id: "event",
       aggregateId: "source",
-      aggregateType: "ingestion_pull" as const,
-      tenantId: createTenantId("project"),
+      aggregateType: INGESTION_PULL_AGGREGATE_TYPE,
+      tenantId: "project",
       createdAt: 30,
       occurredAt: 30,
-      type: "lw.obs.ingestion_pull.run_completed" as const,
-      version: "2026-07-17" as const,
+      type: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
+      version: INGESTION_PULL_EVENT_VERSIONS.RUN_COMPLETED,
       data: {
         sourceId: "source",
         runId: "old-run",
@@ -63,7 +71,7 @@ describe("governance server", () => {
         nextCursor: "old",
         eventCount: 1,
       },
-    };
-    expect(projection.fold(current, stale).cursor).toBe("new");
+    });
+    expect(projection.apply(current, stale).Cursor).toBe("new");
   });
 });

@@ -25,13 +25,13 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { WAREHOUSE_COST_ROW_LIMIT } from "../../features/databricks-genie/rules/databricks-genie-warehouse-cost.rules.ts";
 import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
 } from "../../features/databricks-genie/rules/warehouse-cost.rules.ts";
 import {
   DatabricksGeniePullerService,
-  WAREHOUSE_COST_ROW_LIMIT,
   WAREHOUSE_COST_UNREADABLE,
 } from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 

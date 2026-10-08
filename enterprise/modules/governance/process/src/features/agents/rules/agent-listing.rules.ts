@@ -17,11 +17,7 @@
 import type { ListingRefusal, ProviderListing } from "./provider-listing.rules.ts";
 import { itemsListed, listingRefused } from "./provider-listing.rules.ts";
 
-export {
-  type ListingRefusal as AgentListingRefusal,
-  refusalFromStatus,
-  refusalFromThrown,
-} from "./provider-listing.rules.ts";
+export type { ListingRefusal as AgentListingRefusal } from "./provider-listing.rules.ts";
 
 /** One agent a provider listed, in the shape `DiscoveredAgent` stores. */
 export interface DiscoveredAgentRecord {

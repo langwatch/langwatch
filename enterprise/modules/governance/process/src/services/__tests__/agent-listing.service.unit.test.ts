@@ -22,12 +22,11 @@ import {
 } from "../../channels/http/http.copilot-bots.channel.ts";
 import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
 import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
+import { agentsListed, agentsRefused } from "../../features/agents/rules/agent-listing.rules.ts";
 import {
-  agentsListed,
-  agentsRefused,
   refusalFromStatus,
   refusalFromThrown,
-} from "../../features/agents/rules/agent-listing.rules.ts";
+} from "../../features/agents/rules/provider-listing.rules.ts";
 import { genieSpacesAsAgents } from "../../features/databricks-genie/rules/genie-spaces.rules.ts";
 
 vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({

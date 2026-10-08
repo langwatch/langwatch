@@ -89,8 +89,6 @@ import { DatabricksGenieSweepService } from "./databricks-genie-sweep.service.ts
 import { DatabricksGenieWorkspaceService } from "./databricks-genie-workspace.service.ts";
 import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 
-export { WAREHOUSE_COST_ROW_LIMIT } from "../rules/databricks-genie-warehouse-cost.rules.ts";
-
 const logger = createLogger("langwatch:governance:databricks-genie-puller");
 
 /**

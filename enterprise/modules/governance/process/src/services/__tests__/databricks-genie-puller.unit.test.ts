@@ -6,10 +6,8 @@ import type {
   GovernanceHttpClient,
   GovernanceHttpResponse,
 } from "../../channels/governance-http.channel.ts";
-import {
-  DatabricksGeniePullerService,
-  WAREHOUSE_COST_ROW_LIMIT,
-} from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
+import { WAREHOUSE_COST_ROW_LIMIT } from "../../features/databricks-genie/rules/databricks-genie-warehouse-cost.rules.ts";
+import { DatabricksGeniePullerService } from "../../features/databricks-genie/services/databricks-genie-puller.service.ts";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";
