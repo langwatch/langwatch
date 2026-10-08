@@ -22,6 +22,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { Temporal } from "@langwatch/time";
 
+import type { SignInRouterService } from "../features/signin/services/signin-router.service.ts";
 import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type {
   IdentityLookupRepository,
@@ -32,7 +33,6 @@ import type { IdentityRateLimitRepository } from "../repositories/identity-rate-
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
 import type { LinkProposalService } from "./link-proposal.service.ts";
-import type { SignInRouterService } from "./signin-router.service.ts";
 
 export interface IdentityLookupServiceDeps {
   reads: IdentityLookupRepository;

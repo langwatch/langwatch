@@ -5,7 +5,7 @@ import {
   type CallbackAssertion,
   type CallbackUserMatch,
   SignInCallbackLinkingService,
-} from "../services/signin-callback-linking.service.ts";
+} from "../features/signin/services/signin-callback-linking.service.ts";
 
 const ASSERTION: CallbackAssertion = {
   connectionId: "conn_acme",

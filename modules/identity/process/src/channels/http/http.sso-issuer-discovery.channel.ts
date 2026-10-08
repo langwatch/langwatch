@@ -13,7 +13,7 @@ import { z } from "zod";
 import {
   discoveryEndpointFor,
   looksLikeDiscoveryDocument,
-} from "../../rules/sso-idp-registration.rules.ts";
+} from "../../features/sso-connection/rules/sso-idp-registration.rules.ts";
 import type {
   SsoIssuerDiscovery,
   SsoIssuerDiscoveryChannel,

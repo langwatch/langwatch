@@ -1,7 +1,7 @@
 /**
  * How colleagues on a matching domain get into an organization, in the columns
  * organization owns; identity's join ledger reads and writes it through
- * OrganizationApi. Keep in step with `modules/identity/contract/src/join-matching.ts`.
+ * OrganizationApi. Keep in step with `modules/identity/contract/src/features/join-request/join-matching.ts`.
  */
 import { z } from "zod";
 

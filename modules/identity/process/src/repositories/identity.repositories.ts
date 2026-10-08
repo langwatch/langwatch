@@ -2,9 +2,32 @@ import type { StateProjectionStore } from "@langwatch/eventing";
 
 import type { ProvisionalHeadsWriter } from "../eventing/identity-ledger.store.ts";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
-import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
-import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
-import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
+import type { JoinRequestFoldState } from "../features/join-request/eventing/join-request-state.projection.ts";
+import type { JoinRequestAudienceRepository } from "../features/join-request/repositories/join-request-audience.repository.ts";
+import type { JoinRequestNotificationContextRepository } from "../features/join-request/repositories/join-request-notification-context.repository.ts";
+import type {
+  JoinCandidateRepository,
+  JoinRequestListReadRepository,
+} from "../features/join-request/repositories/join-request.repository.ts";
+import type { MfaFoldState } from "../features/mfa/eventing/mfa-enrollment-state.projection.ts";
+import type { MfaEnrollmentRepository } from "../features/mfa/repositories/mfa-enrollment.repository.ts";
+import type { TwoStepVerificationRepository } from "../features/mfa/repositories/two-step-verification.repository.ts";
+import type { LegacySsoOrganizationRepository } from "../features/sso-arrival/repositories/legacy-sso-organization.repository.ts";
+import type { SsoBreakGlassRepository } from "../features/sso-arrival/repositories/sso-break-glass.repository.ts";
+import type { SsoMigrationEvidenceRepository } from "../features/sso-arrival/repositories/sso-migration-evidence.repository.ts";
+import type { SsoConnectionFoldState } from "../features/sso-connection/eventing/sso-connection-state.projection.ts";
+import type { SsoConnectionAdminRepository } from "../features/sso-connection/repositories/sso-connection-admin.repository.ts";
+import type { SsoConnectionRegistrationRepository } from "../features/sso-connection/repositories/sso-connection-registration.repository.ts";
+import type { SsoConnectionRoutingRepository } from "../features/sso-connection/repositories/sso-connection-routing.repository.ts";
+import type {
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+} from "../features/sso-connection/repositories/sso-connection.repository.ts";
+import type { SsoCredentialRepository } from "../features/sso-connection/repositories/sso-credential.repository.ts";
+import type { SsoEngineProviderRepository } from "../features/sso-connection/repositories/sso-engine-provider.repository.ts";
+import type { SsoRegistrantReadRepository } from "../features/sso-connection/repositories/sso-registrant.repository.ts";
+import type { SsoDomainOwnershipRepository } from "../features/sso-domain/repositories/sso-domain-ownership.repository.ts";
+import type { SsoDomainReproofTargetRepository } from "../features/sso-domain/repositories/sso-domain-reproof.repository.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
@@ -17,29 +40,6 @@ import type { IdentityReservationRepository } from "./identity-reservations.repo
 import type { IdentitySignInAccountsRepository } from "./identity-signin-accounts.repository.ts";
 import type { IdentityUsersRepository } from "./identity-users.repository.ts";
 import type { IdentityVerificationRepository } from "./identity-verification.repository.ts";
-import type { JoinRequestAudienceRepository } from "./join-request-audience.repository.ts";
-import type { JoinRequestNotificationContextRepository } from "./join-request-notification-context.repository.ts";
-import type {
-  JoinCandidateRepository,
-  JoinRequestListReadRepository,
-} from "./join-request.repository.ts";
-import type { LegacySsoOrganizationRepository } from "./legacy-sso-organization.repository.ts";
-import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
-import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
-import type { SsoConnectionAdminRepository } from "./sso-connection-admin.repository.ts";
-import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
-import type { SsoConnectionRoutingRepository } from "./sso-connection-routing.repository.ts";
-import type {
-  SsoConnectionReadRepository,
-  SsoConnectionStrandingRepository,
-} from "./sso-connection.repository.ts";
-import type { SsoCredentialRepository } from "./sso-credential.repository.ts";
-import type { SsoDomainOwnershipRepository } from "./sso-domain-ownership.repository.ts";
-import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
-import type { SsoEngineProviderRepository } from "./sso-engine-provider.repository.ts";
-import type { SsoMigrationEvidenceRepository } from "./sso-migration-evidence.repository.ts";
-import type { SsoRegistrantReadRepository } from "./sso-registrant.repository.ts";
-import type { TwoStepVerificationRepository } from "./two-step-verification.repository.ts";
 
 /**
  * The rows the identity module owns, chosen once at boot. One tier over

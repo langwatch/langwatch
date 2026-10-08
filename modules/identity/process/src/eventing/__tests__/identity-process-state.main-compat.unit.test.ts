@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { breakGlassExpiryWarnStateSchema } from "../break-glass-expiry-warn.process.ts";
-import { connectionTeardownStateSchema } from "../connection-teardown.process.ts";
-import { joinRequestLifecycleStateSchema } from "../join-request-lifecycle.process.ts";
-import { ssoDomainProofNotificationStateSchema } from "../sso-domain-proof-notification.process.ts";
-import { ssoDomainReproofSweepStateSchema } from "../sso-domain-reproof-sweep.process.ts";
+import { joinRequestLifecycleStateSchema } from "../../features/join-request/eventing/join-request-lifecycle.process.ts";
+import { breakGlassExpiryWarnStateSchema } from "../../features/sso-arrival/eventing/break-glass-expiry-warn.process.ts";
+import { connectionTeardownStateSchema } from "../../features/sso-connection/eventing/connection-teardown.process.ts";
+import { ssoDomainProofNotificationStateSchema } from "../../features/sso-domain/eventing/sso-domain-proof-notification.process.ts";
+import { ssoDomainReproofSweepStateSchema } from "../../features/sso-domain/eventing/sso-domain-reproof-sweep.process.ts";
 
 describe("process state stored by the main release", () => {
   it("parses a break-glass expiry warning state as main stored it", () => {

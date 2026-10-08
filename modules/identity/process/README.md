@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:19`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).withTransportFacts(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -205,7 +205,7 @@ Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.t
 
 ### `identity.joinRequests`
 
-Contract `../contract/src/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
+Contract `../contract/src/features/join-request/join-request.trpc.ts:35`, router `src/transport/join-request.trpc.ts:104`.
 
 | Procedure                                  | Kind     | Gate                                                                                                                                                                                                                     | Input                                   | Output                            |
 | ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | --------------------------------- |
@@ -255,55 +255,6 @@ Declared at `src/eventing/identity.pipeline.ts:51`.
 | peer subscriber | `joinRequestInviteAccepted` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:63` |
 | peer subscriber | `joinRequestMembersInvited` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:67` |
 
-### Pipeline `join-requests` (aggregate `join_request`)
-
-Declared at `src/eventing/join-request.pipeline.ts:94`. Events: `joinRequestedEventSchema`, `joinApprovedEventSchema`, `joinRejectedEventSchema`, `joinExpiredEventSchema`, `joinWithdrawnEventSchema`.
-
-| Kind                | Name                                                                                | Handles | Declared at                                 |
-| ------------------- | ----------------------------------------------------------------------------------- | ------- | ------------------------------------------- |
-| command             | –                                                                                   | –       | `src/eventing/join-request.pipeline.ts:112` |
-| command             | –                                                                                   | –       | `src/eventing/join-request.pipeline.ts:117` |
-| command             | –                                                                                   | –       | `src/eventing/join-request.pipeline.ts:122` |
-| command             | –                                                                                   | –       | `src/eventing/join-request.pipeline.ts:127` |
-| command             | –                                                                                   | –       | `src/eventing/join-request.pipeline.ts:132` |
-| process manager     | `joinRequestLifecycle`                                                              | –       | `src/eventing/join-request.pipeline.ts:139` |
-| Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/eventing/join-request.pipeline.ts:107` |
-
-### Pipeline `sso-connections` (aggregate `sso_connection`)
-
-Declared at `src/eventing/sso-connection.pipeline.ts:188`. Events: `connectionRegisteredEventSchema`, `domainClaimedEventSchema`, `domainClaimApprovedEventSchema`, `domainClaimRejectedEventSchema`, `connectionDiscardedEventSchema`, `verificationRequestedEventSchema`, `domainAttestedEventSchema`, `domainWithdrawnEventSchema`, `domainVerifiedEventSchema`, `domainProofWaveredEventSchema`, `domainProofLapsedEventSchema`, `domainProofRecoveredEventSchema`, `connectionActivatedEventSchema`, `connectionSuspendedEventSchema`, `connectionResumedEventSchema`, `teardownRequestedEventSchema`, `connectionTornDownEventSchema`, `connectionArrivalPolicySetEventSchema`, `connectionRenamedEventSchema`, `connectionIdpUpdatedEventSchema`, `replacementConnectionRegisteredEventSchema`, `migrationRouteSelectedEventSchema`, `migrationFinalizationStartedEventSchema`, `migrationFinalizedEventSchema`.
-
-| Kind                | Name                                                                                 | Handles                                                         | Declared at                                   |
-| ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------- |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:225` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:230` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:235` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:240` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:245` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:250` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:255` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:260` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:265` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:270` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:275` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:280` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:285` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:290` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:295` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:300` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:305` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:310` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:315` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:320` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:325` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:330` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:335` |
-| command             | –                                                                                    | –                                                               | `src/eventing/sso-connection.pipeline.ts:340` |
-| process manager     | `connectionTeardown`                                                                 | –                                                               | `src/eventing/sso-connection.pipeline.ts:347` |
-| process manager     | `ssoDomainProofNotification`                                                         | –                                                               | `src/eventing/sso-connection.pipeline.ts:350` |
-| subscriber          | `scimDirectoryMove`                                                                  | `lw.identity.migration_finalized` from [identity](../README.md) | `src/eventing/sso-connection.pipeline.ts:353` |
-| Postgres projection | `≈ new SsoConnectionStateFoldProjection({ store: deps.connectionProjectionStore, })` | –                                                               | `src/eventing/sso-connection.pipeline.ts:220` |
-
 ### Pipeline `identity` (aggregate `user_identity`)
 
 Declared at `src/eventing/user-identity.pipeline.ts:90`. Events: `identifierAttachedEventSchema`, `identifierVerifiedEventSchema`, `identifierDeadEndedEventSchema`, `primaryChangedEventSchema`, `identifierDetachedEventSchema`, `userErasedEventSchema`, `linkProposedEventSchema`, `linkConfirmedEventSchema`, `linkRejectedEventSchema`, `mfaEnrolledEventSchema`, `mfaConfirmedEventSchema`, `mfaEnrollmentExpiredEventSchema`, `mfaDisabledEventSchema`, `backupCodeConsumedEventSchema`, `backupCodesRegeneratedEventSchema`, `mfaVerificationFailedEventSchema`.
@@ -327,6 +278,55 @@ Declared at `src/eventing/user-identity.pipeline.ts:90`. Events: `identifierAtta
 | command             | –                                                                             | –       | `src/eventing/user-identity.pipeline.ts:194` |
 | Postgres projection | `≈ new IdentityStateFoldProjection({ store: deps.identityProjectionStore, })` | –       | `src/eventing/user-identity.pipeline.ts:114` |
 | Postgres projection | `≈ new MfaEnrollmentStateFoldProjection({ store: deps.mfaProjectionStore, })` | –       | `src/eventing/user-identity.pipeline.ts:159` |
+
+### Pipeline `join-requests` (aggregate `join_request`)
+
+Declared at `src/features/join-request/eventing/join-request.pipeline.ts:94`. Events: `joinRequestedEventSchema`, `joinApprovedEventSchema`, `joinRejectedEventSchema`, `joinExpiredEventSchema`, `joinWithdrawnEventSchema`.
+
+| Kind                | Name                                                                                | Handles | Declared at                                                       |
+| ------------------- | ----------------------------------------------------------------------------------- | ------- | ----------------------------------------------------------------- |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:112` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:117` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:122` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:127` |
+| command             | –                                                                                   | –       | `src/features/join-request/eventing/join-request.pipeline.ts:132` |
+| process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:139` |
+| Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:107` |
+
+### Pipeline `sso-connections` (aggregate `sso_connection`)
+
+Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:188`. Events: `connectionRegisteredEventSchema`, `domainClaimedEventSchema`, `domainClaimApprovedEventSchema`, `domainClaimRejectedEventSchema`, `connectionDiscardedEventSchema`, `verificationRequestedEventSchema`, `domainAttestedEventSchema`, `domainWithdrawnEventSchema`, `domainVerifiedEventSchema`, `domainProofWaveredEventSchema`, `domainProofLapsedEventSchema`, `domainProofRecoveredEventSchema`, `connectionActivatedEventSchema`, `connectionSuspendedEventSchema`, `connectionResumedEventSchema`, `teardownRequestedEventSchema`, `connectionTornDownEventSchema`, `connectionArrivalPolicySetEventSchema`, `connectionRenamedEventSchema`, `connectionIdpUpdatedEventSchema`, `replacementConnectionRegisteredEventSchema`, `migrationRouteSelectedEventSchema`, `migrationFinalizationStartedEventSchema`, `migrationFinalizedEventSchema`.
+
+| Kind                | Name                                                                                 | Handles                                                         | Declared at                                                           |
+| ------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:225` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:230` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:235` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:240` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:245` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:250` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:255` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:260` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:265` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:270` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:275` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:280` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:285` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:290` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:295` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:300` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:305` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:310` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:315` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:320` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:325` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:330` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:335` |
+| command             | –                                                                                    | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:340` |
+| process manager     | `connectionTeardown`                                                                 | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:347` |
+| process manager     | `ssoDomainProofNotification`                                                         | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:350` |
+| subscriber          | `scimDirectoryMove`                                                                  | `lw.identity.migration_finalized` from [identity](../README.md) | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:353` |
+| Postgres projection | `≈ new SsoConnectionStateFoldProjection({ store: deps.connectionProjectionStore, })` | –                                                               | `src/features/sso-connection/eventing/sso-connection.pipeline.ts:220` |
 
 ## Configuration
 

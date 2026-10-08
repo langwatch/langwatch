@@ -8,10 +8,62 @@ import type {
   MethodsLastUsed,
 } from "./account-identifiers.ts";
 import type {
+  AttachIdentifierCommandData,
+  DetachIdentifierCommandData,
+  EraseUserCommandData,
+  IdentityFact,
+  IdentityFactInput,
+  MarkPrimaryCommandData,
+  ProposeLinkCommandData,
+  VerifyIdentifierCommandData,
+} from "./facts.ts";
+import type {
+  DomainJoinSetting,
+  JoinerRole,
+  JoinLookupDecision,
+  JoinOffer,
+} from "./features/join-request/join-matching.ts";
+import type {
+  ApproveJoinCommandData,
+  ExpireJoinCommandData,
+  RejectJoinCommandData,
+  RequestJoinCommandData,
+  WithdrawJoinCommandData,
+} from "./features/join-request/join-request-commands.ts";
+import type { identityDomainAdmissionSchema } from "./features/join-request/join-request.responses.ts";
+import type {
+  JoinRequestAggregateState,
+  JoinRequestFactInput,
+  JoinRequestOrigin,
+} from "./features/join-request/join-request.ts";
+import type {
+  ConfirmMfaCommandData,
+  ConsumeBackupCodeCommandData,
+  DisableMfaCommandData,
+  EnrollMfaCommandData,
+  ExpireMfaEnrollmentCommandData,
+  RecordMfaVerificationFailureCommandData,
+  RegenerateBackupCodesCommandData,
+  MfaFactInput,
+} from "./features/mfa/mfa.ts";
+import type { RoutingDecision } from "./features/signin/signin-routing.ts";
+import type {
   BreakGlassBinding,
   BreakGlassCandidateView,
   BreakGlassGrantView,
-} from "./break-glass.ts";
+} from "./features/sso-arrival/break-glass.ts";
+import type {
+  SsoArrivingUser,
+  SsoAssertionDecision,
+  SsoTestArrivalStanding,
+  SsoUserResolution,
+  SsoUserResolutionInput,
+} from "./features/sso-arrival/sso-admission.ts";
+import type {
+  SsoMigrationAccountLinkDecision,
+  SsoMigrationAuthenticationDecision,
+  SsoMigrationView,
+} from "./features/sso-arrival/sso-migration.ts";
 import type {
   ActivateConnectionCommandData,
   ApproveDomainClaimCommandData,
@@ -27,7 +79,7 @@ import type {
   ResumeConnectionCommandData,
   SuspendConnectionCommandData,
   VerifyDomainCommandData,
-} from "./connection-commands.ts";
+} from "./features/sso-connection/connection-commands.ts";
 import type {
   SsoArrivalPolicy,
   SsoConnectionFactInput,
@@ -35,78 +87,30 @@ import type {
   SsoDomainVerification,
   SsoMigrationRoute,
   SsoVerificationCeremonyMethod,
-} from "./connection.ts";
-import type {
-  AttachIdentifierCommandData,
-  DetachIdentifierCommandData,
-  EraseUserCommandData,
-  IdentityFact,
-  IdentityFactInput,
-  MarkPrimaryCommandData,
-  ProposeLinkCommandData,
-  VerifyIdentifierCommandData,
-} from "./facts.ts";
-import type { IdentityEmailResolution } from "./identity-email.service.ts";
-import type { VerifiedUserDomain } from "./identity-lookup.ts";
-import type {
-  DomainJoinSetting,
-  JoinerRole,
-  JoinLookupDecision,
-  JoinOffer,
-} from "./join-matching.ts";
-import type {
-  ApproveJoinCommandData,
-  ExpireJoinCommandData,
-  RejectJoinCommandData,
-  RequestJoinCommandData,
-  WithdrawJoinCommandData,
-} from "./join-request-commands.ts";
-import type { identityDomainAdmissionSchema } from "./join-request.responses.ts";
-import type {
-  JoinRequestAggregateState,
-  JoinRequestFactInput,
-  JoinRequestOrigin,
-} from "./join-request.ts";
-import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
-import type {
-  ConfirmMfaCommandData,
-  ConsumeBackupCodeCommandData,
-  DisableMfaCommandData,
-  EnrollMfaCommandData,
-  ExpireMfaEnrollmentCommandData,
-  RecordMfaVerificationFailureCommandData,
-  RegenerateBackupCodesCommandData,
-  MfaFactInput,
-} from "./mfa.ts";
-import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
-import type { RoutingDecision } from "./signin-routing.ts";
-import type {
-  SsoArrivingUser,
-  SsoAssertionDecision,
-  SsoTestArrivalStanding,
-  SsoUserResolution,
-  SsoUserResolutionInput,
-} from "./sso-admission.ts";
+} from "./features/sso-connection/connection.ts";
 import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
-} from "./sso-connection-history.ts";
-import type {
-  SelfServeActor,
-  SelfServeIssuedDnsRecord,
-  SsoDomainReproofOutcome,
-} from "./sso-domain-proof.ts";
+} from "./features/sso-connection/sso-connection-history.ts";
 import type {
   SsoIdentityProviderView,
   SsoIdpRegistration,
   SsoIdpUpdate,
-} from "./sso-idp-registration.ts";
+} from "./features/sso-connection/sso-idp-registration.ts";
 import type {
-  SsoMigrationAccountLinkDecision,
-  SsoMigrationAuthenticationDecision,
-  SsoMigrationView,
-} from "./sso-migration.ts";
-import type { SsoConnectionRemoval, SsoSetupCommand, SsoSetupView } from "./sso-setup.ts";
+  SsoConnectionRemoval,
+  SsoSetupCommand,
+  SsoSetupView,
+} from "./features/sso-connection/sso-setup.ts";
+import type {
+  SelfServeActor,
+  SelfServeIssuedDnsRecord,
+  SsoDomainReproofOutcome,
+} from "./features/sso-domain/sso-domain-proof.ts";
+import type { IdentityEmailResolution } from "./identity-email.service.ts";
+import type { VerifiedUserDomain } from "./identity-lookup.ts";
+import type { VerifiedEmailsResolution } from "./matchable-emails.ts";
+import type { SessionClaims, SessionClaimsMintInput } from "./session-claims.ts";
 import type { OrganizationMfaStanding } from "./two-step-verification.ts";
 
 /** One address-lock reaper pass (ADR-116 §6). */

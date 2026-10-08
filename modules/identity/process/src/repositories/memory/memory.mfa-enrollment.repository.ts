@@ -1,6 +1,6 @@
 import { emptyMfaEnrollment, type MfaEnrollmentState } from "@langwatch/identity-contract";
 
-import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository.ts";
+import type { MfaEnrollmentRepository } from "../../features/mfa/repositories/mfa-enrollment.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 /**

@@ -18,7 +18,7 @@ import { z } from "zod";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../join-request.repository.ts";
+} from "../../features/join-request/repositories/join-request.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 
 /**

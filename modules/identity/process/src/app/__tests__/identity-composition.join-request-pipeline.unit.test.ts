@@ -6,12 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 import { liveRepositories } from "../../__tests__/support/live-repositories.ts";
 import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
 import { IdentityEventStores } from "../../eventing/identity-event-stores.store.ts";
-import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
 import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
-} from "../../eventing/join-request.pipeline.ts";
-import type { JoinRequestNotifier } from "../../rules/join-requests-contract.rules.ts";
+} from "../../features/join-request/eventing/join-request.pipeline.ts";
+import type { JoinRequestNotifier } from "../../features/join-request/rules/join-requests-contract.rules.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature

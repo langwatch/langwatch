@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/identity-contract";
 import type { JoinRequest, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
 
 /**
  * `JoinRequest` head and its cursor, written under the queue's per-request lock.

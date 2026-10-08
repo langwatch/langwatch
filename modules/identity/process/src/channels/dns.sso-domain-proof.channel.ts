@@ -2,7 +2,7 @@ import { Resolver } from "node:dns/promises";
 
 import { createLogger } from "@langwatch/observability";
 
-import { classifyDnsLookupFailure } from "../rules/domain-proof-lookup.rules.ts";
+import { classifyDnsLookupFailure } from "../features/sso-domain/rules/domain-proof-lookup.rules.ts";
 import type { SsoDomainProofChannel, SsoDomainTxtLookup } from "./sso-domain-proof.channel.ts";
 
 const logger = createLogger("langwatch:identity:sso-domain-proof");

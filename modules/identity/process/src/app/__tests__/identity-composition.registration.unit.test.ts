@@ -12,9 +12,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ConnectedIdentityEventing } from "../../eventing/identity-command-senders.store.ts";
 import { identityEventing } from "../../eventing/identity.pipeline.ts";
-import { joinRequestEventing } from "../../eventing/join-request.pipeline.ts";
-import { ssoConnectionEventing } from "../../eventing/sso-connection.pipeline.ts";
 import { identityPipelineEventing } from "../../eventing/user-identity.pipeline.ts";
+import { joinRequestEventing } from "../../features/join-request/eventing/join-request.pipeline.ts";
+import { ssoConnectionEventing } from "../../features/sso-connection/eventing/sso-connection.pipeline.ts";
 import { identityProcessModule } from "../../identity.module.ts";
 
 const IDENTITY_VERBS = [

@@ -1,7 +1,20 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
 
-import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.rules.ts";
+import { PrismaSsoConnectionAdminRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-admin.repository.ts";
+import { PrismaSsoConnectionProjectionRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-projection.repository.ts";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-reads.repository.ts";
+import { PrismaSsoConnectionRegistrationRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-registration.repository.ts";
+import { PrismaSsoConnectionRoutingRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-connection-routing.repository.ts";
+import { PrismaSsoCredentialRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-credential.repository.ts";
+import { PrismaSsoEngineProviderRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-engine-provider.repository.ts";
+import { PrismaSsoRegistrantReadRepository } from "../../features/sso-connection/repositories/prisma/prisma.sso-registrant.repository.ts";
+import { newSsoAuthenticationActivityId } from "../../features/sso-connection/rules/sso-connection-id.rules.ts";
+import { PrismaSsoDomainOwnershipRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-ownership.repository.ts";
+import { PrismaSsoDomainReproofTargetRepository } from "../../features/sso-domain/repositories/prisma/prisma.sso-domain-reproof.repository.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { RedisIdentityRateLimitRepository } from "../redis/redis.identity-rate-limit.repository.ts";
 import { PrismaIdentityAccountRekeyRepository } from "./prisma.identity-account-rekey.repository.ts";
@@ -27,20 +40,7 @@ import { PrismaLegacySsoOrganizationRepository } from "./prisma.legacy-sso-organ
 import { PrismaMfaEnrollmentProjectionRepository } from "./prisma.mfa-enrollment-projection.repository.ts";
 import { PrismaMfaEnrollmentRepository } from "./prisma.mfa-enrollment.repository.ts";
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
-import { PrismaSsoConnectionAdminRepository } from "./prisma.sso-connection-admin.repository.ts";
-import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
-import {
-  PrismaSsoConnectionReadRepository,
-  PrismaSsoConnectionStrandingRepository,
-} from "./prisma.sso-connection-reads.repository.ts";
-import { PrismaSsoConnectionRegistrationRepository } from "./prisma.sso-connection-registration.repository.ts";
-import { PrismaSsoConnectionRoutingRepository } from "./prisma.sso-connection-routing.repository.ts";
-import { PrismaSsoCredentialRepository } from "./prisma.sso-credential.repository.ts";
-import { PrismaSsoDomainOwnershipRepository } from "./prisma.sso-domain-ownership.repository.ts";
-import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
-import { PrismaSsoEngineProviderRepository } from "./prisma.sso-engine-provider.repository.ts";
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
-import { PrismaSsoRegistrantReadRepository } from "./prisma.sso-registrant.repository.ts";
 import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */

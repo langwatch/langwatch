@@ -8,7 +8,7 @@ import type { Instant } from "@langwatch/time";
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
-} from "../join-request.repository.ts";
+} from "../../features/join-request/repositories/join-request.repository.ts";
 import { MemoryIdentityStore } from "./memory.identity.store.ts";
 
 const PENDING = "PENDING";

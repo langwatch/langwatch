@@ -6,7 +6,7 @@
 import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import { SsoConnectionGuardsService } from "../features/sso-connection/services/sso-connection-guards.service.ts";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,

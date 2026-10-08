@@ -7,7 +7,7 @@ import type {
   OrganizationMfaSetting,
   PersonContact,
   TwoStepVerificationRepository,
-} from "../two-step-verification.repository.ts";
+} from "../../features/mfa/repositories/two-step-verification.repository.ts";
 import { MemoryTwoStepVerificationStore } from "./memory.two-step-verification.store.ts";
 
 /** The two-step twin: reads over a store the reading test seeds. */

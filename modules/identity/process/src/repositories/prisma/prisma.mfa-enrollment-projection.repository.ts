@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
+import type { MfaFoldState } from "../../features/mfa/eventing/mfa-enrollment-state.projection.ts";
 import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper.ts";
 
 /**

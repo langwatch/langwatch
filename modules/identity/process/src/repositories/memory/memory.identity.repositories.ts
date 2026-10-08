@@ -1,6 +1,18 @@
-import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
-import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
-import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
+import type { JoinRequestFoldState } from "../../features/join-request/eventing/join-request-state.projection.ts";
+import type { MfaFoldState } from "../../features/mfa/eventing/mfa-enrollment-state.projection.ts";
+import type { SsoConnectionFoldState } from "../../features/sso-connection/eventing/sso-connection-state.projection.ts";
+import { MemorySsoConnectionRegistrationRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-registration.repository.ts";
+import { MemorySsoConnectionRoutingRepository } from "../../features/sso-connection/repositories/memory/memory.sso-connection-routing.repository.ts";
+import {
+  MemorySsoConnectionAdminRepository,
+  MemorySsoConnectionReadRepository,
+  MemorySsoConnectionStrandingRepository,
+} from "../../features/sso-connection/repositories/memory/memory.sso-connection.repositories.ts";
+import { MemorySsoCredentialRepository } from "../../features/sso-connection/repositories/memory/memory.sso-credential.repository.ts";
+import { MemorySsoEngineProviderRepository } from "../../features/sso-connection/repositories/memory/memory.sso-engine-provider.repository.ts";
+import { MemorySsoRegistrantReadRepository } from "../../features/sso-connection/repositories/memory/memory.sso-registrant.repository.ts";
+import { MemorySsoDomainOwnershipRepository } from "../../features/sso-domain/repositories/memory/memory.sso-domain-ownership.repository.ts";
+import { MemorySsoDomainReproofTargetRepository } from "../../features/sso-domain/repositories/memory/memory.sso-domain-reproof.repository.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityAccountRekeyRepository } from "./memory.identity-account-rekey.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
@@ -27,19 +39,7 @@ import {
 import { MemoryLegacySsoOrganizationRepository } from "./memory.legacy-sso-organization.repository.ts";
 import { MemoryMfaEnrollmentRepository } from "./memory.mfa-enrollment.repository.ts";
 import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.repository.ts";
-import { MemorySsoConnectionRegistrationRepository } from "./memory.sso-connection-registration.repository.ts";
-import { MemorySsoConnectionRoutingRepository } from "./memory.sso-connection-routing.repository.ts";
-import {
-  MemorySsoConnectionAdminRepository,
-  MemorySsoConnectionReadRepository,
-  MemorySsoConnectionStrandingRepository,
-} from "./memory.sso-connection.repositories.ts";
-import { MemorySsoCredentialRepository } from "./memory.sso-credential.repository.ts";
-import { MemorySsoDomainOwnershipRepository } from "./memory.sso-domain-ownership.repository.ts";
-import { MemorySsoDomainReproofTargetRepository } from "./memory.sso-domain-reproof.repository.ts";
-import { MemorySsoEngineProviderRepository } from "./memory.sso-engine-provider.repository.ts";
 import { MemorySsoMigrationEvidenceRepository } from "./memory.sso-migration-evidence.repository.ts";
-import { MemorySsoRegistrantReadRepository } from "./memory.sso-registrant.repository.ts";
 import { MemoryStateProjectionRepository } from "./memory.state-projection.repository.ts";
 import { MemoryTwoStepVerificationRepository } from "./memory.two-step-verification.repository.ts";
 

@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type SignInRoutingRecord,
   SignInRouterService,
-} from "../services/signin-router.service.ts";
+} from "../features/signin/services/signin-router.service.ts";
 
 const PASSWORD: SignInMethod = {
   id: "password",

@@ -1,7 +1,7 @@
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { JoinRequestNotificationContextRepository } from "../join-request-notification-context.repository.ts";
+import { JoinRequestNotificationContextRepository } from "../../features/join-request/repositories/join-request-notification-context.repository.ts";
 
 /** Only what this repository touches, so composition names the slice it needs. */
 type JoinRequestNotificationContextDatabase = Pick<

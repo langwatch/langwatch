@@ -24,7 +24,7 @@ import {
   SsoConnectionStateFoldProjection,
   ssoConnectionEventSchema,
   type SsoConnectionEvent,
-} from "../eventing/sso-connection-state.projection.ts";
+} from "../features/sso-connection/eventing/sso-connection-state.projection.ts";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

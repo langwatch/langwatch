@@ -8,7 +8,7 @@ Feature: The auth boundary is classes over identity services
   # ADR-131's discipline, on today's module layout (dev/docs/ARCHITECTURE.md):
   #
   #   BOUNDARY     modules/auth/process/src/channels/http/http.better-auth*.channel.ts
-  #   SERVICES     modules/identity/process/src/services/*.service.ts
+  #   SERVICES     modules/identity/process/src/{,features/*/}services/*.service.ts
   #   TIER         modules/{identity,auth}/process/src/repositories/prisma/** — the only
   #                files that name a Prisma client or match an address case-insensitively
   #   COMPOSITION  modules/identity/process/src/app/** and eventing/*.pipeline.ts

@@ -11,12 +11,12 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
-import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
+import type { SsoConnectionRegistrationSlot } from "../../features/sso-connection/repositories/sso-connection-registration.repository.ts";
+import type { SsoEngineProviderRow } from "../../features/sso-connection/rules/sso-engine-provider.rules.ts";
 import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
 import type { LegacySignInAccount } from "../identity-signin-accounts.repository.ts";
 import type { IdentityVerificationRecord } from "../identity-verification.repository.ts";
-import type { SsoConnectionRegistrationSlot } from "../sso-connection-registration.repository.ts";
 
 /** The `User` row as the memory tier keeps it, plus the opaque payload a
  *  newborn commit carries through. */

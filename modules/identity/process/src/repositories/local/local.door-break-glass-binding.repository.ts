@@ -1,4 +1,4 @@
-import type { SsoBreakGlassBindingRepository } from "../sso-connection.repository.ts";
+import type { SsoBreakGlassBindingRepository } from "../../features/sso-connection/repositories/sso-connection.repository.ts";
 
 /**
  * Activation's first break-glass precondition: the deployment hangs a

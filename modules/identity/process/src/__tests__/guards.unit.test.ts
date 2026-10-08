@@ -14,10 +14,10 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
+import type { MfaEnrollmentRepository } from "../features/mfa/repositories/mfa-enrollment.repository.ts";
+import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
-import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import {
   ACTOR,
   attachData,

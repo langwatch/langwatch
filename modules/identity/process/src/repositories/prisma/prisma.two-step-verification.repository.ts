@@ -8,7 +8,7 @@ import type {
   OrganizationMfaSetting,
   PersonContact,
   TwoStepVerificationRepository,
-} from "../two-step-verification.repository.ts";
+} from "../../features/mfa/repositories/two-step-verification.repository.ts";
 
 const RETIRED_CONNECTION_STATES = ["DISCARDED", "TORN_DOWN"];
 
