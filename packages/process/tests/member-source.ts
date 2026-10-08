@@ -24,3 +24,11 @@ export function liveMemberSourceOf<Members extends object>(
   const tier: Tier = "live";
   return { ...memberSourceOf(members), tier };
 }
+
+/** The same source, stating the memory tier, as `memoryStores()` does (record §4). */
+export function memoryMemberSourceOf<Members extends object>(
+  members: Members,
+): ReturnType<typeof memberSourceOf<Members>> {
+  const tier: Tier = "memory";
+  return { ...memberSourceOf(members), tier };
+}

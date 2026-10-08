@@ -14,6 +14,7 @@ import {
   type ServerRole,
 } from "../src/feature-installer.ts";
 import { LocalFeatureApis } from "../src/local-feature-api.ts";
+import { testPeer } from "../src/testing.ts";
 import { memberSourceOf } from "./member-source.ts";
 
 interface ProjectApi {
@@ -470,9 +471,12 @@ describe("feature APIs", () => {
 
     /** @scenario "The process supplies a capability a module of that name does not answer for" */
     it("keeps the module's own API and the process's apart", async () => {
-      const runtime = await new ApplicationBuilder({ role: "api", members: processMembers() })
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        members: processMembers(),
+        peers: [testPeer({ token: ProjectGrant, instance: { grant: () => "granted" } })],
+      })
         .withModules([project, grantedOrganization])
-        .withProvided(ProjectGrant, { grant: () => "granted" })
         .boot();
 
       await expect(runtime.service(ProjectApi).name()).resolves.toBe("project");
@@ -483,16 +487,24 @@ describe("feature APIs", () => {
     /** @scenario "A module cannot answer for a capability the process already supplied" */
     it("refuses a module answering for the very token the process handed over", async () => {
       await expect(
-        new ApplicationBuilder({ role: "api", members: processMembers() })
+        new ApplicationBuilder({
+          role: "api",
+          members: processMembers(),
+          peers: [
+            testPeer({
+              token: ProjectApi,
+              instance: {
+                name: async () => "provided",
+                organizationName: async () => "provided",
+                echo: (value: unknown) => value,
+                fail: (error: Error): never => {
+                  throw error;
+                },
+              },
+            }),
+          ],
+        })
           .withModules([project, organization])
-          .withProvided(ProjectApi, {
-            name: async () => "provided",
-            organizationName: async () => "provided",
-            echo: (value: unknown) => value,
-            fail: (error: Error): never => {
-              throw error;
-            },
-          })
           .boot(),
       ).rejects.toBeInstanceOf(DuplicateProviderError);
     });

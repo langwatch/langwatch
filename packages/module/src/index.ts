@@ -13,7 +13,6 @@ export {
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";
-export { supplyToken, SupplyToken, SupplyTokenIdentity } from "./supply-token.ts";
 export {
   FEATURE_NAMES,
   type ModuleName,

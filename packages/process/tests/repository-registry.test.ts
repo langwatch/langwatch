@@ -17,7 +17,7 @@ import {
   instantiateRepositories,
   selectedRepositoryOwnership,
 } from "../src/repository-registry.ts";
-import { liveMemberSourceOf, memberSourceOf } from "./member-source.ts";
+import { liveMemberSourceOf, memoryMemberSourceOf } from "./member-source.ts";
 
 type Repositories = Readonly<{ value: { read(): string } }>;
 let liveCreates = 0;
@@ -203,8 +203,11 @@ describe("given a module that declares both repository tiers", () => {
     it("builds the memory tier and asks for no client at all", async () => {
       liveCreates = 0;
       memoryCreates = 0;
-      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
-        .withModules([withMemoryRepositories(feature)])
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        members: memoryMemberSourceOf({}),
+      })
+        .withModules([feature])
         .boot();
 
       expect(runtime.module(feature).provided.value).toBe("memory");
@@ -314,8 +317,11 @@ describe("given a module that declares both repository tiers", () => {
         .withApi(MethodApp)
         .build();
 
-      const runtime = await new ApplicationBuilder({ role: "api", members: memberSourceOf({}) })
-        .withModules([withMemoryRepositories(methodFeature)])
+      const runtime = await new ApplicationBuilder({
+        role: "api",
+        members: memoryMemberSourceOf({}),
+      })
+        .withModules([methodFeature])
         .boot();
 
       expect(runtime.module(methodFeature).provided.value).toBe("memory");

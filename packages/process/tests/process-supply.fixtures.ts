@@ -1,5 +1,5 @@
 import { Config } from "@langwatch/config";
-import { moduleApi, supplyToken } from "@langwatch/module";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { type BoundApis, defineChannels } from "../src/channel-registry.ts";
@@ -240,7 +240,7 @@ export const connectionsModule = defineProcessModule("sso").withApi(ConnectionsA
 interface LicenseSource {
   resolve(): string;
 }
-export const LicenseSource = supplyToken<LicenseSource>()("licenseSource");
+export const LicenseSource = moduleApi<LicenseSource>()("licensing");
 interface LicenseConsumerApi {
   plan(): string;
 }

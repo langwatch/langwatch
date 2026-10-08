@@ -10,6 +10,7 @@ import { DuplicateProviderError } from "../src/boot-errors.ts";
 import { defineProcessModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { MissingMemberError } from "../src/module-members.ts";
 import type { MemberSource } from "../src/module-members.ts";
+import { testPeer } from "../src/testing.ts";
 
 interface ProjectApi {
   name(): string;
@@ -75,8 +76,8 @@ describe("given a process whose modules declare what they read", () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, asked),
+        peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
-        .withProvided(ProjectApi, projects)
         .withModules([annotation])
         .boot();
 
@@ -90,8 +91,8 @@ describe("given a process whose modules declare what they read", () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "now", mail: { sent: [] }, unread: "x" }, []),
+        peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
-        .withProvided(ProjectApi, projects)
         .withModules([annotation])
         .boot();
 
@@ -104,8 +105,11 @@ describe("given a process whose modules declare what they read", () => {
     /** @scenario "A pool member the module named is absent at boot" */
     it("refuses before serving, naming the module and the member", async () => {
       const create = vi.spyOn(AnnotationModule, "create");
-      const booting = new ApplicationBuilder({ role: "api", members: recordingSource({}, []) })
-        .withProvided(ProjectApi, projects)
+      const booting = new ApplicationBuilder({
+        role: "api",
+        members: recordingSource({}, []),
+        peers: [testPeer({ token: ProjectApi, instance: projects })],
+      })
         .withModules([annotation])
         .boot();
 
@@ -124,8 +128,8 @@ describe("given a peer the process answers for itself", () => {
       const runtime = await new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "noon" }, []),
+        peers: [testPeer({ token: ProjectApi, instance: projects })],
       })
-        .withProvided(ProjectApi, projects)
         .withModules([annotation])
         .boot();
 
@@ -136,13 +140,16 @@ describe("given a peer the process answers for itself", () => {
   });
 
   describe("when the same token is handed in twice", () => {
-    it("refuses at the second call, naming the token", () => {
-      const builder = new ApplicationBuilder({
-        role: "api",
-        members: recordingSource({ clock: () => "noon" }, []),
-      }).withProvided(ProjectApi, projects);
+    it("refuses while building, naming the token", () => {
+      const peer = testPeer({ token: ProjectApi, instance: projects });
+      const build = () =>
+        new ApplicationBuilder({
+          role: "api",
+          members: recordingSource({ clock: () => "noon" }, []),
+          peers: [peer, peer],
+        });
 
-      expect(() => builder.withProvided(ProjectApi, projects)).toThrow(DuplicateProviderError);
+      expect(build).toThrow(DuplicateProviderError);
     });
   });
 
@@ -152,9 +159,11 @@ describe("given a peer the process answers for itself", () => {
       const booting = new ApplicationBuilder({
         role: "api",
         members: recordingSource({ clock: () => "noon" }, []),
+        peers: [
+          testPeer({ token: ProjectApi, instance: projects }),
+          testPeer({ token: AnnotationApi, instance: { stamp: () => "handed" } }),
+        ],
       })
-        .withProvided(ProjectApi, projects)
-        .withProvided(AnnotationApi, { stamp: () => "handed" })
         .withModules([annotation])
         .boot();
 

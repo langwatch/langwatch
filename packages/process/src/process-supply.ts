@@ -1,5 +1,5 @@
 import type { TransportPeers } from "@langwatch/api";
-import { ModuleApiToken, type ResolvedTokens, SupplyToken } from "@langwatch/module";
+import { ModuleApiToken, type ResolvedTokens } from "@langwatch/module";
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
 import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
@@ -24,6 +24,7 @@ import type {
   ValidateSupply,
 } from "./process-supply.types.ts";
 import type { RuntimeService } from "./runtime-lifecycle.ts";
+import { type TestPeer, testPeer } from "./testing.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
@@ -322,12 +323,6 @@ export class ProcessSupply<
     return this.#withMembers({ relational });
   }
 
-  withAnalytical<Value extends MemberValueFrom<RequiredMemberSet, "analytical">>(
-    analytical: Value,
-  ) {
-    return this.#withMembers({ analytical });
-  }
-
   withKeyvalue<Value extends MemberValueFrom<RequiredMemberSet, "keyvalue">>(keyvalue: Value) {
     return this.#withMembers({ keyvalue });
   }
@@ -461,7 +456,22 @@ export class ProcessSupply<
 
   #boot(): Promise<BootedRuntime<SupplyRecord, Rest, Trpc>> {
     const state = this.#state;
+    const supplied = new Set<ModuleApiToken<unknown>>();
+    const peers: TestPeer[] = [];
+    for (const module of state.modules) {
+      for (const token of [...Object.values(module.dependencies), ...boundTokens(module)]) {
+        if (
+          token instanceof ModuleApiToken &&
+          Object.hasOwn(state.peers, token.name) &&
+          !supplied.has(token)
+        ) {
+          peers.push(testPeer({ token, instance: state.peers[token.name] }));
+          supplied.add(token);
+        }
+      }
+    }
     const options = {
+      peers,
       role: state.role,
       config: state.config,
       ...(state.secrets ? { secrets: state.secrets } : {}),
@@ -480,19 +490,6 @@ export class ProcessSupply<
           () => exposed?.serve(),
         )
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
-    const supplied = new Set<ModuleApiToken<unknown> | SupplyToken<unknown>>();
-    for (const module of state.modules) {
-      for (const token of [...Object.values(module.dependencies), ...boundTokens(module)]) {
-        if (
-          (token instanceof ModuleApiToken || token instanceof SupplyToken) &&
-          Object.hasOwn(state.peers, token.name) &&
-          !supplied.has(token)
-        ) {
-          builder.withProvided(token, state.peers[token.name]);
-          supplied.add(token);
-        }
-      }
-    }
     for (const service of state.services) builder.withService(service);
     const modules = state.modules as readonly InstallableServerFeature<SupplyRecord>[];
     const selectedModules = modules.map((module) =>

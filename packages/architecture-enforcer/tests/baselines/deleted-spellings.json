@@ -4,7 +4,6 @@
     "`*-composition.build.ts` files": 1,
     "`reads(...)` statics and `static readonly reads`": 22,
     "absence classes (`Logged*Absence`, `Absent*`)": 1,
-    "createProcess": 2,
     "declared(\"<name>\")": 1,
     "MEMBER_NAMES": 12,
     "MemberName": 16,
@@ -18,12 +17,9 @@
     "public-app-config.projection.ts": 1,
     "setup.members": 6,
     "storesBackedMembers": 8,
-    "SupplyToken": 19,
-    "withAnalytical": 1,
     "withKeyvalue": 4,
-    "withMemoryRepositories": 13,
+    "withMemoryRepositories": 11,
     "withPersistence": 1,
-    "withProvided": 12,
     "withRelational": 4
   }
 }
