@@ -62,7 +62,7 @@ describe("InstantEvalJudgeOnlyModelError", () => {
       });
 
       expect(error.message).toBe(
-        `${INSTANT_EVAL_JUDGE_ONLY_MESSAGE} Pick another model for node "Answer", target 2.`,
+        'Instant Evals runs only LLM judge evaluators. Pick another model for node "Answer", target 2.',
       );
       expect(error.meta).toEqual({ places: ['node "Answer"', "target 2"] });
     });
@@ -70,7 +70,9 @@ describe("InstantEvalJudgeOnlyModelError", () => {
 
   describe("when it names no place", () => {
     it("keeps the plain message", () => {
-      expect(new InstantEvalJudgeOnlyModelError().message).toBe(INSTANT_EVAL_JUDGE_ONLY_MESSAGE);
+      expect(new InstantEvalJudgeOnlyModelError().message).toBe(
+        "Instant Evals runs only LLM judge evaluators.",
+      );
     });
   });
 });

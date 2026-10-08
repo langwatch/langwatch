@@ -703,7 +703,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     @unit
     Scenario Outline: Saving Instant Evals as the model of anything but a judge is refused
       When <thing> is saved with Instant Evals as its model
-      Then it is refused as a client error saying "Instant Evals works only as an evaluator judge model."
+      Then it is refused as a client error saying "Instant Evals runs only LLM judge evaluators."
       And nothing is stored
 
       Examples:

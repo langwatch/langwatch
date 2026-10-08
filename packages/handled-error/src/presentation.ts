@@ -3382,7 +3382,7 @@ const presentations = {
     describe: (error) => {
       const places = strList(error, "places");
       const where = places.length > 0 ? `for ${places.join(", ")}` : "here";
-      return `Instant Evals works only as an evaluator judge model. Pick another model ${where}, or use Instant Evals on an LLM judge evaluator.`;
+      return `Instant Evals runs only LLM judge evaluators. Pick another model ${where}.`;
     },
   },
   instant_eval_memory_judge_in_production: {

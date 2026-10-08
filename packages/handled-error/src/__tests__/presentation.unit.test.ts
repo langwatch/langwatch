@@ -1099,7 +1099,7 @@ describe("explainHandledError on instant_eval_judge_only_model", () => {
       );
 
       expect(description).toBe(
-        'Instant Evals works only as an evaluator judge model. Pick another model for node "Answer", target 2, or use Instant Evals on an LLM judge evaluator.',
+        'Instant Evals runs only LLM judge evaluators. Pick another model for node "Answer", target 2.',
       );
     });
   });
@@ -1111,7 +1111,7 @@ describe("explainHandledError on instant_eval_judge_only_model", () => {
       );
 
       expect(description).toBe(
-        "Instant Evals works only as an evaluator judge model. Pick another model here, or use Instant Evals on an LLM judge evaluator.",
+        "Instant Evals runs only LLM judge evaluators. Pick another model here.",
       );
     });
   });
