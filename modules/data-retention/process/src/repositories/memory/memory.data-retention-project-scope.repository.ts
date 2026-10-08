@@ -34,12 +34,6 @@ export class MemoryDataRetentionProjectScopeRepository implements DataRetentionP
     ]);
   }
 
-  /** Puts or moves a project, as a row written by project. */
-  putProject(placement: DataRetentionProjectPlacement): void {
-    this.#projects.set(placement.projectId, placement);
-    this.#teams.set(placement.teamId, placement.organizationId);
-  }
-
   async findProjectPlacement({
     projectId,
   }: {

@@ -165,9 +165,15 @@ describe("DataRetentionService", () => {
       });
       expect(cache.values.size).toBe(0);
 
-      projectScopes.putProject(retentionTestScopeRow(PROJECT));
+      const created = createService({
+        cache,
+        policies,
+        projectScopes: MemoryDataRetentionProjectScopeRepository.create({
+          projects: [retentionTestScopeRow(PROJECT)],
+        }),
+      });
       await expect(
-        service.getRetentionDays({ projectId: PROJECT, category: "traces" }),
+        created.getRetentionDays({ projectId: PROJECT, category: "traces" }),
       ).resolves.toBe(63);
     });
 
@@ -344,9 +350,8 @@ describe("given placement read from project's and organization's rows", () => {
         { scopeType: "TEAM", scopeId: moved.teamId, days: 91 },
       ]);
       const projectScopes = MemoryDataRetentionProjectScopeRepository.create({
-        projects: [retentionTestScopeRow(PROJECT)],
+        projects: [retentionTestScopeRow(PROJECT), retentionTestScopeRow(PROJECT, moved)],
       });
-      projectScopes.putProject(retentionTestScopeRow(PROJECT, moved));
 
       await expect(
         createService({ policies, projectScopes }).getResolvedForProject({ projectId: PROJECT }),
