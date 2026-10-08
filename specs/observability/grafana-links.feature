@@ -25,3 +25,9 @@ Feature: Grafana deep links from errors and ops screens
     Given the ops screens ask for the Grafana link config
     Then they receive the base URL and datasource uids when GRAFANA_BASE_URL is set
     And they receive nothing when it is unset, so no link is rendered
+
+  Scenario: Every process role reads the Grafana settings from its observability config
+    Given GRAFANA_BASE_URL and GRAFANA_TEMPO_DATASOURCE_UID name a Grafana
+    When an api or worker process parses its configuration
+    Then its observability settings carry the Grafana base URL and datasource uid
+    And with GRAFANA_BASE_URL blank they carry no Grafana base URL

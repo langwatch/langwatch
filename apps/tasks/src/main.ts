@@ -2,6 +2,7 @@ import "@langwatch/time/polyfill";
 import process from "node:process";
 
 import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/observability";
+import { setProcessGlobals } from "@langwatch/process/process-globals";
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
@@ -103,6 +104,8 @@ async function openConnections({
 
 async function main(): Promise<void> {
   configureLogger({ redactPaths: secretLogRedactPaths(Object.values(tasksSecrets)) });
+  // Main stamped the system migrations too; every task here mints ids with the same prefix.
+  setProcessGlobals({ environment: processEnvironment });
   const argv = process.argv.slice(2);
   const [first, ...rest] = argv;
   if (first === "upgrade" && rest[0] === "steps") {

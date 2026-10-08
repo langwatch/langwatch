@@ -5,6 +5,7 @@
  */
 import {
   Config,
+  grafana,
   otelResourceAttributes,
   serviceVersion,
   telemetryExporterEndpoint,
@@ -30,6 +31,8 @@ export const observabilityOwner = {
     /** The shared release leaves, so a module reporting its version holds the same instances. */
     serviceVersion,
     resourceAttributes: otelResourceAttributes,
+    /** GRAFANA_* leaves, so every role can link an error to its trace and logs. */
+    grafana,
     tracesSampleRatio: c.env("OTEL_TRACES_SAMPLER_ARG", z.coerce.number().min(0).max(1).optional()),
     logs: {
       format: c.env("LOG_FORMAT", z.enum(["pretty", "json"]).optional()),

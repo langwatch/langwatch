@@ -6,6 +6,7 @@ import {
   isTransientRefusal,
   isZodLikeError,
   type SerializedReason,
+  traceLinksFor,
   ValidationError,
 } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -260,6 +261,15 @@ export const apiErrorSchema = z.object({
    */
   trace_id: z.string().optional(),
   span_id: z.string().optional(),
+  /** Main's nested form of the same ids, plus Grafana trace and logs links when configured. */
+  trace: z
+    .object({
+      traceId: z.string().optional(),
+      spanId: z.string().optional(),
+      traceUrl: z.string().optional(),
+      logsUrl: z.string().optional(),
+    })
+    .optional(),
   /**
    * The remediation channel: what to do about it, where it is documented,
    * and whose mistake it was.
@@ -336,6 +346,7 @@ export function apiErrorBody({
     ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
     ...(traceId ? { trace_id: traceId } : {}),
     ...(spanId ? { span_id: spanId } : {}),
+    ...(traceId || spanId ? { trace: { traceId, spanId, ...traceLinksFor(traceId) } } : {}),
     ...(tips && tips.length > 0 ? { tips: [...tips] } : {}),
     ...(docsUrl ? { docs_url: docsUrl } : {}),
     ...(fault ? { fault } : {}),

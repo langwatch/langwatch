@@ -46,3 +46,27 @@ Feature: What a process refuses and what it skips at boot
     And a boot that installs the peer's module and also hands a test peer for its Api
     When the process boots
     Then it refuses by name, naming that Api as provided more than once
+
+  @unit
+  Scenario: A process that owns its Node process mints ids carrying its environment prefix
+    Given a process started with ENVIRONMENT "staging" that owns its Node process
+    When its preamble starts
+    Then a newly minted id starts with "staging_"
+
+  @unit
+  Scenario: A process started without ENVIRONMENT mints local ids, as main did
+    Given a process started with no ENVIRONMENT
+    When its process globals are set
+    Then a newly minted id starts with "local_"
+
+  @unit
+  Scenario: A preamble that does not own its Node process leaves the id environment alone
+    Given a process started with ENVIRONMENT "staging" that does not own its Node process
+    When its preamble starts
+    Then the id environment is what it was before
+
+  @unit
+  Scenario: A production process raises the listener ceiling to 128, as main did
+    Given a process started with NODE_ENV "production"
+    When its process globals are set
+    Then the process and every new emitter allow 128 listeners

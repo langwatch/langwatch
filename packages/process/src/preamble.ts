@@ -20,6 +20,7 @@ import {
   type UpgradeGate,
 } from "./migration/upgrade-gate.ts";
 import { isProcessModule } from "./process-container.ts";
+import { setProcessGlobals } from "./process-globals.ts";
 import { ProcessServer } from "./process-server.ts";
 import {
   Server as ServerBoundary,
@@ -146,6 +147,8 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       throw new Error(`${this.name}: the preamble starts only after withEnvironment(...)`);
     }
     const config = parseProcessConfig({ owners, environment });
+    // Before any module is built, so no id is minted without the install's prefix.
+    if (this.state.ownsProcess !== false) setProcessGlobals({ environment });
 
     const chain = (this.state.chain ?? ((_, secrets) => secrets.withEnv()))(
       config,
