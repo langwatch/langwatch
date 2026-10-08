@@ -6,7 +6,6 @@ import type { RetentionCategory } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  createDataRetentionTestOrganizations,
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
@@ -33,7 +32,6 @@ function acme() {
     policies: MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
     projectScopes: createDataRetentionTestProjectScopes(),
-    organizations: createDataRetentionTestOrganizations(),
     defaultRetentionDays: DEFAULT_DAYS,
     retroactive: MemoryRetroactiveRetentionRepository.create(),
     cache: MemoryDataRetentionCacheRepository.create(),
@@ -64,6 +62,7 @@ describe("given the scope chain of project web-app", () => {
     it("applies it to the project", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 63,
@@ -78,11 +77,17 @@ describe("given the scope chain of project web-app", () => {
     it("resolves the project's", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 49,
       });
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
 
       await expect(daysOf(service, "traces")).resolves.toBe(91);
     });
@@ -93,11 +98,17 @@ describe("given the scope chain of project web-app", () => {
     it("resolves the team's", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 49,
       });
-      await service.setForScope({ scope: TEAM_SCOPE, category: "traces", retentionDays: 63 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: TEAM_SCOPE,
+        category: "traces",
+        retentionDays: 63,
+      });
 
       await expect(daysOf(service, "traces")).resolves.toBe(63);
     });
@@ -107,9 +118,20 @@ describe("given the scope chain of project web-app", () => {
     /** @scenario "Categories resolve independently across tiers" */
     it("resolves each category from its own tier", async () => {
       const service = acme();
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
-      await service.setForScope({ scope: TEAM_SCOPE, category: "scenarios", retentionDays: 63 });
       await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: TEAM_SCOPE,
+        category: "scenarios",
+        retentionDays: 63,
+      });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "experiments",
         retentionDays: 49,
@@ -127,7 +149,12 @@ describe("given the scope chain of project web-app", () => {
       const service = acme();
 
       await expect(
-        service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 14 }),
+        service.setForScope({
+          organizationId: ORGANIZATION,
+          scope: PROJECT_SCOPE,
+          category: "traces",
+          retentionDays: 14,
+        }),
       ).rejects.toThrow(/49 days/);
     });
   });
@@ -138,7 +165,12 @@ describe("given the scope chain of project web-app", () => {
       const service = acme();
 
       await expect(
-        service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 50 }),
+        service.setForScope({
+          organizationId: ORGANIZATION,
+          scope: PROJECT_SCOPE,
+          category: "traces",
+          retentionDays: 50,
+        }),
       ).rejects.toThrow(/multiple of 7 days/);
     });
   });
@@ -148,14 +180,24 @@ describe("given the scope chain of project web-app", () => {
     it("resolves the organization's rule again", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 63,
       });
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
       await expect(daysOf(service, "traces")).resolves.toBe(91);
 
-      await service.removeForScope({ scope: PROJECT_SCOPE, category: "traces" });
+      await service.removeForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+      });
 
       await expect(daysOf(service, "traces")).resolves.toBe(63);
     });
@@ -165,9 +207,15 @@ describe("given the scope chain of project web-app", () => {
     /** @scenario "Editing a policy from the row overflow menu changes only its value" */
     it("keeps its scope and resolves the new value", async () => {
       const service = acme();
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
 
       const edited = await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: PROJECT_SCOPE,
         category: "traces",
         retentionDays: 182,
@@ -184,13 +232,22 @@ describe("given the scope chain of project web-app", () => {
     it("shows the value it would fall back to without removing anything", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 49,
       });
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
 
-      const preview = await service.previewScopeRemoval({ scope: PROJECT_SCOPE });
+      const preview = await service.previewScopeRemoval({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+      });
 
       expect(preview.traces).toBe(49);
       await expect(daysOf(service, "traces")).resolves.toBe(91);
@@ -202,13 +259,22 @@ describe("given the scope chain of project web-app", () => {
     it("answers with the resolved day counts alone, naming no scope", async () => {
       const service = acme();
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: ORGANIZATION_SCOPE,
         category: "traces",
         retentionDays: 63,
       });
-      await service.setForScope({ scope: PROJECT_SCOPE, category: "traces", retentionDays: 91 });
+      await service.setForScope({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+        category: "traces",
+        retentionDays: 91,
+      });
 
-      const preview = await service.previewScopeRemoval({ scope: PROJECT_SCOPE });
+      const preview = await service.previewScopeRemoval({
+        organizationId: ORGANIZATION,
+        scope: PROJECT_SCOPE,
+      });
 
       expect(preview).toEqual({ traces: 63, scenarios: DEFAULT_DAYS, experiments: DEFAULT_DAYS });
     });
@@ -220,6 +286,7 @@ describe("given the scope chain of project web-app", () => {
       const service = acme();
 
       const row = await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: TEAM_SCOPE,
         category: "traces",
         retentionDays: 63,

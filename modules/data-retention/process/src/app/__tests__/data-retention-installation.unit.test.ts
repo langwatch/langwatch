@@ -13,7 +13,6 @@ import { dataRetentionProcessModule } from "../../data-retention.module.ts";
 import {
   createDataRetentionTestAuthz,
   createDataRetentionTestEntitlement,
-  createDataRetentionTestOrganizations,
   createDataRetentionTestUsers,
   retentionTestGraph,
 } from "./data-retention.fixture.ts";
@@ -33,7 +32,6 @@ function process(
       },
     })
     .provide({
-      organization: createDataRetentionTestOrganizations(),
       authz: createDataRetentionTestAuthz(),
       user: createDataRetentionTestUsers(),
       entitlement: createDataRetentionTestEntitlement(),
@@ -79,6 +77,7 @@ describe("data retention app installation", () => {
       try {
         await expect(
           runtime.service(DataRetentionApi).previewScopeRemoval({
+            organizationId: retentionTestGraph.organizationId ?? "",
             scope: { scopeType: "ORGANIZATION", scopeId: retentionTestGraph.organizationId ?? "" },
             userId: "user-1",
           }),

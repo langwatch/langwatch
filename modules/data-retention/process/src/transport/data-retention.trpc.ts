@@ -1,33 +1,26 @@
 /**
- * The server half of `dataRetention.*`: a permission and a handler per
- * procedure the contract already named. Three of them do not act on the project
- * their input carries — `enforces` records what gates it instead.
+ * The server half of `dataRetention.*`: a permission and a handler per procedure the contract
+ * already named. A scope write asks the permission its target needs, on the target, at the door.
+ * Spec: modules/data-retention/specs/data-retention-scope-writes.feature
  */
 
+import { permissionBy } from "@langwatch/api/access";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DataRetentionApi, dataRetentionTrpc } from "@langwatch/data-retention-contract";
 
-const SCOPE_TARGETED_REASON =
-  "The authorized target is the organization, team or project named by `scope`, which the app " +
-  "resolves — the `projectId` this input also carries is not acted on.";
-
-const SCOPE_TARGETED_PERMISSIONS = [
-  "organization:manage",
-  "team:manage",
-  "project:update",
-] as const;
-
-function scopeTargeted(enforcesProjectId: string): {
-  reason: string;
-  permissions: typeof SCOPE_TARGETED_PERMISSIONS;
-  enforces: { projectId: string };
-} {
-  return {
-    reason: SCOPE_TARGETED_REASON,
-    permissions: SCOPE_TARGETED_PERMISSIONS,
-    enforces: { projectId: enforcesProjectId },
-  };
-}
+/** Main's rule: a project member edits their own project, not the organization's default. */
+const WRITE_ON_SCOPE = permissionBy({
+  field: "scope.scopeType",
+  map: {
+    ORGANIZATION: {
+      permission: "organization:manage",
+      tier: "organization",
+      field: "scope.scopeId",
+    },
+    TEAM: { permission: "team:manage", tier: "team", field: "scope.scopeId" },
+    PROJECT: { permission: "project:update", tier: "project", field: "scope.scopeId" },
+  },
+});
 
 export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   DataRetentionApi,
@@ -40,13 +33,10 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("setForScope")
-  .serviceAuthorized(
-    scopeTargeted(
-      "not acted on — the authorized target is `scope`: the write permission and the plan gate both run against the scope's own organization",
-    ),
-  )
+  .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) =>
     app.changeScopeRetention({
+      organizationId: input.organizationId,
       scope: input.scope,
       category: input.category,
       retentionDays: input.retentionDays,
@@ -55,23 +45,20 @@ export const dataRetentionTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("previewScopeRemoval")
-  .serviceAuthorized(
-    scopeTargeted(
-      "not acted on — the authorized target is `scope`: the write permission gates the preview exactly like the removal it previews",
-    ),
-  )
+  .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) =>
-    app.previewScopeRemoval({ scope: input.scope, userId: actor.id }),
+    app.previewScopeRemoval({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      userId: actor.id,
+    }),
   )
 
   .procedure("removeForScope")
-  .serviceAuthorized(
-    scopeTargeted(
-      "not acted on — the authorized target is `scope`: the write permission and the plan gate both run against the scope's own organization",
-    ),
-  )
+  .withPermission(WRITE_ON_SCOPE)
   .handle(async ({ app, input, actor }) => {
     await app.removeForScope({
+      organizationId: input.organizationId,
       scope: input.scope,
       category: input.category,
       userId: actor.id,

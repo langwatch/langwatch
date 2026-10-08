@@ -18,7 +18,6 @@ import {
   ReplayService,
 } from "@langwatch/eventing";
 import { testEventSchema } from "@langwatch/eventing/testing";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
@@ -37,7 +36,6 @@ import { describe, expect, it } from "vitest";
 import {
   createDataRetentionTestAuthz,
   createDataRetentionTestEntitlement,
-  createDataRetentionTestOrganizations,
   createDataRetentionTestUsers,
 } from "../../app/__tests__/data-retention.fixture.ts";
 import { dataRetentionProcessModule } from "../../data-retention.module.ts";
@@ -218,7 +216,6 @@ async function bootWorker() {
       testPeer({ token: AuthzApi, instance: createDataRetentionTestAuthz() }),
       testPeer({ token: UserApi, instance: createDataRetentionTestUsers() }),
       testPeer({ token: EntitlementApi, instance: createDataRetentionTestEntitlement() }),
-      testPeer({ token: OrganizationApi, instance: createDataRetentionTestOrganizations() }),
     ],
   });
 }
@@ -239,16 +236,18 @@ describe("given a worker installing data retention over an empty fold and projec
 
     try {
       expect(step).toMatchObject({ kind: "data", mode: "background" });
-      await retention.setForScope({
-        scope: { scopeType: "TEAM", scopeId: "team-2" },
-        category: "traces",
-        retentionDays: 63,
-      });
       await expect(retention.getResolvedForProject({ projectId: PROJECT })).rejects.toMatchObject({
         code: "project_not_found",
       });
 
       const first = await pass(null);
+      // The team is known to sit in the organization once a project folded under it says so.
+      await retention.setForScope({
+        organizationId: ORGANIZATION,
+        scope: { scopeType: "TEAM", scopeId: "team-2" },
+        category: "traces",
+        retentionDays: 63,
+      });
       const resolved = await retention.getResolvedForProject({ projectId: PROJECT });
       const second = await pass(first ?? null);
 

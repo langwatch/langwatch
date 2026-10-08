@@ -2,7 +2,6 @@ import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import {
-  createDataRetentionTestOrganizations,
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
 } from "../../app/__tests__/data-retention.fixture.ts";
@@ -58,7 +57,6 @@ function createService(retroactive: RetroactiveRetentionRepository = new Recordi
     policies: MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
     projectScopes: createDataRetentionTestProjectScopes(),
-    organizations: createDataRetentionTestOrganizations(),
     defaultRetentionDays: 49,
     retroactive,
     cache: RedisDataRetentionCacheRepository.create({ redis: null, ttlMs: 1_000 }),

@@ -3,7 +3,6 @@
  * nothing: the service either returns, or it throws the answer the settings page has always
  * shown.
  */
-import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
@@ -12,8 +11,6 @@ import {
   RetentionLengthBelowPlanMinimumError,
   RetentionLengthNotOnPlanError,
   RetentionNotOnPlanError,
-  ScopeTargetNotFoundError,
-  ScopeWriteForbiddenError,
 } from "@langwatch/data-retention-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
@@ -46,23 +43,6 @@ function ruleForPlan(plan: DataRetentionPlan): RetentionValueRule {
 }
 
 export class DataRetentionPolicyService {
-  /**
-   * Permission required to write a retention override at a given tier.
-   */
-  static requiredWritePermission(
-    scopeType: ScopeAssignment["scopeType"],
-  ): "organization:manage" | "team:manage" | "project:update" {
-    if (scopeType === "ORGANIZATION") {
-      return "organization:manage";
-    }
-
-    if (scopeType === "TEAM") {
-      return "team:manage";
-    }
-
-    return "project:update";
-  }
-
   /**
    * Refuses a free plan by name. Pure — the single source of the free-tier
    * gate, over an already-resolved plan, so a caller that has the plan in hand
@@ -138,25 +118,6 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * Refuses a caller who may not write a retention override at `scope`. The
-   * required permission matches what the read snapshot uses to decide the scope
-   * is writable, so the UI never offers a scope the save will reject.
-   */
-  async assertCanWriteScope(input: {
-    actor: RetentionActor;
-    scope: ScopeAssignment;
-  }): Promise<void> {
-    if (await this.canWriteScope(input)) {
-      return;
-    }
-
-    throw new ScopeWriteForbiddenError(
-      input.scope.scopeType,
-      DataRetentionPolicyService.requiredWritePermission(input.scope.scopeType),
-    );
-  }
-
-  /**
    * Disabling retention (keep data indefinitely, exempt from TTL deletion) is a
    * platform-level capability, NOT a customer tier. The UI hides the option
    * from everyone else; this is the matching server-side enforcement.
@@ -170,14 +131,17 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * Plan-gate a scope-targeted mutation against the organization that owns the SCOPE — never
-   * against the caller-supplied project id.
+   * Plan-gate a scope-targeted mutation against the organization the caller named, which
+   * the retention service has already proved holds the scope.
    */
   async assertPlanForScope(input: {
     actor: RetentionActor;
-    scope: ScopeAssignment;
+    organizationId: string;
   }): Promise<void> {
-    const { plan } = await this.resolveScopePlan(input);
+    const plan = await this.options.plans.getPlan({
+      organizationId: input.organizationId,
+      userId: input.actor.userId,
+    });
     DataRetentionPolicyService.assertPlanConfigurable(plan);
   }
 
@@ -198,80 +162,17 @@ export class DataRetentionPolicyService {
     DataRetentionPolicyService.assertPlanConfigurable(plan);
   }
 
-  /**
-   * The full write gate for a NEW value: resolve the scope's owning-organization plan ONCE,
-   * then apply the free gate and the value gate to it.
-   */
+  /** The full write gate for a NEW value: the plan once, then the free gate and the value gate. */
   async assertWriteAllowed(input: {
     actor: RetentionActor;
-    scope: ScopeAssignment;
+    organizationId: string;
     retentionDays: number;
   }): Promise<void> {
-    const { plan } = await this.resolveScopePlan(input);
-    DataRetentionPolicyService.assertPlanConfigurable(plan);
-    DataRetentionPolicyService.assertPlanAllowsRetentionValue(plan, input.retentionDays);
-  }
-
-  private async canWriteScope(input: {
-    actor: RetentionActor;
-    scope: ScopeAssignment;
-  }): Promise<boolean> {
-    const userId = input.actor.userId;
-    const { scopeType, scopeId } = input.scope;
-    if (scopeType === "ORGANIZATION") {
-      return this.options.permissions.canManageOrganization({
-        userId,
-        organizationId: scopeId,
-      });
-    }
-
-    const organizationId = await this.options.directory.findScopeOrganizationId({
-      scope: input.scope,
-    });
-    if (!organizationId) {
-      return false;
-    }
-
-    if (scopeType === "TEAM") {
-      const decided = await this.options.permissions.canManageTeams({
-        userId,
-        organizationId,
-        teamIds: [scopeId],
-      });
-
-      return decided.get(scopeId) === true;
-    }
-
-    const decided = await this.options.permissions.canUpdateProjects({
-      userId,
-      organizationId,
-      projectIds: [scopeId],
-    });
-
-    return decided.get(scopeId) === true;
-  }
-
-  /**
-   * Resolve a scope to its owning organization's plan in a single pass — the
-   * one place that touches the directory and the plan for a scope-targeted
-   * write, so a write never resolves the organization or fetches the plan twice.
-   */
-  private async resolveScopePlan(input: {
-    actor: RetentionActor;
-    scope: ScopeAssignment;
-  }): Promise<{ organizationId: string; plan: DataRetentionPlan }> {
-    const organizationId = await this.options.directory.findScopeOrganizationId({
-      scope: input.scope,
-    });
-    if (!organizationId) {
-      throw new ScopeTargetNotFoundError();
-    }
-
     const plan = await this.options.plans.getPlan({
-      organizationId,
+      organizationId: input.organizationId,
       userId: input.actor.userId,
     });
-
-    return { organizationId, plan };
+    DataRetentionPolicyService.assertPlanConfigurable(plan);
+    DataRetentionPolicyService.assertPlanAllowsRetentionValue(plan, input.retentionDays);
   }
 }

@@ -101,28 +101,6 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
     };
   }
 
-  async findScopeOrganizationId({ scope }: { scope: ScopeAssignment }): Promise<string | null> {
-    if (scope.scopeType === "ORGANIZATION") {
-      const organization = await this.database.organization.findUnique({
-        where: { id: scope.scopeId },
-        select: { id: true },
-      });
-      return organization?.id ?? null;
-    }
-    if (scope.scopeType === "TEAM") {
-      const team = await this.database.team.findUnique({
-        where: { id: scope.scopeId },
-        select: { organizationId: true },
-      });
-      return team?.organizationId ?? null;
-    }
-    const project = await this.database.project.findUnique({
-      where: { id: scope.scopeId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    return project?.team?.organizationId ?? null;
-  }
-
   async findScopeProjects({
     organizationId,
     scope,

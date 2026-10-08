@@ -90,7 +90,7 @@ Feature: Data Retention service boundary
     Given a retention rule targets a project or team
     When the Data Retention service resolves its organization
     Then a project's team and organization come from data retention's own project fold
-    And a team's organization comes from the Organization service
+    And a team sits in an organization only when a project folded under it says so
     And its repository reads only retention policy rows
 
   @unit

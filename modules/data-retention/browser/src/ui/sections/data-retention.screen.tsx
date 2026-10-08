@@ -103,6 +103,12 @@ function hasWritableScope(
   return !!available.organization || available.teams.length > 0 || available.projects.length > 0;
 }
 
+/** A scope write names its organization; a page outside one offers no scope to write. */
+function organizationOf(organizationId: string | undefined): string {
+  if (!organizationId) throw new Error("Retention overrides are set inside an organization.");
+  return organizationId;
+}
+
 function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; projectId: string }) {
   const { organizationId, teamId } = host.scope();
   const utils = dataRetentionApi.useUtils();
@@ -167,7 +173,11 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // Fallback preview for the remove-confirm dialog: owned here (transport is
   // an application concern) and passed down as controlled data so the dialog
   // itself stays presentation-only.
-  const removePreview = retentionRemovalPreviewQuery(projectId, removeTarget);
+  const removePreview = retentionRemovalPreviewQuery({
+    projectId,
+    organizationId,
+    target: removeTarget,
+  });
   const removePreviewQuery = dataRetentionApi.dataRetention.previewScopeRemoval.useQuery(
     removePreview.input,
     removePreview.options,
@@ -262,7 +272,13 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     projectId,
     notices: host,
     write: ({ scope, category, retentionDays }) =>
-      setForScope.mutateAsync({ projectId, scope, category, retentionDays }),
+      setForScope.mutateAsync({
+        projectId,
+        organizationId: organizationOf(organizationId),
+        scope,
+        category,
+        retentionDays,
+      }),
     trigger: (category) => triggerUpdate.mutateAsync({ projectId, category }),
     afterWrite: () => void invalidate(),
     close: closeDrawer,
@@ -386,7 +402,12 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             await removeRetentionScope({
               group: removeTarget,
               remove: ({ scope, category }) =>
-                removeForScope.mutateAsync({ projectId, scope, category }),
+                removeForScope.mutateAsync({
+                  projectId,
+                  organizationId: organizationOf(organizationId),
+                  scope,
+                  category,
+                }),
               afterWrite: () => void invalidate(),
               notices: host,
             });

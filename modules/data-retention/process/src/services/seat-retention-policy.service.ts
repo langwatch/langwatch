@@ -35,6 +35,7 @@ export class SeatRetentionPolicyService {
     for (const category of retentionCategories) {
       if (covered.has(category)) continue;
       await this.rules.setForScope({
+        organizationId,
         scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
         category,
         retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,

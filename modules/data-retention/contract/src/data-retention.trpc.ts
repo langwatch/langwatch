@@ -37,6 +37,12 @@ export const retentionScopeTargetInputSchema = z.object({
   scope: retentionScopeInputSchema,
 });
 
+/** A scope write names the organisation the page sits in; the target must sit there too. */
+export const retentionScopeWriteInputSchema = z.object({
+  ...retentionScopeTargetInputSchema.shape,
+  organizationId: z.string().min(1),
+});
+
 export const retentionTriggerRetroactiveInputSchema = z.strictObject({
   ...retroactiveMutationProjectInputSchema.shape,
   category: retentionCategorySchema,
@@ -53,14 +59,13 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
   .withOutput(retentionPolicySnapshotSchema)
 
   /**
-   * Set one category's retention at one scope. `projectId` is deliberately not
-   * acted on: the authorized target is `scope`, and both the permission and the
-   * plan gate run against the scope's own organization.
+   * Set one category's retention at one scope. The door asks the permission on
+   * `scope`; `projectId` is not acted on, and the plan gate reads `organizationId`.
    */
   .mutation("setForScope")
   .withInput(
     z.object({
-      ...retentionScopeTargetInputSchema.shape,
+      ...retentionScopeWriteInputSchema.shape,
       category: retentionCategorySchema,
       retentionDays: retentionDaysInputSchema,
     }),
@@ -73,13 +78,13 @@ export const dataRetentionTrpc = defineTrpcContract("dataRetention")
    * dialog names the real number rather than a guessed one.
    */
   .query("previewScopeRemoval")
-  .withInput(retentionScopeTargetInputSchema)
+  .withInput(retentionScopeWriteInputSchema)
   .withOutput(resolvedRetentionSchema)
 
   /** Remove one category's override at one scope; the next tier then applies. */
   .mutation("removeForScope")
   .withInput(
-    z.object({ ...retentionScopeTargetInputSchema.shape, category: retentionCategorySchema }),
+    z.object({ ...retentionScopeWriteInputSchema.shape, category: retentionCategorySchema }),
   )
 
   /** Rewrite the project's existing rows to the retention the cascade resolves. */

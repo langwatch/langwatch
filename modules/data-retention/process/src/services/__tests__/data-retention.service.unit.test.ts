@@ -1,11 +1,8 @@
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
-import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import {
-  createDataRetentionTestOrganizations,
   createDataRetentionTestProjectScopes,
   retentionTestGraph,
   retentionTestScopeRow,
@@ -62,7 +59,6 @@ function createService(
     policies?: MemoryDataRetentionRepository;
     cache?: DataRetentionCacheRepository;
     projectScopes?: MemoryDataRetentionProjectScopeRepository;
-    organizations?: OrganizationApi;
     retroactive?: MemoryRetroactiveRetentionRepository;
   }> = {},
 ) {
@@ -70,7 +66,6 @@ function createService(
     policies: input.policies ?? MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
     projectScopes: input.projectScopes ?? createDataRetentionTestProjectScopes(),
-    organizations: input.organizations ?? createDataRetentionTestOrganizations(),
     defaultRetentionDays: DEFAULT_DAYS,
     retroactive: input.retroactive ?? MemoryRetroactiveRetentionRepository.create(),
     cache: input.cache ?? new RecordingCache(),
@@ -142,6 +137,7 @@ describe("DataRetentionService", () => {
 
       await expect(
         service.setForScope({
+          organizationId: ORGANIZATION,
           scope: { scopeType: "PROJECT", scopeId: PROJECT },
           category: "traces",
           retentionDays: 42,
@@ -180,7 +176,10 @@ describe("DataRetentionService", () => {
       const service = createService();
 
       await expect(
-        service.previewScopeRemoval({ scope: { scopeType: "PROJECT", scopeId: "missing" } }),
+        service.previewScopeRemoval({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: "missing" },
+        }),
       ).resolves.toEqual({
         traces: DEFAULT_DAYS,
         scenarios: DEFAULT_DAYS,
@@ -196,6 +195,7 @@ describe("DataRetentionService", () => {
 
       await expect(
         service.setForScope({
+          organizationId: ORGANIZATION,
           scope: { scopeType: "PROJECT", scopeId: "missing" },
           category: "traces",
           retentionDays: 49,
@@ -208,39 +208,43 @@ describe("DataRetentionService", () => {
     });
   });
 
-  describe("when the organization directory answers a team lookup", () => {
+  describe("when a scope names a team", () => {
     /** @scenario "Resolve scope ownership through canonical services" */
-    it("defaults a genuinely missing team but does not hide service failures", async () => {
-      const missing = createService({
-        organizations: createApiFixture<OrganizationApi>({
-          getTeamById: async () => {
-            throw new TeamNotFoundError("missing");
-          },
-        }),
-      });
+    it("places the team in an organization only from the projects folded under it", async () => {
+      const service = createService();
+      const team = { scopeType: "TEAM", scopeId: retentionTestGraph.teamId } as const;
+      const unknown = { scopeType: "TEAM", scopeId: "team-unfolded" } as const;
 
       await expect(
-        missing.previewScopeRemoval({ scope: { scopeType: "TEAM", scopeId: "missing" } }),
+        service.assertScopeInOrganization({ organizationId: ORGANIZATION, scope: team }),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.assertScopeInOrganization({ organizationId: "organization-other", scope: team }),
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
+      await expect(
+        service.previewScopeRemoval({
+          organizationId: ORGANIZATION,
+          scope: unknown,
+        }),
       ).resolves.toEqual({
         traces: DEFAULT_DAYS,
         scenarios: DEFAULT_DAYS,
         experiments: DEFAULT_DAYS,
       });
+    });
+  });
 
-      const unavailable = new Error("organization service unavailable");
-      const failing = createService({
-        organizations: createApiFixture<OrganizationApi>({
-          getTeamById: async () => {
-            throw unavailable;
-          },
-        }),
-      });
-
+  describe("when a write names a project data retention has not folded", () => {
+    /** @scenario "Reject a missing write target" */
+    it("refuses it as a missing scope target", async () => {
       await expect(
-        failing.previewScopeRemoval({
-          scope: { scopeType: "TEAM", scopeId: retentionTestGraph.teamId },
+        createService().setForScope({
+          organizationId: ORGANIZATION,
+          scope: { scopeType: "PROJECT", scopeId: "project-unfolded" },
+          category: "traces",
+          retentionDays: 63,
         }),
-      ).rejects.toBe(unavailable);
+      ).rejects.toMatchObject({ code: "data_retention_scope_target_not_found" });
     });
   });
 
@@ -253,11 +257,13 @@ describe("DataRetentionService", () => {
       });
 
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
         category: "traces",
         retentionDays: 63,
       });
       await service.removeForScope({
+        organizationId: ORGANIZATION,
         scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
         category: "traces",
       });
@@ -277,11 +283,13 @@ describe("DataRetentionService", () => {
       const service = createService({ cache, projectScopes });
 
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
         category: "traces",
         retentionDays: 63,
       });
       await service.setForScope({
+        organizationId: ORGANIZATION,
         scope: { scopeType: "TEAM", scopeId: retentionTestGraph.teamId },
         category: "traces",
         retentionDays: 63,

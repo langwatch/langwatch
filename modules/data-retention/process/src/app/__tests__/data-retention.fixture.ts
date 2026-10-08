@@ -1,7 +1,6 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -120,26 +119,6 @@ export function retentionTestScopeRow(
   };
 }
 
-export function createDataRetentionTestOrganizations(
-  graph: RetentionTestDirectoryGraph = retentionTestGraph,
-): OrganizationApi {
-  const team: OrganizationTeam = {
-    id: graph.teamId,
-    name: "Payments",
-    slug: "payments",
-    organizationId: graph.organizationId ?? "",
-    isPersonal: graph.organizationId === null,
-    ownerUserId: null,
-    archivedAt: null,
-    createdAt: epoch,
-    updatedAt: epoch,
-  };
-
-  return createApiFixture<OrganizationApi>({
-    getTeamById: vi.fn(async () => team),
-  });
-}
-
 /** Every permission answers `permitted`, so a gate test states one thing. */
 export function createDataRetentionTestAuthz(permitted = true, platformOperator = false): AuthzApi {
   return createApiFixture<AuthzApi>({
@@ -205,7 +184,6 @@ export function createDataRetentionTestApp(
     repositories?: DataRetentionRepositories;
     directory?: DataRetentionDirectoryReader;
     dependencies?: Partial<{
-      organizations: OrganizationApi;
       permissions: AuthzApi;
       users: UserApi;
       entitlement: EntitlementApi;
@@ -220,7 +198,6 @@ export function createDataRetentionTestApp(
       projectScopes: createDataRetentionTestProjectScopes(),
     },
     dependencies: {
-      organizations: input.dependencies?.organizations ?? createDataRetentionTestOrganizations(),
       permissions: input.dependencies?.permissions ?? createDataRetentionTestAuthz(),
       users: input.dependencies?.users ?? createDataRetentionTestUsers(),
       entitlement: input.dependencies?.entitlement ?? createDataRetentionTestEntitlement(),

@@ -36,6 +36,7 @@ export interface DataRetentionApi {
   listOrganizationRules(input: { organizationId: string }): Promise<RetentionPolicy[]>;
   /** The system write, for a plan change that resets an organization's window. */
   setForScope(input: {
+    organizationId: string;
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
@@ -55,9 +56,8 @@ export interface DataRetentionApi {
   getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number>;
 
   /**
-   * The retention settings surface. Each operation authorizes and plan-gates
-   * the caller against the scope it acts on, never against a project id the
-   * input also carries: the two can belong to different organizations.
+   * The retention settings surface. The door authorises each scope write on its
+   * target; these refuse a target outside `organizationId` and plan-gate on it.
    */
   getPolicySnapshot(
     input: { projectId: string } & RetentionCallerInput,
@@ -66,17 +66,22 @@ export interface DataRetentionApi {
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<RetentionStorageUsage>;
   previewScopeRemoval(
-    input: { scope: ScopeAssignment } & RetentionCallerInput,
+    input: { organizationId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention>;
   changeScopeRetention(
     input: {
+      organizationId: string;
       scope: ScopeAssignment;
       category: RetentionCategory;
       retentionDays: number;
     } & RetentionCallerInput,
   ): Promise<RetentionPolicy>;
   removeForScope(
-    input: { scope: ScopeAssignment; category: RetentionCategory } & RetentionCallerInput,
+    input: {
+      organizationId: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+    } & RetentionCallerInput,
   ): Promise<void>;
   /**
    * Rewrites the project's existing rows to the retention the cascade resolves,
