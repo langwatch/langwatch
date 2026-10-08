@@ -336,6 +336,8 @@ class FoldMapReplayRun {
     ).size;
 
     for (let i = 0; i < remaining.length; i += this.aggregateBatchSize) {
+      // A stop between batches keeps the completed sets, so the next run skips what finished.
+      this.callbacks?.signal?.throwIfAborted();
       const batchKeys = remaining.slice(i, i + this.aggregateBatchSize);
       const batchNum = Math.floor(i / this.aggregateBatchSize) + 1;
       const completed = await this.runOneBatch({ batchKeys, batchNum });
@@ -408,6 +410,8 @@ class FoldMapReplayRun {
     const batchStartTime = nowInstant().epochMilliseconds;
     const progress = this.buildProgress({ batchKeys, batchNum });
     const emit: EmitFn = (phase, eventsProcessed) => {
+      // A stop mid-batch takes the failure path: the batch's markers clear and the lane unpauses.
+      this.callbacks?.signal?.throwIfAborted();
       progress.batchPhase = phase;
       if (eventsProcessed !== undefined) {
         progress.batchEventsProcessed = eventsProcessed;
@@ -431,6 +435,7 @@ class FoldMapReplayRun {
       });
     } catch (error) {
       await this.handleBatchFailure({ error, batchKeys, batchNum, progress });
+      this.callbacks?.signal?.throwIfAborted();
       return false;
     }
 
@@ -793,6 +798,19 @@ interface BatchAccumulators {
   mapAccumulators: Map<string, MapReplayAccumulator>;
 }
 
+/** The projection's own pipeline retention, else the runtime's (eventSourcing.ts, registration). */
+function accumulatorOptsFor({
+  ctx,
+  projection,
+}: {
+  ctx: ReplayContext;
+  projection: RegisteredFoldProjection | RegisteredMapProjection;
+}): ReplayContext["accumulatorOpts"] {
+  return {
+    retentionResolver: projection.retentionPolicyResolver ?? ctx.accumulatorOpts.retentionResolver,
+  };
+}
+
 /** One accumulator per selected projection present in this batch. */
 function buildAccumulators({
   ctx,
@@ -810,14 +828,18 @@ function buildAccumulators({
     if (foldProj) {
       foldAccumulators.set(
         projName,
-        foldProj.open<ReplayAccumulator>((fold) => new FoldAccumulator(fold, ctx.accumulatorOpts)),
+        foldProj.open<ReplayAccumulator>(
+          (fold) => new FoldAccumulator(fold, accumulatorOptsFor({ ctx, projection: foldProj })),
+        ),
       );
     }
     const mapProj = selected.mapProjectionByName.get(projName);
     if (mapProj) {
       mapAccumulators.set(
         projName,
-        mapProj.open<MapReplayAccumulator>((map) => new MapAccumulator(map, ctx.accumulatorOpts)),
+        mapProj.open<MapReplayAccumulator>(
+          (map) => new MapAccumulator(map, accumulatorOptsFor({ ctx, projection: mapProj })),
+        ),
       );
     }
   }

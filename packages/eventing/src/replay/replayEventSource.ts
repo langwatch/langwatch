@@ -42,6 +42,11 @@ export interface OccurredAtBounds {
 export const REPLAY_ALL_TENANTS = "";
 
 export interface ReplayEventSource {
+  /**
+   * The tenants holding any of these event types since `sinceMs`, ordinal-sorted, so a replay holds
+   * one tenant's aggregates at a time. Absent, a replay discovers every tenant in one pass.
+   */
+  discoverTenants?(input: { eventTypes: readonly string[]; sinceMs: number }): Promise<string[]>;
   discoverAffectedAggregates(input: {
     eventTypes: readonly string[];
     sinceMs: number;

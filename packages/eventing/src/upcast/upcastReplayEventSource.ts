@@ -53,6 +53,12 @@ class UpcastingReplayEventSource implements ReplayEventSource {
     return this.source.optimizeTables?.bind(this.source);
   }
 
+  get discoverTenants(): ReplayEventSource["discoverTenants"] {
+    const discover = this.source.discoverTenants?.bind(this.source);
+    if (!discover) return undefined;
+    return (input) => discover({ ...input, eventTypes: this.#widenTypes(input.eventTypes) });
+  }
+
   async discoverAffectedAggregates(
     input: Parameters<ReplayEventSource["discoverAffectedAggregates"]>[0],
   ): Promise<DiscoveredAggregateWithEventTypes[]> {

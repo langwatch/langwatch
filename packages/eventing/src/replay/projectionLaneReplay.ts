@@ -1,5 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
+import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "./replayConstants.ts";
 import type { ReplayProjections } from "./replayProjections.ts";
 import type { ReplayService } from "./replayService.ts";
 import type { BatchCompleteInfo, ProjectionKind, ReplayConfig } from "./types.ts";
@@ -45,10 +47,16 @@ export class ProjectionLaneReplayFailedError extends Error {
   }
 }
 
+/** Where an interrupted run stopped: the cursor it completes through and its last done tenant. */
+export interface ProjectionLaneReplayResume {
+  replayedThrough: string;
+  afterTenant: string;
+}
+
 /**
- * Replays one named lane (local or peer) from its owner's log; the engine pauses the lane's live
- * delivery per batch and resumes it. `replayedThrough`, taken before discovery, is the `since` a
- * later run passes back. Spec: specs/upgrade/projection-replay-step.feature.
+ * Replays one named lane (local or peer), one tenant at a time where the log lists its tenants, so
+ * the routed member answers each discovery on that tenant's server. The cursor, taken before
+ * discovery less the skew margin, is the next run's `since`. Spec: projection-replay-step.feature.
  */
 export function projectionLaneReplayer({
   service,
@@ -58,52 +66,96 @@ export function projectionLaneReplayer({
   projections: ReplayProjections;
 }) {
   return {
-    async replayLane({
-      lane,
-      since,
-      dryRun,
-      onBatchComplete,
-    }: {
-      lane: string;
-      since: string;
-      dryRun: boolean;
-      onBatchComplete?: (info: BatchCompleteInfo) => void;
-    }): Promise<ProjectionLaneReplayResult> {
-      const { kind, selection } = selectLane({ projections, lane });
-      const replayedThrough = nowInstant().toString();
-      const result = await service.replay(
-        { ...selection, tenantIds: [], since, dryRun },
-        onBatchComplete ? { onBatchComplete } : undefined,
-      );
-      if (result.batchErrors > 0) {
-        throw new ProjectionLaneReplayFailedError({
-          lane,
-          batchErrors: result.batchErrors,
-          ...(result.firstError === undefined ? {} : { firstError: result.firstError }),
-        });
-      }
-      return {
-        lane,
-        kind,
-        aggregatesReplayed: result.aggregatesReplayed,
-        totalEvents: result.totalEvents,
-        replayedThrough: dryRun ? since : replayedThrough,
-      };
+    async replayLane(input: LaneReplayInput): Promise<ProjectionLaneReplayResult> {
+      const { lane, since, dryRun, resume } = input;
+      const { kind, eventTypes, selection } = selectLane({ projections, lane });
+      const replayedThrough = resume?.replayedThrough ?? cursorBehindClock();
+      const tenants = await service.discoverTenants({ eventTypes, since });
+      const targets =
+        tenants === undefined
+          ? [undefined]
+          : tenants.filter((t) => !resume || compareOrdinal(t, resume.afterTenant) > 0);
+      const totals = await replayTenants({ service, input, selection, targets, replayedThrough });
+      return { lane, kind, ...totals, replayedThrough: dryRun ? since : replayedThrough };
     },
   };
 }
 
+interface LaneReplayInput {
+  lane: string;
+  since: string;
+  dryRun: boolean;
+  signal?: AbortSignal;
+  resume?: ProjectionLaneReplayResume;
+  onBatchComplete?: (info: BatchCompleteInfo) => void;
+  onTenantComplete?: (info: { tenantId: string; replayedThrough: string }) => void;
+}
+
+/** Each target in turn (`undefined`: every tenant in one pass), reporting each tenant done. */
+async function replayTenants({
+  service,
+  input: { lane, since, dryRun, signal, onBatchComplete, onTenantComplete },
+  selection,
+  targets,
+  replayedThrough,
+}: {
+  service: ReplayService;
+  input: LaneReplayInput;
+  selection: LaneSelection;
+  targets: readonly (string | undefined)[];
+  replayedThrough: string;
+}): Promise<{ aggregatesReplayed: number; totalEvents: number }> {
+  const callbacks = {
+    ...(onBatchComplete === undefined ? {} : { onBatchComplete }),
+    ...(signal === undefined ? {} : { signal }),
+  };
+  const totals = { aggregatesReplayed: 0, totalEvents: 0 };
+  for (const tenantId of targets) {
+    signal?.throwIfAborted();
+    const tenantIds = tenantId === undefined ? [] : [tenantId];
+    const result = await service.replay({ ...selection, tenantIds, since, dryRun }, callbacks);
+    if (result.batchErrors > 0) {
+      throw new ProjectionLaneReplayFailedError({
+        lane,
+        batchErrors: result.batchErrors,
+        ...(result.firstError === undefined ? {} : { firstError: result.firstError }),
+      });
+    }
+    totals.aggregatesReplayed += result.aggregatesReplayed;
+    totals.totalEvents += result.totalEvents;
+    if (tenantId !== undefined && !dryRun) onTenantComplete?.({ tenantId, replayedThrough });
+  }
+  return totals;
+}
+
+/** The worker's clock less the skew margin: a later run re-reads what a lagging api stamped. */
+function cursorBehindClock(): string {
+  return nowInstant().subtract({ milliseconds: REPLAY_CURSOR_SKEW_MARGIN_MS }).toString();
+}
+
 export type ProjectionLaneReplayer = ReturnType<typeof projectionLaneReplayer>;
+
+type LaneSelection = Pick<ReplayConfig, "projections" | "mapProjections" | "stateProjections">;
 
 function selectLane({ projections, lane }: { projections: ReplayProjections; lane: string }): {
   kind: ProjectionKind;
-  selection: Pick<ReplayConfig, "projections" | "mapProjections" | "stateProjections">;
+  eventTypes: readonly string[];
+  selection: LaneSelection;
 } {
   const fold = projections.projections.find((p) => p.projectionName === lane);
-  if (fold) return { kind: "fold", selection: { projections: [fold] } };
+  if (fold) {
+    const eventTypes = fold.definition.eventTypes;
+    return { kind: "fold", eventTypes, selection: { projections: [fold] } };
+  }
   const map = projections.mapProjections.find((p) => p.projectionName === lane);
-  if (map) return { kind: "map", selection: { projections: [], mapProjections: [map] } };
+  if (map) {
+    const eventTypes = map.definition.eventTypes;
+    return { kind: "map", eventTypes, selection: { projections: [], mapProjections: [map] } };
+  }
   const state = projections.stateProjections.find((p) => p.projectionName === lane);
-  if (state) return { kind: "state", selection: { projections: [], stateProjections: [state] } };
+  if (state) {
+    const eventTypes = state.definition.eventTypes;
+    return { kind: "state", eventTypes, selection: { projections: [], stateProjections: [state] } };
+  }
   throw new ProjectionLaneNotFoundError({ lane });
 }

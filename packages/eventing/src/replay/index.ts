@@ -16,6 +16,7 @@ export {
   ProjectionLaneNotFoundError,
   ProjectionLaneReplayFailedError,
   type ProjectionLaneReplayer,
+  type ProjectionLaneReplayResume,
   type ProjectionLaneReplayResult,
   projectionLaneReplayer,
 } from "./projectionLaneReplay.ts";

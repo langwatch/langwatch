@@ -34,14 +34,43 @@ function replayerOverLog(): LaneReplayer & { sinces: string[] } {
   };
 }
 
+/** A replayer over two tenants that completes the first, then fails or stops if told to. */
+function twoTenantReplayer({ stopAfterFirst = false }: { stopAfterFirst?: boolean } = {}) {
+  const calls: Parameters<LaneReplayer["replayLane"]>[0][] = [];
+  const replayer: LaneReplayer = {
+    async replayLane(input) {
+      calls.push(input);
+      const runCursor = input.resume?.replayedThrough ?? CURSOR;
+      const tenants = ["tenant-1", "tenant-2"].filter(
+        (tenant) => !input.resume || tenant > input.resume.afterTenant,
+      );
+      for (const tenantId of tenants) {
+        input.signal?.throwIfAborted();
+        input.onTenantComplete?.({ tenantId, replayedThrough: runCursor });
+        if (stopAfterFirst) throw new Error("worker stopping");
+      }
+      return {
+        lane: input.lane,
+        kind: "fold",
+        aggregatesReplayed: tenants.length,
+        totalEvents: tenants.length,
+        replayedThrough: runCursor,
+      };
+    },
+  };
+  return { replayer, calls };
+}
+
 function runOnce({
   replayer,
   resumeFrom,
   dryRun = false,
+  signal = new AbortController().signal,
 }: {
   replayer: LaneReplayer;
   resumeFrom: MigrationStepReport | null;
   dryRun?: boolean;
+  signal?: AbortSignal;
 }) {
   const saved: MigrationStepReport[] = [];
   const step = defineProjectionReplayStep({
@@ -53,7 +82,7 @@ function runOnce({
   const report = step.run({
     checkpoint: { resumeFrom, save: async ({ report: next }) => void saved.push(next) },
     dryRun,
-    signal: new AbortController().signal,
+    signal,
   });
   return { step, report, saved };
 }
@@ -141,6 +170,81 @@ describe("defineProjectionReplayStep", () => {
       await report;
 
       expect(saved).toEqual([]);
+    });
+  });
+
+  describe("when a run completes each tenant", () => {
+    /** @scenario "Each completed tenant is saved with the cursor its run completes through" */
+    it("saves the start cursor, the run's cursor and the tenant it completed", async () => {
+      const { report, saved } = runOnce({
+        replayer: twoTenantReplayer().replayer,
+        resumeFrom: null,
+      });
+
+      expect(await report).toMatchObject({ lane: LANE, replayedThrough: CURSOR });
+      expect(saved).toEqual([
+        {
+          lane: LANE,
+          replayedThrough: PROJECTION_REPLAY_FROM_START,
+          runReplaysThrough: CURSOR,
+          lastTenantDone: "tenant-1",
+        },
+        {
+          lane: LANE,
+          replayedThrough: PROJECTION_REPLAY_FROM_START,
+          runReplaysThrough: CURSOR,
+          lastTenantDone: "tenant-2",
+        },
+      ]);
+    });
+  });
+
+  describe("given a step that saved progress through its first tenant", () => {
+    /** @scenario "A run resumed after an interruption skips the tenants it completed" */
+    it("resumes after that tenant from the same start cursor, through the interrupted cursor", async () => {
+      const interrupted = "2026-10-08T09:00:00Z";
+      const { replayer, calls } = twoTenantReplayer();
+
+      const report = await runOnce({
+        replayer,
+        resumeFrom: {
+          lane: LANE,
+          replayedThrough: PROJECTION_REPLAY_FROM_START,
+          runReplaysThrough: interrupted,
+          lastTenantDone: "tenant-1",
+        },
+      }).report;
+
+      expect(calls[0]).toMatchObject({
+        since: PROJECTION_REPLAY_FROM_START,
+        resume: { replayedThrough: interrupted, afterTenant: "tenant-1" },
+      });
+      expect(report).toMatchObject({ aggregatesReplayed: 1, replayedThrough: interrupted });
+    });
+  });
+
+  describe("when the worker stops the step mid-run", () => {
+    /** @scenario "A worker stop ends the replay without finishing it" */
+    it("hands the signal to the replay and keeps only the progress it completed", async () => {
+      const stop = new AbortController();
+      const { replayer, calls } = twoTenantReplayer({ stopAfterFirst: true });
+
+      const { report, saved } = runOnce({ replayer, resumeFrom: null, signal: stop.signal });
+
+      await expect(report).rejects.toThrow("worker stopping");
+      expect(calls[0]?.signal).toBe(stop.signal);
+      expect(saved.map((one) => one.lastTenantDone)).toEqual(["tenant-1"]);
+    });
+
+    it("returns its start cursor without replaying when already stopped", async () => {
+      const stop = new AbortController();
+      stop.abort();
+      const { replayer, calls } = twoTenantReplayer();
+
+      const report = await runOnce({ replayer, resumeFrom: null, signal: stop.signal }).report;
+
+      expect(calls).toEqual([]);
+      expect(report).toEqual({ lane: LANE, replayedThrough: PROJECTION_REPLAY_FROM_START });
     });
   });
 });

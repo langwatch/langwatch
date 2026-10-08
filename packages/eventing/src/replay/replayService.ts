@@ -1,4 +1,7 @@
+import { toEpochMs } from "@langwatch/time";
+
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { discoverProjectionAggregates } from "./replayDiscovery.ts";
 import { runFoldMapReplay } from "./replayEngine.ts";
 import type { ReplayEventSource } from "./replayEventSource.ts";
@@ -75,6 +78,23 @@ export class ReplayService {
     });
   }
 
+  /**
+   * The tenants holding the event types since `since`, ordinal-sorted, or undefined where the event
+   * source cannot list them (a replay then discovers every tenant in one pass).
+   */
+  async discoverTenants({
+    eventTypes,
+    since,
+  }: {
+    eventTypes: readonly string[];
+    since: string;
+  }): Promise<string[] | undefined> {
+    const source = this.ctx.eventSource;
+    if (!source.discoverTenants) return undefined;
+    const tenants = await source.discoverTenants({ eventTypes, sinceMs: toEpochMs(since) });
+    return [...new Set(tenants)].toSorted(compareOrdinal);
+  }
+
   async replay(
     config: ReplayConfig,
     callbacks?: ReplayCallbacks & { log?: ReplayLogWriter },
@@ -99,6 +119,7 @@ export class ReplayService {
     }
 
     if (totals.batchErrors === 0) {
+      callbacks?.signal?.throwIfAborted();
       await this.replayStateLane({ config, callbacks, totals });
     }
 

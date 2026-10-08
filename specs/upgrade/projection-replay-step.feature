@@ -55,3 +55,52 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
   Scenario: A lane no registered pipeline declares is refused by name
     When a step replays a lane no registered pipeline declares, local or peer
     Then the run fails with "projection_lane_not_found" naming the lane
+
+  # Plan pr-7536 revision 2, F-5 and F-9 (MIG-REPLAY-SCALE): a replay at cloud scale is held one
+  # tenant at a time, checkpoints each tenant, stops on the worker's signal and stamps retention.
+
+  @unit
+  Scenario: A lane is replayed one tenant at a time
+    Given an owner's log holding events for two tenants
+    When the step replays the lane
+    Then the tenants are listed first and each tenant's aggregates are discovered on their own
+    And every discovery names its tenant, so the routed member answers it on that tenant's server
+
+  @unit
+  Scenario: A log that cannot list its tenants is replayed in one pass
+    Given an owner's log that cannot list the tenants holding a lane's events
+    When the step replays the lane
+    Then every tenant is discovered and replayed in one pass, as before
+
+  @unit
+  Scenario: Each completed tenant is saved with the cursor its run completes through
+    Given a replay over two tenants
+    When each tenant completes
+    Then the step saves the cursor it started from, the cursor the run completes through and the tenant it completed
+
+  @unit
+  Scenario: A run resumed after an interruption skips the tenants it completed
+    Given a step that saved progress through its first tenant
+    When the worker runs it again
+    Then only the tenants after it are replayed, from the same start cursor
+    And the step completes through the cursor the interrupted run took, not a new one
+
+  @unit
+  Scenario: A worker stop ends the replay without finishing it
+    Given a replay running over two tenants
+    When the step's signal aborts while the first tenant is replaying
+    Then no further batch or tenant starts and the run ends aborted, not done
+    And the lane's live delivery is not left paused
+    And the step's saved progress still names only what completed
+
+  @unit
+  Scenario: The cursor a run completes through allows for a lagging clock
+    When a run completes
+    Then the cursor it reports is the instant the run started less the clock-skew margin
+    And a later run from that cursor replays an event a lagging api stamped just before the run started
+
+  @unit
+  Scenario: A replayed lane stamps the retention its pipeline declares
+    Given a pipeline that declares each tenant's retention
+    When one of its lanes, or a peer lane it declares, is replayed
+    Then the rebuilt rows carry the retention the pipeline resolves for their tenant, not the platform default

@@ -13,6 +13,7 @@ import type {
 } from "../../projections/foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
 import { RedisCachedFoldStore } from "../../projections/redisCachedFoldStore.ts";
+import type { RetentionPolicyResolver } from "../../runtime.types.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import type { ReplayEvent } from "../replayEventSource.ts";
 import { replayLeanOf, replayProjectionsOf } from "../replayProjections.ts";
@@ -68,6 +69,7 @@ function pipelineOver(input: {
   fold: FoldProjectionDefinition<{ count: number }, PipelineEvent> & { readonly name: "counts" };
   map: MapProjectionDefinition<{ note: string }, PipelineEvent> & { readonly name: "notes" };
   prepare?: (event: PipelineEvent) => PipelineEvent;
+  retention?: RetentionPolicyResolver;
 }) {
   const builder = definePipeline({
     name: "test_processing",
@@ -79,7 +81,8 @@ function pipelineOver(input: {
   const prepared = input.prepare
     ? builder.withProjectionPayloadPreparation(input.prepare)
     : builder;
-  return sealPipelineDefinition(prepared.build());
+  const retained = input.retention ? prepared.withRetention(input.retention) : prepared;
+  return sealPipelineDefinition(retained.build());
 }
 
 function eventOf(type: string, note: string): Event {
@@ -140,6 +143,19 @@ describe("replayProjectionsOf()", () => {
         pauseKey: "test_processing/handler/notes",
         targetTable: "stored_notes",
       });
+    });
+  });
+
+  describe("when the pipeline declares each tenant's retention", () => {
+    /** @scenario "A replayed lane stamps the retention its pipeline declares" */
+    it("carries the pipeline's resolver on each of its lanes", () => {
+      const retention: RetentionPolicyResolver = { resolve: async () => ({ days: 30 }) };
+      const { projections, mapProjections } = replayProjectionsOf([
+        pipelineOver({ fold: countFold(durableStore()), map: notesMap(), retention }),
+      ]);
+
+      expect(projections[0]?.retentionPolicyResolver).toBe(retention);
+      expect(mapProjections[0]?.retentionPolicyResolver).toBe(retention);
     });
   });
 

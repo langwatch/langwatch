@@ -21,6 +21,7 @@ import {
   sealStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { ReplayEvent } from "./replayEventSource.ts";
 import type {
   RegisteredFoldProjection,
@@ -53,9 +54,12 @@ export function replayProjectionsOf(
     replayable.projections.push(...own.projections);
     replayable.mapProjections.push(...own.mapProjections);
     replayable.stateProjections.push(...own.stateProjections);
+    // A peer lane writes under its declaring pipeline's retention, as its live registration does.
+    const host = sealed.open((definition) => retentionOf(definition));
     for (const peer of sealed.open((definition) => peerLanesOf(definition))) {
-      if (peer.kind === "fold") replayable.projections.push(replayPeerFold({ definitions, peer }));
-      else replayable.mapProjections.push(replayPeerMap({ definitions, peer }));
+      if (peer.kind === "fold") {
+        replayable.projections.push({ ...replayPeerFold({ definitions, peer }), ...host });
+      } else replayable.mapProjections.push({ ...replayPeerMap({ definitions, peer }), ...host });
     }
   }
   return replayable;
@@ -116,6 +120,14 @@ function replayPeerMap({
   };
 }
 
+/** A pipeline's declared retention, spread onto each projection a replay rebuilds for it. */
+function retentionOf(definition: Pick<StaticPipelineDefinition, "retentionPolicyResolver">): {
+  retentionPolicyResolver?: RetentionPolicyResolver;
+} {
+  const { retentionPolicyResolver } = definition;
+  return retentionPolicyResolver === undefined ? {} : { retentionPolicyResolver };
+}
+
 function peerLanesOf<
   EventType extends Event,
   ProjectionTypes extends Record<string, Projection>,
@@ -169,7 +181,12 @@ function replayProjectionsOfPipeline<
   Commands extends RegisteredCommand,
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): ReplayProjections {
   const { name: pipelineName, aggregateType } = definition.metadata;
-  const identity = { pipelineName, aggregateType, source: "pipeline" as const };
+  const identity = {
+    pipelineName,
+    aggregateType,
+    source: "pipeline" as const,
+    ...retentionOf(definition),
+  };
 
   const projections = Array.from(definition.foldProjections.values()).map(
     (fold): RegisteredFoldProjection => ({

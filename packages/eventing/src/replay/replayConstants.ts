@@ -1,3 +1,10 @@
+/**
+ * How far a replay's cursor sits behind the worker's clock, so an event an api with a lagging clock
+ * stamped just before the run is replayed again by the next (plan pr-7536 F-9). Five minutes, the
+ * queue's clock-skew allowance (`MAX_SCORE_FUTURE_SKEW_MS`, group-queue `readyScore.ts`).
+ */
+export const REPLAY_CURSOR_SKEW_MARGIN_MS = 5 * 60 * 1000;
+
 /** Redis key prefix for cutoff markers: `projection-replay:cutoff:{projectionName}` */
 export const CUTOFF_KEY_PREFIX = "projection-replay:cutoff:";
 
