@@ -1,6 +1,6 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import type { UpgradeModalSeatsRequest } from "@langwatch/enterprise-licensing-client";
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";
-
-import { defineSlice } from "./global-store.ts";
 
 /** Modal opened by license enforcement when a limit is reached. */
 type LimitVariant = {
@@ -11,18 +11,7 @@ type LimitVariant = {
 };
 
 /** Modal opened to confirm a seat quantity update with proration preview. */
-export type UpgradeModalSeatsVariant = {
-  mode: "seats";
-  organizationId: string;
-  currentSeats: number;
-  newSeats: number;
-  /**
-   * @param quotedAt the instant the quote on screen was priced, so the charge
-   *   can reproduce it rather than re-price at confirm time. Undefined when no
-   *   quote was loaded, which leaves the confirm priced at the moment it runs.
-   */
-  onConfirm: (quotedAt?: number) => Promise<void>;
-};
+export type UpgradeModalSeatsVariant = { mode: "seats" } & UpgradeModalSeatsRequest;
 
 /** Modal shown when a lite member tries to access a restricted feature. */
 type LiteMemberRestrictionVariant = {
@@ -35,18 +24,6 @@ export type UpgradeModalVariant =
   | UpgradeModalSeatsVariant
   | LiteMemberRestrictionVariant;
 
-interface OpenSeatsParams {
-  organizationId: string;
-  currentSeats: number;
-  newSeats: number;
-  /**
-   * @param quotedAt the instant the quote on screen was priced, so the charge
-   *   can reproduce it rather than re-price at confirm time. Undefined when no
-   *   quote was loaded, which leaves the confirm priced at the moment it runs.
-   */
-  onConfirm: (quotedAt?: number) => Promise<void>;
-}
-
 interface UpgradeModalState {
   isOpen: boolean;
   variant: UpgradeModalVariant | null;
@@ -55,7 +32,7 @@ interface UpgradeModalState {
   open: (limitType: LimitType, current: number, max: number) => void;
 
   /** Open the modal in seats confirmation mode. */
-  openSeats: (params: OpenSeatsParams) => void;
+  openSeats: (params: UpgradeModalSeatsRequest) => void;
 
   /** Open the modal in lite member restriction mode. */
   openLiteMemberRestriction: (params: { resource?: string }) => void;

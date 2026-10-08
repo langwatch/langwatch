@@ -71,33 +71,35 @@ const missing = (id, title, evidence) => ({
   evidence,
 });
 
-function r01({ scope }) {
-  const title = "Old projects have no data-privacy scope row (captured content hidden)";
-  if (!Array.isArray(scope) || scope.length === 0) return missing("R01", title, ["scope.json"]);
-  const without = scope.filter((row) => !row.privacy).map((row) => row.projectId);
+function r01({ resolution }) {
+  const title = "Old projects do not resolve a data-privacy policy (captured content hidden)";
+  if (!Array.isArray(resolution) || resolution.length === 0) {
+    return missing("R01", title, ["resolution.json"]);
+  }
+  const without = resolution.filter((row) => !row.privacy).map((row) => row.projectId);
   return {
     id: "R01",
     title,
     verdict: without.length > 0 ? VERDICT.reproduced : VERDICT.notReproduced,
-    detail: `${without.length} of ${scope.length} seeded projects have no DataPrivacyProjectScope row${without.length ? `: ${without.join(", ")}` : ""}`,
-    evidence: ["scope.json"],
+    detail: `${without.length} of ${resolution.length} seeded projects do not resolve a privacy policy${without.length ? `: ${without.join(", ")}` : ""}`,
+    evidence: ["resolution.json"],
   };
 }
 
-function r02({ scope, headWorkerLog, queuesSettled }) {
+function r02({ resolution, headWorkerLog, queuesSettled }) {
   const title = "Trace projections throw ProjectNotFoundError for old projects";
   if (typeof headWorkerLog !== "string") return missing("R02", title, ["logs/head-worker.log"]);
   const thrown = matchingLines({ log: headWorkerLog, pattern: /ProjectNotFoundError/ }).length;
-  const withoutRetention = Array.isArray(scope)
-    ? scope.filter((row) => !row.retention).length
+  const unresolved = Array.isArray(resolution)
+    ? resolution.filter((row) => !row.retention || !row.folded).length
     : null;
   const dead = queuesSettled ? summariseQueues({ pairs: queuesSettled }).deadLetteredTotal : null;
   return {
     id: "R02",
     title,
     verdict: thrown > 0 ? VERDICT.reproduced : VERDICT.notReproduced,
-    detail: `${thrown} ProjectNotFoundError lines on the head worker; ${dead ?? "unknown"} jobs dead-lettered when phase 2 ended (the 2.6 h retry window may not have elapsed); ${withoutRetention ?? "unknown"} seeded projects without a DataRetentionProjectScope row`,
-    evidence: ["logs/head-worker.log", "queues-settled.json", "scope.json"],
+    detail: `${thrown} ProjectNotFoundError lines on the head worker; ${dead ?? "unknown"} jobs dead-lettered when phase 2 ended (the 2.6 h retry window may not have elapsed); ${unresolved ?? "unknown"} seeded projects without a resolved retention or a folded trace`,
+    evidence: ["logs/head-worker.log", "queues-settled.json", "resolution.json"],
   };
 }
 
@@ -225,7 +227,7 @@ function readEvidence({ dir }) {
   return {
     run,
     headImage: run.headImage,
-    scope: json("scope.json"),
+    resolution: json("resolution.json"),
     steps: json("ledger-steps.json"),
     roster: json("ledger-roster.json"),
     drill: json("f2-drill.json"),

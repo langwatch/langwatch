@@ -259,8 +259,7 @@ export class WebModule<
 
   /**
    * Lends to peers by token: a component, operations or hooks token this module owns, or any
-   * module's extension token. The default is checked against the token's shape and, until the
-   * string path goes, also declared under the token's name for `declared(name)`.
+   * module's extension token. The default is checked against the token's shape.
    */
   lends<Props>(
     token: OwnedBy<UiComponentToken<Props>, Name> | UiExtensionToken<Props>,

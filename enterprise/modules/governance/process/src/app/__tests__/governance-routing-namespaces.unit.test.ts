@@ -10,9 +10,9 @@ import { governanceProcessModule } from "../../governance.module.ts";
 describe("the governance module", () => {
   /** @scenario "Governance serves neither routing policies nor personal virtual keys" */
   it("serves neither routingPolicy nor personalVirtualKeys", () => {
-    const namespaces = (governanceProcessModule.transports ?? []).map(
-      (transport) => transport.namespace,
-    );
+    const transports = governanceProcessModule.transports;
+    if (!transports) throw new Error("the governance module declares no transports");
+    const namespaces = transports.map((transport) => transport.namespace);
 
     expect(namespaces).not.toContain("routingPolicy");
     expect(namespaces).not.toContain("personalVirtualKeys");

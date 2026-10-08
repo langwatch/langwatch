@@ -9,9 +9,9 @@ import { gatewayProcessModule } from "../../gateway.module.ts";
 describe("the core gateway module", () => {
   /** @scenario "Core gateway serves neither routing policies nor personal virtual keys" */
   it("serves neither routingPolicy nor personalVirtualKeys", () => {
-    const namespaces = (gatewayProcessModule.transports ?? []).map(
-      (transport) => transport.namespace,
-    );
+    const transports = gatewayProcessModule.transports;
+    if (!transports) throw new Error("the gateway module declares no transports");
+    const namespaces = transports.map((transport) => transport.namespace);
 
     expect(namespaces).not.toContain("routingPolicy");
     expect(namespaces).not.toContain("personalVirtualKeys");

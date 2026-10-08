@@ -5,8 +5,9 @@
  */
 
 import { defineBrowserModule } from "@langwatch/browser";
-import { ResourceLimitRowToken } from "@langwatch/enterprise-licensing-client";
+import { ResourceLimitRowToken, UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
 
+import { useUpgradeModalStore } from "./model/upgrade-modal-store.ts";
 import { reportLicenseFailure } from "./ui/sections/license-error-interceptor/index.ts";
 
 export const licensingWeb = defineBrowserModule("licensing")
@@ -32,6 +33,16 @@ export const licensingWeb = defineBrowserModule("licensing")
       within: "settings",
       label: "Connect",
       load: () => import("./ui/sections/connect.screen.tsx"),
+    },
+  })
+  /** The upgrade modal's openers, for screens that hit a limit (§10.1). */
+  .lends(UpgradeModalToken, {
+    value: {
+      open: (limitType, current, max) =>
+        useUpgradeModalStore.getState().open(limitType, current, max),
+      openSeats: (request) => useUpgradeModalStore.getState().openSeats(request),
+      openLiteMemberRestriction: (request) =>
+        useUpgradeModalStore.getState().openLiteMemberRestriction(request),
     },
   })
   /** The usage row billing and organization both draw (§3.4 rule 7). */

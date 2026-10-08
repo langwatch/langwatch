@@ -19,3 +19,16 @@ Feature: Gateway operator tasks
     When the "virtual-key-config-backfill" task runs with --execute
     Then it mints the routing policy at the key's scopes and strips the legacy keys from the key's config
     And without --execute it leaves the stored key as it was
+
+  @unit
+  Scenario: The virtual-key config backfill walks every page of organizations
+    Given the organization module lists its ids in pages
+    When the "virtual-key-config-backfill" task runs
+    Then it follows each page's cursor until none is left
+    And it reads the keys of every organization on every page
+
+  @unit
+  Scenario: The virtual-key config backfill ends on an empty page of organizations
+    Given the organization module lists no organization ids
+    When the "virtual-key-config-backfill" task runs
+    Then the scan ends after that page and reads no keys

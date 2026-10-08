@@ -113,6 +113,7 @@ vi.mock("@langwatch/evaluator-client", () => ({
 }));
 
 vi.mock("@langwatch/prompt-client", () => ({
+  PromptEditorDrawerToken: { id: "promptEditor" },
   promptClient: {
     useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },

@@ -69,10 +69,11 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withEventing(gatewayRealtimeSessionEventing)
   .withEventing(gatewayPulledUsageLedgerEventing)
   .withEventing(gatewayInstantEvalJudgeSpendEventing)
-  .withTasks(({ repositories }) => [
+  .withTasks(({ repositories, dependencies }) => [
     TraceDestinationReportTask.create({ repository: () => repositories.traceDestinationReport }),
     VirtualKeyConfigBackfillTask.create({
       repository: () => repositories.virtualKeyConfigBackfill,
+      organizations: dependencies.organizations,
     }),
   ])
   .withTransportFacts(({ app }) => {

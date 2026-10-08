@@ -258,6 +258,20 @@ phase1_overlap() {
   fi
 }
 
+# One row per seeded project: its privacy and retention scope rows (Postgres) and a folded trace
+# summary (ClickHouse trace_summaries, TenantId = project id), read-only.
+collect_resolution() {
+  local projects folded
+  projects="$(psql_json "SELECT p.id AS \"projectId\", dp.\"projectId\" IS NOT NULL AS privacy, dr.\"projectId\" IS NOT NULL AS retention FROM mydb.\"Project\" p LEFT JOIN mydb.\"DataPrivacyProjectScope\" dp ON dp.\"projectId\" = p.id LEFT JOIN mydb.\"DataRetentionProjectScope\" dr ON dr.\"projectId\" = p.id WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%' ORDER BY p.id")"
+  folded="$(compose exec -T clickhouse clickhouse-client --password langwatch --database langwatch --query "SELECT DISTINCT TenantId FROM trace_summaries WHERE TenantId LIKE 'rh\\_${RUN_ID}\\_%' FORMAT JSONEachRow" 2>/dev/null || true)"
+  node -e '
+    const projects = JSON.parse(process.argv[1]);
+    const folded = new Set(process.argv[2].split("\n").filter(Boolean).map((l) => JSON.parse(l).TenantId));
+    const rows = projects.map((p) => ({ projectId: p.projectId, privacy: p.privacy, retention: p.retention, folded: folded.has(p.projectId) }));
+    process.stdout.write(JSON.stringify(rows));
+  ' "$projects" "$folded" >"$RUN_DIR/evidence/resolution.json"
+}
+
 phase2_collect() {
   log "phase 2: settling for up to ${SETTLE_SECONDS}s"
   local deadline=$((SECONDS + SETTLE_SECONDS)) open
@@ -269,7 +283,7 @@ phase2_collect() {
   ledger_query ledger-steps.json
   psql_json "SELECT step_id, target, status, version, last_error FROM \"mydb_upgrade_ledger\".\"_langwatch_upgrade_target\" ORDER BY step_id, target" >"$RUN_DIR/evidence/ledger-targets.json"
   psql_json "SELECT process_id, role, image, release, steps, heartbeat_at FROM \"mydb_upgrade_ledger\".\"_langwatch_serving_roster\"" >"$RUN_DIR/evidence/ledger-roster.json"
-  psql_json "SELECT p.id AS \"projectId\", dp.\"projectId\" IS NOT NULL AS privacy, dr.\"projectId\" IS NOT NULL AS retention FROM mydb.\"Project\" p LEFT JOIN mydb.\"DataPrivacyProjectScope\" dp ON dp.\"projectId\" = p.id LEFT JOIN mydb.\"DataRetentionProjectScope\" dr ON dr.\"projectId\" = p.id WHERE p.id LIKE 'rh\\_${RUN_ID}\\_%' ORDER BY p.id" >"$RUN_DIR/evidence/scope.json"
+  collect_resolution
   snapshot_queues queues-settled.json
   curl -s "http://localhost:${HEAD_WORKER_METRICS_PORT}/metrics" >"$RUN_DIR/evidence/head-worker.metrics" || rm -f "$RUN_DIR/evidence/head-worker.metrics"
   local svc

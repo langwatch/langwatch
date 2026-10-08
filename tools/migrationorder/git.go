@@ -30,8 +30,8 @@ func (r Repo) Inputs(ctx context.Context, baseRef string, releasedRefs ...string
 	mergeBase = strings.TrimSpace(mergeBase)
 
 	inputs := make([]Input, 0, len(Sets))
-	for _, set := range Sets {
-		in, err := r.input(ctx, set, comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
+	for i := range Sets {
+		in, err := r.input(ctx, Sets[i], comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
 		if err != nil {
 			return nil, err
 		}

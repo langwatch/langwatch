@@ -5,7 +5,6 @@
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   SeatProrationPreviewToken,
@@ -14,6 +13,7 @@ import {
 import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { useUpgradeModalStore } from "../../../../model/upgrade-modal-store.ts";
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
 const renderGate = (isSaaS: boolean) =>

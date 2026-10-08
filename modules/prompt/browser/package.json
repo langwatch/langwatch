@@ -31,6 +31,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-client": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-client": "workspace:*",

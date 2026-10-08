@@ -7,14 +7,14 @@ import { evaluate, NOWG_STEP_IDS, renderReport, summariseQueues, VERDICT } from 
 const HEAD = "langwatch-rehearsal:head";
 const finding = (evidence, id) => evaluate(evidence).find((f) => f.id === id);
 
-void describe("R01, the privacy scope", () => {
-  /** @scenario "Old projects with no privacy scope row after the upgrade reproduce R01" */
-  void it("is reproduced and names the projects without a row", () => {
+void describe("R01, privacy resolution", () => {
+  /** @scenario "Old projects with no resolved privacy policy after the upgrade reproduce R01" */
+  void it("is reproduced and names the projects unresolved", () => {
     const r01 = finding(
       {
-        scope: [
-          { projectId: "rh_1_p_team", privacy: false, retention: false },
-          { projectId: "rh_1_p_org_b", privacy: true, retention: true },
+        resolution: [
+          { projectId: "rh_1_p_team", privacy: false, retention: false, folded: false },
+          { projectId: "rh_1_p_org_b", privacy: true, retention: true, folded: true },
         ],
       },
       "R01",
@@ -25,13 +25,16 @@ void describe("R01, the privacy scope", () => {
     assert.doesNotMatch(r01.detail, /rh_1_p_org_b/);
   });
 
-  void it("is not reproduced when every seeded project has a row", () => {
-    const r01 = finding({ scope: [{ projectId: "p", privacy: true, retention: true }] }, "R01");
+  void it("is not reproduced when every seeded project resolves a policy", () => {
+    const r01 = finding(
+      { resolution: [{ projectId: "p", privacy: true, retention: true, folded: true }] },
+      "R01",
+    );
     assert.equal(r01.verdict, VERDICT.notReproduced);
   });
 });
 
-void describe("R02, the retention scope", () => {
+void describe("R02, retention resolution and the trace fold", () => {
   /** @scenario "A head worker that throws ProjectNotFoundError reproduces R02" */
   void it("is reproduced with the count of lines and of dead-lettered jobs", () => {
     const r02 = finding(
@@ -42,7 +45,7 @@ void describe("R02, the retention scope", () => {
           '{"level":"warn","msg":"retrying ProjectNotFoundError"}',
         ].join("\n"),
         queuesSettled: ["{q}:gq:dlq:t1/agg:jobs", "3", "{q}:gq:group:t1/agg:jobs", "1"],
-        scope: [{ projectId: "p", privacy: false, retention: false }],
+        resolution: [{ projectId: "p", privacy: false, retention: false, folded: false }],
       },
       "R02",
     );
@@ -151,7 +154,7 @@ void describe("missing evidence", () => {
       findings.map((f) => f.verdict),
       findings.map(() => VERDICT.inconclusive),
     );
-    assert.match(findings.find((f) => f.id === "R01").detail, /scope\.json/);
+    assert.match(findings.find((f) => f.id === "R01").detail, /resolution\.json/);
     assert.match(findings.find((f) => f.id === "Q09").detail, /queues-cut\.json/);
   });
 

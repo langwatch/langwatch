@@ -49,8 +49,6 @@ export type MintGuardrailInput = Readonly<{
  * predicate on every VirtualKey read.
  */
 export abstract class GatewayVirtualKeyConfigBackfillRepository {
-  abstract findOrganizationIds(): Promise<string[]>;
-
   abstract findVirtualKeys(input: { organizationId: string }): Promise<VirtualKeyRow[]>;
 
   abstract mintRoutingPolicy(input: MintRoutingPolicyInput): Promise<string>;

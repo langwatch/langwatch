@@ -128,7 +128,7 @@ export class CodexSpanCanonicaliserService {
       return;
     }
 
-    if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES[ctx.span.name] === true) {
+    if (CODEX_REDUNDANT_USAGE_SPAN_NAMES[ctx.span.name] !== true) {
       return;
     }
 

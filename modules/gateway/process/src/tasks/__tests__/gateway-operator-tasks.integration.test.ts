@@ -83,6 +83,12 @@ describe("the gateway's operator tasks over its own stores", () => {
       });
       const task = VirtualKeyConfigBackfillTask.create({
         repository: () => world.repositories.virtualKeyConfigBackfill,
+        organizations: {
+          listAllIds: async () => ({
+            ids: world.store.organizations.map((organization) => organization.id),
+            next: null,
+          }),
+        },
       });
       return { ...world, task };
     }

@@ -28,9 +28,6 @@
       "path": "../design-system/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {

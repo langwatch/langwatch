@@ -6,6 +6,7 @@ import {
   replayLeanOf,
   replayProjectionsOf,
   type RetentionPolicyResolver,
+  unionReplayTenants,
   upcastReplayEventSource,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
@@ -25,6 +26,7 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
       redis: RedisConnection;
       clickhouse: ClickHouseQueryClient;
       eventing: Pick<EventSourcing, "definitions">;
+      privateTenants?: () => AsyncIterable<string>;
     }>,
   ) {
     super();
@@ -34,12 +36,13 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
     redis: RedisConnection;
     clickhouse: ClickHouseQueryClient;
     eventing: Pick<EventSourcing, "definitions">;
+    privateTenants?: () => AsyncIterable<string>;
   }): LiveReplayRuntimeRepository {
     return new LiveReplayRuntimeRepository(members);
   }
 
   create({ retention }: { retention: RetentionPolicyResolver }): OpsReplayRuntime {
-    const { redis, clickhouse, eventing } = this.members;
+    const { redis, clickhouse, eventing, privateTenants } = this.members;
     if (redis.isCluster) {
       throw new Error(
         "Replay requires a standalone Redis: a Cluster refuses its multi-key operations.",
@@ -47,14 +50,18 @@ export class LiveReplayRuntimeRepository extends ReplayRuntimeRepository {
     }
     const connection = redis.duplicate();
     const definitions = eventing.definitions;
-    const service = new EventingReplayService({
-      eventSource: upcastReplayEventSource({
-        source: new EventingClickHouseReplayEventSource({
-          clickhouse,
-          lean: replayLeanOf(definitions),
-        }),
-        upcasts: pipelineUpcastsOf(definitions),
+    const logSource = upcastReplayEventSource({
+      source: new EventingClickHouseReplayEventSource({
+        clickhouse,
+        lean: replayLeanOf(definitions),
       }),
+      upcasts: pipelineUpcastsOf(definitions),
+    });
+    const service = new EventingReplayService({
+      eventSource:
+        privateTenants === undefined
+          ? logSource
+          : unionReplayTenants({ source: logSource, listTenants: privateTenants }),
       redis: connection,
       retentionPolicyResolver: retention,
     });
