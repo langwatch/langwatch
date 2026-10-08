@@ -202,6 +202,20 @@ Feature: An aggregate project reads its member projects
     When ana creates a project from "Create New Project" without checking "Governance"
     Then the request names no project kind and no rule, as before
 
+  @integration
+  Scenario: A project list that fails to load never shows the server's own words
+    Given listing the projects ana may pick fails for a reason we cannot name
+    When ana checks "Governance"
+    Then she reads that the projects could not be listed and to try again
+    And she can copy the error ID
+    And the server's own message, which names the request it made, is not shown
+
+  @integration
+  Scenario: A project list refused to a non-admin says who can pick projects
+    Given listing the projects sam may pick is refused because sam is not an organisation admin
+    When the picker shows the refusal
+    Then sam reads that only organisation admins can do this
+
   @unit
   Scenario: A rule that names a project in another organisation is refused
     When a rule names a project that belongs to a different organisation

@@ -27,6 +27,10 @@ const ORG_ID = "org-acme";
 
 let organizationRole: "ADMIN" | "MEMBER" = "ADMIN";
 let mutateCalls: Array<Record<string, unknown>> = [];
+let candidatesQuery: { data: unknown; error: unknown } = {
+  data: null,
+  error: null,
+};
 
 const CANDIDATES = [
   {
@@ -93,7 +97,7 @@ vi.mock("../../../utils/api", () => ({
         }),
       },
       aggregateMemberCandidates: {
-        useQuery: () => ({ data: CANDIDATES, error: null }),
+        useQuery: () => candidatesQuery,
       },
     },
     team: {
@@ -122,6 +126,7 @@ describe("<CreateProjectDrawer/> Governance", () => {
   beforeEach(() => {
     organizationRole = "ADMIN";
     mutateCalls = [];
+    candidatesQuery = { data: CANDIDATES, error: null };
   });
 
   afterEach(() => {
@@ -207,6 +212,92 @@ describe("<CreateProjectDrawer/> Governance", () => {
         });
         expect(mutateCalls[0]).not.toHaveProperty("kind");
         expect(mutateCalls[0]).not.toHaveProperty("aggregateRule");
+      });
+    });
+  });
+
+  describe("given listing the projects to pick fails", () => {
+    const MISSING_PROCEDURE = `No procedure found on path "project.aggregateMemberCandidates"`;
+
+    describe("when the server answers with a message of its own", () => {
+      /** @scenario "A project list that fails to load never shows the server's own words" */
+      it("shows the picker's own copy and the error ID, never the server's message", async () => {
+        // The answer a server without the procedure sends: tRPC writes the
+        // message itself, with no cause, so the boundary marks it authored.
+        candidatesQuery = {
+          data: undefined,
+          error: {
+            message: MISSING_PROCEDURE,
+            data: {
+              code: "NOT_FOUND",
+              httpStatus: 404,
+              path: "project.aggregateMemberCandidates",
+              error: null,
+              authored: true,
+              traceId: "trace-acme-1",
+            },
+          },
+        };
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByRole("checkbox", { name: "Governance" }));
+
+        const alert = screen.getByRole("alert");
+        expect(
+          within(alert).getByText("Couldn't list this organization's projects"),
+        ).toBeVisible();
+        expect(
+          within(alert).getByText(
+            "We've been notified. Try again in a moment.",
+          ),
+        ).toBeVisible();
+        // The copy button where a clipboard API exists, the id as selectable
+        // text where it does not (jsdom, unless user-event has stubbed one).
+        const errorId =
+          within(alert).queryByRole("button", { name: /Copy error ID/ }) ??
+          within(alert).queryByText("Error ID: trace-acme-1");
+        expect(errorId).toBeVisible();
+        expect(screen.queryByText(MISSING_PROCEDURE)).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/aggregateMemberCandidates/),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the server refuses a caller who is not an organisation admin", () => {
+      /** @scenario "A project list refused to a non-admin says who can pick projects" */
+      it("says only organisation admins can do this", async () => {
+        candidatesQuery = {
+          data: undefined,
+          error: {
+            message: "aggregate_project_admin_only",
+            data: {
+              code: "FORBIDDEN",
+              httpStatus: 403,
+              error: {
+                code: "aggregate_project_admin_only",
+                httpStatus: 403,
+                fault: "customer",
+                traceId: "trace-acme-2",
+              },
+              authored: false,
+              traceId: "trace-acme-2",
+            },
+          },
+        };
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByRole("checkbox", { name: "Governance" }));
+
+        const alert = screen.getByRole("alert");
+        expect(
+          within(alert).getByText("Only organization admins can do this"),
+        ).toBeVisible();
+        expect(
+          screen.queryByText("aggregate_project_admin_only"),
+        ).not.toBeInTheDocument();
       });
     });
   });
