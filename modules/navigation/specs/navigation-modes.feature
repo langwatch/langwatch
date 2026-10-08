@@ -57,3 +57,9 @@ Feature: Navigation modes
     When I open a shared trace page
     Then the page renders in a plain frame with a sign-in entry
     And no navigation mode is consulted
+
+  @integration
+  Scenario: The avatar menu offers the reduced graphics switch and remembers the pick
+    When I open the avatar menu
+    Then a "Reduced graphics" entry shows the current setting
+    And picking "On" is remembered on the device

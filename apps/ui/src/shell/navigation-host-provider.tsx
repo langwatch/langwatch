@@ -13,6 +13,11 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import {
+  setGraphicsQualityOverride,
+  useGraphicsQualityOverrideStore,
+  type GraphicsQualityOverride,
+} from "@langwatch/browser-host/facilities";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
@@ -81,6 +86,16 @@ function rememberScope({
  * an empty one: every scope answer below is read off that one query, so
  * rendering the chrome around a refusal would leave it empty forever.
  */
+const GRAPHICS_QUALITY_LABELS: Record<GraphicsQualityOverride, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
+
+function setGraphicsQualityFromMenu(value: string): void {
+  if (value === "auto" || value === "on" || value === "off") setGraphicsQualityOverride(value);
+}
+
 export function UiNavigationHost({
   children,
   commandBar = false,
@@ -258,20 +273,27 @@ function useNavigationHostReading({
   // The header carries ops's impersonation banner whenever the session says so
   // (specs/auth/impersonation-banner.feature). Presence is offered only on the
   // surface that broadcasts it, its switches off the graph already read.
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore();
   const accountMenu = useMemo<NavigationAccountMenu>(() => {
     const ImpersonationBanner = impersonationBanner.default;
     const headerBanner = currentUser?.impersonator ? (
       <ImpersonationBanner user={currentUser} />
     ) : null;
-    if (!offersPresenceMenuItem(routePattern)) return { headerBanner };
+    const graphicsQuality = {
+      value: graphicsQualityOverride,
+      label: GRAPHICS_QUALITY_LABELS[graphicsQualityOverride],
+      set: setGraphicsQualityFromMenu,
+    };
+    if (!offersPresenceMenuItem(routePattern)) return { headerBanner, graphicsQuality };
     const flags = presenceFlagsOf({
       read,
       organizationId: activeScope.organizationId,
       projectId: activeScope.projectId,
     });
     const PresenceMenuItem = presenceMenuItem.default;
-    return { headerBanner, presence: <PresenceMenuItem {...flags} /> };
+    return { headerBanner, graphicsQuality, presence: <PresenceMenuItem {...flags} /> };
   }, [
+    graphicsQualityOverride,
     routePattern,
     read,
     activeScope.organizationId,

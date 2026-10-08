@@ -18,11 +18,12 @@ import {
   type UiCapabilities,
   UiScope,
 } from "@langwatch/browser-host/capabilities";
+import { resetGraphicsQualityOverrideForTests } from "@langwatch/browser-host/facilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { UiDesignSystemShell } from "@langwatch/browser/outer-providers";
 import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -160,9 +161,14 @@ function HostProbe() {
       data-loading={String(host.isLoading())}
       data-organizations={host.organizations().length}
       data-presence={host.accountMenu()?.presence ? "offered" : "absent"}
+      data-graphics={host.accountMenu()?.graphicsQuality?.label ?? "absent"}
       data-langy={host.langy() ? "offered" : "absent"}
       data-flag={JSON.stringify(host.featureFlag("release_langy_enabled"))}
-    />
+    >
+      <button type="button" onClick={() => host.accountMenu()?.graphicsQuality?.set("on")}>
+        reduce graphics
+      </button>
+    </div>
   );
 }
 
@@ -360,6 +366,21 @@ describe("the application chrome", () => {
     await waitFor(() =>
       expect(screen.getByTestId("probe").getAttribute("data-presence")).toBe("offered"),
     );
+  });
+
+  /** @scenario The avatar menu offers the reduced graphics switch and remembers the pick */
+  it("offers the reduced graphics switch and persists the pick", async () => {
+    resetGraphicsQualityOverrideForTests();
+    renderChrome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("Auto"),
+    );
+    act(() => screen.getByRole("button", { name: "reduce graphics" }).click());
+    await waitFor(() =>
+      expect(screen.getByTestId("probe").getAttribute("data-graphics")).toBe("On"),
+    );
+    resetGraphicsQualityOverrideForTests();
   });
 
   it("draws the address bare when no application shell answers, rather than throwing", () => {
