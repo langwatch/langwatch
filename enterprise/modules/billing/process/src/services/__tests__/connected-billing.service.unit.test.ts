@@ -341,7 +341,7 @@ describe("renewing a term", () => {
 });
 
 describe("an invoice paid outside the payment provider", () => {
-  /** @scenario "Finance marks an invoice paid out of band from the backoffice" */
+  /** @scenario "Finance marks an invoice paid out of band from the admin console" */
   it("tells the provider and records when the money arrived", async () => {
     const { invoicing, repository, service } = harness();
     const account = await service.onboard(onboarding());

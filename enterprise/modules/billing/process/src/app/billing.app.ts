@@ -185,7 +185,7 @@ export class BillingModule
   static readonly dependencies = {
     /** The commit and the contract budget live on the license, not here. */
     licensing: LicensingApi,
-    /** The platform-operator grant the backoffice commands are checked against. */
+    /** The platform-operator grant the admin console commands are checked against. */
     authorization: AuthzApi,
     /** Which organizations are connected customers, and their projects. */
     organizations: OrganizationApi,
@@ -1044,7 +1044,7 @@ export class BillingModule
     });
   }
 
-  /** Audit-log writes each backoffice command's row from billing's fact (round 37 D3). */
+  /** Audit-log writes each admin console command's row from billing's fact (round 37 D3). */
   #audited(): BillingLifecycleAnnouncerService {
     if (!this.#lifecycle) {
       throw new Error("This billing app was composed without a lifecycle pipeline");

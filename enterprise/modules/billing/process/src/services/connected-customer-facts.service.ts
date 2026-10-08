@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * What a connected customer's statement and backoffice overview read from the
+ * What a connected customer's statement and admin console overview read from the
  * modules that own it (ADR-156 section 7): the customers from the organization
  * directory, the contract budget and seats from the license registry; spend
  * and projects through gateway's and project's shares (round 37 D5).

@@ -258,7 +258,7 @@ describe("the installed billing application", () => {
     });
   });
 
-  describe("given the backoffice", () => {
+  describe("given the admin console", () => {
     it("shows a staff member a customer never onboarded, with the license's terms and seats", async () => {
       const { app } = billingApp({ isSaas: true, withStripe: true });
 
@@ -286,7 +286,7 @@ describe("the installed billing application", () => {
     });
 
     /** @scenario A platform operator's billing command records an audit fact for audit-log */
-    it("records who read a customer's billing, as main's backoffice did", async () => {
+    it("records who read a customer's billing, as main's admin console did", async () => {
       const { app, audited } = billingApp({ isSaas: true, withStripe: true });
 
       await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF);

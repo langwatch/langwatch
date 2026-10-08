@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * What the backoffice shows about a connected customer's commercial state
+ * What the admin console shows about a connected customer's commercial state
  * (ADR-156 section 7). The drawdown comes from LangWatch's own budget ledger,
  * never the payment provider's credit balance, which settles only when an
  * invoice is finalized; unread, it is null and the screen says so.
@@ -79,7 +79,7 @@ export class ConnectedBillingOverviewService {
     };
   }
 
-  /** An account as the backoffice reads it back after a command. */
+  /** An account as the admin console reads it back after a command. */
   viewAccount(account: ConnectedBillingAccountRecord): ConnectedBillingAccountView {
     return accountView(account);
   }

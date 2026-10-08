@@ -21,7 +21,7 @@ import type {
 import type { RenewalCompletion } from "./connected-billing.ts";
 
 /**
- * The staff member the platform door admitted for a backoffice command: the
+ * The staff member the platform door admitted for an admin console command: the
  * impersonator where one is borrowing a customer's session.
  */
 export type BillingStaff = Readonly<{ id: string; email?: string | null | undefined }>;
@@ -30,7 +30,7 @@ export type BillingStaff = Readonly<{ id: string; email?: string | null | undefi
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
  * off LangWatch Cloud, and where no payment provider is configured. The
- * backoffice operations trust the platform door (Q43): staff only, writes need ops:manage.
+ * admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
  */
 export interface BillingApi {
   /** The commercial state of one connected customer. */

@@ -90,7 +90,7 @@ export class SeatEventSubscriptionService {
     const active = candidates.filter((s) => s.status === SubscriptionStatus.ACTIVE);
 
     // Two live plans on one account: refuse, do not choose. There is no unique
-    // index on `organizationId`, and the backoffice form writes ACTIVE rows
+    // index on `organizationId`, and the admin console form writes ACTIVE rows
     // with no uniqueness check, so this state is reachable and the row that
     // still carries a provider id is not reliably the one the operator meant
     // to keep. Charging either is a coin flip against a customer's card.

@@ -515,7 +515,7 @@ describe("seatEventSubscription", () => {
     describe("when the organization has two active subscriptions", () => {
       /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
       it("refuses rather than charging whichever one still carries a link", async () => {
-        // Reachable through the backoffice subscription form, which writes any
+        // Reachable through the admin console subscription form, which writes any
         // status against any organization with no uniqueness check behind it.
         // Preferring the linked row would charge the older plan even when the
         // newer one was added to supersede it.

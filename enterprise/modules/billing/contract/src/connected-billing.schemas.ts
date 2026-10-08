@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Invoice billing for a connected customer as the backoffice reads and writes
+ * Invoice billing for a connected customer as the admin console reads and writes
  * it (ADR-156 section 7). Instants travel as ISO strings: tRPC carries no transformer.
  */
 

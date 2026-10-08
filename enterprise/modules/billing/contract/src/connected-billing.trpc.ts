@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * `connectedBilling.*`: the backoffice's invoice billing for a connected
+ * `connectedBilling.*`: the admin console's invoice billing for a connected
  * customer, gated on the platform-operator grant and answered 404 to anybody else.
  */
 import { defineTrpcContract } from "@langwatch/module";
