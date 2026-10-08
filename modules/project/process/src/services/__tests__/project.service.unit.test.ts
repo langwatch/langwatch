@@ -112,7 +112,9 @@ class StubRepository implements ProjectRepository {
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
   findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
-  findLiveNonGovernanceIds = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
+  findLiveNonGovernanceIds = vi.fn<
+    (input: { organizationId: string; includeArchived: boolean }) => Promise<string[]>
+  >(async () => []);
   findLiveByIdInOrganization = vi.fn(async (): Promise<Project[]> => []);
   findLiveBySlugInOrganization = vi.fn(async (): Promise<Project[]> => []);
   countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
@@ -826,6 +828,27 @@ describe("ProjectService", () => {
       createService(repository).listIdsByOrganization({ organizationId: "org" }),
     ).resolves.toEqual(["project_1", "project_2"]);
     expect(repository.findIdsByOrganization).toHaveBeenCalledWith("org");
+  });
+
+  /** @scenario "The model-defaults scope picker offers an archived project" */
+  it("passes includeArchived to the live read, defaulting to false", async () => {
+    const repository = new StubRepository();
+    const service = createService(repository);
+
+    await service.findLiveNonGovernanceIdsByOrganization({ organizationId: "org" });
+    await service.findLiveNonGovernanceIdsByOrganization({
+      organizationId: "org",
+      includeArchived: true,
+    });
+
+    expect(repository.findLiveNonGovernanceIds).toHaveBeenNthCalledWith(1, {
+      organizationId: "org",
+      includeArchived: false,
+    });
+    expect(repository.findLiveNonGovernanceIds).toHaveBeenNthCalledWith(2, {
+      organizationId: "org",
+      includeArchived: true,
+    });
   });
 
   it("bounds active project scope queries and reports another page", async () => {

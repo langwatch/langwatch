@@ -407,7 +407,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   }
 
   findLiveNonGovernanceIdsByOrganization(
-    input: projectContractModule.ProjectIdsByOrganizationInput,
+    input: projectContractModule.LiveProjectIdsByOrganizationInput,
   ): Promise<string[]> {
     return this.#projectService.findLiveNonGovernanceIdsByOrganization(input);
   }

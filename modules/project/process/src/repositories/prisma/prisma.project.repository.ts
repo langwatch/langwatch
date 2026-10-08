@@ -508,10 +508,16 @@ export class PrismaProjectRepository
     return projects.map((project) => project.id);
   }
 
-  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+  async findLiveNonGovernanceIds({
+    organizationId,
+    includeArchived,
+  }: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       where: {
-        archivedAt: null,
+        ...(includeArchived ? {} : { archivedAt: null }),
         team: { organizationId },
         kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
       },

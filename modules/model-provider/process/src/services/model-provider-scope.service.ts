@@ -140,7 +140,10 @@ export class ModelProviderScopeService {
     const [organization, teams, projectIds] = await Promise.all([
       this.organizations.getBillingProfile({ organizationId }),
       this.listTeams(organizationId),
-      this.projects.findLiveNonGovernanceIdsByOrganization({ organizationId }),
+      this.projects.findLiveNonGovernanceIdsByOrganization({
+        organizationId,
+        includeArchived: true,
+      }),
     ]);
     const projects = await this.projects.listNamesByIds({ projectIds });
 

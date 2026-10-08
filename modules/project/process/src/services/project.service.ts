@@ -5,12 +5,14 @@ import {
   internalProjectKindSchema,
   internalProjectQuerySchema,
   projectPaginationSchema,
+  liveProjectIdsByOrganizationInputSchema,
   projectIdsByOrganizationInputSchema,
   projectNamesByIdsInputSchema,
   projectPresenceInputSchema,
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
   type InternalProject,
+  type LiveProjectIdsByOrganizationInput,
   type InternalProjectKind,
   type InternalProjectQuery,
   type OrgAdminResolution,
@@ -330,10 +332,12 @@ export class ProjectService {
     return this.repository.findIdsByOrganization(parsed.organizationId);
   }
 
-  findLiveNonGovernanceIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
-    const parsed = projectIdsByOrganizationInputSchema.parse(input);
+  findLiveNonGovernanceIdsByOrganization(
+    input: LiveProjectIdsByOrganizationInput,
+  ): Promise<string[]> {
+    const parsed = liveProjectIdsByOrganizationInputSchema.parse(input);
 
-    return this.repository.findLiveNonGovernanceIds(parsed.organizationId);
+    return this.repository.findLiveNonGovernanceIds(parsed);
   }
 
   findLiveBySlug(input: { slug: string; organizationId: string }): Promise<Project[]> {

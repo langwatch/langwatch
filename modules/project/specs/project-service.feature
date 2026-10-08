@@ -205,3 +205,11 @@ Feature: Shared project service
     When the backfill-project-department-assigned task runs twice
     Then each run records each project's department, team and personal flag once, marked backfilled
     And each project's fact is keyed alike on both runs, so the second run records nothing new
+
+  @unit
+  Scenario: The model-defaults scope picker offers an archived project
+    Given an organization with a live project, an archived project and the hidden governance project
+    When the live non-governance project ids are read including archived projects
+    Then the live and the archived project are listed
+    And the governance project is not listed
+    And a read that does not ask for archived projects still leaves the archived one out

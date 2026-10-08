@@ -11,6 +11,7 @@ import type {
   PaginatedProjects,
   Project,
   ProjectIdentity,
+  LiveProjectIdsByOrganizationInput,
   ProjectIdsByOrganizationInput,
   ProjectNamesByIdsInput,
   ProjectWithTeam,
@@ -80,7 +81,9 @@ export interface ProjectApi {
   listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
   listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   /** Unarchived, non-governance project ids, unpaged: main's `findAllByOrganization` filter. */
-  findLiveNonGovernanceIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
+  findLiveNonGovernanceIdsByOrganization(
+    input: LiveProjectIdsByOrganizationInput,
+  ): Promise<string[]>;
   /** Main's CLI project-key read (auth-cli.ts:2092): a live project by slug, in one org. */
   findLiveBySlug(input: Readonly<{ slug: string; organizationId: string }>): Promise<Project[]>;
   /** Main's `findProjectInOrg` (auth-cli.ts:2533): a live project by id, else slug, in one org. */

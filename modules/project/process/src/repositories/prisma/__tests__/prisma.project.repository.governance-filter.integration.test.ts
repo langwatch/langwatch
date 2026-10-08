@@ -89,7 +89,10 @@ describe.skipIf(!DB_URL)("PrismaProjectRepository project lists over Postgres", 
       const departments = await repository.findProjectsWithDepartments({
         organizationId: ids.organization,
       });
-      const live = await repository.findLiveNonGovernanceIds(ids.organization);
+      const live = await repository.findLiveNonGovernanceIds({
+        organizationId: ids.organization,
+        includeArchived: false,
+      });
 
       expect(departments.map((project) => project.id)).toEqual([ids.application]);
       expect(live).toEqual([ids.application]);

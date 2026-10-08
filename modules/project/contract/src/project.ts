@@ -204,6 +204,12 @@ export const projectIdsByOrganizationInputSchema = z
   .strict();
 export type ProjectIdsByOrganizationInput = z.infer<typeof projectIdsByOrganizationInputSchema>;
 
+export const liveProjectIdsByOrganizationInputSchema =
+  projectIdsByOrganizationInputSchema.safeExtend({ includeArchived: z.boolean().default(false) });
+export type LiveProjectIdsByOrganizationInput = z.input<
+  typeof liveProjectIdsByOrganizationInputSchema
+>;
+
 export interface TraceSharingConfig {
   orgEnabled: boolean;
   projectEnabled: boolean;

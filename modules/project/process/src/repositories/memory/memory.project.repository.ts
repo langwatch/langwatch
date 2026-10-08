@@ -378,12 +378,18 @@ export class MemoryProjectRepository implements ProjectRepository {
       .map((project) => project.id);
   }
 
-  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+  async findLiveNonGovernanceIds({
+    organizationId,
+    includeArchived,
+  }: {
+    organizationId: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
     return this.#database
       .projects()
       .filter(
         (project) =>
-          project.archivedAt === null &&
+          (includeArchived || project.archivedAt === null) &&
           project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
           this.#database.isInOrganization(project, organizationId),
       )
