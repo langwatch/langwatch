@@ -11,6 +11,7 @@ export * from "./evaluation.performance.ts";
 export * from "./evaluator-effective-settings.ts";
 export * from "./evaluator-dispatch-data.ts";
 export * from "./evaluator-requirements.ts";
+export * from "./evaluator-id.ts";
 export * from "./evaluation.queries.ts";
 export * from "./evaluation.api.ts";
 export * from "./evaluation-rest.schemas.ts";

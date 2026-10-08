@@ -36,12 +36,10 @@ async function expectRefusal(
 function mount({
   projects = {},
   probePermission = async () => true,
-  fieldProtections = {},
   permits = () => true,
 }: {
   projects?: Partial<ProjectApi>;
   probePermission?: () => Promise<boolean>;
-  fieldProtections?: Record<string, unknown>;
   /**
    * The authorization answer for THIS request, at the scope the input named.
    * The door resolves it per call, so two calls with two answers are two
@@ -65,7 +63,6 @@ function mount({
     revokeProjectApiKey,
     getLegacyKeyStatus,
     probePermission: probe,
-    getFieldProtections: async () => fieldProtections,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
   };
 
@@ -93,7 +90,6 @@ describe("the project tRPC namespace", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "archiveById",
         "create",
-        "getFieldRedactionStatus",
         "getHasFirstMessage",
         "getLegacyKeyStatus",
         "revokeProjectApiKey",
@@ -537,23 +533,6 @@ describe("the project tRPC namespace", () => {
         }),
         { code: "project_slug_taken", httpStatus: 409 },
       );
-    });
-  });
-
-  describe("when the viewer's captured content is restricted", () => {
-    it("reports each field as redacted and who may still read it", async () => {
-      const { caller } = mount({
-        fieldProtections: {
-          canSeeCapturedInput: false,
-          canSeeCapturedOutput: true,
-          capturedInputVisibleTo: "Admins, Security",
-        },
-      });
-
-      await expect(caller.getFieldRedactionStatus({ projectId: "project_123" })).resolves.toEqual({
-        isRedacted: { input: true, output: false },
-        visibleTo: { input: "Admins, Security", output: null },
-      });
     });
   });
 });

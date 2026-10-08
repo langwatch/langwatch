@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { MemoryNullTraceListRepository } from "../../repositories/memory/memory.null-trace-list.repository.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const emptyResult = { values: [], totalDistinct: 0 };
@@ -22,7 +23,7 @@ function makeService() {
     discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
-    evaluations: undefined as never,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     topicNames: undefined as never,
   });
   return { repository, service };

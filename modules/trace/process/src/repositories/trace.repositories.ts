@@ -14,6 +14,7 @@ import type { TraceAttributedRollupRepository } from "./trace-attributed-rollup.
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
+import type { TraceEvaluationRunsReadRepository } from "./trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceExportSlotRepository } from "./trace-export-slot.repository.ts";
 import type { TraceIngestSourceBillingRepository } from "./trace-ingest-source-billing.repository.ts";
@@ -52,6 +53,8 @@ export interface TraceRepositories {
   readonly topicNames: TraceTopicNamesReadRepository;
   /** Instant-eval's runs, read through its shared table to date an Explorer eval chip. */
   readonly instantEvalRuns: TraceInstantEvalRunsReadRepository;
+  /** Evaluation's shared `evaluation_runs`, which trace's evaluation joins read (R40). */
+  readonly evaluationRuns: TraceEvaluationRunsReadRepository;
   /** Annotation's rows and score names, read through its shared tables for the legacy read. */
   readonly annotations: TraceAnnotationsReadRepository;
   readonly annotationScores: TraceAnnotationScoresReadRepository;

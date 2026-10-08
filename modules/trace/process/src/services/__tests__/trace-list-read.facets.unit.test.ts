@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 /**
  * The sidebar's counts read the list's own predicate (the active query, the
  * exact window, the hidden origins), each facet with its own field left out,
@@ -17,6 +16,7 @@ import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
 } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { createFacetFilterResolver } from "../../rules/trace-facet-filter.rules.ts";
 import {
   explorerOriginExclusion,
@@ -83,7 +83,7 @@ async function facetsFor({
     discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository,
-    evaluations: createApiFixture<EvaluationApi>({}),
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     topicNames: { findNamesByIds: async () => new Map() },
   });
   const facets = await service.getFacets({

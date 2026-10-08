@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 /**
  * Claude Code content enrichment at read time: real enrichment adapter + join,
  * mocked trace read and log-record store (no Docker).
@@ -134,7 +133,8 @@ const CLAUDE_LOG_ROWS = [
   ),
 ];
 
-function refusingEvaluations(): EvaluationApi {
+/** Evaluation's shared runs, which this test does not read. */
+function refusingEvaluations<T extends object>(): T {
   return new Proxy(
     {},
     {
@@ -142,7 +142,7 @@ function refusingEvaluations(): EvaluationApi {
         throw new Error("this test reads no evaluation behind a trace");
       },
     },
-  ) as EvaluationApi;
+  ) as T;
 }
 
 function makeService(
@@ -165,7 +165,7 @@ function makeService(
     editOverlay: {} as TraceEditOverlayService,
     logRecordStorage: { getLogsByTraceId },
     // The enrichment join reads no evaluation; a refusing double proves it.
-    evaluationService: refusingEvaluations(),
+    evaluationRuns: refusingEvaluations(),
   });
 }
 

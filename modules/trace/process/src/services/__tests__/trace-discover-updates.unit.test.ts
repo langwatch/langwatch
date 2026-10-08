@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 /**
  * A finished background discover refresh tells the tenant's open tabs to refetch.
@@ -9,6 +8,7 @@ import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 const TENANT = "tenant-discover-updates";
@@ -35,7 +35,7 @@ describe("the discover refresh push", () => {
       };
       const service = TraceListService.create({
         repository: emptyRepository(),
-        evaluations: createApiFixture<EvaluationApi>({}),
+        evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
         topicNames: { findNamesByIds: async () => new Map() },
         facets: CLICKHOUSE_FACET_CATALOG,
         discoverUpdates: updates,

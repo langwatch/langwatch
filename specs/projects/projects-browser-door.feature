@@ -25,10 +25,12 @@ Feature: The project.* browser namespace is served by the application the compos
     When somebody creates a project into a new team
     Then they are answered with the slug of the project created
 
-  Scenario: the redaction status reads the caller's own protections
+  # The door moved to traces.getFieldRedactionStatus with the protections' owner (CD-2,
+  # T2b 2026-10-08): modules/trace/specs/trace-viewer-protection.feature.
+  Scenario: the redaction status is read from traces, not project
     Given the project module installed over memory repositories
-    When somebody reads the project's field redaction status
-    Then the answer is resolved from the caller's own captured-content protections
+    When somebody reads the field redaction status on the project namespace
+    Then they are answered as for a procedure that does not exist
 
   # Project records the creation as a fact; Langy mints from its own side, so project never
   # names Langy (peer cycle cut, ARCHITECTURE.md §5 and §9).

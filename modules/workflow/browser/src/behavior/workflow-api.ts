@@ -17,6 +17,7 @@ import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import type { projectTrpc } from "@langwatch/project-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
+import type { tracesTrpc } from "@langwatch/trace-contract";
 import type { workflowOptimizationTrpc, workflowTrpc } from "@langwatch/workflow-contract";
 
 export type WorkflowApiMap = ContractApiMap<typeof workflowTrpc> &
@@ -28,7 +29,10 @@ export type WorkflowApiMap = ContractApiMap<typeof workflowTrpc> &
   ContractApiMap<typeof featureFlagTrpc> &
   ContractApiMap<typeof modelProviderTrpc> &
   ContractApiMap<typeof projectTrpc> &
-  ContractApiMap<typeof secretTrpc>;
+  ContractApiMap<typeof secretTrpc> & {
+    /** Whether a privacy rule hides input or output from this reader, and who can see it. */
+    traces: Pick<ContractApiMap<typeof tracesTrpc>["traces"], "getFieldRedactionStatus">;
+  };
 
 export const workflowApi = createModuleApi<WorkflowApiMap>();
 

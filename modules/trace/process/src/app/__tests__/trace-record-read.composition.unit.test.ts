@@ -11,7 +11,6 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { CLOUD_FREE_LICENSING_PLAN } from "@langwatch/plans";
 import { LocalFeatureApis } from "@langwatch/process";
@@ -87,7 +86,7 @@ function compose({
   askedOrganizations?: string[];
 }) {
   const apis = new LocalFeatureApis();
-  for (const token of [AuthzApi, DataRetentionApi, EvaluationApi, ModelProviderApi, ShareApi]) {
+  for (const token of [AuthzApi, DataRetentionApi, ModelProviderApi, ShareApi]) {
     apis.declare(token);
   }
   const refuse = () => Promise.reject(new Error("no datastore in this test"));
@@ -132,7 +131,6 @@ function compose({
       fallbackVisibilityDays: 14,
     },
     dataRetention: apis.reference(DataRetentionApi),
-    evaluations: apis.reference(EvaluationApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects,
     share: apis.reference(ShareApi),

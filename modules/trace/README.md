@@ -11,26 +11,25 @@ Traces: ingestion and canonicalisation of spans, the projections built from them
 | Classification | core (`modules/catalogue.json`)                                                                 |
 | Subjects       | trace, trace-ingestion                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)     |
-| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:936` (147 operations) |
+| Api token      | `TraceApi` = `moduleApi<TraceApi>()("trace")`, `contract/src/trace.api.ts:895` (140 operations) |
 | Other token    | `CollectorApi`, `process/src/transport/collector.rest.ts:94`                                    |
 | Other token    | `TrackedEventApi`, `process/src/transport/tracked-event.rest.ts:41`                             |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                      |
 
 ## What trace owns
 
-| Kind                      | Name                                                                                                                                                                                  | Declared at                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `trace_annotation_scores`                                                                                                                                                             | `process/src/repositories/clickhouse/clickhouse.trace-annotation-scores.repository.ts:72` |
-| ClickHouse table (writes) | `trace_annotations`                                                                                                                                                                   | `process/src/repositories/clickhouse/clickhouse.trace-annotations.repository.ts:103`      |
-| ClickHouse table (writes) | `trace_topic_names`                                                                                                                                                                   | `process/src/repositories/clickhouse/clickhouse.trace-topic-names.repository.ts:62`       |
-| ClickHouse table (writes) | `stored_log_records`                                                                                                                                                                  | `process/src/repositories/clickhouse/log-record-storage.repository.ts:76`                 |
-| ClickHouse table (writes) | `stored_spans`                                                                                                                                                                        | `process/src/repositories/clickhouse/span-storage.repository.ts:674`                      |
-| ClickHouse table (writes) | `trace_analytics_rollup`                                                                                                                                                              | `process/src/repositories/clickhouse/trace-analytics-rollup.repository.ts:92`             |
-| ClickHouse table (writes) | `trace_analytics`                                                                                                                                                                     | `process/src/repositories/clickhouse/trace-metrics-analytics.repository.ts:124`           |
-| ClickHouse table (writes) | `trace_summaries`                                                                                                                                                                     | `process/src/repositories/clickhouse/trace-summary.repository.ts:220`                     |
-| Stores required           | prisma, clickhouse, redis, rateLimiter, eventReadSeat                                                                                                                                 | `process/src/repositories/live/live.trace.repositories.ts:21`                             |
-| Stores required           | prisma, clickhouse                                                                                                                                                                    | `process/src/repositories/prisma/prisma.trace.repositories.ts:34`                         |
-| Config                    | `spanProcessingShards` (TRACE_SPAN_PROCESSING_SHARDS), `tokenizer.bpeDirectory` (TIKTOKENS_PATH), `tokenizer.fetchTimeoutMs` (TIKTOKEN_FETCH_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST) | `contract/src/trace.config.ts:9`                                                          |
+| Kind                      | Name                                                                                                                                                                                  | Declared at                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Postgres table            | `AnnotationScore`                                                                                                                                                                     | `process/src/repositories/prisma/prisma.trace-annotation-scores.repository.ts:7` |
+| Postgres table            | `Annotation`                                                                                                                                                                          | `process/src/repositories/prisma/prisma.trace-annotations.repository.ts:25`      |
+| Postgres table            | `Topic`                                                                                                                                                                               | `process/src/repositories/prisma/prisma.trace-topic-names.repository.ts:7`       |
+| ClickHouse table (writes) | `stored_spans`                                                                                                                                                                        | `process/src/repositories/clickhouse/span-storage.repository.ts:674`             |
+| ClickHouse table (writes) | `trace_analytics_rollup`                                                                                                                                                              | `process/src/repositories/clickhouse/trace-analytics-rollup.repository.ts:92`    |
+| ClickHouse table (writes) | `trace_analytics`                                                                                                                                                                     | `process/src/repositories/clickhouse/trace-metrics-analytics.repository.ts:124`  |
+| ClickHouse table (writes) | `trace_summaries`                                                                                                                                                                     | `process/src/repositories/clickhouse/trace-summary.repository.ts:220`            |
+| Stores required           | prisma, clickhouse, redis, rateLimiter, eventReadSeat                                                                                                                                 | `process/src/repositories/live/live.trace.repositories.ts:21`                    |
+| Stores required           | prisma, clickhouse                                                                                                                                                                    | `process/src/repositories/prisma/prisma.trace.repositories.ts:36`                |
+| Config                    | `spanProcessingShards` (TRACE_SPAN_PROCESSING_SHARDS), `tokenizer.bpeDirectory` (TIKTOKENS_PATH), `tokenizer.fetchTimeoutMs` (TIKTOKEN_FETCH_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST) | `contract/src/trace.config.ts:9`                                                 |
 
 Anything else trace needs belongs to another module and is reached through its `*Api`.
 
@@ -42,7 +41,6 @@ Anything else trace needs belongs to another module and is reached through its `
 | `authz`          | `AuthzApi`         | [authz](../authz/README.md)                   |
 | `dataPrivacy`    | `DataPrivacyApi`   | [data-privacy](../data-privacy/README.md)     |
 | `dataRetention`  | `DataRetentionApi` | [data-retention](../data-retention/README.md) |
-| `evaluations`    | `EvaluationApi`    | [evaluation](../evaluation/README.md)         |
 | `evaluators`     | `EvaluatorApi`     | [evaluator](../evaluator/README.md)           |
 | `featureFlags`   | `FeatureFlagApi`   | [feature-flag](../feature-flag/README.md)     |
 | `instantEvals`   | `InstantEvalApi`   | [instant-eval](../instant-eval/README.md)     |
@@ -55,6 +53,6 @@ Anything else trace needs belongs to another module and is reached through its `
 
 ## Who depends on trace
 
-[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
+[analytics](../analytics/README.md), [annotation](../annotation/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [gateway](../gateway/README.md), [governance](../../enterprise/modules/governance/README.md), [instant-eval](../instant-eval/README.md), [log](../log/README.md), [metric](../metric/README.md), [ops](../ops/README.md), [scenario](../scenario/README.md), [topic](../topic/README.md) (as a peer).
 
 <!-- readme:generated:end -->

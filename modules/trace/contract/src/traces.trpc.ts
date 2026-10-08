@@ -35,6 +35,7 @@ import {
   tracesChangedNameSchema,
   tracesConversationContextSchema,
   tracesEvaluationRunsSchema,
+  tracesFieldRedactionStatusSchema,
   tracesListEventsSchema,
   tracesListPageSchema,
   tracesNewCountSchema,
@@ -170,15 +171,6 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(traceScopeSchema)
   .withOutput(evaluationSchema.array().optional())
 
-  /**
-   * Protected (not public-share): keyed by evaluationId, which is only
-   * tenant-scoped, so a share token could otherwise read any evaluation's
-   * inputs in the project by supplying another id. Stays project-gated.
-   */
-  .query("getEvaluationInputs")
-  .withInput(z.object({ projectId: z.string(), evaluationId: z.string() }))
-  .withOutput(z.record(z.string(), z.unknown()).nullable())
-
   .query("getEvaluationsMultiple")
   .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()).max(TRACE_IDS_MAX) }))
   .withOutput(z.record(z.string(), evaluationSchema.array()))
@@ -241,6 +233,11 @@ export const tracesTrpc = defineTrpcContract("traces")
   .query("getFieldNames")
   .withInput(z.object({ projectId: z.string(), startDate: z.number(), endDate: z.number() }))
   .withOutput(distinctFieldNamesResultSchema)
+
+  // Whether this viewer may read captured input and output, and who can if they may not.
+  .query("getFieldRedactionStatus")
+  .withInput(z.object({ projectId: z.string() }))
+  .withOutput(tracesFieldRedactionStatusSchema)
 
   .mutation("getAllForDownload")
   .withInput(

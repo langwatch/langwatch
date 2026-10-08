@@ -9,6 +9,15 @@ import { z } from "zod";
 export const evaluationProjectScopeSchema = z.object({ projectId: z.string() });
 export type EvaluationProjectScope = z.infer<typeof evaluationProjectScopeSchema>;
 
+/** One evaluation in a project, whose inputs the trace drawer's evaluation card expands. */
+export const evaluationInputsInputSchema = z.object({
+  projectId: z.string(),
+  evaluationId: z.string(),
+});
+
+/** What an evaluation was run over, offloaded inputs resolved; null when none are stored. */
+export const evaluationInputsSchema = z.record(z.string(), z.unknown()).nullable();
+
 /**
  * A run's field mappings, with no vocabulary attached: which sources a mapping
  * may name is the trace-mapping registry's answer, and that registry is a

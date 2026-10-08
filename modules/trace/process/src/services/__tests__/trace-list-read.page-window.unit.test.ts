@@ -5,6 +5,7 @@ import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
@@ -12,7 +13,7 @@ function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
     discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository: { listAll } as never,
-    evaluations: { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     topicNames: { findNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
   });
 }

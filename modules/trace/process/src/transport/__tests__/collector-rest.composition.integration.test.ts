@@ -9,7 +9,6 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -53,7 +52,6 @@ function unreachablePeers() {
     DataPrivacyApi,
     DataRetentionApi,
     EntitlementApi,
-    EvaluationApi,
     ModelProviderApi,
     ProjectApi,
     ShareApi,
@@ -66,7 +64,6 @@ function unreachablePeers() {
     dataPrivacy: apis.reference(DataPrivacyApi),
     dataRetention: apis.reference(DataRetentionApi),
     plans: apis.reference(EntitlementApi),
-    evaluations: apis.reference(EvaluationApi),
     modelProviders: apis.reference(ModelProviderApi),
     projects: apis.reference(ProjectApi),
     share: apis.reference(ShareApi),
@@ -166,7 +163,6 @@ function deployment(access: CollectorAccess = {}) {
       projects: peers.projects,
       modelProviders: peers.modelProviders,
       dataRetention: peers.dataRetention,
-      evaluations: peers.evaluations,
       share: peers.share,
       requestBounds: peers.plans,
       exportBounds: null,

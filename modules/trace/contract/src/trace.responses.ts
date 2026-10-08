@@ -195,3 +195,12 @@ export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);
 
 /** `traceLogs`: the trace's correlated log records, visibility-gated. */
 export const tracesTraceLogsSchema = z.array(traceLogRecordDtoSchema);
+
+/** `getFieldRedactionStatus`: whether this reader may see captured input and output, and who. */
+export const tracesFieldRedactionStatusSchema = z
+  .object({
+    isRedacted: z.object({ input: z.boolean(), output: z.boolean() }).strict(),
+    visibleTo: z.object({ input: z.string().nullable(), output: z.string().nullable() }).strict(),
+  })
+  .strict();
+export type TracesFieldRedactionStatus = z.infer<typeof tracesFieldRedactionStatusSchema>;

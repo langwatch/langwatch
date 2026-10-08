@@ -6,6 +6,7 @@ import {
 import { defineProcessModule } from "@langwatch/process";
 
 import { TraceModule } from "./app/trace.app.ts";
+import { traceCollectorEvaluationsEventing } from "./eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { traceProjectMilestonesEventing } from "./eventing/trace-project-milestones.pipeline.ts";
@@ -67,4 +68,5 @@ export const traceProcessModule = defineProcessModule("trace")
   ])
   .withEventing(traceProcessingEventing)
   .withEventing(traceProjectMilestonesEventing)
+  .withEventing(traceCollectorEvaluationsEventing)
   .withEventing(traceIngestSourceBillingEventing);

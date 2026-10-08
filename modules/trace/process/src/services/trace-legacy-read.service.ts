@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   Protections,
@@ -21,6 +20,7 @@ import { getLangWatchTracer } from "langwatch";
 
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 
+import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
 import { type TraceLogRecordReader } from "../rules/claude-code-log-enrichment.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
@@ -106,7 +106,10 @@ export class TraceLegacyReadService {
     private readonly clickHouseService: TraceLegacyReadRepository,
     // Required, so it comes before the optional tail: every single-trace read
     // resolves the evaluations behind it.
-    private readonly evaluationService: EvaluationApi,
+    private readonly evaluationRuns: Pick<
+      TraceEvaluationRunsReadRepository,
+      "findTraceEvaluations"
+    >,
   ) {}
 
   static create({
@@ -114,7 +117,7 @@ export class TraceLegacyReadService {
     traceRead,
     editOverlay,
     logRecordStorage,
-    evaluationService,
+    evaluationRuns,
   }: {
     traceCanonicalisation: TraceCanonicalisationService;
     /** The composed trace store; the composition root picks the implementation. */
@@ -122,13 +125,13 @@ export class TraceLegacyReadService {
     /** Reviewer corrections, applied only where a caller opts in. */
     editOverlay: TraceEditOverlayService;
     logRecordStorage?: TraceLogRecordReader;
-    /** Required: every single-trace read resolves the evaluations behind it. */
-    evaluationService: EvaluationApi;
+    /** Evaluation's shared runs (R40); every single-trace read resolves its evaluations. */
+    evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findTraceEvaluations">;
   }): TraceLegacyReadService {
     return new TraceLegacyReadService(
       TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),
       traceRead,
-      evaluationService,
+      evaluationRuns,
     );
   }
 
@@ -334,41 +337,12 @@ export class TraceLegacyReadService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const result = await this.evaluationService.findTraceEvaluations({
+        const result = await this.evaluationRuns.findTraceEvaluations({
           tenantId: projectId,
           traceIds,
         });
 
         return mapTraceEvaluationsToLegacyEvaluations(result);
-      },
-    );
-  }
-
-  /**
-   * @param projectId - The project ID
-   * @param evaluationId - The evaluation to fetch inputs for
-   * @returns The parsed inputs, or null when none are available
-   */
-  async findEvaluationInputs({
-    projectId,
-    evaluationId,
-  }: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null> {
-    return this.tracer.withActiveSpan(
-      "TraceService.findEvaluationInputs",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "evaluation.id": evaluationId,
-        },
-      },
-      async () => {
-        return this.evaluationService.findInputs({
-          tenantId: projectId,
-          evaluationId,
-        });
       },
     );
   }

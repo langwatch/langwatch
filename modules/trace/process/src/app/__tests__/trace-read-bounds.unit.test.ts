@@ -10,6 +10,7 @@ import type { Evaluation, TracesForProjectResult } from "@langwatch/trace-contra
 import { TraceIdsTooManyError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
@@ -75,7 +76,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
       },
       cleanupTenantEmitter: () => undefined,
     },
-    evaluations: {} as never,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     share: {} as never,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

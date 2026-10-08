@@ -14,8 +14,7 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
-  EvaluationApi,
-  reportEvaluationCommandDataSchema,
+  deriveEvaluatorId,
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
@@ -203,6 +202,10 @@ import type { z } from "zod";
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
 import {
+  buildTraceCollectorEvaluationsPipeline,
+  type TraceCollectorEvaluationsDefinition,
+} from "../eventing/trace-collector-evaluations.pipeline.ts";
+import {
   buildTraceIngestSourceBillingPipeline,
   type TraceIngestSourceBillingPipeline,
 } from "../eventing/trace-ingest-source-billing.pipeline.ts";
@@ -233,6 +236,7 @@ import {
 } from "../repositories/query-field-values.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
+import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
@@ -291,6 +295,7 @@ import { SpanCostService } from "../services/span-cost.service.ts";
 import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService as TraceCanonicalisation } from "../services/trace-canonicalisation.service.ts";
+import { TraceCollectorEvaluationsService } from "../services/trace-collector-evaluations.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
 import { TraceEdgeMediaPayloadService } from "../services/trace-edge-media-payload.service.ts";
@@ -677,7 +682,8 @@ export interface TraceAppDependencies {
   broadcast: TracesTrpcEmitters;
   /** The unmapped-model hint the span detail carries; read after the span is protected. */
   spanCostSuggestions: TraceSpanCostSuggestion;
-  evaluations: EvaluationApi;
+  /** Evaluation's shared runs (R40), which `readEvaluationRuns` answers from. */
+  evaluationRuns: Pick<TraceEvaluationRunsReadRepository, "findRunsByTraceId">;
   /**
    * The Instant Eval peer the search router classifies a sentence and reads
    * the release through. Absent, the router decides with the model alone.
@@ -794,7 +800,6 @@ type TraceReaderCompositionOptions = {
    * drops. Defaults to the coding-agent contract's pure rule; tests swap it.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
-  evaluations: TraceAppDependencies["evaluations"];
   /** The Instant Eval peer the search router classifies a sentence through. */
   instantEvals?: TraceAppDependencies["instantEvals"];
   storedObjects: TraceAppDependencies["storedObjects"];
@@ -856,7 +861,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     dataPrivacy: DataPrivacyApi,
     dataRetention: DataRetentionApi,
     plans: EntitlementApi,
-    evaluations: EvaluationApi,
     evaluators: EvaluatorApi,
     featureFlags: FeatureFlagApi,
     instantEvals: InstantEvalApi,
@@ -936,6 +940,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    app.#collectorEvaluations = TraceCollectorEvaluationsService.create({ role });
     app.#processing = TraceProcessingRuntimeAdapter.create({
       role,
       tokenizer,
@@ -1003,11 +1008,11 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       editOverlay,
       logRecordStorage: logRecords,
-      evaluationService: options.evaluations,
+      evaluationRuns: options.repositories.evaluationRuns,
     });
     const list = TraceListService.create({
       repository: options.repositories.list,
-      evaluations: options.evaluations,
+      evaluationRuns: options.repositories.evaluationRuns,
       topicNames: options.repositories.topicNames,
       facets: CLICKHOUSE_FACET_CATALOG,
       discoverUpdates: options.tenantBroadcast,
@@ -1105,7 +1110,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       spanCostSuggestions: SpanCostSuggestionService.create({
         modelProviders: options.modelProviders,
       }),
-      evaluations: options.evaluations,
+      evaluationRuns: options.repositories.evaluationRuns,
       ...(options.instantEvals ? { instantEvals: options.instantEvals } : {}),
       explorerEvalRuns: TraceInstantEvalRunService.create({
         runs: options.repositories.instantEvalRuns,
@@ -1205,6 +1210,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
+  #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
@@ -1257,6 +1263,18 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** Binds the milestone senders the worker's project-metadata subscriber records through. */
   connectProjectMilestones(commands: EventingCommands<TraceProjectMilestonesDefinition>): void {
     this.#milestones?.connect(commands);
+  }
+
+  /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */
+  collectorEvaluationsPipeline(): TraceCollectorEvaluationsDefinition {
+    return buildTraceCollectorEvaluationsPipeline();
+  }
+
+  /** Binds the sender the collector door records each body's evaluations through. */
+  connectCollectorEvaluations(
+    commands: EventingCommands<TraceCollectorEvaluationsDefinition>,
+  ): void {
+    this.#collectorEvaluations?.connect(commands);
   }
 
   /** trace_ingest_source_billing: folds governance's billing fact from trace's side (§9, Q82). */
@@ -2274,14 +2292,6 @@ export class TraceModule implements TraceApi, CollectorApp {
     );
   }
 
-  /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  findEvaluationInputs(input: {
-    projectId: string;
-    evaluationId: string;
-  }): Promise<Record<string, unknown> | null> {
-    return this.#dependencies.traces.read.findEvaluationInputs(input);
-  }
-
   /** Topic and subtopic counts for the filtered window. */
   readTopicCounts(input: TraceLegacyFilterInput): Promise<TopicCountsResult> {
     return this.#dependencies.traces.read.getTopicCounts(input);
@@ -3115,7 +3125,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   /** The evaluation runs recorded against one trace. */
   readEvaluationRuns(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
-    return this.#dependencies.evaluations.findRunsByTraceId(input);
+    return this.#dependencies.evaluationRuns.findRunsByTraceId(input);
   }
 
   /** Port of main's `codingAgentTranscript`: the viewer's protections, then the shared read. */
@@ -3385,19 +3395,22 @@ export class TraceModule implements TraceApi, CollectorApp {
   }
 
   /**
-   * One custom SDK evaluation, on the command the workbench's re-scores
-   * also travel. Parsed against its schema rather than cast, so a
-   * differently-spelled field is rejected here, not malformed downstream.
+   * One custom SDK evaluation, recorded as trace's "evaluations received" fact that evaluation
+   * reports from its own side (T1 D1). Unbound in a process with no such pipeline, it refuses.
    */
   reportEvaluation(input: CollectorEvaluationReportInput): Promise<unknown> {
-    return this.#dependencies.evaluations.reportEvaluation(
-      reportEvaluationCommandDataSchema.parse(input),
-    );
+    if (!this.#collectorEvaluations) {
+      throw new TraceCapabilityUnavailableError(
+        "this process",
+        "the trace_collector_evaluations commands",
+      );
+    }
+    return this.#collectorEvaluations.record(input);
   }
 
-  /** The evaluator-id slug rule, as EVALUATION's own module spells it. */
+  /** The evaluator-id slug rule evaluation-contract exports (CI-1 precedent; T1 D3). */
   deriveEvaluatorId(name: string): string {
-    return this.#dependencies.evaluations.deriveEvaluatorId(name);
+    return deriveEvaluatorId({ name });
   }
 
   /** One validated collector body, fanned out to the span and evaluation pipelines. */

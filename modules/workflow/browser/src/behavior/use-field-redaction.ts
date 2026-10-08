@@ -14,7 +14,7 @@ export const useFieldRedaction = (field: "input" | "output") => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
-  const { data, isLoading } = workflowApi.project.getFieldRedactionStatus.useQuery(
+  const { data, isLoading } = workflowApi.traces.getFieldRedactionStatus.useQuery(
     {
       projectId: projectId ?? "",
     },

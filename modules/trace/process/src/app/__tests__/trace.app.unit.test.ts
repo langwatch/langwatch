@@ -1,4 +1,3 @@
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
@@ -18,6 +17,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryTraceEvaluationRunsRepository } from "../../repositories/memory/memory.trace-evaluation-runs.repository.ts";
 import type { TraceSpanCostSuggestion } from "../../services/span-cost-suggestion.service.ts";
 import type { TraceLegacyRead } from "../../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
@@ -140,7 +140,7 @@ function harness(
       },
       cleanupTenantEmitter: () => undefined,
     },
-    evaluations: {} as EvaluationApi,
+    evaluationRuns: MemoryTraceEvaluationRunsRepository.create(),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,

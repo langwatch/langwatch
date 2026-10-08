@@ -7,6 +7,8 @@ import { defineTrpcContract } from "@langwatch/module";
 
 import {
   customEvaluatorSchema,
+  evaluationInputsInputSchema,
+  evaluationInputsSchema,
   evaluationProjectScopeSchema,
   runTraceEvaluationInputSchema,
   warmupEvaluatorsInputSchema,
@@ -56,4 +58,13 @@ export const evaluationTrpc = defineTrpcContract("evaluations")
   .query("getMonitorPerformanceForProject")
   .withInput(monitorPerformanceForProjectInputSchema)
   .withOutput(onlineEvaluationPerformanceSchema.array())
+
+  /**
+   * What one evaluation was run over, for the trace drawer's evaluation card. Keyed by
+   * evaluationId, which is only tenant-scoped, so it stays project-gated, never share-public.
+   * Moved from `traces.getEvaluationInputs` with its owner (CD-2; T1 D2, 2026-10-08).
+   */
+  .query("getEvaluationInputs")
+  .withInput(evaluationInputsInputSchema)
+  .withOutput(evaluationInputsSchema)
   .build();

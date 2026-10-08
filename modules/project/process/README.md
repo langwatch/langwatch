@@ -6,7 +6,7 @@ The server half of [project](../README.md). Projects: finding them, their summar
 
 ## Installation
 
-`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:12`.
+`defineProcessModule("project").withRepositories(projectRepositories).withApi(ProjectModule).withTransports(projectRest, projectTrpcTransport).withEventing(projectLifecycleEventing).withTasks(…)`, `src/project.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -322,7 +322,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:66
 ```
 
 #### `PATCH /:id` · `updateProject`
@@ -336,7 +336,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
 type Body = z.infer<typeof projectRestUpdateSchema>; // ../contract/src/project-rest.schemas.ts:4
-type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:78
+type Response = z.infer<typeof projectRestDetailSchema>; // ../contract/src/project.responses.ts:66
 ```
 
 #### `DELETE /:id` · `archiveProject`
@@ -349,7 +349,7 @@ Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:i
 
 ```typescript
 type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project-rest.schemas.ts:14
-type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:84
+type Response = z.infer<typeof projectRestArchivedSchema>; // ../contract/src/project.responses.ts:72
 ```
 
 #### `GET /:id/api-key` · `getProjectApiKey`
@@ -383,17 +383,16 @@ type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/
 
 ### `project`
 
-Contract `../contract/src/project.trpc.ts:25`, router `src/transport/project.trpc.ts:81`.
+Contract `../contract/src/project.trpc.ts:24`, router `src/transport/project.trpc.ts:64`.
 
-| Procedure                         | Kind     | Gate                                                                                                                                                                                                                                                                | Input                           | Output                              |
-| --------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------- |
-| `project.create`                  | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`      | `projectProvisionedSchema`          |
-| `project.getHasFirstMessage`      | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`            | `projectFirstMessageSchema`         |
-| `project.getLegacyKeyStatus`      | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectLegacyKeyStatusSchema`      |
-| `project.revokeProjectApiKey`     | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectApiKeyRevokedSchema`        |
-| `project.update`                  | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`      | `projectSettingsSavedSchema`        |
-| `project.getFieldRedactionStatus` | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`            | `projectFieldRedactionStatusSchema` |
-| `project.archiveById`             | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema` | `projectArchivedSchema`             |
+| Procedure                     | Kind     | Gate                                                                                                                                                                                                                                                                | Input                           | Output                         |
+| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------ |
+| `project.create`              | mutation | Service-authorized: project:create, organization:manage; creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed | `projectCreateInputSchema`      | `projectProvisionedSchema`     |
+| `project.getHasFirstMessage`  | query    | Permission `project:view`                                                                                                                                                                                                                                           | `projectScopeSchema`            | `projectFirstMessageSchema`    |
+| `project.getLegacyKeyStatus`  | query    | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectLegacyKeyStatusSchema` |
+| `project.revokeProjectApiKey` | mutation | Permission `project:manage`                                                                                                                                                                                                                                         | `projectScopeSchema`            | `projectApiKeyRevokedSchema`   |
+| `project.update`              | mutation | Permission `project:update`                                                                                                                                                                                                                                         | `projectUpdateInputSchema`      | `projectSettingsSavedSchema`   |
+| `project.archiveById`         | mutation | Permission `project:delete`                                                                                                                                                                                                                                         | `projectArchiveByIdInputSchema` | `projectArchivedSchema`        |
 
 ## Sockets
 

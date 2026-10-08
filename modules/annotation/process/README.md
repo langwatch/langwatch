@@ -6,7 +6,7 @@ The server half of [annotation](../README.md). Annotations on traces: comments, 
 
 ## Installation
 
-`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withTasks(…).withMigrations(…)`, `src/annotation.module.ts:17`.
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withTasks(…)`, `src/annotation.module.ts:18`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
