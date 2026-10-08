@@ -1,6 +1,5 @@
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
-import { serializeAttributes } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { StoredTraceSpan } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { Span } from "~/server/tracer/types";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import { parseLLMSpanMessages } from "./parseLLMSpanMessages";
@@ -9,10 +8,10 @@ import type { PromptStudioSpanResult } from "./types";
 
 /**
  * One span of a trace as the prompt playground reads it: the stored row's
- * columns, with its attributes in their stored string form. Both reads build
- * these rows, the legacy one straight from `stored_spans` and the one fenced
- * by the proof from the spans the span store returns, so the playground sees
- * the same values whichever read loaded the trace.
+ * columns, with its attributes exactly as stored. Both reads build these
+ * rows, the legacy one straight from `stored_spans` and the one fenced by the
+ * proof from the span store's stored read, so the playground sees the same
+ * values whichever read loaded the trace.
  */
 export interface PromptStudioSpanRow {
   SpanId: string;
@@ -28,19 +27,20 @@ export interface PromptStudioSpanRow {
 }
 
 /**
- * A span the span store returned, as the playground reads it. Attributes go
- * back to their stored string form, the shape the legacy read hands over, so
- * a parameter the extraction reads as stored keeps the value it had there.
+ * A span the span store returned with its stored attributes, as the
+ * playground reads it. The attributes pass through untouched: parsing them
+ * and writing them back would rewrite number-like strings ("0042" to "42",
+ * "1.50" to "1.5") that the legacy read hands over as stored.
  */
-export function promptStudioRowFromNormalizedSpan(
-  span: NormalizedSpan,
+export function promptStudioRowFromStoredSpan(
+  span: StoredTraceSpan,
 ): PromptStudioSpanRow {
   return {
     SpanId: span.spanId,
     TraceId: span.traceId,
     ParentSpanId: span.parentSpanId,
     SpanName: span.name,
-    SpanAttributes: serializeAttributes(span.spanAttributes),
+    SpanAttributes: span.spanAttributes,
     StartTime: span.startTimeUnixMs,
     EndTime: span.endTimeUnixMs,
     DurationMs: span.durationMs,

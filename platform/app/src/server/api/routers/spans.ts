@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
-  promptStudioRowFromNormalizedSpan,
+  promptStudioRowFromStoredSpan,
   promptStudioSpanFromTrace,
 } from "~/server/traces/prompt-studio-span";
 import { TraceService } from "~/server/traces/trace.service";
@@ -131,7 +131,8 @@ async function readProjectSpanForPromptStudio({
 
 /**
  * The playground's read through the proof: every span of the named trace,
- * from the tenants the proof reads, resolved to the llm span to load.
+ * from the tenants the proof reads, with attributes as stored (so values
+ * match the span-only read), resolved to the llm span to load.
  */
 async function readTraceSpanForPromptStudio({
   authorization,
@@ -144,17 +145,13 @@ async function readTraceSpanForPromptStudio({
   spanId: string;
   occurredAtMs?: number;
 }) {
-  const spans = await getApp().traces.spans.getNormalizedSpansByTraceId({
+  const spans = await getApp().traces.spans.getStoredSpansByTraceId({
     authorization,
     traceId,
-    limit: PROMPT_STUDIO_TRACE_SPAN_LIMIT,
     ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
   });
   return promptStudioSpanFromTrace({
-    rows: spans.map(promptStudioRowFromNormalizedSpan),
+    rows: spans.map(promptStudioRowFromStoredSpan),
     spanId,
   });
 }
-
-/** The span ceiling the playground's trace read has always had. */
-const PROMPT_STUDIO_TRACE_SPAN_LIMIT = 1000;

@@ -44,6 +44,31 @@ export function clampSpanReadLimit(
 export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
 /**
+ * Per-trace ceiling for {@link SpanStorageRepository.getStoredSpansByTraceId}:
+ * the span ceiling the prompt playground's trace read has always had.
+ */
+export const MAX_STORED_TRACE_SPAN_ROWS = 1000;
+
+/**
+ * One span of a trace with its attributes exactly as `stored_spans` holds
+ * them: strings, not parsed back into numbers, booleans or JSON. For a reader
+ * that hands stored values on unchanged, where parsing would rewrite them
+ * ("0042" becomes "42", "1.50" becomes "1.5").
+ */
+export interface StoredTraceSpan {
+  spanId: string;
+  traceId: string;
+  parentSpanId: string | null;
+  name: string;
+  spanAttributes: Record<string, string>;
+  startTimeUnixMs: number;
+  endTimeUnixMs: number;
+  durationMs: number;
+  statusCode: number | null;
+  statusMessage: string | null;
+}
+
+/**
  * How many distinct event names one trace contributes to a list-page rollup.
  *
  * A trace's events collapse to one entry per name, so this is a distinct-name
@@ -279,6 +304,18 @@ export interface SpanStorageRepository {
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
+  /**
+   * The spans of a trace with their attributes as stored, unparsed. Same
+   * scope and partition hint as {@link getNormalizedSpansByTraceId}, bounded
+   * by {@link MAX_STORED_TRACE_SPAN_ROWS}; `limit` may only lower the bound.
+   */
+  getStoredSpansByTraceId(
+    params: {
+      authorization: Authorization;
+      traceId: string;
+      limit?: number;
+    } & OccurredAtHint,
+  ): Promise<StoredTraceSpan[]>;
   getSpanByIds(
     params: {
       authorization: Authorization;
@@ -430,6 +467,16 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
+    return [];
+  }
+
+  async getStoredSpansByTraceId(
+    _params: {
+      authorization: Authorization;
+      traceId: string;
+      limit?: number;
+    } & OccurredAtHint,
+  ): Promise<StoredTraceSpan[]> {
     return [];
   }
 

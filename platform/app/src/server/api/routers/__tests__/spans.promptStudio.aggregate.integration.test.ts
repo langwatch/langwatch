@@ -63,7 +63,11 @@ function llmSpanRow({
     SpanAttributes: {
       "langwatch.span.type": "llm",
       "gen_ai.request.model": `model-of-${tenantId}`,
-      "gen_ai.request.temperature": "0.7",
+      // Stored strings a parse-and-reserialise round trip would rewrite
+      // ("1.50" to "1.5", "0042" to "42"), so a read that does not hand the
+      // stored value on unchanged shows up as a difference.
+      "gen_ai.request.temperature": "1.50",
+      "gen_ai.request.seed": "0042",
       "langwatch.input": JSON.stringify([
         { role: "system", content: `system of ${tenantId}` },
         { role: "user", content: `question of ${tenantId}` },
@@ -208,6 +212,8 @@ describe("Feature: opening a span in the playground carries the proof", () => {
         });
 
         expect(named.llmConfig.model).toBe(`model-of-${plain.id}`);
+        expect(named.llmConfig.temperature).toBe("1.50");
+        expect(named.llmConfig.seed).toBe("0042");
         expect(named).toEqual(spanOnly);
       });
     });

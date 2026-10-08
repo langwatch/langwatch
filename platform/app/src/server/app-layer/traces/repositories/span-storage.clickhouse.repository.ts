@@ -42,6 +42,7 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  StoredTraceSpan,
   TraceEventRollup,
   TraceEventRollupParams,
 } from "./span-storage.repository";
@@ -51,6 +52,7 @@ import {
   MAX_DERIVATION_SPANS,
   MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
+  MAX_STORED_TRACE_SPAN_ROWS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -974,6 +976,35 @@ export interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
+/** The columns {@link SpanStorageClickHouseRepository.getStoredSpansByTraceId} selects. */
+interface StoredSpanRow {
+  SpanId: string;
+  TraceId: string;
+  ParentSpanId: string | null;
+  SpanName: string;
+  SpanAttributes: Record<string, unknown>;
+  StartTimeMs: number;
+  EndTimeMs: number;
+  DurationMs: number;
+  StatusCode: number | null;
+  StatusMessage: string | null;
+}
+
+function storedTraceSpanOf(row: StoredSpanRow): StoredTraceSpan {
+  return {
+    spanId: row.SpanId,
+    traceId: row.TraceId,
+    parentSpanId: row.ParentSpanId,
+    name: row.SpanName,
+    spanAttributes: ensureStringRecord(row.SpanAttributes),
+    startTimeUnixMs: row.StartTimeMs,
+    endTimeUnixMs: row.EndTimeMs,
+    durationMs: row.DurationMs,
+    statusCode: row.StatusCode,
+    statusMessage: row.StatusMessage,
+  };
+}
+
 export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
@@ -1231,6 +1262,74 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           error: error instanceof Error ? error.message : String(error),
         },
         "Failed to get normalized spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  async getStoredSpansByTraceId({
+    authorization,
+    traceId,
+    limit,
+    occurredAtMs,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    limit?: number;
+  } & OccurredAtHint): Promise<StoredTraceSpan[]> {
+    const effectiveLimit = clampSpanReadLimit(limit, {
+      max: MAX_STORED_TRACE_SPAN_ROWS,
+    });
+
+    try {
+      return await this.readTraceSpans<StoredTraceSpan[]>(
+        { authorization, traceId, occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = this.reader(authorization);
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId,
+                TraceId,
+                ParentSpanId,
+                SpanName,
+                SpanAttributes,
+                toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+                toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
+                DurationMs,
+                StatusCode,
+                StatusMessage
+              FROM ${TABLE_NAME}
+              WHERE ${tenantScope("StartTime")}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as StoredSpanRow[];
+          return rows.map(storedTraceSpanOf);
+        },
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          scope: scopeOf(authorization),
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get stored spans by trace ID from ClickHouse",
       );
       throw error;
     }

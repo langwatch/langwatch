@@ -25,6 +25,7 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  StoredTraceSpan,
   TraceEventRollup,
   TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
@@ -153,6 +154,16 @@ export class SpanStorageService {
     params: ByTraceId & { limit?: number },
   ): Promise<NormalizedSpan[]> {
     return this.repository.getNormalizedSpansByTraceId(params);
+  }
+
+  /**
+   * The spans of a trace with their attributes as stored, unparsed, for a
+   * reader that hands stored values on unchanged (the prompt playground).
+   */
+  async getStoredSpansByTraceId(
+    params: ByTraceId & { limit?: number },
+  ): Promise<StoredTraceSpan[]> {
+    return this.repository.getStoredSpansByTraceId(params);
   }
 
   /**

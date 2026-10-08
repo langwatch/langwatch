@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { StoredTraceSpan } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   type PromptStudioSpanRow,
+  promptStudioRowFromStoredSpan,
   promptStudioSpanFromTrace,
 } from "../prompt-studio-span";
 
@@ -114,6 +116,49 @@ describe("promptStudioSpanFromTrace()", () => {
 
       expect(result?.llmConfig.model).toBe("gpt-5-mini");
       expect(result?.promptHandle).toBe("pizza-prompt");
+    });
+  });
+});
+
+describe("promptStudioRowFromStoredSpan()", () => {
+  describe("when the stored attributes hold number-like strings", () => {
+    const stored: StoredTraceSpan = {
+      spanId: "llm-1",
+      traceId: "trace-1",
+      parentSpanId: null,
+      name: "llm",
+      spanAttributes: {
+        "langwatch.span.type": "llm",
+        "gen_ai.request.seed": "0042",
+        "gen_ai.request.temperature": "1.50",
+        "custom.flag": "true",
+        "custom.json": '{ "a": 1 }',
+      },
+      startTimeUnixMs: 1,
+      endTimeUnixMs: 11,
+      durationMs: 10,
+      statusCode: 1,
+      statusMessage: null,
+    };
+
+    it("keeps every stored string unchanged", () => {
+      expect(promptStudioRowFromStoredSpan(stored).SpanAttributes).toEqual({
+        "langwatch.span.type": "llm",
+        "gen_ai.request.seed": "0042",
+        "gen_ai.request.temperature": "1.50",
+        "custom.flag": "true",
+        "custom.json": '{ "a": 1 }',
+      });
+    });
+
+    it("hands the stored strings on to the llm config", () => {
+      const result = promptStudioSpanFromTrace({
+        rows: [promptStudioRowFromStoredSpan(stored)],
+        spanId: "llm-1",
+      });
+
+      expect(result?.llmConfig.seed).toBe("0042");
+      expect(result?.llmConfig.temperature).toBe("1.50");
     });
   });
 });
