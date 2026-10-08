@@ -12,7 +12,7 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
-import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type {
@@ -119,7 +119,6 @@ interface UserAppDependencies {
   auth: AuthApiContract;
   authz: AuthzApi;
   organizations: OrganizationApi;
-  projects: ProjectApi;
   /** Where avatar bytes are kept, as user-owned objects in a personal project. */
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById" | "getReadUrlForPurpose">;
 }
@@ -156,14 +155,12 @@ export class UserModule implements UserApi {
     authz: typeof AuthzApi;
     notifications: typeof NotificationService;
     organizations: typeof OrganizationApi;
-    projects: typeof ProjectApi;
     storedObjects: typeof StoredObjectApi;
   } = {
     auth: AuthApi,
     authz: AuthzApi,
     notifications: NotificationService,
     organizations: OrganizationApi,
-    projects: ProjectApi,
     storedObjects: StoredObjectApi,
   };
 
@@ -704,15 +701,8 @@ export class UserModule implements UserApi {
   // -- the /api/me/project door ---------------------------------------------
 
   /** The identity of the project the calling API key belongs to. */
-  async getKeyProject({ projectId }: { projectId: string }): Promise<MeProject> {
-    const project = await this.#requireProject({ projectId });
-
-    return {
-      id: project.id,
-      name: project.name,
-      slug: project.slug,
-      isPersonal: project.isPersonal,
-    };
+  getKeyProject(input: { projectId: string }): Promise<MeProject> {
+    return this.#directory.getKeyProject(input);
   }
 
   countUsage(): Promise<UserUsageCount> {
@@ -754,13 +744,5 @@ export class UserModule implements UserApi {
 
   #nowMs(): number {
     return this.#now().epochMilliseconds;
-  }
-
-  async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {
-    const project = await this.#peers.projects.findIdentity(projectId);
-
-    if (!project) throw new Error(`no project row for the credential's project "${projectId}"`);
-
-    return project;
   }
 }

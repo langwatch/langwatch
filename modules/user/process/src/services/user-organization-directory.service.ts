@@ -1,4 +1,4 @@
-import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
+import { type MeProject, UserCapabilityUnavailableError } from "@langwatch/user-contract";
 
 import type { UserOrganizationDirectoryRepository } from "../repositories/user-organization-directory.repository.ts";
 
@@ -29,6 +29,14 @@ export class UserOrganizationDirectoryService {
     }
 
     return adminEmail;
+  }
+
+  /** `/api/me/project`: the calling key's project, read through project's share (R40). */
+  async getKeyProject({ projectId }: { projectId: string }): Promise<MeProject> {
+    const project = await this.directory.findKeyProject({ projectId });
+    if (!project) throw new Error(`no project row for the credential's project "${projectId}"`);
+
+    return project;
   }
 
   findName({ organizationId }: { organizationId: string }): Promise<string | null> {

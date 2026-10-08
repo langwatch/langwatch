@@ -7,7 +7,6 @@ import {
   type PersonalWorkspace,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { type StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -122,10 +121,6 @@ export function createUserTestLifecycle() {
   return { senders, recorded };
 }
 
-export function createUserTestProjects() {
-  return createApiFixture<ProjectApi>({ findIdentity: async () => null });
-}
-
 export function createUserTestOrganizations(projectId = "project-1") {
   return Object.assign(createApiFixture<OrganizationApi>(), {
     ensurePersonalWorkspace: vi.fn(async () => ({
@@ -202,7 +197,6 @@ export function createUserTestApp(
       auth: AuthApi;
       authz: AuthzApi;
       organizations: OrganizationApi;
-      projects: ProjectApi;
       storedObjects: StoredObjectApi;
     }>;
     facts?: Partial<UserFacts>;
@@ -223,7 +217,6 @@ export function createUserTestApp(
       auth,
       authz: input.dependencies?.authz ?? createUserTestAuthorization(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
-      projects: input.dependencies?.projects ?? createUserTestProjects(),
       storedObjects: input.dependencies?.storedObjects ?? createUserTestStoredObjects(),
     },
   });

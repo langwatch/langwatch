@@ -39,8 +39,9 @@ vi.mock("@langwatch/api-key-client", () => ({
   apiKeyClient: { apiKey: { list: { useQuery: () => ({ data: [] }) } } },
 }));
 
-vi.mock("../../../../behavior/user-api.ts", () => ({
-  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
+vi.mock("../../../../behavior/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) =>
+    image?.startsWith("/api/user-avatar/") ? null : (image ?? null),
 }));
 
 afterEach(() => cleanup());

@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getAvatarUrl } = vi.hoisted(() => ({ getAvatarUrl: vi.fn() }));
 
-vi.mock("../user-api.ts", () => ({
-  userApi: { user: { getAvatarUrl: { useQuery: getAvatarUrl } } },
+vi.mock("@langwatch/api/web", () => ({
+  createModuleApi: () => ({ user: { getAvatarUrl: { useQuery: getAvatarUrl } } }),
 }));
 
 const { useUserAvatarUrl } = await import("../use-user-avatar-url.ts");

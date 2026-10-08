@@ -235,6 +235,19 @@ Feature: Canonical user lifecycle
     Then the mutation refuses the request as not delivered
     And no email is sent
 
+  # User reads project's own table through its declared share, never ProjectApi (ruling R40).
+  @unit
+  Scenario: The key's project door names the project from project's own table
+    Given an API key that belongs to a project
+    When the caller asks for the key's project
+    Then the answer carries the project's id, name, slug and whether it is personal
+
+  @unit
+  Scenario: The key's project door refuses a key whose project row is gone
+    Given an API key whose project no longer exists
+    When the caller asks for the key's project
+    Then the request is refused and names no project
+
   # Organization records a seat taken away; user ends that person's browser sessions from its own
   # side, eventually, while authorization refuses them at once (ruling R7).
   Rule: A seat taken away in an organization ends the person's browser sessions

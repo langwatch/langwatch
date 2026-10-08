@@ -35,8 +35,9 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../behavior/user-api.ts", () => ({
-  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
+vi.mock("../../../behavior/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) =>
+    image?.startsWith("/api/user-avatar/") ? null : (image ?? null),
 }));
 
 function renderSection(options: FakePersonalHostOptions = {}) {

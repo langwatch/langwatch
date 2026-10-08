@@ -36,9 +36,10 @@ export const SHARED_PRISMA_TABLES: readonly SharedPrismaTable[] = [
       "nurturing",
       "presence",
       "organization",
+      "user",
     ],
     reason:
-      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40)",
+      "entitlement reads a project's organisation and an organisation's projects, never a fold (C1, R40); billing reads an organisation's project ids and names for spend and usage warnings (round 37 D5, R40); data retention and data privacy read where a project sits to resolve its policy, never a fold (round 46 E1, R40); the Instant Evals judge and nurturing read a project's team to place it, and nurturing an organisation's earliest project creation for its cutover (DATA-NURTURING-GUARD), never a fold (round 46 E1, R40); presence reads a project's and its organisation's presence flags in one joined read for each heartbeat, never a copy (R40); organization reads its projects' ids for a trace-sharing revocation, its project grants' names, and its teams' projects for the team screens, never a copy (O1, R40); user reads the project an API key belongs to for /api/me/project, never ProjectApi (U1, R40)",
   },
   {
     table: "Team",

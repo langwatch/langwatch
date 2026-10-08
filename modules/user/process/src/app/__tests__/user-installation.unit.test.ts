@@ -5,7 +5,6 @@ import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { isMigrationStep } from "@langwatch/upgrade/step";
@@ -47,7 +46,6 @@ function process(
       authz: peers.authz ?? createApiFixture<AuthzApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
-      project: createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });
 }

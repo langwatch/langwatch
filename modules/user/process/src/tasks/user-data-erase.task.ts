@@ -5,7 +5,7 @@ import type { GdprUserDataEraseRepository } from "../repositories/user-data-eras
 
 const logger = createLogger("langwatch:task:user-data-erase");
 
-export type GdprUserDataEraseOutcome = {
+type GdprUserDataEraseOutcome = {
   userId: string;
   email: string;
   mode: "dry-run" | "execute";
