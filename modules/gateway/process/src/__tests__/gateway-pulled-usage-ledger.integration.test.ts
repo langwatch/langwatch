@@ -5,16 +5,12 @@ import {
 } from "@langwatch/clickhouse-client/testing";
 /** @vitest-environment node */
 /**
- * Pulled provider cost is visible, attributed, correct under restatement, and
- * cannot block a request: real Postgres and ClickHouse, and the enforcement
- * half read through the gateway's own `check`. ADR-088.
+ * The gateway's side of pulled provider cost over real Postgres and ClickHouse: a priced
+ * fact is debited, attributed, restated correctly and never counts against a limit. ADR-088.
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import {
-  GatewayBudgetClickHouseRepository,
-  PrismaGatewayAdapter,
-  type GatewayService,
-} from "@langwatch/gateway-process/testing";
+import type { PulledUsagePricedEventData } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -23,15 +19,14 @@ import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import {
-  PulledUsageLedgerIntent,
-  type PulledUsagePricingDeps,
-  type WritePulledUsagePayload,
-} from "../eventing/pulled-usage-ledger.intent.ts";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { PrismaGatewayAdapter } from "./support/postgres.gateway-service.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);
@@ -57,30 +52,8 @@ type GatewayBudgetSpend = ReturnType<typeof GatewayBudgetClickHouseRepository.cr
 
 let budgets: GatewayBudgetSpend;
 let gateway: GatewayService;
-let writePulledUsage: (payload: WritePulledUsagePayload) => Promise<void>;
+let ledger: GatewayBudgetLedgerService;
 let clickhouse: ClickHouseClient;
-
-/** The priced fact, debited into gateway's ClickHouse ledger as gateway's peer subscriber does. */
-class LedgerOverGatewayBudgets implements PulledUsagePricingDeps {
-  constructor(private readonly repository: GatewayBudgetSpend) {}
-
-  sendRecordPulledUsagePriced: PulledUsagePricingDeps["sendRecordPulledUsagePriced"] = (fact) =>
-    this.repository.insertPulledUsageRows([
-      {
-        tenantId: fact.tenantId,
-        scopeId: fact.scopeId,
-        restatementKey: fact.restatementKey,
-        amountNanoUsd: fact.amountNanoUsd,
-        tokensInput: fact.tokensInput,
-        tokensOutput: fact.tokensOutput,
-        tokensCacheRead: fact.tokensCacheRead,
-        tokensCacheWrite: fact.tokensCacheWrite,
-        model: fact.model,
-        occurredAt: Temporal.Instant.fromEpochMilliseconds(fact.occurredAtMs),
-        observedAt: Temporal.Instant.fromEpochMilliseconds(fact.observedAtMs),
-      },
-    ]);
-}
 
 /** The two project reads the decision path makes, answered from this suite's rows. */
 function suiteProjects(): ProjectApi {
@@ -97,29 +70,33 @@ function suiteProjects(): ProjectApi {
   );
 }
 
-/** One pulled usage item, as the process manager mints it. */
+/** One priced pulled-usage fact, as governance records it and the ledger subscriber receives it. */
 function pulledItem(options: {
   restatementKey: string;
   scopeId: string;
   costNanoUsd: number;
   teamId?: string | null;
   observedAt: Date;
-}): WritePulledUsagePayload {
+}): PulledUsagePricedEventData {
   return {
-    restatement_key: options.restatementKey,
-    tenant_id: GOV_PROJECT_ID,
-    scope_id: options.scopeId,
-    organization_id: ORG_ID,
-    team_id: options.teamId === undefined ? TEAM_ID : options.teamId,
+    restatementKey: options.restatementKey,
+    organizationId: ORG_ID,
+    teamId: options.teamId === undefined ? TEAM_ID : options.teamId,
+    scopeId: options.scopeId,
     model: "anthropic/claude-sonnet-5",
-    cost_nano_usd: options.costNanoUsd,
-    tokens_input: 1_000,
-    tokens_output: 200,
-    tokens_cache_read: 0,
-    tokens_cache_write: 0,
-    occurred_at_ms: BUCKET_AT.getTime(),
-    observed_at_ms: options.observedAt.getTime(),
+    amountNanoUsd: options.costNanoUsd,
+    tokensInput: 1_000,
+    tokensOutput: 200,
+    tokensCacheRead: 0,
+    tokensCacheWrite: 0,
+    occurredAtMs: BUCKET_AT.getTime(),
+    observedAtMs: options.observedAt.getTime(),
   };
+}
+
+/** The ledger's debit of a priced fact, as gateway's peer subscriber performs it. */
+function writePulledUsage(fact: PulledUsagePricedEventData): Promise<void> {
+  return ledger.debitPulledUsage({ tenantId: GOV_PROJECT_ID, fact });
 }
 
 /** What the dedicated pulled read reports for a scope over the window. */
@@ -195,7 +172,7 @@ describe.skipIf(!databaseUrl)(
   () => {
     beforeAll(async () => {
       const [endpoint] = await startTestClickHouseEndpoints({
-        suite: "governance-pulled-usage",
+        suite: "gateway-pulled-usage",
         names: ["ledger"],
         environment: process.env,
       });
@@ -300,8 +277,10 @@ describe.skipIf(!databaseUrl)(
         audit: {} as never,
         budgetSpend: budgets,
       }).build();
-      writePulledUsage = (payload) =>
-        PulledUsageLedgerIntent.create(new LedgerOverGatewayBudgets(budgets)).execute(payload);
+      ledger = GatewayBudgetLedgerService.create({
+        spend: budgets,
+        changes: { append: async () => ({ revision: 0n }) },
+      });
     }, 600_000);
 
     afterAll(async () => {
@@ -411,7 +390,7 @@ describe.skipIf(!databaseUrl)(
         // bucket. Same money, same quantities, new observation instant.
         await writePulledUsage({
           ...item,
-          observed_at_ms: new Date("2026-08-05T10:00:00.000Z").getTime(),
+          observedAtMs: new Date("2026-08-05T10:00:00.000Z").getTime(),
         });
         const afterSecond = await pulledTotalsFor([TEAM_ID]);
 
