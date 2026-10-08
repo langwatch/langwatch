@@ -40,7 +40,8 @@ export async function startMigratedClickHouse({
     names: [name],
     environment: process.env,
   });
-  if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the migrated suite");
+  if (!provisioned)
+    throw new Error("No ClickHouse endpoint was provisioned for the migrated suite");
 
   await migrateTestClickHouseOnce({
     url: provisioned.url,
