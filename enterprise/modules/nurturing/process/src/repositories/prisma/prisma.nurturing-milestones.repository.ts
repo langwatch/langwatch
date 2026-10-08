@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   NurturingMilestonesRepository,
@@ -14,14 +15,24 @@ const ORGANIZATION_STATE = {
   simulationRunCount: true,
 } as const;
 
+/** Only the shared delegate the project read touches; it claims no table (R40). */
+type NurturingProjectShare = Pick<PrismaClient, "project">;
+
 /** Nurturing's organizations; a project's organization is read through its owners' shares (R40). */
 export class PrismaNurturingMilestonesRepository
-  extends PrismaRepository.for("NurturingOrganization", "Project", "Team")
+  extends PrismaRepository.for("NurturingOrganization")
   implements NurturingMilestonesRepository
 {
-  static readonly create = this.factory(
-    (prisma) => new PrismaNurturingMilestonesRepository(prisma),
-  );
+  static create({ prisma }: { prisma: PrismaClient }): PrismaNurturingMilestonesRepository {
+    return new PrismaNurturingMilestonesRepository(prisma, prisma);
+  }
+
+  private constructor(
+    prisma: PrismaClient,
+    private readonly projects: NurturingProjectShare,
+  ) {
+    super(prisma);
+  }
 
   async recordOrganization({
     organizationId,
@@ -70,15 +81,10 @@ export class PrismaNurturingMilestonesRepository
   }
 
   private async organizationOf({ projectId }: { projectId: string }): Promise<string | undefined> {
-    const project = await this.prisma.project.findUnique({
+    const project = await this.projects.project.findUnique({
       where: { id: projectId },
-      select: { teamId: true },
+      select: { team: { select: { organizationId: true } } },
     });
-    if (!project) return void 0;
-    const team = await this.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    return team?.organizationId;
+    return project?.team?.organizationId;
   }
 }

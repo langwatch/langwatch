@@ -1,18 +1,24 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   InstantEvalJudgeProjectPlacement,
   InstantEvalJudgeProjectRepository,
 } from "../instant-eval-judge-placement.repository.ts";
 
-/** Project's `Project` and organization's `Team` rows, read through their shares (R40). */
-export class PrismaInstantEvalJudgeProjectRepository
-  extends PrismaRepository.for("Project", "Team")
-  implements InstantEvalJudgeProjectRepository
-{
-  static readonly create = this.factory(
-    (prisma) => new PrismaInstantEvalJudgeProjectRepository(prisma),
-  );
+/** Only the shared delegate this reader touches; it claims no table (R40). */
+type InstantEvalJudgePlacementDatabase = Pick<PrismaClient, "project">;
+
+/** Project's `Project` row and its team's organization, through their shares, in one read. */
+export class PrismaInstantEvalJudgeProjectRepository implements InstantEvalJudgeProjectRepository {
+  static create({
+    prisma,
+  }: {
+    prisma: InstantEvalJudgePlacementDatabase;
+  }): PrismaInstantEvalJudgeProjectRepository {
+    return new PrismaInstantEvalJudgeProjectRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: InstantEvalJudgePlacementDatabase) {}
 
   async getPlacement({
     projectId,
@@ -21,15 +27,10 @@ export class PrismaInstantEvalJudgeProjectRepository
   }): Promise<InstantEvalJudgeProjectPlacement> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { teamId: true },
+      select: { team: { select: { organizationId: true } } },
     });
-    if (!project) return { outcome: "unknown" };
-    const team = await this.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    return team
-      ? { outcome: "known", organizationId: team.organizationId }
+    return project?.team
+      ? { outcome: "known", organizationId: project.team.organizationId }
       : { outcome: "unknown" };
   }
 }
