@@ -1,5 +1,67 @@
 # Changelog
 
+## [3.21.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.1...langwatch@v3.21.0) (2026-10-08)
+
+
+### Features
+
+* **analytics:** campaign conversion events for sign in, sign up and paid ([#8445](https://github.com/langwatch/langwatch/issues/8445)) ([c502c44](https://github.com/langwatch/langwatch/commit/c502c441f5ce09073b41ee99f422570ace96a3b4))
+* **auth:** setting to restrict self sign-up on self-hosted installs ([#8425](https://github.com/langwatch/langwatch/issues/8425)) ([dd31854](https://github.com/langwatch/langwatch/commit/dd3185478284c7897ad112efa28366238decc0e5))
+* **clickhouse:** separate insert and read statement concurrency budgets ([#8488](https://github.com/langwatch/langwatch/issues/8488)) ([d96113b](https://github.com/langwatch/langwatch/commit/d96113ba11e7fedca27d91f8fa7c81874a4e473b))
+* **governance:** an aggregate project reads its member projects through shared grants ([#8487](https://github.com/langwatch/langwatch/issues/8487)) ([e683dd9](https://github.com/langwatch/langwatch/commit/e683dd9ea52c148e7678b1c22202dbfea9f1eb9f))
+* **instant-evals:** opt-in switch for self-serve organizations, clearer refusal popovers ([#8348](https://github.com/langwatch/langwatch/issues/8348)) ([0a2baa6](https://github.com/langwatch/langwatch/commit/0a2baa67ecbf6e8973cdec617ccb66ce414295b2))
+* **instant-evals:** release self-hosted installs by license, and say why when not ([#8416](https://github.com/langwatch/langwatch/issues/8416)) ([fa9139d](https://github.com/langwatch/langwatch/commit/fa9139d92ae0360054454dcd8ca16a2df3479a7e))
+* **members:** developer seat, a member who owns a personal project and nothing shared ([#8373](https://github.com/langwatch/langwatch/issues/8373)) ([30ff7ea](https://github.com/langwatch/langwatch/commit/30ff7ea74a4caba95afb76d59ca9a6906b6f613e))
+* **members:** join requests made from the terminal land as a Developer and the welcome screen honours pending invitations ([#8462](https://github.com/langwatch/langwatch/issues/8462)) ([2687513](https://github.com/langwatch/langwatch/commit/2687513eaaef639123bec601f78d4c11d9679826))
+* **otel:** decode OTLP bodies by magic bytes (zstd, gzip under wrong Content-Encoding) ([#8501](https://github.com/langwatch/langwatch/issues/8501)) ([9ad8f1e](https://github.com/langwatch/langwatch/commit/9ad8f1e46454dd11dae47410de4e30b48bd07ad2))
+
+
+### Bug Fixes
+
+* **aigateway:** merge parallel tool results on the Bedrock Converse lane and keep Bedrock refusal statuses ([#8422](https://github.com/langwatch/langwatch/issues/8422)) ([0182e6b](https://github.com/langwatch/langwatch/commit/0182e6ba578a772a362b27ec6a5c94b5d2ed9240))
+* **alerts:** read a grouped graph's series ungrouped instead of adding groups together ([#8436](https://github.com/langwatch/langwatch/issues/8436)) ([9f4024c](https://github.com/langwatch/langwatch/commit/9f4024c205fb87da5a9d71744ccaadda74b55b07))
+* **analytics:** keep dashboard panels under the ClickHouse memory limit and show a compact panel error ([#8525](https://github.com/langwatch/langwatch/issues/8525)) ([d20264a](https://github.com/langwatch/langwatch/commit/d20264acad2efd4068e80080ec407f3c335255cc))
+* **analytics:** read metadata key and value filters from every storage format ([#8432](https://github.com/langwatch/langwatch/issues/8432)) ([10878ad](https://github.com/langwatch/langwatch/commit/10878add81dc900d3560da7bc0ee89a8e09ecfb5))
+* **annotations:** serialize annotation commands per trace and 404 on unknown delete ([#8400](https://github.com/langwatch/langwatch/issues/8400)) ([7606bf6](https://github.com/langwatch/langwatch/commit/7606bf6a6641e03912b2e16bbafbe0021f681bb8))
+* **auth:** leave brokered connections to the legacy guard instead of bouncing ([#8471](https://github.com/langwatch/langwatch/issues/8471)) ([418a183](https://github.com/langwatch/langwatch/commit/418a18367710998af79e9b19c62fbf7593b74af1))
+* **auth:** sign-in from pages whose address better-auth refuses ([#8503](https://github.com/langwatch/langwatch/issues/8503)) ([#8504](https://github.com/langwatch/langwatch/issues/8504)) ([3d8d9ce](https://github.com/langwatch/langwatch/commit/3d8d9ce4058446ac3a0a62c597141cde630bed24))
+* **automations:** evaluation-based automations never fired because the evaluation read returned no rows ([#8465](https://github.com/langwatch/langwatch/issues/8465)) ([ab34223](https://github.com/langwatch/langwatch/commit/ab342230644c2102078baa1972179a9a063b5a49))
+* **billing:** currency-aware custom retention price on the Growth plan ([#8502](https://github.com/langwatch/langwatch/issues/8502)) ([303a35e](https://github.com/langwatch/langwatch/commit/303a35e02b471b759b250c222cbdb8989c8fc125))
+* **billing:** over-seat upgrade prompt, cloud Free creation caps, Free card copy ([#8505](https://github.com/langwatch/langwatch/issues/8505)) ([4ea3334](https://github.com/langwatch/langwatch/commit/4ea333482aba1e8eef5870c15ce35ce96e751a71))
+* **deps:** bump OpenTelemetry Go modules to clear govulncheck ([#8417](https://github.com/langwatch/langwatch/issues/8417)) ([e477614](https://github.com/langwatch/langwatch/commit/e4776147883d496995fbf4f34dbdd8ba218d8db2))
+* **dev:** make service loads an env file named without a slash under dash ([#8522](https://github.com/langwatch/langwatch/issues/8522)) ([42a381a](https://github.com/langwatch/langwatch/commit/42a381aa9aeb10db5b121dfdfda39d0531cdf1b7))
+* **experiments:** replicated experiment saves to itself, not the original ([#8514](https://github.com/langwatch/langwatch/issues/8514)) ([26e6093](https://github.com/langwatch/langwatch/commit/26e60935e2284a2e6e00cdb89269b497c977a281))
+* **ingest:** accept OTLP/JSON spans whose links/events omit default-valued fields ([#8478](https://github.com/langwatch/langwatch/issues/8478)) ([2b7c11b](https://github.com/langwatch/langwatch/commit/2b7c11baa782ba9184140f1a6a9e091b3c6db511))
+* **langy:** route Bedrock OpenAI models through Converse, name provider refusals, apply provider changes to cached keys ([#8388](https://github.com/langwatch/langwatch/issues/8388)) ([d75ae80](https://github.com/langwatch/langwatch/commit/d75ae801b38966a25b0d512109cdeab73826e7ce))
+* **langy:** save a picked default model, name the rejected key, and show the queued question in provider setup ([#8486](https://github.com/langwatch/langwatch/issues/8486)) ([681628e](https://github.com/langwatch/langwatch/commit/681628e7736937cbeca60a9617a6eb2650175d94))
+* **model-providers:** save a first provider with its key and serve openai base urls on the responses lane ([#8473](https://github.com/langwatch/langwatch/issues/8473)) ([ddb939c](https://github.com/langwatch/langwatch/commit/ddb939ce73aeaf1c661f85dba71f191d60cffe48))
+* **monitors:** refuse parameters that the linked evaluator's settings override ([#8435](https://github.com/langwatch/langwatch/issues/8435)) ([b9bc5d1](https://github.com/langwatch/langwatch/commit/b9bc5d14f53a1139ee2dbfb1ff1e619bafc341c8))
+* **nlpgo:** harden code-block isolation and internal endpoint auth ([#8424](https://github.com/langwatch/langwatch/issues/8424)) ([ff9f1ed](https://github.com/langwatch/langwatch/commit/ff9f1ed1e6a96cc33daa1dfc49f11aed34c45f7c))
+* **observability:** log a bounded cause summary on request errors so Loki stops dropping them ([#8485](https://github.com/langwatch/langwatch/issues/8485)) ([72e699b](https://github.com/langwatch/langwatch/commit/72e699b392b63a31008b0246cc4af4c2c965f78b))
+* **otel:** log unparseable OTLP bodies as client warnings, not PostHog exceptions ([#8489](https://github.com/langwatch/langwatch/issues/8489)) ([f73b082](https://github.com/langwatch/langwatch/commit/f73b082ad2f0f6b06758afeabd419439a75b5699))
+* **scenarios:** refuse fields PUT /api/scenarios/{id} does not have instead of dropping them ([#8438](https://github.com/langwatch/langwatch/issues/8438)) ([891c048](https://github.com/langwatch/langwatch/commit/891c048827e57d32c1ff9038daa4a6db913b3f79))
+* **scenarios:** run a project's turns on its own engine, and read that engine's status ([#8429](https://github.com/langwatch/langwatch/issues/8429)) ([66c9815](https://github.com/langwatch/langwatch/commit/66c98151dfbd5b49c353c246a1462b090599a7ad))
+* **scenarios:** send a relayed turn to the address the app hands out, not the public one ([#8431](https://github.com/langwatch/langwatch/issues/8431)) ([4c193ed](https://github.com/langwatch/langwatch/commit/4c193ed46a4f8f823e0f47c9461b460413595bd9))
+* **suites:** refuse fields POST /api/suites does not have instead of dropping them ([#8437](https://github.com/langwatch/langwatch/issues/8437)) ([3afaf50](https://github.com/langwatch/langwatch/commit/3afaf50b85011910f7fedf19ec55b7821027b51b))
+* **traces:** cap trace list page size at 1000 ([#8484](https://github.com/langwatch/langwatch/issues/8484)) ([5167dad](https://github.com/langwatch/langwatch/commit/5167dadf2578b727301e03dc5fe49e4520cc78d1))
+* **traces:** show costs below a tenth of a cent instead of $0.0000 ([#8434](https://github.com/langwatch/langwatch/issues/8434)) ([2d2bf4d](https://github.com/langwatch/langwatch/commit/2d2bf4d47e64a4a6e20b659762ac3550efa20c67))
+* **traces:** tie an evaluator's verdict, score and label to that evaluator in trace filters ([#8430](https://github.com/langwatch/langwatch/issues/8430)) ([bfc3931](https://github.com/langwatch/langwatch/commit/bfc3931eabcc7eaef500ac6e1767ebba5bceff69))
+* **triggers:** refuse a different customGraphId on PATCH instead of ignoring it ([#8433](https://github.com/langwatch/langwatch/issues/8433)) ([0ad8ad2](https://github.com/langwatch/langwatch/commit/0ad8ad2e1ae6981c130c4c2877bbd5e2722e8dd6))
+
+
+### Miscellaneous
+
+* drop unused SENTRY_DSN env key ([#8381](https://github.com/langwatch/langwatch/issues/8381)) ([47135b2](https://github.com/langwatch/langwatch/commit/47135b2627af2c5f00188cf0b854adf01b27c47f))
+* sync model registry ([704ff1e](https://github.com/langwatch/langwatch/commit/704ff1efdf5f8869918008f5459480954c50a28a))
+* sync model registry (531 models) ([#8532](https://github.com/langwatch/langwatch/issues/8532)) ([704ff1e](https://github.com/langwatch/langwatch/commit/704ff1efdf5f8869918008f5459480954c50a28a))
+
+
+### Documentation
+
+* **members:** document terminal sign-ups landing on the Developer seat ([#8482](https://github.com/langwatch/langwatch/issues/8482)) ([c81ac27](https://github.com/langwatch/langwatch/commit/c81ac2772f35b3f4eb2489fd535db2fa803f12bf))
+* **readme:** cover headline says who LangWatch is for ([#8452](https://github.com/langwatch/langwatch/issues/8452)) ([a848689](https://github.com/langwatch/langwatch/commit/a848689d3a51e230aee3c5bb078185a27e55d901))
+* **self-hosting:** correct security, env var and Helm values docs against the code ([#8426](https://github.com/langwatch/langwatch/issues/8426)) ([92d3399](https://github.com/langwatch/langwatch/commit/92d3399871bbd920a022ec46b983fc7db9f48f72))
+
 ## [3.20.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.20.0...langwatch@v3.20.1) (2026-10-02)
 
 
