@@ -536,6 +536,7 @@ Sweep: 25 decisions plus 39 low-consequence defaults (scratchpad open-decisions-
 12. DS-C (members family, DS-2a hand-back): (a) `MissingSupply` is deleted by §15 with no successor named; it is the compile-time refusal for missing config, peers and stores (ADR-147). Rec: `MissingRequirement`. (b) `bootInstalledProcess({ members })` and `ApplicationOptions.members` need a successor parameter. Rec: `stores: StoresMemberSource`, overrides through `createApp().withStores(...).withMembers(...)`. (c) `.provide()`: §15 deletes it but §5 uses it for bound channel Apis. Rec: keep `.provide()` for bound-channel test stand-ins only and amend §15.
 
 ## Round 54 candidates (2026-10-08)
+
 - PO-1. analytics lwql-provision reads every project's `lwqlKey` directly; no ProjectApi read returns it. Rec: a new ProjectApi.listLwqlKeys paged read (analytics -> project already exists?) vs a Project share to analytics.
 - PO-2. authz-migration scans project ids per organisation and projects with an apiKey plus createdAt. authz -> project is likely a peer cycle (project -> authz). Rec: project publishes the facts authz needs (project created, with apiKey presence) and authz folds them; vs a Project share for the migration only.
 - From dev/docs/plans/peer-cycles-remaining-2026-10-08.md §5 (the last 72 findings ride on licensing -> gateway):
