@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:65`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:66`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -250,6 +250,14 @@ Whether one hosted service is both entitled here and switched on.
 
 ```typescript
 isConnectServiceEnabled(input: { organizationId: string; service: ConnectService; }): Promise<boolean>;
+```
+
+#### `getConnectServiceState`
+
+Whether the license names one hosted service, and whether it is still on; no network call.
+
+```typescript
+getConnectServiceState(input: { organizationId: string; service: ConnectService; }): Promise<ConnectServiceState>;
 ```
 
 #### `classifyThroughConnect`
@@ -565,8 +573,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:179`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:180`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:180`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:181`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

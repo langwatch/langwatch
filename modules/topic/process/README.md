@@ -48,14 +48,6 @@ Asks the project's clustering process for a run; ports main's `requestClustering
 requestClustering(input: TopicClusteringRequestInput): Promise<void>;
 ```
 
-#### `bootstrapClustering`
-
-Re-asserts the project's clustering schedule, at most once per project per hour.
-
-```typescript
-bootstrapClustering(input: TopicProjectInput): Promise<void>;
-```
-
 ## REST transport
 
 None: this module declares no REST family.
@@ -81,20 +73,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `topic_clustering_processing` (aggregate `topic_clustering`)
 
-Declared at `src/eventing/topic-clustering-processing.pipeline.ts:75`. Events: `TopicClusteringRequestedEventSchema`, `TopicClusteringRunStartedEventSchema`, `TopicClusteringRunCompletedEventSchema`, `TopicClusteringRunFailedEventSchema`, `TopicClusteringTopicsRecordedEventSchema`.
+Declared at `src/eventing/topic-clustering-processing.pipeline.ts:85`. Events: `TopicClusteringRequestedEventSchema`, `TopicClusteringRunStartedEventSchema`, `TopicClusteringRunCompletedEventSchema`, `TopicClusteringRunFailedEventSchema`, `TopicClusteringTopicsRecordedEventSchema`.
 
 | Kind                | Name                                                                                           | Handles                                                                                                      | Declared at                                                |
 | ------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| command             | `requestClustering`                                                                            | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:99`  |
-| command             | `recordClusteringRunStarted`                                                                   | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:100` |
-| command             | `recordClusteringRunCompleted`                                                                 | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:101` |
-| command             | `recordClusteringRunFailed`                                                                    | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:102` |
-| command             | `recordTopics`                                                                                 | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:103` |
-| process manager     | `topicClustering`                                                                              | intents `run` (outbox)                                                                                       | `src/eventing/topic-clustering-processing.pipeline.ts:113` |
-| process manager     | `topicClusteringSeed`                                                                          | every 1 h (`TOPIC_CLUSTERING_SEED_INTERVAL_MS = 60 * 60 * 1000`); intents `seedSchedules`, `seedTopicModels` | `src/eventing/topic-clustering-processing.pipeline.ts:114` |
-| Postgres projection | `≈ TopicClusteringRunStatusFoldProjection.create({ store: deps.topicClusteringRunStatusStore…` | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:88`  |
-| Postgres projection | `≈ TopicClusteringRunHistoryFoldProjection.create({ store: deps.topicClusteringRunHistorySto…` | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:93`  |
-| Postgres projection | `≈ TopicModelFoldProjection.create({ store: deps.topicModelStore })`                           | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:98`  |
+| command             | `requestClustering`                                                                            | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:109` |
+| command             | `recordClusteringRunStarted`                                                                   | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:110` |
+| command             | `recordClusteringRunCompleted`                                                                 | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:111` |
+| command             | `recordClusteringRunFailed`                                                                    | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:112` |
+| command             | `recordTopics`                                                                                 | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:113` |
+| process manager     | `topicClustering`                                                                              | intents `run` (outbox)                                                                                       | `src/eventing/topic-clustering-processing.pipeline.ts:123` |
+| process manager     | `topicClusteringSeed`                                                                          | every 1 h (`TOPIC_CLUSTERING_SEED_INTERVAL_MS = 60 * 60 * 1000`); intents `seedSchedules`, `seedTopicModels` | `src/eventing/topic-clustering-processing.pipeline.ts:127` |
+| peer subscriber     | `topicClusteringFirstTraceBootstrap`                                                           | `lw.trace.first_trace_recorded` from [trace](../../trace/README.md)                                          | `src/eventing/topic-clustering-processing.pipeline.ts:136` |
+| peer subscriber     | `topicClusteringTraceReceivedBootstrap`                                                        | `lw.trace.trace_received` from [trace](../../trace/README.md)                                                | `src/eventing/topic-clustering-processing.pipeline.ts:141` |
+| Postgres projection | `≈ TopicClusteringRunStatusFoldProjection.create({ store: deps.topicClusteringRunStatusStore…` | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:98`  |
+| Postgres projection | `≈ TopicClusteringRunHistoryFoldProjection.create({ store: deps.topicClusteringRunHistorySto…` | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:103` |
+| Postgres projection | `≈ TopicModelFoldProjection.create({ store: deps.topicModelStore })`                           | –                                                                                                            | `src/eventing/topic-clustering-processing.pipeline.ts:108` |
 
 ### Tasks
 

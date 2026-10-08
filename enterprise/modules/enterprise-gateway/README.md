@@ -37,6 +37,6 @@ Anything else enterprise-gateway needs belongs to another module and is reached 
 
 ## Who depends on enterprise-gateway
 
-[governance](../governance/README.md), [user](../../../modules/user/README.md) (as a peer).
+[governance](../governance/README.md) (as a peer).
 
 <!-- readme:generated:end -->

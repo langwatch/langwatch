@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).withTransportFacts(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing)`, `src/governance.module.ts:41`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).withTransportFacts(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing)`, `src/governance.module.ts:43`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:166`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:168`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -672,10 +672,18 @@ departmentAssignProject(input: { organizationId: string; projectId: string; depa
 
 #### `personalUsage`
 
-One person's own usage against a tenant the caller resolved, as main's `/api/me/usage`.
+One person's own usage against a tenant the caller resolved.
 
 ```typescript
 personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup>;
+```
+
+#### `getPersonalUsage`
+
+`/api/me/usage`: the key's own usage; its credential's class is half the decision.
+
+```typescript
+getPersonalUsage(input: { projectId: string; credential: MePersonalCredential; window?: { startMs: number; endMs: number }; }): Promise<MeUsage>;
 ```
 
 #### `personalUsageDashboard`
@@ -979,6 +987,29 @@ type Body = z.infer<typeof governanceRestCloneTemplateSchema>; // ../contract/sr
 type Response = z.infer<typeof governanceRestTemplateDetailSchema>; // ../contract/src/governance-rest.schemas.ts:55
 ```
 
+### `meUsageRest`
+
+|             |                                     |
+| ----------- | ----------------------------------- |
+| Declared at | `src/transport/me-usage.rest.ts:25` |
+| Base URL    | `/api/me`, twin `/api/v1/me`        |
+| Addressing  | dated                               |
+| Credential  | project                             |
+| Versions    | `2026-08-07`                        |
+
+#### `GET /usage` · `getApiMeUsage`
+
+Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.
+
+Permission `project:view`. Declared at `src/transport/me-usage.rest.ts:29`.
+
+Answers at `/api/me/usage`, `/api/v1/me/usage`; also, undocumented, `/api/me/2026-08-07/usage`, `/api/v1/me/2026-08-07/usage`, `/api/me/latest/usage`, `/api/v1/me/latest/usage`.
+
+```typescript
+type Query = z.infer<typeof meUsageQuerySchema>; // ../contract/src/personal-usage.ts:83
+type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/personal-usage.ts:129
+```
+
 ## tRPC transport
 
 ### `activityMonitor`
@@ -1226,7 +1257,7 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:156`. Events: `pulledUsageObs
 
 | Kind   | Leaf                      | Environment variable                  | Declared at                               |
 | ------ | ------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:468`           |
+| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:473`           |
 | config | `gatewayPublicUrl`        | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:33` |
 | config | `gatewayInternalUrl`      | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:34` |
 | config | `gatewayLegacyUrl`        | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:35` |

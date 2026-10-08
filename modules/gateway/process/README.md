@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`GatewayApi`)
 
-Peers call these through the token, declared at `../contract/src/gateway.api.ts:568`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/gateway.api.ts:569`; nothing else in this package is public.
 It extends `GatewayInternalProtocol`.
 
 #### `internalDoor`
@@ -599,6 +599,14 @@ Every budget binding this member's own keys in this organization, with spend and
 
 ```typescript
 budgetOverviewForUser(input: { organizationId: string; userId: string; /** Adds up to three top models to each personal budget. */ includeTopModels?: boolean; }): Promise<GatewayBudgetOverviewForUser>;
+```
+
+#### `getPersonalBudget`
+
+The /me budget banner: the gateway's own check at a projected cost of zero on the caller's personal key, so the banner and the command line's pre-check agree.
+
+```typescript
+getPersonalBudget(input: { userId: string; organizationId: string; }): Promise<GatewayPersonalBudget>;
 ```
 
 #### `spendByVirtualKey`
@@ -1338,7 +1346,7 @@ type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contrac
 
 ### `gatewayBudgets`
 
-Contract `../contract/src/gateway-budget.trpc.ts:24`, router `src/transport/gateway-budget.trpc.ts:78`.
+Contract `../contract/src/gateway-budget.trpc.ts:25`, router `src/transport/gateway-budget.trpc.ts:78`.
 
 | Procedure                       | Kind     | Gate                               | Input                                     | Output                            |
 | ------------------------------- | -------- | ---------------------------------- | ----------------------------------------- | --------------------------------- |
@@ -1346,6 +1354,7 @@ Contract `../contract/src/gateway-budget.trpc.ts:24`, router `src/transport/gate
 | `gatewayBudgets.listForProject` | query    | Permission `gatewayBudgets:view`   | `gatewayBudgetApiProjectInputSchema`      | `gatewayBudgetListSchema`         |
 | `gatewayBudgets.get`            | query    | Permission `gatewayBudgets:view`   | `gatewayBudgetApiBudgetInputSchema`       | `gatewayBudgetDetailSchema`       |
 | `gatewayBudgets.groupTargets`   | query    | Permission `gatewayBudgets:create` | `gatewayBudgetApiOrganizationInputSchema` | `gatewayBudgetGroupTargetsSchema` |
+| `gatewayBudgets.personalBudget` | query    | Permission `organization:view`     | `gatewayBudgetApiOrganizationInputSchema` | `gatewayPersonalBudgetSchema`     |
 | `gatewayBudgets.create`         | mutation | Permission `gatewayBudgets:create` | `gatewayBudgetApiCreateInputSchema`       | `gatewayBudgetDtoResponseSchema`  |
 | `gatewayBudgets.update`         | mutation | Permission `gatewayBudgets:update` | `gatewayBudgetApiUpdateInputSchema`       | `gatewayBudgetDtoResponseSchema`  |
 | `gatewayBudgets.archive`        | mutation | Permission `gatewayBudgets:delete` | `gatewayBudgetApiBudgetInputSchema`       | `gatewayBudgetDtoResponseSchema`  |
@@ -1475,9 +1484,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1139`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1140`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1141`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1143`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1144`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1145`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:25` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:27` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:29` |

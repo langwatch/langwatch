@@ -6,7 +6,7 @@ The server half of [agent](../README.md). Agents a project builds and runs: thei
 
 ## Installation
 
-`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withEventing(agentLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:22`.
+`defineProcessModule("agent").withRepositories(agentRepositories).withApi(AgentModule).withTransports(…, …, …, agentLegacyRest, agentTrpcTransport, httpProxyTrpcTransport).withEventing(agentLifecycleEventing).withEventing(agentWorkflowFieldsEventing).withTasks(…).withTransportFacts(…)`, `src/agent.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -134,12 +134,6 @@ listWithPresence(input: { projectId: string; page: number; limit: number; viewer
 getCopiesForActor(input: { agentId: string; projectId: string; actorId: string; }): Promise<AgentCopy[]>;
 ```
 
-#### `copyForActor`
-
-```typescript
-copyForActor(input: CopyAgentCommand & { actorId: string }): Promise<agentQueriesModule.AgentCopyCreated>;
-```
-
 #### `pushToCopiesForActor`
 
 ```typescript
@@ -206,10 +200,12 @@ getCopies(input: { sourceAgentId: string; allowedProjectIds?: string[] }): Promi
 getSourceOfCopy(input: { agentId: string; projectId: string }): Promise<Agent>;
 ```
 
-#### `copy`
+#### `createCopy`
+
+Writes the copy's row; workflow's `copyAgent` door copied a workflow agent's graph first.
 
 ```typescript
-copy(input: CopyAgentCommand): Promise<{ id: string; projectId: string; name: string; copiedFromAgentId: string; }>;
+createCopy(input: CopyAgentCommand): Promise<agentQueriesModule.AgentCopyCreated>;
 ```
 
 #### `pushToCopies`
@@ -524,7 +520,7 @@ type Response = z.infer<typeof relayCallResponseSchema>; // ../contract/src/conn
 
 ### `agents`
 
-Contract `../contract/src/agent.trpc.ts:27`, router `src/transport/agent.trpc.ts:16`.
+Contract `../contract/src/agent.trpc.ts:25`, router `src/transport/agent.trpc.ts:16`.
 
 | Procedure               | Kind     | Gate                            | Input                               | Output                           |
 | ----------------------- | -------- | ------------------------------- | ----------------------------------- | -------------------------------- |
@@ -535,14 +531,13 @@ Contract `../contract/src/agent.trpc.ts:27`, router `src/transport/agent.trpc.ts
 | `agents.cascadeArchive` | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentCascadeArchiveSchema`      |
 | `agents.delete`         | mutation | Permission `evaluations:manage` | `agentApiAgentInputSchema`          | `agentSchema`                    |
 | `agents.getCopies`      | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
-| `agents.copy`           | mutation | Permission `evaluations:manage` | `agentApiCopyRequestSchema`         | `agentCopyCreatedSchema`         |
 | `agents.pushToCopies`   | mutation | Permission `evaluations:manage` | `agentApiPushToCopiesInputSchema`   | `agentPushToCopiesSchema`        |
 | `agents.syncFromSource` | mutation | Permission `evaluations:manage` | `agentApiAgentReferenceInputSchema` | `agentSyncFromSourceSchema`      |
 | `agents.getHistory`     | query    | Permission `evaluations:view`   | `agentApiAgentReferenceInputSchema` | inline                           |
 
 ### `httpProxy`
 
-Contract `../contract/src/agent.trpc.ts:74`, router `src/transport/http-proxy.trpc.ts:5`.
+Contract `../contract/src/agent.trpc.ts:68`, router `src/transport/http-proxy.trpc.ts:5`.
 
 | Procedure           | Kind     | Gate                            | Input                      | Output                  |
 | ------------------- | -------- | ------------------------------- | -------------------------- | ----------------------- |
@@ -563,6 +558,15 @@ Declared at `src/eventing/agent-lifecycle.pipeline.ts:29`. Events: `agentArchive
 | Kind    | Name                  | Handles | Declared at                                   |
 | ------- | --------------------- | ------- | --------------------------------------------- |
 | command | `recordAgentArchived` | –       | `src/eventing/agent-lifecycle.pipeline.ts:34` |
+
+### Pipeline `agent_workflow_fields` (aggregate `global`)
+
+Declared at `src/eventing/agent-workflow-fields.pipeline.ts:43`.
+
+| Kind            | Name                   | Handles                                                               | Declared at                                         |
+| --------------- | ---------------------- | --------------------------------------------------------------------- | --------------------------------------------------- |
+| peer subscriber | `workflowVersionSaved` | `lw.workflow.version_saved` from [workflow](../../workflow/README.md) | `src/eventing/agent-workflow-fields.pipeline.ts:49` |
+| peer subscriber | `workflowArchived`     | `lw.workflow.archived` from [workflow](../../workflow/README.md)      | `src/eventing/agent-workflow-fields.pipeline.ts:62` |
 
 ### Tasks
 

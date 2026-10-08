@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:39`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:40`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -113,7 +113,7 @@ listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
 Unarchived, non-governance project ids, unpaged: main's `findAllByOrganization` filter.
 
 ```typescript
-findLiveNonGovernanceIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
+findLiveNonGovernanceIdsByOrganization(input: LiveProjectIdsByOrganizationInput): Promise<string[]>;
 ```
 
 #### `findLiveBySlug`

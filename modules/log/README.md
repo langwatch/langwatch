@@ -11,7 +11,7 @@ Logs: receiving OTLP logs, canonicalising and recording them, and reading a trac
 | Classification | core (`modules/catalogue.json`)                                                      |
 | Subjects       | log, log-ingestion                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md)                                  |
-| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:55` (4 operations) |
+| Api token      | `LogApi` = `moduleApi<LogApi>()("log")`, `contract/src/log.api.ts:51` (4 operations) |
 | Installed by   | api, worker, tasks (process)                                                         |
 
 ## What log owns
