@@ -189,7 +189,7 @@ export function VerificationFirstSignUp() {
   // The address's domain routes through an identity provider, which makes the account.
   const [routedEmail, setRoutedEmail] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
-  // The single-use proof `user.register` spends; only where no account stands behind the address.
+  // The single-use proof `auth.register` spends; only where no account stands behind the address.
   const [addressProof, setAddressProof] = useState<string | null>(null);
   // False where the installation cannot send email: the proof confirms nobody's address.
   const [addressConfirmed, setAddressConfirmed] = useState(true);

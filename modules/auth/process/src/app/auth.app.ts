@@ -75,6 +75,8 @@ import {
   UserApi,
   type ChangeOwnPasswordInput,
   type SetOwnFirstPasswordInput,
+  type CreatedUser,
+  type RegisterCredentialAccountInput,
   type UpdateUserEmailInput,
   type UserCaller,
   type UserLifecycleChangeInput,
@@ -121,6 +123,7 @@ import {
   type CliDeviceFlowCollaborators,
 } from "../services/cli-device-flow.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
+import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
 import { FederatedPasswordService } from "../services/federated-password.service.ts";
 import {
@@ -170,6 +173,8 @@ type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
+  /** Whether the installation's sign-up policy admits an address, before its proof is spent. */
+  organizations: Pick<OrganizationApi, "checkSignUp">;
   /** The account writes auth's lifecycle doors run before ending credentials. */
   users: Pick<
     UserApi,
@@ -181,6 +186,7 @@ type AuthAppPeers = Readonly<{
     | "hasPassword"
     | "setFirstPassword"
     | "rotatePassword"
+    | "registerCredentialAccount"
   >;
 }>;
 
@@ -266,6 +272,7 @@ export class AuthModule implements AuthApiContract {
   /** The account writes that end credentials: deactivation and an address change. */
   readonly #accounts: AccountLifecycleService;
   readonly #ownPasswords: OwnPasswordService;
+  readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
   /** The Auth0 tenant's password change; set once the provider secrets resolve. */
@@ -404,6 +411,12 @@ export class AuthModule implements AuthApiContract {
       auth: this,
       issuesOwnPasswords: () => this.#issuesOwnPasswords,
     });
+    this.#registrations = CredentialRegistrationService.create({
+      users: dependencies.users,
+      organizations: dependencies.organizations,
+      auth: this,
+      issuesOwnPasswords: () => this.#issuesOwnPasswords,
+    });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
@@ -502,6 +515,7 @@ export class AuthModule implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
+        organizations: dependencies.organizations,
         users: dependencies.users,
       },
       legacySsoAccess: LegacySsoAccessService.create({
@@ -986,6 +1000,10 @@ export class AuthModule implements AuthApiContract {
 
   changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
     return this.#ownPasswords.change(input);
+  }
+
+  registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
+    return this.#registrations.register(input);
   }
 
   /** Meters through the counter every process supplies, the same one the token

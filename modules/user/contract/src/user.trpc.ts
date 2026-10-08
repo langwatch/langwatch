@@ -19,7 +19,6 @@ import {
   userApiEmptyInputSchema,
   userApiNotificationTopicInputSchema,
   userApiOrganizationInputSchema,
-  userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
@@ -29,7 +28,6 @@ import {
   userApiUserInputSchema,
 } from "./user.schemas.ts";
 import {
-  createdUserSchema,
   userAccountInfoSchema,
   userNotificationPreferenceSchema,
   userSecureAccountOfferSchema,
@@ -40,12 +38,6 @@ import {
 } from "./user.ts";
 
 export const userTrpc = defineTrpcContract("user")
-  // The account predates itself here: `register` is the signup form's backend
-  // and runs with no caller at all.
-  .mutation("register")
-  .withInput(userApiRegisterInputSchema)
-  .withOutput(createdUserSchema)
-
   // The address an uploaded avatar's `image` carries (`/api/user-avatar/:projectId/:userAvatarId`),
   // answered with the signed URL the browser renders it from (Alex, 2026-09-30).
   .query("getAvatarUrl")

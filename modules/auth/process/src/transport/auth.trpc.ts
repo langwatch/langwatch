@@ -248,6 +248,28 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
     }),
   )
 
+  // `register` predates the account it creates, so it runs with no caller at all and the
+  // address it arrived from is the only thing to throttle on (D-A1U-2, wire from `user.*`).
+  .procedure("register")
+  .withFacts(callerAddressFact, authRequestHeadersFact)
+  .withAccess(
+    publicRoute({
+      reason:
+        "the signup form's own backend: it mints the account a caller would otherwise need to already hold",
+    }),
+  )
+  .handle(({ app, input }, callerAddress, headers) =>
+    app.registerCredentialAccount({
+      name: input.name ?? null,
+      email: input.email,
+      password: input.password,
+      addressProof: input.addressProof,
+      callerAddress: callerAddress ?? "unknown",
+      origin: headers.get("origin"),
+      referer: headers.get("referer"),
+    }),
+  )
+
   // The session row travels as a fact: one person on two tabs is one actor and two sessions,
   // so "end every session but this one" asks about the request (D-A1U-4, wire from `user.*`).
   .procedure("setPassword")

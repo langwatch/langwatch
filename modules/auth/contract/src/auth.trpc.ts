@@ -6,7 +6,9 @@ import { routingDecisionSchema } from "@langwatch/identity-contract";
  */
 import { defineTrpcContract } from "@langwatch/module";
 import {
+  createdUserSchema,
   userApiChangePasswordInputSchema,
+  userApiRegisterInputSchema,
   userApiSetPasswordInputSchema,
   userApiSuccessSchema,
   userApiUserInputSchema,
@@ -100,4 +102,12 @@ export const authTrpc = defineTrpcContract("auth")
   .mutation("changePassword")
   .withInput(userApiChangePasswordInputSchema)
   .withOutput(userApiSuccessSchema)
+
+  /**
+   * The signup form's backend, moved from `user.*` with its wire (D-A1U-2). The account
+   * predates itself here, so it runs with no caller at all.
+   */
+  .mutation("register")
+  .withInput(userApiRegisterInputSchema)
+  .withOutput(createdUserSchema)
   .build();

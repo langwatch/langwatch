@@ -1,4 +1,3 @@
-import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi, UserServerConfig } from "@langwatch/user-contract";
@@ -10,7 +9,7 @@ import { userRepositories } from "./repositories/user-repositories.registry.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
 import { meRest } from "./transport/me.rest.ts";
 import { userAvatarRest } from "./transport/user-avatar.rest.ts";
-import { signUpOriginFact, userTrpcTransport } from "./transport/user.trpc.ts";
+import { userTrpcTransport } from "./transport/user.trpc.ts";
 
 export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServerConfig> =
   defineProcessModule("user")
@@ -41,11 +40,4 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
           });
         },
       }),
-    ])
-    .withTransportFacts(() => [
-      // A Node header may arrive repeated; the first value is the one the browser sent.
-      bindTrpcFact(signUpOriginFact, (context: TrpcRuntimeContext) => ({
-        origin: [context.req?.headers.origin].flat()[0] ?? null,
-        referer: [context.req?.headers.referer].flat()[0] ?? null,
-      })),
     ]);

@@ -54,8 +54,6 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
       priorSession: {
         useQuery: () => ({ data: priorSessionRef.current }),
       },
-    },
-    user: {
       register: {
         useMutation: () => ({ mutateAsync: registerMock, isPending: false, error: null }),
       },
@@ -900,14 +898,14 @@ describe("given the identifier-first sign-in screen", () => {
     });
 
     /**
-     * The router reads the projection and `user.register` the account, so an
+     * The router reads the projection and `auth.register` the account, so an
      * account the projection lags is invisible to one and plain to the other.
      * "Already registered" used to be a dead end here.
      */
     /** @scenario Sign-up with an address that already has an account becomes a log-in */
     it("becomes the log-in picker when the address turns out to be held", async () => {
       // Mount, then the address (nobody holds it), then the re-ask after
-      // `user.register` says otherwise.
+      // `auth.register` says otherwise.
       routeMock
         .mockResolvedValueOnce(localPicker)
         .mockResolvedValueOnce(unknownIdentifier)

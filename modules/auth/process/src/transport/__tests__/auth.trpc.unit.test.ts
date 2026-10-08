@@ -40,6 +40,7 @@ const endBrowserSession = vi.fn<AuthApi["endBrowserSession"]>();
 const deactivateAccount = vi.fn<AuthApi["deactivateAccount"]>();
 const setOwnFirstPassword = vi.fn<AuthApi["setOwnFirstPassword"]>();
 const changeOwnPassword = vi.fn<AuthApi["changeOwnPassword"]>();
+const registerCredentialAccount = vi.fn<AuthApi["registerCredentialAccount"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -98,6 +99,7 @@ const door: AuthApi = {
   deactivateAccount,
   setOwnFirstPassword,
   changeOwnPassword,
+  registerCredentialAccount,
   changeUserEmail: () => unreached("changeUserEmail"),
 };
 
@@ -139,6 +141,7 @@ describe("the signed-out front door", () => {
         "inviteLanding",
         "myAddressConfirmation",
         "priorSession",
+        "register",
         "requestFreshInvite",
         "requestSignUpVerification",
         "route",
@@ -170,6 +173,7 @@ describe("the signed-out front door", () => {
         endBrowserSession: "mutation",
         setPassword: "mutation",
         changePassword: "mutation",
+        register: "mutation",
       });
     });
   });
@@ -337,6 +341,28 @@ describe("the signed-out front door", () => {
       await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
         sent: false,
         addressProof: "proof-1",
+      });
+    });
+  });
+
+  describe("when a signed-out visitor submits the sign-up form", () => {
+    /** @scenario "The register procedure answers on auth's namespace" */
+    it("hands auth the form, the caller's address and origin, and answers the new id", async () => {
+      registerCredentialAccount.mockResolvedValue({ id: "user-1" });
+
+      await expect(
+        router
+          .createCaller({ address: "203.0.113.7", headers: { origin: "http://localhost:5560" } })
+          .register({ email: "sam@acme.com", password: "supersecret", addressProof: "proof-1" }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(registerCredentialAccount).toHaveBeenCalledWith({
+        name: null,
+        email: "sam@acme.com",
+        password: "supersecret",
+        addressProof: "proof-1",
+        callerAddress: "203.0.113.7",
+        origin: "http://localhost:5560",
+        referer: null,
       });
     });
   });

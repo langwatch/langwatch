@@ -30,7 +30,6 @@ describe("the user tRPC surface", () => {
         "homePagePickerState",
         "isAdmin",
         "reactivate",
-        "register",
         "removeAvatar",
         "requestBudgetIncrease",
         "secureAccountNudge",
@@ -62,7 +61,6 @@ describe("the user tRPC surface", () => {
         secureAccountNudge: "query",
         dismissSecureAccountNudge: "mutation",
         updateName: "mutation",
-        register: "mutation",
         setAvatar: "mutation",
         unlinkAccount: "mutation",
       });

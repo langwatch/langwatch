@@ -235,7 +235,7 @@ export async function signUpSession({
   if (!addressProof) throw new Error(`sign-up verification gave no proof: ${asked.body}`);
   const registered = await callTrpc({
     api,
-    path: "user.register",
+    path: "auth.register",
     kind: "mutation",
     input: { email, password: SIGN_UP_PASSWORD, addressProof },
     headers: browser,

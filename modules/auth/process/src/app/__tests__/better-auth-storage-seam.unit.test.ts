@@ -15,7 +15,7 @@ const PERSON = { email: "dana@company.test", password: "correct-horse-battery", 
 async function memoryTier() {
   const repositories = instantiateRepositories(authRepositories, { tier: "memory", members: {} });
   const { transport, call } = await composedAuth({ repositories });
-  // Better Auth's own sign-up, server-side: its HTTP route stays sealed for user.register.
+  // Better Auth's own sign-up, server-side: its HTTP route stays sealed for auth.register.
   const signUp = async () => {
     const created = await transport.api.signUpEmail({ body: PERSON });
     return created.user.id;

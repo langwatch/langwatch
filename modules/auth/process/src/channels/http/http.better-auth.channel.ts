@@ -118,7 +118,7 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
 
 /**
  * Seals better-auth's own sign-up route unconditionally, before any licence
- * is read: creation belongs to `user.register`'s pending-confirmation latch,
+ * is read: creation belongs to `auth.register`'s pending-confirmation latch,
  * else email-mode (the common case) would stay wide open to the raw route.
  */
 function refuseDirectEmailSignUp(pathname: string): void {

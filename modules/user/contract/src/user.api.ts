@@ -18,7 +18,7 @@ import type {
   CreatePasskeyUserInput,
   CreateUserInput,
   CreatedUser,
-  RegisterCredentialAccountInput,
+  CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetOwnAvatarInput,
@@ -100,8 +100,8 @@ export interface UserApi {
    * and drops every sign-in method set before the proof; memberships stay (rulings 2026-10-06).
    */
   adoptUnconfirmedAccount(input: UserEmailInput): Promise<AdoptUnconfirmedAccountOutcome>;
-  /** The signup form's whole path: the mode gate, the throttle and the mint. */
-  registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
+  /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
+  registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult>;
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;

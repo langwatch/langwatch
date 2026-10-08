@@ -31,6 +31,13 @@ Feature: Sign-up
     When the user is created
     Then the invite stays unapplied and nothing is granted
 
+  # D-A1U-2: the register door moved from user to auth with its wire.
+  @unit
+  Scenario: The register procedure answers on auth's namespace
+    When a signed-out person submits the sign-up form to auth.register
+    Then auth checks the request and has user mint the account
+    And the answer is the new account's id, as user.register answered before
+
   # Round 48 (A1-d): auth asks user to adopt, then ends the sessions itself; user calls no auth.
   @unit
   Scenario: Adopting an account ends every session it held before the proof

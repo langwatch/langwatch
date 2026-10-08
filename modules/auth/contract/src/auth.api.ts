@@ -11,6 +11,8 @@ import type {
   UserProfile,
   ChangeOwnPasswordInput,
   SetOwnFirstPasswordInput,
+  CreatedUser,
+  RegisterCredentialAccountInput,
 } from "@langwatch/user-contract";
 import { z } from "zod";
 
@@ -221,6 +223,11 @@ export interface AuthApi {
   setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
   /** Verifies the current password and replaces it, then ends every other session. */
   changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
+  /**
+   * The signup form's door (D-A1U-2): the origin, the mode, the throttle and the sign-up
+   * policy, then the address proof is spent and user mints the account.
+   */
+  registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
 
   /** Whether this attempt is inside the budget the door asked for, and how
    *  long to wait when it is not — the refusal's words name the seconds. */

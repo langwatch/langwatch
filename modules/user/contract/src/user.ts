@@ -288,6 +288,17 @@ export const registerCredentialAccountInputSchema = z
   .strict();
 export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;
 
+/** An account auth's register door cleared; `addressConfirmed` is what its spent proof proved. */
+export const credentialAccountInputSchema = z
+  .object({
+    name: z.string().nullable(),
+    email: z.string().min(1),
+    password: z.string().min(1),
+    addressConfirmed: z.boolean(),
+  })
+  .strict();
+export type CredentialAccountInput = z.infer<typeof credentialAccountInputSchema>;
+
 /**
  * The session row a credential write keeps. Null while impersonating: the
  * row is the OPERATOR's, so "end every session but this one" would neither

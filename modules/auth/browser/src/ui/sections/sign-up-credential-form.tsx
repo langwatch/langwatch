@@ -100,7 +100,7 @@ export function SignUpCredentialForm({
       else form.clearErrors(field);
     },
   });
-  const register = api.user.register.useMutation();
+  const register = api.auth.register.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);

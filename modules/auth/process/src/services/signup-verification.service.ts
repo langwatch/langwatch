@@ -53,7 +53,7 @@ const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 /** One hour, matching the reset link's lifetime and the email's promise. */
 export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
 
-/** A link confirmed an address with no account behind it; `user.register` spends this proof. */
+/** A link confirmed an address with no account behind it; `auth.register` spends this proof. */
 const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
 
 /** Long enough to choose a password on the next screen; worthless in a closed tab. */
@@ -212,7 +212,7 @@ export class SignUpVerificationService {
   }
 
   /**
-   * Spends a link and answers the address it proved, with the proof `user.register` spends.
+   * Spends a link and answers the address it proved, with the proof `auth.register` spends.
    * An address holding an unfinished account adopts it instead; any other account refuses.
    */
   async completeVerification({ token }: { token: string }): Promise<CompletedVerification> {

@@ -1,16 +1,10 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { ValidationError } from "@langwatch/handled-error";
-import {
-  IdentityVerificationExpiredError,
-  describePasswordProblem,
-  routesToOrganizationConnection,
-} from "@langwatch/identity-contract";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
-import { OrganizationApi, SignUpRestrictedError } from "@langwatch/organization-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,
@@ -29,7 +23,7 @@ import type {
   CreatedUser,
   UserEmailInput,
   MeProject,
-  RegisterCredentialAccountInput,
+  CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
   SetFirstUserPasswordInput,
@@ -75,8 +69,6 @@ import {
   UserBudgetRequestNotDeliveredError,
   UserLastAuthenticationMethodError,
   UserLinkedAccountNotFoundError,
-  UserRegistrationNotAvailableError,
-  UserSignupThrottledError,
   UserApi,
   userConfig,
 } from "@langwatch/user-contract";
@@ -112,11 +104,6 @@ const logger = createLogger("langwatch:user-app");
  * on signup day is asked again once they have something worth protecting.
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
-
-/** Mirrors the hosted sign-up budget so this path is no spam side-channel. */
-const SIGNUP_BUDGET = { windowSeconds: 60 * 60, max: 20 } as const;
-
-/** A credential outlives the session that set it, so every attempt is metered. */
 
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
@@ -422,54 +409,11 @@ export class UserModule implements UserApi {
     return this.#users.createPasskeyUser(input);
   }
 
-  /**
-   * The signup form's whole path. Keyed off the RESOLVED provider, not the raw
-   * environment: the platform gate coerces to email mode with no license (ADR-027
-   * Decision 4), and blocking this path would kill fresh-signup recovery (5c).
-   */
-  async registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
-    // Before anything is claimed or written: the sign-in that follows is refused on a foreign
-    // origin, and an account created first would be left with nobody signed in to it.
-    await this.#peers.auth.assertSignUpOrigin({ origin: input.origin, referer: input.referer });
-
-    // The same rules the form ran, from the same module, so the two cannot
-    // drift into accepting different passwords. Carried as `fieldErrors` so the
-    // refusal lands on the password box rather than in a banner over it.
-    const problem = describePasswordProblem(input.password);
-
-    if (problem) {
-      throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
-    }
-
+  /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
+  async registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser> {
     // Sign-in lowercases the address on every lookup, so an account stored as
     // typed is one sign-in can never find, no matter the password.
     const email = input.email.toLowerCase();
-
-    // D09: a deployment issuing its own passwords beside its provider passes
-    // too, except for an address an organization routes to its own connection.
-    const emailMode = (await this.#authReads.resolveAuthProvider()) === "email";
-
-    if (!emailMode && !this.#facts.localPasswords) {
-      throw new UserRegistrationNotAvailableError();
-    }
-    if (!emailMode && (await this.#addressRoutesToConnection(email))) {
-      throw new UserRegistrationNotAvailableError();
-    }
-
-    await this.#meter({
-      key: `user.register:${input.callerAddress}`,
-      budget: SIGNUP_BUDGET,
-      refuse: () => new UserSignupThrottledError(),
-    });
-
-    // Before the proof is spent: a refused address keeps its link for the day
-    // an administrator invites it.
-    const verdict = await this.#peers.organizations.checkSignUp({ email });
-    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
-
-    // The mailbox proof is the authority to enrol a credential, spent before
-    // anything is hashed or written and bound to this exact address.
-    const addressConfirmed = await this.#claimSignUpProof({ token: input.addressProof, email });
 
     // Case-insensitive on purpose: rows written before the lowercasing above
     // may carry capitals, and minting a case-twin beside one would leave two
@@ -482,19 +426,12 @@ export class UserModule implements UserApi {
       passwordHash: await this.#passwords.hash({ password: input.password }),
     };
     // The created and registered facts commit with the account, so a down bus never fails it.
-    const created = await this.#users.registerCredentialUser({ account, addressConfirmed });
+    const created = await this.#users.registerCredentialUser({
+      account,
+      addressConfirmed: input.addressConfirmed,
+    });
 
     return { id: created.id };
-  }
-
-  /**
-   * Spends the sign-up proof and answers whether it confirmed the address. An unconfirmed
-   * proof counts only while the installation cannot send email (ADR-117, revision 2026-09-25).
-   */
-  async #claimSignUpProof(proof: { token: string; email: string }): Promise<boolean> {
-    if (await this.#peers.auth.claimSignUpAddressProof(proof)) return true;
-    if (await this.#peers.auth.claimUnconfirmedSignUpAddressProof(proof)) return false;
-    throw new IdentityVerificationExpiredError();
   }
 
   /** Whether this account can sign in with a password at all. */
@@ -505,17 +442,6 @@ export class UserModule implements UserApi {
   /** Sets a first password on an account that has none. */
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
     return this.#users.setFirstPassword(input);
-  }
-
-  /**
-   * Whether an organization's own connection governs this address (D04). Left
-   * to throw: for an address a company signs in, "could not tell" must not
-   * become "here is a password".
-   */
-  async #addressRoutesToConnection(email: string): Promise<boolean> {
-    return routesToOrganizationConnection(
-      await this.#authReads.route({ identifier: email, breakGlass: false }),
-    );
   }
 
   /** Whether this deployment still owes the user a passkey offer, and when. */
@@ -828,20 +754,6 @@ export class UserModule implements UserApi {
 
   #nowMs(): number {
     return this.#now().epochMilliseconds;
-  }
-
-  async #meter({
-    key,
-    budget,
-    refuse,
-  }: {
-    key: string;
-    budget: { windowSeconds: number; max: number };
-    refuse: () => Error;
-  }): Promise<void> {
-    const allowance = await this.#rateLimits.check({ key, ...budget });
-
-    if (!allowance.allowed) throw refuse();
   }
 
   async #requireProject({ projectId }: { projectId: string }): Promise<ProjectIdentity> {

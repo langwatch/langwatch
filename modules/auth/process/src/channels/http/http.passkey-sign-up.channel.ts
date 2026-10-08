@@ -134,7 +134,7 @@ async function refuseIfRegistered({
   users: PasskeySignUpDirectory;
   email: string;
 }): Promise<void> {
-  // Case-insensitive for the same reason `user.register` is: rows written
+  // Case-insensitive for the same reason `auth.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
   const existing = await users.findByEmail({ email: candidateEmail });
