@@ -138,9 +138,11 @@ DEV_ENV_FILE ?= platform/app/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
-		{ test -f "$(DEV_ENV_FILE)" \
-			&& . dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)" \
-			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
+		{ if test -f "$(DEV_ENV_FILE)"; then \
+			. dev/scripts/lib/load-dev-env.sh && load_dev_env "$(DEV_ENV_FILE)"; \
+		else \
+			echo "$(DEV_ENV_FILE) not found — using process environment"; \
+		fi; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=pretty && \

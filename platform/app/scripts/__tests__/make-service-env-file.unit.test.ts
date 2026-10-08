@@ -48,10 +48,10 @@ function loadWithSh(envFile: string): { out: string; status: number } {
   }
 }
 
-function runMake(target: string): string {
+function runMake(target: string, envFile = repoEnvName): string {
   return execFileSync(
     "make",
-    ["-s", target, "svc=aigateway", `DEV_ENV_FILE=${repoEnvName}`],
+    ["-s", target, "svc=aigateway", `DEV_ENV_FILE=${envFile}`],
     {
       cwd: REPO_ROOT,
       encoding: "utf8",
@@ -66,11 +66,13 @@ describe("load-dev-env.sh", () => {
       path.join(REPO_ROOT, repoEnvName),
       "LOAD_DEV_ENV_TEST=from-make\n",
     );
+    fs.writeFileSync(path.join(REPO_ROOT, `${repoEnvName}.bad`), "false\n");
   });
 
   afterAll(() => {
     fs.rmSync(workDir, { recursive: true, force: true });
     fs.rmSync(path.join(REPO_ROOT, repoEnvName), { force: true });
+    fs.rmSync(path.join(REPO_ROOT, `${repoEnvName}.bad`), { force: true });
   });
 
   describe("when DEV_ENV_FILE is a name without a slash", () => {
@@ -115,6 +117,14 @@ describe("load-dev-env.sh", () => {
     describe(`when make ${target} gets a DEV_ENV_FILE without a slash`, () => {
       it("starts the service with the variables of that file", () => {
         expect(runMake(target)).toContain("service env: from-make");
+      });
+    });
+  }
+
+  for (const target of ["service", "service-watch"]) {
+    describe(`when make ${target} gets an env file that fails to load`, () => {
+      it("stops before starting the service", () => {
+        expect(() => runMake(target, `${repoEnvName}.bad`)).toThrow();
       });
     });
   }
