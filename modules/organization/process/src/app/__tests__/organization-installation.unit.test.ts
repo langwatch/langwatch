@@ -9,7 +9,6 @@ import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -43,7 +42,6 @@ function process(role: "api" | "worker") {
       notification: createApiFixture<NotificationService>(),
       project: createApiFixture<ProjectApi>(),
       role: createApiFixture<RoleApi>(),
-      share: createApiFixture<ShareApi>(),
       user: createApiFixture<UserApi>(),
     });
 }

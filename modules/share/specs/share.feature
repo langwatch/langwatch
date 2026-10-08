@@ -274,6 +274,20 @@ Feature: Share a trace behind a secret, scoped, expiring link
       Then both deliveries share one deduplication identity
       And the second delivery revokes nothing and does not fail
 
+    @unit
+    Scenario: organization's trace sharing disabled fact revokes the trace links of each listed project
+      Given the share_trace_sharing_revocation pipeline over projects with trace share links
+      When organization records trace sharing disabled naming some of those projects
+      Then share revokes every trace link of each named project from its own side
+      And the links of projects the fact does not name stay
+
+    @unit
+    Scenario: a redelivered organization trace sharing disabled fact is harmless
+      Given the share_trace_sharing_revocation pipeline
+      When the same organization trace sharing disabled fact is delivered twice
+      Then both deliveries share one deduplication identity
+      And the second delivery revokes nothing and does not fail
+
     @integration
     Scenario: Disabling trace sharing for the organization disables it everywhere
       Given an organization with trace sharing enabled

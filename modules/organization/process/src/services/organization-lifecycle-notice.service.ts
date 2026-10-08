@@ -12,6 +12,7 @@ import type {
   RecordPersonalWorkspaceProvisionedCommandData,
   RecordPresenceSettingChangedCommandData,
   RecordSignedUpCommandData,
+  RecordTraceSharingDisabledCommandData,
 } from "../eventing/organization-lifecycle.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -24,6 +25,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordIntegrationMethodChosen: Sender<RecordIntegrationMethodChosenCommandData>;
   recordPersonalWorkspaceProvisioned: Sender<RecordPersonalWorkspaceProvisionedCommandData>;
   recordPresenceSettingChanged: Sender<RecordPresenceSettingChangedCommandData>;
+  recordTraceSharingDisabled: Sender<RecordTraceSharingDisabledCommandData>;
 }>;
 
 /**
@@ -116,6 +118,19 @@ export class OrganizationLifecycleNoticeService {
     const sender = this.#senders?.recordPresenceSettingChanged;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input, backfilled: true });
+  }
+
+  /** Trace sharing switched off; awaited and loud, since share revokes only on this record. */
+  async traceSharingDisabled(
+    input: Readonly<{
+      organizationId: string;
+      projectIds: string[];
+      changedByUserId: string | null;
+    }>,
+  ): Promise<void> {
+    const sender = this.#senders?.recordTraceSharingDisabled;
+    if (!sender) throw new Error("organization_lifecycle is not registered in this process");
+    await sender.send({ ...this.#envelope(input.organizationId), ...input });
   }
 
   #envelope(tenantId: string) {

@@ -27,7 +27,6 @@ import {
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
   OrganizationApi,
-  OrganizationCapabilityUnavailableError,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -130,7 +129,6 @@ import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
-import { ShareApi } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -262,8 +260,6 @@ export interface ServerOrganizationAppDependencies {
   projects: OrganizationProjectApi;
   /** The one permission service every door on this application asks. */
   permissions: AuthzApi;
-  /** Revokes trace shares after a settings write turns trace sharing off. */
-  shares: ShareApi;
   /** Mints the bootstrap admin service key a provisioned organization needs. */
   apiKeys: ApiKeyApi;
 }
@@ -287,16 +283,16 @@ export type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The full and lite seats an organization holds, as a licence and a plan count them. */
   seatCounts: OrganizationSeatRepository;
-  /** The invitations this deployment administers, or none. */
-  invitations: OrganizationInvitations | null;
+  /** The invitations this deployment administers. */
+  invitations: OrganizationInvitations;
   /**
    * The sender-scoped creation counter the invitation door spends before a
    * batch is written. Travels beside `invitations`: a deployment with the
    * ceremony always has the throttle.
    */
   inviteCreationThrottle: InviteCreationThrottleService;
-  /** The join-request ledger, or none. */
-  joinRequests: OrganizationJoinRequests | null;
+  /** The join-request ledger. */
+  joinRequests: OrganizationJoinRequests;
   signals: OrganizationSignals;
   /** Where a reached seat limit is recorded as this module's event (§9). */
   seatLimits: SeatLimitNoticeService;
@@ -330,7 +326,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     projects: ProjectApi,
     permissions: AuthzApi,
     users: UserApi,
-    shares: ShareApi,
     apiKeys: ApiKeyApi,
     /** Identity application that answers for the caller's verified addresses. */
     identity: IdentityApi,
@@ -402,7 +397,6 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       groups,
       projects: setup.dependencies.projects,
       permissions: setup.dependencies.permissions,
-      shares: setup.dependencies.shares,
       apiKeys: setup.dependencies.apiKeys,
     });
 
@@ -433,24 +427,20 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     application.#personalTeamScope = PersonalTeamScopeService.create(
       setup.repositories.personalTeamScope,
     );
-    application.#invitationDoor = infrastructure.invitations
-      ? OrganizationInvitationDoorService.create({
-          invitations: infrastructure.invitations,
-          directory: infrastructure.directory,
-          joinRequests: infrastructure.joinRequests,
-          signals: infrastructure.signals,
-          lifecycle: infrastructure.lifecycle,
-          creationThrottle: infrastructure.inviteCreationThrottle,
-          ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
-          ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
-        })
-      : null;
-    application.#joinDoor = infrastructure.joinRequests
-      ? OrganizationJoinDoorService.create({
-          joinRequests: infrastructure.joinRequests,
-          directory: infrastructure.directory,
-        })
-      : null;
+    application.#invitationDoor = OrganizationInvitationDoorService.create({
+      invitations: infrastructure.invitations,
+      directory: infrastructure.directory,
+      joinRequests: infrastructure.joinRequests,
+      signals: infrastructure.signals,
+      lifecycle: infrastructure.lifecycle,
+      creationThrottle: infrastructure.inviteCreationThrottle,
+      ceiling: OrganizationGrantCeilingService.create(setup.dependencies.permissions),
+      ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
+    });
+    application.#joinDoor = OrganizationJoinDoorService.create({
+      joinRequests: infrastructure.joinRequests,
+      directory: infrastructure.directory,
+    });
     application.#initialization = OrganizationInitializationService.create({
       ceremony: infrastructure.ceremony,
       signals: infrastructure.signals,
@@ -568,27 +558,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   #visibility!: OrganizationVisibilityService;
   #scopeGraph!: OrganizationScopeGraphService;
   #personalTeamScope!: PersonalTeamScopeService;
-  #invitationDoor!: OrganizationInvitationDoorService | null;
-  #joinDoor!: OrganizationJoinDoorService | null;
+  #invitationDoor!: OrganizationInvitationDoorService;
+  #joinDoor!: OrganizationJoinDoorService;
   #initialization!: OrganizationInitializationService;
   /** Who may sign up and found an organization; absent only in a test's app, which is open. */
   #signUpPolicy: SignUpPolicyService | null = null;
   /** organization_audit's sender, once registration answers with it. */
   #auditSender: OrganizationAuditSender | undefined;
-
-  /** The invitation ceremony; a deployment without one refuses by name. */
-  #invitations(): OrganizationInvitationDoorService {
-    if (!this.#invitationDoor) {
-      throw new OrganizationCapabilityUnavailableError("organization invitation service");
-    }
-    return this.#invitationDoor;
-  }
-
-  /** The join-request ledger; a deployment without one refuses by name. */
-  #joinRequests(): OrganizationJoinDoorService {
-    if (!this.#joinDoor) throw new OrganizationCapabilityUnavailableError("join-request ledger");
-    return this.#joinDoor;
-  }
 
   /** The ledger actor a write is recorded under — one spelling, shared by every door. */
   #ledgerActor(by: OrganizationCaller): { type: "user"; id: string } {
@@ -632,7 +608,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async listPendingInvitationsForCaller(
     by: OrganizationCaller,
   ): Promise<PendingInvitationsForCaller> {
-    return this.#invitations().listPendingForCaller({ userId: by.id });
+    return this.#invitationDoor.listPendingForCaller({ userId: by.id });
   }
 
   /** The invitation waiting for a caller who belongs to no organization yet. */
@@ -764,33 +740,33 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     by: Readonly<{ id: string }> | null,
   ): Promise<UpdateOrganizationSettingsResult> {
     const result = await this.#dependencies.organizations.updateSettings(input, by);
-    await this.#revokeTraceSharesIfRequired(input.organizationId, result);
+    await this.#recordTraceSharingDisabledIfRequired({
+      organizationId: input.organizationId,
+      result,
+      by,
+    });
 
     return result;
   }
 
-  /**
-   * Trace sharing switched off revokes every share link org-wide — this
-   * feature owns neither projects nor shares, so it reaches both peers
-   * directly. Loud on purpose: a surviving link is a live leak.
-   */
-  async #revokeTraceSharesIfRequired(
-    organizationId: string,
-    result: UpdateOrganizationSettingsResult,
-  ): Promise<void> {
+  /** Trace sharing switched off: share revokes each project's links from its own side (§9, R7). */
+  async #recordTraceSharingDisabledIfRequired({
+    organizationId,
+    result,
+    by,
+  }: {
+    organizationId: string;
+    result: UpdateOrganizationSettingsResult;
+    by: Readonly<{ id: string }> | null;
+  }): Promise<void> {
     if (!result.traceShareRevocationRequired) return;
 
     const projectIds = await this.#dependencies.projects.listIdsByOrganization({ organizationId });
-    const outcomes = await Promise.allSettled(
-      projectIds.map((projectId) => this.#dependencies.shares.revokeAllTraceShares(projectId)),
-    );
-    const unrevoked = projectIds.filter((_, index) => outcomes[index]?.status === "rejected");
-
-    if (unrevoked.length > 0) {
-      throw new Error(
-        `Trace sharing was disabled, but share links survive on ${unrevoked.length} project(s): ${unrevoked.join(", ")}`,
-      );
-    }
+    await this.#infrastructure.lifecycle.traceSharingDisabled({
+      organizationId,
+      projectIds,
+      changedByUserId: by?.id ?? null,
+    });
   }
 
   getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
@@ -1576,27 +1552,27 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteCreated[]> {
-    return this.#invitations().create(input, by);
+    return this.#invitationDoor.create(input, by);
   }
 
   async revokeInvitation(
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): Promise<void> {
-    return this.#invitations().revoke(input);
+    return this.#invitationDoor.revoke(input);
   }
 
   async resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent> {
-    return this.#invitations().resend(input);
+    return this.#invitationDoor.resend(input);
   }
 
   async extendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended> {
-    return this.#invitations().extend(input);
+    return this.#invitationDoor.extend(input);
   }
 
   async listPendingInvitations(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationListedInvite[]> {
-    return this.#invitations().list(input);
+    return this.#invitationDoor.list(input);
   }
 
   async checkInvitesWithinCaller(
@@ -1606,7 +1582,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     }>,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.#invitations().checkInvitesWithinCaller(input, by);
+    return this.#invitationDoor.checkInvitesWithinCaller(input, by);
   }
 
   async createPaymentPendingInvites(
@@ -1617,13 +1593,13 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     }>,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.#invitations().createPaymentPending(input, by);
+    return this.#invitationDoor.createPaymentPending(input, by);
   }
 
   async cancelPaymentPendingInvites(
     input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void> {
-    return this.#invitations().cancelPaymentPending(input);
+    return this.#invitationDoor.cancelPaymentPending(input);
   }
 
   async countMemberSeats(
@@ -1702,20 +1678,20 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   async approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,
   ): Promise<void> {
-    return this.#invitations().approvePaymentPending(input);
+    return this.#invitationDoor.approvePaymentPending(input);
   }
 
   async acceptInvitation(
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted> {
-    return this.#invitations().accept(input, by);
+    return this.#invitationDoor.accept(input, by);
   }
 
   async applyPendingInvite(
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied> {
-    return this.#invitations().applyPending(input);
+    return this.#invitationDoor.applyPending(input);
   }
 
   /**
@@ -1960,47 +1936,47 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   // -- the join-request doors ------------------------------------------------
 
   async lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinRequests().lookup(input);
+    return this.#joinDoor.lookup(input);
   }
 
   async listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine> {
-    return this.#joinRequests().listOwn(input);
+    return this.#joinDoor.listOwn(input);
   }
 
   async fileJoinRequest(
     input: Readonly<{ userId: string; organizationId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestFiled> {
-    return this.#joinRequests().file(input);
+    return this.#joinDoor.file(input);
   }
 
   async withdrawJoinRequest(
     input: Readonly<{ joinRequestId: string; userId: string }>,
   ): Promise<void> {
-    return this.#joinRequests().withdraw(input);
+    return this.#joinDoor.withdraw(input);
   }
 
   async listPendingJoinRequests(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestPending> {
-    return this.#joinRequests().listPending(input);
+    return this.#joinDoor.listPending(input);
   }
 
   async approveJoinRequest(
     input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
   ): Promise<void> {
-    return this.#joinRequests().approve(input);
+    return this.#joinDoor.approve(input);
   }
 
   async rejectJoinRequest(
     input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
   ): Promise<void> {
-    return this.#joinRequests().reject(input);
+    return this.#joinDoor.reject(input);
   }
 
   async readJoiningPolicy(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestJoining> {
-    return this.#joinRequests().readJoining(input);
+    return this.#joinDoor.readJoining(input);
   }
 
   async setJoiningPolicy(
@@ -2012,27 +1988,27 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
-    return this.#joinRequests().setJoining(input);
+    return this.#joinDoor.setJoining(input);
   }
 
   async offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinRequests().offer(input);
+    return this.#joinDoor.offer(input);
   }
 
   async dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void> {
-    return this.#joinRequests().dismissOffer(input);
+    return this.#joinDoor.dismissOffer(input);
   }
 
   async admitAutomatically(
     input: Readonly<{ userId: string; origin?: JoinRequestApiOrigin }>,
   ): Promise<JoinRequestAdmitted> {
-    return this.#joinRequests().admitAutomatically(input);
+    return this.#joinDoor.admitAutomatically(input);
   }
 
   async listAutomaticJoins(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestAutomaticJoins> {
-    return this.#joinRequests().listAutomaticJoins(input);
+    return this.#joinDoor.listAutomaticJoins(input);
   }
 
   // -- the sign-up ceremony --------------------------------------------------

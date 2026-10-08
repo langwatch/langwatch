@@ -6,9 +6,13 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 /**
- * Share revokes a project's trace links from its own side once project records trace sharing
- * disabled (§9, R7), so project holds no share peer. Spec: modules/share/specs/share.feature
+ * Share revokes trace links from its own side once project or organization records trace
+ * sharing disabled (§9, R7), so neither holds a share peer. Spec: modules/share/specs/share.feature
  */
+import {
+  ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  organizationTraceSharingDisabledEventDataSchema,
+} from "@langwatch/organization-contract";
 import {
   PROJECT_TRACE_SHARING_DISABLED_EVENT_TYPE,
   projectTraceSharingDisabledEventDataSchema,
@@ -21,6 +25,9 @@ import type { ShareService } from "../services/share.service.ts";
 const SHARE_TRACE_SHARING_REVOCATION_PIPELINE_NAME = "share_trace_sharing_revocation" as const;
 
 const disabledAtOf = projectTraceSharingDisabledEventDataSchema.pick({ occurredAt: true });
+const organizationDisabledAtOf = organizationTraceSharingDisabledEventDataSchema.pick({
+  occurredAt: true,
+});
 
 export type ShareTraceSharingRevocationPipeline = StaticPipelineDefinition<never>;
 
@@ -32,7 +39,7 @@ export function buildShareTraceSharingRevocationPipeline({
   return (
     definePipeline({
       name: SHARE_TRACE_SHARING_REVOCATION_PIPELINE_NAME,
-      // `global`: share appends no events of its own here; it only reacts to project's.
+      // `global`: share appends no events of its own here; it only reacts to peers' facts.
       aggregate: defineAggregate({ type: "global" }),
     })
       .withEvents([])
@@ -48,6 +55,21 @@ export function buildShareTraceSharingRevocationPipeline({
           },
         },
         handle: ({ projectId }) => shares.revokeAllTraceShares(projectId),
+      })
+      // The fact names the organization's projects as read when the setting was saved.
+      .withPeerSubscriber("shareOrganizationTraceSharingDisabled", {
+        eventType: ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
+        data: organizationTraceSharingDisabledEventDataSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `share-organization-trace-sharing-disabled:${event.tenantId}:${String(event.aggregateId)}:${organizationDisabledAtOf.parse(event.data).occurredAt}`,
+            ttlMs: 60_000,
+          },
+        },
+        handle: async ({ projectIds }) => {
+          await Promise.all(projectIds.map((projectId) => shares.revokeAllTraceShares(projectId)));
+        },
       })
       .build()
   );

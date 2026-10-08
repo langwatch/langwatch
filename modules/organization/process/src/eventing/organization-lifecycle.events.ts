@@ -11,6 +11,9 @@ import {
   organizationPresenceSettingChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
+  ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
+  organizationTraceSharingDisabledEventDataSchema,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
   personalWorkspaceProvisionedEventDataSchema,
 } from "@langwatch/organization-contract";
@@ -32,6 +35,8 @@ export const RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE =
   "lw.organization.record_personal_workspace_provisioned" as const;
 export const RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE =
   "lw.organization.record_presence_setting_changed" as const;
+export const RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE =
+  "lw.organization.record_trace_sharing_disabled" as const;
 
 /** Somebody finished onboarding by creating this organization. */
 export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
@@ -109,4 +114,21 @@ export const organizationPresenceSettingChangedEventSchema = z.object({
 });
 export type OrganizationPresenceSettingChangedEvent = z.infer<
   typeof organizationPresenceSettingChangedEventSchema
+>;
+
+/** Trace sharing switched off; versioned on its own, like the presence switch. */
+export const recordTraceSharingDisabledCommandDataSchema =
+  organizationTraceSharingDisabledEventDataSchema;
+export type RecordTraceSharingDisabledCommandData = z.infer<
+  typeof recordTraceSharingDisabledCommandDataSchema
+>;
+
+export const organizationTraceSharingDisabledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION),
+  data: organizationTraceSharingDisabledEventDataSchema,
+});
+export type OrganizationTraceSharingDisabledEvent = z.infer<
+  typeof organizationTraceSharingDisabledEventSchema
 >;

@@ -7,7 +7,6 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -31,7 +30,6 @@ export function organizationModuleSetup(peers: Partial<Peers> = {}): Organizatio
       projects: peers.projects ?? createApiFixture<ProjectApi>({}, "ProjectApi"),
       permissions: peers.permissions ?? createApiFixture<AuthzApi>({}, "AuthzApi"),
       users: peers.users ?? createApiFixture<UserApi>({}, "UserApi"),
-      shares: peers.shares ?? createApiFixture<ShareApi>({}, "ShareApi"),
       apiKeys: peers.apiKeys ?? createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
       identity: peers.identity ?? createApiFixture<IdentityApi>({}, "IdentityApi"),
       entitlement: peers.entitlement ?? createApiFixture<EntitlementApi>({}, "EntitlementApi"),

@@ -32,7 +32,8 @@ Feature: Shared organization service
     Given trace sharing is currently enabled
     When a management transport commits the organization settings update
     Then the organization service reports that trace-share revocation is required
-    And the transport lists each project and revokes its trace shares after the commit
+    And organization records trace sharing disabled after the commit, naming each project
+    And share revokes those projects' trace links from its own side
 
   @unit
   Scenario: A request manages a shared team

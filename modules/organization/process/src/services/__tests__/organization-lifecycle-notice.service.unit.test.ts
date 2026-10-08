@@ -23,6 +23,7 @@ function notices(
     recordIntegrationMethodChosen,
     recordPersonalWorkspaceProvisioned,
     recordPresenceSettingChanged: idle,
+    recordTraceSharingDisabled: idle,
   });
   return { service, reportError };
 }
@@ -115,5 +116,17 @@ describe("organization's lifecycle notices", () => {
 
     expect(reportError).toHaveBeenCalledOnce();
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("throws, rather than reports, when trace sharing disabled cannot be recorded", async () => {
+    const service = OrganizationLifecycleNoticeService.create({ reportError: vi.fn() });
+
+    await expect(
+      service.traceSharingDisabled({
+        organizationId: "org_acme",
+        projectIds: ["project-1"],
+        changedByUserId: "user_admin",
+      }),
+    ).rejects.toThrow("organization_lifecycle is not registered in this process");
   });
 });

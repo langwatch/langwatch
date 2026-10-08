@@ -119,8 +119,3 @@ Feature: Invitation acceptance and role recomputation
     Then the answer is absent
     And nothing is thrown
 
-  @unit
-  Scenario: A deployment with no invitation service refuses by name
-    Given a deployment that composed no invitation service
-    When an admin asks to create invitations
-    Then it is refused with the named capability error

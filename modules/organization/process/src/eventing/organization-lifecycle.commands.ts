@@ -7,6 +7,8 @@ import {
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_TYPE,
   ORGANIZATION_PRESENCE_SETTING_CHANGED_EVENT_VERSION,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
+  ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
+  ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   PERSONAL_WORKSPACE_PROVISIONED_EVENT_TYPE,
 } from "@langwatch/organization-contract";
 
@@ -18,6 +20,7 @@ import {
   ORGANIZATION_LIFECYCLE_EVENT_VERSION,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
+  type OrganizationTraceSharingDisabledEvent,
   type PersonalWorkspaceProvisionedEvent,
   RECORD_INTEGRATION_METHOD_CHOSEN_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
@@ -25,6 +28,7 @@ import {
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
   RECORD_PRESENCE_SETTING_CHANGED_COMMAND_TYPE,
   RECORD_SIGNED_UP_COMMAND_TYPE,
+  RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE,
   type RecordIntegrationMethodChosenCommandData,
   recordIntegrationMethodChosenCommandDataSchema,
   type RecordInviteAcceptedCommandData,
@@ -37,6 +41,8 @@ import {
   recordPresenceSettingChangedCommandDataSchema,
   type RecordSignedUpCommandData,
   recordSignedUpCommandDataSchema,
+  type RecordTraceSharingDisabledCommandData,
+  recordTraceSharingDisabledCommandDataSchema,
 } from "./organization-lifecycle.events.ts";
 
 /** Records an organization's sign-up; one event per organization, however often it is sent. */
@@ -238,6 +244,40 @@ export class RecordPresenceSettingChangedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordPresenceSettingChangedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records trace sharing switched off, keyed on its moment; share revokes from its own side. */
+export class RecordTraceSharingDisabledCommand implements CommandHandler<
+  Command<RecordTraceSharingDisabledCommandData>,
+  OrganizationTraceSharingDisabledEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_TRACE_SHARING_DISABLED_COMMAND_TYPE,
+    recordTraceSharingDisabledCommandDataSchema,
+    "Record that an organization switched trace sharing off",
+  );
+
+  handle(
+    command: Command<RecordTraceSharingDisabledCommandData>,
+  ): OrganizationTraceSharingDisabledEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationTraceSharingDisabledEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
+        version: ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:trace_sharing_disabled:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordTraceSharingDisabledCommandData): string {
     return payload.organizationId;
   }
 }
