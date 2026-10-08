@@ -14,13 +14,10 @@ import {
   type ExperimentRunTargetCell,
   type RecordEvaluatorResultCommandData,
   type RecordTargetResultCommandData,
-  type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { nowInstant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
@@ -49,21 +46,17 @@ import {
 } from "../rules/experiment-run-plan.rules.ts";
 import { loadedDataForTarget } from "../rules/experiment-target-data.rules.ts";
 import { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
+import { ExperimentCellLoadService } from "./experiment-cell-load.service.ts";
+import { ExperimentCellRecordService } from "./experiment-cell-record.service.ts";
 import { ExperimentComparisonPlanService } from "./experiment-comparison-plan.service.ts";
 import { ExperimentConnectedCellService } from "./experiment-connected-cell.service.ts";
 import type { ExecutionDataServices, LoadedWorkflow } from "./experiment-execution-data.service.ts";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
-import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 
 const logger = createLogger("langwatch:experiment:run-cell");
 
-const EVALUATION_KSUID_RESOURCE = "eval";
-
 const targetLoading = ExperimentTargetLoadingService.create();
-const sandboxKey = ExperimentRunSandboxKeyService.create();
-const resultDispatches = ExperimentResultDispatchService.create();
 
 /** One cell the manager asked for, by its place in the plan. */
 export type ExperimentCellRequest = {
@@ -87,7 +80,7 @@ export type ExperimentCellExecution = {
 };
 
 /** What a cell loads of the run's targets before it dispatches. */
-type LoadedCellRun = {
+export type LoadedCellRun = {
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, Agent>;
   loadedWorkflows: Map<string, LoadedWorkflow>;
@@ -96,7 +89,7 @@ type LoadedCellRun = {
 };
 
 /** What every step of one cell reads. */
-type CellScope = {
+export type CellScope = {
   request: ExperimentCellRequest;
   plan: ExperimentRunPlan;
   /** `<rowIndex>:<targetId>` to the trace a verdict is reported against. */
@@ -133,6 +126,8 @@ export class ExperimentRunCellService {
   private readonly collaborators: ExperimentRunCollaborators;
   private readonly services: ExecutionDataServices;
   private readonly workflows: WorkflowApi;
+  private readonly loading: ExperimentCellLoadService;
+  private readonly recording: ExperimentCellRecordService;
 
   private constructor(deps: ExperimentRunCellDeps) {
     this.folds = deps.folds;
@@ -140,6 +135,8 @@ export class ExperimentRunCellService {
     this.collaborators = deps.collaborators;
     this.services = deps.services;
     this.workflows = deps.workflows;
+    this.loading = ExperimentCellLoadService.create(deps);
+    this.recording = ExperimentCellRecordService.create(deps);
   }
 
   /**
@@ -170,7 +167,7 @@ export class ExperimentRunCellService {
     const executionCell = targetCellOf({ plan, cell });
     let loaded: LoadedCellRun;
     try {
-      loaded = await this.load({
+      loaded = await this.loading.load({
         projectId: request.projectId,
         userId: plan.actor?.userId ?? null,
         targets: [executionCell.targetConfig],
@@ -221,7 +218,7 @@ export class ExperimentRunCellService {
     const progress = await this.getPhaseOneProgress(request);
     let loaded: LoadedCellRun;
     try {
-      loaded = await this.load({
+      loaded = await this.loading.load({
         projectId: request.projectId,
         userId: plan.actor?.userId ?? null,
         targets,
@@ -269,7 +266,7 @@ export class ExperimentRunCellService {
     loadedEvaluators: Map<string, Evaluator>;
   }): Promise<ExperimentCellExecution> {
     const { detail, errorType } = comparisonSkipMessage(reason);
-    const results = await this.record({
+    const results = await this.recording.record({
       scope,
       loadedEvaluators,
       event: {
@@ -306,7 +303,11 @@ export class ExperimentRunCellService {
       }
 
       results.push(
-        ...(await this.record({ scope, event, loadedEvaluators: loaded.loadedEvaluators })),
+        ...(await this.recording.record({
+          scope,
+          event,
+          loadedEvaluators: loaded.loadedEvaluators,
+        })),
       );
       const failed = event.type === "error" || (event.type === "target_result" && !!event.error);
       if (failed && !failure) {
@@ -380,155 +381,6 @@ export class ExperimentRunCellService {
     return cells.executeCell({ ...shared, loadedData });
   }
 
-  /** One event as the results it appends, with a verdict reported as an evaluation as main did. */
-  private async record({
-    scope,
-    event: produced,
-    loadedEvaluators,
-  }: {
-    scope: CellScope;
-    event: EvaluationV3Event;
-    loadedEvaluators: Map<string, Evaluator>;
-  }): Promise<ExperimentCellResult[]> {
-    const { request, plan, traceIds } = scope;
-    const event = keptAsEvaluatorError(produced);
-    const envelope = {
-      tenantId: request.projectId,
-      runId: request.runId,
-      experimentId: request.experimentId,
-      occurredAt: nowInstant().epochMilliseconds,
-    };
-
-    if (event.type === "target_result" || event.type === "error") {
-      if (event.type === "target_result" && event.traceId) {
-        traceIds.set(runCellKey(event), event.traceId);
-      }
-      const rows = planDatasetRows(plan);
-      const data = resultDispatches.findTargetResultDispatch({
-        ...envelope,
-        event,
-        datasetEntry: event.rowIndex !== undefined ? (rows[event.rowIndex] ?? {}) : {},
-      });
-      return data ? [{ kind: "target", data }] : [];
-    }
-
-    if (event.type !== "evaluator_result") return [];
-
-    const evaluator = plan.evaluators.find((candidate) => candidate.id === event.evaluatorId);
-    const dbEvaluator = evaluator?.dbEvaluatorId
-      ? loadedEvaluators.get(evaluator.dbEvaluatorId)
-      : undefined;
-    await this.reportEvaluation({
-      request,
-      event,
-      evaluatorType: evaluator?.evaluatorType ?? "unknown",
-      evaluatorName: dbEvaluator?.name,
-      traceId: traceIds.get(runCellKey(event)),
-    });
-
-    return [
-      {
-        kind: "evaluator",
-        data: resultDispatches.buildEvaluatorResultDispatch({
-          ...envelope,
-          event,
-          result: event.result,
-          evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-        }),
-      },
-    ];
-  }
-
-  /** Reported to the evaluation pipeline, best-effort: a failed report never fails the cell. */
-  private async reportEvaluation({
-    request,
-    event,
-    evaluatorType,
-    evaluatorName,
-    traceId,
-  }: {
-    request: ExperimentCellRequest;
-    event: Extract<EvaluationV3Event, { type: "evaluator_result" }>;
-    evaluatorType: string;
-    evaluatorName: string | undefined;
-    traceId: string | undefined;
-  }): Promise<void> {
-    const result = event.result;
-    const processed = result.status === "processed" ? result : undefined;
-    const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
-    try {
-      await this.collaborators.evaluationReporting.reportEvaluation({
-        tenantId: request.projectId,
-        evaluationId,
-        evaluatorId: event.evaluatorId,
-        evaluatorType,
-        evaluatorName,
-        traceId,
-        status: result.status,
-        score: processed?.score ?? undefined,
-        passed: processed?.passed ?? undefined,
-        label: processed?.label ?? undefined,
-        details: processed?.details ?? undefined,
-        error: result.status === "error" ? result.details : undefined,
-        occurredAt: nowInstant().epochMilliseconds,
-      });
-    } catch (error) {
-      logger.error(
-        { error, evaluationId, evaluatorId: event.evaluatorId },
-        "Failed to dispatch evaluator result to evaluation processing pipeline",
-      );
-    }
-  }
-
-  /** The run's targets a cell needs, as the run pinned them, and the key it lends their code. */
-  private async load({
-    projectId,
-    userId,
-    targets,
-    evaluators,
-  }: {
-    projectId: string;
-    /** Who started the run; the key lent to its code acts as them, or as the system. */
-    userId: string | null;
-    targets: TargetConfig[];
-    evaluators: { dbEvaluatorId?: string }[];
-  }): Promise<LoadedCellRun> {
-    const services = this.services;
-    const loadedPrompts = await targetLoading.loadPrompts({ projectId, targets, services });
-
-    const loadedAgents = await targetLoading.loadAgents({ projectId, targets, services });
-
-    const loadedWorkflows = await targetLoading.loadWorkflows({
-      projectId,
-      targets,
-      services,
-      loadedAgents,
-    });
-
-    const loadedEvaluators = await targetLoading.loadEvaluators({
-      projectId,
-      targets,
-      evaluators,
-      services,
-    });
-
-    const sandboxApiKey = await sandboxKey.findRunSandboxApiKey({
-      sandboxCredentials: this.collaborators.sandboxCredentials,
-      projectId,
-      userId,
-      loadedAgents,
-      loadedWorkflows,
-    });
-
-    return {
-      loadedPrompts,
-      loadedAgents,
-      loadedWorkflows,
-      loadedEvaluators,
-      ...(sandboxApiKey ? { sandboxApiKey } : {}),
-    };
-  }
-
   /** The run's plan; one not folded yet throws, so the queue retries the cell. */
   private async getPlan(request: ExperimentCellRequest): Promise<ExperimentRunPlan> {
     const read = await this.folds.readPlan({ runKey: runKeyOf(request) });
@@ -581,26 +433,6 @@ export class ExperimentRunCellService {
   private isAborted(request: ExperimentCellRequest): Promise<boolean> {
     return this.collaborators.abort.isAborted(request.runId);
   }
-}
-
-/** An evaluator's error stays an evaluator's (ARCHITECTURE §9), as evaluatorErrorResult has it. */
-function keptAsEvaluatorError(event: EvaluationV3Event): EvaluationV3Event {
-  if (event.type !== "error" || !event.evaluatorId) return event;
-  if (event.rowIndex === undefined || !event.targetId) return event;
-
-  return {
-    type: "evaluator_result",
-    rowIndex: event.rowIndex,
-    targetId: event.targetId,
-    evaluatorId: event.evaluatorId,
-    result: {
-      status: "error",
-      error_type: "EvaluatorError",
-      details: event.message,
-      traceback: [],
-      ...(event.domainError ? { domainError: event.domainError } : {}),
-    },
-  };
 }
 
 function runKeyOf(request: ExperimentCellRequest): string {

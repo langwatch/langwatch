@@ -5,7 +5,6 @@ import {
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
   dslWithoutHttpAgentSecrets,
-  dslWithoutHttpCredentials,
   publishWorkflowCommandSchema,
   runWorkflowCommandSchema,
   saveWorkflowVersionCommandSchema,
@@ -34,6 +33,12 @@ import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
 } from "../repositories/workflow.repository.ts";
+import {
+  dslForTargetProject,
+  freshCopyDsl,
+  narrowToPublishedVersion,
+  selectCopiesToPush,
+} from "../rules/workflow-copy-selection.rules.ts";
 import type {
   StudioEventPreparationInput,
   StudioEventPreparer,
@@ -42,11 +47,7 @@ import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
 import { WorkflowDslService } from "./workflow-dsl.service.ts";
 import { WorkflowVersionHistoryService } from "./workflow-version-history.service.ts";
 
-/**
- * The app's KSUID resources for a workflow row and a version row
- * (`KSUID_RESOURCES.WORKFLOW`/`WORKFLOW_VERSION`). Literals, not the app's
- * constant table: the prefix is part of the id format already on the database.
- */
+/** KSUID resources for a workflow and a version row; the prefix is already on the database. */
 const WORKFLOW_KSUID_RESOURCE = "workflow";
 const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
 
@@ -178,12 +179,7 @@ export class WorkflowService {
   async findEvaluatorWorkflows(input: {
     projectId: string;
   }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
-    const workflows = await this.options.repository.findEvaluators(input);
-
-    return workflows.map((workflow) => ({
-      ...workflow,
-      versions: workflow.versions.filter((version) => version.id === workflow.publishedId),
-    }));
+    return narrowToPublishedVersion(await this.options.repository.findEvaluators(input));
   }
 
   getVersions(input: {
@@ -378,12 +374,11 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
-    const cloned = this.dsl.copy(sourceVersion.dsl);
-    // A copy into another project arrives with every HTTP credential blank.
-    const sourceDsl =
-      command.targetProjectId === command.sourceProjectId
-        ? cloned
-        : dslWithoutHttpCredentials(cloned);
+    const sourceDsl = dslForTargetProject({
+      dsl: this.dsl.copy(sourceVersion.dsl),
+      sourceProjectId: command.sourceProjectId,
+      targetProjectId: command.targetProjectId,
+    });
     const dsl = command.copyDatasets
       ? await this.datasetCopies.copy({
           dsl: sourceDsl,
@@ -405,13 +400,7 @@ export class WorkflowService {
     const version = await this.saveVersion({
       workflowId,
       projectId: command.targetProjectId,
-      dsl: {
-        ...dsl,
-        workflow_id: workflowId,
-        version: "1",
-        experiment_id: "",
-        state: {},
-      },
+      dsl: freshCopyDsl({ dsl, workflowId }),
       commitMessage: `Copied from ${source.name}`,
       autoSaved: false,
       authorId: command.authorId,
@@ -445,14 +434,13 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ?? (await this.latestVersion(source.id, input.projectId));
     const copies = await this.options.repository.findCopies(input);
-    const selected = copies.filter(
-      (copy) =>
-        (!input.copyIds || input.copyIds.includes(copy.id)) &&
-        (!input.allowedProjectIds || input.allowedProjectIds.includes(copy.projectId)),
-    );
+    const selected = selectCopiesToPush({ copies, ...input });
     for (const copy of selected) {
-      const cloned = this.dsl.copy(sourceVersion.dsl);
-      const dsl = copy.projectId === input.projectId ? cloned : dslWithoutHttpCredentials(cloned);
+      const dsl = dslForTargetProject({
+        dsl: this.dsl.copy(sourceVersion.dsl),
+        sourceProjectId: input.projectId,
+        targetProjectId: copy.projectId,
+      });
       await this.saveVersion({
         workflowId: copy.id,
         projectId: copy.projectId,

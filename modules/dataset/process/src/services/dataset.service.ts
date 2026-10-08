@@ -1,6 +1,5 @@
 import { NotFoundError } from "@langwatch/api/rest";
 import {
-  copyDatasetInputSchema,
   datasetLookupInputSchema,
   listDatasetsInputSchema,
   type CopyDatasetInput,
@@ -30,8 +29,6 @@ import {
   type UpdateDatasetRecordInput,
   type UploadExistingDatasetInput,
   type UpsertDatasetInput,
-  upsertDatasetInputSchema,
-  DatasetNameTakenError,
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetTooLargeToReadInlineError,
@@ -42,15 +39,15 @@ import { nowInstant } from "@langwatch/time";
 
 import type { DatasetNormalizeQueue, DatasetUpload, DatasetContent } from "../app/dataset.app.ts";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository.ts";
-import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository.ts";
+import type { DatasetRepository } from "../repositories/dataset.repository.ts";
 import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
-import { onceMaxBytes } from "../rules/dataset-inline-file.rules.ts";
-import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 import type { DatasetAttachmentReferenceService } from "./dataset-attachment-reference.service.ts";
+import { DatasetCopyService } from "./dataset-copy.service.ts";
 import type { DatasetInlineAttachmentService } from "./dataset-inline-attachment.service.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import { DatasetUpsertService } from "./dataset-upsert.service.ts";
 
 export type DatasetServiceOptions = {
   repository: DatasetRepository;
@@ -74,9 +71,6 @@ export type DatasetServiceOptions = {
  */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/** How many postgres-backed rows a copy moves at a time. */
-const COPY_BATCH_ROWS = 200;
-
 /** Archiving appends `-archived-<id>` to the slug; the live slug is what precedes the last one. */
 function liveSlugOf(slug: string): string {
   const suffixAt = slug.lastIndexOf("-archived-");
@@ -91,10 +85,27 @@ export class DatasetService {
 
   private readonly naming: DatasetNamingService;
 
+  private readonly upserts: DatasetUpsertService;
+
+  private readonly copies: DatasetCopyService;
+
   private constructor(private readonly options: DatasetServiceOptions) {
     this.generateId =
       options.generateId ?? (() => generate(DATASET_RECORD_KSUID_RESOURCE).toString());
     this.naming = DatasetNamingService.create(options.repository);
+    this.upserts = DatasetUpsertService.create({
+      options,
+      getBySlugOrId: (input) => this.getBySlugOrId(input),
+      assertReady: (dataset) => this.assertReady(dataset),
+      generateId: () => this.generateId(),
+    });
+    this.copies = DatasetCopyService.create({
+      options,
+      getBySlugOrId: (input) => this.getBySlugOrId(input),
+      findNextAvailableName: (input) => this.findNextAvailableName(input),
+      upsertDataset: (input) => this.upsertDataset(input),
+      generateId: () => this.generateId(),
+    });
     this.records = DatasetRecordService.create({
       options,
       getBySlugOrId: (input) => this.getBySlugOrId(input),
@@ -109,109 +120,8 @@ export class DatasetService {
     return new DatasetService(options);
   }
 
-  async upsertDataset(input: UpsertDatasetInput): Promise<Dataset> {
-    const parsed = upsertDatasetInputSchema.parse(input);
-    const name = parsed.name.trim();
-    const slug = datasetSlugOf(name);
-    if (parsed.datasetId) {
-      const existing = await this.getBySlugOrId({
-        projectId: parsed.projectId,
-        slugOrId: parsed.datasetId,
-      });
-      this.assertReady(existing);
-      await this.refuseRenameCollision({ projectId: parsed.projectId, dataset: existing, name });
-
-      const update: DatasetUpdateInput = {
-        id: existing.id,
-        projectId: parsed.projectId,
-        name,
-        slug: existing.slug,
-        columnTypes: parsed.columnTypes,
-      };
-      if (
-        existing.contentLayout === "s3_jsonl" &&
-        this.options.content &&
-        JSON.stringify(existing.columnTypes) !== JSON.stringify(parsed.columnTypes)
-      ) {
-        return this.options.content.updateColumns({
-          dataset: existing,
-          projectId: parsed.projectId,
-          name,
-          slug: existing.slug,
-          columnTypes: parsed.columnTypes,
-        });
-      }
-
-      return this.options.repository.update(update);
-    }
-
-    const conflict = await this.options.repository.findBySlug({
-      projectId: parsed.projectId,
-      slug,
-    });
-    if (conflict) {
-      throw new DatasetNameTakenError();
-    }
-
-    if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
-      const maxBytes = onceMaxBytes(() =>
-        this.options.requestBounds.limit(parsed.projectId, "attachmentBytes"),
-      );
-      parsed.datasetRecords = await this.options.inlineAttachments.storeAll(
-        {
-          projectId: parsed.projectId,
-          columns: { kind: "typed", columnTypes: parsed.columnTypes },
-          maxBytes,
-        },
-        parsed.datasetRecords,
-      );
-      await this.options.attachments.assertAccepted({
-        projectId: parsed.projectId,
-        columnTypes: parsed.columnTypes,
-        entries: parsed.datasetRecords,
-        maxBytes,
-      });
-    }
-
-    const created = await this.options.repository.create({
-      projectId: parsed.projectId,
-      name,
-      slug,
-      columnTypes: parsed.columnTypes,
-    });
-    if (parsed.datasetRecords && parsed.datasetRecords.length > 0) {
-      await this.options.records.createMany({
-        datasetId: created.id,
-        projectId: parsed.projectId,
-        entries: parsed.datasetRecords.map((entry) => ({
-          ...entry,
-          id: entry.id ?? this.generateId(),
-        })),
-      });
-    }
-
-    return created;
-  }
-
-  /**
-   * A rename keeps the slug (SDK and API callers address the dataset by it), but a
-   * new name whose slug another dataset already holds is still refused.
-   * See specs/datasets/dataset-slug-stability.feature.
-   */
-  private async refuseRenameCollision(input: {
-    projectId: string;
-    dataset: Dataset;
-    name: string;
-  }): Promise<void> {
-    if (input.name === input.dataset.name) return;
-    const conflict = await this.options.repository.findBySlug({
-      projectId: input.projectId,
-      slug: datasetSlugOf(input.name),
-      excludeId: input.dataset.id,
-    });
-    if (conflict) {
-      throw new DatasetNameTakenError();
-    }
+  upsertDataset(input: UpsertDatasetInput): Promise<Dataset> {
+    return this.upserts.upsertDataset(input);
   }
 
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult> {
@@ -513,58 +423,8 @@ export class DatasetService {
     return result;
   }
 
-  async copyDataset(input: CopyDatasetInput): Promise<Dataset> {
-    const parsed = copyDatasetInputSchema.parse(input);
-    const source = await this.getBySlugOrId({
-      projectId: parsed.sourceProjectId,
-      slugOrId: parsed.sourceDatasetId,
-    });
-    const name = await this.findNextAvailableName({
-      projectId: parsed.targetProjectId,
-      proposedName: source.name,
-    });
-    const target = await this.upsertDataset({
-      projectId: parsed.targetProjectId,
-      name,
-      columnTypes: source.columnTypes,
-    });
-    if (
-      source.contentLayout === "s3_jsonl" &&
-      target.contentLayout === "s3_jsonl" &&
-      this.options.content
-    ) {
-      await this.options.content.copyDataset({
-        source,
-        sourceProjectId: parsed.sourceProjectId,
-        target,
-        targetProjectId: parsed.targetProjectId,
-      });
-
-      return target;
-    }
-
-    // Every row, one batch in memory at a time.
-    let cursorId: string | undefined;
-    let copied = COPY_BATCH_ROWS;
-    while (copied === COPY_BATCH_ROWS) {
-      const batch = await this.options.records.findPage({
-        datasetId: source.id,
-        projectId: parsed.sourceProjectId,
-        limit: COPY_BATCH_ROWS,
-        cursorId,
-      });
-      if (batch.length > 0) {
-        await this.options.records.createMany({
-          datasetId: target.id,
-          projectId: parsed.targetProjectId,
-          entries: batch.map((record) => ({ id: this.generateId(), ...record.entry })),
-        });
-      }
-      copied = batch.length;
-      cursorId = batch.at(-1)?.id;
-    }
-
-    return target;
+  copyDataset(input: CopyDatasetInput): Promise<Dataset> {
+    return this.copies.copyDataset(input);
   }
 
   private assertReady(dataset: Dataset): void {

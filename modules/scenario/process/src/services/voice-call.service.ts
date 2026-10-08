@@ -3,19 +3,13 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import {
-  browserTranscriptToCallRecord,
-  ScenarioRunStatus,
   type BrowserTranscriptTurn,
   type CallRecord,
   type VoiceSessionFinishResult,
   type VoiceSessionMintResult,
   type VoiceSessionTokenPayload,
   type VoiceTransport,
-  VoiceConversationMismatchError,
-  VoiceMintFailedError,
   VoiceNameRequiredError,
-  VoiceRecordingKeyMissingError,
-  VoiceRecordingUnavailableError,
   VoiceScenarioNotFoundError,
 } from "@langwatch/scenario-contract";
 
@@ -24,7 +18,16 @@ import {
   type VoiceTransportCredential,
   type VoiceTransportRunner,
 } from "../channels/voice-transport.channel.ts";
+import {
+  assertProviderRecordMatchesToken,
+  selectCallRecord,
+  terminalRunResult,
+  WRITTEN_STATUSES,
+  type VoiceSessionExistingRun,
+} from "../rules/voice-call-finish.rules.ts";
 import { scenarioRunIdForConversation } from "../rules/voice-call-record.rules.ts";
+import { VoiceCallMintService } from "./voice-call-mint.service.ts";
+import { VoiceCallPlaybackService } from "./voice-call-playback.service.ts";
 
 export type VoiceCallMintInput = {
   projectId: string;
@@ -56,21 +59,6 @@ export type VoiceCallFinishInput = {
 export type VoiceCallPlaybackInput = {
   projectId: string;
   conversationId: string;
-};
-
-/** A run already written for a conversation, as a finish or a replay reads it back. */
-type VoiceSessionExistingRun = {
-  agentId: string | null;
-  status: ScenarioRunStatus;
-  source: CallRecord["source"] | null;
-  audioUrl: string | null;
-  /** The scenario the run was written under, reused on a re-drive so a
-   *  scenario archived between attempts cannot break the retry (#7973 AC1).
-   *  Null when the run carries none (a drawer call). */
-  scenarioId: string | null;
-  /** The set the run landed in, so a terminal retry deep-links it (AC14).
-   *  Null when the run carries none (a drawer call). */
-  scenarioSetId: string | null;
 };
 
 export interface VoiceSessionInfrastructure {
@@ -157,54 +145,6 @@ function runnerFor(
   transport: VoiceTransport,
 ): VoiceTransportRunner {
   return ports.registry[transport];
-}
-
-/** Extra grace beyond the call budget before a session token expires: a call
- *  runs at most the budget, and finish arrives soon after. */
-const VOICE_SESSION_TOKEN_GRACE_MS = 10 * 60 * 1000;
-
-// Ask transport for signed URL. Vendor agent id from saved row if present; from request if draft.
-// Throws VoiceAgentRowNotFoundError, VoiceKeyMissingError, or VoiceMintFailedError.
-async function mintVoiceSession({
-  ports,
-  projectId,
-  transport,
-  agentId: bodyAgentId,
-  agentRowId,
-  maxDurationSeconds,
-}: VoiceCallMintInput & { ports: VoiceSessionInfrastructure }): Promise<VoiceSessionMintResult> {
-  const row = agentRowId ? await ports.getVoiceAgentRow({ projectId, agentRowId }) : undefined;
-  const agentId = row?.agentExternalId ?? bodyAgentId;
-
-  const runner = runnerFor(ports, transport);
-  runner.assertAvailable?.();
-  const credential = await ports.getCredential({ projectId, transport });
-
-  let connect: { signedUrl: string };
-  try {
-    connect = await runner.mintSession({ agentId, credential });
-  } catch (error) {
-    throw new VoiceMintFailedError(error instanceof Error ? error.message : String(error));
-  }
-
-  // The token binds the call to its project, the row (when one exists) and
-  // the vendor agent for the whole of its life plus a grace window; finish
-  // rejects anything outside these claims.
-  const sessionToken = ports.signSessionToken({
-    sessionId: ports.newSessionId(),
-    projectId,
-    agentId: row?.id ?? null,
-    agentExternalId: agentId,
-    transport,
-    exp: ports.now() + maxDurationSeconds * 1000 + VOICE_SESSION_TOKEN_GRACE_MS,
-  });
-
-  return {
-    transport,
-    sessionToken,
-    maxDurationSeconds,
-    connect,
-  };
 }
 
 /**
@@ -306,99 +246,6 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
-type ExistingRun = VoiceSessionExistingRun;
-
-/**
- * The result for a terminal run returned untouched: a duplicate finish
- * writes nothing (AC14, #7973 AC1). The scenario is deliberately not
- * re-resolved, so an archived scenario cannot break the retry (#7973 AC1).
- */
-function terminalRunResult({
-  scenarioRunId,
-  token,
-  existing,
-}: {
-  scenarioRunId: string;
-  token: VoiceSessionTokenPayload;
-  existing: ExistingRun;
-}): VoiceSessionFinishResult {
-  return {
-    runId: scenarioRunId,
-    agentId: token.agentId ?? existing.agentId ?? "",
-    source: existing.source ?? "provider",
-    hasFetchFailed: false,
-    hasAudio: existing.audioUrl !== null,
-    audioUrl: existing.audioUrl ?? undefined,
-    scenarioSetId: existing.scenarioSetId ?? undefined,
-  };
-}
-
-/**
- * A provider record must have run against the very agent the token was minted
- * for. Anything else — including a record with no agent id at all — is a
- * conversation this session has no claim to, and nothing is written (AC13).
- */
-function assertProviderRecordMatchesToken(
-  providerRecord: CallRecord | null,
-  token: VoiceSessionTokenPayload,
-): void {
-  if (providerRecord && providerRecord.agentExternalId !== token.agentExternalId) {
-    throw new VoiceConversationMismatchError();
-  }
-}
-
-// Record to write: provider's when it holds turns, else browser transcript.
-// Provider with empty turns loses conversation; prefer browser to avoid "no response" (#8019).
-function selectCallRecord({
-  providerRecord,
-  transcript,
-  conversationId,
-  transport,
-  startedAt,
-  endedAt,
-  isCutAtLimit,
-}: {
-  providerRecord: CallRecord | null;
-  transcript: BrowserTranscriptTurn[];
-  conversationId: string;
-  transport: VoiceTransport;
-  startedAt: number;
-  endedAt: number;
-  isCutAtLimit: boolean;
-}): CallRecord {
-  // The provider's record when it actually holds turns.
-  if (providerRecord && providerRecord.turns.length > 0) {
-    return { ...providerRecord, isCutAtLimit };
-  }
-  const browserRecord = browserTranscriptToCallRecord({
-    conversationId,
-    transport,
-    transcript,
-    startedAt,
-    endedAt,
-    isCutAtLimit,
-  });
-  // No provider turns, but the browser captured the conversation: keep it
-  // rather than write an empty run the reader sees as "no response" (#8019).
-  // The turns come from the browser, but a recording the provider already
-  // returned is still this call's audio.
-  if (transcript.length > 0) {
-    return {
-      ...browserRecord,
-      ...(providerRecord?.audioUrl ? { audioUrl: providerRecord.audioUrl } : {}),
-    };
-  }
-  // Neither side has turns: keep the (empty) provider record when one came
-  // back, else the empty browser record.
-  return providerRecord ? { ...providerRecord, isCutAtLimit } : browserRecord;
-}
-
-/** Statuses that mean the finish write already completed: only these are
- *  returned untouched on a retry (#7973 AC1). */
-const WRITTEN_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
-  ScenarioRunStatus.SUCCESS,
-  ScenarioRunStatus.FAILED,
-]);
 /**
  * The shared tail of a finished call: read the provider record (or fall
  * back to the transcript), reject an unclaimed token, resolve the agent row
@@ -602,95 +449,22 @@ async function finishVoiceSession(
   };
 }
 
-// Whether drawer call's recording belongs to this project. Drawer call not persisted (#8020), so
-// check provider agent against saved agents.
-async function drawerRecordingBelongsToProject(
-  ports: VoiceSessionInfrastructure,
-  {
-    projectId,
-    transport,
-    conversationId,
-    credential,
-  }: {
-    projectId: string;
-    transport: VoiceTransport;
-    conversationId: string;
-    credential: VoiceTransportCredential;
-  },
-): Promise<boolean> {
-  let record: CallRecord;
-  try {
-    record = await runnerFor(ports, transport).getCallRecord({
-      conversationId,
-      credential,
-      audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
-    });
-  } catch {
-    return false;
-  }
-  const agentExternalId = record.agentExternalId;
-  if (!agentExternalId) return false;
-  return ports.hasVoiceAgentForExternalId({
-    projectId,
-    transport,
-    agentExternalId,
-  });
-}
-
-// Authorize recording playback and return provider credential. Scenario runs authorize directly;
-// drawer calls (#8020) authorized only if conversation ran against saved voice agent.
-async function authorizeRecordingPlayback({
-  ports,
-  projectId,
-  conversationId,
-}: VoiceCallPlaybackInput & { ports: VoiceSessionInfrastructure }): Promise<ElevenLabsCredential> {
-  const transport: VoiceTransport = "elevenlabs_convai";
-  const existing = await ports.findExistingRun({
-    projectId,
-    scenarioRunId: scenarioRunIdForConversation(conversationId),
-  });
-
-  let credential: VoiceTransportCredential;
-  try {
-    credential = await ports.getCredential({ projectId, transport });
-  } catch (error) {
-    if (HandledError.isHandled(error) && error.code === "voice_key_missing") {
-      throw new VoiceRecordingKeyMissingError();
-    }
-    throw error;
-  }
-  // Recording playback only exists for ElevenLabs conversations; a credential
-  // of another kind reaching here is a wiring bug (transport is hardcoded
-  // above), not a customer-facing failure.
-  if (credential.kind !== "elevenlabs") {
-    throw new Error("Recording playback is only available for ElevenLabs conversations");
-  }
-
-  // A scenario run authorizes playback directly; no provider call needed.
-  if (existing) return credential;
-
-  // No run was written (a drawer call, #8020): authorize only when the provider
-  // conversation ran against a voice agent this project actually saved.
-  const allowed = await drawerRecordingBelongsToProject(ports, {
-    projectId,
-    transport,
-    conversationId,
-    credential,
-  });
-  if (!allowed) throw new VoiceRecordingUnavailableError();
-  return credential;
-}
-
 /** The call lifecycle behind a browser session: mint, ingest the finished call, gate playback. */
 export class VoiceCallService {
   static create(ports: VoiceSessionInfrastructure): VoiceCallService {
     return new VoiceCallService(ports);
   }
 
-  private constructor(private readonly ports: VoiceSessionInfrastructure) {}
+  private readonly minting: VoiceCallMintService;
+  private readonly playback: VoiceCallPlaybackService;
+
+  private constructor(private readonly ports: VoiceSessionInfrastructure) {
+    this.minting = VoiceCallMintService.create(ports);
+    this.playback = VoiceCallPlaybackService.create(ports);
+  }
 
   mint(input: VoiceCallMintInput): Promise<VoiceSessionMintResult> {
-    return mintVoiceSession({ ...input, ports: this.ports });
+    return this.minting.mint(input);
   }
 
   finish(input: VoiceCallFinishInput): Promise<VoiceSessionFinishResult> {
@@ -698,6 +472,6 @@ export class VoiceCallService {
   }
 
   authorizeRecordingPlayback(input: VoiceCallPlaybackInput): Promise<ElevenLabsCredential> {
-    return authorizeRecordingPlayback({ ...input, ports: this.ports });
+    return this.playback.authorizeRecordingPlayback(input);
   }
 }
