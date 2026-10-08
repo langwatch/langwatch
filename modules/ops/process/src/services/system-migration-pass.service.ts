@@ -18,6 +18,7 @@ import {
   migrationRunsOnThisInstallation,
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules.ts";
+import { declarationOf, mergeSummaries } from "../rules/system-migration-pass-summary.rules.ts";
 import { RoutingTableOrganizationDataplaneService } from "./organization-dataplane.service.ts";
 import { SystemMigrationCohortService } from "./system-migration-cohort.service.ts";
 import type { SystemMigrationPassRequestsService } from "./system-migration-pass-requests.service.ts";
@@ -35,23 +36,6 @@ export class UserStartupMigrationsUnsupportedError extends Error {
     this.name = "UserStartupMigrationsUnsupportedError";
     this.migrationNames = migrationNames;
   }
-}
-
-/** Both legs count into one summary: the convergence loop stops when a whole
- *  pass moved nothing, so one leg still advancing has to keep it non-zero. */
-function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): MigrationPassSummary {
-  return {
-    tenantsSeen: a.tenantsSeen + b.tenantsSeen,
-    finalized: a.finalized + b.finalized,
-    held: a.held + b.held,
-    parked: a.parked + b.parked,
-    skipped: a.skipped + b.skipped,
-    alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
-    alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
-    claimed: a.claimed + b.claimed,
-    advanced: a.advanced + b.advanced,
-    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
-  };
 }
 
 /** The ledger, enrollment, membership, tenant walks and lease a pass reads and writes. */
@@ -491,23 +475,4 @@ export class SystemMigrationPassService {
       hasTenantAwaitingRedrive: () => passes.hasTenantAwaitingRedrive(),
     });
   }
-}
-
-/** What the migrations page reads of one migration: its declaration plus its tenant axis. */
-function declarationOf({
-  migration,
-  tenant,
-}: {
-  migration: SystemMigration;
-  tenant: "organization" | "user";
-}) {
-  return {
-    name: migration.name,
-    title: migration.title,
-    description: migration.description,
-    requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
-    runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-    enrolledAutomatically: migration.enrolledAutomatically,
-    tenant,
-  };
 }

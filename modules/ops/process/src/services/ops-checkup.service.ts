@@ -1,28 +1,9 @@
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type {
-  ConnectStatus,
-  LicenseStatus,
-  LicensingApi,
-} from "@langwatch/enterprise-licensing-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type {
-  ModelProviderApi,
-  ModelProviderCredentialVerdict,
-} from "@langwatch/model-provider-contract";
-import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type {
   CheckupResult,
   ExplicitCheckInput,
   OpsServerConfig,
   UsageReportPreview,
 } from "@langwatch/ops-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type {
-  StoredObjectApi,
-  StoredObjectStorageDestination,
-} from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { CheckupProbeChannel } from "../channels/checkup-probe.channel.ts";
@@ -34,28 +15,22 @@ import type {
 } from "../repositories/datastore-health.repository.ts";
 import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
 import { checkupVerdictsOnly } from "../rules/checkup-audience.rules.ts";
-import { CANARY_KEY_PERMISSIONS } from "../rules/checkup-canary-key.rules.ts";
+import { type CheckupFacts } from "../rules/checkup-facts.rules.ts";
+import { CheckupService } from "./checkup.service.ts";
 import {
-  type CheckupConnectView,
-  type CheckupFacts,
-  type CheckupLicenseView,
-  CheckupService,
-  type ControlPlaneProbe,
-  type ProviderTestOutcome,
-} from "./checkup.service.ts";
+  GATEWAY_PROBE_TIMEOUT_MS,
+  type OpsCheckupPeers,
+  appAddresses,
+  canaryFact,
+  connectFact,
+  licenseView,
+  modelProviderFacts,
+  probeControlPlane,
+  storageFacts,
+} from "./ops-checkup-facts.service.ts";
 import type { OpsHealthService } from "./ops-health.service.ts";
-import {
-  UsageReportCollectionService,
-  type UsageReportPeers,
-} from "./usage-report-collection.service.ts";
-import {
-  type UsageReportInstall,
-  UsageReportService,
-  type UsageReportSwitchChange,
-} from "./usage-report.service.ts";
-
-const CANARY_TIMEOUT_MS = 150_000;
-const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
+import { UsageReportCollectionService } from "./usage-report-collection.service.ts";
+import { UsageReportService, type UsageReportSwitchChange } from "./usage-report.service.ts";
 
 /** The process facts the checkup and the usage report read, drilled in. */
 type OpsCheckupFacts = Readonly<{
@@ -65,21 +40,6 @@ type OpsCheckupFacts = Readonly<{
   nodeEnvironment: string | undefined;
   processRole: string;
 }>;
-
-/** Every peer the checkup and the report ask, by the one operation each needs. */
-type OpsCheckupPeers = UsageReportPeers &
-  Readonly<{
-    organizationDirectory: Pick<OrganizationApi, "findAllIds">;
-    licensing: UsageReportInstall & Pick<LicensingApi, "getLicenseStatus" | "getConnectStatus">;
-    providerTests: Pick<ModelProviderApi, "listForOrganization" | "testConnection">;
-    projectDirectory: Pick<ProjectApi, "listByOrganization">;
-    mail: Pick<NotificationApi, "getMailDelivery" | "verifySmtp">;
-    storage: Pick<StoredObjectApi, "getStorageDestination" | "probeStorage">;
-    lwql: Pick<AnalyticsApi, "findAppFunctionsProvisionable">;
-    gateway: Pick<GatewayApi, "getDeploymentAddresses">;
-    /** Mints the minimal system key each canary runs with. */
-    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
-  }>;
 
 interface OpsCheckupDependencies {
   readonly facts: OpsCheckupFacts;
@@ -205,46 +165,14 @@ export class OpsCheckupService {
           publicBaseUrl: facts.publicBaseUrl,
         }),
       license: async () => licenseView(await peers.licensing.getLicenseStatus(organizationId)),
-      connect: async () => {
-        const [status, deployment] = await Promise.all([
-          peers.licensing.getConnectStatus({ organizationId }),
-          peers.licensing.getConnectDeployment(),
-        ]);
-        return connectView({
-          status,
-          hosts: {
-            licenseHost: deployment.licenseEndpoint,
-            gatewayHost: deployment.gatewayEndpoint,
-          },
-        });
-      },
+      connect: connectFact({ licensing: peers.licensing, organizationId }),
       usageReport: {
         disabled: config.usageStats.disabled,
         findIdentity: () => peers.licensing.findInstanceIdentity(),
         getEndpoint: () => usageReports.getEndpoint(),
       },
       reach: (url) => channels.probes.reach(url),
-      storage: {
-        findDestination: async () => {
-          const projects = await findOldestProjects({
-            projects: peers.projectDirectory,
-            organizationId,
-          });
-          return Promise.all(
-            projects.map(async ({ id }) =>
-              destinationWords(await peers.storage.getStorageDestination({ projectId: id })),
-            ),
-          );
-        },
-        probe: async () => {
-          const [project] = await findOldestProjects({
-            projects: peers.projectDirectory,
-            organizationId,
-          });
-          if (!project) throw new Error("no project to write for");
-          await peers.storage.probeStorage({ projectId: project.id });
-        },
-      },
+      storage: storageFacts({ peers, organizationId }),
       email: async () => {
         const view = await peers.mail.getMailDelivery();
         return {
@@ -254,38 +182,8 @@ export class OpsCheckupService {
           verifySmtp: () => peers.mail.verifySmtp(),
         };
       },
-      modelProviders: async () =>
-        (await peers.providerTests.listForOrganization({ organizationId }))
-          .filter((row) => row.enabled)
-          .map((row) => ({ id: row.id, provider: row.provider })),
-      // The owner's connection test holds the organization's budget itself.
-      modelProviderBudget: async () => undefined,
-      testModelProvider: async (row) =>
-        providerOutcome(
-          await peers.providerTests.testConnection(
-            { organizationId, modelProviderId: row.id },
-            { id: requestedBy },
-          ),
-        ),
-      canary: async (name, params) => {
-        const [project] = await findOldestProjects({
-          projects: peers.projectDirectory,
-          organizationId,
-        });
-        if (!project) return { status: 412, body: { message: "no project" } };
-        // A minimal key of the checkup's own, acting as the system: never the project's legacy key.
-        const token = await peers.apiKeys.mintRunKey({
-          userId: null,
-          projectId: project.id,
-          permissions: [...CANARY_KEY_PERMISSIONS[name]],
-        });
-        const query = new URLSearchParams(params).toString();
-        return channels.probes.get({
-          url: `${facts.publicBaseUrl ?? ""}/api/health/${name}${query ? `?${query}` : ""}`,
-          headers: { "X-Auth-Token": token, "X-Project-Id": project.id },
-          timeoutMs: CANARY_TIMEOUT_MS,
-        });
-      },
+      ...modelProviderFacts({ peers, organizationId, requestedBy }),
+      canary: canaryFact({ peers, channels, publicBaseUrl: facts.publicBaseUrl, organizationId }),
     });
 
     return new OpsCheckupService(facts.isSaas, usageReports, factsFor);
@@ -326,129 +224,5 @@ export class OpsCheckupService {
   /** Changes what the install reports; only an install admin reaches it. */
   setUsageReportSwitches(switches: UsageReportSwitchChange): Promise<UsageReportPreview> {
     return this.usageReports.setSwitches(switches);
-  }
-}
-
-/** The addresses this app is reached at, public first, each once. */
-function appAddresses(candidates: (string | undefined)[]): string[] {
-  return [
-    ...new Set(
-      candidates.filter((url): url is string => typeof url === "string" && url.trim() !== ""),
-    ),
-  ];
-}
-
-/** Where the gateway says its control plane is, or why it would not say. */
-async function probeControlPlane({
-  probes,
-  baseUrl,
-}: {
-  probes: CheckupProbeChannel;
-  baseUrl: string | undefined;
-}): Promise<ControlPlaneProbe> {
-  if (!baseUrl) return { kind: "unreachable", reason: "no gateway" };
-  try {
-    const answer = await probes.get({
-      url: `${baseUrl}/debug/control-plane`,
-      timeoutMs: GATEWAY_PROBE_TIMEOUT_MS,
-    });
-    if (answer.status < 200 || answer.status >= 300) {
-      return { kind: "unreachable", reason: `answered ${answer.status}` };
-    }
-    const named = extractControlPlaneUrl(answer.body);
-    return named
-      ? { kind: "ok", controlPlaneBaseUrl: named }
-      : { kind: "unreachable", reason: "the answer named no control plane" };
-  } catch (error) {
-    return { kind: "unreachable", reason: error instanceof Error ? error.message : String(error) };
-  }
-}
-
-function extractControlPlaneUrl(body: unknown): string | undefined {
-  if (typeof body !== "object" || body === null || !("control_plane_base_url" in body)) {
-    return undefined;
-  }
-  return typeof body.control_plane_base_url === "string" ? body.control_plane_base_url : undefined;
-}
-
-/** Where stored objects go, in the words the checkup row reads. */
-function destinationWords(destination: StoredObjectStorageDestination): string {
-  switch (destination.kind) {
-    case "s3":
-      return `S3 bucket ${destination.bucket}`;
-    case "file":
-      return `the local path ${destination.root}`;
-    case "azure":
-      return `Azure container ${destination.container} on ${destination.accountName}`;
-  }
-}
-
-/** The organization's oldest project, which the canaries run as; empty where it has none. */
-async function findOldestProjects({
-  projects,
-  organizationId,
-}: {
-  projects: Pick<ProjectApi, "listByOrganization">;
-  organizationId: string;
-}): Promise<{ id: string }[]> {
-  const page = await projects.listByOrganization({
-    organizationId,
-    page: 1,
-    limit: 100,
-    includeGovernance: true,
-  });
-  return page.data
-    .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
-    .slice(0, 1)
-    .map((project) => ({ id: project.id }));
-}
-
-function licenseView(status: LicenseStatus): CheckupLicenseView {
-  return {
-    hasLicense: status.hasLicense,
-    valid: status.valid,
-    ...("corrupted" in status && status.corrupted !== undefined
-      ? { corrupted: status.corrupted }
-      : {}),
-    ...("expired" in status ? { expired: status.expired } : {}),
-    ...("planName" in status ? { planName: status.planName, expiresAt: status.expiresAt } : {}),
-    ...("currentMembers" in status
-      ? { currentMembers: status.currentMembers, maxMembers: status.maxMembers }
-      : {}),
-  };
-}
-
-function connectView({
-  status,
-  hosts,
-}: {
-  status: ConnectStatus;
-  hosts: { licenseHost: string; gatewayHost: string };
-}): CheckupConnectView {
-  if (status.deployment === "off") {
-    return { deployment: "off", licensed: false, entitledServices: [], ...hosts };
-  }
-  return {
-    deployment: "on",
-    licensed: status.licensed,
-    entitledServices: status.entitledServices ?? [...status.enabledServices],
-    ...(status.sync.lastSyncAt ? { lastSyncAt: status.sync.lastSyncAt } : {}),
-    ...(status.sync.lastError ? { lastSyncError: status.sync.lastError.code } : {}),
-    ...hosts,
-  };
-}
-
-function providerOutcome(verdict: ModelProviderCredentialVerdict): ProviderTestOutcome {
-  switch (verdict.outcome) {
-    case "verified":
-      return { outcome: "verified" };
-    case "refused":
-      return {
-        outcome: "refused",
-        code: verdict.domainError.code,
-        message: verdict.domainError.code.replace(/_/g, " "),
-      };
-    default:
-      return { outcome: "unchecked", reason: verdict.reason };
   }
 }

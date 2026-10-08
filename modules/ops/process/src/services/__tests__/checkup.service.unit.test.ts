@@ -15,7 +15,8 @@ import {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { type CheckupConnectView, type CheckupFacts, CheckupService } from "../checkup.service.ts";
+import type { CheckupConnectView, CheckupFacts } from "../../rules/checkup-facts.rules.ts";
+import { CheckupService } from "../checkup.service.ts";
 import { ledgerOf, statusOf, stepOf } from "./support/upgrade-ledger.ts";
 
 /** What the reach probe throws for a host it could not open a connection to. */

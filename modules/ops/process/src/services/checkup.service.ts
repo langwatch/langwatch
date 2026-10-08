@@ -1,5 +1,3 @@
-import type { InstanceIdentityView } from "@langwatch/enterprise-licensing-contract";
-import { HandledError } from "@langwatch/handled-error";
 import {
   CHECK_DEFINITIONS,
   CHECKUP_DOCS,
@@ -12,161 +10,12 @@ import {
   freeCheckIds,
   getCheckDefinition,
 } from "@langwatch/ops-contract";
-import { type Instant, Temporal } from "@langwatch/time";
-import type { UpgradeReader, UpgradeStepView } from "@langwatch/upgrade/reader";
+import { Temporal } from "@langwatch/time";
 
-/** What a control plane probe of the local gateway came back with. */
-export type ControlPlaneProbe =
-  | { readonly kind: "ok"; readonly controlPlaneBaseUrl: string }
-  | { readonly kind: "unreachable"; readonly reason: string };
-
-/** What a model provider connection test came back with. */
-export type ProviderTestOutcome =
-  | { readonly outcome: "verified" }
-  | { readonly outcome: "refused"; readonly code: string; readonly message: string }
-  | { readonly outcome: "unchecked"; readonly reason: string };
-
-/** What a canary route answered. */
-interface CanaryAnswer {
-  readonly status: number;
-  readonly body: unknown;
-}
-
-type CanaryName = "collector" | "processor" | "evaluations" | "scenarios" | "langy";
-
-/** Where the daily license sync stands, as the connect settings report it. */
-export interface CheckupConnectView {
-  readonly deployment: "off" | "on";
-  readonly licensed: boolean;
-  readonly entitledServices: string[];
-  readonly lastSyncAt?: string;
-  readonly lastSyncError?: string;
-  readonly licenseHost: string;
-  readonly gatewayHost: string;
-}
-
-export interface CheckupLicenseView {
-  readonly hasLicense: boolean;
-  readonly valid: boolean;
-  readonly expired?: boolean;
-  readonly corrupted?: boolean;
-  readonly planName?: string;
-  readonly expiresAt?: string;
-  readonly currentMembers?: number;
-  readonly maxMembers?: number;
-}
-
-interface CheckupGatewayFacts {
-  readonly baseUrl: string | undefined;
-  /**
-   * Every address this app is reached at, its public address first. The
-   * gateway usually reaches the app over the cluster, so its control plane
-   * is this app when it names any one of them.
-   */
-  readonly controlPlaneUrls: string[];
-  readonly health: () => Promise<void>;
-  readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
-}
-
-interface CheckupEmailFacts {
-  readonly provider: string | undefined;
-  readonly smtpConfigured: boolean;
-  /** The transport logs in to the relay; an internal relay often takes none. */
-  readonly smtpSendsCredentials: boolean;
-  readonly verifySmtp: () => Promise<void>;
-}
-
-/**
- * Everything a check reads, one fact or one probe each, so a suite states the
- * world in a few lines. Every probe resolves or throws; the check decides what
- * a throw means. The process wires each to the module that owns the fact.
- */
-export interface CheckupFacts {
-  readonly now: () => Instant;
-  readonly install: {
-    readonly version: string;
-    readonly processRole: string;
-    readonly environment: string;
-  };
-  readonly postgres: {
-    readonly ping: () => Promise<string>;
-  };
-  /** The upgrade ledger as the Upgrades page reads it; throws where it cannot be read. */
-  readonly upgrade: Pick<UpgradeReader, "status" | "listSteps">;
-  readonly clickhouse: {
-    readonly configured: boolean;
-    readonly ping: () => Promise<void>;
-    /** Empty where ClickHouse did not answer the settings the provisioning probe reads. */
-    readonly findAppFunctionsProvisionable: () => Promise<boolean[]>;
-  };
-  readonly redis: {
-    readonly target: string | undefined;
-    readonly ready: () => Promise<void>;
-  };
-  /** Where the gateway is and how to ask it; throws where no owner answered this process. */
-  readonly gateway: () => Promise<CheckupGatewayFacts>;
-  readonly license: () => Promise<CheckupLicenseView>;
-  readonly connect: () => Promise<CheckupConnectView>;
-  readonly usageReport: {
-    readonly disabled: boolean;
-    readonly findIdentity: () => Promise<InstanceIdentityView[]>;
-    readonly getEndpoint: () => Promise<string>;
-  };
-  /** Resolves on any HTTP answer; throws a `HandledError` naming the host otherwise. */
-  readonly reach: (url: string) => Promise<void>;
-  readonly storage: {
-    /** Empty where no project exists to resolve a destination for. */
-    readonly findDestination: () => Promise<string[]>;
-    readonly probe: () => Promise<void>;
-  };
-  /** How mail leaves the install; throws where no owner answered this process. */
-  readonly email: () => Promise<CheckupEmailFacts>;
-  /** The organization's enabled providers, by id and name: a key never leaves its owner. */
-  readonly modelProviders: () => Promise<{ id: string; provider: string }[]>;
-  /** Throws a `HandledError` carrying `retryAfterSeconds` past the organization's budget. */
-  readonly modelProviderBudget: () => Promise<void>;
-  readonly testModelProvider: (row: {
-    id: string;
-    provider: string;
-  }) => Promise<ProviderTestOutcome>;
-  readonly canary: (name: CanaryName, params: Record<string, string>) => Promise<CanaryAnswer>;
-}
-
-/** Statuses of a step with nothing left to do; any other status, known or not, is outstanding. */
-const SETTLED_STATUSES: ReadonlySet<string> = new Set(["done", "not-needed"]);
-
-/** How many step ids a row names before it counts the rest. */
-const NAMED_STEPS_LIMIT = 5;
-
-/** Each code sits beside a literal `code:` so the registry's dead-code scan sees it raised. */
-const PENDING = {
-  "postgres-schema": { code: "checkup_postgres_migrations_pending" },
-  "clickhouse-schema": { code: "checkup_clickhouse_migrations_pending" },
-} as const;
-
-/** Each engine's failed step has its own code (round 18, U3-a). */
-const FAILED = {
-  "postgres-schema": { code: "checkup_postgres_migration_failed" },
-  "clickhouse-schema": { code: "checkup_clickhouse_migration_failed" },
-} as const;
-
-const UPGRADE_FIX =
-  "Run `pnpm task upgrade` from the app image, then restart. Operators can follow it on /ops/upgrades.";
-
-const UPGRADE_STATUS_FIX =
-  "Run `pnpm task upgrade status` from the app image to read the ledger, or `pnpm task upgrade` to create it. Operators can read it on /ops/upgrades.";
-
-function nameSteps(steps: readonly UpgradeStepView[]): string {
-  const named = steps.slice(0, NAMED_STEPS_LIMIT).map((step) => step.id);
-  const rest = steps.length - named.length;
-  return rest > 0 ? `${named.join(", ")} and ${rest} more` : named.join(", ");
-}
-
-const NOT_ASKED_FOR: CheckVerdict = {
-  outcome: "unchecked",
-  detail:
-    "Not run. This check opens a connection or spends money, so it runs only when you ask for it.",
-};
+import type { CheckupFacts } from "../rules/checkup-facts.rules.ts";
+import { NOT_ASKED_FOR, hostOf, reasonOf, withoutUserInfo } from "../rules/checkup-text.rules.ts";
+import { CheckupMigrationsService } from "./checkup-migrations.service.ts";
+import { CheckupPaidService } from "./checkup-paid.service.ts";
 
 /**
  * The checkup of a self-hosted install (specs/self-hosting/checkup/checkup.feature).
@@ -174,10 +23,18 @@ const NOT_ASKED_FOR: CheckVerdict = {
  * one that could not run answers `unchecked` with the reason, never `verified`.
  */
 export class CheckupService {
-  private constructor(private readonly facts: CheckupFacts) {}
+  private constructor(
+    private readonly facts: CheckupFacts,
+    private readonly migrations: CheckupMigrationsService,
+    private readonly paidChecks: CheckupPaidService,
+  ) {}
 
   static create(facts: CheckupFacts): CheckupService {
-    return new CheckupService(facts);
+    return new CheckupService(
+      facts,
+      CheckupMigrationsService.create(facts),
+      CheckupPaidService.create(facts),
+    );
   }
 
   /** The free checks, which are what the page opens with. */
@@ -196,7 +53,7 @@ export class CheckupService {
     const rows = await Promise.all(
       explicitCheckIds().map((id) =>
         wanted.has(id)
-          ? this.row(id, () => this.paid(id, input))
+          ? this.row(id, () => this.paidChecks.run(id, input))
           : Promise.resolve({ ...getCheckDefinition(id), verdict: NOT_ASKED_FOR }),
       ),
     );
@@ -281,7 +138,7 @@ export class CheckupService {
   }
 
   private postgresMigrations(): Promise<CheckVerdict> {
-    return this.migrationsRow({ kind: "postgres-schema", engine: "Postgres" });
+    return this.migrations.run({ kind: "postgres-schema", engine: "Postgres" });
   }
 
   private async clickhouse(): Promise<CheckVerdict> {
@@ -312,63 +169,7 @@ export class CheckupService {
     if (!this.facts.clickhouse.configured) {
       return { outcome: "unchecked", detail: "ClickHouse is not configured." };
     }
-    return this.migrationsRow({ kind: "clickhouse-schema", engine: "ClickHouse" });
-  }
-
-  /** Both migration rows read the ledger the Upgrades page reads: one source, one answer. */
-  private async migrationsRow({
-    kind,
-    engine,
-  }: {
-    kind: "postgres-schema" | "clickhouse-schema";
-    engine: "Postgres" | "ClickHouse";
-  }): Promise<CheckVerdict> {
-    let steps: UpgradeStepView[];
-    let noUpgradeRecorded: boolean;
-    try {
-      const [page, status] = await Promise.all([
-        this.facts.upgrade.listSteps({ mode: "blocking" }),
-        this.facts.upgrade.status(),
-      ]);
-      steps = page.items.filter((step) => step.kind === kind);
-      noUpgradeRecorded = status.reason === "no-upgrade-recorded";
-    } catch (error) {
-      return {
-        outcome: "unchecked",
-        detail: `The upgrade ledger could not be read: ${reasonOf(error)}`,
-        fix: UPGRADE_STATUS_FIX,
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    if (steps.length === 0 && noUpgradeRecorded) {
-      return {
-        outcome: "unchecked",
-        detail: `No upgrade is recorded yet, so ${engine} migrations cannot be compared.`,
-        fix: UPGRADE_FIX,
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    const failed = steps.filter((step) => step.status === "failed");
-    if (failed.length > 0) {
-      return {
-        outcome: "refused",
-        code: FAILED[kind].code,
-        detail: `${failed.length} ${engine} migration(s) failed: ${nameSteps(failed)}.`,
-        fix: `Read the error on /ops/upgrades or with \`pnpm task upgrade status\`, fix the cause, then run \`pnpm task upgrade\` again: it resumes where it stopped.`,
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    const outstanding = steps.filter((step) => !SETTLED_STATUSES.has(step.status));
-    if (outstanding.length > 0) {
-      return {
-        outcome: "refused",
-        code: PENDING[kind].code,
-        detail: `${outstanding.length} ${engine} migration(s) not applied: ${nameSteps(outstanding)}.`,
-        fix: UPGRADE_FIX,
-        docsPath: CHECKUP_DOCS.upgrade,
-      };
-    }
-    return { outcome: "verified", detail: `Every ${engine} migration is applied.` };
+    return this.migrations.run({ kind: "clickhouse-schema", engine: "ClickHouse" });
   }
 
   private async lwql(): Promise<CheckVerdict> {
@@ -514,7 +315,9 @@ export class CheckupService {
       return {
         outcome: "unchecked",
         detail:
-          "This install's license names no hosted service, so there is no sync to check. A license with hosted services adds Instant Evals judging and managed models, and delivers renewals and seat changes without a key to paste.",
+          "This install's license names no hosted service, so there is no sync to check. " +
+          "A license with hosted services adds Instant Evals judging and managed models, " +
+          "and delivers renewals and seat changes without a key to paste.",
         fix: "Enter an activation code on the License page. The license and its entitlements arrive over the connect host and refresh daily.",
         docsPath: CHECKUP_DOCS.connect,
       };
@@ -614,248 +417,6 @@ export class CheckupService {
     const names = [...new Set(providers.map((row) => row.provider))].toSorted();
     return { outcome: "verified", detail: `Configured: ${names.join(", ")}.` };
   }
-
-  private async paid(id: CheckId, input: ExplicitCheckInput): Promise<CheckVerdict> {
-    switch (id) {
-      case "reach_connect_host":
-        return this.reachLangWatch("licenseHost");
-      case "reach_gateway_host":
-        return this.reachLangWatch("gatewayHost");
-      case "gateway_control_plane":
-        return this.gatewayControlPlane();
-      case "storage_probe":
-        return this.storageProbe();
-      case "smtp_verify":
-        return this.smtpVerify();
-      case "model_provider_test":
-        return this.modelProviderTest();
-      case "canary_collector":
-        return this.canary("collector", {});
-      case "canary_processor":
-        return this.canary("processor", {});
-      case "canary_evaluations":
-        return this.canary("evaluations", {});
-      case "canary_scenarios":
-        return input.scenarioRunPlanId
-          ? this.canary("scenarios", { runPlanId: input.scenarioRunPlanId })
-          : {
-              outcome: "unchecked",
-              detail: "The scenario canary launches a real run and needs a run plan to launch.",
-              fix: "Name a run plan id or slug and run this check again.",
-            };
-      case "canary_langy":
-        return this.canary("langy", {});
-      default:
-        return NOT_ASKED_FOR;
-    }
-  }
-
-  /** A LangWatch host is probed only while Connect is allowed; a probe is a connection too. */
-  private async reachLangWatch(which: "licenseHost" | "gatewayHost"): Promise<CheckVerdict> {
-    const connect = await this.facts.connect();
-    if (connect.deployment === "off") {
-      return {
-        outcome: "unchecked",
-        detail:
-          "Not run. LANGWATCH_CONNECT_DISABLED is set, so this install opens no connection to LangWatch.",
-      };
-    }
-    return this.reach(connect[which]);
-  }
-
-  private async reach(host: string): Promise<CheckVerdict> {
-    const url = host.includes("://") ? host : `https://${host}`;
-    try {
-      await this.facts.reach(url);
-      return { outcome: "verified", detail: `${hostOf(url)} answers on port ${portOf(url)}.` };
-    } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
-      return {
-        outcome: "refused",
-        code: error.code,
-        detail: `${hostOf(url)} could not be reached on port ${portOf(url)}.`,
-        fix: error.message,
-        docsPath: CHECKUP_DOCS.connect,
-        meta: { ...error.meta, host: hostOf(url), port: portOf(url) },
-      };
-    }
-  }
-
-  private async gatewayControlPlane(): Promise<CheckVerdict> {
-    const gateway = await this.facts.gateway();
-    const known = gateway.controlPlaneUrls;
-    const expected = known[0];
-    if (!gateway.baseUrl || !expected) {
-      return {
-        outcome: "unchecked",
-        detail: "No AI Gateway is configured, so there is no control plane to compare.",
-        docsPath: CHECKUP_DOCS.gateway,
-      };
-    }
-    const probe = await gateway.probeControlPlane();
-    if (probe.kind === "unreachable") {
-      return {
-        outcome: "unchecked",
-        detail: `The gateway did not answer GET /debug/control-plane: ${probe.reason}. An older gateway build has no such route.`,
-        fix: "Upgrade the gateway to the release that ships with this app, then run this check again.",
-        docsPath: CHECKUP_DOCS.gateway,
-      };
-    }
-    const reported = normalizeUrl(probe.controlPlaneBaseUrl);
-    if (!known.some((url) => normalizeUrl(url) === reported)) {
-      return {
-        outcome: "refused",
-        code: "checkup_gateway_control_plane_mismatch",
-        detail: `The gateway reports its control plane as ${probe.controlPlaneBaseUrl}; this app is at ${expected}. Requests return 200 while budgets, spend and auth apply to another install.`,
-        fix: "Point the gateway's control plane at this app (GATEWAY_CONTROL_PLANE_URL on the gateway) and restart it.",
-        docsPath: CHECKUP_DOCS.gateway,
-      };
-    }
-    return {
-      outcome: "verified",
-      detail: `The gateway reports ${probe.controlPlaneBaseUrl} as its control plane, which is this app.`,
-    };
-  }
-
-  private async storageProbe(): Promise<CheckVerdict> {
-    const [destination] = await this.facts.storage.findDestination();
-    if (!destination) {
-      return {
-        outcome: "unchecked",
-        detail: "No project exists yet, so there is no storage destination to write to.",
-      };
-    }
-    try {
-      await this.facts.storage.probe();
-      return {
-        outcome: "verified",
-        detail: `One object was written to ${destination} and deleted.`,
-      };
-    } catch (error) {
-      return {
-        outcome: "refused",
-        code: "checkup_storage_write_failed",
-        detail: `Writing to ${destination} failed: ${reasonOf(error)}`,
-        fix: "Check the bucket or path exists and that the app's credentials allow put and delete on it.",
-        docsPath: CHECKUP_DOCS.environment,
-      };
-    }
-  }
-
-  private async smtpVerify(): Promise<CheckVerdict> {
-    const email = await this.facts.email();
-    if (!email.smtpConfigured) {
-      return {
-        outcome: "unchecked",
-        detail: email.provider
-          ? `Email goes through ${email.provider}, which has no connection to verify. Send a test invitation to check it.`
-          : "SMTP is not configured.",
-        docsPath: CHECKUP_DOCS.email,
-      };
-    }
-    try {
-      await email.verifySmtp();
-      return {
-        outcome: "verified",
-        detail: email.smtpSendsCredentials
-          ? "The SMTP server accepted a connection and the credentials."
-          : "The SMTP server accepted a connection.",
-      };
-    } catch (error) {
-      return {
-        outcome: "refused",
-        code: "checkup_smtp_refused",
-        detail: `The SMTP server refused: ${reasonOf(error)}`,
-        fix: "Check SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER and SMTP_PASSWORD.",
-        docsPath: CHECKUP_DOCS.email,
-      };
-    }
-  }
-
-  private async modelProviderTest(): Promise<CheckVerdict> {
-    const providers = await this.facts.modelProviders();
-    if (providers.length === 0) {
-      return {
-        outcome: "unchecked",
-        detail: "No model provider is configured, so there is nothing to test.",
-        docsPath: CHECKUP_DOCS.modelProviders,
-      };
-    }
-    try {
-      await this.facts.modelProviderBudget();
-    } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
-      const retry = Number(error.meta?.retryAfterSeconds ?? 60);
-      return {
-        outcome: "unchecked",
-        detail: `This organization used its connection test budget for the minute. Try again in ${retry} seconds.`,
-      };
-    }
-    const results = await Promise.all(
-      providers.slice(0, 5).map(async (row) => ({
-        provider: row.provider,
-        result: await this.facts.testModelProvider(row),
-      })),
-    );
-    const refused = results.flatMap((entry) =>
-      entry.result.outcome === "refused" ? [{ provider: entry.provider, ...entry.result }] : [],
-    );
-    const [firstRefusal] = refused;
-    if (firstRefusal) {
-      return {
-        outcome: "refused",
-        code: "checkup_model_provider_refused",
-        detail:
-          `${refused.map((entry) => entry.provider).join(", ")} refused the connection test. ${firstRefusal.message}`.trim(),
-        fix: "Open Settings, Model providers, and test the provider there to see the refusal in full.",
-        docsPath: CHECKUP_DOCS.modelProviders,
-      };
-    }
-    const verified = results.filter((entry) => entry.result.outcome === "verified");
-    if (verified.length === 0) {
-      return {
-        outcome: "unchecked",
-        detail: `None of the configured providers could be tested: ${results.map((entry) => `${entry.provider} (${untestedReason(entry.result)})`).join(", ")}.`,
-      };
-    }
-    return {
-      outcome: "verified",
-      detail: `Connected: ${verified.map((entry) => entry.provider).join(", ")}.`,
-    };
-  }
-
-  private async canary(name: CanaryName, params: Record<string, string>): Promise<CheckVerdict> {
-    const answer = await this.facts.canary(name, params);
-    if (answer.status === 404 && name === "langy") {
-      return {
-        outcome: "unchecked",
-        detail: "Langy is not enabled for this project, so there is no turn to send.",
-      };
-    }
-    if (answer.status >= 200 && answer.status < 300) {
-      return { outcome: "verified", detail: `The ${name} canary came back healthy.` };
-    }
-    return {
-      outcome: "refused",
-      code: `checkup_canary_${name}_failed`,
-      detail: `The ${name} canary answered ${answer.status}: ${firstLine(bodyText(answer.body))}`,
-      fix: `Read the ${name} logs for the canary's trace, then see the troubleshooting page.`,
-      docsPath: CHECKUP_DOCS.troubleshooting,
-    };
-  }
-}
-
-const UNTESTED_REASONS: Record<string, string> = {
-  no_credential: "no key stored",
-  credential_masked: "no key stored",
-  no_endpoint: "no endpoint to ask",
-  provider_not_probeable: "its sign-in cannot be tested from here",
-  unknown_provider: "not a known provider",
-};
-
-function untestedReason(result: ProviderTestOutcome): string {
-  if (result.outcome !== "unchecked") return result.outcome;
-  return UNTESTED_REASONS[result.reason] ?? result.reason.replaceAll("_", " ");
 }
 
 function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {
@@ -865,51 +426,6 @@ function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {
     if (!row) throw new Error(`the checkup lost the ${definition.id} row`);
     return row;
   });
-}
-
-function firstLine(text: string): string {
-  const line = text.split("\n")[0] ?? "";
-  return line.length > 200 ? `${line.slice(0, 197)}...` : line;
-}
-
-/** Masks the user and password of every URL in the text before a row shows it. */
-function withoutUserInfo(text: string): string {
-  // Greedy up to the authority's last "@", so a raw "@" in a password is masked too.
-  return text.replace(/(\/\/)[^/\s]*@/g, "$1***@");
-}
-
-function reasonOf(error: unknown): string {
-  return firstLine(
-    error instanceof Error ? error.message : (JSON.stringify(error) ?? "unknown error"),
-  );
-}
-
-function bodyText(body: unknown): string {
-  if (typeof body === "string") return body;
-  if (body && typeof body === "object" && "message" in body) return String(body.message);
-  return JSON.stringify(body ?? null);
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}
-
-function portOf(url: string): number {
-  try {
-    const parsed = new URL(url);
-    if (parsed.port) return Number(parsed.port);
-    return parsed.protocol === "http:" ? 80 : 443;
-  } catch {
-    return 443;
-  }
-}
-
-function normalizeUrl(url: string): string {
-  return url.trim().replace(/\/+$/, "").toLowerCase();
 }
 
 /** The day a license date falls on, as the License page shows it. */
