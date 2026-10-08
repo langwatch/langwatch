@@ -18,6 +18,7 @@ import {
 import type { ProcessConfig } from "./config.ts";
 import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
 import { buildEventing } from "./eventing-members.ts";
+import { groupQueueStorage } from "./group-queue-storage.ts";
 import {
   type Encryption,
   STORE_CLIENT_NAMES,
@@ -218,8 +219,18 @@ function eventingMember({
     prisma,
     organizationIds: (config.clickhouse?.privateRoutes ?? []).map((r) => r.organizationId),
   });
+  // Main offloaded every role's oversized payloads through its storage registry.
+  const storage =
+    eventing.groupQueue === undefined ||
+    eventing.groupQueue.storage !== undefined ||
+    !config.objectStorage
+      ? undefined
+      : groupQueueStorage({ storage: read("objectStorage") });
   return buildEventing({
-    config: eventing,
+    config:
+      storage === undefined
+        ? eventing
+        : { ...eventing, groupQueue: { ...eventing.groupQueue, storage } },
     processName: config.processName,
     prisma,
     ...(privateTenants === undefined ? {} : { privateTenants }),

@@ -88,6 +88,7 @@ function isObjectMissingError(err: unknown): boolean {
   return (
     e.name === "NoSuchKey" ||
     e.name === "NotFound" ||
+    e.name === "StoredObjectNotFoundError" ||
     e.code === "ENOENT" ||
     e.code === "NoSuchKey" ||
     e.$metadata?.httpStatusCode === 404
