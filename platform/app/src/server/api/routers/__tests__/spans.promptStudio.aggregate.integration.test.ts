@@ -193,8 +193,8 @@ describe("Feature: opening a span in the playground carries the proof", () => {
   });
 
   describe("given a plain project holding a trace with an LLM span", () => {
-    /** @scenario "A playground link on a plain project opens as before" */
     describe("when ana opens that span from a link naming its trace, or only the span", () => {
+      /** @scenario "A playground link on a plain project opens as before" */
       it("loads the same span either way", async () => {
         const named = await admin.spans.getForPromptStudio({
           projectId: plain.id,
