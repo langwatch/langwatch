@@ -6,7 +6,7 @@ The server half of [webhook](../README.md). Webhook endpoints: creating and mana
 
 ## Installation
 
-`defineProcessModule("webhook").withRepositories(webhookRepositories).withApi(WebhookModule).withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest).withEventing(webhookDeliveryEventing)`, `src/webhook.module.ts:15`.
+`defineProcessModule("webhook").withRepositories(webhookRepositories).withChannels(webhookChannels).withApi(WebhookModule).withTransports(webhookEndpointTrpcTransport, webhookRest, webhookSpendReplayRest).withEventing(webhookDeliveryEventing)`, `src/webhook.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -376,30 +376,31 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `webhook_delivery` (aggregate `webhook_spend_delivery`)
 
-Declared at `src/eventing/webhook-delivery.pipeline.ts:51`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
+Declared at `src/eventing/webhook-delivery.pipeline.ts:60`. Events: `webhookSpendDeliveryRequestedEventSchema`, `webhookGovernanceDeliveryRequestedEventSchema`.
 
-The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents` (`src/eventing/webhook-delivery.pipeline.ts:61`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!input.deliveryProcess || !input.governanceProcess || !input.gatewayEvents` (`src/eventing/webhook-delivery.pipeline.ts:70`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
-| Kind            | Name                            | Handles                                                                 | Declared at                                    | Built                |
-| --------------- | ------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | -------------------- |
-| command         | `requestSpendDelivery`          | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:59` | always               |
-| command         | `requestGovernanceDelivery`     | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:60` | always               |
-| process manager | `webhookDelivery`               | ≈ applier `input.deliveryProcess`                                       | `src/eventing/webhook-delivery.pipeline.ts:66` | past the early build |
-| process manager | `governanceEventsDelivery`      | ≈ applier `input.governanceProcess`                                     | `src/eventing/webhook-delivery.pipeline.ts:67` | past the early build |
-| peer subscriber | `gatewaySpendAdmittedDelivery`  | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)     | `src/eventing/webhook-delivery.pipeline.ts:68` | past the early build |
-| peer subscriber | `gatewaySpendConfirmedDelivery` | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:69` | past the early build |
-| peer subscriber | `gatewaySpendFailedDelivery`    | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)       | `src/eventing/webhook-delivery.pipeline.ts:70` | past the early build |
-| peer subscriber | `gatewaySpendSettledDelivery`   | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)      | `src/eventing/webhook-delivery.pipeline.ts:71` | past the early build |
-| peer subscriber | `gatewayBudgetCrossingDelivery` | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md) | `src/eventing/webhook-delivery.pipeline.ts:72` | past the early build |
-| peer subscriber | `gatewayVkLifecycleDelivery`    | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:73` | past the early build |
+| Kind            | Name                              | Handles                                                                 | Declared at                                    | Built                |
+| --------------- | --------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- | -------------------- |
+| command         | `requestSpendDelivery`            | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:68` | always               |
+| command         | `requestGovernanceDelivery`       | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:69` | always               |
+| process manager | `webhookDelivery`                 | ≈ applier `input.deliveryProcess`                                       | `src/eventing/webhook-delivery.pipeline.ts:75` | past the early build |
+| process manager | `governanceEventsDelivery`        | ≈ applier `input.governanceProcess`                                     | `src/eventing/webhook-delivery.pipeline.ts:76` | past the early build |
+| peer subscriber | `gatewaySpendAdmittedDelivery`    | `lw.gateway.spend.admitted` from [gateway](../../gateway/README.md)     | `src/eventing/webhook-delivery.pipeline.ts:77` | past the early build |
+| peer subscriber | `gatewaySpendConfirmedDelivery`   | `lw.gateway.spend.confirmed` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:78` | past the early build |
+| peer subscriber | `gatewaySpendFailedDelivery`      | `lw.gateway.spend.failed` from [gateway](../../gateway/README.md)       | `src/eventing/webhook-delivery.pipeline.ts:79` | past the early build |
+| peer subscriber | `gatewaySpendSettledDelivery`     | `lw.gateway.spend.settled` from [gateway](../../gateway/README.md)      | `src/eventing/webhook-delivery.pipeline.ts:80` | past the early build |
+| peer subscriber | `gatewayBudgetCrossingDelivery`   | `lw.governance.budget_crossing` from [gateway](../../gateway/README.md) | `src/eventing/webhook-delivery.pipeline.ts:81` | past the early build |
+| peer subscriber | `gatewayVkLifecycleDelivery`      | `lw.governance.vk_lifecycle` from [gateway](../../gateway/README.md)    | `src/eventing/webhook-delivery.pipeline.ts:82` | past the early build |
+| lane aliases    | `≈ MAIN_DELIVERY_MANAGER_ALIASES` | –                                                                       | `src/eventing/webhook-delivery.pipeline.ts:83` | past the early build |
 
 ## Configuration
 
 | Kind   | Leaf                         | Environment variable                        | Declared at                            |
 | ------ | ---------------------------- | ------------------------------------------- | -------------------------------------- |
-| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:13` |
-| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:14` |
-| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:16` |
-| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:18` |
+| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:10` |
+| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:11` |
+| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:13` |
+| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:15` |
 
 <!-- readme:generated:end -->

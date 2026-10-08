@@ -6,7 +6,7 @@ The server half of [dataset](../README.md). Datasets and their records: creating
 
 ## Installation
 
-`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withTasks(…)`, `src/dataset.module.ts:12`.
+`defineProcessModule("dataset").withRepositories(datasetRepositories).withApi(DatasetModule).withTransports(…, datasetTrpcTransport, datasetRecordTrpcTransport).withEventing(datasetNormalizationEventing).withTasks(…)`, `src/dataset.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -560,11 +560,12 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `dataset_normalization` (aggregate `dataset`)
 
-Declared at `src/eventing/dataset-normalization.pipeline.ts:27`.
+Declared at `src/eventing/dataset-normalization.pipeline.ts:28`.
 
-| Kind    | Name | Handles | Declared at                                         |
-| ------- | ---- | ------- | --------------------------------------------------- |
-| command | –    | –       | `src/eventing/dataset-normalization.pipeline.ts:32` |
+| Kind         | Name                                                                                           | Handles | Declared at                                         |
+| ------------ | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------- |
+| command      | –                                                                                              | –       | `src/eventing/dataset-normalization.pipeline.ts:33` |
+| lane aliases | `≈ [ { from: "trace_processing:job:datasetNormalize", to: { jobType: "command", lane: "datas…` | –       | `src/eventing/dataset-normalization.pipeline.ts:40` |
 
 ### Tasks
 

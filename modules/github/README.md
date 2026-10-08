@@ -21,6 +21,7 @@ The GitHub integration: app installations, their webhooks, and the pull requests
 | Kind                           | Name                                                                                         | Declared at                                                                    |
 | ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | Postgres, accessed not claimed | `GithubBranchPullRequestCheck`, `GithubInstallation`, `GithubPullRequest`                    | `process/src/repositories/prisma/prisma.github-pull-requests.repository.ts:54` |
+| Stores required                |                                                                                              | `process/src/channels/http/http.github.channels.ts:11`                         |
 | Stores required                | prisma, redis                                                                                | `process/src/repositories/live/live.github.repositories.ts:11`                 |
 | Stores required                | prisma                                                                                       | `process/src/repositories/prisma/prisma.github.repositories.ts:13`             |
 | Secrets                        | GITHUB_LANGY_PRIVATE_KEY                                                                     | `process/src/app/github.app.ts:219`                                            |

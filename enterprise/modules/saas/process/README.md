@@ -6,7 +6,7 @@ The server half of [saas](../README.md). LangWatch Cloud's own surface.
 
 ## Installation
 
-`defineProcessModule("saas").withRepositories(saasRepositories).withApi(SaasModule).withTransports(usageReportRest)`, `src/saas.module.ts:8`.
+`defineProcessModule("saas").withRepositories(saasRepositories).withApi(SaasModule).withTransports(usageReportRest)`, `src/saas.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

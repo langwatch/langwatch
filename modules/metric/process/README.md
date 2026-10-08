@@ -6,7 +6,7 @@ The server half of [metric](../README.md). Metrics: receiving OTLP metrics, cano
 
 ## Installation
 
-`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing)`, `src/metric.module.ts:8`.
+`defineProcessModule("metric").withRepositories(metricRepositories).withApi(MetricModule).withTransports(otlpMetricsRest).withEventing(metricEventing)`, `src/metric.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

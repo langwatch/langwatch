@@ -11,7 +11,7 @@ Single sign-on: what a deployment may federate with, connections and claimed dom
 | Classification | enterprise (`modules/catalogue.json`)                                                  |
 | Subjects       | sso                                                                                    |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)               |
-| Api token      | `SsoApi` = `moduleApi<SsoApi>()("sso")`, `contract/src/sso.api.ts:244` (44 operations) |
+| Api token      | `SsoApi` = `moduleApi<SsoApi>()("sso")`, `contract/src/sso.api.ts:241` (44 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                             |
 
 ## What sso owns

@@ -6,7 +6,7 @@ The server half of [github](../README.md). The GitHub integration: app installat
 
 ## Installation
 
-`defineProcessModule("github").withRepositories(githubRepositories).withApi(GithubModule).withTransports(githubInstallRest, githubTrpcTransport).withEventing(githubMaintenanceEventing).withEventing(githubLifecycleEventing)`, `src/github.module.ts:34`.
+`defineProcessModule("github").withRepositories(githubRepositories).withChannels(githubChannels).withApi(GithubModule).withTransports(githubInstallRest, githubTrpcTransport).withEventing(githubMaintenanceEventing).withEventing(githubLifecycleEventing)`, `src/github.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

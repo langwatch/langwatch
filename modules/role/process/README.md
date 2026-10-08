@@ -6,7 +6,7 @@ The server half of [role](../README.md). Roles: the built-in roles and the custo
 
 ## Installation
 
-`defineProcessModule("role").withRepositories(roleRepositories).withApi(RoleModule).withTransports(roleRest, roleTrpcTransport).withTransportFacts(…)`, `src/role.module.ts:9`.
+`defineProcessModule("role").withRepositories(roleRepositories).withApi(RoleModule).withTransports(roleRest, roleTrpcTransport).withTransportFacts(…)`, `src/role.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

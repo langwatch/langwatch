@@ -6,7 +6,7 @@ The server half of [auth](../README.md). Signing in and staying signed in: the b
 
 ## Installation
 
-`defineProcessModule("auth").withRepositories(authRepositories).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:21`.
+`defineProcessModule("auth").withRepositories(authRepositories).withChannels(authChannels).withApi(AuthModule).withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest).withEventing(authEventing).withEventing(authLifecycleEventing).withTasks(…).withTransportFacts(…)`, `src/auth.module.ts:22`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:95`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:101`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -184,6 +184,30 @@ revokeBrowserSession(input: { sessionId: string }): Promise<void>;
 
 ```typescript
 revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
+```
+
+#### `deactivateUser`
+
+Retires an account: user's write refuses the last active operator, then every browser session and CLI token ends, then user records the fact. A refused write ends nothing.
+
+```typescript
+deactivateUser(input: UserLifecycleChangeInput): Promise<UserProfile>;
+```
+
+#### `deactivateAccount`
+
+The same retirement, for oneself or by a platform operator who is not impersonating.
+
+```typescript
+deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
+```
+
+#### `changeUserEmail`
+
+Writes the address through user, then ends every session that cached the old one.
+
+```typescript
+changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
 ```
 
 #### `isWithinBudget`
@@ -582,7 +606,7 @@ Answers at `/api/auth/*`.
 
 ### `auth`
 
-Contract `../contract/src/auth.trpc.ts:27`, router `src/transport/auth.trpc.ts:81`.
+Contract `../contract/src/auth.trpc.ts:28`, router `src/transport/auth.trpc.ts:86`.
 
 | Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                            | Output                            |
 | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------------------------------- |
@@ -594,6 +618,7 @@ Contract `../contract/src/auth.trpc.ts:27`, router `src/transport/auth.trpc.ts:8
 | `auth.myAddressConfirmation`     | query    | No permission: reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable                                                                               | inline                           | `addressConfirmationSchema`       |
 | `auth.sendMyAddressConfirmation` | mutation | No permission: sends the session user's own address confirmation; no tenant scope is involved                                                                                                                       | `frontDoorOwnAddressInputSchema` | `frontDoorOwnAddressSentSchema`   |
 | `auth.priorSession`              | query    | Public: classifies the caller's OWN session cookie so an expired session can carry its address to the sign-in screen; takes no input, names nobody the caller is not already holding a token for, and mints nothing | inline                           | `priorSessionSchema`              |
+| `auth.deactivate`                | mutation | No permission: self-service for the named account; the application enforces self-or-operator itself, against the platform operator list rather than a tenant                                                        | `userApiUserInputSchema`         | `userApiSuccessSchema`            |
 
 ### `signInSecurity`
 
@@ -635,13 +660,13 @@ Run by the tasks process, before serve.
 
 | Task                            | Class                           | Declared at                                          |
 | ------------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:14` |
+| `clear-stale-pending-sso-setup` | `ClearStalePendingSsoSetupTask` | `src/tasks/clear-stale-pending-sso-setup.task.ts:11` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable       | Declared at                                          |
 | ------ | ----------------------------- | -------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:241`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`          | `src/app/auth.app.ts:216`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`     | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -651,20 +676,20 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`    | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`   | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`       | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:244`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:246`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:36`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:37`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:38`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`    | `../contract/src/auth.config.ts:40`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`  | `../contract/src/auth.config.ts:46`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`     | `../contract/src/auth.config.ts:51`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`  | `../contract/src/auth.config.ts:53`                  |
-| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`     | `../contract/src/auth.config.ts:58`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`            | `../contract/src/auth.config.ts:60`                  |
-| config | `isSaas`                      | `IS_SAAS`                  | `../contract/src/auth.config.ts:62`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`             | `../contract/src/auth.config.ts:64`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                | `../contract/src/auth.config.ts:66`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                 | `../contract/src/auth.config.ts:67`                  |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET` | `src/app/auth.app.ts:219`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`    | `src/app/auth.app.ts:221`                            |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`             | `../contract/src/auth.config.ts:19`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`      | `../contract/src/auth.config.ts:21`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`         | `../contract/src/auth.config.ts:22`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`    | `../contract/src/auth.config.ts:24`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`  | `../contract/src/auth.config.ts:26`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`     | `../contract/src/auth.config.ts:27`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`  | `../contract/src/auth.config.ts:29`                  |
+| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`     | `../contract/src/auth.config.ts:34`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`            | `../contract/src/auth.config.ts:36`                  |
+| config | `isSaas`                      | `IS_SAAS`                  | `../contract/src/auth.config.ts:38`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`             | `../contract/src/auth.config.ts:40`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                | `../contract/src/auth.config.ts:42`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                 | `../contract/src/auth.config.ts:43`                  |
 
 <!-- readme:generated:end -->

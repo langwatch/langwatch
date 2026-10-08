@@ -21,8 +21,9 @@ Webhook endpoints: creating and managing them, signing secrets, and delivering e
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Postgres table  | `WebhookEndpoint`                                                                                                                                                                        | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:162` |
 | Postgres table  | `WebhookEndpointDelivery`                                                                                                                                                                | `process/src/repositories/prisma/prisma.webhook-endpoint.repository.ts:162` |
+| Stores required |                                                                                                                                                                                          | `process/src/channels/http/http.webhook.channels.ts:14`                     |
 | Stores required | prisma, encryption, redis, rateLimiter                                                                                                                                                   | `process/src/repositories/prisma/prisma.webhook.repositories.ts:54`         |
-| Config          | `allowInsecureLocalUrls` (WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS), `allowAmbientAwsCredentials` (WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS), `isSaas` (IS_SAAS), `outboundProxy` (HTTPS_PROXY) | `contract/src/webhook.config.ts:13`                                         |
+| Config          | `allowInsecureLocalUrls` (WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS), `allowAmbientAwsCredentials` (WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS), `isSaas` (IS_SAAS), `outboundProxy` (HTTPS_PROXY) | `contract/src/webhook.config.ts:10`                                         |
 
 Anything else webhook needs belongs to another module and is reached through its `*Api`.
 

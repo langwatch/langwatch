@@ -6,7 +6,7 @@ The server half of [topic](../README.md). A project's conversation topics, and w
 
 ## Installation
 
-`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…)`, `src/topic.module.ts:11`.
+`defineProcessModule("topic").withRepositories(topicRepositories).withApi(TopicModule).withTransports(topicTrpcTransport).withEventing(topicClusteringEventing).withTasks(…)`, `src/topic.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The project's conversation topics, and what the last clustering run did.
 
-Peers call these through the token, declared at `../contract/src/topic.api.ts:13`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/topic.ts:102`; nothing else in this package is public.
 
 #### `getAll`
 

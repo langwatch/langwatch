@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:40`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:53`; nothing else in this package is public.
 
 #### `listPaths`
 
@@ -298,6 +298,14 @@ Live shared-team projects, oldest first; with a member, only theirs (main `resol
 
 ```typescript
 findSharedProjectSlugs(input: { organizationId: string; memberUserId?: string; limit: number; }): Promise<string[]>;
+```
+
+#### `listAllIds`
+
+Project ids on this install ordered by id, archived included, a page at a time for fleet-wide scans. No limit reads them all; `next` is null on the last page.
+
+```typescript
+listAllIds(input?: ProjectIdPageInput): Promise<ProjectIdPage>;
 ```
 
 ## REST transport

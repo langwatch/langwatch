@@ -6,7 +6,7 @@ The server half of [hosted-mcp](../README.md). The hosted MCP server, and the MC
 
 ## Installation
 
-`defineProcessModule("hosted-mcp").withRepositories(hostedMcpRepositories).withApi(HostedMcpModule).withTransports(mcpAuthorizeRest, mcpEndpointDoor)`, `src/hosted-mcp.module.ts:8`.
+`defineProcessModule("hosted-mcp").withRepositories(hostedMcpRepositories).withApi(HostedMcpModule).withTransports(mcpAuthorizeRest, mcpEndpointDoor)`, `src/hosted-mcp.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

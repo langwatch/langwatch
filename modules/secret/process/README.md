@@ -6,7 +6,7 @@ The server half of [secret](../README.md). Project secrets: storing, listing, up
 
 ## Installation
 
-`defineProcessModule("secret").withRepositories(secretRepositories).withApi(SecretModule).withTransports(secretRest, secretTrpcTransport)`, `src/secret.module.ts:8`.
+`defineProcessModule("secret").withRepositories(secretRepositories).withApi(SecretModule).withTransports(secretRest, secretTrpcTransport)`, `src/secret.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 

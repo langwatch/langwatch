@@ -6,7 +6,7 @@ The server half of [demo-data](../README.md). The demo instance's seeding: one r
 
 ## Installation
 
-`defineProcessModule("demo-data").withApi(DemoDataModule).withEventing(demoDataEventing).withTasks(…)`, `src/demo-data.module.ts:8`.
+`defineProcessModule("demo-data").withApi(DemoDataModule).withEventing(demoDataEventing).withTasks(…)`, `src/demo-data.module.ts:13`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
