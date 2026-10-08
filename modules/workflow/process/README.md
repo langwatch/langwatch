@@ -6,7 +6,7 @@ The server half of [workflow](../README.md). Workflows: definitions, graph versi
 
 ## Installation
 
-`defineProcessModule("workflow").withRepositories(workflowRepositories).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withTransportFacts(…)`, `src/workflow.module.ts:22`.
+`defineProcessModule("workflow").withRepositories(workflowRepositories).withApi(WorkflowModule).withTransports(…, workflowTrpcTransport, workflowOptimizationTrpcTransport, workflowRunRest, workflowStudioRest, workflowExecuteSyncRest).withEventing(workflowNlpLambdaCleanupEventing).withEventing(workflowLifecycleEventing).withEventing(workflowAgentArchiveCascadeEventing).withTasks(…).withMigrations(…).withTransportFacts(…)`, `src/workflow.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -262,18 +262,6 @@ generateCommitMessage(input: { projectId: string; prevDsl: StudioWorkflow; newDs
 listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
 ```
 
-#### `linkEvaluatorToWorkflow`
-
-```typescript
-linkEvaluatorToWorkflow(input: { workflowId: string; projectId: string; name: string; }): Promise<Evaluator>;
-```
-
-#### `unlinkEvaluatorFromWorkflow`
-
-```typescript
-unlinkEvaluatorFromWorkflow(input: { workflowId: string; projectId: string }): Promise<void>;
-```
-
 #### `hasProjectPermission`
 
 ```typescript
@@ -360,12 +348,6 @@ cascadeArchive(input: { projectId: string; workflowId: string; unarchive?: boole
 
 ```typescript
 runPublished(input: { workflowId: string; projectId: string; body: Readonly<Record<string, unknown>>; principal?: WorkflowRunPrincipal | undefined; }): Promise<WorkflowRunAnswer>;
-```
-
-#### `toggleSaveAsEvaluator`
-
-```typescript
-toggleSaveAsEvaluator(input: { workflowId: string; projectId: string; isEvaluator: boolean; }): Promise<void>;
 ```
 
 #### `findWorkflowFlags`
@@ -608,35 +590,34 @@ Contract `../contract/src/workflow-optimization.trpc.ts:22`, router `src/transpo
 | `optimization.chat`                  | mutation | Permission `workflows:manage` | inline                | `processAnswerSchema`             |
 | `optimization.getPublishedWorkflow`  | query    | Permission `workflows:view`   | `workflowScopeSchema` | `processAnswerSchema`             |
 | `optimization.disableAsComponent`    | mutation | Permission `workflows:update` | `workflowScopeSchema` | `workflowWriteAcknowledgedSchema` |
-| `optimization.disableAsEvaluator`    | mutation | Permission `workflows:update` | `workflowScopeSchema` | `workflowWriteAcknowledgedSchema` |
 | `optimization.toggleSaveAsComponent` | mutation | Permission `workflows:update` | inline                | `workflowWriteAcknowledgedSchema` |
-| `optimization.toggleSaveAsEvaluator` | mutation | Permission `workflows:update` | inline                | `workflowWriteAcknowledgedSchema` |
 | `optimization.getComponents`         | query    | Permission `workflows:view`   | inline                | `processAnswerSchema`             |
 
 ### `workflow`
 
-Contract `../contract/src/workflow.trpc.ts:46`, router `src/transport/workflow.trpc.ts:26`.
+Contract `../contract/src/workflow.trpc.ts:47`, router `src/transport/workflow.trpc.ts:39`.
 
-| Procedure                        | Kind     | Gate                          | Input                                         | Output                          |
-| -------------------------------- | -------- | ----------------------------- | --------------------------------------------- | ------------------------------- |
-| `workflow.engineMode`            | query    | Permission `workflows:view`   | `workflowApiEngineModeInputSchema`            | `workflowEngineModeSchema`      |
-| `workflow.create`                | mutation | Permission `workflows:create` | `workflowApiCreateInputSchema`                | `workflowWithNewVersionSchema`  |
-| `workflow.copy`                  | mutation | Permission `workflows:create` | `workflowApiCopyInputSchema`                  | `workflowWithNewVersionSchema`  |
-| `workflow.getAll`                | query    | Permission `workflows:view`   | `workflowApiProjectInputSchema`               | inline                          |
-| `workflow.getCopies`             | query    | Permission `workflows:view`   | `workflowApiWorkflowInputSchema`              | inline                          |
-| `workflow.getById`               | query    | Permission `workflows:view`   | `workflowApiGetByIdInputSchema`               | `workflowWithVersionSchema`     |
-| `workflow.getVersions`           | query    | Permission `workflows:view`   | `workflowApiGetVersionsInputSchema`           | inline                          |
-| `workflow.restoreVersion`        | mutation | Permission `workflows:update` | `workflowApiRestoreVersionInputSchema`        | `workflowVersionSchema`         |
-| `workflow.autosave`              | mutation | Permission `workflows:update` | `workflowApiAutosaveInputSchema`              | `workflowVersionSchema`         |
-| `workflow.commitVersion`         | mutation | Permission `workflows:update` | `workflowApiCommitVersionInputSchema`         | `workflowVersionSchema`         |
-| `workflow.publish`               | mutation | Permission `workflows:update` | `workflowApiPublishInputSchema`               | `workflowSchema`                |
-| `workflow.unpublish`             | mutation | Permission `workflows:update` | `workflowApiWorkflowInputSchema`              | `workflowSchema`                |
-| `workflow.syncFromSource`        | mutation | Permission `workflows:update` | `workflowApiWorkflowInputSchema`              | `syncedFromSourceSchema`        |
-| `workflow.pushToCopies`          | mutation | Permission `workflows:update` | `workflowApiPushToCopiesInputSchema`          | `workflowPushToCopiesSchema`    |
-| `workflow.getRelatedEntities`    | query    | Permission `workflows:view`   | `workflowApiWorkflowInputSchema`              | `workflowRelatedEntitiesSchema` |
-| `workflow.cascadeArchive`        | mutation | Permission `workflows:delete` | `workflowApiArchiveInputSchema`               | `workflowCascadeArchiveSchema`  |
-| `workflow.archive`               | mutation | Permission `workflows:delete` | `workflowApiArchiveInputSchema`               | `workflowSchema`                |
-| `workflow.generateCommitMessage` | mutation | Permission `workflows:update` | `workflowApiGenerateCommitMessageInputSchema` | inline                          |
+| Procedure                        | Kind     | Gate                            | Input                                         | Output                          |
+| -------------------------------- | -------- | ------------------------------- | --------------------------------------------- | ------------------------------- |
+| `workflow.engineMode`            | query    | Permission `workflows:view`     | `workflowApiEngineModeInputSchema`            | `workflowEngineModeSchema`      |
+| `workflow.create`                | mutation | Permission `workflows:create`   | `workflowApiCreateInputSchema`                | `workflowWithNewVersionSchema`  |
+| `workflow.copy`                  | mutation | Permission `workflows:create`   | `workflowApiCopyInputSchema`                  | `workflowWithNewVersionSchema`  |
+| `workflow.getAll`                | query    | Permission `workflows:view`     | `workflowApiProjectInputSchema`               | inline                          |
+| `workflow.getCopies`             | query    | Permission `workflows:view`     | `workflowApiWorkflowInputSchema`              | inline                          |
+| `workflow.getById`               | query    | Permission `workflows:view`     | `workflowApiGetByIdInputSchema`               | `workflowWithVersionSchema`     |
+| `workflow.getVersions`           | query    | Permission `workflows:view`     | `workflowApiGetVersionsInputSchema`           | inline                          |
+| `workflow.restoreVersion`        | mutation | Permission `workflows:update`   | `workflowApiRestoreVersionInputSchema`        | `workflowVersionSchema`         |
+| `workflow.autosave`              | mutation | Permission `workflows:update`   | `workflowApiAutosaveInputSchema`              | `workflowVersionSchema`         |
+| `workflow.commitVersion`         | mutation | Permission `workflows:update`   | `workflowApiCommitVersionInputSchema`         | `workflowVersionSchema`         |
+| `workflow.publish`               | mutation | Permission `workflows:update`   | `workflowApiPublishInputSchema`               | `workflowSchema`                |
+| `workflow.unpublish`             | mutation | Permission `workflows:update`   | `workflowApiWorkflowInputSchema`              | `workflowSchema`                |
+| `workflow.syncFromSource`        | mutation | Permission `workflows:update`   | `workflowApiWorkflowInputSchema`              | `syncedFromSourceSchema`        |
+| `workflow.pushToCopies`          | mutation | Permission `workflows:update`   | `workflowApiPushToCopiesInputSchema`          | `workflowPushToCopiesSchema`    |
+| `workflow.getRelatedEntities`    | query    | Permission `workflows:view`     | `workflowApiWorkflowInputSchema`              | `workflowRelatedEntitiesSchema` |
+| `workflow.cascadeArchive`        | mutation | Permission `workflows:delete`   | `workflowApiArchiveInputSchema`               | `workflowCascadeArchiveSchema`  |
+| `workflow.archive`               | mutation | Permission `workflows:delete`   | `workflowApiArchiveInputSchema`               | `workflowSchema`                |
+| `workflow.generateCommitMessage` | mutation | Permission `workflows:update`   | `workflowApiGenerateCommitMessageInputSchema` | inline                          |
+| `workflow.copyAgent`             | mutation | Permission `evaluations:manage` | `agentApiCopyRequestSchema`                   | `agentCopyCreatedSchema`        |
 
 ## Sockets
 
@@ -654,12 +635,13 @@ Declared at `src/eventing/workflow-agent-archive-cascade.pipeline.ts:29`.
 
 ### Pipeline `workflow_lifecycle` (aggregate `workflow`)
 
-Declared at `src/eventing/workflow-lifecycle.pipeline.ts:33`. Events: `workflowCreatedEventSchema`, `workflowVersionSavedEventSchema`.
+Declared at `src/eventing/workflow-lifecycle.pipeline.ts:37`. Events: `workflowCreatedEventSchema`, `workflowVersionSavedEventSchema`, `workflowArchivedEventSchema`.
 
 | Kind    | Name                         | Handles | Declared at                                      |
 | ------- | ---------------------------- | ------- | ------------------------------------------------ |
-| command | `recordWorkflowCreated`      | –       | `src/eventing/workflow-lifecycle.pipeline.ts:38` |
-| command | `recordWorkflowVersionSaved` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:39` |
+| command | `recordWorkflowCreated`      | –       | `src/eventing/workflow-lifecycle.pipeline.ts:46` |
+| command | `recordWorkflowVersionSaved` | –       | `src/eventing/workflow-lifecycle.pipeline.ts:47` |
+| command | `recordWorkflowArchived`     | –       | `src/eventing/workflow-lifecycle.pipeline.ts:48` |
 
 ### Pipeline `workflow_nlp_lambda_cleanup` (aggregate `global`)
 
@@ -681,8 +663,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:610`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:611`           |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:618`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:619`           |
 | config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
 | config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
 | config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |

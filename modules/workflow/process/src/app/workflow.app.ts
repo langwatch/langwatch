@@ -14,7 +14,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
+import { EvaluatorApi, type Evaluator } from "@langwatch/evaluator-contract";
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
@@ -317,7 +317,7 @@ interface WorkflowInfrastructure {
   executeSyncRelay: WorkflowExecuteSyncRelayService;
   /** The ONE workflow graph service on this process. */
   workflows: WorkflowService;
-  /** The evaluators a workflow is published as. */
+  /** The evaluators an archive preview names. */
   evaluators: EvaluatorApi;
   /** The dataset copies a Studio graph carries with it into another project. */
   datasets: DatasetApi;
@@ -593,7 +593,7 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
 export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
-    /** The evaluators a workflow is published as - a peer's App, not a member. */
+    /** The evaluators an archive preview names - a peer's App, not a member. */
     evaluators: EvaluatorApi,
     /** Resolves a Studio graph's models before any version of it is written. */
     modelProviders: ModelProviderApi,
@@ -1269,64 +1269,11 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     });
   }
 
-  // -- the evaluator a published workflow is wrapped in -----------------------
+  // -- the evaluators an archive preview names --------------------------------
 
   /** Every evaluator in the project. */
   listEvaluators(input: { projectId: string }): Promise<Evaluator[]> {
     return this.#infrastructure.evaluators.getAll(input);
-  }
-
-  /**
-   * Create-or-rename rather than create: a workflow republished after a rename
-   * must not leave the picker showing the old name, and a second evaluator for
-   * one workflow would be two rows the picker cannot tell apart.
-   */
-  async linkEvaluatorToWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-    name: string;
-  }): Promise<Evaluator> {
-    const { workflowId, projectId, name } = input;
-    const [existing] = await this.#infrastructure.evaluators.listByWorkflow({
-      workflowId,
-      projectId,
-    });
-
-    if (existing) {
-      return this.#infrastructure.evaluators.update({
-        id: existing.id,
-        projectId,
-        data: { name },
-      });
-    }
-
-    return this.#infrastructure.evaluators.create({
-      id: newEvaluatorId(),
-      projectId,
-      name,
-      type: "workflow",
-      config: {},
-      workflowId,
-    });
-  }
-
-  /**
-   * Nothing may keep an evaluator pointing at a workflow that no longer offers
-   * itself as one. A workflow never published as an evaluator has nothing to
-   * archive, which is a no-op rather than a refusal.
-   */
-  async unlinkEvaluatorFromWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<void> {
-    const [linked] = await this.#infrastructure.evaluators.listByWorkflow(input);
-
-    if (!linked) return;
-
-    await this.#infrastructure.evaluators.archive({
-      id: linked.id,
-      projectId: input.projectId,
-    });
   }
 
   // -- what the caller may see elsewhere -------------------------------------
@@ -1483,32 +1430,6 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
   }
 
   // -- the Optimization Studio's publication flags ---------------------------
-
-  async toggleSaveAsEvaluator(input: {
-    workflowId: string;
-    projectId: string;
-    isEvaluator: boolean;
-  }): Promise<void> {
-    const workflow = await this.#infrastructure.publications.findFlags(input);
-    if (!workflow) {
-      throw new WorkflowNotFoundError(input.workflowId, input.projectId);
-    }
-
-    await this.#infrastructure.publications.setFlags({
-      workflowId: input.workflowId,
-      projectId: input.projectId,
-      isEvaluator: input.isEvaluator,
-      isComponent: !input.isEvaluator,
-    });
-
-    if (input.isEvaluator) {
-      await this.linkEvaluatorToWorkflow({
-        workflowId: input.workflowId,
-        projectId: input.projectId,
-        name: workflow.name,
-      });
-    }
-  }
 
   findWorkflowFlags(input: {
     workflowId: string;

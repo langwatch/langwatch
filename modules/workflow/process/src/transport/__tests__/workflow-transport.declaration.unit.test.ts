@@ -111,9 +111,7 @@ describe("the workflow module's transport declarations", () => {
         ["chat", "mutation", "workflows:manage"],
         ["getPublishedWorkflow", "query", "workflows:view"],
         ["disableAsComponent", "mutation", "workflows:update"],
-        ["disableAsEvaluator", "mutation", "workflows:update"],
         ["toggleSaveAsComponent", "mutation", "workflows:update"],
-        ["toggleSaveAsEvaluator", "mutation", "workflows:update"],
         ["getComponents", "query", "workflows:view"],
       ]);
     });

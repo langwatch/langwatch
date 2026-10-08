@@ -304,15 +304,9 @@ export interface WorkflowApi {
     newDsl: StudioWorkflow;
   }): Promise<string>;
 
-  // -- the evaluator a published workflow is wrapped in ----------------------
+  // -- the evaluators an archive preview names --------------------------------
 
   listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
-  linkEvaluatorToWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-    name: string;
-  }): Promise<Evaluator>;
-  unlinkEvaluatorFromWorkflow(input: { workflowId: string; projectId: string }): Promise<void>;
 
   // -- what the caller may see in a project other than the scoped one -------
 
@@ -383,11 +377,6 @@ export interface WorkflowApi {
     body: Readonly<Record<string, unknown>>;
     principal?: WorkflowRunPrincipal | undefined;
   }): Promise<WorkflowRunAnswer>;
-  toggleSaveAsEvaluator(input: {
-    workflowId: string;
-    projectId: string;
-    isEvaluator: boolean;
-  }): Promise<void>;
   findWorkflowFlags(input: {
     workflowId: string;
     projectId: string;

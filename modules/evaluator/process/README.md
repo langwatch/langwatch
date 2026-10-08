@@ -6,7 +6,7 @@ The server half of [evaluator](../README.md). Evaluators: their definitions, and
 
 ## Installation
 
-`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing)`, `src/evaluator.module.ts:9`.
+`defineProcessModule("evaluator").withRepositories(evaluatorRepositories).withApi(EvaluatorModule).withTransports(…, evaluatorTrpcTransport).withEventing(evaluatorLifecycleEventing).withEventing(evaluatorWorkflowArchiveCascadeEventing)`, `src/evaluator.module.ts:10`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -335,24 +335,26 @@ type Response = z.infer<typeof archivedEvaluatorResponseSchema>; // ../contract/
 
 ### `evaluators`
 
-Contract `../contract/src/evaluator.trpc.ts:27`, router `src/transport/evaluator.trpc.ts:9`.
+Contract `../contract/src/evaluator.trpc.ts:30`, router `src/transport/evaluator.trpc.ts:28`.
 
-| Procedure                       | Kind     | Gate                            | Input                                 | Output                           |
-| ------------------------------- | -------- | ------------------------------- | ------------------------------------- | -------------------------------- |
-| `evaluators.getAll`             | query    | Permission `evaluations:view`   | `evaluatorApiProjectInputSchema`      | inline                           |
-| `evaluators.getById`            | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`  | inline                           |
-| `evaluators.getBySlug`          | query    | Permission `evaluations:view`   | `evaluatorApiSlugInputSchema`         | inline                           |
-| `evaluators.create`             | mutation | Permission `evaluations:manage` | `evaluatorApiCreateInputSchema`       | `evaluatorSchema`                |
-| `evaluators.update`             | mutation | Permission `evaluations:manage` | `evaluatorApiUpdateInputSchema`       | `evaluatorSchema`                |
-| `evaluators.getRelatedEntities` | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`  | `evaluatorRelatedEntitiesSchema` |
-| `evaluators.cascadeArchive`     | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`  | `evaluatorCascadeArchiveSchema`  |
-| `evaluators.delete`             | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`  | `evaluatorSchema`                |
-| `evaluators.getWorkflowFields`  | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`  | `evaluatorWorkflowFieldsSchema`  |
-| `evaluators.getCopies`          | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorInputSchema`    | inline                           |
-| `evaluators.copy`               | mutation | Permission `evaluations:manage` | `evaluatorApiCopyInputSchema`         | `evaluatorSchema`                |
-| `evaluators.pushToCopies`       | mutation | Permission `evaluations:manage` | `evaluatorApiPushToCopiesInputSchema` | `evaluatorPushToCopiesSchema`    |
-| `evaluators.syncFromSource`     | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorInputSchema`    | `evaluatorSyncFromSourceSchema`  |
-| `evaluators.getHistory`         | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorInputSchema`    | inline                           |
+| Procedure                          | Kind     | Gate                            | Input                                   | Output                            |
+| ---------------------------------- | -------- | ------------------------------- | --------------------------------------- | --------------------------------- |
+| `evaluators.getAll`                | query    | Permission `evaluations:view`   | `evaluatorApiProjectInputSchema`        | inline                            |
+| `evaluators.getById`               | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`    | inline                            |
+| `evaluators.getBySlug`             | query    | Permission `evaluations:view`   | `evaluatorApiSlugInputSchema`           | inline                            |
+| `evaluators.create`                | mutation | Permission `evaluations:manage` | `evaluatorApiCreateInputSchema`         | `evaluatorSchema`                 |
+| `evaluators.update`                | mutation | Permission `evaluations:manage` | `evaluatorApiUpdateInputSchema`         | `evaluatorSchema`                 |
+| `evaluators.getRelatedEntities`    | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorRelatedEntitiesSchema`  |
+| `evaluators.cascadeArchive`        | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorCascadeArchiveSchema`   |
+| `evaluators.delete`                | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorSchema`                 |
+| `evaluators.getWorkflowFields`     | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorIdInputSchema`    | `evaluatorWorkflowFieldsSchema`   |
+| `evaluators.getCopies`             | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorInputSchema`      | inline                            |
+| `evaluators.copy`                  | mutation | Permission `evaluations:manage` | `evaluatorApiCopyInputSchema`           | `evaluatorSchema`                 |
+| `evaluators.pushToCopies`          | mutation | Permission `evaluations:manage` | `evaluatorApiPushToCopiesInputSchema`   | `evaluatorPushToCopiesSchema`     |
+| `evaluators.syncFromSource`        | mutation | Permission `evaluations:manage` | `evaluatorApiEvaluatorInputSchema`      | `evaluatorSyncFromSourceSchema`   |
+| `evaluators.getHistory`            | query    | Permission `evaluations:view`   | `evaluatorApiEvaluatorInputSchema`      | inline                            |
+| `evaluators.disableAsEvaluator`    | mutation | Permission `workflows:update`   | `evaluatorApiWorkflowInputSchema`       | `evaluatorWorkflowSwitchedSchema` |
+| `evaluators.toggleSaveAsEvaluator` | mutation | Permission `workflows:update`   | `evaluatorApiWorkflowToggleInputSchema` | `evaluatorWorkflowSwitchedSchema` |
 
 ## Sockets
 
@@ -367,6 +369,14 @@ Declared at `src/eventing/evaluator-lifecycle.pipeline.ts:22`. Events: `evaluato
 | Kind    | Name                     | Handles | Declared at                                       |
 | ------- | ------------------------ | ------- | ------------------------------------------------- |
 | command | `recordEvaluatorDeleted` | –       | `src/eventing/evaluator-lifecycle.pipeline.ts:27` |
+
+### Pipeline `evaluator_workflow_archive_cascade` (aggregate `global`)
+
+Declared at `src/eventing/evaluator-workflow-archive-cascade.pipeline.ts:35`.
+
+| Kind            | Name                        | Handles                                                          | Declared at                                                      |
+| --------------- | --------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| peer subscriber | `evaluatorWorkflowArchived` | `lw.workflow.archived` from [workflow](../../workflow/README.md) | `src/eventing/evaluator-workflow-archive-cascade.pipeline.ts:42` |
 
 ## Configuration
 

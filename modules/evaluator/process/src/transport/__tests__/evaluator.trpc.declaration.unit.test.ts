@@ -85,6 +85,8 @@ describe("the evaluator tRPC declaration", () => {
         ["pushToCopies", "mutation", "evaluations:manage"],
         ["syncFromSource", "mutation", "evaluations:manage"],
         ["getHistory", "query", "evaluations:view"],
+        ["disableAsEvaluator", "mutation", "workflows:update"],
+        ["toggleSaveAsEvaluator", "mutation", "workflows:update"],
       ]);
     });
 

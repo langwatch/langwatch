@@ -11,7 +11,8 @@ Workflows: definitions, graph versions and the Studio DSL, and executing a workf
 | Classification | core (`modules/catalogue.json`)                                                                            |
 | Subjects       | workflow                                                                                                   |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                |
-| Api token      | `WorkflowApi` = `moduleApi<WorkflowApi>()("workflow")`, `contract/src/workflow.api.ts:422` (59 operations) |
+| Api token      | `WorkflowApi` = `moduleApi<WorkflowApi>()("workflow")`, `contract/src/workflow.api.ts:411` (56 operations) |
+| Other token    | `WorkflowBrowserApi`, `process/src/transport/workflow.trpc.ts:26`                                          |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                 |
 
 ## What workflow owns
@@ -19,7 +20,7 @@ Workflows: definitions, graph versions and the Studio DSL, and executing a workf
 | Kind            | Name                                                                                                                                                                                                                                                                                                            | Declared at                                                          |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | Stores required | prisma                                                                                                                                                                                                                                                                                                          | `process/src/repositories/prisma/prisma.workflow.repositories.ts:19` |
-| Secrets         | `nlpLambdaFleet` (LANGWATCH_NLP_LAMBDA_CONFIG), `nlpInternal` (LANGWATCH_NLP_INTERNAL_SECRET)                                                                                                                                                                                                                   | `process/src/app/workflow.app.ts:610`                                |
+| Secrets         | `nlpLambdaFleet` (LANGWATCH_NLP_LAMBDA_CONFIG), `nlpInternal` (LANGWATCH_NLP_INTERNAL_SECRET)                                                                                                                                                                                                                   | `process/src/app/workflow.app.ts:618`                                |
 | Config          | `nlpServiceUrl` (LANGWATCH_NLP_SERVICE), `stagingThresholdBytes` (LANGEVALS_STAGING_THRESHOLD_BYTES), `stagingTtlSeconds` (LANGEVALS_STAGING_TTL_SECONDS), `relayTurnCeilingMs` (NLP_FETCH_MAX_TIMEOUT_MS), `publicBaseUrl` (BASE_HOST), `nlpCodeBlockTimeoutSeconds` (NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS) | `contract/src/workflow.config.ts:79`                                 |
 
 Anything else workflow needs belongs to another module and is reached through its `*Api`.

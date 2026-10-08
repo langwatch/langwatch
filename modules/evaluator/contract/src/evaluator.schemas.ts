@@ -154,6 +154,22 @@ export const evaluatorPushToCopiesSchema = z.object({
 /** A copy pulled back into line with its source. */
 export const evaluatorSyncFromSourceSchema = z.object({ ok: z.literal(true) });
 
+/** One workflow inside one project: the Optimization Studio's evaluator switch is scoped by it. */
+export const evaluatorApiWorkflowInputSchema = z.object({
+  workflowId: z.string(),
+  projectId: z.string(),
+});
+
+/** The studio's save-as-evaluator switch; `isComponent` is sent and ignored, as it always was. */
+export const evaluatorApiWorkflowToggleInputSchema = z.object({
+  ...evaluatorApiWorkflowInputSchema.shape,
+  isEvaluator: z.boolean(),
+  isComponent: z.boolean(),
+});
+
+/** What a studio switch answers once the write is done. */
+export const evaluatorWorkflowSwitchedSchema = z.object({ success: z.boolean() }).strict();
+
 export type EvaluatorCopy = z.infer<typeof evaluatorCopySchema>;
 export type EvaluatorHistoryEntry = z.infer<typeof evaluatorHistoryEntrySchema>;
 export type EvaluatorWorkflowFields = z.infer<typeof evaluatorWorkflowFieldsSchema>;

@@ -34,16 +34,8 @@ export const workflowOptimizationTrpc = defineTrpcContract("optimization")
   .withInput(workflowScopeSchema)
   .withOutput(workflowWriteAcknowledgedSchema)
 
-  .mutation("disableAsEvaluator")
-  .withInput(workflowScopeSchema)
-  .withOutput(workflowWriteAcknowledgedSchema)
-
   .mutation("toggleSaveAsComponent")
   .withInput(z.object({ ...workflowScope, isComponent: z.boolean(), isEvaluator: z.boolean() }))
-  .withOutput(workflowWriteAcknowledgedSchema)
-
-  .mutation("toggleSaveAsEvaluator")
-  .withInput(z.object({ ...workflowScope, isEvaluator: z.boolean(), isComponent: z.boolean() }))
   .withOutput(workflowWriteAcknowledgedSchema)
 
   .query("getComponents")

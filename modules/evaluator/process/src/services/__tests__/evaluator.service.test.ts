@@ -78,6 +78,7 @@ function service(
       auditLog: {
         record: async () => ({ id: "audit", occurredAt: 0 }),
         listEntityHistory: async () => [],
+        findByTargetKind: async () => [],
         hasRecordedSince: async () => false,
       },
       users: createApiFixture<UserApi>({ getProfiles: async () => [] }),

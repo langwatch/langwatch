@@ -60,7 +60,9 @@ import { EvaluatorHistoryService } from "../services/evaluator-history.service.t
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorWorkflowArchiveService } from "../services/evaluator-workflow-archive.service.ts";
+import { EvaluatorWorkflowPublicationService } from "../services/evaluator-workflow-publication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
+import type { EvaluatorBrowserApi } from "../transport/evaluator.trpc.ts";
 
 /** The workflow rows an evaluator is entangled with, read through their owner. */
 export interface EvaluatorGraph {
@@ -101,10 +103,11 @@ type EvaluatorAppParts = Readonly<{
   permissions: AuthzApi;
   graph: EvaluatorGraph;
   deletionFacts: EvaluatorDeletionFactsService;
+  publications: EvaluatorWorkflowPublicationService;
   publicBaseUrl: string | undefined;
 }>;
 
-export class EvaluatorModule implements EvaluatorApi {
+export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
   static readonly contract = EvaluatorApi;
   static readonly config = evaluatorConfig;
   static readonly dependencies = {
@@ -133,22 +136,27 @@ export class EvaluatorModule implements EvaluatorApi {
    */
   static createWithGraph(setup: EvaluatorSetup, graph: EvaluatorGraph): EvaluatorModule {
     const { dependencies, repositories, config } = setup;
+    const evaluators = EvaluatorRuntimeService.create({
+      repository: repositories.evaluators,
+      workflows: dependencies.workflows,
+      history: EvaluatorHistoryService.create({
+        auditLog: dependencies.auditLog,
+        users: dependencies.users,
+      }),
+      codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
+      generateId: (kind: string) => generate(kind).toString(),
+    });
 
     return new EvaluatorModule({
-      evaluators: EvaluatorRuntimeService.create({
-        repository: repositories.evaluators,
-        workflows: dependencies.workflows,
-        history: EvaluatorHistoryService.create({
-          auditLog: dependencies.auditLog,
-          users: dependencies.users,
-        }),
-        codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
-        generateId: (kind: string) => generate(kind).toString(),
-      }),
+      evaluators,
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,
       graph,
       deletionFacts: EvaluatorDeletionFactsService.create(),
+      publications: EvaluatorWorkflowPublicationService.create({
+        workflows: dependencies.workflows,
+        evaluators,
+      }),
       publicBaseUrl: config.publicBaseUrl,
     });
   }
@@ -172,6 +180,25 @@ export class EvaluatorModule implements EvaluatorApi {
 
   private constructor(dependencies: EvaluatorAppParts) {
     this.#dependencies = dependencies;
+  }
+
+  /** This module's own application, which the browser door reads through. */
+  evaluators(): EvaluatorApi {
+    return this;
+  }
+
+  /** Publishes a workflow as an evaluator, creating or renaming the evaluator that wraps it. */
+  toggleSaveAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    isEvaluator: boolean;
+  }): Promise<void> {
+    return this.#dependencies.publications.toggleSaveAsEvaluator(input);
+  }
+
+  /** Clears a workflow's evaluator flag and archives the evaluator that wrapped it. */
+  disableAsEvaluator(input: { workflowId: string; projectId: string }): Promise<void> {
+    return this.#dependencies.publications.disableAsEvaluator(input);
   }
 
   /** Runs a code evaluator's program in the process's own code sandbox. */
