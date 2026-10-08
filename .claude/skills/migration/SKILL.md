@@ -65,20 +65,22 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 
 - `pnpm task upgrade [status | plan] [--json]` (`apps/tasks/src/upgrade.ts`) first creates the ledger
   in its own Postgres schema (`<schema>_upgrade_ledger`, round 21; a role without `CREATE` ends the
-  run `schema_failed`), takes the runner lease there (ttl 60 s, renewed every 15 s, a second run
-  waits 10 min), seeds an empty ledger, refuses an installation below the floor (exit 2), then walks
+  run `schema_failed`), takes the runner lease there (ttl 60 s, heartbeat every 15 s, a second run
+  waits 10 min; `DEFAULT_LEASE_TIMING`, `packages/upgrade/src/runner/runner-lease.ts`), seeds an empty ledger, refuses an installation below the floor (exit 2), then walks
   the plan release by release: the release's schema, then its blocking steps; then the reconcilers.
   **A one-release upgrade applies its schema in one pass (`oneReleaseApplier`); a jump across
   several releases steps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`): each release's
   Prisma folders and goose `up-to` its last version, then its blocking steps, so a blocking step sees
   its own release's schema** (`specs/upgrade/stepping.feature`). Unreleased schema goes in one pass at
-  the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions carry `lock_timeout` (10 s) and a failed apply is attempted up to 3
-  times (2 s, then 4 s). A Prisma migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a
+  the end. Write a blocking step as stepped (frozen SQL, its own release's columns). Postgres sessions
+  carry `lock_timeout` (10 s) and a failed apply is attempted up to 3 times (2 s, then 4 s;
+  `DEFAULT_LOCK_TIMEOUT_MS`, `DEFAULT_RETRY`, `packages/upgrade/src/runner/upgrade-runner.ts`). A Prisma migration newer than `RERUNNABLE_PRISMA_FROM` that fails (a
   `lock_timeout` cancel) is marked rolled back and retried, logged by name; an older one stops the
   run `failed_prisma_migration` naming the `prisma migrate resolve` command
   (`specs/upgrade/rerunnable-migrations.feature`). Exit codes: 0 done; 1 any failure
   (`failed_prisma_migration`, `rerunnable_migration_failed`, `schema_failed`, `step_failed`,
-  `reconciler_failed`, `lease_lost`, `failed`); 2 below the floor; 3 lease not acquired
+  `reconciler_failed`, `lease_lost`, `failed`); 2 the installation or the image below the floor
+  (`refused_below_floor`, `refused_image_below_floor`); 3 lease not acquired
   (`packages/upgrade/src/runner/upgrade-outcome.ts`). Operator table: `docs/self-hosting/upgrade.mdx`.
 - `pnpm start:prepare:db` (apps/api) is the one preparation script: `upgrade`, then the
   system-migrations pass. Every entry point runs it once (Helm pre-upgrade Job, the compose
@@ -86,7 +88,8 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   itself (`specs/upgrade/entry-points.feature`).
 - api and worker **never migrate**. Their serving gate refuses to start, by name, while a blocking
   step of their image is not `done` or `not-needed`, or their release is below the floor. ClickHouse
-  steps always count: an install without ClickHouse refuses (round 20). Admitted, each writes a
+  steps always count: an install with a database and no ClickHouse refuses, naming `CLICKHOUSE_URL`
+  (round 20; `NO_CLICKHOUSE_REFUSAL`). Admitted, each writes a
   roster entry, refreshed every 15 s, stale after 60 s; a process whose own row lapses stops serving.
 - Background steps run on the worker after the last release. A step with `needsOldWritersGone`
   waits until the serving roster says every live process declares it. A rollback is seen from the serving roster and
@@ -95,23 +98,43 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
   step is never the only way new rows become correct**: writers write the new shape from the release
   that adds it.
 
-## Landed and not landed (2026-10-07)
+## Landed and not landed (checked 2026-10-08)
 
-| Piece                                                                            | State                                                                                                   |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, manifests, floor  | landed (`packages/upgrade`, `apps/tasks/src/upgrade.ts`)                                                |
-| Stepping applier (one release's schema at a time) in the real task               | landed for multi-release jumps (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                  |
-| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen         | landed (`packages/upgrade/src/gate`, `packages/upgrade/src/serving-roster`)                             |
-| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals           | landed (`packages/*/src/__tests__/migration-safety.rules.ts`)                                           |
-| `migration-order` CI check, `migration-owners` policy                            | landed (`cmd/migrationorder`, `packages/architecture-enforcer`)                                         |
-| `defineMigrationStep` and `.withMigrations` collection (tasks, worker)           | landed (`packages/upgrade/src/step`, `packages/process/src/migration-steps.ts`)                         |
-| The upgrade task running declared code steps; the worker running background ones | landed (`apps/tasks/src/upgrade.ts`, `packages/upgrade/src/background`)                                 |
-| `.withUpcasts` read-time upcast and drain                                        | landed (`packages/eventing/src/upcast`)                                                                 |
-| Upcast rewrite step, drain-age lint                                              | **not landed** (`@unimplemented` in `packages/eventing/specs/event-upcast.feature`)                     |
-| Re-runnable migration guard rule and the runner's auto-resolve                   | landed (`rerunnable-migrations` policy; `packages/upgrade/src/stepping/rerunnable-migrations.ts`)       |
-| No new foreign key or `@relation` (W-01)                                         | landed (`new-foreign-key` in `packages/prisma-client/src/__tests__/migration-safety.rules.ts`)          |
-| Peer projections for cross-module read models                                    | landed (`packages/eventing/src/projections/peerProjection.ts`, `peer-projection.feature`)               |
-| A lapsed roster entry turning `/readyz` 503 and pausing the worker               | landed for readiness and background steps; queue consumers pause once `packages/eventing` implements it |
+| Piece                                                                      | State                                                                                                                 |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`, floor       | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
+| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `apps/tasks/src/upgrade.ts`)                                                        |
+| Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen   | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
+| No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
+| Prisma and ClickHouse guard scanners, floor check, lock-heavy refusals     | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |
+| `migration-order` CI check, `migration-owners` policy                      | landed (`cmd/migrationorder/main.go`, `packages/architecture-enforcer/src/policies/index.ts`)                         |
+| `defineMigrationStep` and `.withMigrations` collection                     | landed (`packages/upgrade/src/step/migration-step.ts`, `packages/process/src/migration-steps.ts`)                     |
+| The upgrade task running declared blocking steps                           | landed (`app.migrationSteps(isMigrationStep)`, `apps/tasks/src/upgrade.ts`)                                           |
+| The worker running background steps after the serving roster allows it     | landed (`packages/upgrade/src/background/background-steps.service.ts`, `packages/process/src/process-server.ts`)      |
+| `.withUpcasts` read-time upcast, drain, one ledger step per upcast         | landed (`packages/upgrade/src/upcast-steps.ts`, `packages/eventing/specs/event-upcast.feature`)                       |
+| Upcast rewrite step                                                        | **not landed** (three `@unimplemented` scenarios in `packages/eventing/specs/event-upcast.feature`)                   |
+| Drain-age lint (a drain older than one release)                            | **not landed** (record §9 names it; no rule or policy in `packages/oxlint-rules` or the enforcer)                     |
+| Re-runnable migration policy and the runner's auto-resolve                 | landed (`packages/upgrade/src/stepping/rerunnable-migrations.ts`)                                                     |
+| No new foreign key or `@relation` (W-01)                                   | landed (`new-foreign-key` scanner rule; `packages/architecture-enforcer/tests/baselines/prisma-relations.json`)       |
+| Projection replay steps and peer projections                               | landed (`packages/upgrade/src/step/projection-replay-step.ts`, `packages/eventing/src/projections/peerProjection.ts`) |
+| A lapsed roster entry: `/readyz` 503, background steps and consumers pause | landed (`packages/process/src/upgrade-gate.ts`, `pauseConsumers` in `packages/process/src/module-eventing.ts`)        |
+
+## Wrong first moves
+
+What an agent reaches for first, and what to write instead:
+
+- **Renaming an event type by rewriting `event_log`** or adding a new pipeline: declare
+  `.withUpcasts` on the owning pipeline; the ledger step `upcast:<pipeline>:<stored type>` is derived.
+- **`ALTER TABLE ... RENAME COLUMN` or `SET NOT NULL`** from `prisma migrate dev`'s default SQL:
+  generate with `--create-only` and rewrite to expand/contract (`postgres-migration`).
+- **A backfill as a one-shot task, a script or an operator comment**: a `defineMigrationStep` in
+  the owning module's `.withMigrations`, `data`, `background` (`migration-data-step`).
+- **A `DROP` in the same release that stops reading the column**: the drop waits for the floor and
+  carries `-- contract: retired in <release>`; until then it is left out and named in the handoff.
+- **A blocking step that calls a service or the typed Prisma client**: blocking means frozen SQL
+  through the owner's migration repository, or it is background.
+- **Running `pnpm prisma:migrate` or `pnpm clickhouse:migrate`** to apply: they bypass the ledger;
+  `pnpm start:prepare:db` is the path every entry point takes.
 
 ## Never
 
