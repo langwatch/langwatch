@@ -5,7 +5,13 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { lintPeerCycles, peerCycleEdges } from "../src/policies/boundaries/peer-cycles.ts";
+import {
+  keptPeerCycleEdges,
+  lintPeerCycles,
+  peerCycleEdges,
+  peerCycleFindings,
+  type PeerCycleException,
+} from "../src/policies/boundaries/peer-cycles.ts";
 import type { ClassifiedPackage } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -36,6 +42,16 @@ function fixture(features: readonly string[]) {
   );
 
   return { root, write, edges: () => peerCycleEdges({ packages }), packages };
+}
+
+function exception(overrides: Partial<PeerCycleException> = {}): PeerCycleException {
+  return {
+    between: ["a", "b"],
+    owner: "a",
+    reason: "a asks b for a guard",
+    ruling: "a ruling",
+    ...overrides,
+  };
 }
 
 function app({ feature, peers }: { feature: string; peers: readonly string[] }): string {
@@ -100,6 +116,90 @@ describe("peer-cycles", () => {
         ["a", "b"],
         ["b", "a"],
       ]);
+    });
+  });
+
+  describe("given a named exception for a two-module cycle", () => {
+    /** @scenario "A named exception keeps exactly its two-module cycle" */
+    it("reports nothing and keeps both edges", () => {
+      const workspace = fixture(["a", "b"]);
+      workspace.write("modules/a/process/src/app/a.app.ts", app({ feature: "a", peers: ["b"] }));
+      workspace.write("modules/b/process/src/app/b.app.ts", app({ feature: "b", peers: ["a"] }));
+      const exceptions = [exception()];
+
+      expect(peerCycleFindings({ packages: workspace.packages, exceptions })).toEqual([]);
+      expect(
+        keptPeerCycleEdges({ packages: workspace.packages, exceptions }).map((edge) => [
+          edge.from,
+          edge.to,
+        ]),
+      ).toEqual([
+        ["a", "b"],
+        ["b", "a"],
+      ]);
+    });
+  });
+
+  describe("given a named exception whose pair also sits on a longer loop", () => {
+    /** @scenario "A named exception does not hide a longer loop through its pair" */
+    it("reports the longer loop's edges with their way back", () => {
+      const workspace = fixture(["a", "b", "c"]);
+      workspace.write("modules/a/process/src/app/a.app.ts", app({ feature: "a", peers: ["b"] }));
+      workspace.write(
+        "modules/b/process/src/app/b.app.ts",
+        app({ feature: "b", peers: ["a", "c"] }),
+      );
+      workspace.write("modules/c/process/src/app/c.app.ts", app({ feature: "c", peers: ["a"] }));
+      const exceptions = [exception()];
+
+      expect(
+        peerCycleEdges({ packages: workspace.packages, exceptions }).map((edge) => [
+          edge.from,
+          edge.to,
+          edge.back.join(" -> "),
+        ]),
+      ).toEqual([
+        ["a", "b", "b -> c -> a"],
+        ["b", "c", "c -> a -> b"],
+        ["c", "a", "a -> b -> c"],
+      ]);
+      expect(
+        keptPeerCycleEdges({ packages: workspace.packages, exceptions }).map((edge) => edge.from),
+      ).toEqual(["b"]);
+    });
+  });
+
+  describe("given a named exception whose cycle is gone", () => {
+    /** @scenario "A named exception whose modules no longer name each other is reported for deletion" */
+    it("reports the exception", () => {
+      const workspace = fixture(["a", "b"]);
+      workspace.write("modules/a/process/src/app/a.app.ts", app({ feature: "a", peers: ["b"] }));
+
+      expect(
+        peerCycleFindings({ packages: workspace.packages, exceptions: [exception()] }).map(
+          (finding) => finding.message,
+        ),
+      ).toEqual(["The named exception a <-> b no longer names a two-module cycle; delete it."]);
+    });
+  });
+
+  describe("given a named exception missing its owner, reason or ruling", () => {
+    /** @scenario "A named exception without an owner, a reason or a ruling is refused" */
+    it.each([
+      [{ owner: "c" }, "has no owner among its two modules"],
+      [{ reason: " " }, "states no reason"],
+      [{ ruling: "" }, "cites no ruling"],
+    ])("refuses %o", (overrides, problem) => {
+      const workspace = fixture(["a", "b"]);
+      workspace.write("modules/a/process/src/app/a.app.ts", app({ feature: "a", peers: ["b"] }));
+      workspace.write("modules/b/process/src/app/b.app.ts", app({ feature: "b", peers: ["a"] }));
+
+      expect(
+        peerCycleFindings({
+          packages: workspace.packages,
+          exceptions: [exception(overrides)],
+        }).map((finding) => finding.message),
+      ).toEqual([`The named exception a <-> b ${problem}.`]);
     });
   });
 });

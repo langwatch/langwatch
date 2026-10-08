@@ -900,7 +900,8 @@ after boot.
 deleted 2026-10-05, Alex). Refusal is the rule, but today nothing reaches it at boot: the container hands
 every `*Api` token a proxy before any module installs and orders modules without them, so two modules
 naming each other's `*Api` in `static dependencies` boot. The shrink-only list that held this transition
-was deleted on 2026-10-05 (Alex, 2026-10-05): every cycle is now reported and none is allowed. The
+was deleted on 2026-10-05 (Alex, 2026-10-05): every cycle is now reported and none is allowed but the
+one named exception below. The
 `peer-cycles` policy reports every declared peer edge whose peer reaches back, and
 `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` expects the edge list to be empty,
 so it fails until the last cycle is cut. A cycle is cut from the reactor's side, in §9's shape (a
@@ -912,6 +913,11 @@ No peer-cycle edge is cut or listed without asking Alex first (Alex, 2026-10-05)
 gateway holds no `WebhookApi` peer. Workflow's HTTP-credentials backfill is still needed for a while: it
 stays, done another way (workflow walks its own rows; the agents half becomes agent's own task), so
 workflow drops `ProjectApi` and `OrganizationApi` (Alex, 2026-10-05).
+**One named exception: organization <-> identity** (Alex, 2026-10-08, round 29 PC-1): organization asks
+identity for the SSO-test guard (D2) and verified addresses (D4), identity reads membership from organization.
+`PEER_CYCLE_EXCEPTIONS` in the `peer-cycles` policy holds it with owner, reason and ruling. It excuses only
+the two-module loop (a longer loop through the pair is still reported), refuses a malformed entry, reports
+one whose modules no longer name each other, and only shrinks.
 
 Online policy execution (guardrails) is a synchronous capability with an end-to-end deadline and
 cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
