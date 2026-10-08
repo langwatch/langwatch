@@ -18,7 +18,6 @@ import {
   type StoreStoredObjectFromBytesResult,
   type StoredObjectDeliveryAudience,
   type StoredObjectHead,
-  type StoredObjectId,
   type StoredObjectMetadata,
   type StoredObjectReadUrl,
   type StoredObjectReadUrlInput,
@@ -47,6 +46,7 @@ import type {
 } from "../rules/stored-object-file-access.rules.ts";
 import { requiredPermissionForPurpose } from "../rules/stored-object-purpose-permission.rules.ts";
 import { storedObjectMetadataOf } from "../rules/stored-object-view.rules.ts";
+import { StoredObjectCleanupService } from "./stored-object-cleanup.service.ts";
 import type { StoredObjectDelivery } from "./stored-object-delivery.service.ts";
 import { StoredObjectFileReadService } from "./stored-object-file-read.service.ts";
 import type { StoredObjectUploadSignerService } from "./stored-object-upload-signer.service.ts";
@@ -93,9 +93,17 @@ export class StoredObjectService {
 
   private readonly now: () => Instant;
   private readonly uploads: StoredObjectUploadService;
+  private readonly cleanup: StoredObjectCleanupService;
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
     this.now = options.now ?? nowInstant;
+    this.cleanup = StoredObjectCleanupService.create({
+      records: options.records,
+      storage: options.storage,
+      deleteObject: (input) => this.delete(input),
+      cleanupBatchSize: options.cleanupBatchSize,
+      now: this.now,
+    });
     this.uploads = StoredObjectUploadService.create({
       records: options.records,
       storage: options.storage,
@@ -354,7 +362,7 @@ export class StoredObjectService {
     };
     await this.options.records.upsert(deleted);
     if (deleted.storage) {
-      const cleaned = await this.deleteStorageBestEffort({
+      const cleaned = await this.cleanup.deleteStorageBestEffort({
         projectId: input.projectId,
         address: deleted.storage,
       });
@@ -402,114 +410,15 @@ export class StoredObjectService {
   }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
-    let afterId: StoredObjectId | undefined;
-    let deletedObjectCount = 0;
-    let deletedByteLength = 0;
-    const limit = this.options.cleanupBatchSize ?? 100;
-    let isFullPage: boolean;
-    do {
-      const query: {
-        tenantId: string;
-        afterId?: StoredObjectId;
-        limit: number;
-      } = {
-        tenantId: input.projectId,
-        limit,
-      };
-      if (afterId) {
-        query.afterId = afterId;
-      }
-
-      const page = await this.options.records.findPage(query);
-      for (const value of page) {
-        if (value.status !== "deleted") {
-          await this.delete({
-            projectId: input.projectId,
-            id: value.id,
-            idempotencyKey: `project-delete:${input.projectId}:${value.id}`,
-          });
-          deletedObjectCount += 1;
-          deletedByteLength += value.byteLength;
-        }
-      }
-
-      isFullPage = page.length >= limit;
-      afterId = page.at(-1)?.id;
-    } while (isFullPage && afterId);
-
-    return {
-      projectId: input.projectId,
-      deletedObjectCount,
-      deletedByteLength,
-      status: "completed",
-    };
+    return this.cleanup.deleteOwnedBy(input);
   }
 
-  /** Bounded retry for pending uploads that have expired. */
   async cleanupExpiredUploads(input: { projectId: string; limit?: number }): Promise<number> {
-    const now = this.now();
-    const page = await this.options.records.findPage({
-      tenantId: input.projectId,
-      status: "pending",
-      expiresBefore: now,
-      limit: input.limit ?? this.options.cleanupBatchSize ?? 100,
-    });
-    let cleaned = 0;
-    for (const value of page) {
-      if (
-        value.storage &&
-        !(await this.deleteStorageBestEffort({
-          projectId: input.projectId,
-          address: value.storage,
-        }))
-      ) {
-        continue;
-      }
-
-      await this.options.records.upsert({
-        ...value,
-        status: "failed",
-        storage: null,
-        updatedAt: now,
-      });
-      cleaned += 1;
-    }
-
-    return cleaned;
+    return this.cleanup.cleanupExpiredUploads(input);
   }
 
-  /** Bounded retry for provider deletion after logical deletion won. */
   async cleanupDeletedObjects(input: { projectId: string; limit?: number }): Promise<number> {
-    const now = this.now();
-    const page = await this.options.records.findPage({
-      tenantId: input.projectId,
-      status: "deleted",
-      limit: input.limit ?? this.options.cleanupBatchSize ?? 100,
-    });
-    let cleaned = 0;
-    for (const value of page) {
-      if (!value.storage) {
-        continue;
-      }
-
-      if (
-        !(await this.deleteStorageBestEffort({
-          projectId: input.projectId,
-          address: value.storage,
-        }))
-      ) {
-        continue;
-      }
-
-      await this.options.records.upsert({
-        ...value,
-        storage: null,
-        updatedAt: now,
-      });
-      cleaned += 1;
-    }
-
-    return cleaned;
+    return this.cleanup.cleanupDeletedObjects(input);
   }
 
   private async getAvailable(input: {
@@ -549,18 +458,5 @@ export class StoredObjectService {
     }
 
     return value.storage;
-  }
-
-  private async deleteStorageBestEffort(input: {
-    projectId: string;
-    address: StoredObjectStorageAddress;
-  }): Promise<boolean> {
-    try {
-      await this.options.storage.delete(input);
-
-      return true;
-    } catch {
-      return false;
-    }
   }
 }

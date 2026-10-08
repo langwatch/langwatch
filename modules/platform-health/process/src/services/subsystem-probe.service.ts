@@ -11,6 +11,12 @@ import { type CanaryTransport, HealthCheckFailedError } from "@langwatch/platfor
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { SubsystemProbeChannel } from "../channels/subsystem-probe.channel.ts";
+import {
+  canaryHeaders,
+  otelCanaryPayload,
+  readbackHeaders,
+  restCanaryPayload,
+} from "../rules/subsystem-probe-canary.rules.ts";
 
 const probesLogger = createLogger("langwatch:platform-health:probes");
 
@@ -51,21 +57,6 @@ interface ProbeCredential {
   readonly signal: AbortSignal | undefined;
 }
 
-function canaryHeaders(authToken: string, projectId: string | null): Record<string, string> {
-  return {
-    "X-Auth-Token": authToken,
-    ...(projectId === null ? {} : { "X-Project-Id": projectId }),
-    "Content-Type": "application/json",
-  };
-}
-
-function readbackHeaders(authToken: string, projectId: string | null): Record<string, string> {
-  return {
-    "X-Auth-Token": authToken,
-    ...(projectId === null ? {} : { "X-Project-Id": projectId }),
-  };
-}
-
 /** What the probes reach that they do not own. */
 export interface SubsystemProbeCollaborators {
   /** The deployment's public origin, which every canary is posted back through. */
@@ -82,26 +73,6 @@ export interface SubsystemProbeCollaborators {
   /** Whether the project has the workflow the workflow probe was pointed at. */
   workflowExists(input: { workflowId: string; projectId: string }): Promise<boolean>;
 }
-
-/** The OTLP body a canary is sent as, written out rather than borrowed. */
-type CanaryOtelPayload = Readonly<{
-  resourceSpans: readonly {
-    resource: { attributes: readonly { key: string; value: { stringValue: string } }[] };
-    scopeSpans: readonly {
-      scope: { name: string };
-      spans: readonly {
-        traceId: string;
-        spanId: string;
-        name: string;
-        kind: string;
-        startTimeUnixNano: string;
-        endTimeUnixNano: string;
-        attributes: readonly { key: string; value: { stringValue: string } }[];
-        status: Record<string, never>;
-      }[];
-    }[];
-  }[];
-}>;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -345,19 +316,14 @@ export class SubsystemProbeService {
       path: "/api/collector",
       headers: canaryHeaders(authToken, projectId),
       signal,
-      body: JSON.stringify({
-        spans: [
-          {
-            trace_id: traceId,
-            span_id: generate(SPAN_KSUID_RESOURCE).toString(),
-            type: "span",
-            input: { type: "text", value: input },
-            output: { type: "text", value: "\u{1F4AF}" },
-            timestamps: { started_at: now, finished_at: now },
-          },
-        ],
-        metadata: { canary: true },
-      }),
+      body: JSON.stringify(
+        restCanaryPayload({
+          traceId,
+          input,
+          now,
+          spanId: generate(SPAN_KSUID_RESOURCE).toString(),
+        }),
+      ),
     });
   }
 
@@ -376,37 +342,13 @@ export class SubsystemProbeService {
     model?: string;
   }): Promise<Response> {
     const nanos = (nowInstant().epochMilliseconds * 1000 * 1000).toString();
-    const payload: CanaryOtelPayload = {
-      resourceSpans: [
-        {
-          resource: { attributes: [{ key: "metadata.canary", value: { stringValue: "true" } }] },
-          scopeSpans: [
-            {
-              scope: { name: "opentelemetry.langwatch.health_check" },
-              spans: [
-                {
-                  traceId,
-                  spanId: Buffer.from(randomBytes(8).toString("hex"), "hex").toString("base64"),
-                  name: "Health check",
-                  kind: "SPAN_KIND_INTERNAL",
-                  startTimeUnixNano: nanos,
-                  endTimeUnixNano: nanos,
-                  attributes: [
-                    ...(model === undefined
-                      ? []
-                      : [{ key: "gen_ai.request.model", value: { stringValue: model } }]),
-                    { key: "gen_ai.prompt.0.role", value: { stringValue: "user" } },
-                    { key: "gen_ai.prompt.0.content.0.text", value: { stringValue: input } },
-                    { key: "gen_ai.completion.0.text", value: { stringValue: "\u{1F4AF}" } },
-                  ],
-                  status: {},
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
+    const payload = otelCanaryPayload({
+      traceId,
+      input,
+      model,
+      nanos,
+      spanId: Buffer.from(randomBytes(8).toString("hex"), "hex").toString("base64"),
+    });
 
     return this.#sendCanary({
       probe,
