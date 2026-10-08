@@ -43045,6 +43045,141 @@
         }
       }
     },
+    "/api/v1/workflows/{id}/evaluate": {
+      "post": {
+        "operationId": "postApiWorkflowsByIdEvaluate",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "run_id": {
+                      "type": "string"
+                    },
+                    "run_url": {
+                      "type": "string"
+                    },
+                    "workflow_version_id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "run_id",
+                    "run_url",
+                    "workflow_version_id",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The workflow has no committed version, or the run could not start",
+            "content": {}
+          },
+          "403": {
+            "description": "The API key cannot read the evaluation run it would start",
+            "content": {}
+          },
+          "404": {
+            "description": "The project holds no such workflow or dataset",
+            "content": {}
+          },
+          "422": {
+            "description": "The body failed validation",
+            "content": {}
+          }
+        },
+        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version_id": {
+                    "description": "Committed version to evaluate; defaults to the latest commit",
+                    "type": "string"
+                  },
+                  "data": {
+                    "description": "Inline rows to evaluate instead of the workflow's attached dataset",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "dataset_id": {
+                    "description": "Platform dataset id to evaluate; mutually exclusive with data",
+                    "type": "string"
+                  },
+                  "parameters": {
+                    "description": "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "row_indices": {
+                    "description": "Subset of dataset row indices to evaluate",
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "project_api_key"
+          ],
+          "permissions": [
+            "workflows:create",
+            "evaluations:view"
+          ]
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/v1/agent-cache/{name}": {
       "get": {
         "operationId": "getApiAgentCacheByName",
@@ -109284,141 +109419,6 @@
           ],
           "permissions": [
             "workflows:manage"
-          ]
-        },
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true
-          }
-        ]
-      }
-    },
-    "/api/v1/workflows/{id}/evaluate": {
-      "post": {
-        "operationId": "postApiWorkflowsByIdEvaluate",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "run_id": {
-                      "type": "string"
-                    },
-                    "run_url": {
-                      "type": "string"
-                    },
-                    "workflow_version_id": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "run_id",
-                    "run_url",
-                    "workflow_version_id",
-                    "version"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The workflow has no committed version, or the run could not start",
-            "content": {}
-          },
-          "403": {
-            "description": "The API key cannot read the evaluation run it would start",
-            "content": {}
-          },
-          "404": {
-            "description": "The project holds no such workflow or dataset",
-            "content": {}
-          },
-          "422": {
-            "description": "The body failed validation",
-            "content": {}
-          }
-        },
-        "description": "Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser.",
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "version_id": {
-                    "description": "Committed version to evaluate; defaults to the latest commit",
-                    "type": "string"
-                  },
-                  "data": {
-                    "description": "Inline rows to evaluate instead of the workflow's attached dataset",
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "additionalProperties": {}
-                    }
-                  },
-                  "dataset_id": {
-                    "description": "Platform dataset id to evaluate; mutually exclusive with data",
-                    "type": "string"
-                  },
-                  "parameters": {
-                    "description": "Constant entry inputs applied to every row, e.g. a feature flag or PR number",
-                    "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
-                    "additionalProperties": {
-                      "type": [
-                        "string",
-                        "number",
-                        "boolean"
-                      ]
-                    }
-                  },
-                  "row_indices": {
-                    "description": "Subset of dataset row indices to evaluate",
-                    "type": "array",
-                    "items": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "project_api_key": []
-          }
-        ],
-        "x-access-policy": {
-          "kind": "handlerManaged",
-          "credential": [
-            "project_api_key"
-          ],
-          "permissions": [
-            "workflows:create",
-            "evaluations:view"
           ]
         },
         "parameters": [

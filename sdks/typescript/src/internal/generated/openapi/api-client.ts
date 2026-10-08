@@ -1756,6 +1756,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/{id}/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser. */
+        post: operations["postApiWorkflowsByIdEvaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-cache/{name}": {
         parameters: {
             query?: never;
@@ -5162,23 +5179,6 @@ export interface paths {
         head?: never;
         /** @description Update a workflow's metadata (name, icon, description) */
         patch: operations["patchApiWorkflowsById"];
-        trace?: never;
-    };
-    "/api/v1/workflows/{id}/evaluate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser. */
-        post: operations["postApiWorkflowsByIdEvaluate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/v1/optimization/{workflowId}/{versionId}": {
@@ -17802,6 +17802,80 @@ export interface operations {
                 content: {
                     "text/plain": string;
                 };
+            };
+        };
+    };
+    postApiWorkflowsByIdEvaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Committed version to evaluate; defaults to the latest commit */
+                    version_id?: string;
+                    /** @description Inline rows to evaluate instead of the workflow's attached dataset */
+                    data?: {
+                        [key: string]: unknown;
+                    }[];
+                    /** @description Platform dataset id to evaluate; mutually exclusive with data */
+                    dataset_id?: string;
+                    /** @description Constant entry inputs applied to every row, e.g. a feature flag or PR number */
+                    parameters?: {
+                        [key: string]: string | number | boolean;
+                    };
+                    /** @description Subset of dataset row indices to evaluate */
+                    row_indices?: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        run_id: string;
+                        run_url: string;
+                        workflow_version_id: string;
+                        version: string;
+                    };
+                };
+            };
+            /** @description The workflow has no committed version, or the run could not start */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The API key cannot read the evaluation run it would start */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The project holds no such workflow or dataset */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The body failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -39623,80 +39697,6 @@ export interface operations {
             };
             /** @description The project holds no workflow with this id */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    postApiWorkflowsByIdEvaluate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** @description Committed version to evaluate; defaults to the latest commit */
-                    version_id?: string;
-                    /** @description Inline rows to evaluate instead of the workflow's attached dataset */
-                    data?: {
-                        [key: string]: unknown;
-                    }[];
-                    /** @description Platform dataset id to evaluate; mutually exclusive with data */
-                    dataset_id?: string;
-                    /** @description Constant entry inputs applied to every row, e.g. a feature flag or PR number */
-                    parameters?: {
-                        [key: string]: string | number | boolean;
-                    };
-                    /** @description Subset of dataset row indices to evaluate */
-                    row_indices?: number[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        run_id: string;
-                        run_url: string;
-                        workflow_version_id: string;
-                        version: string;
-                    };
-                };
-            };
-            /** @description The workflow has no committed version, or the run could not start */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The API key cannot read the evaluation run it would start */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The project holds no such workflow or dataset */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The body failed validation */
-            422: {
                 headers: {
                     [name: string]: unknown;
                 };
