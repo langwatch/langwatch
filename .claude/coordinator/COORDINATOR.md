@@ -70,32 +70,41 @@ orchestrator and lanes run on Opus 5.5 (`claude-opus-5-5`), with effort pinned
 by the agent type you spawn, so the spawn is the enforcement. Sonnet and
 Haiku remain for really simple work, to save usage:
 
-| Agent type           | Effort | Use for                                                                                                 |
-| -------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| `lane-opus`          | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.  |
-| `lane-opus-medium`   | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps. |
-| `lane-opus-low`      | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                     |
-| `lane-sonnet`        | high   | Sonnet 5.5: big implementation lanes, scoped fixes, flow and test-id work.                              |
-| `lane-sonnet-medium` | medium | Sonnet 5.5: pattern-following UI, test-id sweeps, probe cases.                                          |
-| `lane-sonnet-low`    | low    | Sonnet 5.5: renames, one-line wiring, formatting-only work.                                             |
-| `lane` + `haiku`     | -      | The simplest: file inventories, narrow validation, formatting, repetitive checks.                       |
+| Agent type           | Effort | Use for                                                                                                     |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------- |
+| `lane-opus-xhigh`    | xhigh  | The hardest lanes: peer-cycle and architecture cuts, security, authz and tenancy, cross-module integration. |
+| `lane-opus`          | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.      |
+| `lane-opus-medium`   | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps.     |
+| `lane-opus-low`      | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                         |
+| `lane-sonnet`        | high   | Sonnet 5.5: big scoped implementation lanes with a clear acceptance test.                                   |
+| `lane-sonnet-medium` | medium | Sonnet 5.5: well-scoped fixes, pattern-following UI, test-id sweeps, probe cases, first drafts of docs.     |
+| `lane-sonnet-low`    | low    | Sonnet 5.5: renames, one-line wiring, formatting-only work.                                                 |
+| `lane-haiku`         | medium | Haiku 5.5: well-defined mechanical edits with a clear check: inventories, codemod follow-ups, sweeps.       |
+| `lane-haiku-low`     | low    | Haiku 5.5: file inventories, narrow validation, formatting, repetitive checks, summaries.                   |
 
 Opus 5.5 is the default; reach for Sonnet or Haiku only when the task has no
 judgement left in it. A manifest's `Model:` line names one of these. Opus 5.5 needs
 Claude Code 2.1.280 or newer; an older CLI refuses the model at the API.
-Spawn the `lane-sonnet*` agents with no model parameter: `model: "sonnet"` overrides
-the pinned Sonnet 5.5 down to Sonnet 5 (Alex, 2026-09-29).
+Spawn the `lane-sonnet*` and `lane-haiku*` agents with no model parameter: `model: "sonnet"`
+overrides the pinned Sonnet 5.5 down to Sonnet 5 (Alex, 2026-09-29), and `model: "haiku"`
+may resolve to an older Haiku.
+
+Sonnet 5.5 earns its place at low and medium effort, where it costs a fraction of Opus
+per task; at high effort it costs about what Opus does, so judgement-heavy work goes
+to Opus rather than to Sonnet pushed high. Haiku 5.5 (2026-10-07, the first Haiku with
+effort) is the cheap subagent for well-defined subtasks an Opus coordinator planned; it
+trails Sonnet on complex coding, so it never gets a task with a design choice in it.
 
 **How to spawn one.** Write the manifest, then add the lane's row to
 `.claude/coordinator/LANES.md` **before** the Agent call - a lane spawned and
 not recorded is precisely the one a rotating coordinator loses - then start it
-with the Agent tool: `subagent_type` set to the `lane-opus*` type the manifest names, and a
+with the Agent tool: `subagent_type` set to the lane type the manifest names, and a
 prompt built from the paste in `.claude/coordinator/LANE.md` with the manifest
 and handoff paths filled in. Choosing the type is the whole of enforcement:
 the type pins the model and the effort, so nothing depends on remembering a
 parameter.
 
-The three types are defined in `.claude/agents/lane-opus*.md` (the model-free
+The lane types are defined in `.claude/agents/lane-{opus,sonnet,haiku}*.md` (the model-free
 `lane.md` remains for other sessions' use). Each carries a restricted tool list: a lane gets
 Read, Write, Edit, Bash, Grep, Glob and Skill, and **no Agent tool**. That makes
 "no subagents, no forks" a constraint rather than a sentence a lane can overlook,
