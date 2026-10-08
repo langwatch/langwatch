@@ -50,5 +50,5 @@ Feature: A folder is one concept and a file is one readable part
     Given a source file shorter than the fragment floor is the target of an exports entry in its own package.json
     And only its own folder reads it
     When architecture lint checks the workspace
-    Then it reports nothing, because other packages read it by its published name
+    Then it reports nothing, because an export target is a deliberate public entry point (ruling SF-2)
     And an unexported small file beside it is still reported
